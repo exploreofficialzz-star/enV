@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --color-bg: #f7f6f3;
+  --color-fg: #16181d;
+  --color-muted: #5c636c;
+  --color-subtle: #8a9098;
+  --color-surface: #ffffff;
+  --color-surface-2: #efece6;
+  --color-border: #e4e0d8;
+  --color-border-strong: #cfc9bd;
+  --color-accent: #0d9f8a;
+  --color-accent-fg: #ffffff;
+  --color-accent-soft: #d8f3ee;
+  --color-ink: #16181d;
+  --color-danger: #b42318;
+  --color-warn: #b54708;
+  --color-ok: #027a48;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+
+  --shadow-border:
+    0px 0px 0px 1px rgba(22, 24, 29, 0.06),
+    0px 1px 2px -1px rgba(22, 24, 29, 0.06),
+    0px 2px 8px 0px rgba(22, 24, 29, 0.04);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark {
+  --color-bg: #101214;
+  --color-fg: #eef0f2;
+  --color-muted: #a7adb4;
+  --color-subtle: #7c848c;
+  --color-surface: #171b1e;
+  --color-surface-2: #1e2327;
+  --color-border: #2a3036;
+  --color-border-strong: #3c444c;
+  --color-accent: #2ec4b6;
+  --color-accent-fg: #06211e;
+  --color-accent-soft: #14332f;
+  --color-ink: #eef0f2;
+  --color-danger: #f97066;
+  --color-warn: #fdb022;
+  --color-ok: #32d583;
+  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+@layer base {
+  :root {
+    --accent-color: var(--color-accent);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 28%, white);
+    color: var(--color-fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
