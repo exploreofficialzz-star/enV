@@ -190,6 +190,23 @@ export const CATEGORIES: CategoryMeta[] = [
     blurb: "Drop a screenshot into a clean device frame.",
     icon: "Smartphone",
   },
+  { id: "interactive", name: "Interactive Experiences", description: "Build small interactive pages, quizzes, reveals, and shareable experiences.", blurb: "Create interactive experiences without starting from scratch.", icon: "Sparkles" },
+  { id: "celebrations", name: "Celebrations", description: "Birthday, anniversary, graduation, appreciation, and celebration generators.", blurb: "Create memorable digital surprises and celebration pages.", icon: "PartyPopper" },
+  { id: "relationships", name: "Relationships & Social", description: "Playful, respectful tools for messages, questions, quizzes, and surprises.", blurb: "Questions, messages, quizzes, and interactive surprises.", icon: "Heart" },
+  { id: "events", name: "Events", description: "Invitations, RSVP pages, countdowns, schedules, tickets, and event helpers.", blurb: "Plan and present events simply.", icon: "Calendar" },
+  { id: "gaming", name: "Gaming", description: "Game utilities, character tools, randomizers, brackets, scores, and stream helpers.", blurb: "Tools for players, creators, and game communities.", icon: "Gamepad2" },
+  { id: "photography", name: "Photography", description: "Photo dimensions, print sizing, exposure, camera, and image planning utilities.", blurb: "Practical tools for photographers and creators.", icon: "Camera" },
+  { id: "travel", name: "Travel", description: "Travel planning, budgeting, time zones, packing, fuel, and itinerary utilities.", blurb: "Plan trips with practical calculations and generators.", icon: "Plane" },
+  { id: "food", name: "Food & Cooking", description: "Recipe scaling, kitchen conversions, meal planning, and cooking calculators.", blurb: "Scale recipes and convert kitchen measurements.", icon: "Utensils" },
+  { id: "career", name: "Career", description: "Resume, CV, interview, salary, portfolio, and job-search utilities.", blurb: "Practical tools for career preparation.", icon: "BriefcaseBusiness" },
+  { id: "ecommerce", name: "E-commerce", description: "Product, pricing, inventory, shipping, catalog, and store utilities.", blurb: "Tools for online stores and product businesses.", icon: "ShoppingCart" },
+  { id: "accessibility", name: "Accessibility", description: "Accessibility checks and helpers for websites, documents, and interfaces.", blurb: "Make digital experiences easier to use.", icon: "Accessibility" },
+  { id: "webdesign", name: "Web Design", description: "CSS, layout, typography, responsive design, and design-system helpers.", blurb: "Build clean interfaces faster.", icon: "PanelsTopLeft" },
+  { id: "marketing", name: "Marketing", description: "Campaign, copy, pricing, content, and marketing planning utilities.", blurb: "Practical marketing utilities for creators and businesses.", icon: "Megaphone" },
+  { id: "streaming", name: "Streaming", description: "Streaming setup, bitrate, resolution, schedule, and creator utilities.", blurb: "Tools for livestreamers and video creators.", icon: "Radio" },
+  { id: "communication", name: "Communication", description: "Message, email, meeting, sharing, and communication helpers.", blurb: "Create and format communication quickly.", icon: "MessageCircle" },
+  { id: "personal", name: "Personal Utilities", description: "Everyday personal planning, organization, decision, and life utilities.", blurb: "Small tools for everyday tasks.", icon: "UserRound" },
+
 ];
 
 export const CATEGORY_MAP = Object.fromEntries(

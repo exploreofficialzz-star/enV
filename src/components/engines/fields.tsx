@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 export type UiField = {
   name: string;
   label: string;
-  type?: "number" | "text" | "select" | "textarea" | "color" | "date" | "time";
+  type?: "number" | "text" | "select" | "textarea" | "color" | "date" | "time" | "datetime-local";
   suffix?: string;
   options?: { value: string; label: string }[];
   defaultValue?: string | number;

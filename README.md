@@ -63,3 +63,8 @@ Never prefix secrets with `VITE_` and never commit their values. Keep preview an
 ## Privacy and security
 
 The project does not require an account for its browser-based utilities. Keep file handling local to the browser unless a specific feature clearly requires server processing. Review changes to authentication, migrations, and external network requests carefully.
+
+
+## Category 20 — AI micro-tools
+
+The AI micro-tools category provides local, deterministic writing templates for titles, captions, bios, product copy, email drafts, prompts, alt text, SEO descriptions, resume bullets, outlines, CTAs, hooks, FAQs, meeting notes, rewriting, shortening, expansion, decision worksheets, ideas, and content briefs. These tools do not call an AI provider or upload user text.

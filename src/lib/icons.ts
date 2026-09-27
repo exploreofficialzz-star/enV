@@ -26,6 +26,7 @@ import {
   Type,
   Video,
   Wand2,
+  PartyPopper, Heart, Gamepad2, Camera, Plane, Utensils, BriefcaseBusiness, ShoppingCart, Accessibility, PanelsTopLeft, Megaphone, Radio, MessageCircle, UserRound,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -58,6 +59,7 @@ const MAP: Record<string, LucideIcon> = {
   Type,
   Video,
   Wand2,
+  PartyPopper, Heart, Gamepad2, Camera, Plane, Utensils, BriefcaseBusiness, ShoppingCart, Accessibility, PanelsTopLeft, Megaphone, Radio, MessageCircle, UserRound,
   Wrench,
 };
 

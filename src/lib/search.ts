@@ -75,7 +75,7 @@ export function scoreTool(tool: ToolMeta, query: string): number {
 
 export function searchTools(tools: ToolMeta[], query: string, limit = 40): ToolMeta[] {
   const q = query.trim();
-  const pool = tools.filter((t) => t.status !== "planned");
+  const pool = tools;
   if (!q) {
     return [...pool].sort((a, b) => b.popularity - a.popularity).slice(0, limit);
   }

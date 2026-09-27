@@ -26,6 +26,22 @@ export const CATEGORY_IDS = [
   "audio",
   "mockups",
   "screenshots",
+  "interactive",
+  "celebrations",
+  "relationships",
+  "events",
+  "gaming",
+  "photography",
+  "travel",
+  "food",
+  "career",
+  "ecommerce",
+  "accessibility",
+  "webdesign",
+  "marketing",
+  "streaming",
+  "communication",
+  "personal",
 ] as const;
 
 export type CategoryId = (typeof CATEGORY_IDS)[number];
@@ -41,7 +57,14 @@ export type DisclaimerKind =
 
 export type EngineRef =
   | { type: "calculator"; formula: string }
-  | { type: "converter"; system: string }
+  | { type: "converter"; system: string; mode?: "standard" | "table" | "quick" | "comparison" | "reference" }
+  | { type: "file-converter"; op: string }
+  | { type: "mime"; op: string }
+  | { type: "security"; op: string }
+  | { type: "creator"; op: string }
+  | { type: "business"; op: string }
+  | { type: "audio"; op: string }
+  | { type: "network"; op: string }
   | { type: "text"; op: string }
   | { type: "generator"; op: string }
   | { type: "codec"; op: string }
@@ -58,6 +81,7 @@ export type EngineRef =
   | { type: "document"; op: string }
   | { type: "pdf"; op: string }
   | { type: "ai"; op: string }
+  | { type: "developer"; op: string }
   | { type: "custom"; id: string };
 
 export interface ToolMeta {

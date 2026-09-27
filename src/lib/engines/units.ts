@@ -270,6 +270,37 @@ const COOKING: Unit[] = [
   u("stick", "Stick of butter", 113.4),
 ];
 
+const DENSITY: Unit[] = [
+  u("kg-m3", "Kilogram per cubic metre", 1),
+  u("g-cm3", "Gram per cubic centimetre", 1000),
+  u("g-ml", "Gram per millilitre", 1000),
+  u("kg-l", "Kilogram per litre", 1),
+  u("lb-ft3", "Pound per cubic foot", 16.01846337),
+  u("lb-in3", "Pound per cubic inch", 27679.9047),
+  u("lb-gal-us", "Pound per US gallon", 119.826427),
+  u("oz-in3", "Ounce per cubic inch", 1729.99404),
+];
+
+const FLOW_RATE: Unit[] = [
+  u("m3-s", "Cubic metre per second", 1),
+  u("l-s", "Litre per second", 0.001),
+  u("l-min", "Litre per minute", 0.001 / 60),
+  u("l-h", "Litre per hour", 0.001 / 3600),
+  u("ml-s", "Millilitre per second", 1e-6),
+  u("gpm-us", "US gallon per minute", 0.003785411784 / 60),
+  u("gph-us", "US gallon per hour", 0.003785411784 / 3600),
+  u("cfm", "Cubic foot per minute", 0.028316846592 / 60),
+  u("cfs", "Cubic foot per second", 0.028316846592),
+];
+
+const PIXELS: Unit[] = [
+  u("px", "Pixel (px)", 1),
+  u("pt", "Point (pt)", 96 / 72),
+  u("pc", "Pica (pc)", 16),
+  u("dp", "Density-independent pixel (dp)", 1),
+  u("sp", "Scale-independent pixel (sp)", 1),
+];
+
 const SHOE_US_M: Record<string, number> = {
   "3.5": 35.5, "4": 36, "4.5": 36.5, "5": 37, "5.5": 37.5, "6": 38.5, "6.5": 39,
   "7": 40, "7.5": 40.5, "8": 41, "8.5": 42, "9": 42.5, "9.5": 43, "10": 44,
@@ -385,6 +416,10 @@ export const systems: Record<string, System> = {
   clothing: sys("clothing", "Clothing size", CLOTHING),
   paper: sys("paper", "Paper size", PAPER),
   dpi: sys("dpi", "DPI / PPI", DPI),
+  density: sys("density", "Density", DENSITY),
+  "flow-rate": sys("flow-rate", "Flow rate", FLOW_RATE),
+  "fuel-economy": sys("fuel-economy", "Fuel economy", FUEL),
+  pixels: sys("pixels", "Pixels & CSS units", PIXELS),
 };
 
 function findUnit(system: System, id: string): Unit | undefined {

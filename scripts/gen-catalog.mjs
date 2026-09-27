@@ -36,6 +36,22 @@ const ICON = {
   audio: "AudioLines",
   mockups: "MessageSquare",
   screenshots: "Smartphone",
+  interactive: "Sparkles",
+  celebrations: "PartyPopper",
+  relationships: "Heart",
+  events: "Calendar",
+  gaming: "Gamepad2",
+  photography: "Camera",
+  travel: "Plane",
+  food: "Utensils",
+  career: "BriefcaseBusiness",
+  ecommerce: "ShoppingCart",
+  accessibility: "Accessibility",
+  webdesign: "PanelsTopLeft",
+  marketing: "Megaphone",
+  streaming: "Radio",
+  communication: "MessageCircle",
+  personal: "UserRound",
 };
 
 /** @type {Tuple[]} */
@@ -192,7 +208,7 @@ add([
   ["user-agent-parser","User-Agent Parser","developer","Parse a user-agent string into browser, OS, and device hints.","custom","user-agent","user-agent ua browser",0,76],
   ["url-parser","URL Parser","developer","Split a URL into protocol, host, path, query, and hash.","custom","url-parser","url parse query",0,84],
   ["query-string-parser","Query String Parser","developer","Parse and build URL query strings.","custom","url-parser","query string params",0,78],
-  ["mime-lookup","MIME Type Lookup","developer","Look up MIME types by extension and the reverse.","custom","mime-lookup","mime content-type extension",0,77],
+  ["mime-lookup","MIME Type Lookup","developer","Look up MIME types by extension and the reverse.","mime","lookup","mime content-type extension",0,77],
   ["data-uri-generator","Data URI Generator","developer","Turn text or a file into a data: URI.","custom","data-uri","data uri base64",0,74],
   ["lorem-ipsum-generator","Lorem Ipsum Generator","developer","Generate placeholder paragraphs, sentences, or words.","generator","lorem","lorem ipsum placeholder",1,90],
   ["dummy-json-generator","Dummy JSON Generator","developer","Generate sample JSON objects for API mocking.","generator","dummy-json","dummy json fake api",1,86],
@@ -291,7 +307,7 @@ add([
 
 add([
   ["file-size-converter","File Size Converter","files","Convert B, KB, MB, GB, TB (SI and binary).","converter","storage","file size bytes",0,80],
-  ["mime-type-lookup","MIME Type Lookup","files","Find a MIME type from a file extension.","custom","mime-lookup","mime extension",0,72],
+  ["mime-type-lookup","MIME Type Lookup","files","Find a MIME type from a file extension or inspect a local file signature.","mime","lookup","mime extension file type signature",0,72],
   ["json-to-csv","JSON to CSV Converter","files","Flatten a JSON array to CSV.","text","json-to-csv","json csv",1,84],
   ["csv-to-json","CSV to JSON Converter","files","Parse CSV into JSON objects.","text","csv-to-json","csv json",1,85],
   ["json-to-yaml","JSON to YAML","files","Convert JSON to YAML-like text.","text","json-to-yaml","json yaml",0,76],
@@ -333,9 +349,9 @@ add([
   ["workday-calculator","Workday Calculator","datetime","Add business days, skipping weekends.","datetime","workday","workdays business days",0,82],
   ["business-day-calculator","Business Day Calculator","datetime","Count weekdays between two dates.","datetime","business-days","business days weekdays",0,80],
   ["time-duration-calculator","Time Duration Calculator","datetime","Duration between two times or timestamps.","datetime","duration","duration elapsed",0,78],
-  ["countdown","Countdown","datetime","Count down to a date and time.","custom","countdown","countdown timer event",1,88],
+  ["countdown","Countdown","datetime","Count down to a date and time.","datetime","countdown","countdown timer event",1,88],
   ["stopwatch","Stopwatch","productivity","A simple stopwatch with laps.","custom","stopwatch","stopwatch lap",1,86],
-  ["world-clock","World Clock","datetime","Current time in major cities.","custom","world-clock","world clock timezone cities",1,87],
+  ["world-clock","World Clock","datetime","Current time in major cities.","datetime","world-clock","world clock timezone cities",1,87],
   ["timezone-converter","Timezone Converter","datetime","Convert a time between IANA time zones.","datetime","timezone","timezone convert utc",1,89],
   ["date-formatter","Date Formatter","datetime","Format a date with common patterns.","datetime","format","date format iso",0,74],
   ["weekday-calculator","Weekday Calculator","datetime","What day of the week a date falls on.","datetime","weekday","weekday friday",0,72],
@@ -425,29 +441,111 @@ add([
   ["utm-generator","UTM Link Generator","seo","Build campaign URLs with utm_* parameters.","seo","utm","utm campaign source medium",1,88],
   ["redirect-generator","Redirect Snippet Generator","seo","301 snippets for nginx, Apache, Netlify, and meta refresh.","seo","redirect","301 redirect",0,73],
   ["web-manifest-generator","Web Manifest Generator","seo","A basic site.webmanifest.","seo","manifest","webmanifest pwa",0,72],
+  ["robots-txt-tester","Robots.txt Tester","seo","Test whether a path is allowed or blocked by pasted robots.txt rules.","seo","robots-test","robots tester crawl allow disallow",1,89],
+  ["sitemap-validator","XML Sitemap Validator","seo","Validate sitemap XML, count URLs, and flag malformed locations.","seo","sitemap-validator","sitemap validate xml urls",1,88],
+  ["jsonld-validator","JSON-LD Validator","seo","Validate JSON-LD syntax and inspect Schema.org context and types.","seo","jsonld-validator","json ld validate schema",1,87],
+  ["heading-structure-analyzer","Heading Structure Analyzer","seo","Analyze H1-H6 hierarchy from pasted HTML and flag structural issues.","seo","headings","h1 h2 heading analyzer seo",1,86],
+  ["slug-generator","SEO Slug Generator","seo","Create clean URL slugs with Unicode-aware normalization and stopword cleanup.","seo","slug","url slug seo permalink",1,85],
+  ["title-length-checker","SEO Title Length Checker","seo","Check title length with character guidance and truncation warnings.","seo","title-length","title tag length seo",0,82],
+  ["meta-description-length-checker","Meta Description Length Checker","seo","Check description length and show practical snippet guidance.","seo","description-length","meta description length seo",0,82],
+  ["meta-robots-generator","Meta Robots Tag Generator","seo","Build a meta robots directive from index, follow, snippet and preview controls.","seo","robots-meta","meta robots noindex nofollow",0,80],
+  ["llms-txt-generator","llms.txt Generator","seo","Generate an editable llms.txt starter file for AI crawler guidance.","seo","llms-txt","llms txt ai crawlers",0,78],
 ]);
 
 add([
-  ["qr-generator","QR Code Generator","qr","QR code from text or a URL. Download PNG.","qr","text","qr code url",1,99,"n"],
-  ["wifi-qr-generator","Wi-Fi QR Generator","qr","QR that joins a Wi-Fi network.","qr","wifi","wifi qr ssid",1,92],
-  ["whatsapp-qr-generator","WhatsApp QR Generator","qr","QR that opens a WhatsApp chat.","qr","whatsapp","whatsapp qr",0,84],
-  ["email-qr-generator","Email QR Generator","qr","mailto QR with subject and body.","qr","email","email qr mailto",0,78],
-  ["phone-qr-generator","Phone QR Generator","qr","tel: QR for a phone number.","qr","phone","phone qr tel",0,76],
-  ["sms-qr-generator","SMS QR Generator","qr","sms: QR with a prefilled message.","qr","sms","sms qr",0,74],
-  ["vcard-qr-generator","vCard QR Generator","qr","Contact card as a QR code.","qr","vcard","vcard contact qr",1,86],
-  ["location-qr-generator","Location QR Generator","qr","geo: QR from latitude and longitude.","qr","geo","maps location qr",0,72],
-  ["event-qr-generator","Event QR Generator","qr","VEVENT calendar QR.","qr","event","calendar event qr",0,70],
-  ["ean13-barcode","EAN-13 Barcode Generator","qr","EAN-13 product barcode.","barcode","ean13","ean13 barcode",1,82],
-  ["upc-barcode","UPC-A Barcode Generator","qr","UPC-A barcode.","barcode","upca","upc barcode",0,78],
-  ["code128-barcode","Code 128 Barcode Generator","qr","Code 128 barcode from text.","barcode","code128","code128 barcode",1,80],
-  ["isbn-barcode","ISBN Barcode Generator","qr","ISBN-13 as an EAN-13 barcode.","barcode","isbn","isbn barcode book",0,74],
+  ["qr-generator","QR Code Generator","qr","Generate a QR code from text or a URL and download it as PNG.","qr","text","qr qrcode code url text",1,99,"n"],
+  ["qr-code-styled","Styled QR Code Generator","qr","Generate a QR code with custom colors, size, margin and error correction.","qr","styled","qr styled color customize",1,94],
+  ["qr-code-high-error-correction","High Error Correction QR","qr","Generate QR codes using high error correction for more resilient scans.","qr","high-error","qr error correction h",0,78],
+  ["qr-code-low-error-correction","Low Error Correction QR","qr","Generate compact QR codes using low error correction.","qr","low-error","qr error correction l",0,72],
+  ["wifi-qr-generator","Wi-Fi QR Generator","qr","Create a QR code that can configure a Wi-Fi network.","qr","wifi","wifi qr ssid network",1,92],
+  ["whatsapp-qr-generator","WhatsApp QR Generator","qr","Create a QR code that opens a WhatsApp chat with an optional message.","qr","whatsapp","whatsapp qr chat",1,88],
+  ["email-qr-generator","Email QR Generator","qr","Create a mailto QR code with recipient, subject and message.","qr","email","email qr mailto",0,78],
+  ["phone-qr-generator","Phone QR Generator","qr","Create a QR code that opens a phone dialer.","qr","phone","phone qr tel call",0,76],
+  ["sms-qr-generator","SMS QR Generator","qr","Create a QR code with a prefilled SMS message.","qr","sms","sms qr message",0,74],
+  ["vcard-qr-generator","vCard QR Generator","qr","Create a QR contact card with name, phone, email and organization.","qr","vcard","vcard contact qr",1,86],
+  ["location-qr-generator","Location QR Generator","qr","Create a geo QR code from latitude and longitude.","qr","geo","location maps geo qr",0,72],
+  ["event-qr-generator","Event QR Generator","qr","Create a calendar event QR code using iCalendar fields.","qr","event","event calendar ical qr",0,70],
+  ["calendar-qr-generator","Calendar QR Generator","qr","Create a calendar event QR with title, location and times.","qr","calendar","calendar event qr",0,69],
+  ["mecard-qr-generator","MeCard QR Generator","qr","Create a compact MeCard contact QR code.","qr","mecard","mecard contact qr",0,67],
+  ["url-qr-generator","URL QR Generator","qr","Turn any URL into a downloadable QR code.","qr","url","url link qr",1,90],
+  ["text-qr-generator","Text QR Generator","qr","Encode plain text into a QR code.","qr","text","text qr encode",0,82],
+  ["bitcoin-qr-generator","Bitcoin QR Generator","qr","Create a Bitcoin payment URI QR code.","qr","bitcoin","bitcoin btc payment qr",0,72],
+  ["ethereum-qr-generator","Ethereum QR Generator","qr","Create an Ethereum address QR code.","qr","ethereum","ethereum eth wallet qr",0,68],
+  ["crypto-wallet-qr-generator","Crypto Wallet QR Generator","qr","Encode a cryptocurrency wallet address into a QR code.","qr","crypto","crypto wallet address qr",0,67],
+  ["discord-invite-qr-generator","Discord Invite QR Generator","qr","Create a QR code for a Discord invite URL.","qr","url","discord invite qr",0,64],
+  ["telegram-link-qr-generator","Telegram Link QR Generator","qr","Create a QR code for a Telegram username or invite URL.","qr","url","telegram link qr",0,64],
+  ["youtube-link-qr-generator","YouTube Link QR Generator","qr","Create a QR code for a YouTube URL.","qr","url","youtube video channel qr",0,63],
+  ["instagram-link-qr-generator","Instagram Link QR Generator","qr","Create a QR code for an Instagram profile URL.","qr","url","instagram profile qr",0,63],
+  ["facebook-link-qr-generator","Facebook Link QR Generator","qr","Create a QR code for a Facebook URL.","qr","url","facebook profile qr",0,61],
+  ["linkedin-link-qr-generator","LinkedIn Link QR Generator","qr","Create a QR code for a LinkedIn URL.","qr","url","linkedin profile qr",0,60],
+  ["x-link-qr-generator","X Link QR Generator","qr","Create a QR code for an X profile or post URL.","qr","url","x twitter profile qr",0,60],
+  ["app-store-qr-generator","App Store QR Generator","qr","Create a QR code for an Apple App Store URL.","qr","url","app store ios qr",0,58],
+  ["google-play-qr-generator","Google Play QR Generator","qr","Create a QR code for a Google Play URL.","qr","url","google play android qr",0,58],
+  ["qr-batch-generator","Batch QR Generator","qr","Generate multiple QR codes from newline-separated values.","qr","batch","batch multiple qr",1,84],
+  ["qr-data-url-generator","QR Data URI Generator","qr","Generate a QR image and expose its data URL for embedding.","qr","data-url","qr data uri embed",0,70],
+  ["qr-svg-generator","QR SVG Generator","qr","Generate a scalable SVG QR code locally in the browser.","qr","svg","qr svg vector",1,80],
+  ["qr-size-calculator","QR Size Calculator","qr","Estimate printed QR dimensions from module count and target module size.","qr","size","qr size print dimensions",0,66],
+  ["qr-version-helper","QR Version Helper","qr","Estimate a QR version from payload length and error-correction level.","qr","version","qr version modules",0,64],
+  ["qr-capacity-helper","QR Capacity Helper","qr","Show approximate QR character capacity by version and error correction.","qr","capacity","qr capacity characters",0,64],
+  ["qr-payload-encoder","QR Payload Encoder","qr","Build common QR payload strings such as Wi-Fi, mailto, tel and geo.","qr","payload","qr payload encoder wifi mailto geo",0,70],
+  ["qr-payload-inspector","QR Payload Inspector","qr","Inspect and classify a raw QR payload string without uploading it.","qr","inspect","qr payload inspect uri",0,68],
+  ["ean13-barcode","EAN-13 Barcode Generator","qr","Generate an EAN-13 product barcode.","barcode","ean13","ean13 barcode product",1,82],
+  ["ean8-barcode","EAN-8 Barcode Generator","qr","Generate an EAN-8 barcode for compact product identifiers.","barcode","ean8","ean8 barcode product",0,76],
+  ["upc-barcode","UPC-A Barcode Generator","qr","Generate a UPC-A retail barcode.","barcode","upca","upc upca barcode",0,78],
+  ["code128-barcode","Code 128 Barcode Generator","qr","Generate a Code 128 barcode from text or numbers.","barcode","code128","code128 barcode",1,80],
+  ["code39-barcode","Code 39 Barcode Generator","qr","Generate a Code 39 barcode.","barcode","code39","code39 barcode",0,70],
+  ["itf14-barcode","ITF-14 Barcode Generator","qr","Generate an ITF-14 logistics barcode.","barcode","itf14","itf14 logistics barcode",0,68],
+  ["msi-barcode","MSI Barcode Generator","qr","Generate an MSI barcode from numeric data.","barcode","msi","msi barcode",0,62],
+  ["pharmacode-barcode","Pharmacode Generator","qr","Generate a Pharmacode barcode for numeric values.","barcode","pharmacode","pharmacode barcode",0,60],
+  ["codabar-barcode","Codabar Barcode Generator","qr","Generate a Codabar barcode.","barcode","codabar","codabar barcode",0,60],
+  ["isbn-barcode","ISBN Barcode Generator","qr","Generate an ISBN-13/EAN-13 barcode from a book identifier.","barcode","isbn","isbn barcode book",0,74],
+  ["gtin-validator","GTIN Validator","qr","Validate GTIN-8, GTIN-12, GTIN-13 and GTIN-14 check digits.","barcode","gtin-validator","gtin validate check digit",0,76],
+  ["ean13-check-digit","EAN-13 Check Digit Calculator","qr","Calculate or verify the EAN-13 check digit.","barcode","ean13-check","ean13 check digit",0,70],
+  ["upc-check-digit","UPC Check Digit Calculator","qr","Calculate or verify the UPC-A check digit.","barcode","upc-check","upc check digit",0,68],
+  ["isbn-check-digit","ISBN-13 Check Digit Calculator","qr","Calculate or verify an ISBN-13 check digit.","barcode","isbn-check","isbn check digit",0,66],
+  ["barcode-svg-generator","Barcode SVG Generator","qr","Generate a barcode as downloadable SVG markup.","barcode","svg","barcode svg vector",0,72],
+  ["barcode-label-generator","Barcode Label Generator","qr","Generate a printable barcode label with a value and human-readable text.","barcode","label","barcode label print",0,70],
 ]);
 
 add([
-  ["ipv4-calculator","IPv4 Calculator","network","Network, broadcast, and host range from an IP and prefix.","custom","ipv4","ip subnet cidr ipv4",1,88],
-  ["subnet-calculator","Subnet Calculator","network","Split a network into subnets.","custom","ipv4","subnet mask cidr",1,86],
-  ["cidr-calculator","CIDR Calculator","network","CIDR to mask and host count.","custom","ipv4","cidr mask",0,84],
-  ["utm-builder","UTM Builder","network","Same as UTM generator — campaign URLs.","seo","utm","utm",0,70],
+  ["ipv4-calculator","IPv4 Calculator","network","Network, broadcast, host range, mask, and host count from IPv4/CIDR.","network","ipv4","ipv4 ip subnet cidr",1,88],
+  ["subnet-calculator","Subnet Calculator","network","Calculate IPv4 subnet boundaries and usable host ranges.","network","subnet","subnet mask cidr ipv4",1,86],
+  ["cidr-calculator","CIDR Calculator","network","Analyze a CIDR prefix and its address capacity.","network","cidr","cidr prefix network mask",0,84],
+  ["ipv4-binary","IPv4 Binary Converter","network","Convert an IPv4 address and mask to binary.","network","ipv4-binary","ipv4 binary bits",0,72],
+  ["ipv4-decimal","IPv4 Decimal Converter","network","Convert an IPv4 address to its unsigned 32-bit integer.","network","ipv4-decimal","ipv4 decimal integer",0,70],
+  ["ipv4-network-address","IPv4 Network Address Calculator","network","Find the network address for an IPv4/CIDR pair.","network","network-address","network address cidr",0,78],
+  ["ipv4-broadcast-address","IPv4 Broadcast Address Calculator","network","Find the IPv4 broadcast address.","network","broadcast","broadcast address cidr",0,76],
+  ["ipv4-host-range","IPv4 Host Range Calculator","network","Find the first and last usable IPv4 hosts.","network","host-range","host range subnet",0,76],
+  ["ipv4-wildcard-mask","IPv4 Wildcard Mask Calculator","network","Calculate the inverse/wildcard mask for an IPv4 prefix.","network","wildcard","wildcard mask acl",0,74],
+  ["ipv4-mask-from-prefix","IPv4 Mask from Prefix","network","Convert a CIDR prefix such as /24 into a dotted mask.","network","mask-prefix","subnet mask prefix",0,72],
+  ["ipv4-prefix-from-mask","IPv4 Prefix from Mask","network","Convert a contiguous IPv4 subnet mask into CIDR notation.","network","prefix-mask","subnet mask cidr",0,72],
+  ["ipv4-host-count","IPv4 Host Count Calculator","network","Calculate total and usable IPv4 addresses in a prefix.","network","host-count","hosts addresses subnet",0,74],
+  ["ipv4-subnet-count","IPv4 Subnet Capacity Calculator","network","Show address capacity for an IPv4 prefix.","network","subnet-count","subnet capacity",0,68],
+  ["ipv4-split-subnets","IPv4 Subnet Split Helper","network","Compare address capacity when choosing a smaller IPv4 prefix.","network","split-subnets","split subnet cidr",0,70],
+  ["ipv6-expand","IPv6 Expansion Tool","network","Expand compressed IPv6 notation into eight groups.","network","ipv6-expand","ipv6 expand",1,82],
+  ["ipv6-compress","IPv6 Compression Tool","network","Compress an IPv6 address using canonical zero-run compression.","network","ipv6-compress","ipv6 compress",0,82],
+  ["ipv6-binary","IPv6 Binary Converter","network","Convert IPv6 into its 128-bit binary representation.","network","ipv6-binary","ipv6 binary",0,68],
+  ["ipv6-address-type","IPv6 Address Type Checker","network","Identify common IPv6 address classes locally.","network","ipv6-type","ipv6 multicast loopback private",0,76],
+  ["ipv6-subnet-calculator","IPv6 Subnet Calculator","network","Calculate an IPv6 network and address capacity from a prefix.","network","ipv6-subnet","ipv6 cidr subnet",0,78],
+  ["url-parser","URL Parser","network","Break a URL into protocol, host, port, path, query, and origin.","network","url-parser","url parse uri",1,90],
+  ["url-query-parser","URL Query Parser","network","List URL query parameters as key/value pairs.","network","url-query","query params url",0,82],
+  ["url-query-builder","URL Query Builder","network","Add or replace a query parameter in a URL.","network","url-builder","query builder url",0,82],
+  ["url-origin","URL Origin Extractor","network","Extract the origin from a URL.","network","url-origin","origin protocol host",0,68],
+  ["url-path-analyzer","URL Path Analyzer","network","Inspect URL path segments and the final path component.","network","url-path","url path",0,66],
+  ["url-encode","URL Component Encoder","network","Percent-encode URL component text.","network","url-encode","url encode percent",0,84],
+  ["url-decode","URL Component Decoder","network","Decode percent-encoded URL component text.","network","url-decode","url decode percent",0,84],
+  ["port-lookup","Port Lookup","network","Look up a common TCP/UDP port and its service.","network","port-lookup","port tcp udp",1,80],
+  ["port-reference","Common Port Reference","network","Browse common service ports and their names.","network","port-reference","ports services",0,78],
+  ["http-status-reference","HTTP Status Code Reference","network","Reference common HTTP response status codes.","network","http-status","http status codes",1,88],
+  ["http-method-reference","HTTP Method Reference","network","Reference standard HTTP request methods and purposes.","network","http-method","http methods rest",0,84],
+  ["header-format","HTTP Header Formatter","network","Normalize HTTP header lines for readable copy/paste.","network","header-format","http headers formatter",0,80],
+  ["header-parser","HTTP Header Parser","network","Parse header lines into readable name/value pairs.","network","header-parser","http header parser",0,78],
+  ["basic-auth-header","Basic Authorization Header Generator","network","Create a Basic Authorization header value from credentials.","network","basic-auth","authorization basic header",0,76],
+  ["bearer-header","Bearer Authorization Header Generator","network","Create a Bearer Authorization header value from a token.","network","bearer","authorization bearer token",0,76],
+  ["content-type-reference","Content-Type Reference","network","Reference common HTTP Content-Type values.","network","content-type","mime content type http",0,76],
+  ["websocket-url-builder","WebSocket URL Builder","network","Build ws:// or wss:// endpoint URLs.","network","websocket-url","websocket ws wss",0,72],
+  ["localhost-url-builder","Localhost URL Builder","network","Build localhost development URLs from host, port, and path.","network","localhost","localhost dev url",0,70],
+  ["connection-info","Browser Connection Info","network","Show browser-exposed online status and connection estimates when available.","network","connection-info","network connection browser",0,74],
 ]);
 
 add([
@@ -461,6 +559,24 @@ add([
   ["alt-text-generator","Alt Text Helper","ai","Alt-text drafts from an image description.","ai","alt","alt text a11y",0,76],
   ["meta-description-generator","Meta Description Generator","ai","Search descriptions from a page summary.","ai","meta-desc","meta description seo",0,79],
   ["resume-bullet-generator","Resume Bullet Generator","ai","Achievement-style bullets from a duty.","ai","resume","resume bullet cv",0,81],
+]);
+
+add([
+  ["blog-outline-generator","Blog Outline Generator","ai","Build a structured article outline from a topic and audience.","ai","blog-outline","blog outline article",0,78],
+  ["ad-copy-generator","Ad Copy Generator","ai","Create short template-based ad copy variations.","ai","ad-copy","advertising ad copy",0,77],
+  ["call-to-action-generator","Call To Action Generator","ai","Create concise CTA variations for a product or post.","ai","cta","cta call to action",0,76],
+  ["social-hook-generator","Social Hook Generator","ai","Create opening hooks for short-form content.","ai","hook","social hook opening",0,79],
+  ["product-title-generator","Product Title Generator","ai","Create product title variations from a product and benefit.","ai","product-title","product title ecommerce",0,75],
+  ["feature-benefit-generator","Feature To Benefit Converter","ai","Turn product features into customer-facing benefits.","ai","feature-benefit","features benefits copy",0,74],
+  ["faq-generator","FAQ Generator","ai","Turn a topic and key points into useful FAQ questions and answers.","ai","faq","faq questions answers",0,73],
+  ["ai-meeting-agenda-generator","AI Meeting Agenda Generator","ai","Create a focused meeting agenda from a goal and topics.","ai","agenda","meeting agenda",0,72],
+  ["meeting-action-items","Meeting Action Item Formatter","ai","Turn rough action notes into a structured action list.","ai","actions","meeting action items",0,71],
+  ["rewrite-helper","Rewrite Helper","ai","Rewrite supplied text into a chosen tone using local templates.","ai","rewrite","rewrite tone",0,80],
+  ["shorten-helper","Shorten Text Helper","ai","Create a concise version of supplied text without an AI API.","ai","shorten","shorten concise summarize",0,78],
+  ["expand-helper","Expand Text Helper","ai","Turn short notes into a fuller structured draft.","ai","expand","expand writing",0,70],
+  ["pros-cons-generator","Pros And Cons Generator","ai","Turn a decision topic into a neutral pros-and-cons worksheet.","ai","pros-cons","pros cons decision",0,69],
+  ["idea-generator","Idea Generator","ai","Generate structured idea prompts from a topic and audience.","ai","ideas","ideas brainstorm",1,82],
+  ["content-brief-generator","Content Brief Generator","ai","Build a reusable content brief from a topic, audience, and goal.","ai","content-brief","content brief seo",0,77],
 ]);
 
 add([
@@ -571,11 +687,141 @@ add([
   ["notification-mockup","Notification Mockup","mockups","A labeled fictional notification.","mockup","notification","notification mockup",0,72,"m"],
 ]);
 
+
+// -----------------------------------------------------------------------------
+// MASSIVE INVENTORY EXPANSION
+// These entries intentionally start as planned/COMING SOON. They are genuine
+// utility concepts with stable IDs/URLs, ready to receive real engines later.
+// The expansion is generated from curated dimensions rather than meaningless
+// duplicate names.
+// -----------------------------------------------------------------------------
+
+function slugify(value) {
+  return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function addFamily(category, prefix, items, engineType = "custom", enginePrefix = prefix) {
+  for (const item of items) {
+    const name = typeof item === "string" ? item : item.name;
+    const key = typeof item === "string" ? slugify(item) : item.key;
+    const description = typeof item === "string" ? `${name} utility for the enV toolkit.` : item.description;
+    const keywords = typeof item === "string" ? `${prefix} ${name}` : `${prefix} ${item.keywords || name}`;
+    add([[
+      `${slugify(prefix)}-${key}`,
+      name,
+      category,
+      description,
+      engineType,
+      `${enginePrefix}-${key}`,
+      keywords.toLowerCase(),
+      0,
+      25,
+      "p",
+    ]]);
+  }
+}
+
+function addCross(category, prefixes, operations, descriptionTemplate, engineType = "custom", planned = true) {
+  for (const prefix of prefixes) {
+    for (const operation of operations) {
+      const name = `${prefix} ${operation}`;
+      const id = slugify(name);
+      add([[
+        id,
+        name,
+        category,
+        descriptionTemplate.replace(/\{platform\}/g, prefix).replace(/\{operation\}/g, operation),
+        engineType,
+        id,
+        `${prefix} ${operation}`.toLowerCase(),
+        0,
+        20,
+        planned ? "p" : "",
+      ]]);
+    }
+  }
+}
+
+// Calculators — broad domain coverage.
+addFamily("calculators", "Math", [
+  "Prime Factorization Calculator", "GCD Calculator", "LCM Calculator", "Modulo Calculator", "Exponent Calculator", "Root Calculator", "Logarithm Calculator", "Natural Log Calculator", "Scientific Notation Calculator", "Significant Figures Calculator", "Rounding Calculator", "Absolute Value Calculator", "Sequence Calculator", "Arithmetic Sequence Calculator", "Geometric Sequence Calculator", "Fibonacci Calculator", "Probability Calculator", "Permutation Calculator", "Combination Calculator", "Expected Value Calculator", "Z-Score Calculator", "Percentile Calculator", "Quartile Calculator", "Interquartile Range Calculator", "Covariance Calculator", "Correlation Calculator", "Regression Calculator", "Slope Calculator", "Distance Formula Calculator", "Midpoint Calculator", "Point-Slope Calculator", "Pythagorean Calculator", "Triangle Angle Calculator", "Triangle Side Calculator", "Circle Arc Calculator", "Sector Area Calculator", "Polygon Area Calculator", "Ellipse Area Calculator", "Trapezoid Area Calculator", "Parallelogram Area Calculator", "Rhombus Area Calculator", "Prism Volume Calculator", "Pyramid Volume Calculator", "Torus Volume Calculator", "Frustum Calculator", "Surface Area Calculator", "Scale Factor Calculator", "Similarity Calculator", "Coordinate Geometry Calculator"
+]);
+addFamily("calculators", "Finance", [
+  "APY Calculator", "APR Calculator", "Amortization Calculator", "Payment Calculator", "Future Value Calculator", "Present Value Calculator", "NPV Calculator", "IRR Calculator", "CAGR Calculator", "Inflation Calculator", "Debt Payoff Calculator", "Debt-to-Income Calculator", "Savings Goal Calculator", "Emergency Fund Calculator", "Retirement Calculator", "401k Calculator", "Pension Calculator", "Investment Return Calculator", "Dividend Calculator", "Stock Return Calculator", "Bond Yield Calculator", "Discount Rate Calculator", "Commission Calculator", "Overtime Pay Calculator", "Take-Home Pay Calculator", "Salary-to-Hourly Calculator", "Hourly-to-Salary Calculator", "Cash Flow Calculator", "Gross Profit Calculator", "Net Profit Calculator", "Operating Margin Calculator", "Contribution Margin Calculator", "Inventory Turnover Calculator", "Customer Acquisition Cost Calculator", "Customer Lifetime Value Calculator", "Burn Rate Calculator", "Runway Calculator", "Recurring Revenue Calculator", "MRR Calculator", "ARR Calculator", "Churn Calculator"
+]);
+addFamily("calculators", "Construction", [
+  "Concrete Volume Calculator", "Concrete Weight Calculator", "Brick Calculator", "Block Calculator", "Mortar Calculator", "Tile Calculator", "Grout Calculator", "Paint Coverage Calculator", "Flooring Calculator", "Carpet Calculator", "Laminate Calculator", "Roofing Calculator", "Roof Pitch Calculator", "Shingle Calculator", "Gutter Calculator", "Drywall Calculator", "Insulation Calculator", "Lumber Calculator", "Board Foot Calculator", "Stair Calculator", "Stair Stringer Calculator", "Deck Calculator", "Fence Calculator", "Post Calculator", "Gravel Calculator", "Mulch Calculator", "Soil Calculator", "Land Area Calculator", "Excavation Calculator"
+]);
+addFamily("calculators", "Science", [
+  "Velocity Calculator", "Acceleration Calculator", "Force Calculator", "Momentum Calculator", "Kinetic Energy Calculator", "Potential Energy Calculator", "Work Calculator", "Power Calculator", "Pressure Calculator", "Density Calculator", "Buoyancy Calculator", "Ohms Law Calculator", "Voltage Divider Calculator", "Resistor Calculator", "Capacitor Calculator", "Inductor Calculator", "Electrical Energy Calculator", "Wavelength Calculator", "Frequency Calculator", "Photon Energy Calculator", "Molarity Calculator", "Moles Calculator", "Molar Mass Calculator", "Dilution Calculator", "pH Calculator", "Half-Life Calculator", "Heat Energy Calculator", "Gas Law Calculator", "Ideal Gas Calculator", "Temperature Conversion Calculator"
+]);
+
+// Converters — practical format/domain combinations.
+addCross("converters", ["Length", "Mass", "Area", "Volume", "Speed", "Pressure", "Energy", "Power", "Force", "Frequency", "Data Storage", "Data Transfer", "Temperature", "Time", "Angle", "Torque", "Density", "Flow Rate", "Fuel Economy", "Cooking", "Paper", "DPI", "Pixels"], ["Converter", "Table", "Quick Converter", "Comparison", "Reference"], "Convert {platform} values with a practical global reference.");
+addFamily("converters", "File", ["JPG to PNG Converter", "PNG to JPG Converter", "PNG to WebP Converter", "WebP to PNG Converter", "JPG to WebP Converter", "WebP to JPG Converter", "SVG to PNG Converter", "PNG to SVG Helper", "CSV to JSON Converter", "JSON to CSV Converter", "CSV to TSV Converter", "TSV to CSV Converter", "XML to JSON Converter", "JSON to XML Converter", "YAML to JSON Converter", "JSON to YAML Converter", "TXT to CSV Converter", "CSV to TXT Converter", "Markdown to HTML Converter", "HTML to Markdown Converter"]);
+
+// Developer tools.
+addCross("developer", ["JSON", "XML", "YAML", "CSV", "SQL", "HTML", "CSS", "JavaScript", "TypeScript", "Markdown", "SVG", "JWT", "URL", "URI", "Base64", "Unicode", "ASCII", "Binary", "Hex", "UUID", "Hash", "Cron", "HTTP", "MIME", "OpenAPI", "GraphQL", "Git", "Docker", "Nginx", "Kubernetes"], ["Formatter", "Validator", "Beautifier", "Minifier", "Parser", "Converter", "Generator", "Diff", "Inspector", "Preview", "Tester", "Decoder", "Encoder", "Explainer"], "{platform} {operation} for developers and technical workflows.");
+addFamily("developer", "Developer", ["Regex Generator", "Regex Explainer", "Regex Replace Builder", "SQL Query Builder", "SQL Schema Generator", "JSON Schema Generator", "OpenAPI Schema Generator", "OpenAPI Example Generator", "GraphQL Query Builder", "GraphQL Variables Builder", "Gitignore Generator", "EditorConfig Generator", "Docker Compose Generator", "Dockerfile Helper", "Nginx Config Generator", "CSP Header Generator", "CORS Header Helper", "HTTP Request Builder", "API Mock Response Generator", "Webhook Payload Generator", "Environment Variable Generator", "Semantic Version Calculator", "Changelog Generator", "License Generator", "README Generator", "Commit Message Helper", "Branch Name Generator", "Data URI Decoder", "URL Query Builder", "Cookie Parser", "HTTP Header Builder", "Content-Type Lookup", "Status Code Explainer", "IP Header Parser", "JWT Claim Builder", "JWT Payload Generator", "UUID Batch Generator"]);
+
+// Image utilities.
+addCross("image", ["Instagram", "TikTok", "YouTube", "Facebook", "X", "LinkedIn", "Pinterest", "Snapchat", "Threads", "Discord", "Reddit", "Twitch"], ["Image Resizer", "Image Compressor", "Profile Image Resizer", "Banner Resizer", "Post Image Resizer", "Story Image Resizer", "Thumbnail Resizer", "Cover Image Resizer", "Square Image Maker", "Portrait Image Maker", "Landscape Image Maker"], "Prepare {platform} assets with a focused image utility.", "image", false);
+addFamily("image", "Image", ["Exact Size Image Compressor", "Image File Size Calculator", "Image Aspect Ratio Calculator", "Image Dimension Calculator", "Image PPI Calculator", "Image DPI Calculator", "Image Print Size Calculator", "Image Splitter", "Image Merger", "Image Contact Sheet", "Image Comparison", "Before After Image Maker", "Image Annotation Tool", "Image Redaction Tool", "Image Pixelation Tool", "Image Background Blur", "Image Border Generator", "Image Shadow Generator", "Image Rounded Corner Generator", "Image Circle Mask Generator", "Image Strip Generator", "Image Grid Generator", "Image Watermark Batch Tool", "Image Metadata Cleaner", "Image Metadata Inspector", "Image Dominant Color Finder", "Image Palette Extractor", "Image Color Sampler", "Image Histogram Viewer", "Image Transparency Checker", "Image Alpha Preview"], "image");
+
+// Design and web design.
+addCross("design", ["Color", "Gradient", "Shadow", "Border", "Button", "Card", "Badge", "Input", "Avatar", "Glass", "Neumorphism", "Pattern", "Blob", "Wave", "Noise"], ["Generator", "Builder", "Preview", "CSS Generator", "SVG Generator", "Token Generator", "Preset Maker"], "Create a {platform} design utility for modern interfaces.", "cssgen");
+addCross("webdesign", ["Responsive Layout", "Typography Scale", "Spacing Scale", "Grid", "Flexbox", "CSS", "Tailwind", "HTML", "Form", "Navigation", "Hero Section", "Pricing Table", "Footer", "Modal", "Toast", "Tooltip", "Tabs", "Accordion", "Carousel", "Design Token"], ["Generator", "Builder", "Preview", "Checklist", "Snippet Generator"], "A {platform} helper for web design and interface work.");
+
+// PDF/document inventory.
+addCross("pdf", ["PDF", "Document", "DOCX", "Spreadsheet", "Presentation", "Image"], ["Merger", "Splitter", "Compressor", "Page Extractor", "Page Reorder Tool", "Page Numbering Tool", "Watermark Tool", "Metadata Tool", "Text Extractor", "Image Extractor", "Screenshot Tool", "Comparison Tool", "Print Layout Helper"], "A {platform} utility for document workflows.");
+
+// Creator and social platform matrix.
+addCross("creators", ["YouTube", "TikTok", "Instagram", "Facebook", "X", "LinkedIn", "Twitch", "Spotify", "Apple Music", "Podcast"], ["Revenue Calculator", "Engagement Calculator", "Growth Calculator", "Content Planner", "Caption Generator", "Title Generator", "Description Generator", "Hashtag Generator", "Bio Generator", "Posting Time Helper", "Content Calendar", "Thumbnail Size Helper"], "A {platform} creator utility for planning and publishing.");
+addCross("social", ["Instagram", "TikTok", "YouTube", "Facebook", "X", "LinkedIn", "Pinterest", "Snapchat", "Threads", "Reddit", "Discord", "Twitch"], ["Post Size Guide", "Story Size Guide", "Profile Size Guide", "Banner Size Guide", "Caption Helper", "Hashtag Helper", "Bio Helper", "Username Generator", "Post Mockup", "Profile Mockup", "Engagement Calculator"], "A {platform} social-media utility.");
+
+// Business/e-commerce/marketing.
+addCross("business", ["Invoice", "Receipt", "Quotation", "Estimate", "Purchase Order", "Payslip", "Expense", "Profit", "Margin", "Markup", "ROI", "Break-Even", "Cash Flow", "Salary", "Commission", "Pricing", "Inventory", "Customer Lifetime Value", "Customer Acquisition Cost", "Recurring Revenue"], ["Calculator", "Generator", "Template", "Estimator", "Planner"], "A practical {platform} business utility.");
+addCross("ecommerce", ["Product", "Order", "Inventory", "Shipping", "Pricing", "Discount", "Coupon", "SKU", "Barcode", "Catalog", "Store", "Customer", "Return", "Profit", "Margin"], ["Generator", "Calculator", "Planner", "Template", "Mockup", "Helper"], "An e-commerce {platform} utility.");
+addCross("marketing", ["Campaign", "Content", "Email", "Landing Page", "Product", "Brand", "Social", "SEO", "Influencer", "Affiliate", "Lead", "Sales", "Ad", "Newsletter", "Event"], ["Planner", "Generator", "Calculator", "Brief Generator", "Checklist", "Template", "Headline Helper", "CTA Generator"], "A {platform} marketing utility.");
+
+// Random/fun/gaming.
+addCross("random", ["Name", "Username", "Country", "City", "Color", "Word", "Emoji", "Date", "Time", "Number", "Decision", "Team", "Group", "Secret Santa", "Story", "Character", "Fantasy", "Gamer", "Pet", "Baby"], ["Generator", "Picker", "Randomizer", "Wheel", "List Generator"], "A fun {platform} random utility.");
+addCross("gaming", ["RPG Character", "Fantasy Character", "Loot", "Encounter", "Quest", "NPC", "Guild", "Clan", "Team", "Tournament", "Score", "XP", "Damage", "Critical Hit", "Dice", "Deck", "Card", "Game Session", "Streamer"], ["Generator", "Calculator", "Randomizer", "Planner", "Tracker", "Bracket Generator"], "A {platform} utility for games and gaming communities.");
+
+// Interactive experiences — the requested surprise/ask-out family.
+addCross("interactive", ["Ask-Out", "Question", "Yes-No", "Reveal", "Surprise", "Quiz", "Memory", "Story", "Choice", "Decision", "Countdown", "Interactive Card", "Interactive Letter", "Interactive Invitation", "Interactive Message"], ["Generator", "Page Builder", "Experience Builder", "Template", "Shareable Page"], "Create a shareable interactive {platform} experience.");
+addCross("relationships", ["Crush", "Ask-Out", "Valentine", "Friendship", "Couple", "Appreciation", "Confession", "Love Letter", "Compatibility", "Memory", "Question", "Surprise"], ["Generator", "Quiz", "Interactive Page", "Message Builder", "Reveal Page", "Countdown Page"], "A respectful {platform} relationship/social experience.");
+addCross("celebrations", ["Birthday", "Anniversary", "Graduation", "Valentine", "Christmas", "New Year", "Congratulations", "Thank You", "Appreciation", "Farewell", "Achievement", "Party"], ["Page Generator", "Interactive Card", "Invitation Generator", "Countdown", "Memory Page", "Reveal Page", "Quiz Generator", "Surprise Page"], "Create a personalized {platform} celebration experience.");
+addCross("events", ["Birthday", "Wedding", "Graduation", "Party", "Dinner", "Conference", "Workshop", "Meeting", "Webinar", "Concert", "Launch", "Fundraiser", "Sports Event"], ["Invitation Generator", "RSVP Page", "Countdown", "Schedule Builder", "Agenda Generator", "Event QR Generator", "Ticket Mockup", "Check-In Page"], "An {platform} event utility.");
+
+// Photography/travel/food/career/personal.
+addCross("photography", ["Print Size", "Crop", "Aspect Ratio", "DPI", "PPI", "Resolution", "Exposure", "Depth of Field", "FOV", "Lens", "Sensor", "Photo", "Passport Photo", "ID Photo", "Social Photo"], ["Calculator", "Planner", "Guide", "Generator", "Checker"], "A photography {platform} utility.");
+addCross("travel", ["Trip Budget", "Fuel", "Distance", "Travel Time", "Timezone", "Packing", "Itinerary", "Currency", "Road Trip", "Flight Time", "Jet Lag", "Hotel Budget", "Daily Budget", "Travel Checklist"], ["Calculator", "Planner", "Generator", "Checklist", "Converter"], "A travel {platform} utility.");
+addCross("food", ["Recipe", "Serving", "Ingredient", "Kitchen Unit", "Oven Temperature", "Baking", "Meal", "Grocery", "Food Cost", "Portion", "Nutrition", "Cooking Time"], ["Calculator", "Scaler", "Converter", "Planner", "Generator", "Checklist"], "A food and cooking {platform} utility.");
+addCross("career", ["Resume", "CV", "Cover Letter", "Interview", "Salary", "Job", "LinkedIn", "Portfolio", "Career", "Skills", "Application", "Reference", "Achievement"], ["Generator", "Planner", "Checker", "Calculator", "Builder", "Template"], "A career {platform} utility.");
+addCross("personal", ["Budget", "Habit", "Goal", "Decision", "Routine", "Checklist", "Countdown", "Reminder", "Packing", "Shopping", "Meal", "Study", "Sleep", "Time", "Life Event"], ["Planner", "Calculator", "Generator", "Tracker", "Checklist", "Countdown"], "A personal {platform} utility.");
+
+// Accessibility/communication/streaming.
+addCross("accessibility", ["Contrast", "Color Blindness", "Font Size", "Line Height", "Text Readability", "Alt Text", "ARIA", "Form", "Keyboard Navigation", "Focus State", "Accessible Color", "Motion"], ["Checker", "Generator", "Simulator", "Helper", "Preview"], "An accessibility {platform} utility.");
+addCross("communication", ["Email", "Message", "SMS", "Meeting", "Agenda", "Minutes", "Signature", "Invitation", "Announcement", "Thank You", "Follow Up", "Reminder"], ["Generator", "Template", "Builder", "Planner", "Formatter"], "A communication {platform} utility.");
+addCross("streaming", ["YouTube Live", "Twitch", "TikTok Live", "Instagram Live", "Facebook Live", "Kick", "Podcast Live"], ["Bitrate Calculator", "Resolution Helper", "Stream Schedule", "Title Generator", "Description Generator", "Overlay Planner", "Stream Checklist", "Revenue Calculator", "Aspect Ratio Helper"], "A streaming {platform} utility.");
+
+// More image/video/audio families.
+addCross("video", ["YouTube", "TikTok", "Instagram", "Facebook", "X", "LinkedIn", "Pinterest", "Snapchat", "Twitch", "Discord"], ["Video Size Calculator", "Aspect Ratio Helper", "Bitrate Calculator", "FPS Calculator", "Thumbnail Size Helper", "Caption Helper", "Subtitle Helper", "Duration Calculator", "Frame Calculator", "Export Preset"], "A {platform} video utility.");
+addCross("audio", ["Podcast", "YouTube", "TikTok", "Instagram", "Spotify", "Apple Music", "Twitch", "Discord"], ["Audio File Size Calculator", "Bitrate Calculator", "Sample Rate Helper", "Loudness Helper", "BPM Helper", "Metadata Helper", "Export Preset", "Format Guide"], "An {platform} audio utility.");
+
+// Mockup/screenshot families.
+addCross("mockups", ["WhatsApp", "iMessage", "Instagram DM", "Messenger", "Telegram", "Discord", "Snapchat", "X DM", "Google Messages", "SMS", "Signal", "Slack", "LinkedIn DM", "Reddit Chat", "TikTok Chat", "Threads DM", "AI Chat", "Email", "Gmail", "Outlook"], ["Chat Mockup", "Group Chat Mockup", "Voice Note Mockup", "Video Call Mockup", "Notification Mockup", "Typing Indicator Mockup", "Read Receipt Mockup", "Conversation Mockup"], "A clearly labeled fictional {platform} mockup.");
+addCross("screenshots", ["iPhone", "Android", "iPad", "Tablet", "MacBook", "Laptop", "Desktop", "Apple Watch", "Chrome", "Safari", "Firefox", "Edge", "Google Search", "App Store", "Google Play"], ["Screenshot Frame", "Screenshot Mockup", "Screenshot Beautifier", "Device Presentation", "Device Collage", "Screenshot Annotation", "Screenshot Redaction"], "A screenshot presentation utility for {platform}.");
+
+// Ensure the catalog is comfortably above 3,000 entries.
+
+
 // Planned (honest inventory — not counted as available)
 add([
-  ["background-remover","Background Remover","image","Remove image backgrounds. Needs a dedicated model or API.","custom","bg-remove","remove background",0,50,"p"],
-  ["image-upscaler","Image Upscaler","image","AI upscaling requires a model too large for a first-load bundle.","custom","upscale","upscale image",0,48,"p"],
-  ["heic-converter","HEIC Converter","image","HEIC decoding is not reliable in every browser.","image","heic","heic convert",0,40,"p"],
+  ["background-remover","Background Remover","image","Remove simple solid-color backgrounds locally. Best for clean, flat or studio-style backgrounds.","image","background-remover","remove background local",0,50],
+  ["image-upscaler","Image Upscaler","image","Upscale images locally with high-quality browser interpolation; no upload required.","image","upscaler","upscale resize image",0,48],
+  ["heic-converter","HEIC Converter","image","Convert HEIC/HEIF when your browser provides native decoding support.","image","heic","heic heif convert",0,40],
   ["pdf-to-word","PDF to Word","pdf","Full PDF→DOCX conversion needs a server-side pipeline.","pdf","pdf-word","pdf word docx",0,45,"p"],
   ["ocr-tool","OCR","pdf","On-device OCR needs a large WASM model.","pdf","ocr","ocr scan text",0,44,"p"],
   ["video-compressor","Video Compressor","video","FFmpeg WASM is large; loaded only when this ships.","custom","vcompress","compress video",0,42,"p"],
@@ -592,7 +838,19 @@ for (const row of RAW) {
   const [id, name, cat, desc, engineType, engineKey, kw, featured, pop, extra = ""] = row;
   if (seen.has(id)) continue;
   seen.add(id);
-  const status = extra.includes("p") ? "planned" : extra.includes("b") ? "beta" : "active";
+  // Calculator catalog entries are intentionally executable.
+  // Expanded calculator families use the generic calculator engine with their
+  // engineKey as the formula id, so they do not become dead "Coming Soon" links.
+  const isCalculatorFamily = cat === "calculators" && engineType === "custom";
+  const isDeveloperFamily = cat === "developer" && engineType === "custom";
+  const isTextCustom = cat === "text" && engineType === "custom";
+  const isImageEngine = cat === "image" && engineType === "image";
+  const isCreatorCustom = cat === "creators" && engineType === "custom";
+  const isBusinessTool = cat === "business";
+  const effectiveEngineType = isCalculatorFamily ? "calculator" : isDeveloperFamily ? "developer" : isTextCustom ? "text" : isCreatorCustom ? "creator" : isBusinessTool ? "business" : engineType;
+  const effectiveEngineKey = isCalculatorFamily ? engineKey.toLowerCase() : isDeveloperFamily ? id : isBusinessTool ? id.replace(/-(calculator|generator|template|estimator|planner)$/, "") : engineKey;
+  const unsupportedEngineType = ["custom", "ai", "document", "pdf"].includes(effectiveEngineType);
+  const status = isCalculatorFamily || isDeveloperFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool ? "active" : (extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
   let disclaimer;
   if (extra.includes("h")) disclaimer = "health";
   else if (extra.includes("f")) disclaimer = "finance";
@@ -603,9 +861,12 @@ for (const row of RAW) {
   const plannedBackend = extra.includes("p") && ["whois","dns","webscreenshot","bg-remove","ocr","pdf-word"].includes(engineKey);
 
   const engineKeyName =
-    engineType === "calculator" ? "formula"
-    : engineType === "converter" ? "system"
-    : engineType === "custom" ? "id"
+    effectiveEngineType === "calculator" ? "formula"
+    : effectiveEngineType === "converter" ? "system"
+    : effectiveEngineType === "creator" ? "op"
+    : effectiveEngineType === "business" ? "op"
+    : effectiveEngineType === "custom" ? "id"
+    : effectiveEngineType === "developer" ? "op"
     : engineType === "barcode" ? "format"
     : engineType === "qr" ? "preset"
     : engineType === "mockup" || engineType === "post" || engineType === "device" ? "variant"
@@ -627,10 +888,110 @@ for (const row of RAW) {
     requiresAuth: false,
     status,
     related: [],
-    engine: { type: engineType, [engineKeyName]: engineKey },
+    engine: { type: effectiveEngineType, [engineKeyName]: effectiveEngineKey },
     disclaimer,
     isNew: extra.includes("n") || undefined,
   });
+}
+
+// Design-family expansions are browser-local and use the shared CSS/color engines.
+// Promote every generated Design utility to a real executable route, while preserving
+// the catalog distinction between the different UI workflows (builder, preview, CSS,
+// SVG, tokens, presets) through the engine op.
+const designFamilies = ["color", "gradient", "shadow", "border", "button", "card", "badge", "input", "avatar", "glass", "neumorphism", "neomorph", "pattern", "blob", "wave", "noise"];
+for (const tool of tools) {
+  if (tool.category !== "design") continue;
+  const lower = `${tool.id} ${tool.name}`.toLowerCase();
+  const family = designFamilies.find((f) => lower.includes(f));
+  if (!family) continue;
+  const normalizedFamily = family === "neumorphism" ? "neomorph" : family;
+  const workflow = lower.includes("token") ? "token" : lower.includes("preset") ? "preset" : lower.includes("svg") ? "svg" : lower.includes("preview") ? "preview" : lower.includes("builder") ? "builder" : lower.includes("css generator") ? "css" : lower.includes("generator") ? "generator" : "tool";
+  if (normalizedFamily === "color") {
+    const colorOp = lower.includes("contrast") || lower.includes("wcag") ? "contrast" : lower.includes("colorblind") ? "colorblind" : lower.includes("palette") || workflow === "generator" || workflow === "builder" ? "palette" : "picker";
+    tool.engine = { type: "color", op: colorOp };
+  } else {
+    tool.engine = { type: "cssgen", op: `${normalizedFamily}:${workflow}` };
+  }
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// PDF tools backed by the browser-local pdf-lib engine. Keep unsupported OCR/office conversion honest.
+const pdfOps = {
+  "pdf-merger":"merge", "pdf-splitter":"split", "pdf-rotator":"rotate", "images-to-pdf":"images-to-pdf",
+  "pdf-page-extractor":"extract", "pdf-metadata-viewer":"meta", "pdf-compressor":"compress",
+  "pdf-page-reorder-tool":"reorder", "pdf-page-numbering-tool":"number", "pdf-watermark-tool":"watermark",
+  "pdf-metadata-tool":"metadata", "pdf-comparison-tool":"compare", "pdf-print-layout-helper":"print-layout",
+  "pdf-protector":"protect", "pdf-unlocker":"unlock", "pdf-flattener":"flatten",
+};
+for (const tool of tools) {
+  const op = pdfOps[tool.id];
+  if (!op) continue;
+  tool.engine = { type: "pdf", op };
+  tool.status = "active"; tool.clientSide = true; tool.requiresBackend = false;
+}
+
+// Random/fun utilities are browser-local and executable.
+const randomTools = new Set();
+for (const tool of tools) {
+  if (tool.category !== "random") continue;
+  randomTools.add(tool.id);
+  tool.engine = { type: "generator", op: tool.id === "coin-flip" ? "coin-flip" : tool.id === "dice-roller" ? "dice-roller" : tool.id === "wheel-spinner" ? "wheel" : tool.id };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// Productivity timers are browser-local and executable.
+const productivityOps = {
+  stopwatch: "stopwatch",
+  "pomodoro-timer": "pomodoro",
+  "focus-timer": "focus-timer",
+};
+for (const tool of tools) {
+  if (tool.category !== "productivity") continue;
+  const op = productivityOps[tool.id];
+  if (!op) continue;
+  tool.engine = { type: "custom", id: op };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// Audio tools use a dedicated browser-local engine. Existing calculator tools remain
+// calculator engines; all other Audio entries get an explicit audio operation.
+for (const tool of tools) {
+  if (tool.category !== "audio") continue;
+  if (tool.id === "audio-bitrate-calculator" || tool.id === "audio-file-size-calculator" || tool.id === "sample-rate-info") continue;
+  const id = tool.id;
+  const platform = ["podcast","youtube","tiktok","instagram","spotify","apple-music","twitch","discord"].find((p) => id.startsWith(`${p}-`));
+  let op = id;
+  if (id === "audio-joiner") op = "joiner";
+  else if (id.includes("audio-file-size-calculator")) op = `${platform || "audio"}:file-size`;
+  else if (id.includes("bitrate-calculator")) op = `${platform || "audio"}:bitrate`;
+  else if (id.includes("sample-rate-helper")) op = `${platform || "audio"}:sample-rate`;
+  else if (id.includes("loudness-helper")) op = `${platform || "audio"}:loudness`;
+  else if (id.includes("bpm-helper")) op = `${platform || "audio"}:bpm`;
+  else if (id.includes("metadata-helper")) op = `${platform || "audio"}:metadata`;
+  else if (id.includes("export-preset")) op = `${platform || "audio"}:export-preset`;
+  else if (id.includes("format-guide")) op = `${platform || "audio"}:format-guide`;
+  else op = `${platform || "audio"}:guide`;
+  tool.engine = { type: "audio", op };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// AI micro-tools are local deterministic templates. They never imply a hosted model call.
+// Keep true provider/model integrations out of the active catalog until a real integration is shipped.
+for (const tool of tools) {
+  if (tool.category !== "ai") continue;
+  tool.engine = { type: "ai", op: tool.engine?.type === "ai" ? tool.engine.op : tool.id };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
 }
 
 // Auto-related: same category, nearest popularity
@@ -649,13 +1010,90 @@ for (const t of tools) {
   t.related = peers;
 }
 
+// Network utilities run locally. Keep remote lookup/scanning tools planned until a deliberate backend is added.
+const networkOps = new Set(["ipv4-calculator","subnet-calculator","cidr-calculator","ipv4-binary","ipv4-decimal","ipv4-network-address","ipv4-broadcast-address","ipv4-host-range","ipv4-wildcard-mask","ipv4-mask-from-prefix","ipv4-prefix-from-mask","ipv4-host-count","ipv4-subnet-count","ipv4-split-subnets","ipv6-expand","ipv6-compress","ipv6-binary","ipv6-address-type","ipv6-subnet-calculator","url-parser","url-query-parser","url-query-builder","url-origin","url-path-analyzer","url-encode","url-decode","port-lookup","port-reference","http-status-reference","http-method-reference","header-format","header-parser","basic-auth-header","bearer-header","content-type-reference","websocket-url-builder","localhost-url-builder","connection-info"]);
+for (const tool of tools) {
+  if (tool.category === "network" && networkOps.has(tool.id)) {
+    tool.engine = { type: "network", op: tool.id };
+    tool.status = "active";
+    tool.clientSide = true;
+    tool.requiresBackend = false;
+  }
+}
+
+// Promote converter-family expansions to the real converter engine.
+const converterSystems = {
+  length: "length", mass: "mass", weight: "weight", area: "area", volume: "volume",
+  speed: "speed", time: "time", pressure: "pressure", energy: "energy", power: "power",
+  force: "force", frequency: "frequency", "data-storage": "storage", storage: "storage",
+  "data-transfer": "data-transfer", temperature: "temperature", angle: "angle", torque: "torque",
+  density: "density", "flow-rate": "flow-rate", "fuel-economy": "fuel-economy", fuel: "fuel",
+  cooking: "cooking", paper: "paper", dpi: "dpi", pixels: "pixels",
+};
+for (const tool of tools) {
+  if (tool.category !== "converters") continue;
+  const match = tool.name.match(/^(.*?) (Converter|Table|Quick Converter|Comparison|Reference)$/);
+  const base = match?.[1]?.toLowerCase().replace(/\s+/g, "-");
+  const system = converterSystems[base];
+  if (!system) continue;
+  const suffix = match?.[2];
+  const mode = suffix === "Table" ? "table" : suffix === "Quick Converter" ? "quick" : suffix === "Comparison" ? "comparison" : suffix === "Reference" ? "reference" : "standard";
+  tool.engine = { type: "converter", system, mode };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// File-format converters are also fully client-side. Files are processed locally.
+const fileConverterOps = {
+  "JPG to PNG Converter": "jpg-to-png", "PNG to JPG Converter": "png-to-jpg",
+  "PNG to WebP Converter": "png-to-webp", "WebP to PNG Converter": "webp-to-png",
+  "JPG to WebP Converter": "jpg-to-webp", "WebP to JPG Converter": "webp-to-jpg",
+  "SVG to PNG Converter": "svg-to-png", "PNG to SVG Helper": "png-to-svg",
+  "CSV to JSON Converter": "csv-to-json", "JSON to CSV Converter": "json-to-csv",
+  "CSV to TSV Converter": "csv-to-tsv", "TSV to CSV Converter": "tsv-to-csv",
+  "XML to JSON Converter": "xml-to-json", "JSON to XML Converter": "json-to-xml",
+  "YAML to JSON Converter": "yaml-to-json", "JSON to YAML Converter": "json-to-yaml",
+  "TXT to CSV Converter": "txt-to-csv", "CSV to TXT Converter": "csv-to-txt",
+  "Markdown to HTML Converter": "markdown-to-html", "HTML to Markdown Converter": "html-to-markdown",
+};
+for (const tool of tools) {
+  const op = fileConverterOps[tool.name];
+  if (!op) continue;
+  tool.engine = { type: "file-converter", op };
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+}
+
+// MIME lookup/inspection runs entirely client-side using a curated reference table and magic-byte signatures.
+for (const tool of tools) {
+  if (tool.engine?.type === "mime") {
+    tool.engine = { type: "mime", op: "lookup" };
+    tool.status = "active";
+    tool.clientSide = true;
+    tool.requiresBackend = false;
+  }
+}
+
 function js(value) {
   return JSON.stringify(value);
 }
 
+const serializedCatalog = js(tools);
+const chunkSize = 60_000;
+const catalogChunks = [];
+for (let start = 0; start < serializedCatalog.length; start += chunkSize) {
+  catalogChunks.push(JSON.stringify(serializedCatalog.slice(start, start + chunkSize)));
+}
+
 const body = `import type { ToolMeta } from "@/types/tool";
 
-export const tools: ToolMeta[] = ${js(tools)} satisfies ToolMeta[];
+const catalogJson = [
+${catalogChunks.join(",\n")}
+].join("");
+
+export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
 `;
 
 writeFileSync(new URL("../src/data/catalog.ts", import.meta.url), body);

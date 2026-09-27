@@ -70,6 +70,14 @@ export function activeCount(): number {
   return getActiveTools().length;
 }
 
+export function plannedCount(): number {
+  return allTools.filter((t) => t.status === "planned").length;
+}
+
+export function totalToolCount(): number {
+  return allTools.length;
+}
+
 export function categoryLabel(id: CategoryId): string {
   return CATEGORY_MAP[id]?.name ?? id;
 }

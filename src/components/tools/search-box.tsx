@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getActiveTools, toolPath } from "@/lib/registry";
+import { getAllTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +24,7 @@ export function SearchBox({
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => (q.trim() ? searchTools(getActiveTools(), q, 8) : []), [q]);
+  const results = useMemo(() => (q.trim() ? searchTools(getAllTools(), q, 8) : []), [q]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -57,7 +57,7 @@ export function SearchBox({
         value={q}
         autoFocus={autoFocus}
         autoComplete="off"
-        placeholder={`Search ${getActiveTools().length} tools…`}
+        placeholder={`Search ${getAllTools().length.toLocaleString()} tools…`}
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
@@ -94,7 +94,7 @@ export function SearchBox({
                     setOpen(false);
                   }}
                 >
-                  <span className="text-sm font-medium">{t.name}</span>
+                  <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[9px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
                   <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
                 </button>
               </li>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "@/components/tools/error-banner";
@@ -49,40 +50,112 @@ const TEXT_OPTION_FIELDS: Partial<Record<string, UiField[]>> = {
   "keyword-density": [{ name: "keyword", label: "Keyword", type: "text" }],
 };
 
+function segmentWords(input: string): string[] {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    try {
+      const Segmenter = (Intl as typeof Intl & { Segmenter: new (locales?: string | string[], options?: { granularity?: string }) => { segment(text: string): Iterable<{ segment: string; isWordLike?: boolean }> } }).Segmenter;
+      const segmenter = new Segmenter(undefined, { granularity: "word" });
+      return [...segmenter.segment(input)].filter((x) => x.isWordLike).map((x) => x.segment);
+    } catch {
+      // Fall back for browsers without a usable Intl.Segmenter implementation.
+    }
+  }
+  return input.match(/\S+/gu) ?? [];
+}
+
+function countSentences(input: string): number {
+  return (input.match(/[^.!?。！？]+[.!?。！？]+(?=\s|$)|[^.!?。！？]+$/gu) ?? []).filter((x) => x.trim()).length;
+}
+
+function countParagraphs(input: string): number {
+  return input.split(/(?:\r?\n){2,}/).map((x) => x.trim()).filter(Boolean).length;
+}
+
+function buildTextDiff(a: string, b: string): { added: number; removed: number; unchanged: number; lines: string } {
+  const left = a.split(/\r?\n/);
+  const right = b.split(/\r?\n/);
+  const rows = left.length, cols = right.length;
+  const dp: number[][] = Array.from({ length: rows + 1 }, () => Array(cols + 1).fill(0));
+  for (let i = rows - 1; i >= 0; i--) {
+    for (let j = cols - 1; j >= 0; j--) dp[i][j] = left[i] === right[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  }
+  const out: string[] = [];
+  let i = 0, j = 0, added = 0, removed = 0, unchanged = 0;
+  while (i < rows && j < cols) {
+    if (left[i] === right[j]) { out.push(`  ${left[i]}`); unchanged++; i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push(`- ${left[i]}`); removed++; i++; }
+    else { out.push(`+ ${right[j]}`); added++; j++; }
+  }
+  while (i < rows) { out.push(`- ${left[i++]}`); removed++; }
+  while (j < cols) { out.push(`+ ${right[j++]}`); added++; }
+  return { added, removed, unchanged, lines: out.join("\n") };
+}
+
 export function TextEngine({ op }: { op: string }) {
   const [input, setInput] = useState("");
+  const [compare, setCompare] = useState("");
+  const [limit, setLimit] = useState("280");
+  const [wpm, setWpm] = useState("200");
   const extra = TEXT_OPTION_FIELDS[op] ?? [];
   const [opts, setOpts] = useState(() => initialValues(extra));
   const { error, out, wrap, setOut, setError } = useRunner();
-  const run = () =>
-    wrap(() => {
-      const fn = transforms[op];
-      if (!fn) throw new Error("Unknown text operation.");
-      return fn(input, opts);
-    });
+  const words = segmentWords(input);
+  const chars = Array.from(input).length;
+  const charsNoSpaces = Array.from(input.replace(/\s/gu, "")).length;
+  const sentences = countSentences(input);
+  const paragraphs = countParagraphs(input);
+  const readingSeconds = words.length ? Math.ceil((words.length / Math.max(1, Number(wpm) || 200)) * 60) : 0;
+
+  if (op === "word-counter" || op === "character-counter" || op === "sentence-counter" || op === "paragraph-counter" || op === "reading-time-calculator") {
+    const limitValue = Math.max(1, Number(limit) || 1);
+    const metric = op === "word-counter" ? words.length : op === "character-counter" ? chars : op === "sentence-counter" ? sentences : op === "paragraph-counter" ? paragraphs : Math.ceil(readingSeconds / 60);
+    return (
+      <div className="space-y-4">
+        <label className="block space-y-1.5">
+          <Label htmlFor="text-in">Text</Label>
+          <Textarea id="text-in" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-56 font-mono" placeholder="Paste or type your text…" />
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {[['Words', words.length], ['Characters', chars], ['No spaces', charsNoSpaces], ['Sentences', sentences], ['Paragraphs', paragraphs], ['Lines', input ? input.split(/\r?\n/).length : 0], ['Reading time', readingSeconds ? `${Math.max(1, Math.ceil(readingSeconds / 60))} min` : '0 min']].map(([label, value]) => (
+            <div key={String(label)} className="rounded-lg border border-border bg-surface-2 p-3"><div className="text-xs text-muted">{label}</div><div className="mt-1 text-lg font-semibold tabular-nums">{value}</div></div>
+          ))}
+        </div>
+        {(op === "character-counter" || op === "word-counter") ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5"><Label htmlFor="limit">Target limit</Label><Input id="limit" value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="numeric" /></label>
+            <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted">Limit status</div><div className="mt-1 font-medium">{metric <= limitValue ? `${limitValue - metric} remaining` : `${metric - limitValue} over`}</div></div>
+          </div>
+        ) : null}
+        {op === "reading-time-calculator" ? <label className="block max-w-sm space-y-1.5"><Label htmlFor="wpm">Reading speed (words/min)</Label><Input id="wpm" value={wpm} onChange={(e) => setWpm(e.target.value)} inputMode="numeric" /></label> : null}
+        <CodeResult code={input ? `Words: ${words.length}\nCharacters: ${chars}\nCharacters without spaces: ${charsNoSpaces}\nSentences: ${sentences}\nParagraphs: ${paragraphs}\nLines: ${input.split(/\r?\n/).length}\nReading time: ${readingSeconds ? `${Math.max(1, Math.ceil(readingSeconds / 60))} min` : '0 min'}` : ""} filename="env-text-stats.txt" />
+      </div>
+    );
+  }
+
+  if (op === "text-diff") {
+    const diff = buildTextDiff(input, compare);
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="block space-y-1.5"><Label htmlFor="diff-a">Original text</Label><Textarea id="diff-a" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-64 font-mono" /></label>
+          <label className="block space-y-1.5"><Label htmlFor="diff-b">New text</Label><Textarea id="diff-b" value={compare} onChange={(e) => setCompare(e.target.value)} className="min-h-64 font-mono" /></label>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-lg border border-border p-3"><div className="text-xs text-muted">Added lines</div><div className="text-lg font-semibold">{diff.added}</div></div><div className="rounded-lg border border-border p-3"><div className="text-xs text-muted">Removed lines</div><div className="text-lg font-semibold">{diff.removed}</div></div><div className="rounded-lg border border-border p-3"><div className="text-xs text-muted">Unchanged lines</div><div className="text-lg font-semibold">{diff.unchanged}</div></div></div>
+        <CodeResult code={diff.lines} filename="env-text-diff.txt" />
+      </div>
+    );
+  }
+
+  const run = () => wrap(() => {
+    const fn = transforms[op];
+    if (!fn) throw new Error("Unknown text operation.");
+    return fn(input, opts);
+  });
   return (
     <div className="space-y-4">
       {extra.length ? <FieldGrid fields={extra} values={opts} onChange={(n, v) => setOpts((o) => ({ ...o, [n]: v }))} /> : null}
-      <label className="block space-y-1.5">
-        <Label htmlFor="text-in">Input</Label>
-        <Textarea id="text-in" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-44 font-mono" />
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={run}>
-          Run
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setInput("");
-            setOut("");
-            setError(null);
-          }}
-        >
-          Reset
-        </Button>
-      </div>
+      <label className="block space-y-1.5"><Label htmlFor="text-in">Input</Label><Textarea id="text-in" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-44 font-mono" /></label>
+      <div className="flex flex-wrap gap-2"><Button type="button" onClick={run}>Run</Button><Button type="button" variant="ghost" onClick={() => { setInput(""); setOut(""); setError(null); }}>Reset</Button></div>
       <ErrorBanner message={error} />
       <CodeResult code={out} filename={`env-${op}.txt`} />
     </div>
@@ -179,6 +252,17 @@ const GEN_FIELDS: Record<string, UiField[]> = {
 
 function genFieldsFor(op: string): UiField[] {
   if (GEN_FIELDS[op]) return GEN_FIELDS[op];
+  if (["coin-flip"].includes(op)) return [];
+  if (op === "dice-roller") return [
+    { name: "dice", label: "Dice", type: "number", defaultValue: 1 },
+    { name: "sides", label: "Sides", type: "number", defaultValue: 6 },
+  ];
+  if (op === "wheel" || op.endsWith("-wheel") || op.includes("decision-")) return [{ name: "options", label: "Options (one per line)", type: "textarea", defaultValue: "Option A\nOption B\nOption C" }];
+  if (op.includes("team-") || op.includes("group-")) return [
+    { name: "names", label: "Names (one per line)", type: "textarea", defaultValue: "Alex\nJordan\nSam\nTaylor" },
+    ...(op.includes("group-") ? [{ name: "groups", label: "Groups", type: "number", defaultValue: 2 } as UiField] : []),
+  ];
+  if (op.endsWith("-list-generator") || op.endsWith("-generator") || op.endsWith("-picker") || op.endsWith("-randomizer")) return [{ name: "count", label: "How many", type: "number", defaultValue: 5 }];
   if (op.startsWith("dummy")) return GEN_FIELDS.dummy;
   if (op.startsWith("test-")) return [{ name: "count", label: "Count", type: "number", defaultValue: 8 }];
   return [{ name: "count", label: "Count", type: "number", defaultValue: 8 }];
@@ -245,6 +329,8 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   leap: [{ name: "year", label: "Year", type: "number", defaultValue: new Date().getFullYear() }],
   birthday: [{ name: "birth", label: "Birth date", type: "date" }],
   "time-until": [{ name: "target", label: "Target date", type: "date" }],
+  countdown: [{ name: "target", label: "Target date & time", type: "datetime-local" }],
+  "world-clock": [{ name: "zones", label: "IANA time zones (one per line)", type: "textarea", defaultValue: "Africa/Lagos\\nEurope/London\\nAmerica/New_York\\nAsia/Tokyo" }],
   deadline: [{ name: "target", label: "Deadline", type: "date" }],
 };
 
@@ -253,6 +339,24 @@ export function DateTimeEngine({ op }: { op: string }) {
   const [opts, setOpts] = useState(() => initialValues(fields));
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<{ label: string; value: string }[]>([]);
+
+  const live = op === "countdown" || op === "world-clock";
+  useEffect(() => {
+    if (!live) return;
+    const tick = () => {
+      try {
+        setError(null);
+        setItems(runDateTime(op, opts));
+      } catch (err) {
+        setItems([]);
+        setError(err instanceof Error ? err.message : "Could not compute that date.");
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [live, op, opts]);
+
   return (
     <form
       className="space-y-4"
@@ -268,9 +372,20 @@ export function DateTimeEngine({ op }: { op: string }) {
       }}
     >
       <FieldGrid fields={fields} values={opts} onChange={(n, v) => setOpts((o) => ({ ...o, [n]: v }))} />
-      <Button type="submit">Calculate</Button>
+      {!live ? <Button type="submit">Calculate</Button> : null}
       <ErrorBanner message={error} />
-      <ResultPanel items={items} filename={`env-${op}.txt`} />
+      {live ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {items.map((item) => (
+            <div key={item.label} className="rounded-xl border border-border bg-surface-2 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted">{item.label}</div>
+              <div className="mt-1 break-words text-lg font-semibold tabular-nums">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ResultPanel items={items} filename={`env-${op}.txt`} />
+      )}
     </form>
   );
 }
@@ -328,6 +443,28 @@ const SEO_FIELDS: Record<string, UiField[]> = {
     { name: "from", label: "From path", type: "text", defaultValue: "/old" },
     { name: "to", label: "To URL", type: "text" },
   ],
+  "robots-test": [
+    { name: "robots", label: "robots.txt", type: "textarea", defaultValue: "User-agent: *\nDisallow: /admin\nAllow: /" },
+    { name: "path", label: "Path to test", type: "text", defaultValue: "/admin/settings" },
+    { name: "agent", label: "User-agent", type: "text", defaultValue: "*" },
+  ],
+  "sitemap-validator": [{ name: "xml", label: "Sitemap XML", type: "textarea" }],
+  "jsonld-validator": [{ name: "jsonld", label: "JSON-LD", type: "textarea" }],
+  headings: [{ name: "html", label: "HTML", type: "textarea" }],
+  slug: [
+    { name: "text", label: "Text", type: "text" },
+    { name: "stopwords", label: "Stopwords (comma-separated)", type: "text", defaultValue: "the,a,an,and,or,of,to,in,on,for,with,by" },
+  ],
+  "title-length": [{ name: "text", label: "Title", type: "text" }],
+  "description-length": [{ name: "text", label: "Meta description", type: "textarea" }],
+  "meta-robots": [
+    { name: "index", label: "Indexing", type: "select", options: [{ value: "index", label: "index" }, { value: "noindex", label: "noindex" }] },
+    { name: "follow", label: "Links", type: "select", options: [{ value: "follow", label: "follow" }, { value: "nofollow", label: "nofollow" }] },
+    { name: "snippet", label: "Snippet", type: "select", options: [{ value: "snippet", label: "snippet" }, { value: "nosnippet", label: "nosnippet" }] },
+    { name: "maxSnippet", label: "max-snippet (optional)", type: "text" },
+    { name: "maxImage", label: "max-image-preview (optional)", type: "select", options: [{ value: "", label: "not set" }, { value: "none", label: "none" }, { value: "standard", label: "standard" }, { value: "large", label: "large" }] },
+  ],
+  "llms-txt": [{ name: "name", label: "Site name", type: "text" }, { name: "description", label: "Description", type: "textarea" }, { name: "url", label: "Site URL", type: "text" }, { name: "pages", label: "Important pages (one per line)", type: "textarea" }],
   manifest: [
     { name: "name", label: "Name", type: "text", defaultValue: "My App" },
     { name: "short_name", label: "Short name", type: "text", defaultValue: "App" },

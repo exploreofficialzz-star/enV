@@ -42,6 +42,20 @@ function num(opts: Record<string, string>, key: string, fallback: number) {
 function linesOf(s: string) {
   return s.split(/\n/).map((x) => x.trim()).filter(Boolean);
 }
+function uniquePicks<T>(arr: T[], count: number): T[] {
+  const pool = [...arr];
+  const out: T[] = [];
+  while (pool.length && out.length < count) {
+    const i = rnd(pool.length);
+    out.push(pool.splice(i, 1)[0]!);
+  }
+  return out;
+}
+
+function optionList(opts: Record<string, string>) {
+  return linesOf(opts.options || opts.items || opts.names || opts.values || "");
+}
+
 
 const LOREM =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor.";
@@ -189,6 +203,148 @@ export function runGenerator(op: string, opts: Record<string, string>): string {
         .join(" ");
     case "uuid-list":
       return Array.from({ length: count }, () => uuid()).join("\n");
+    case "coin-flip":
+      return rnd(2) === 0 ? "Heads" : "Tails";
+    case "dice-roller": {
+      const dice = Math.max(1, Math.min(100, Math.floor(Number(opts.dice || 1))));
+      const sides = Math.max(2, Math.min(1000, Math.floor(Number(opts.sides || 6))));
+      const rolls = Array.from({ length: dice }, () => 1 + rnd(sides));
+      return `${dice}d${sides}: ${rolls.join(", ")}\nTotal: ${rolls.reduce((a, b) => a + b, 0)}`;
+    }
+    case "wheel": {
+      const options = optionList(opts);
+      if (options.length < 2) throw new Error("Enter at least two options, one per line.");
+      return `Selected: ${pick(options)}`;
+    }
+    case "name-generator":
+    case "name-picker":
+    case "name-randomizer":
+    case "name-wheel":
+    case "name-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => `${pick(FIRST)} ${pick(LAST)}`).join("\n");
+    case "username-picker":
+    case "username-randomizer":
+    case "username-wheel":
+    case "username-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => `${pick(ADJ)}${pick(NOUN)}${rnd(100)}`).join("\n");
+    case "country-picker":
+    case "country-randomizer":
+    case "country-wheel":
+    case "country-list-generator":
+      return (op.endsWith("list-generator") ? uniquePicks(COUNTRIES, Math.min(count, COUNTRIES.length)) : [pick(COUNTRIES)]).join("\n");
+    case "city-picker":
+    case "city-randomizer":
+    case "city-wheel":
+    case "city-list-generator":
+      return (op.endsWith("list-generator") ? uniquePicks(CITIES, Math.min(count, CITIES.length)) : [pick(CITIES)]).join("\n");
+    case "color-randomizer":
+    case "color-wheel":
+    case "color-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => `#${hex(3)}`).join("\n");
+    case "word-generator":
+    case "word-picker":
+    case "word-randomizer":
+    case "word-wheel":
+    case "word-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => pick(WORDS)).join("\n");
+    case "emoji-generator":
+    case "emoji-picker":
+    case "emoji-randomizer":
+    case "emoji-wheel":
+    case "emoji-list-generator": {
+      const emojis = ["😀","😂","😍","🤔","🔥","🎉","🚀","❤️","⭐","🌍","🎵","🎮","🍕","☀️","🌈"];
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => pick(emojis)).join(" ");
+    }
+    case "date-generator":
+    case "date-picker":
+    case "date-randomizer":
+    case "date-wheel":
+    case "date-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => { const y=1990+rnd(36), m=1+rnd(12), d=1+rnd(28); return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }).join("\n");
+    case "time-generator":
+    case "time-picker":
+    case "time-randomizer":
+    case "time-wheel":
+    case "time-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => `${String(rnd(24)).padStart(2,"0")}:${String(rnd(60)).padStart(2,"0")}`).join("\n");
+    case "number-generator":
+    case "number-picker":
+    case "number-randomizer":
+    case "number-wheel":
+    case "number-list-generator":
+      return Array.from({ length: op.endsWith("list-generator") ? count : 1 }, () => String(rnd(1000))).join("\n");
+    case "decision-generator":
+    case "decision-picker":
+    case "decision-randomizer":
+    case "decision-wheel":
+    case "decision-list-generator": {
+      const options = optionList(opts);
+      if (options.length < 2) throw new Error("Enter at least two options, one per line.");
+      if (op.endsWith("list-generator")) return uniquePicks(options, options.length).join("\n");
+      return pick(options);
+    }
+    case "team-picker":
+    case "team-randomizer":
+    case "team-wheel":
+    case "team-list-generator": {
+      const names = optionList(opts);
+      if (!names.length) throw new Error("Enter names, one per line.");
+      return pick(names);
+    }
+    case "group-generator":
+    case "group-picker":
+    case "group-randomizer":
+    case "group-wheel":
+    case "group-list-generator": {
+      const names = optionList(opts);
+      if (!names.length) throw new Error("Enter names, one per line.");
+      const groups = Math.max(2, Math.min(names.length, Math.floor(Number(opts.groups || 2))));
+      const shuffled = uniquePicks(names, names.length);
+      const buckets = Array.from({length: groups}, () => [] as string[]);
+      shuffled.forEach((n,i)=>buckets[i%groups]!.push(n));
+      return buckets.map((b,i)=>`Group ${i+1}\n${b.join("\n")}`).join("\n\n");
+    }
+    case "secret-santa-picker":
+    case "secret-santa-randomizer":
+    case "secret-santa-wheel":
+    case "secret-santa-list-generator":
+      return runGenerator("secret-santa", opts);
+    case "story-generator":
+    case "story-picker":
+    case "story-randomizer":
+    case "story-wheel":
+    case "story-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => `Story seed: ${pick(FIRST)} discovers a ${pick(NOUN)} that could change everything.`).join("\n");
+    case "character-generator":
+    case "character-picker":
+    case "character-randomizer":
+    case "character-wheel":
+    case "character-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => `${pick(FIRST)} — ${pick(ADJ)} ${pick(["explorer","inventor","guardian","scholar","rogue"])}`).join("\n");
+    case "fantasy-generator":
+    case "fantasy-picker":
+    case "fantasy-randomizer":
+    case "fantasy-wheel":
+    case "fantasy-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => pick(FANTASY)+pick(["iel","or","eth","an","is"])).join("\n");
+    case "gamer-generator":
+    case "gamer-picker":
+    case "gamer-randomizer":
+    case "gamer-wheel":
+    case "gamer-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => `${pick(ADJ)}${pick(NOUN)}${rnd(999)}`).join("\n");
+    case "pet-generator":
+    case "pet-picker":
+    case "pet-randomizer":
+    case "pet-wheel":
+    case "pet-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => pick(["Miso","Pebble","Nimbus","Fig","Clover","Sable","Pip","Maple"])).join("\n");
+    case "baby-generator":
+    case "baby-picker":
+    case "baby-randomizer":
+    case "baby-wheel":
+    case "baby-list-generator":
+      return Array.from({length: op.endsWith("list-generator") ? count : 1}, () => pick(FIRST)).join("\n");
     case "test-address":
       return Array.from({ length: count }, () => `${100 + rnd(900)} ${pick(NOUN).replace(/^./, (c) => c.toUpperCase())} Street, ${pick(CITIES)}`).join("\n");
     case "test-email":

@@ -1,4 +1,5 @@
 import { formatNumber } from "@/lib/utils";
+import { advancedCalculators } from "./advanced-calculators";
 
 export type Field = {
   name: string;
@@ -144,10 +145,19 @@ export const calculators: Record<string, CalculatorDef> = {
     },
   },
   average: {
-    fields: [{ name: "numbers", label: "Numbers", type: "textarea", placeholder: "10, 20, 30" }],
+    fields: [
+      { name: "numbers", label: "Numbers", type: "textarea", placeholder: "10, 20, 30" },
+      { name: "weights", label: "Weights (optional)", type: "textarea", placeholder: "1, 2, 1", hint: "Leave blank for a simple average." },
+    ],
     compute: (v) => {
       const xs = list(v.numbers);
-      return [out("Mean", xs.reduce((a, b) => a + b, 0) / xs.length, { primary: true }), out("Count", xs.length)];
+      const weightsRaw = String(v.weights ?? "").trim();
+      if (!weightsRaw) return [out("Mean", xs.reduce((a, b) => a + b, 0) / xs.length, { primary: true }), out("Count", xs.length)];
+      const ws = list(weightsRaw);
+      if (ws.length !== xs.length) throw new Error("Numbers and weights must have the same count.");
+      const totalWeight = ws.reduce((a, b) => a + b, 0);
+      if (totalWeight === 0) throw new Error("Weights cannot add up to 0.");
+      return [out("Weighted mean", xs.reduce((sum, x, i) => sum + x * ws[i]!, 0) / totalWeight, { primary: true }), out("Total weight", totalWeight), out("Count", xs.length)];
     },
   },
   mean: {
@@ -273,14 +283,14 @@ export const calculators: Record<string, CalculatorDef> = {
         { value: "circle", label: "Circle" },
         { value: "trapezoid", label: "Trapezoid" },
       ]),
-      f("length", "Length / base / a"),
-      f("width", "Width / height / b"),
-      f("radius", "Radius (circle)", { hint: "Used for circle" }),
+      f("length", "Length / base / base 1"),
+      f("width", "Width / height"),
+      f("radius", "Radius / base 2", { hint: "Radius for circle; second base for trapezoid." }),
     ],
     compute: (v) => {
       if (v.shape === "circle") return [out("Area", Math.PI * pos(v.radius, "radius") ** 2, { primary: true })];
       if (v.shape === "triangle") return [out("Area", 0.5 * n(v.length) * n(v.width), { primary: true })];
-      if (v.shape === "trapezoid") return [out("Area", 0.5 * (n(v.length) + n(v.radius, "b")) * n(v.width), { primary: true })];
+      if (v.shape === "trapezoid") return [out("Area", 0.5 * (n(v.length, "base 1") + n(v.radius, "base 2")) * n(v.width, "height"), { primary: true })];
       return [out("Area", area(n(v.length), n(v.width)), { primary: true })];
     },
   },
@@ -381,9 +391,9 @@ export const calculators: Record<string, CalculatorDef> = {
     compute: (v) => {
       if (v.method === "heron") {
         const a = pos(v.sideA, "a"), b = pos(v.sideB, "b"), c = pos(v.sideC, "c");
+        if (a + b <= c || a + c <= b || b + c <= a) throw new Error("Those sides do not form a triangle.");
         const s = (a + b + c) / 2;
         const area0 = Math.sqrt(s * (s - a) * (s - b) * (s - c));
-        if (!Number.isFinite(area0)) throw new Error("Those sides do not form a triangle.");
         return [out("Area", area0, { primary: true })];
       }
       return [out("Area", 0.5 * n(v.base, "base") * n(v.height, "height"), { primary: true })];
@@ -473,6 +483,8 @@ export const calculators: Record<string, CalculatorDef> = {
     },
   },
 };
+
+Object.assign(calculators, advancedCalculators);
 
 function moneyCalc(
   key: string,
@@ -777,3 +789,118 @@ calculators.twitch = { fields: [f("subs", "Subs"), f("subPrice", "Net / sub", { 
 earn("spotify", [f("streams", "Streams"), f("perStream", "Per stream", { defaultValue: 0.003 })], (v) => n(v.streams) * n(v.perStream));
 earn("apple-music", [f("streams", "Streams"), f("perStream", "Per stream", { defaultValue: 0.006 })], (v) => n(v.streams) * n(v.perStream));
 earn("podcast", [f("downloads", "Downloads"), f("cpm", "CPM", { defaultValue: 18 }), f("adsPerEpisode", "Ads", { defaultValue: 2 })], (v) => (n(v.downloads) / 1000) * n(v.cpm) * n(v.adsPerEpisode));
+
+
+// Fitness calculators — educational estimates, not medical diagnosis or treatment.
+calculators.bmr = { fields: [
+  f("weightKg", "Weight", { suffix: "kg" }), f("heightCm", "Height", { suffix: "cm" }),
+  f("age", "Age", { suffix: "years" }),
+  sel("sex", "Sex", [{ value: "male", label: "Male" }, { value: "female", label: "Female" }], "male"),
+], formula: "Mifflin–St Jeor: 10W + 6.25H − 5A + sex constant", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), h = pos(v.heightCm, "Height"), age = pos(v.age, "Age");
+  if (age > 120) throw new Error("Enter an age between 1 and 120.");
+  const bmr = 10 * w + 6.25 * h - 5 * age + (v.sex === "female" ? -161 : 5);
+  return [out("BMR", bmr, { primary: true, hint: "kcal/day estimate" })];
+}};
+calculators.tdee = { fields: [
+  f("weightKg", "Weight", { suffix: "kg" }), f("heightCm", "Height", { suffix: "cm" }), f("age", "Age", { suffix: "years" }),
+  sel("sex", "Sex", [{ value: "male", label: "Male" }, { value: "female", label: "Female" }], "male"),
+  sel("activity", "Activity", [
+    { value: "1.2", label: "Sedentary — little exercise" }, { value: "1.375", label: "Light — 1–3 days/week" },
+    { value: "1.55", label: "Moderate — 3–5 days/week" }, { value: "1.725", label: "Very active — 6–7 days/week" },
+    { value: "1.9", label: "Extra active — hard training/physical work" },
+  ], "1.55"),
+], formula: "TDEE = Mifflin–St Jeor BMR × activity factor", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), h = pos(v.heightCm, "Height"), age = pos(v.age, "Age");
+  if (age > 120) throw new Error("Enter an age between 1 and 120.");
+  const bmr = 10 * w + 6.25 * h - 5 * age + (v.sex === "female" ? -161 : 5);
+  const factor = Number(v.activity);
+  if (!Number.isFinite(factor)) throw new Error("Choose an activity level.");
+  return [out("BMR", bmr), out("TDEE", bmr * factor, { primary: true, hint: "kcal/day estimate" })];
+}};
+calculators.calorie = { fields: [
+  f("weightKg", "Weight", { suffix: "kg" }), f("heightCm", "Height", { suffix: "cm" }), f("age", "Age", { suffix: "years" }),
+  sel("sex", "Sex", [{ value: "male", label: "Male" }, { value: "female", label: "Female" }], "male"),
+  sel("activity", "Activity", [
+    { value: "1.2", label: "Sedentary" }, { value: "1.375", label: "Light" }, { value: "1.55", label: "Moderate" }, { value: "1.725", label: "Very active" }, { value: "1.9", label: "Extra active" },
+  ], "1.55"),
+  sel("goal", "Goal", [{ value: "lose", label: "Lose weight" }, { value: "maintain", label: "Maintain" }, { value: "gain", label: "Gain weight" }], "maintain"),
+], formula: "TDEE adjusted by a 500 kcal/day goal assumption", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), h = pos(v.heightCm, "Height"), age = pos(v.age, "Age"), factor = Number(v.activity);
+  if (age > 120 || !Number.isFinite(factor)) throw new Error("Check age and activity inputs.");
+  const bmr = 10 * w + 6.25 * h - 5 * age + (v.sex === "female" ? -161 : 5), tdee = bmr * factor;
+  const adjustment = v.goal === "lose" ? -500 : v.goal === "gain" ? 500 : 0;
+  return [out("Maintenance", tdee, { hint: "TDEE estimate" }), out("Daily target", Math.max(0, tdee + adjustment), { primary: true, hint: "uses ±500 kcal goal assumption" })];
+}};
+calculators.macro = { fields: [
+  f("calories", "Daily calories", { suffix: "kcal" }),
+  f("proteinPct", "Protein", { suffix: "%", defaultValue: 30 }), f("carbPct", "Carbohydrates", { suffix: "%", defaultValue: 40 }), f("fatPct", "Fat", { suffix: "%", defaultValue: 30 }),
+], formula: "Protein/carbs/fat grams = calories × percentage ÷ 4/4/9", compute: (v) => {
+  const calories = pos(v.calories, "Calories"), p = n(v.proteinPct, "protein %"), c = n(v.carbPct, "carb %"), fat = n(v.fatPct, "fat %");
+  if (p < 0 || c < 0 || fat < 0 || Math.abs(p + c + fat - 100) > 0.01) throw new Error("Protein, carbohydrate, and fat percentages must add up to 100%.");
+  return [out("Protein", calories * p / 100 / 4, { primary: true, hint: "g/day" }), out("Carbohydrates", calories * c / 100 / 4, { hint: "g/day" }), out("Fat", calories * fat / 100 / 9, { hint: "g/day" })];
+}};
+calculators.protein = { fields: [
+  f("weightKg", "Weight", { suffix: "kg" }),
+  sel("goal", "Goal", [{ value: "general", label: "General" }, { value: "active", label: "Active" }, { value: "strength", label: "Strength / hypertrophy" }], "general"),
+], formula: "Weight × goal factor: 1.2 / 1.6 / 2.2 g/kg", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), factor = v.goal === "strength" ? 2.2 : v.goal === "active" ? 1.6 : 1.2;
+  return [out("Protein target", w * factor, { primary: true, hint: `${factor} g/kg assumption` })];
+}};
+calculators["body-fat"] = { fields: [
+  f("heightIn", "Height", { suffix: "in" }), f("neckIn", "Neck", { suffix: "in" }), f("waistIn", "Waist", { suffix: "in" }),
+  f("hipIn", "Hip (female only)", { suffix: "in", hint: "Required for the female Navy equation." }),
+  sel("sex", "Sex", [{ value: "male", label: "Male" }, { value: "female", label: "Female" }], "male"),
+], formula: "US Navy circumference method; logarithmic estimate", compute: (v) => {
+  const h = pos(v.heightIn, "Height"), neck = pos(v.neckIn, "Neck"), waist = pos(v.waistIn, "Waist");
+  let bf: number;
+  if (v.sex === "female") {
+    const hip = pos(v.hipIn, "Hip");
+    if (waist + hip <= neck) throw new Error("Check waist, hip, and neck measurements.");
+    bf = 495 / (1.29579 - 0.35004 * Math.log10(waist + hip - neck) + 0.221 * Math.log10(h)) - 450;
+  } else {
+    if (waist <= neck) throw new Error("Waist must be larger than neck for this estimate.");
+    bf = 495 / (1.0324 - 0.19077 * Math.log10(waist - neck) + 0.15456 * Math.log10(h)) - 450;
+  }
+  return [out("Estimated body fat", Math.max(0, bf), { primary: true, hint: "% · measurement-based estimate" })];
+}};
+calculators["ideal-weight"] = { fields: [
+  f("heightIn", "Height", { suffix: "in" }),
+], formula: "Devine, Robinson, and Miller formulas", compute: (v) => {
+  const h = pos(v.heightIn, "Height");
+  if (h < 48) throw new Error("Enter a height of at least 48 inches.");
+  const extra = h - 60;
+  const devine = 50 + 2.3 * extra, robinson = 52 + 1.9 * extra, miller = 56.2 + 1.41 * extra;
+  return [out("Devine", devine, { primary: true, hint: "kg" }), out("Robinson", robinson, { hint: "kg" }), out("Miller", miller, { hint: "kg" })];
+}};
+calculators.water = { fields: [f("weightKg", "Weight", { suffix: "kg" }), f("activityMin", "Exercise minutes/day", { suffix: "min", defaultValue: 30 })], formula: "≈35 mL/kg + ≈12 mL per exercise minute", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), min = n(v.activityMin, "exercise minutes");
+  if (min < 0) throw new Error("Exercise minutes cannot be negative.");
+  return [out("Daily water", (w * 35 + min * 12) / 1000, { primary: true, hint: "litres/day estimate" }), out("Daily water", w * 35 + min * 12, { hint: "mL/day estimate" })];
+}};
+calculators.pace = { fields: [f("distanceKm", "Distance", { suffix: "km" }), f("timeMin", "Time", { suffix: "min" })], formula: "Pace = time ÷ distance", compute: (v) => {
+  const d = pos(v.distanceKm, "Distance"), t = pos(v.timeMin, "Time"), pace = t / d, totalSec = Math.round(pace * 60), mins = Math.floor(totalSec / 60), secs = totalSec % 60;
+  const speed = d / (t / 60);
+  return [out("Pace", `${mins}:${String(secs).padStart(2, "0")} /km`, { primary: true }), out("Speed", speed, { hint: "km/h" }), out("Pace", pace * 1.609344, { hint: "min/mile" })];
+}};
+calculators["one-rep-max"] = { fields: [f("weightKg", "Weight lifted", { suffix: "kg" }), f("reps", "Repetitions", { defaultValue: 5 })], formula: "Epley: 1RM = weight × (1 + reps/30)", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), reps = pos(v.reps, "Repetitions");
+  if (reps > 30) throw new Error("Epley is most useful for lower rep ranges; enter 30 or fewer reps.");
+  const epley = w * (1 + reps / 30), brzycki = w * 36 / (37 - reps);
+  return [out("Estimated 1RM", epley, { primary: true, hint: "Epley · kg" }), out("Brzycki estimate", brzycki, { hint: "kg" })];
+}};
+calculators["hr-zone"] = { fields: [f("age", "Age", { suffix: "years" })], formula: "Fox max HR = 220 − age; zones use 50–100% of max", compute: (v) => {
+  const age = pos(v.age, "Age");
+  if (age > 120) throw new Error("Enter an age between 1 and 120.");
+  const max = 220 - age;
+  return [out("Estimated max HR", max, { primary: true, hint: "bpm" }), out("Zone 1", `${Math.round(max * .50)}–${Math.round(max * .60)} bpm`), out("Zone 2", `${Math.round(max * .60)}–${Math.round(max * .70)} bpm`), out("Zone 3", `${Math.round(max * .70)}–${Math.round(max * .80)} bpm`), out("Zone 4", `${Math.round(max * .80)}–${Math.round(max * .90)} bpm`), out("Zone 5", `${Math.round(max * .90)}–${Math.round(max)} bpm`)];
+}};
+calculators["calories-burned"] = { fields: [f("weightKg", "Weight", { suffix: "kg" }), f("minutes", "Duration", { suffix: "min" }), f("met", "MET", { defaultValue: 7, hint: "Use the activity's published MET value." })], formula: "Calories ≈ MET × 3.5 × kg ÷ 200 × minutes", compute: (v) => {
+  const kg = pos(v.weightKg, "Weight"), min = pos(v.minutes, "Duration"), met = pos(v.met, "MET");
+  return [out("Estimated calories", met * 3.5 * kg / 200 * min, { primary: true, hint: "rough estimate" })];
+}};
+calculators.lbm = { fields: [f("weightKg", "Weight", { suffix: "kg" }), f("heightCm", "Height", { suffix: "cm" }), sel("sex", "Sex", [{ value: "male", label: "Male" }, { value: "female", label: "Female" }], "male")], formula: "Boer lean-body-mass estimate", compute: (v) => {
+  const w = pos(v.weightKg, "Weight"), h = pos(v.heightCm, "Height");
+  const lbm = v.sex === "female" ? 0.252 * w + 0.473 * h - 48.3 : 0.407 * w + 0.267 * h - 19.2;
+  return [out("Lean body mass", Math.max(0, lbm), { primary: true, hint: "kg · estimate" })];
+}};

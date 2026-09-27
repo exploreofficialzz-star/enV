@@ -63,6 +63,46 @@ export function runDateTime(op: string, opts: Record<string, string>): { label: 
         { label: "Total hours", value: (Math.abs(to.getTime() - from.getTime()) / 3600000).toFixed(2) },
       ];
     }
+    case "countdown": {
+      const targetRaw = opts.target;
+      if (!targetRaw?.trim()) throw new Error("Choose a target date and time.");
+      const target = new Date(targetRaw);
+      if (!isValid(target)) throw new Error("Could not read that target date and time.");
+      const diff = target.getTime() - Date.now();
+      if (diff <= 0) {
+        return [
+          { label: "Status", value: "The target time has arrived." },
+          { label: "Difference", value: `${Math.abs(diff / 1000).toFixed(0)} seconds ago` },
+        ];
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return [
+        { label: "Countdown", value: `${days}d ${hours}h ${minutes}m ${seconds}s` },
+        { label: "Target", value: target.toLocaleString() },
+        { label: "Total seconds", value: String(totalSeconds) },
+      ];
+    }
+    case "world-clock": {
+      const zones = (opts.zones || "").split(/\\r?\\n|,/).map((z) => z.trim()).filter(Boolean);
+      if (!zones.length) throw new Error("Enter at least one IANA time zone.");
+      const now = new Date();
+      return zones.slice(0, 20).map((zone) => {
+        try {
+          const formatter = new Intl.DateTimeFormat("en-GB", {
+            timeZone: zone,
+            dateStyle: "medium",
+            timeStyle: "medium",
+          });
+          return { label: zone, value: formatter.format(now) };
+        } catch {
+          throw new Error(`Unknown or unsupported time zone: ${zone}`);
+        }
+      });
+    }
     case "timezone": {
       const raw = opts.time || new Date().toISOString();
       const date = parseDate(raw, "time");

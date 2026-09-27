@@ -1,0 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { parseGeneratedCatalog } from './catalog-reader.mjs';
+const catalogText = readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8');
+const formulasText = readFileSync(new URL('../src/lib/engines/formulas.ts', import.meta.url), 'utf8');
+const tools = parseGeneratedCatalog(catalogText).filter((tool) => tool.category === 'fitness');
+const defs = new Set();
+for (const m of formulasText.matchAll(/calculators(?:\["([^"]+)"\]|\.([A-Za-z0-9_-]+))\s*=/g)) defs.add(m[1] ?? m[2]);
+for (const _match of formulasText.matchAll(/(?:^|\n)calculators\s*=\s*\{/g)) defs.add('');
+const missing = tools.filter(t => !defs.has(t.engine.formula));
+const planned = tools.filter(t => t.status === 'planned');
+const wrong = tools.filter(t => t.engine.type !== 'calculator');
+console.log(`Fitness audit: ${tools.length} tools`);
+console.log(`Definitions found: ${defs.size}`);
+console.log(`Missing: ${missing.length}`);
+console.log(`Planned: ${planned.length}`);
+console.log(`Wrong engine: ${wrong.length}`);
+if (missing.length || planned.length || wrong.length) process.exit(1);
+console.log('Fitness catalog is fully executable.');

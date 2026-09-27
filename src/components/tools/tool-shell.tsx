@@ -8,6 +8,7 @@ import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { Button } from "@/components/ui/button";
+import { ComingSoonBadge } from "@/components/tools/coming-soon";
 
 export function ToolShell({
   tool,
@@ -56,7 +57,7 @@ export function ToolShell({
             <Icon className="size-5" />
           </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>{tool.status === "planned" ? <ComingSoonBadge /> : null}</div>
             <p className="mt-1 max-w-2xl text-sm text-muted">{tool.description}</p>
           </div>
         </div>

@@ -18,7 +18,12 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/auth/sign-in-gate.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "check:catalog": "node scripts/check-catalog.mjs",
+    "check:calculators": "node scripts/check-calculators.mjs",
+    "check:converters": "node scripts/check-converters.mjs",
+    "check:text": "node scripts/check-text.mjs",
+    "check:datetime": "node scripts/check-datetime.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
