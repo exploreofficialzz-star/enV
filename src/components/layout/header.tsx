@@ -19,7 +19,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-bg/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:h-16 sm:px-6">
-        <Logo />
+        <Logo wordmark={false} />
         <nav className="ml-2 hidden items-center gap-1 md:flex" aria-label="Primary">
           {NAV.map((item) => (
             <Link
