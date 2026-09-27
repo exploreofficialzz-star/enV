@@ -14,6 +14,11 @@ enV is a browser-based toolkit built with React, TanStack Start, Vite, and Tailw
 - Use `src/routes/` for routes, `src/components/` for UI, and `src/lib/` for reusable logic.
 - Keep generated route-tree files out of commits; the TanStack/Vite build generates them.
 
+## Brand system
+
+- Use `src/components/brand/logo.tsx` for every full enV lockup; it renders the canonical `public/logo-header-transparent.png` asset used by the header.
+- Do not recreate the wordmark or draw an alternate logo inline. Browser and PWA icons use the matching header-derived PNG assets.
+
 ## Vercel deployment
 
 Vercel uses the committed `package-lock.json`, installs production dependencies, and builds with `npm run build`. The app uses the Nitro Vercel preset in `vite.config.ts`. Set `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `DATABASE_URL`, and OAuth credentials in Vercel only when enabling the optional authentication features.

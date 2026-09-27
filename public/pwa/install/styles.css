@@ -77,14 +77,13 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 20px;
+  gap: 4px;
+  min-height: 40px;
   margin: 0 auto;
   flex: 0 0 auto;
 }
 
-.powered-by,
-.powered-app {
+.powered-by {
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
   letter-spacing: -0.01em;
@@ -99,19 +98,16 @@ img {
 .powered-brand {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 20px;
+  width: 60px;
+  height: 40px;
 }
 
 .app-logo {
   display: block;
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-}
-
-.powered-app {
-  color: rgba(255, 255, 255, 0.6);
+  width: 60px;
+  height: 40px;
+  flex: 0 0 60px;
+  object-fit: contain;
 }
 
 .content {

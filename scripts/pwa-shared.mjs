@@ -130,7 +130,7 @@ export function renderWebManifest(_hostHeader = "", site = readOgSite()) {
       theme_color: themeColor,
       icons: [
         { src: "/pwa/icon-180.png", sizes: "180x180", type: "image/png" },
-        { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+        { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png" },
       ],
     },
     null,

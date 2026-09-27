@@ -54,8 +54,23 @@ test("manifest identifies enV and serves the canonical app icon", () => {
   assert.equal(manifest.name, "enV — Browser Toolkit");
   assert.equal(manifest.short_name, "enV");
   assert.equal(manifest.icons[0].src, "/pwa/icon-180.png");
+  assert.equal(manifest.icons[1].src, "/pwa/icon-512.png");
+  assert.ok(manifest.icons.every((icon) => icon.type === "image/png"));
+  assert.equal(manifest.background_color, "#ffffff");
   assert.equal(manifest.theme_color, "#0d9f8a");
   assert.equal(manifest.display, "standalone");
+});
+
+test("all web brand lockups use the exact header image", () => {
+  const logo = readFileSync(join(PROJECT_ROOT, "src/components/brand/logo.tsx"), "utf8");
+  const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");
+  const footer = readFileSync(join(PROJECT_ROOT, "src/components/layout/footer.tsx"), "utf8");
+  const install = readFileSync(join(PROJECT_ROOT, "scripts/install-page.html"), "utf8");
+  assert.match(logo, /src="\/logo-header-transparent\.png"/);
+  assert.doesNotMatch(logo, /<svg/);
+  assert.match(header, /<Logo\s*\/>/);
+  assert.match(footer, /<Logo\s*\/>/);
+  assert.match(install, /src="\/logo-header-transparent\.png"/);
 });
 
 test("share metadata is generated from the project card without third-party defaults", () => {
