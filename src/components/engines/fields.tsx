@@ -79,14 +79,3 @@ export function FieldGrid({
     </div>
   );
 }
-
-export function initialValues(fields: UiField[]): Record<string, string> {
-  const v: Record<string, string> = {};
-  for (const f of fields) {
-    v[f.name] =
-      f.defaultValue === undefined || f.defaultValue === ""
-        ? ""
-        : String(f.defaultValue);
-  }
-  return v;
-}

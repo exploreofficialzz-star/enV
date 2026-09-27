@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FieldGrid, initialValues, type UiField } from "@/components/engines/fields";
+import { FieldGrid, type UiField } from "@/components/engines/fields";
+import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 
 const FIELDS: Record<string, UiField[]> = {

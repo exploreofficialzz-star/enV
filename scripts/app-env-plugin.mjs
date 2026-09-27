@@ -13,7 +13,7 @@ export const APP_ENV_ROUTE = "/__app-env";
 
 export function appEnvPlugin() {
   return {
-    name: "app-builder:app-env",
+    name: "enV:app-env",
     apply: "serve",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {

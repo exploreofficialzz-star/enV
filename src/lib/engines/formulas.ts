@@ -298,7 +298,7 @@ export const calculators: Record<string, CalculatorDef> = {
       f("c", "Height (box)"),
     ],
     compute: (v) => {
-      const a = pos(v.a, "first dimension"), b = n(v.b || "0"), c = n(v.c || "0");
+      const a = pos(v.a, "first dimension");
       let vol = 0;
       if (v.shape === "box") vol = a * pos(v.b, "width") * pos(v.c, "height");
       else if (v.shape === "cylinder") vol = Math.PI * a * a * pos(v.b, "height");

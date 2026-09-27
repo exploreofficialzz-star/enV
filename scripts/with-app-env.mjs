@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Run a command with `.grok/app-env.json` merged into its environment.
+ * Run a command with `.enV/app-env.json` merged into its environment.
  *
  * `dev`, `build` and `preview` all route through this wrapper, so the dev
  * server, the built bundle and the preview server can never disagree about
@@ -12,9 +12,8 @@
  * `process.env` entry always wins, so an explicit override still works.
  *
  * That precedence also means the file governs this workspace only. A deployed
- * build runs with the provider's project env, where the deployer sets
- * `VITE_AUTH_ENABLED` itself (today unconditionally `"true"`), so the deployed
- * flag is the platform's, not this file's.
+ * build uses the Vercel project environment; authentication is disabled unless
+ * the deployer explicitly sets `VITE_AUTH_ENABLED=true`.
  *
  * Vite picks the values up because `loadEnv` prefix-matches entries already in
  * `process.env`, which is why the merge has to happen before Vite starts.
@@ -25,14 +24,14 @@ import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const APP_ENV_REL_PATH = ".grok/app-env.json";
+export const APP_ENV_REL_PATH = ".enV/app-env.json";
 
 const VITE_PREFIX = "VITE_";
 
 /**
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
  * Anything unparseable is an empty environment — a workspace without the file
- * must behave exactly like today (auth on, no overrides).
+ * receives no local overrides. App defaults keep auth disabled.
  */
 export function parseAppEnv(text) {
   let parsed;

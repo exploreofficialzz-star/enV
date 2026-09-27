@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FieldGrid, initialValues, type UiField } from "@/components/engines/fields";
+import { FieldGrid, type UiField } from "@/components/engines/fields";
+import { initialValues } from "@/components/engines/initial-values";
 import { Button } from "@/components/ui/button";
 
 const THEMES: Record<string, { name: string; bg: string; bubbleMe: string; bubbleThem: string; meFg: string; themFg: string; header: string; radius: string }> = {

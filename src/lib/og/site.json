@@ -1,4 +1,7 @@
 {
-  "title": "enV",
+  "title": "enV — Browser Toolkit",
+  "shortName": "enV",
+  "description": "Useful tools. One place. A fast, privacy-conscious collection of browser-based utilities.",
+  "color": "#0d9f8a",
   "card": "custom"
 }

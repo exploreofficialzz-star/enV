@@ -15,7 +15,6 @@ export function ConverterEngine({ system }: { system: string }) {
   const [amount, setAmount] = useState("1");
   const [from, setFrom] = useState(units[0]?.id ?? "");
   const [to, setTo] = useState(units[1]?.id ?? units[0]?.id ?? "");
-  const [error, setError] = useState<string | null>(null);
 
   const result = useMemo(() => {
     if (!def) return null;
@@ -87,7 +86,7 @@ export function ConverterEngine({ system }: { system: string }) {
           </Select>
         </div>
       </div>
-      <ErrorBanner message={result && "error" in result ? result.error ?? null : error} />
+      <ErrorBanner message={result && "error" in result ? result.error ?? null : null} />
       {text ? (
         <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-4 py-3">
           <p className="text-sm">{text}</p>

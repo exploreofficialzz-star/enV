@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { FieldGrid, initialValues } from "@/components/engines/fields";
+import { FieldGrid } from "@/components/engines/fields";
+import { initialValues } from "@/components/engines/initial-values";
 import { ResultPanel } from "@/components/engines/result-panel";
 import { calculators } from "@/lib/engines/formulas";
 
@@ -11,7 +12,7 @@ export function CalculatorEngine({ formula }: { formula: string }) {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<{ label: string; value: string; hint?: string; primary?: boolean }[]>([]);
 
-  const fields = def?.fields ?? [];
+  const fields = useMemo(() => def?.fields ?? [], [def]);
 
   const onChange = (name: string, value: string) => {
     setValues((v) => ({ ...v, [name]: value }));

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { FieldGrid, initialValues, type UiField } from "@/components/engines/fields";
+import { FieldGrid, type UiField } from "@/components/engines/fields";
+import { initialValues } from "@/components/engines/initial-values";
 import { downloadBlob } from "@/lib/utils";
 import { Download } from "lucide-react";
 
