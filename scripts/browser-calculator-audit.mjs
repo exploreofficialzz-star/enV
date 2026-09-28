@@ -55,6 +55,7 @@ const sampleOverrides = {
   "science-molar-mass-calculator": { masses: "12.01, 2*1.008, 16.00" },
   "finance-gross-profit-calculator": { revenue: "100", cogs: "60" },
   "finance-contribution-margin-calculator": { sales: "100", variableCosts: "60" },
+  "finance-irr-calculator": { cashflows: "-1000, 300, 400, 500" },
 };
 
 function sampleForField(field, formula) {
@@ -73,8 +74,9 @@ function sampleForField(field, formula) {
   return "2";
 }
 
-function alternateSampleForField(field, currentValue) {
+function alternateSampleForField(field, currentValue, formula) {
   if (field.type === "select" || !String(currentValue).trim()) return String(currentValue);
+  if (formula === "finance-irr-calculator" && field.name === "cashflows") return "-1200, 400, 500, 600";
   if (field.type === "textarea") {
     if (/probabilit/i.test(field.name + field.label)) return "0.1, 0.3, 0.6";
     if (/weight/i.test(field.name + field.label)) return "";
@@ -83,6 +85,12 @@ function alternateSampleForField(field, currentValue) {
   }
   if (field.name === "expression") return "18 / 3 + 4";
   const numericValue = Number(String(currentValue).replace(/,/g, ""));
+  const precisionField = /significant figures/i.test(`${field.name} ${field.label}`);
+  const decimalPlacesField = /decimal places/i.test(`${field.name} ${field.label}`);
+  if ((precisionField || decimalPlacesField) && Number.isFinite(numericValue)) {
+    const nextInteger = Math.round(numericValue * 1.5 + 1);
+    return String(precisionField ? Math.min(15, Math.max(1, nextInteger)) : Math.min(20, Math.max(0, nextInteger)));
+  }
   if (Number.isFinite(numericValue)) return String(numericValue < 0 ? numericValue * 1.5 : numericValue * 1.5 + 1);
   return String(currentValue);
 }
@@ -186,6 +194,7 @@ try {
       const knownAnswers = {
         "science-gas-law-calculator": [{ label: "T₂", value: "1,000" }],
         "science-molar-mass-calculator": [{ label: "Total molar mass", value: "30.026" }],
+        "finance-irr-calculator": [{ label: "IRR", value: "8.89633947" }],
       }[tool.id];
       if (knownAnswers && JSON.stringify(expected.map(({ label, value }) => ({ label: String(label), value: String(value) }))) !== JSON.stringify(knownAnswers)) {
         throw new Error(`Known-answer check failed. Expected ${JSON.stringify(knownAnswers)}; formula returned ${JSON.stringify(expected)}.`);
@@ -203,7 +212,7 @@ try {
       }
       const alternateValues = {};
       for (const field of definition.fields) {
-        const value = alternateSampleForField(field, values[field.name]);
+        const value = alternateSampleForField(field, values[field.name], formula);
         alternateValues[field.name] = value;
         const control = form.locator(`[id="${field.name}"]`);
         if (field.type === "select") await control.selectOption(value);
@@ -211,6 +220,12 @@ try {
       }
       const alternateExpected = definition.compute(alternateValues);
       if (!Array.isArray(alternateExpected) || !alternateExpected.length) throw new Error("Formula did not return outputs for its second valid input.");
+      const knownAlternateAnswers = {
+        "finance-irr-calculator": [{ label: "IRR", value: "11.21871874" }],
+      }[tool.id];
+      if (knownAlternateAnswers && JSON.stringify(alternateExpected.map(({ label, value }) => ({ label: String(label), value: String(value) }))) !== JSON.stringify(knownAlternateAnswers)) {
+        throw new Error(`Second known-answer check failed. Expected ${JSON.stringify(knownAlternateAnswers)}; formula returned ${JSON.stringify(alternateExpected)}.`);
+      }
       await form.getByRole("button", { name: "Calculate", exact: true }).click();
       await resultList.waitFor({ state: "visible", timeout: 5000 });
       const alternateActual = await visibleRows(form);
@@ -220,6 +235,38 @@ try {
       }
       if (alternateActual.some((row) => !row.value || /NaN|Infinity|undefined/i.test(row.value))) {
         throw new Error(`Second input produced an empty or non-finite result: ${JSON.stringify(alternateActual)}.`);
+      }
+      if (tool.id === "finance-irr-calculator") {
+        await form.locator('[id="cashflows"]').fill("1, 2, 3");
+        await form.getByRole("button", { name: "Calculate", exact: true }).click();
+        const error = await form.locator('[role="alert"]').textContent();
+        if (!/at least one negative and one positive/i.test(error ?? "")) {
+          throw new Error("IRR accepted cash flows without both negative and positive values.");
+        }
+        await form.locator('[id="cashflows"]').fill("-100, 200, -100");
+        await form.getByRole("button", { name: "Calculate", exact: true }).click();
+        const multipleSignError = await form.locator('[role="alert"]').textContent();
+        if (!/multiple sign changes/i.test(multipleSignError ?? "")) {
+          throw new Error("IRR accepted cash flows with multiple sign changes and potentially ambiguous roots.");
+        }
+        result.irrInvalidCasesPassed = 2;
+      }
+      if (tool.id === "science-gas-law-calculator") {
+        const gasIds = ["p1", "v1", "t1", "p2", "v2", "t2"];
+        const submitGasValues = async (values) => {
+          for (let index = 0; index < gasIds.length; index++) {
+            await form.locator(`[id="${gasIds[index]}"]`).fill(values[index] ?? "");
+          }
+          await form.getByRole("button", { name: "Calculate", exact: true }).click();
+          return (await form.locator('[role="alert"]').textContent()) ?? "";
+        };
+        const rejectsFour = /exactly five/i.test(await submitGasValues(["2", "3", "300", "4", "", ""]));
+        const rejectsSix = /exactly five/i.test(await submitGasValues(["2", "3", "300", "4", "5", "350"]));
+        const rejectsZero = /greater than 0/i.test(await submitGasValues(["0", "3", "300", "4", "5", ""]));
+        if (!rejectsFour || !rejectsSix || !rejectsZero) {
+          throw new Error(`Gas Law invalid-input checks failed (four=${rejectsFour}, six=${rejectsSix}, zero=${rejectsZero}).`);
+        }
+        result.invalidInputCasesPassed = 3;
       }
       result.ok = true;
       result.outputCount = alternateActual.length;

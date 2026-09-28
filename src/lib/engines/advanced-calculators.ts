@@ -49,6 +49,76 @@ const comb = (nn: number, rr: number) => { const n0 = integer(nn, "n"), r0 = int
 const perm = (nn: number, rr: number) => { const n0 = integer(nn, "n"), r0 = integer(rr, "r"); if (n0 < 0 || r0 < 0 || r0 > n0) throw new Error("Need integers with 0 ≤ r ≤ n."); let p=1; for(let i=0;i<r0;i++) p*=n0-i; return p; };
 const mean = (xs: number[]) => xs.reduce((a,b)=>a+b,0)/xs.length;
 
+function calculateIrr(cashFlows: number[]): number {
+  const nonZeroFlows = cashFlows.filter((flow) => flow !== 0);
+  if (!nonZeroFlows.some((flow) => flow < 0) || !nonZeroFlows.some((flow) => flow > 0)) {
+    throw new Error("Cash flows must include at least one negative and one positive value.");
+  }
+  let signChanges = 0;
+  for (let index = 1; index < nonZeroFlows.length; index++) {
+    if (Math.sign(nonZeroFlows[index]!) !== Math.sign(nonZeroFlows[index - 1]!)) signChanges++;
+  }
+  if (signChanges > 1) {
+    throw new Error("Cash flows with multiple sign changes may have multiple IRRs; use a conventional cash-flow series.");
+  }
+
+  const scaledNpv = (rate: number): number => {
+    const logDiscount = -Math.log1p(rate);
+    let maxLog = Number.NEGATIVE_INFINITY;
+    for (let period = 0; period < cashFlows.length; period++) {
+      const flow = cashFlows[period]!;
+      if (flow !== 0) maxLog = Math.max(maxLog, Math.log(Math.abs(flow)) + period * logDiscount);
+    }
+    let sum = 0;
+    let compensation = 0;
+    for (let period = 0; period < cashFlows.length; period++) {
+      const flow = cashFlows[period]!;
+      if (flow === 0) continue;
+      const logTerm = Math.log(Math.abs(flow)) + period * logDiscount - maxLog;
+      const term = Math.sign(flow) * Math.exp(logTerm);
+      const adjusted = term - compensation;
+      const next = sum + adjusted;
+      compensation = (next - sum) - adjusted;
+      sum = next;
+    }
+    return sum;
+  };
+
+  let low = -0.5;
+  let high = 0.5;
+  let lowValue = scaledNpv(low);
+  let highValue = scaledNpv(high);
+  let bracketed = false;
+  for (let expansion = 0; expansion < 64; expansion++) {
+    if (lowValue === 0) return low;
+    if (highValue === 0) return high;
+    if ((lowValue < 0) !== (highValue < 0)) {
+      bracketed = true;
+      break;
+    }
+    low = Math.max(-0.999999999999, (low - 1) / 2);
+    high = high * 2 + 0.5;
+    lowValue = scaledNpv(low);
+    highValue = scaledNpv(high);
+  }
+  if (!bracketed) throw new Error("Could not find an IRR above -100% for these cash flows.");
+
+  let rate = low;
+  for (let iteration = 0; iteration < 200; iteration++) {
+    rate = low + (high - low) / 2;
+    const value = scaledNpv(rate);
+    if (value === 0 || high - low <= 1e-13 * Math.max(1, Math.abs(rate))) break;
+    if ((lowValue < 0) !== (value < 0)) {
+      high = rate;
+      highValue = value;
+    } else {
+      low = rate;
+      lowValue = value;
+    }
+  }
+  return rate;
+}
+
 export const advancedCalculators: Record<string, CalculatorDef> = {};
 function add(id: string, fields: Field[], compute: CalculatorDef["compute"], formula?: string) { advancedCalculators[id] = { fields, compute, formula }; }
 
@@ -131,7 +201,11 @@ add("finance-payment-calculator", [f("principal","Principal"),f("rate","Annual r
 add("finance-future-value-calculator", [f("present","Present value"),f("rate","Annual rate",{suffix:"%"}),f("years","Years"),f("contribution","Annual contribution",{defaultValue:0})], v=>{const P=n(v.present),r=n(v.rate)/100,t=pos(v.years);const fv=P*(1+r)**t+n(v.contribution)*(((1+r)**t-1)/(r||1));return [out("Future value",r===0?P+n(v.contribution)*t:fv,true)];});
 add("finance-present-value-calculator", [f("future","Future value"),f("rate","Annual rate",{suffix:"%"}),f("years","Years")], v=>[out("Present value",n(v.future)/(1+n(v.rate)/100)**pos(v.years),true)]);
 add("finance-npv-calculator", [f("initial","Initial investment"),ta("cashflows","Future cash flows",{placeholder:"1000, 1200, 1500"}),f("rate","Discount rate",{suffix:"%"})], v=>{const r=n(v.rate)/100,c=list(v.cashflows),npv=-n(v.initial)+c.reduce((s,x,i)=>s+x/(1+r)**(i+1),0);return [out("NPV",npv,true)];});
-add("finance-irr-calculator", [ta("cashflows","Cash flows",{placeholder:"-1000, 300, 400, 500"})], v=>{const c=list(v.cashflows);let r=.1;for(let i=0;i<100;i++){const f0=c.reduce((s,x,k)=>s+x/(1+r)**k,0);const d=c.reduce((s,x,k)=>k? s-k*x/(1+r)**(k+1):s,0);if(Math.abs(d)<1e-12)break;const nr=r-f0/d;if(!Number.isFinite(nr)||nr<=-0.9999)break;if(Math.abs(nr-r)<1e-10){r=nr;break}r=nr;}return [out("IRR",r*100,true,"% · estimate")];});
+add(
+  "finance-irr-calculator",
+  [ta("cashflows", "Cash flows", { placeholder: "-1000, 300, 400, 500" })],
+  (v) => [out("IRR", calculateIrr(list(v.cashflows)) * 100, true, "% · estimate")],
+);
 add("finance-cagr-calculator", [f("start","Start value"),f("end","End value"),f("years","Years")], v=>[out("CAGR",((pos(v.end)/pos(v.start))**(1/pos(v.years))-1)*100,true,"%")]);
 add("finance-inflation-calculator", [f("amount","Current amount"),f("inflation","Annual inflation",{suffix:"%"}),f("years","Years")], v=>{const a=pos(v.amount),r=n(v.inflation)/100,t=pos(v.years);return [out("Future cost",a*(1+r)**t,true),out("Purchasing power",a/(1+r)**t)];});
 add("finance-debt-payoff-calculator", [f("balance","Balance"),f("rate","Annual rate",{suffix:"%"}),f("payment","Monthly payment")], v=>{const B=pos(v.balance),r=n(v.rate)/1200,p=pos(v.payment);if(r>0&&p<=B*r)throw new Error("Payment must exceed the first month's interest.");const months=r===0?B/p:-Math.log(1-B*r/p)/Math.log(1+r);return [out("Payoff time",months,true,"months"),out("Years",months/12)];});

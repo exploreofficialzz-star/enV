@@ -10,7 +10,7 @@ const calculators = tools.filter((tool) => tool.category === "calculators");
 const keys = new Set();
 for (const match of formulasText.matchAll(/(?:^|\n)\s*(?:["']([^"']+)["']|([A-Za-z0-9_-]+)):\s*\{/g)) keys.add(match[1] ?? match[2]);
 for (const match of formulasText.matchAll(/calculators(?:\["([^"]+)"\]|\.([A-Za-z0-9_-]+))\s*=/g)) keys.add(match[1] ?? match[2]);
-for (const match of advancedText.matchAll(/add\("([^"]+)"/g)) keys.add(match[1]);
+for (const match of advancedText.matchAll(/add\(\s*"([^"]+)"/g)) keys.add(match[1]);
 for (const match of formulasText.matchAll(/(?:moneyCalc|geoMat)\("([^"]+)"/g)) keys.add(match[1]);
 for (const match of advancedText.matchAll(/(?:material|sci)\("([^"]+)"/g)) keys.add(match[1]);
 
