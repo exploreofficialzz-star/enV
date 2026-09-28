@@ -60,6 +60,10 @@ Never prefix secrets with `VITE_` and never commit their values. Keep preview an
 - `migrations/` — SQL schema migrations
 - `scripts/` — build, migration, and quality tooling
 
+## Mobile app
+
+`apps/mobile/` is a separate Expo/React Native app for Android, with iOS support configured for a later native target. It hosts the existing enV web experience in a native WebView so the full tool catalog remains shared; the root web application and its Vercel deployment are unchanged. The generated Android Studio/Gradle/Kotlin project is checked in under `apps/mobile/android/`. GitHub Actions builds and uploads a test APK and an unsigned release AAB. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, artifact/signing details, the public site URL configuration, and known device-validation requirements.
+
 ## Privacy and security
 
 The project does not require an account for its browser-based utilities. Keep file handling local to the browser unless a specific feature clearly requires server processing. Review changes to authentication, migrations, and external network requests carefully.
