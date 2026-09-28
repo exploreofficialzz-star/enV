@@ -36,7 +36,7 @@ module.exports = function withUnsignedAndroidRelease(config) {
 
     const safeReleaseBody = releaseBody.replace(DEBUG_SIGNING_LINE, `            ${UNSIGNED_MARKER}\n${RELEASE_SIGNING_ASSIGNMENT}`);
     const withReleaseSigning = contents.replace(RELEASE_BLOCK, `${match[1]}${safeReleaseBody}${match[3]}`);
-    modConfig.modResults.contents = withReleaseSigning.replace(/(    signingConfigs \{[\s\S]*?\n    \}\n)(    buildTypes \{)/m, `$1${RELEASE_SIGNING_CONFIG}$2`);
+    modConfig.modResults.contents = withReleaseSigning.replace(/(\s{4}signingConfigs\s*\{[\s\S]*?\n)(\s{4}\}\n\s{4}buildTypes\s*\{)/m, `$1${RELEASE_SIGNING_CONFIG}$2`);
     return modConfig;
   });
 };

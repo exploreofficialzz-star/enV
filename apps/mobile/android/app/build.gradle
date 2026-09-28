@@ -104,7 +104,6 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-    }
         // enV: Production signing is supplied by CI or a local environment, never committed.
         release {
             if (System.getenv('ANDROID_KEYSTORE_FILE') && System.getenv('ANDROID_KEYSTORE_PASSWORD') && System.getenv('ANDROID_KEY_ALIAS') && System.getenv('ANDROID_KEY_PASSWORD')) {
@@ -114,6 +113,7 @@ android {
                 keyPassword System.getenv('ANDROID_KEY_PASSWORD')
             }
         }
+    }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
