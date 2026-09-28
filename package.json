@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/auth/sign-in-gate.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/auth/sign-in-gate.test.ts src/lib/engines/codecs.test.ts src/lib/engines/units.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "check:catalog": "node scripts/check-catalog.mjs",
@@ -24,7 +24,8 @@
     "check:converters": "node scripts/check-converters.mjs",
     "check:text": "node scripts/check-text.mjs",
     "check:datetime": "node scripts/check-datetime.mjs",
-    "audit:calculators:browser": "node scripts/browser-calculator-audit.mjs"
+    "audit:calculators:browser": "node scripts/browser-calculator-audit.mjs",
+    "audit:converters:browser": "node scripts/browser-converter-audit.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

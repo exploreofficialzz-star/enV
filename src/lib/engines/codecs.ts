@@ -1,4 +1,4 @@
-import { md5 } from "../md5";
+import { md5 } from "../md5.ts";
 
 export type HashAlgo = "SHA-1" | "SHA-256" | "SHA-512";
 
@@ -112,11 +112,16 @@ function baseConvert(input: string, opts?: Record<string, string>): string {
     throw new Error("toBase must be 2–36");
   }
   const negative = raw.startsWith("-");
-  const body = negative ? raw.slice(1) : raw;
-  const n = parseInt(body, fromBase);
-  if (!Number.isFinite(n)) throw new Error("Invalid number");
-  const converted = Math.trunc(n).toString(toBase);
-  return (negative ? "-" : "") + converted;
+  const body = /^[+-]/.test(raw) ? raw.slice(1) : raw;
+  if (!body) throw new Error("Invalid number");
+  let value = 0n;
+  for (const character of body.toLowerCase()) {
+    const digit = Number.parseInt(character, 36);
+    if (!Number.isInteger(digit) || digit >= fromBase) throw new Error("Invalid number");
+    value = value * BigInt(fromBase) + BigInt(digit);
+  }
+  const converted = value.toString(toBase);
+  return `${negative && value !== 0n ? "-" : ""}${converted}`;
 }
 
 export async function runCodec(

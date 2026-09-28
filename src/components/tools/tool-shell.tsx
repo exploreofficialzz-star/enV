@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Heart, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
-import { faqFor, howToFor, disclaimerText } from "@/lib/content";
+import { disclaimerText } from "@/lib/content";
 import { toolIcon } from "@/lib/icons";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
@@ -19,8 +19,6 @@ export function ToolShell({
 }) {
   const Icon = toolIcon(tool.icon);
   const related = getRelatedTools(tool);
-  const faq = faqFor(tool);
-  const howTo = howToFor(tool);
   const note = disclaimerText(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
@@ -85,31 +83,9 @@ export function ToolShell({
         {children}
       </section>
 
-      <section className="mt-10 grid gap-8 md:grid-cols-2">
-        <div>
-          <h2 className="text-lg font-semibold">How to use</h2>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted">
-            {howTo.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold">What this tool does</h2>
-          <p className="mt-3 text-sm text-muted">{tool.description} Results can be copied or downloaded from this page.</p>
-        </div>
-      </section>
-
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Frequently asked questions</h2>
-        <dl className="mt-4 divide-y divide-border">
-          {faq.map((item) => (
-            <div key={item.q} className="py-4">
-              <dt className="text-sm font-medium">{item.q}</dt>
-              <dd className="mt-1 text-sm text-muted">{item.a}</dd>
-            </div>
-          ))}
-        </dl>
+        <h2 className="text-lg font-semibold">What this tool does</h2>
+        <p className="mt-3 text-sm text-muted">{tool.description} Results can be copied or downloaded from this page.</p>
       </section>
 
       {related.length > 0 ? (

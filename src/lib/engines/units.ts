@@ -423,8 +423,12 @@ export const systems: Record<string, System> = {
 };
 
 function findUnit(system: System, id: string): Unit | undefined {
+  const exact = system.units.find((unit) => unit.id === id);
+  if (exact) return exact;
+
   const lower = id.toLowerCase();
-  return system.units.find((unit) => unit.id.toLowerCase() === lower);
+  const matches = system.units.filter((unit) => unit.id.toLowerCase() === lower);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 function tableEntries(table: Record<string, number>): Array<[number, number]> {

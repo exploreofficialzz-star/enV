@@ -50,7 +50,7 @@ export function Header() {
           </Link>
           <Link
             to="/favorites"
-            className="inline-flex size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+            className="hidden size-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg md:inline-flex"
             aria-label="Favorites"
           >
             <Heart className="size-4" />

@@ -27,7 +27,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
     case "calculator":
       return <CalculatorEngine formula={tool.engine.formula} toolId={tool.id} />;
     case "converter":
-      return <ConverterEngine system={tool.engine.system} />;
+      return <ConverterEngine system={tool.engine.system} mode={tool.engine.mode} />;
     case "text":
       return <TextEngine op={tool.engine.op} />;
     case "generator":
