@@ -57,14 +57,14 @@ jobs:
         run: npm ci
       - name: Audit web dependencies
         run: npm audit --audit-level=moderate
+      - name: Build web app
+        run: npm run build
       - name: Typecheck web app
         run: npm run typecheck
       - name: Lint web app
         run: npm run lint
       - name: Test web app
         run: npm test
-      - name: Build web app
-        run: npm run build
 
   build-android:
     name: Validate and build Android packages
@@ -133,7 +133,7 @@ jobs:
           fi
 
       - name: Build debug APK and release AAB
-        run: ./android/gradlew --no-daemon --stacktrace -p android :app:assembleDebug :app:bundleRelease
+        run: ./android/gradlew --no-daemon --max-workers=2 --stacktrace -p android :app:assembleDebug :app:bundleRelease
 
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
