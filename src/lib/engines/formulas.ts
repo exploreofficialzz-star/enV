@@ -22,7 +22,9 @@ export type CalculatorDef = {
 };
 
 function n(v: unknown, label = "value"): number {
-  const x = typeof v === "number" ? v : Number(String(v ?? "").replace(/,/g, "").trim());
+  const raw = typeof v === "number" ? String(v) : String(v ?? "").replace(/,/g, "").trim();
+  if (raw === "") throw new Error(`Enter a valid ${label}.`);
+  const x = typeof v === "number" ? v : Number(raw);
   if (!Number.isFinite(x)) throw new Error(`Enter a valid ${label}.`);
   return x;
 }
