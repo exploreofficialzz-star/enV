@@ -1,6 +1,6 @@
 # enV Tool Audit — Working Notes
 
-**Last updated:** 2026-09-28 11:49 UTC
+**Last updated:** 2026-09-28 11:51 UTC
 
 **Status:** Category 1 (Calculators) remains in progress. Do not proceed to Category 2 until its deployed interactive audit passes.
 
@@ -15,6 +15,7 @@
 - Fixed the Molar Mass Calculator to support the field's advertised stoichiometric coefficient syntax without `eval`, including `12.01, 2*1.008, 16.00`.
 - Improved the Playwright calculator audit runner: it supports selecting individual tool IDs, uses known-answer checks for Gas Law and Molar Mass, and exercises two different valid input sets plus blank-input rejection for each tested tool.
 - Re-tested Coordinate Geometry, Gas Law, and Molar Mass in the fresh local production preview: **3/3 passed**, with two valid cases per tool, blank forms rejected, expected results verified, and no browser errors. Known answers include `T₂ = 1,000` (locale-formatted) and total molar mass `30.026`.
+- Catalog audit: **3,639 tools across 42 categories**; 1,841 available and 1,798 Coming Soon. Category 1 has 221 active calculators, zero Coming Soon, no duplicate IDs/routes, and every active entry maps to a calculator engine.
 
 ## Regression/build checks
 
@@ -23,11 +24,11 @@
 - `npm test` — passed: 113 main tests plus 3 auth-gate tests (**116 total**).
 - `npm run typecheck -- --pretty false` — passed.
 - `npm run check:calculators` — passed; all 221 active calculator catalog entries have executable definitions.
+- The focused Gas Law, Molar Mass, browser-audit, and note changes were pushed as **`c61b4fb`**. Its Vercel build status is currently being checked.
 
 ## In progress
 
-- The focused Gas Law, Molar Mass, and audit-runner changes have passed local targeted browser checks and regression checks, but have **not yet been committed/pushed**.
-- The complete interactive Calculator sweep must be rerun against the actual deployed domain after those changes deploy. The live 221/221 route-heading check is not a substitute for that interactive sweep.
+- Waiting for both Vercel deployments on `c61b4fb` to report success. The full interactive Calculator sweep must then be rerun against the actual deployed domain. The 221/221 live route-heading check is not a substitute for that interactive sweep.
 
 ## Not done yet
 
@@ -37,7 +38,7 @@
 
 ## Next steps
 
-1. Commit and push the verified Gas Law, Molar Mass, audit-runner, and note updates now; wait for both Vercel contexts to succeed.
+1. Confirm both Vercel contexts for `c61b4fb` succeed.
 2. Run the full 221-calculator browser interaction audit against `https://en-v-6h2l.vercel.app/`, inspect every result, and fix/retest/push any new defects immediately.
 3. Re-run Category 1 regressions, then record its final total/tested/fixed/Coming Soon counts. Only then proceed to Category 2.
 4. Continue category by category with real browser inputs, outputs, edge cases, exports, runtime errors, and responsive checks; push each validated fix batch rather than deferring pushes until the project-wide audit ends.
