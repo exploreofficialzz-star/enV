@@ -63,9 +63,13 @@ assert.match(require("uuid").v4(), /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}
 
 const androidFiles = walk(join(appRoot, "android"));
 const androidAppGradle = readFileSync(join(appRoot, "android/app/build.gradle"), "utf8");
+const rootLayout = readFileSync(join(appRoot, "src/app/_layout.tsx"), "utf8");
 assert.match(androidAppGradle, /debug\s*\{\s*signingConfig signingConfigs\.debug/, "Debug APK must keep the development signing key.");
-assert.doesNotMatch(androidAppGradle, /release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.debug/, "Release bundles must never use the public debug key.");
+assert.doesNotMatch(androidAppGradle, /buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.debug/, "Release bundles must never use the public debug key.");
 assert.ok(androidAppGradle.includes("enV: Release artifacts intentionally remain unsigned"), "The generated release signing policy must be explicit.");
+assert.ok(androidAppGradle.includes("ANDROID_KEYSTORE_FILE") && androidAppGradle.includes("signingConfig signingConfigs.release"), "Release signing must be available through protected environment variables.");
+assert.ok(rootLayout.includes("SplashScreen.preventAutoHideAsync") && rootLayout.includes("SplashScreen.hideAsync"), "Native splash dismissal must be explicit and bounded by the React root lifecycle.");
+assert.ok(webShell.includes("WEBVIEW_LOAD_TIMEOUT_MS") && webShell.includes("startLoadTimeout"), "WebView startup must fail into a recoverable connection state instead of hanging indefinitely.");
 for (const relativePath of ["android/settings.gradle", "android/build.gradle", "android/gradlew", "android/gradlew.bat", "android/app/build.gradle", "android/app/src/main/AndroidManifest.xml"]) {
   assertFile(relativePath);
 }

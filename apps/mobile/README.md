@@ -32,9 +32,9 @@ npm run android
 
 ## GitHub Actions builds
 
-`.github/workflows/android-build.yml` runs on mobile-app changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds `app-debug.apk` and `app-release.aab` with the committed Gradle wrapper. Both outputs are uploaded as a 14-day workflow artifact named `env-android-<commit-sha>`.
+`.github/workflows/android-build.yml` runs on mobile-app changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds a standalone release APK and `app-release.aab` with the committed Gradle wrapper. The release APK/AAB are uploaded as a 14-day workflow artifact named `env-android-<commit-sha>`. The debug APK is intentionally not uploaded: debug builds expect a Metro development server and are not standalone app packages.
 
-The workflow creates an ephemeral debug keystore for the test APK; the keystore is ignored and is not committed. The release AAB is deliberately **unsigned** until a separate production keystore and protected signing secrets are configured. It is a build-validation artifact, not ready for Google Play submission. Never use the debug key as a release signing identity.
+The release APK/AAB are signed only when a separate production keystore and protected signing secrets are configured. Without them, CI produces unsigned release validation artifacts that are not installable/submittable production packages. Never use the debug key as a release signing identity.
 
 The default public site is `https://en-v-6h2l.vercel.app`. To use another HTTPS deployment, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_WEB_URL`. This is public build-time app configuration; never put secrets in `EXPO_PUBLIC_*` values.
 
@@ -44,4 +44,4 @@ The React Native screens, URL policy, share bridge, and iOS bundle identifier ar
 
 ## Release and signing
 
-The Android application ID is `com.exploreofficialzzstar.env`, derived from the repository namespace. Confirm that identifier before publishing because changing it after store release creates a separate app. No keystore, signing credentials, store submission, or release APK is included in this source setup.
+The Android application ID is `com.exploreofficialzzstar.env`, derived from the repository namespace. Confirm that identifier before publishing because changing it after store release creates a separate app. The workflow accepts the protected GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`; when all four are present, the release APK and AAB are signed with that production key. Without them, CI still builds `app-release-unsigned.apk` and `app-release.aab` as validation artifacts, but those files are not installable/submittable production packages. Never commit a keystore or signing credentials.

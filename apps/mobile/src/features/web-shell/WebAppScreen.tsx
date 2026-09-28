@@ -23,6 +23,8 @@ import {
   isInternalWebUrl,
 } from "@/lib/web-app-config";
 
+const WEBVIEW_LOAD_TIMEOUT_MS = 20_000;
+
 type NativeDownload = {
   id: string;
   uri: string;
@@ -66,6 +68,24 @@ export default function WebAppScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current !== null) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearLoadTimeout, [clearLoadTimeout, retryKey]);
+
+  const startLoadTimeout = useCallback(() => {
+    clearLoadTimeout();
+    loadTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+      setLoadError(true);
+    }, WEBVIEW_LOAD_TIMEOUT_MS);
+  }, [clearLoadTimeout]);
 
   const enqueueFileOperation = useCallback((operation: () => Promise<void>) => {
     const next = writeQueueRef.current.catch(() => undefined).then(operation);
@@ -224,11 +244,12 @@ export default function WebAppScreen() {
   }, [canGoBack]);
 
   const retry = useCallback(() => {
+    clearLoadTimeout();
     setLoadError(false);
     setIsLoading(true);
     setCanGoBack(false);
     setRetryKey((current) => current + 1);
-  }, []);
+  }, [clearLoadTimeout]);
 
   if (loadError) {
     return (
@@ -252,9 +273,9 @@ export default function WebAppScreen() {
           onFileDownload={({ nativeEvent }) => { void handleDirectDownload(nativeEvent.downloadUrl); }}
           onMessage={(event) => handleBridgeMessage(event.nativeEvent.data)}
           onNavigationStateChange={(navigationState) => setCanGoBack(navigationState.canGoBack)}
-          onLoadStart={() => { setIsLoading(true); setLoadError(false); }}
-          onLoadEnd={() => setIsLoading(false)}
-          onError={() => { setIsLoading(false); setLoadError(true); }}
+          onLoadStart={() => { setIsLoading(true); setLoadError(false); startLoadTimeout(); }}
+          onLoadEnd={() => { clearLoadTimeout(); setIsLoading(false); }}
+          onError={() => { clearLoadTimeout(); setIsLoading(false); setLoadError(true); }}
           onRenderProcessGone={() => { webViewRef.current?.reload(); }}
           onContentProcessDidTerminate={() => { webViewRef.current?.reload(); }}
           injectedJavaScriptBeforeContentLoaded={BLOB_DOWNLOAD_BRIDGE_SCRIPT}

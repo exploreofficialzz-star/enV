@@ -118,29 +118,37 @@ jobs:
       - name: Check mobile configuration and native sources
         run: npm run check:mobile
 
-      - name: Create CI-only debug keystore
+      - name: Configure production release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ ! -f android/app/debug.keystore ]; then
-            keytool -genkeypair -noprompt -v \
-              -keystore android/app/debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            keystore_path="$RUNNER_TEMP/env-release.keystore"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            test -s "$keystore_path"
+            {
+              echo "ANDROID_KEYSTORE_FILE=$keystore_path"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "Production signing configured; release APK/AAB will be installable/submittable for the configured key."
+          else
+            echo "No production keystore secrets configured; release APK/AAB will be unsigned validation artifacts."
           fi
 
-      - name: Build debug APK and release AAB
-        run: ./android/gradlew --no-daemon --max-workers=2 --stacktrace -p android :app:assembleDebug :app:bundleRelease
+      - name: Build release APK and AAB
+        run: ./android/gradlew --no-daemon --max-workers=2 --stacktrace -p android :app:assembleRelease :app:bundleRelease
 
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: env-android-${{ github.sha }}
           path: |
-            apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            apps/mobile/android/app/build/outputs/apk/release/app-release*.apk
             apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           compression-level: 0
