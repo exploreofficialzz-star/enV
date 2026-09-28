@@ -13,6 +13,7 @@ function option(name) {
 const category = option("category") ?? "calculators";
 const baseUrl = option("base-url") ?? process.env.BROWSER_AUDIT_BASE_URL ?? "http://127.0.0.1:8080";
 const reportPath = option("report");
+const onlyIds = option("only")?.split(",").map((id) => id.trim()).filter(Boolean);
 const limit = Number(option("limit") ?? Infinity);
 const viewportWidth = Number(option("width") ?? 390);
 const base = new URL(baseUrl);
@@ -48,7 +49,10 @@ const sampleOverrides = {
   "ohms-law": { volts: "12", amps: "2", ohms: "", watts: "" },
   circle: { radius: "5", diameter: "", circumference: "", area: "" },
   "math-slope-calculator": { x1: "1", y1: "2", x2: "3", y2: "6" },
+  "math-coordinate-geometry-calculator": { x1: "1", y1: "2", x2: "4", y2: "6" },
   "science-ohms-law-calculator": { voltage: "12", current: "2", resistance: "" },
+  "science-gas-law-calculator": { p1: "2", v1: "3", t1: "300", p2: "4", v2: "5", t2: "" },
+  "science-molar-mass-calculator": { masses: "12.01, 2*1.008, 16.00" },
   "finance-gross-profit-calculator": { revenue: "100", cogs: "60" },
   "finance-contribution-margin-calculator": { sales: "100", variableCosts: "60" },
 };
@@ -69,6 +73,20 @@ function sampleForField(field, formula) {
   return "2";
 }
 
+function alternateSampleForField(field, currentValue) {
+  if (field.type === "select" || !String(currentValue).trim()) return String(currentValue);
+  if (field.type === "textarea") {
+    if (/probabilit/i.test(field.name + field.label)) return "0.1, 0.3, 0.6";
+    if (/weight/i.test(field.name + field.label)) return "";
+    if (field.name === "masses") return "24.02, 2*1.008";
+    return "2, 4, 8";
+  }
+  if (field.name === "expression") return "18 / 3 + 4";
+  const numericValue = Number(String(currentValue).replace(/,/g, ""));
+  if (Number.isFinite(numericValue)) return String(numericValue < 0 ? numericValue * 1.5 : numericValue * 1.5 + 1);
+  return String(currentValue);
+}
+
 function visibleRows(form) {
   return form.locator("dl > div").evaluateAll((rows) =>
     rows.map((row) => ({
@@ -80,13 +98,18 @@ function visibleRows(form) {
 
 const allTools = parseGeneratedCatalog(readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
 const tools = allTools
-  .filter((tool) => tool.category === category && tool.status === "active")
+  .filter((tool) => tool.category === category && tool.status === "active" && (!onlyIds || onlyIds.includes(tool.id)))
   .slice(0, Number.isFinite(limit) ? limit : undefined);
 if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
+if (onlyIds) {
+  const found = new Set(tools.map((tool) => tool.id));
+  const missing = onlyIds.filter((id) => !found.has(id));
+  if (missing.length) throw new Error(`Unknown active tool IDs for category "${category}": ${missing.join(", ")}`);
+}
 
 const vite = await createServer({
   configFile: "vite.config.ts",
-  server: { middlewareMode: true },
+  server: { middlewareMode: true, hmr: false },
   appType: "custom",
   logLevel: "error",
 });
@@ -160,6 +183,13 @@ try {
       }
       const expected = definition.compute(values);
       if (!Array.isArray(expected) || !expected.length) throw new Error("Formula did not return any outputs for its valid test input.");
+      const knownAnswers = {
+        "science-gas-law-calculator": [{ label: "T₂", value: "1,000" }],
+        "science-molar-mass-calculator": [{ label: "Total molar mass", value: "30.026" }],
+      }[tool.id];
+      if (knownAnswers && JSON.stringify(expected.map(({ label, value }) => ({ label: String(label), value: String(value) }))) !== JSON.stringify(knownAnswers)) {
+        throw new Error(`Known-answer check failed. Expected ${JSON.stringify(knownAnswers)}; formula returned ${JSON.stringify(expected)}.`);
+      }
       await form.getByRole("button", { name: "Calculate", exact: true }).click();
       const resultList = form.locator("dl");
       await resultList.waitFor({ state: "visible", timeout: 5000 });
@@ -171,8 +201,29 @@ try {
       if (actual.some((row) => !row.value || /NaN|Infinity|undefined/i.test(row.value))) {
         throw new Error(`Output includes an empty or non-finite result: ${JSON.stringify(actual)}.`);
       }
+      const alternateValues = {};
+      for (const field of definition.fields) {
+        const value = alternateSampleForField(field, values[field.name]);
+        alternateValues[field.name] = value;
+        const control = form.locator(`[id="${field.name}"]`);
+        if (field.type === "select") await control.selectOption(value);
+        else await control.fill(value);
+      }
+      const alternateExpected = definition.compute(alternateValues);
+      if (!Array.isArray(alternateExpected) || !alternateExpected.length) throw new Error("Formula did not return outputs for its second valid input.");
+      await form.getByRole("button", { name: "Calculate", exact: true }).click();
+      await resultList.waitFor({ state: "visible", timeout: 5000 });
+      const alternateActual = await visibleRows(form);
+      const alternateExpectedPairs = alternateExpected.map(({ label, value }) => ({ label: String(label), value: String(value) }));
+      if (JSON.stringify(alternateActual) !== JSON.stringify(alternateExpectedPairs)) {
+        throw new Error(`Second valid result differs from calculator definition. Expected ${JSON.stringify(alternateExpectedPairs)}; received ${JSON.stringify(alternateActual)}.`);
+      }
+      if (alternateActual.some((row) => !row.value || /NaN|Infinity|undefined/i.test(row.value))) {
+        throw new Error(`Second input produced an empty or non-finite result: ${JSON.stringify(alternateActual)}.`);
+      }
       result.ok = true;
-      result.outputCount = actual.length;
+      result.outputCount = alternateActual.length;
+      result.validInputCases = 2;
       result.emptySubmissionRejected = true;
       tested++;
     } catch (error) {

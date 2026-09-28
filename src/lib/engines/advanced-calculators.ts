@@ -22,6 +22,22 @@ const list = (v: unknown) => {
   if (!xs.length || xs.some((x) => !Number.isFinite(x))) throw new Error("Enter numbers separated by commas or spaces.");
   return xs;
 };
+const parseWeightedMasses = (v: unknown) => {
+  const tokens = String(v ?? "").split(/[,;\n]|(?<!\*)\s+(?!\*)/).map((token) => token.trim()).filter(Boolean);
+  if (!tokens.length) throw new Error("Enter molar masses separated by commas or spaces.");
+  const numeric = String.raw`(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?`;
+  const pattern = new RegExp(`^(?:(${numeric})\\s*\\*\\s*)?(${numeric})$`);
+  return tokens.map((token) => {
+    const match = token.match(pattern);
+    if (!match) throw new Error("Use positive masses with optional coefficients, such as 2*1.008.");
+    const count = match[1] === undefined ? 1 : Number(match[1]);
+    const mass = Number(match[2]);
+    if (!Number.isFinite(count) || !Number.isFinite(mass) || count <= 0 || mass <= 0) {
+      throw new Error("Molar-mass coefficients and masses must be greater than 0.");
+    }
+    return count * mass;
+  });
+};
 const out = (label: string, value: number | string, primary = false, hint?: string) => ({ label, value: typeof value === "number" ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(value) : value, primary, hint });
 const f = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "number", ...extra });
 const text = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "text", ...extra });
@@ -206,14 +222,33 @@ sci("science-frequency-calculator",[f("wavelength","Wavelength"),f("speed","Wave
 sci("science-photon-energy-calculator",[f("frequency","Frequency"),f("h","Planck constant",{defaultValue:6.62607015e-34})],v=>[out("Photon energy",n(v.h)*n(v.frequency),true,"J")]);
 sci("science-molarity-calculator",[f("moles","Moles"),f("liters","Solution volume (L)")],v=>[out("Molarity",n(v.moles)/pos(v.liters),true,"mol/L")]);
 sci("science-moles-calculator",[f("mass","Mass"),f("molarMass","Molar mass")],v=>[out("Moles",n(v.mass)/pos(v.molarMass),true,"mol")]);
-sci("science-molar-mass-calculator",[ta("masses","Atomic/molar masses",{placeholder:"12.01, 2*1.008, 16.00"})],v=>[out("Total molar mass",list(v.masses).reduce((a,b)=>a+b,0),true,"g/mol")]);
+sci("science-molar-mass-calculator",[ta("masses","Atomic/molar masses",{placeholder:"12.01, 2*1.008, 16.00"})],v=>[out("Total molar mass",parseWeightedMasses(v.masses).reduce((a,b)=>a+b,0),true,"g/mol")]);
 sci("science-dilution-calculator",[f("c1","Initial concentration"),f("v1","Initial volume"),f("c2","Final concentration")],v=>[out("Final volume",n(v.c1)*n(v.v1)/pos(v.c2),true)]);
 sci("science-ph-calculator",[f("hydrogen","[H⁺] mol/L")],v=>[out("pH",-Math.log10(pos(v.hydrogen)),true)]);
 sci("science-half-life-calculator",[f("initial","Initial amount"),f("halfLife","Half-life"),f("time","Elapsed time")],v=>[out("Remaining",n(v.initial)*.5**(n(v.time)/pos(v.halfLife)),true)]);
 sci("science-heat-energy-calculator",[f("mass","Mass"),f("specificHeat","Specific heat"),f("deltaT","Temperature change")],v=>[out("Heat energy",n(v.mass)*n(v.specificHeat)*n(v.deltaT),true,"J")]);
-sci("science-gas-law-calculator",[f("p1","P₁"),f("v1","V₁"),f("t1","T₁"),f("p2","P₂"),f("v2","V₂"),f("t2","T₂")],v=>{const vals=[v.p1,v.v1,v.t1,v.p2,v.v2,v.t2].filter(x=>String(x).trim()).length;if(vals<5)throw new Error("Enter five of the six variables.");const names=["p1","v1","t1","p2","v2","t2"] as const;const missing=names.find(k=>!String(v[k]).trim())!;const val=(k:string)=>n(v[k],k);let r=0;if(missing==="p1")r=val("p2")*val("v2")*val("t1")/(val("v1")*val("t2"));if(missing==="v1")r=val("p2")*val("v2")*val("t1")/(val("p1")*val("t2"));if(missing==="t1")r=val("p1")*val("v1")*val("t2")/(val("p2")*val("v2"));if(missing==="p2")r=val("p1")*val("v1")*val("t2")/(val("v2")*val("t1"));if(missing==="v2")r=val("p1")*val("v1")*val("t2")/(val("p2")*val("t1"));if(missing==="t2")r=val("p2")*val("v2")*val("t1")/(val("p1")*val("v1"));return [out(missing,r,true)];});
+sci("science-gas-law-calculator",[f("p1","P₁"),f("v1","V₁"),f("t1","T₁"),f("p2","P₂"),f("v2","V₂"),f("t2","T₂")],v=>{
+  const names=["p1","v1","t1","p2","v2","t2"] as const;
+  type GasVariable=typeof names[number];
+  const labels:Record<GasVariable,string>={p1:"P₁",v1:"V₁",t1:"T₁",p2:"P₂",v2:"V₂",t2:"T₂"};
+  const provided=names.filter(name=>String(v[name]??"").trim()!=="");
+  if(provided.length!==5)throw new Error("Enter exactly five of the six variables.");
+  const missing=names.find(name=>String(v[name]??"").trim()==="")!;
+  const val=(name:GasVariable)=>pos(v[name],labels[name]);
+  const formulas:Record<GasVariable,()=>number>={
+    p1:()=>val("p2")*val("v2")*val("t1")/(val("v1")*val("t2")),
+    v1:()=>val("p2")*val("v2")*val("t1")/(val("p1")*val("t2")),
+    t1:()=>val("p1")*val("v1")*val("t2")/(val("p2")*val("v2")),
+    p2:()=>val("p1")*val("v1")*val("t2")/(val("v2")*val("t1")),
+    v2:()=>val("p1")*val("v1")*val("t2")/(val("p2")*val("t1")),
+    t2:()=>val("p2")*val("v2")*val("t1")/(val("p1")*val("v1")),
+  };
+  const result=formulas[missing]();
+  if(!Number.isFinite(result))throw new Error("The calculated result is outside the supported numeric range.");
+  return [out(labels[missing],result,true)];
+});
 sci("science-ideal-gas-calculator",[f("pressure","Pressure"),f("volume","Volume"),f("moles","Moles"),f("temperature","Temperature K")],v=>[out("Gas constant check",n(v.pressure)*n(v.volume)/(n(v.moles)*pos(v.temperature)),true,"R units depend on your inputs")]);
-sci("science-temperature-conversion-calculator",[f("value","Temperature"),sel("from","From",[{value:"c",label:"Celsius"},{value:"f",label:"Fahrenheit"},{value:"k",label:"Kelvin"}])],v=>{const x=n(v.value);const c=v.from==="c"?x:v.from==="f"?(x-32)*5/9:x-273.15;return [out("Celsius",c,true,"°C"),out("Fahrenheit",c*9/5+32,false,"°F"),out("Kelvin",c+273.15,false,"K")];});
+ sci("science-temperature-conversion-calculator",[f("value","Temperature"),sel("from","From",[{value:"c",label:"Celsius"},{value:"f",label:"Fahrenheit"},{value:"k",label:"Kelvin"}])],v=>{const x=n(v.value);const c=v.from==="c"?x:v.from==="f"?(x-32)*5/9:x-273.15;return [out("Celsius",c,true,"°C"),out("Fahrenheit",c*9/5+32,false,"°F"),out("Kelvin",c+273.15,false,"K")];});
 
 // aliases for expanded names whose existing definitions are equivalent.
 
