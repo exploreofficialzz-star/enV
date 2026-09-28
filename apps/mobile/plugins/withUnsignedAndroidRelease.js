@@ -1,3 +1,5 @@
+// Expo loads config plugins as CommonJS modules during prebuild.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { withAppBuildGradle } = require("@expo/config-plugins");
 
 const RELEASE_BLOCK = /^([ \t]*release[ \t]*\{[ \t]*\r?\n)([\s\S]*?)(\r?\n[ \t]*\})/m;

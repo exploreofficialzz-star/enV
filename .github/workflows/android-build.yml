@@ -1,14 +1,32 @@
-name: Android CI (APK and AAB)
+name: Web and Android CI
 
 on:
   push:
     branches: [main]
     paths:
       - "apps/mobile/**"
+      - "src/**"
+      - "server/**"
+      - "public/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "vite.config.ts"
+      - "vercel.json"
       - ".github/workflows/android-build.yml"
   pull_request:
     paths:
       - "apps/mobile/**"
+      - "src/**"
+      - "server/**"
+      - "public/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "vite.config.ts"
+      - "vercel.json"
       - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
@@ -20,6 +38,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-web:
+    name: Validate and build web application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked web dependencies
+        run: npm ci
+      - name: Audit web dependencies
+        run: npm audit --audit-level=moderate
+      - name: Typecheck web app
+        run: npm run typecheck
+      - name: Lint web app
+        run: npm run lint
+      - name: Test web app
+        run: npm test
+      - name: Build web app
+        run: npm run build
+
   build-android:
     name: Validate and build Android packages
     runs-on: ubuntu-24.04
