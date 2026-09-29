@@ -8,12 +8,12 @@
     "scheme": "env",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.exploreofficialzzstar.env",
+      "bundleIdentifier": "com.chastech.env",
       "supportsTablet": true,
       "icon": "./assets/images/icon.png"
     },
     "android": {
-      "package": "com.exploreofficialzzstar.env",
+      "package": "com.chastech.env",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",

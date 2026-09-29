@@ -1,4 +1,4 @@
-package com.exploreofficialzzstar.env
+package com.chastech.env
 
 import android.app.Application
 import android.content.res.Configuration

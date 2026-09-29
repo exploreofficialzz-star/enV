@@ -35,7 +35,7 @@ assert.equal(packageJson.scripts.postinstall, "patch-package", "Security compati
 assert.equal(packageJson.overrides["decode-uri-component"], "0.5.0", "Use the patched URI decoder version.");
 assert.equal(packageJson.overrides.uuid, "11.1.1", "Use the patched UUID version.");
 assert.equal(appConfig.name, "enV", "Native app must use the canonical enV brand.");
-assert.equal(appConfig.android.package, "com.exploreofficialzzstar.env", "Android application ID changed unexpectedly.");
+assert.equal(appConfig.android.package, "com.chastech.env", "Android application ID changed unexpectedly.");
 assert.equal(appConfig.ios.bundleIdentifier, appConfig.android.package, "iOS bundle ID must be ready to align with Android.");
 assert.equal(appConfig.scheme, "env", "Native deep-link scheme must be stable.");
 assert.equal(appConfig.userInterfaceStyle, "light", "Native system chrome must use the configured light UI style.");

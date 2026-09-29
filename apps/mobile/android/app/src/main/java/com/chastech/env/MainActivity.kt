@@ -1,4 +1,4 @@
-package com.exploreofficialzzstar.env
+package com.chastech.env
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
