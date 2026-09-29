@@ -109,7 +109,7 @@ export function SearchBox({
                 setOpen(false);
               }}
             >
-              View all results
+              See more results
             </button>
           </li>
         </ul>

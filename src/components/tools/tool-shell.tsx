@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Heart, ShieldCheck } from "lucide-react";
+import { Heart } from "lucide-react";
 import { useEffect } from "react";
 import { disclaimerText } from "@/lib/content";
 import { toolIcon } from "@/lib/icons";
@@ -69,13 +69,6 @@ export function ToolShell({
           {saved ? "Saved" : "Save"}
         </Button>
       </header>
-
-      {tool.clientSide && tool.status !== "planned" ? (
-        <p className="mt-5 flex items-start gap-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-fg">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" />
-          Runs entirely in your browser. Your files and text are not uploaded to enV.
-        </p>
-      ) : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
 

@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
+import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { getFeaturedTools, getPopularTools, toolPath } from "@/lib/registry";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -25,14 +26,15 @@ function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <h2 className="text-xl font-semibold">{title}</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tools.map((tool) => (
           <Link key={tool.id} to={toolPath(tool)} className="rounded-xl bg-surface p-4 shadow-[var(--shadow-border)] hover:text-accent">
             <h3 className="font-medium">{tool.name}</h3>
             <p className="mt-1 text-sm text-muted">{tool.description}</p>
           </Link>
-        ))}
-      </div>
-    </section>
+          ))}
+        </div>
+        <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
+      </section>
   );
 }

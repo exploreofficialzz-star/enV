@@ -39,6 +39,7 @@ export function Header() {
         <div className="ml-auto flex items-center gap-1">
           <Link
             to="/search"
+            search={{ q: "" }}
             className="hidden items-center gap-2 rounded-full bg-surface px-3 py-2 text-sm text-subtle shadow-[var(--shadow-border)] hover:text-fg sm:inline-flex"
             aria-label="Search tools"
           >
