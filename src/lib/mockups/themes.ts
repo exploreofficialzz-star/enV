@@ -10,7 +10,7 @@ export const THEME_MAP = new Map(themes.map((theme) => [theme.id, theme]));
 
 export function platformTheme(platform: MockupPlatform, theme: "light" | "dark" | "system") {
   const base = THEME_MAP.get(theme === "system" ? "light" : theme)!;
-  const overrides: Partial<typeof base.tokens> = {
+  const overrides: Partial<typeof base.tokens> = ({
     "imessage": { accent: "#1c1c1e", outgoing: "#0b84ff", incoming: theme === "dark" ? "#2c2c2e" : "#e9e9eb" },
     "instagram-dm": { accent: "#000000", background: "#000000", outgoing: "#3797f0", incoming: "#262626" },
     "messenger": { accent: "#ffffff", outgoing: "#0084ff", incoming: "#e4e6eb" },
@@ -26,6 +26,6 @@ export function platformTheme(platform: MockupPlatform, theme: "light" | "dark" 
     "threads": { accent: "#000000", background: "#000000", outgoing: "#ffffff", incoming: "#1e1e1e" },
     "ai-chat": { accent: "#171b1e", background: "#0e1114", outgoing: "#0d9f8a", incoming: "#171b1e" },
     "outlook": { accent: "#0078d4", outgoing: "#dbeafe", incoming: "#ffffff" },
-  }[platform] ?? {};
+  } as Record<string, Partial<typeof base.tokens>>)[platform] ?? {};
   return { ...base, tokens: { ...base.tokens, ...overrides } };
 }

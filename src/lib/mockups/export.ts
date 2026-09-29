@@ -34,7 +34,7 @@ async function recordWebm(project: MockupProject, device: DeviceTemplate, tokens
   if (!mime) throw new Error("This browser cannot encode WebM animation.");
   const recorder = new MediaRecorder(stream, { mimeType: mime });
   const chunks: Blob[] = []; recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-  const done = new Promise<Blob>((resolve, reject) => { recorder.onerror = () => reject(recorder.error ?? new Error("WebM recording failed.")); recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+  const done = new Promise<Blob>((resolve, reject) => { recorder.onerror = (event) => reject((event as ErrorEvent).error ?? new Error("WebM recording failed.")); recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
   recorder.start();
   const frameCount = Math.max(1, Math.ceil(duration / 1000 * fps));
   for (let i = 0; i < frameCount; i++) {

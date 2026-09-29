@@ -86,12 +86,14 @@ function makeAdapter(id: Exclude<MockupPlatform, "whatsapp">, config: Config): P
 }
 
 export const PLATFORM_ADAPTERS: Record<MockupPlatform, PlatformAdapter> = {
+  ...(Object.fromEntries(Object.entries(configs)
+    .filter(([id]) => !["instagram-dm", "imessage", "messenger", "discord", "telegram", "signal", "x-dm", "tiktok-chat", "snapchat", "slack", "google-messages", "linkedin-dm", "reddit", "threads", "email", "gmail", "outlook", "ai-chat", "sms", "tinder", "youtube-community"].includes(id))
+    .map(([id, config]) => [id, makeAdapter(id as Exclude<MockupPlatform, "whatsapp">, config)])) as Record<Exclude<MockupPlatform, "whatsapp" | "instagram-dm" | "imessage" | "messenger" | "discord">, PlatformAdapter>),
   whatsapp: whatsappAdapter,
   "instagram-dm": instagramAdapter,
   imessage: imessageAdapter,
   messenger: messengerAdapter,
   discord: discordAdapter,
-  telegram: telegramAdapter,
   signal: signalAdapter,
   "x-dm": xAdapter,
   "tiktok-chat": tiktokAdapter,
@@ -108,7 +110,4 @@ export const PLATFORM_ADAPTERS: Record<MockupPlatform, PlatformAdapter> = {
   sms: smsAdapter,
   tinder: tinderAdapter,
   "youtube-community": youtubeAdapter,
-  ...(Object.fromEntries(Object.entries(configs)
-    .filter(([id]) => !["instagram-dm", "imessage", "messenger", "discord", "telegram", "signal", "x-dm", "tiktok-chat", "snapchat", "slack", "google-messages", "linkedin-dm", "reddit", "threads", "email", "gmail", "outlook", "ai-chat", "sms", "tinder", "youtube-community"].includes(id))
-    .map(([id, config]) => [id, makeAdapter(id as Exclude<MockupPlatform, "whatsapp">, config)])) as Record<Exclude<MockupPlatform, "whatsapp" | "instagram-dm" | "imessage" | "messenger" | "discord">, PlatformAdapter>),
 };
