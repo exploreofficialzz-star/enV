@@ -81,6 +81,9 @@ export type EngineRef =
   | { type: "document"; op: string }
   | { type: "pdf"; op: string }
   | { type: "ai"; op: string }
+  | { type: "video"; op: string }
+  | { type: "url-media"; provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" }
+  | { type: "url-media-info"; provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" }
   | { type: "developer"; op: string }
   | { type: "custom"; id: string };
 

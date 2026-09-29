@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { FileDropzone } from "@/components/tools/file-dropzone";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { downloadBlob, formatFileSize } from "@/lib/utils";
+import { calculateSplitTiles } from "@/components/engines/image-splitter-utils";
 
 type LoadedImage = { file: File; url: string; el: HTMLImageElement };
 
@@ -95,6 +96,7 @@ function drawContain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: nu
 export function ImageEngine({ op }: { op: string }) {
   const [images, setImages] = useState<LoadedImage[]>([]);
   const [outUrl, setOutUrl] = useState<string | null>(null);
+  const [splitOutputs, setSplitOutputs] = useState<{url:string;name:string}[]>([]);
   const [textResult, setTextResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,6 +106,8 @@ export function ImageEngine({ op }: { op: string }) {
   const [percent, setPercent] = useState("100");
   const [text, setText] = useState("enV");
   const [angle, setAngle] = useState("90");
+  const [splitCols, setSplitCols] = useState("2");
+  const [splitRows, setSplitRows] = useState("2");
   const [preset, setPreset] = useState("instagram");
   const [bgThreshold, setBgThreshold] = useState("35");
   const [copied, setCopied] = useState(false);
@@ -114,18 +118,21 @@ export function ImageEngine({ op }: { op: string }) {
   useEffect(() => () => {
     images.forEach((i) => URL.revokeObjectURL(i.url));
     if (outUrl?.startsWith("blob:")) URL.revokeObjectURL(outUrl);
-  }, [images, outUrl]);
+    splitOutputs.forEach(part => URL.revokeObjectURL(part.url));
+  }, [images, outUrl, splitOutputs]);
 
   const onFiles = async (files: File[]) => {
     try {
       setError(null);
       setTextResult(null);
+      setSplitOutputs([]);
       if (outUrl?.startsWith("blob:")) URL.revokeObjectURL(outUrl);
       const selected = multiple ? files.slice(0, 20) : files.slice(0, 1);
       const loaded = await Promise.all(selected.map(loadImage));
       images.forEach((i) => URL.revokeObjectURL(i.url));
       setImages(loaded);
       setOutUrl(null);
+      setSplitOutputs([]);
       if (loaded[0]) {
         setWidth(String(loaded[0].el.naturalWidth));
         setHeight(String(loaded[0].el.naturalHeight));
@@ -156,6 +163,27 @@ export function ImageEngine({ op }: { op: string }) {
         const dpi = safeNumber(width || "300", 300);
         setTextResult(`At ${dpi} DPI/PPI:\nPrint width: ${(src.naturalWidth / dpi).toFixed(2)} in\nPrint height: ${(src.naturalHeight / dpi).toFixed(2)} in\nPrint size: ${(src.naturalWidth / dpi * 2.54).toFixed(2)} × ${(src.naturalHeight / dpi * 2.54).toFixed(2)} cm`); return;
       }
+      if (op === "splitter") {
+        const cols = Math.floor(Number(splitCols) || 1);
+        const rows = Math.floor(Number(splitRows) || 1);
+        const outputs: {url:string;name:string}[] = [];
+        const base = images[0].file.name.replace(/\.[^.]+$/, "");
+        const tiles = calculateSplitTiles(src.naturalWidth, src.naturalHeight, rows, cols);
+        for (const tileInfo of tiles) {
+            const x0 = tileInfo.x, y0 = tileInfo.y, x1 = tileInfo.x + tileInfo.width, y1 = tileInfo.y + tileInfo.height;
+            const tile = document.createElement("canvas");
+            tile.width = tileInfo.width; tile.height = tileInfo.height;
+            const tctx = tile.getContext("2d");
+            if (!tctx) throw new Error("Canvas is not supported in this browser.");
+            tctx.drawImage(src, x0, y0, x1 - x0, y1 - y0, 0, 0, tile.width, tile.height);
+            const blob = await new Promise<Blob>((resolve, reject) => tile.toBlob(b => b ? resolve(b) : reject(new Error("Could not encode split image.")), "image/png"));
+            outputs.push({ url: URL.createObjectURL(blob), name: `${base}-part-${tileInfo.row + 1}-${tileInfo.column + 1}.png` });
+        }
+        setSplitOutputs(outputs);
+        setTextResult(`Split ${src.naturalWidth} × ${src.naturalHeight} image into ${outputs.length} PNG tiles (${cols} columns × ${rows} rows).`);
+        return;
+      }
+
       if (op.includes("metadata-inspector") || op === "exif-view") {
         setTextResult(`File: ${images[0].file.name}\nType: ${images[0].file.type || "unknown"}\nSize: ${bytesText(images[0].file.size)}\nDimensions: ${src.naturalWidth} × ${src.naturalHeight}\nNote: Full EXIF decoding depends on the browser. Re-encoding below strips common embedded metadata.`); return;
       }
@@ -199,9 +227,17 @@ export function ImageEngine({ op }: { op: string }) {
       if (op.includes("upscaler")) { const scale=Math.max(1.5,Math.min(4,safeNumber(percent,200)/100)); w=Math.round(src.naturalWidth*scale);h=Math.round(src.naturalHeight*scale); }
 
       const {canvas,ctx}=canvasFrom(w,h); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-      if (op.includes("circle")) { ctx.beginPath();ctx.arc(w/2,h/2,Math.min(w,h)/2,0,Math.PI*2);ctx.clip(); }
-      if (op.includes("rounded")) { const r=Math.min(w,h)*.12;ctx.beginPath();ctx.roundRect(0,0,w,h,r);ctx.clip(); }
-      if (op.includes("crop")) drawCover(ctx,src,w,h); else drawContain(ctx,src,w,h);
+      if (op === "beautify") {
+        const pad=Math.max(24,Math.round(Math.min(w,h)*.08));
+        const innerW=w, innerH=h; w+=pad*2; h+=pad*2; canvas.width=w; canvas.height=h;
+        ctx.fillStyle="#eef1f5";ctx.fillRect(0,0,w,h);
+        ctx.fillStyle="rgba(0,0,0,.16)";ctx.beginPath();ctx.roundRect(pad+8,pad+12,innerW,innerH,Math.min(innerW,innerH)*.05);ctx.fill();
+        ctx.save();ctx.translate(pad,pad);drawContain(ctx,src,innerW,innerH);ctx.restore();
+      } else {
+        if (op.includes("circle")) { ctx.beginPath();ctx.arc(w/2,h/2,Math.min(w,h)/2,0,Math.PI*2);ctx.clip(); }
+        if (op.includes("rounded")) { const r=Math.min(w,h)*.12;ctx.beginPath();ctx.roundRect(0,0,w,h,r);ctx.clip(); }
+        if (op.includes("crop")) drawCover(ctx,src,w,h); else drawContain(ctx,src,w,h);
+      }
 
       if (op.includes("flip-horizontal")) { ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(w,0);ctx.scale(-1,1);drawContain(ctx,src,w,h);ctx.restore(); }
       if (op.includes("flip-vertical")) { ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(0,h);ctx.scale(1,-1);drawContain(ctx,src,w,h);ctx.restore(); }
@@ -245,9 +281,11 @@ export function ImageEngine({ op }: { op: string }) {
     {op.includes("watermark")||op.includes("annotation")||op.includes("meme")?<label className="space-y-1.5"><Label>Text</Label><Input value={text} onChange={e=>setText(e.target.value)}/></label>:null}
     {op.includes("rotate")?<label className="space-y-1.5"><Label>Angle</Label><Input value={angle} onChange={e=>setAngle(e.target.value)} inputMode="numeric"/></label>:null}
     {op.includes("social-resize")?<label className="space-y-1.5"><Label>Platform</Label><Select value={preset} onChange={e=>setPreset(e.target.value)}>{Object.keys(SOCIAL).map(k=><option key={k} value={k}>{k}</option>)}</Select></label>:null}
+    {op === "splitter"?<div className="grid grid-cols-2 gap-3"><label className="space-y-1.5"><Label>Columns</Label><Input value={splitCols} onChange={e=>setSplitCols(e.target.value)} inputMode="numeric" min="1" max="12"/></label><label className="space-y-1.5"><Label>Rows</Label><Input value={splitRows} onChange={e=>setSplitRows(e.target.value)} inputMode="numeric" min="1" max="12"/></label></div>:null}
     <Button type="button" onClick={process} disabled={busy||!images[0]}>{busy?"Working…":"Process image"}</Button>
     <ErrorBanner message={error}/>
     {textResult?<div className="space-y-2"><pre className="rounded-lg bg-surface-2 p-3 text-xs whitespace-pre-wrap">{textResult}</pre><Button type="button" variant="outline" onClick={copyText}>{copied?<Check className="size-4"/>:<Copy className="size-4"/>}{copied?"Copied":"Copy result"}</Button></div>:null}
+    {splitOutputs.length>0?<div className="flex flex-wrap gap-2 rounded-lg border border-border p-3">{splitOutputs.map(part=><a key={part.name} href={part.url} download={part.name}><Button type="button" variant="outline"><Download className="size-4"/>{part.name}</Button></a>)}</div>:null}
     {outUrl?<div className="space-y-3"><img src={outUrl} alt="Processed result" className="max-h-96 max-w-full rounded-lg outline outline-1 -outline-offset-1 outline-black/10"/><Button type="button" variant="outline" onClick={async()=>{const r=await fetch(outUrl);downloadBlob(await r.blob(),`env-${op}.jpg`);}}><Download className="size-4"/>Download</Button><a ref={outRef} href={outUrl} className="sr-only">result</a></div>:images[0]?<img src={images[0].url} alt="Original" className="max-h-72 max-w-full rounded-lg outline outline-1 -outline-offset-1 outline-black/10"/>:null}
   </div>;
 }

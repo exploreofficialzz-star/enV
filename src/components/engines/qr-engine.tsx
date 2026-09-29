@@ -87,7 +87,7 @@ function approxVersion(length: number, level: string) {
 
 export function QrEngine({ preset }: { preset: string }) {
   const fieldPreset = ["high-error", "low-error"].includes(preset) ? "text" : preset;
-  const fields = COMMON_FIELDS[fieldPreset] ?? COMMON_FIELDS.text;
+  const fields = ["size", "version", "capacity", "inspect"].includes(preset) ? [] : (COMMON_FIELDS[fieldPreset] ?? COMMON_FIELDS.text);
   const defaults = useMemo(() => Object.fromEntries(fields.map((f) => [f.name, String(f.defaultValue ?? "")])), [fields]);
   const [vals, setVals] = useState<Record<string, string>>(defaults);
   const [url, setUrl] = useState<string | null>(null);
@@ -113,6 +113,7 @@ export function QrEngine({ preset }: { preset: string }) {
       }
       if (preset === "inspect") {
         const p = vals.payload || "";
+        if (!p.trim()) throw new Error("Enter a QR payload to inspect.");
         const kind = p.startsWith("WIFI:") ? "Wi-Fi" : p.startsWith("BEGIN:VCARD") ? "vCard" : p.startsWith("BEGIN:VEVENT") ? "Calendar event" : p.startsWith("mailto:") ? "Email" : p.startsWith("tel:") ? "Phone" : p.startsWith("sms:") ? "SMS" : p.startsWith("geo:") ? "Location" : p.startsWith("bitcoin:") ? "Bitcoin payment" : /^https?:\/\//i.test(p) ? "URL" : "Plain text";
         setInfo(`Detected payload type: ${kind}. Length: ${p.length} characters.`); return;
       }
@@ -127,9 +128,12 @@ export function QrEngine({ preset }: { preset: string }) {
       if (!data.trim()) throw new Error("Enter something to encode.");
       const level = preset === "high-error" ? "H" : preset === "low-error" ? "L" : (vals.level || "M");
       const opts = { width: Number(vals.size || 512), margin: Number(vals.margin ?? 1), errorCorrectionLevel: level as "L" | "M" | "Q" | "H", color: { dark: vals.dark || "#16181d", light: vals.light || "#ffffff" } };
-      if (preset === "svg" || preset === "data-url") {
+      if (preset === "svg") {
         setSvg(await QR.toString(data, { type: "svg", ...opts }));
-        if (preset === "data-url") setInfo(`Generated a QR SVG data representation for ${data.length} characters.`);
+      } else if (preset === "data-url") {
+        const dataUrl = await QR.toDataURL(data, opts);
+        setUrl(dataUrl);
+        setInfo(`Generated a QR image data URL for ${data.length} characters.`);
       } else {
         setUrl(await QR.toDataURL(data, opts));
         setInfo(`Encoded ${data.length} characters using error correction ${level}.`);
@@ -142,7 +146,7 @@ export function QrEngine({ preset }: { preset: string }) {
     {preset === "size" ? <FieldGrid fields={[{name:"modules",label:"QR modules",type:"number",defaultValue:21},{name:"modulePx",label:"Module size (px)",type:"number",defaultValue:4}]} values={vals} onChange={(n,v)=>setVals(o=>({...o,[n]:v}))}/> : null}
     {preset === "version" ? <FieldGrid fields={[{name:"level",label:"Error correction",type:"select",options:[{value:"L",label:"L"},{value:"M",label:"M"},{value:"Q",label:"Q"},{value:"H",label:"H"}]},{name:"text",label:"Payload",type:"textarea"}]} values={vals} onChange={(n,v)=>setVals(o=>({...o,[n]:v}))}/> : null}
     {preset === "capacity" ? <FieldGrid fields={[{name:"version",label:"Version",type:"number",defaultValue:1,min:1,max:40},{name:"level",label:"Error correction",type:"select",options:[{value:"L",label:"L"},{value:"M",label:"M"},{value:"Q",label:"Q"},{value:"H",label:"H"}]}]} values={vals} onChange={(n,v)=>setVals(o=>({...o,[n]:v}))}/> : null}
-    <Button type="button" onClick={run}>{preset.includes("helper") || ["size","version","capacity","inspect"].includes(preset) ? "Calculate" : "Generate QR"}</Button>
+    <div className="flex gap-2"><Button type="button" onClick={run}>{["size","version","capacity","inspect"].includes(preset) ? "Calculate" : "Generate QR"}</Button><Button type="button" variant="outline" onClick={()=>{setVals(defaults);setUrl(null);setSvg("");setBatch([]);setInfo(null);setError(null);}}>Reset</Button></div>
     <ErrorBanner message={error} />
     {info ? <div className="rounded-lg border p-3 text-sm">{info}</div> : null}
     {url ? <div className="space-y-3"><img src={url} alt="Generated QR code" className="size-56 rounded-lg bg-white p-2" /><div className="flex gap-2"><Button type="button" variant="outline" onClick={async()=>downloadBlob(await (await fetch(url)).blob(),"env-qr.png")}><Download className="size-4"/>Download PNG</Button></div></div> : null}
@@ -179,7 +183,7 @@ export function BarcodeEngine({ format }: { format: string }) {
 
   return <div className="space-y-4">
     <label className="block space-y-1.5"><span className="text-sm font-medium">Value</span><input className="flex h-11 w-full rounded-md bg-surface px-3 text-sm shadow-[var(--shadow-border)]" value={value} onChange={(e)=>setValue(e.target.value)} /></label>
-    <Button type="button" onClick={run}>{["gtin-validator","ean13-check","upc-check","isbn-check"].includes(format) ? "Validate / Calculate" : "Generate barcode"}</Button>
+    <div className="flex gap-2"><Button type="button" onClick={run}>{["gtin-validator","ean13-check","upc-check","isbn-check"].includes(format) ? "Validate / Calculate" : "Generate barcode"}</Button><Button type="button" variant="outline" onClick={()=>{setValue(format === "ean13" || format === "isbn" ? "9780143127741" : format === "upca" ? "036000291452" : format === "ean8" ? "96385074" : "ENV-12345");setError(null);setResult(null);setSvg("");}}>Reset</Button></div>
     <ErrorBanner message={error}/>
     {result ? <div className="rounded-lg border p-3 text-sm">{result}</div> : null}
     {svg ? <div className="space-y-3"><div className="overflow-x-auto rounded-lg bg-white p-4" dangerouslySetInnerHTML={{__html:svg}}/><div className="flex gap-2"><Button type="button" variant="outline" onClick={()=>downloadText(svg,"env-barcode.svg","image/svg+xml")}><Download className="size-4"/>Download SVG</Button></div></div> : null}

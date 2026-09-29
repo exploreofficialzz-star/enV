@@ -10,7 +10,7 @@
 - `android/` contains the generated Android Studio/Gradle/Kotlin project. It is checked in so the native app source is available immediately; regenerate it from `app.json` with `npm run prebuild:android` rather than making untracked edits to generated files.
 - `plugins/withUnsignedAndroidRelease.js` keeps the release build unsigned across clean prebuilds and fails loudly if the generated Gradle signing template changes.
 
-The initial Android application loads the live enV site in a native WebView so the full existing tool catalog and responsive UI remain shared rather than being reimplemented. Android back navigates WebView history; external links open outside the app. Site-generated `blob:` downloads are transferred through a size-limited bridge into app cache and opened with the native share sheet. The bridge rejects malformed or oversized transfers; its limit is 20 MiB. Web file-input behavior is delegated to the platform WebView and must be verified on a physical Android device before release.
+The initial Android application loads the live enV site in a native WebView so the full existing tool catalog and responsive UI remain shared rather than being reimplemented. Android back navigates WebView history; external links open outside the app. Site-generated `blob:` downloads are transferred through a size-limited bridge into app cache and opened with the native share sheet. The bridge rejects malformed or oversized transfers; its limit is 100 MiB. Web file-input behavior is delegated to the platform WebView and must be verified on a physical Android device before release.
 
 ## Development
 

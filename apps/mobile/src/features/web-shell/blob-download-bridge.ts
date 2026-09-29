@@ -41,7 +41,7 @@ export const BLOB_DOWNLOAD_BRIDGE_SCRIPT = `
       })
       .then(async function (blob) {
         if (blob.size > maxBytes) {
-          post({ type: "env-download-error", message: "This file is larger than the 20 MB in-app sharing limit." });
+          post({ type: "env-download-error", message: "This file is larger than the 100 MB in-app sharing limit." });
           return;
         }
         var bytes = new Uint8Array(await blob.arrayBuffer());

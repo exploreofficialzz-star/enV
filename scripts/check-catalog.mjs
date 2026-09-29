@@ -22,7 +22,7 @@ const categories = new Set([
 const statuses = new Set(["active", "beta", "planned"]);
 const engineTypes = new Set([
   "calculator", "converter", "text", "generator", "codec", "color", "qr", "barcode", "image",
-  "cssgen", "developer", "mime", "security", "mockup", "post", "device", "datetime", "seo", "creator","business","audio", "network", "file-converter", "document", "pdf", "ai", "custom",
+  "cssgen", "developer", "mime", "security", "mockup", "post", "device", "datetime", "seo", "creator","business","audio", "network", "file-converter", "document", "pdf", "ai", "video", "url-media", "url-media-info", "custom",
 ]);
 
 for (const tool of tools) {
@@ -42,6 +42,50 @@ const byId = new Set(tools.map((t) => t.id));
 for (const tool of tools) {
   for (const related of tool.related) {
     if (!byId.has(related)) errors.push(`${tool.id}: broken related id ${related}`);
+  }
+}
+
+const alphabeticalKey = (value) =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const categoryLabels = new Map();
+const categorySource = readFileSync(new URL("../src/data/categories.ts", import.meta.url), "utf8");
+for (const match of categorySource.matchAll(/\bid:\s*"([^"]+)"\s*,\s*name:\s*"((?:\\.|[^"\\])*)"/g)) {
+  categoryLabels.set(match[1], match[2]);
+}
+
+const categoryEntries = [...categoryLabels.entries()];
+for (let i = 1; i < categoryEntries.length; i += 1) {
+  if (alphabeticalKey(categoryEntries[i - 1][1]) > alphabeticalKey(categoryEntries[i][1])) {
+    errors.push(`Categories are not alphabetically ordered: ${categoryEntries[i - 1][1]} before ${categoryEntries[i][1]}`);
+  }
+}
+
+const emptyCategories = categoryEntries
+  .filter(([id]) => !tools.some((tool) => tool.category === id))
+  .map(([, label]) => label);
+if (emptyCategories.length) {
+  console.log(`Empty categories (allowed): ${emptyCategories.join(", ")}`);
+}
+
+for (let i = 1; i < tools.length; i += 1) {
+  const previous = tools[i - 1];
+  const current = tools[i];
+  const previousCategory = alphabeticalKey(categoryLabels.get(previous.category) ?? previous.category);
+  const currentCategory = alphabeticalKey(categoryLabels.get(current.category) ?? current.category);
+  const previousTool = alphabeticalKey(previous.name);
+  const currentTool = alphabeticalKey(current.name);
+  const outOfOrder =
+    previousCategory > currentCategory ||
+    (previousCategory === currentCategory &&
+      (previousTool > currentTool || (previousTool === currentTool && previous.id > current.id)));
+  if (outOfOrder) {
+    errors.push(`Catalog order: ${previous.name} -> ${current.name}`);
   }
 }
 

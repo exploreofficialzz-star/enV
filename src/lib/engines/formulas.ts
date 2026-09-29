@@ -1,5 +1,8 @@
 import { formatNumber } from "@/lib/utils";
 import { advancedCalculators } from "./advanced-calculators";
+import { regularCalculators } from "./regular-calculators";
+import { registerMathExerciseCalculators } from "./math-exercise-calculators";
+import { stemCalculators } from "./stem-calculators";
 
 export type Field = {
   name: string;
@@ -487,6 +490,7 @@ export const calculators: Record<string, CalculatorDef> = {
 };
 
 Object.assign(calculators, advancedCalculators);
+Object.assign(calculators, regularCalculators);
 
 function moneyCalc(
   key: string,
@@ -906,3 +910,6 @@ calculators.lbm = { fields: [f("weightKg", "Weight", { suffix: "kg" }), f("heigh
   const lbm = v.sex === "female" ? 0.252 * w + 0.473 * h - 48.3 : 0.407 * w + 0.267 * h - 19.2;
   return [out("Lean body mass", Math.max(0, lbm), { primary: true, hint: "kg · estimate" })];
 }};
+
+registerMathExerciseCalculators(calculators);
+Object.assign(calculators, stemCalculators);

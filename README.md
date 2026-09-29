@@ -72,3 +72,49 @@ The project does not require an account for its browser-based utilities. Keep fi
 ## Category 20 — AI micro-tools
 
 The AI micro-tools category provides local, deterministic writing templates for titles, captions, bios, product copy, email drafts, prompts, alt text, SEO descriptions, resume bullets, outlines, CTAs, hooks, FAQs, meeting notes, rewriting, shortening, expansion, decision worksheets, ideas, and content briefs. These tools do not call an AI provider or upload user text.
+
+## FFmpeg media processor
+
+The optional `scripts/media-processor.mjs` service provides real FFmpeg-backed media processing for tools that require server-side codecs. Configure the web app with `VITE_MEDIA_PROCESSOR_URL` pointing at the processor's `/media` endpoint.
+
+The processor uses an allowlisted operation table rather than accepting arbitrary FFmpeg commands. Current multi-file operations include:
+
+- `video-merge` — concatenates multiple video files into a normalized MP4 and supplies silent audio when an input has no audio track.
+- `audio-merge` — concatenates multiple audio files into a WAV output.
+- `video-replace-audio` — keeps the first input's video stream and replaces its audio with the second input's audio stream.
+
+Multi-file uploads are sent as repeated `files` multipart fields and are subject to the processor's aggregate upload-size limit. The service also validates operation names, isolates temporary files per request, and removes temporary files after processing.
+
+## Transcription backend (optional, real model required)
+
+`script/transcription-processor.mjs` provides a separate, isolated speech-to-text service for future Audio to Text, Audio to Subtitles, Video to Text, and Video to Subtitles tools. It is deliberately not activated in the catalog until a real Whisper-compatible executable and model are configured.
+
+Environment:
+- `WHISPER_BIN` — Whisper-compatible CLI, default `whisper-cli`
+- `WHISPER_MODEL` — path to the downloaded Whisper model
+- `TRANSCRIBE_PORT` — default `8788`
+- `TRANSCRIBE_MAX_BYTES` — default 250 MiB
+- `TRANSCRIBE_ALLOWED_ORIGIN` — CORS origin
+
+Endpoints:
+- `GET /health` — reports executable/model readiness
+- `POST /transcribe` — multipart `file`, with `format=txt|srt|vtt`, optional `language`, and optional `translate=true`
+
+The service uses an allowlisted command shape, isolated temporary directories, bounded uploads, and never accepts arbitrary shell arguments. The existing transcription catalog entries remain Coming Soon until a real model is installed and the client integration is completed.
+
+## URL media processor
+
+`URL_MEDIA_PROCESSOR_URL` is the optional enV URL-media backend endpoint. The service in `scripts/url-media-processor.mjs` currently defines provider adapters for YouTube, TikTok, Facebook, Instagram, and X and uses `yt-dlp` only when the deployment explicitly provides that executable.
+
+Security boundaries include:
+- HTTPS/HTTP only
+- explicit provider-host allowlist
+- DNS resolution with private/local IP rejection
+- no arbitrary provider URLs
+- `--no-playlist`
+- configurable output-size and duration limits
+- request timeout and cancellation
+- isolated temporary job directories
+- no arbitrary downloader command input from clients
+
+The corresponding catalog downloader tools remain Coming Soon until a deployment has a real `yt-dlp` runtime and the provider operation has been validated end-to-end.

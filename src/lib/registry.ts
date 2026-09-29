@@ -21,16 +21,23 @@ export function getToolByPath(category: string, slug: string): ToolMeta | undefi
   return byPath.get(`${category}/${slug}`);
 }
 
+function alphabeticalKey(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 export function getToolsByCategory(category: CategoryId): ToolMeta[] {
   return allTools
     .filter((t) => t.category === category)
-    .sort((a, b) => {
-      if (a.status !== b.status) {
-        const order = { active: 0, beta: 1, planned: 2 };
-        return order[a.status] - order[b.status];
-      }
-      return b.popularity - a.popularity;
-    });
+    .slice()
+    .sort((a, b) =>
+      alphabeticalKey(a.name).localeCompare(alphabeticalKey(b.name)) ||
+      a.id.localeCompare(b.id),
+    );
 }
 
 export function getFeaturedTools(limit = 8): ToolMeta[] {

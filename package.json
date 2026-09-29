@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/auth/sign-in-gate.test.ts src/lib/engines/codecs.test.ts src/lib/engines/units.test.ts",
+    "test": "npm run check:production && node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/auth/sign-in-gate.test.ts src/lib/engines/codecs.test.ts src/lib/engines/units.test.ts src/lib/engines/stem-expansion.test.ts src/lib/engines/regular-calculators.test.ts src/lib/engines/media-noise.test.ts src/lib/engines/developer-utils.test.ts src/components/engines/security-engine-utils.test.ts src/components/engines/ecommerce-engine-utils.test.ts src/components/engines/relationship-engine-utils.test.ts src/components/engines/interactive-engine-utils.test.ts src/components/engines/gaming-engine-utils.test.ts src/components/engines/marketing-engine-utils.test.ts src/components/engines/webdesign-engine-utils.test.ts src/components/engines/screenshot-engine-utils.test.ts src/components/engines/mockups-category-engine-utils.test.ts src/components/engines/social-engine-utils.test.ts src/components/engines/document-engine-utils.test.ts src/components/engines/image-splitter-utils.test.ts src/components/engines/career-engine-utils.test.ts src/components/engines/accessibility-engine.test.ts src/components/engines/streaming-engine-utils.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "check:catalog": "node scripts/check-catalog.mjs",
@@ -25,7 +25,13 @@
     "check:text": "node scripts/check-text.mjs",
     "check:datetime": "node scripts/check-datetime.mjs",
     "audit:calculators:browser": "node scripts/browser-calculator-audit.mjs",
-    "audit:converters:browser": "node scripts/browser-converter-audit.mjs"
+    "audit:converters:browser": "node scripts/browser-converter-audit.mjs",
+    "media:processor": "node scripts/media-processor.mjs",
+    "check:developer": "node scripts/check-developer.mjs",
+    "check:production": "node scripts/check-production.mjs",
+    "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run check:text && npm run check:datetime && npm test && npm run typecheck && npm run lint && npm run build",
+    "check:coming-soon": "node --experimental-strip-types scripts/coming-soon-audit.mjs",
+    "audit:coming-soon:deep": "node scripts/coming-soon-deep-audit.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
