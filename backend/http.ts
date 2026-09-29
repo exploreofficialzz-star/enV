@@ -42,15 +42,15 @@ export async function proxyRequest(request: Request, upstream: string) {
   return new Response(response.body, { status: response.status, headers: outputHeaders });
 }
 
-export function unavailable(service: string) {
+export function unavailable(service: string, envVar: string) {
   return jsonResponse({
-    error: `${service} is not configured on this Vercel deployment. Configure its external processor URL in Vercel project environment variables.`,
+    error: `${service} is not connected to the Vercel gateway yet. Add ${envVar} in the Vercel project environment variables, then redeploy. Vercel hosts the gateway; the processor performs the heavy media work.`,
   }, 503);
 }
 
 export async function responseAsBlob(response: Response, prefix: string) {
   if (!response.ok || !response.body) return response;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return unavailable("Vercel Blob result storage");
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return unavailable("Vercel Blob result storage", "BLOB_READ_WRITE_TOKEN");
   const result = await put(`env-results/${prefix}.bin`, response.body, {
     access: "public",
     addRandomSuffix: true,

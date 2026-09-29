@@ -19,7 +19,7 @@ async function proxyBlobTranscription(request: Request, upstream: string) {
 export default defineHandler(async (event) => {
   if (event.req.method === "OPTIONS") return optionsResponse();
   const upstream = backendConfig().transcription;
-  if (!upstream) return unavailable("The transcription processor");
+  if (!upstream) return unavailable("The transcription processor", "TRANSCRIBE_URL");
   if ((event.req.headers.get("content-type") || "").includes("application/json")) return responseAsBlob(await proxyBlobTranscription(event.req, upstream), "transcription-result");
   return proxyRequest(event.req, joinUrl(upstream, "transcribe"));
 });

@@ -32,7 +32,7 @@ async function proxyBlobJob(request: Request, upstream: string) {
 export default defineHandler(async (event) => {
   if (event.req.method === "OPTIONS") return optionsResponse();
   const upstream = backendConfig().media;
-  if (!upstream) return unavailable("The FFmpeg media processor");
+  if (!upstream) return unavailable("The FFmpeg media processor", "MEDIA_PROCESSOR_URL");
   if ((event.req.headers.get("content-type") || "").includes("application/json")) return responseAsBlob(await proxyBlobJob(event.req, upstream), "media-result");
   return proxyRequest(event.req, upstream);
 });

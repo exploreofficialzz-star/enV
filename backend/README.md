@@ -28,3 +28,16 @@ First create a **Blob** store in the Vercel project’s **Storage** tab and conn
 The Vercel gateway intentionally does not run FFmpeg, yt-dlp, or Whisper itself. Vercel Functions are request handlers with temporary writable storage and execution limits; those processor binaries belong in the configured external service. The frontend falls back to these same-origin routes when the corresponding public `VITE_*` URL is not set, so processor URLs and credentials remain server-side.
 
 For local media conversion and transcription, the browser uploads the selected file directly to Vercel Blob first. The gateway then fetches the Blob URL and sends a multipart request to the configured processor. This keeps the Vercel Function request under its payload limit and enforces the current 100MB per-file policy.
+
+## Active backend-tool coverage
+
+The catalog currently has **33 active tools** that use the gateway:
+
+- **25 FFmpeg tools**: 9 audio conversions/merges and 16 video conversions/edits. They all use `MEDIA_PROCESSOR_URL`.
+- **8 URL-media tools**: YouTube audio/video, Facebook, Instagram, TikTok, X, generic URL downloads, and URL inspection. They all use `URL_MEDIA_PROCESSOR_URL`.
+
+The catalog also contains planned OCR, document conversion, DNS/WHOIS, screenshot, and transcription entries. They are not silently treated as working; they remain planned until their real processor is connected. `TRANSCRIBE_URL` is ready for the transcription route when those tools are promoted.
+
+### Important Vercel boundary
+
+Vercel **does host the gateway, upload-token route, result storage, and API responses** in this repository. It does not automatically provide FFmpeg, yt-dlp/social-platform extraction, or Whisper. Vercel’s current Function limits include a 4.5MB request/response payload limit, a 500MB writable `/tmp` scratch space, and a maximum duration that depends on the plan; that is why this project uses Blob for files and a processor URL for heavy work. The gateway and processor are separate responsibilities even though the gateway remains on the same Vercel deployment.
