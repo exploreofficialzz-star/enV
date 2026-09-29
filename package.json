@@ -29,7 +29,7 @@
     "media:processor": "node scripts/media-processor.mjs",
     "check:developer": "node scripts/check-developer.mjs",
     "check:production": "node scripts/check-production.mjs",
-    "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run check:text && npm run check:datetime && npm test && npm run typecheck && npm run lint && npm run build",
+    "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
     "check:coming-soon": "node --experimental-strip-types scripts/coming-soon-audit.mjs",
     "audit:coming-soon:deep": "node scripts/coming-soon-deep-audit.mjs"
   },
