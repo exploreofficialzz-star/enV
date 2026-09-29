@@ -1,10 +1,24 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CopyButton } from "@/components/tools/copy-button";
 import { ResultPanel } from "@/components/engines/result-panel";
+import { Select } from "@/components/ui/select";
+import {
+  type ContrastTarget,
+  contrastRatio,
+  evaluateContrast,
+  formatColorSummary,
+  getContrastTargets,
+  parseCssColor,
+  suggestContrastCorrections,
+  targetLabel,
+  toHex,
+  type RgbaColor,
+  resolveRenderedPair,
+} from "@/lib/engines/accessibility-color";
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
 const COLORS = ["#000000", "#ffffff", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e"];
@@ -186,7 +200,315 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
   return "Accessibility utility ready.";
 }
 
+
+function pickerValue(color: RgbaColor | null): string {
+  if (!color || color.a < 0.9995) return "#000000";
+  return toHex(color).slice(0, 7);
+}
+
+function swatchStyle(color: RgbaColor): CSSProperties {
+  return { backgroundColor: toHex(color) };
+}
+
+function correctionCard(
+  label: string,
+  before: RgbaColor,
+  after: RgbaColor | null,
+  background: RgbaColor,
+  canvas: RgbaColor,
+) {
+  if (!after) return null;
+  const beforeRatio = contrastRatio(before, background, canvas);
+  const afterRatio = contrastRatio(
+    label.startsWith("Foreground") ? after : before,
+    label.startsWith("Foreground") ? background : after,
+    canvas,
+  );
+  const summary = formatColorSummary(after);
+  return { label, beforeRatio, afterRatio, summary };
+}
+
+function AccessibleColorChecker() {
+  const [fgInput, setFgInput] = useState("#000000");
+  const [bgInput, setBgInput] = useState("#ffffff");
+  const [canvasInput, setCanvasInput] = useState("#ffffff");
+  const [target, setTarget] = useState<ContrastTarget>("normal-aa");
+
+  const fg = useMemo(() => parseCssColor(fgInput), [fgInput]);
+  const bg = useMemo(() => parseCssColor(bgInput), [bgInput]);
+  const canvas = useMemo(() => parseCssColor(canvasInput), [canvasInput]);
+
+  const allValid = Boolean(fg && bg && canvas);
+  const evaluation = useMemo(
+    () => (fg && bg && canvas ? evaluateContrast(fg, bg, target, canvas) : null),
+    [bg, canvas, fg, target],
+  );
+  const targets = useMemo(() => getContrastTargets(), []);
+  const suggestions = useMemo(
+    () => (fg && bg && canvas ? suggestContrastCorrections(fg, bg, target, canvas) : null),
+    [bg, canvas, fg, target],
+  );
+
+  const corrections = useMemo(() => {
+    if (!fg || !bg || !canvas || !suggestions) return [];
+    const items = [
+      correctionCard("Foreground lightness", fg, suggestions.foreground, bg, canvas),
+      correctionCard("Background lightness", bg, suggestions.background, fg, canvas),
+      correctionCard("Foreground opacity", fg, suggestions.foregroundOpacity, bg, canvas),
+      correctionCard("Background opacity", bg, suggestions.backgroundOpacity, fg, canvas),
+    ];
+    const seen = new Set<string>();
+    return items.filter((item): item is NonNullable<typeof item> => {
+      if (!item) return false;
+      const key = `${item.summary.hex}:${item.summary.alpha}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 4);
+  }, [bg, canvas, fg, suggestions]);
+
+  const rendered = useMemo(() => {
+    if (!fg || !bg || !canvas) return null;
+    return resolveRenderedPair(fg, bg, canvas);
+  }, [bg, canvas, fg]);
+
+  const report = useMemo(() => {
+    if (!fg || !bg || !canvas || !evaluation || !rendered) {
+      return `Accessible Color Checker\n\n${!fg ? `Foreground: invalid (${fgInput})` : ""}\n${!bg ? `Background: invalid (${bgInput})` : ""}\n${!canvas ? `Canvas/base: invalid (${canvasInput})` : ""}`.trim();
+    }
+    const checks = targets.map((item) => {
+      const check = evaluateContrast(fg, bg, item.value, canvas);
+      return `${item.label} — ${check.ratio.toFixed(2)}:1 — ${check.passes ? "PASS" : "FAIL"} — WCAG 2.2 ${check.criterion}`;
+    }).join("\n");
+    const correctionText = corrections.length
+      ? corrections.map((item) => `${item.label}: ${item.summary.hex} (${item.afterRatio.toFixed(2)}:1)`).join("\n")
+      : "No correction is required for the selected target, or no same-parameter correction was found.";
+    return [
+      "Accessible Color Checker",
+      "",
+      `Foreground: ${fgInput}`,
+      `Background: ${bgInput}`,
+      `Canvas/base: ${canvasInput}`,
+      `Rendered foreground: ${formatColorSummary(rendered.foreground).hex}`,
+      `Rendered background: ${formatColorSummary(rendered.background).hex}`,
+      `Selected target: ${targetLabel(target)}`,
+      `Selected ratio: ${evaluation.ratio.toFixed(2)}:1`,
+      `Selected result: ${evaluation.passes ? "PASS" : "FAIL"}`,
+      `WCAG 2.2 criterion: ${evaluation.criterion}`,
+      "",
+      "WCAG evaluations:",
+      checks,
+      "",
+      "Suggested corrections:",
+      correctionText,
+      "",
+      "Scope note: a two-color contrast calculation cannot determine WCAG 1.4.1 Use of Color or establish full-page WCAG conformance.",
+    ].join("\n");
+  }, [bgInput, canvasInput, corrections, evaluation, fgInput, fg, bg, canvas, rendered, target, targets]);
+
+  if (!allValid) {
+    return (
+      <div className="space-y-5">
+        <p className="text-sm text-muted">
+          Deterministic local WCAG-oriented contrast calculation. Enter HEX, RGB/RGBA, or HSL/HSLA colors. Alpha is composited before the ratio is calculated.
+        </p>
+        <ColorInput label="Foreground" value={fgInput} onChange={setFgInput} parsed={fg} />
+        <ColorInput label="Background" value={bgInput} onChange={setBgInput} parsed={bg} />
+        <ColorInput label="Canvas / underlying color" value={canvasInput} onChange={setCanvasInput} parsed={canvas} />
+        <p className="rounded-lg bg-danger/10 px-4 py-3 text-sm text-danger">
+          Correct the invalid color input before running the accessibility check.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-muted">
+        Deterministic local calculation based on WCAG 2.2 contrast rules. This evaluates the supplied color pair; it does not prove complete WCAG conformance.
+      </p>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ColorInput label="Foreground" value={fgInput} onChange={setFgInput} parsed={fg} />
+        <ColorInput label="Background" value={bgInput} onChange={setBgInput} parsed={bg} />
+        <ColorInput label="Canvas / underlying color" value={canvasInput} onChange={setCanvasInput} parsed={canvas} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
+        <label className="flex flex-col gap-1.5">
+          <Label>Recommended correction target</Label>
+          <Select value={target} onChange={(event) => setTarget(event.target.value as ContrastTarget)}>
+            {targets.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label} · {item.threshold}:1
+              </option>
+            ))}
+          </Select>
+          <span className="text-xs text-muted">
+            Large text is the WCAG large-scale category; 1.4.11 applies to qualifying UI components and graphics.
+          </span>
+        </label>
+        <div className="rounded-xl border border-border bg-surface-2 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Input formats</p>
+          <p className="mt-1 font-mono text-xs leading-5">#RGB · #RGBA · #RRGGBB · #RRGGBBAA<br />rgb()/rgba() · hsl()/hsla()</p>
+        </div>
+      </div>
+
+      {rendered ? (
+        <div className="grid overflow-hidden rounded-2xl border border-border sm:grid-cols-2">
+          <div className="min-h-40 p-6" style={swatchStyle(rendered.background)}>
+            <div className="max-w-md rounded-xl bg-white/10 p-4" style={{ color: toHex(rendered.foreground) }}>
+              <p className="text-2xl font-semibold">Accessible color preview</p>
+              <p className="mt-1 text-sm">The rendered pair used for the deterministic contrast calculation.</p>
+              <button
+                type="button"
+                className="mt-4 rounded-md border px-3 py-2 text-sm font-medium"
+                style={{ borderColor: toHex(rendered.foreground), color: toHex(rendered.foreground) }}
+              >
+                Sample action
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col justify-center gap-2 bg-surface p-6">
+            <p className="text-sm text-muted">Selected evaluation · {evaluation?.criterion}</p>
+            <p className="text-4xl font-semibold tabular-nums">{evaluation?.ratio.toFixed(2)}:1</p>
+            <p className={evaluation?.passes ? "text-sm font-medium text-success" : "text-sm font-medium text-danger"}>
+              {evaluation?.passes ? "PASS" : "FAIL"} · requires {evaluation?.threshold.toFixed(1)}:1
+            </p>
+            <p className="text-xs text-muted">
+              Rendered foreground {formatColorSummary(rendered.foreground).hex} · rendered background {formatColorSummary(rendered.background).hex}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <section aria-labelledby="wcag-evaluations">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="wcag-evaluations" className="text-base font-semibold">WCAG 2.2 evaluations</h2>
+          <span className="text-xs text-muted">Ratio is deterministic; applicability still depends on context.</span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {targets.map((item) => {
+            const check = evaluateContrast(fg!, bg!, item.value, canvas!);
+            return (
+              <div key={item.value} className="rounded-xl border border-border bg-surface-2 p-3">
+                <p className="text-xs font-medium text-muted">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">{check.ratio.toFixed(2)}:1</p>
+                <p className={check.passes ? "text-xs font-medium text-success" : "text-xs font-medium text-danger"}>
+                  {check.passes ? "PASS" : "FAIL"} · {item.threshold}:1
+                </p>
+                <p className="mt-1 text-[11px] text-muted">WCAG 2.2 · {item.criterion}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section aria-labelledby="corrections">
+        <h2 id="corrections" className="text-base font-semibold">Suggested corrections</h2>
+        <p className="mt-1 text-sm text-muted">
+          The engine first searches HSL lightness while preserving hue/saturation, then checks whether increasing opacity can reach the selected threshold.
+        </p>
+        {corrections.length === 0 ? (
+          <div className="mt-3 rounded-xl border border-border bg-surface-2 p-4 text-sm">
+            {evaluation?.passes ? "The selected target already passes, so no correction is necessary." : "No same-parameter correction was found for the selected target. Consider changing the hue/saturation or the base color."}
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {corrections.map((item) => (
+              <div key={`${item.label}-${item.summary.hex}-${item.summary.alpha}`} className="rounded-xl border border-border bg-surface-2 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="size-12 rounded-lg border border-black/10" style={swatchStyle(parseCssColor(item.summary.hex) ?? { r: 0, g: 0, b: 0, a: 1 })} />
+                  <div>
+                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="font-mono text-xs text-muted">{item.summary.hex}</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted">
+                  Before {item.beforeRatio.toFixed(2)}:1 → After <strong>{item.afterRatio.toFixed(2)}:1</strong>
+                </p>
+                <p className="mt-1 text-xs text-muted">{item.summary.rgb} · {item.summary.hsl} · alpha {item.summary.alpha}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="scope-notes" className="rounded-xl bg-surface-2 p-4">
+        <h2 id="scope-notes" className="text-base font-semibold">What this check can and cannot establish</h2>
+        <ul className="mt-2 space-y-1 text-sm text-muted">
+          <li><strong className="text-fg">1.4.3 Contrast (Minimum):</strong> evaluates text and images of text at 4.5:1 normal and 3:1 large.</li>
+          <li><strong className="text-fg">1.4.6 Contrast (Enhanced):</strong> evaluates 7:1 normal and 4.5:1 large.</li>
+          <li><strong className="text-fg">1.4.11 Non-text Contrast:</strong> evaluates the 3:1 threshold for qualifying UI components and graphical objects.</li>
+          <li><strong className="text-fg">Not evaluated from colors alone:</strong> WCAG 1.4.1 Use of Color, typography/context exceptions, focus-state context, and full-page conformance.</li>
+        </ul>
+      </section>
+
+      <ResultPanel
+        items={[
+          { label: "Selected target", value: targetLabel(target) },
+          { label: "Contrast ratio", value: `${evaluation?.ratio.toFixed(2)}:1`, primary: true },
+          { label: "Result", value: evaluation?.passes ? "PASS" : "FAIL" },
+        ]}
+        extraText={report}
+        filename="env-accessible-color-checker.txt"
+      />
+    </div>
+  );
+}
+
+function ColorInput({
+  label,
+  value,
+  onChange,
+  parsed,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  parsed: ReturnType<typeof parseCssColor>;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          type="color"
+          value={pickerValue(parsed)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-11 w-14 shrink-0 p-1"
+          aria-label={`${label} color picker`}
+        />
+        <Input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="#000000 or rgb(0 0 0)"
+          aria-label={`${label} value`}
+          spellCheck={false}
+        />
+      </div>
+      {parsed ? (
+        <div className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
+          <span className="font-mono">{formatColorSummary(parsed).hex}</span>
+          <span className="mx-2">·</span>
+          <span>{formatColorSummary(parsed).rgb}</span>
+          <span className="mx-2">·</span>
+          <span>{formatColorSummary(parsed).hsl}</span>
+        </div>
+      ) : (
+        <span className="text-xs text-danger">Unsupported color syntax. Use HEX, RGB/RGBA, or HSL/HSLA.</span>
+      )}
+    </label>
+  );
+}
+
+
 export function AccessibilityEngine({ toolId }: { toolId: string }) {
+  if (toolId === "accessible-color-checker") return <AccessibleColorChecker />;
+  return <LegacyAccessibilityEngine toolId={toolId} />;
+}
+
+function LegacyAccessibilityEngine({ toolId }: { toolId: string }) {
   const { kind, action } = parseToolId(toolId);
   const [fg, setFg] = useState("#000000"); const [bg, setBg] = useState("#ffffff");
   const [text, setText] = useState(""); const [size, setSize] = useState("16px"); const [lineHeight, setLineHeight] = useState("1.5");
