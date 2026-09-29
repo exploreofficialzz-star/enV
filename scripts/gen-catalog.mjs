@@ -1458,10 +1458,11 @@ for (const row of RAW) {
   const isImageEngine = cat === "image" && engineType === "image";
   const isCreatorCustom = cat === "creators" && engineType === "custom";
   const isBusinessTool = cat === "business";
+  const isMockupsTool = cat === "mockups";
   const effectiveEngineType = isCalculatorFamily ? "calculator" : isDeveloperFamily ? "developer" : isTextCustom ? "text" : isCreatorCustom ? "creator" : isBusinessTool ? "business" : engineType;
   const effectiveEngineKey = isCalculatorFamily ? engineKey.toLowerCase() : isDeveloperFamily ? id : isBusinessTool ? id.replace(/-(calculator|generator|template|estimator|planner)$/, "") : engineKey;
   const unsupportedEngineType = ["custom", "ai", "document", "pdf"].includes(effectiveEngineType);
-  const status = isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
+  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
   let disclaimer;
   if (extra.includes("h")) disclaimer = "health";
   else if (extra.includes("f")) disclaimer = "finance";

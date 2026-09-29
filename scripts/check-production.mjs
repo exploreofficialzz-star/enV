@@ -26,7 +26,7 @@ for (const tool of tools) {
   if (!tool.slug || slugs.has(tool.slug)) errors.push(`Duplicate tool slug: ${tool.slug || "<missing>"}`);
   slugs.add(tool.slug);
   if (!tool.engine?.type || !engineTypes.has(tool.engine.type)) errors.push(`${tool.id}: unknown engine type`);
-  if (tool.status === "active" && tool.engine?.type === "custom") {
+  if (tool.status === "active" && tool.engine?.type === "custom" && tool.category !== "mockups") {
     const supported = new Set([
       "productivity", "personal", "communication", "streaming", "marketing", "accessibility",
     ]);

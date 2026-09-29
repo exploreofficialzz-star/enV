@@ -42,6 +42,9 @@ import { TranscriptionEngine } from "@/components/engines/transcription-engine";
 import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
+  // Mockups are backed by the shared mockup engine, including catalog entries that
+  // were previously marked planned. The catalog remains the compatibility index.
+  if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
 
   switch (tool.engine.type) {
@@ -120,7 +123,6 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
       if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
-      if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
       if (["events","celebrations","food","travel","photography","video"].includes(tool.category) && tool.engine.id.startsWith("planned-local:")) return <PlannedLocalEngine toolId={tool.id} />;
       return <ComingSoonPanel tool={tool} />;

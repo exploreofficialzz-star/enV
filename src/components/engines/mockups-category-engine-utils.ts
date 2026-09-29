@@ -2,6 +2,13 @@ export type MockupKind = 'chat' | 'group' | 'voice' | 'video' | 'notification' |
 
 export function parseMockupToolId(toolId: string) {
   const id = toolId.replace(/-mockup$/, '');
+  const specialPlatforms: Record<string, MockupKind> = {
+    "ai-chat": "chat",
+    "threads": "chat",
+    "tiktok-chat": "chat",
+    "notification": "notification",
+  };
+  if (specialPlatforms[id]) return { platform: id === "threads" ? "threads" : id === "tiktok-chat" ? "tiktok-chat" : id, kind: specialPlatforms[id] };
   const suffixes: Array<[string, MockupKind]> = [
     ['-group-chat', 'group'], ['-voice-note', 'voice'], ['-video-call', 'video'],
     ['-notification', 'notification'], ['-typing-indicator', 'typing'], ['-read-receipt', 'receipt'],
@@ -11,6 +18,19 @@ export function parseMockupToolId(toolId: string) {
     if (id.endsWith(suffix)) return { platform: id.slice(0, -suffix.length), kind };
   }
   return { platform: id, kind: 'chat' as MockupKind };
+}
+
+export function normalizeMockupPlatform(platform: string) {
+  if (platform === "reddit-chat") return "reddit";
+  if (platform === "tiktok-chat") return "tiktok-chat";
+  if (platform === "x") return "x-dm";
+  if (platform === "google") return "google-messages";
+  if (platform === "instagram") return "instagram-dm";
+  if (platform === "ai") return "ai-chat";
+  if (platform === "threads-dm") return "threads";
+  if (platform === "threads") return "threads";
+  if (platform === "tiktok") return "tiktok-chat";
+  return platform;
 }
 
 export function normalizeMessages(value: string) {

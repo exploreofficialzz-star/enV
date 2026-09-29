@@ -1,0 +1,2 @@
+import { createPlatformAdapter } from "./adapter-factory.ts";
+export const youtubeAdapter = createPlatformAdapter({ id: "youtube-community", name: "YouTube Community", scenes: ["post","notification"], media: ["image","video","gif"], messageRadius: 8, messageGap: 8, maxBubbleWidth: "94%", featureFlags: ["posts","polls","media","reactions"], ui: { fontFamily: "Roboto, Arial, sans-serif", headerHeight: 52, headerStyle: "post", navigationStyle: "tabs", bubbleStyle: "plain", composerStyle: "none" }, meta: (t) => t });
