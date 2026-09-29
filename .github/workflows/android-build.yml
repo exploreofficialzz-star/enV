@@ -53,6 +53,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Install production media runtime
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Install locked web dependencies
         run: npm ci
       - name: Audit web dependencies
