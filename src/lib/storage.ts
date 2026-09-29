@@ -5,9 +5,22 @@ const RECENT_KEY = "env:recent";
 const THEME_KEY = "env:theme";
 const MAX_RECENT = 24;
 
+function browserStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const storage = window.localStorage;
+    const probe = "__env_storage_probe__";
+    storage.setItem(probe, "1");
+    storage.removeItem(probe);
+    return storage;
+  } catch {
+    return null;
+  }
+}
+
 function readList(key: string): string[] {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = browserStorage()?.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
@@ -16,11 +29,14 @@ function readList(key: string): string[] {
   }
 }
 
-function writeList(key: string, value: string[]) {
+function writeList(key: string, value: string[]): boolean {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const storage = browserStorage();
+    if (!storage) return false;
+    storage.setItem(key, JSON.stringify(value));
+    return storage.getItem(key) === JSON.stringify(value);
   } catch {
-    /* quota */
+    return false;
   }
 }
 
@@ -29,6 +45,8 @@ type PrefsState = {
   recent: string[];
   theme: "light" | "dark";
   hydrated: boolean;
+  storageAvailable: boolean;
+  storageError: string | null;
   hydrate: () => void;
   toggleFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
@@ -42,9 +60,12 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   recent: [],
   theme: "light",
   hydrated: false,
+  storageAvailable: false,
+  storageError: null,
   hydrate: () => {
     if (typeof window === "undefined") return;
-    const storedTheme = localStorage.getItem(THEME_KEY);
+    const storage = browserStorage();
+    const storedTheme = storage?.getItem(THEME_KEY);
     const theme: "light" | "dark" =
       storedTheme === "dark" || storedTheme === "light"
         ? storedTheme
@@ -57,14 +78,19 @@ export const usePrefs = create<PrefsState>((set, get) => ({
       recent: readList(RECENT_KEY),
       theme,
       hydrated: true,
+      storageAvailable: Boolean(storage),
+      storageError: storage ? null : "Browser storage is blocked, so saved tools cannot persist on this device.",
     });
   },
   toggleFavorite: (id) => {
     const next = get().favorites.includes(id)
       ? get().favorites.filter((x) => x !== id)
       : [id, ...get().favorites];
-    writeList(FAV_KEY, next);
-    set({ favorites: next });
+    const persisted = writeList(FAV_KEY, next);
+    set({
+      favorites: next,
+      storageError: persisted ? null : "Browser storage is blocked, so this save may be lost when the page closes.",
+    });
   },
   isFavorite: (id) => get().favorites.includes(id),
   recordRecent: (id) => {
@@ -74,7 +100,7 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   },
   setTheme: (theme) => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    localStorage.setItem(THEME_KEY, theme);
+    browserStorage()?.setItem(THEME_KEY, theme);
     set({ theme });
   },
   toggleTheme: () => {

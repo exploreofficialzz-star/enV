@@ -23,6 +23,7 @@ export function ToolShell({
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const recordRecent = usePrefs((s) => s.recordRecent);
+  const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
 
   useEffect(() => {
@@ -62,13 +63,20 @@ export function ToolShell({
         <Button
           type="button"
           variant={saved ? "default" : "outline"}
-          onClick={() => toggleFavorite(tool.id)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleFavorite(tool.id);
+          }}
           aria-pressed={saved}
+          aria-label={saved ? `Remove ${tool.name} from saved tools` : `Save ${tool.name}`}
         >
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button>
       </header>
+
+      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
 
