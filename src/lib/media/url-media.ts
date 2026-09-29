@@ -29,7 +29,15 @@ export async function downloadUrlMedia(request: UrlMediaRequest, signal?: AbortS
     throw new Error(payload?.error || `URL media service returned HTTP ${response.status}.`);
   }
   onProgress?.(90);
-  const blob = await response.blob();
+  const blob = (response.headers.get("content-type") || "").includes("application/json")
+    ? await (async () => {
+        const payload = await response.json() as { url?: string; error?: string };
+        if (!payload.url) throw new Error(payload.error || "URL media service did not return a result file.");
+        const result = await fetch(payload.url, { signal });
+        if (!result.ok) throw new Error(`URL media result download returned HTTP ${result.status}.`);
+        return result.blob();
+      })()
+    : await response.blob();
   onProgress?.(100);
   return blob;
 }
