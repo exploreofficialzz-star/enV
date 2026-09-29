@@ -28,8 +28,8 @@ function detectProvider(value: string): UrlMediaProvider | null {
     for (const [provider, names] of Object.entries(hosts) as [UrlMediaProvider, string[]][]) {
       if (names.some((name) => host === name || host.endsWith(`.${name}`))) return provider;
     }
-  } catch { /* handled by validation */ }
-  return null;
+  } catch { return null; }
+  return "generic";
 }
 
 function extensionFor(format: string, audioOnly: boolean) {
@@ -43,6 +43,7 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
   const [audioOnly, setAudioOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [transfer, setTransfer] = useState<{ bytes: number; total?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [output, setOutput] = useState<{ size: number; type: string } | null>(null);
   const [preview, setPreview] = useState<UrlMediaInfo | null>(null);
@@ -54,7 +55,7 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
     const trimmed = url.trim();
     if (!/^https?:\/\//i.test(trimmed)) { setError("Enter a valid public HTTP(S) URL."); return null; }
     const detected = detectProvider(trimmed);
-    if (!detected) { setError("This URL is not from one of the currently supported providers."); return null; }
+    if (!detected) { setError("Enter a valid HTTP(S) media URL."); return null; }
     if (provider !== "generic" && detected !== provider) { setError(`This tool expects ${labels[provider]} URLs, but this URL appears to be ${labels[detected]}.`); return null; }
     return { trimmed, detected };
   }
@@ -75,7 +76,7 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
   }
 
   async function run() {
-    setError(null); setOutput(null); setProgress(0);
+    setError(null); setOutput(null); setProgress(0); setTransfer(null);
     const valid = validateUrl();
     if (!valid) return;
     if (!config.configured) { setError("The URL media service is not configured. Set VITE_URL_MEDIA_PROCESSOR_URL to enable downloads."); return; }
@@ -84,7 +85,11 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
     setController(nextController);
     setBusy(true);
     try {
-      const blob = await downloadUrlMedia({ url: valid.trimmed, provider: valid.detected, format: effectiveFormat as "mp4" | "webm" | "mp3" | "m4a" | "best", audioOnly }, nextController.signal, setProgress);
+      const blob = await downloadUrlMedia(
+        { url: valid.trimmed, provider: valid.detected, format: effectiveFormat as "mp4" | "webm" | "mp3" | "m4a" | "best", audioOnly },
+        nextController.signal,
+        (value, detail) => { setProgress(value); if (detail) setTransfer(detail); },
+      );
       const ext = extensionFor(effectiveFormat, audioOnly);
       const safeProvider = valid.detected === "x" ? "x-twitter" : valid.detected;
       downloadBlob(blob, `env-${safeProvider}-download.${ext}`);
@@ -105,14 +110,18 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
     </div>
     <div className="flex flex-wrap items-end gap-4">
       <label className="space-y-2 text-sm"><span className="block font-medium">Format</span><select className="rounded-md border border-border bg-background px-3 py-2" value={format} onChange={(e) => setFormat(e.target.value)} disabled={audioOnly || busy}><option value="mp4">MP4</option><option value="webm">WebM</option></select></label>
-      <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={audioOnly} onChange={(e) => setAudioOnly(e.target.checked)} disabled={busy} /> Audio only (MP3)</label>
+      <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={audioOnly} onChange={(e) => setAudioOnly(e.target.checked)} disabled={busy || provider === "generic"} /> Audio only (MP3){provider === "generic" ? " · unavailable for direct files" : ""}</label>
       {url.trim() && detectProvider(url.trim()) ? <span className="pb-2 text-xs text-muted">Detected: <strong className="text-fg">{labels[detectProvider(url.trim())!]}</strong></span> : null}
     </div>
     <div className="flex flex-wrap gap-2">
-      <Button type="button" onClick={() => void run()} disabled={busy || previewBusy}>{busy ? `Processing ${progress}%` : "Download"}</Button>
+      <Button type="button" onClick={() => void run()} disabled={busy || previewBusy}>{busy ? (transfer?.total ? `Downloading ${Math.round(progress)}%` : "Downloading…") : "Download"}</Button>
       <Button type="button" variant="outline" onClick={() => void previewUrl()} disabled={busy || previewBusy}>{previewBusy ? "Inspecting…" : "Preview first"}</Button>
       {controller && (busy || previewBusy) ? <Button type="button" variant="secondary" onClick={() => controller.abort()}>Cancel</Button> : null}
     </div>
+    {busy && transfer ? <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3 text-sm" aria-live="polite">
+      <div className="flex items-center justify-between gap-3"><span>{transfer.total ? `${Math.round(progress)}% downloaded` : "Downloading media"}</span><span className="text-muted">{(transfer.bytes / 1024 / 1024).toFixed(2)} MB{transfer.total ? ` / ${(transfer.total / 1024 / 1024).toFixed(2)} MB` : ""}</span></div>
+      {transfer.total ? <div className="h-2 overflow-hidden rounded-full bg-surface"><div className="h-full bg-accent" style={{ width: `${progress}%` }} /></div> : <div className="h-2 rounded-full bg-surface motion-safe:animate-pulse" aria-hidden="true" />}
+    </div> : null}
     {preview ? <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-4">
       <div className="flex gap-4">
         {preview.thumbnail ? <img src={preview.thumbnail} alt="Media preview" className="h-20 w-32 rounded-md object-cover" loading="lazy" referrerPolicy="no-referrer" /> : null}

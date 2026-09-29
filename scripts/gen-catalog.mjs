@@ -1532,7 +1532,7 @@ for (const tool of tools) {
 // Browser-local video operations use the dedicated VideoEngine. Source downloads,
 // transcoding-heavy operations, and transcription remain planned until their real
 // processing backends are shipped.
-const videoOps = new Set(["media-capability-checker","webcodecs-video-checker","mediarecorder-support-checker","video-codec-support-checker","media-worker-support-checker","video-file-inspector","video-duration-tool","video-dimensions-tool","video-aspect-ratio-tool","video-thumbnail-extractor","video-poster-generator","video-frame-preview","video-audio-extractor","video-frame-png","video-frame-percent","video-frame-contact-sheet","video-metadata-json","video-bitrate-estimator","video-audio-track-checker","media-runtime-inspector","ffmpeg-runtime-checker","media-backend-checker","video-trimmer","video-compressor","video-speed-changer","video-to-mp4","video-to-mp3","video-to-gif"]);
+const videoOps = new Set(["media-capability-checker","webcodecs-video-checker","mediarecorder-support-checker","video-codec-support-checker","media-worker-support-checker","video-file-inspector","video-duration-tool","video-dimensions-tool","video-aspect-ratio-tool","video-thumbnail-extractor","video-poster-generator","video-frame-preview","video-audio-extractor","video-frame-png","video-frame-percent","video-frame-contact-sheet","video-metadata-json","video-bitrate-estimator","video-audio-track-checker","media-runtime-inspector","ffmpeg-runtime-checker","media-backend-checker","video-trimmer","video-compressor","video-speed-changer","video-to-mp4","video-to-mp3","video-to-gif","video-to-webm","video-to-mov","video-to-avi","video-resize","video-crop","video-rotate","video-mute","video-fps","video-bitrate","video-resolution-presets","video-audio-volume","video-merger","video-audio-replacer"]);
 for (const tool of tools) {
   if (tool.category !== "video" || !videoOps.has(tool.id)) continue;
   const opMap = {
@@ -1553,6 +1553,11 @@ for (const tool of tools) {
     "video-metadata-json": "metadata-json", "video-bitrate-estimator": "bitrate-estimator", "video-audio-track-checker": "audio-track-check",
     "video-trimmer": "video-trimmer", "video-compressor": "video-compressor", "video-speed-changer": "video-speed",
     "video-to-mp4": "video-to-mp4", "video-to-mp3": "video-to-mp3", "video-to-gif": "video-to-gif",
+    "video-to-webm": "video-to-webm", "video-to-mov": "video-to-mov", "video-to-avi": "video-to-avi",
+    "video-resize": "video-resize", "video-crop": "video-crop", "video-rotate": "video-rotate",
+    "video-mute": "video-mute", "video-fps": "video-fps", "video-bitrate": "video-bitrate",
+    "video-resolution-presets": "video-resolution-presets", "video-audio-volume": "video-audio-volume",
+    "video-merger": "video-merger", "video-audio-replacer": "video-audio-replacer",
   };
   tool.engine = { type: "video", op: opMap[tool.id] };
   tool.status = "active";

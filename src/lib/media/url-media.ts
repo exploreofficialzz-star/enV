@@ -1,4 +1,4 @@
-export type UrlMediaProvider = "youtube" | "tiktok" | "facebook" | "instagram" | "x";
+export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
 
 export interface UrlMediaRequest {
   url: string;
@@ -14,10 +14,13 @@ export function getUrlMediaConfig() {
   return { endpoint: endpoint || "/api/backend/url-media", configured: true };
 }
 
-export async function downloadUrlMedia(request: UrlMediaRequest, signal?: AbortSignal, onProgress?: (value: number) => void) {
+export async function downloadUrlMedia(
+  request: UrlMediaRequest,
+  signal?: AbortSignal,
+  onProgress?: (value: number, detail?: { bytes: number; total?: number }) => void,
+) {
   const { endpoint } = getUrlMediaConfig();
   if (!endpoint) throw new Error("No URL media service is configured.");
-  onProgress?.(5);
   const response = await fetch(`${endpoint.replace(/\/$/, "")}/download`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -28,18 +31,27 @@ export async function downloadUrlMedia(request: UrlMediaRequest, signal?: AbortS
     const payload = await response.json().catch(() => null) as { error?: string } | null;
     throw new Error(payload?.error || `URL media service returned HTTP ${response.status}.`);
   }
-  onProgress?.(90);
-  const blob = (response.headers.get("content-type") || "").includes("application/json")
-    ? await (async () => {
-        const payload = await response.json() as { url?: string; error?: string };
-        if (!payload.url) throw new Error(payload.error || "URL media service did not return a result file.");
-        const result = await fetch(payload.url, { signal });
-        if (!result.ok) throw new Error(`URL media result download returned HTTP ${result.status}.`);
-        return result.blob();
-      })()
-    : await response.blob();
-  onProgress?.(100);
-  return blob;
+  const totalHeader = response.headers.get("content-length");
+  const total = totalHeader ? Number(totalHeader) : undefined;
+  if (!response.body) {
+    const blob = await response.blob();
+    onProgress?.(100, { bytes: blob.size, total });
+    return blob;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    chunks.push(value);
+    bytes += value.byteLength;
+    onProgress?.(total ? Math.min(100, (bytes / total) * 100) : 0, { bytes, total });
+  }
+  onProgress?.(100, { bytes, total: total ?? bytes });
+  const type = response.headers.get("content-type") || "application/octet-stream";
+  return new Blob(chunks.map((chunk) => chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer), { type });
 }
 
 

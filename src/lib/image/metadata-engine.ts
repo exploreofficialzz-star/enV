@@ -189,7 +189,7 @@ export async function stripJpegMetadata(file: File): Promise<Blob> {
     offset += 2 + length;
   }
   if (offset !== bytes.length) parts.push(bytes.slice(offset));
-  return new Blob(parts.map((part) => part.slice().buffer as ArrayBuffer), { type: "image/jpeg" });
+  return new Blob(parts.map((part) => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength) as ArrayBuffer), { type: "image/jpeg" });
 }
 
 export async function stripPngMetadata(file: File): Promise<Blob> {
@@ -207,7 +207,7 @@ export async function stripPngMetadata(file: File): Promise<Blob> {
     offset += 12 + length;
     if (type === "IEND") break;
   }
-  return new Blob(chunks.map((part) => part.slice().buffer as ArrayBuffer), { type: "image/png" });
+  return new Blob(chunks.map((chunk) => chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer), { type: "image/png" });
 }
 
 export async function stripMetadata(file: File): Promise<Blob> {

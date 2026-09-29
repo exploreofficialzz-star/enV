@@ -265,7 +265,7 @@ function AccessibleColorChecker() {
       seen.add(key);
       return true;
     }).slice(0, 4);
-  }, [bg, canvas, fg, suggestions]);
+  }, [bg, canvas, fg, suggestions, target]);
 
   const rendered = useMemo(() => {
     if (!fg || !bg || !canvas) return null;
