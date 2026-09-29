@@ -27,6 +27,7 @@
     "audit:calculators:browser": "node scripts/browser-calculator-audit.mjs",
     "audit:converters:browser": "node scripts/browser-converter-audit.mjs",
     "media:processor": "node scripts/media-processor.mjs",
+    "check:processor": "node --check processor/server.mjs && node --check scripts/media-processor.mjs && node --check scripts/url-media-processor.mjs && node --check scripts/transcription-processor.mjs",
     "check:developer": "node scripts/check-developer.mjs",
     "check:production": "node scripts/check-production.mjs",
     "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: env-media-processor
+    runtime: docker
+    dockerfilePath: ./processor/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PROCESSOR_SHARED_SECRET
+        generateValue: true
+      - key: MEDIA_MAX_BYTES
+        value: "104857600"
+      - key: PROCESSOR_ALLOWED_ORIGIN
+        value: "*"
+      - key: TRANSCRIBE_ENABLED
+        value: "false"

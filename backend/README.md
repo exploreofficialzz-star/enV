@@ -24,8 +24,11 @@ First create a **Blob** store in the Vercel project’s **Storage** tab and conn
 - `TRANSCRIBE_URL`: external transcription processor base URL (it must provide `/transcribe`).
 - `BLOB_READ_WRITE_TOKEN`: supplied automatically after connecting a Vercel Blob store; do not commit it to Git.
 - `BACKEND_ALLOWED_ORIGIN`: optional allowed origin; leave unset for the default permissive CORS behavior used by the existing standalone processors.
+- `PROCESSOR_SHARED_SECRET`: server-only secret shared by Vercel and the Render processor. Render's Blueprint generates it for the processor; copy the same value into the Vercel project without exposing it as `VITE_*`.
 
 The Vercel gateway intentionally does not run FFmpeg, yt-dlp, or Whisper itself. Vercel Functions are request handlers with temporary writable storage and execution limits; those processor binaries belong in the configured external service. The frontend falls back to these same-origin routes when the corresponding public `VITE_*` URL is not set, so processor URLs and credentials remain server-side.
+
+The repository includes a Render-ready processor in `processor/` and `render.yaml`. It packages the existing FFmpeg and yt-dlp implementations into one HTTPS service. Render Free is appropriate for initial testing but may sleep after inactivity, has limited CPU/RAM, and has no persistent filesystem; Blob remains the durable file store.
 
 For local media conversion and transcription, the browser uploads the selected file directly to Vercel Blob first. The gateway then fetches the Blob URL and sends a multipart request to the configured processor. This keeps the Vercel Function request under its payload limit and enforces the current 100MB per-file policy.
 

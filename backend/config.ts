@@ -13,6 +13,7 @@ export function backendConfig() {
     media: firstEnv("MEDIA_PROCESSOR_URL", "VITE_MEDIA_PROCESSOR_URL"),
     urlMedia: firstEnv("URL_MEDIA_PROCESSOR_URL", "VITE_URL_MEDIA_PROCESSOR_URL"),
     transcription: firstEnv("TRANSCRIBE_URL", "VITE_TRANSCRIBE_URL"),
+    processorSecret: trim(process.env.PROCESSOR_SHARED_SECRET),
     allowedOrigin: trim(process.env.BACKEND_ALLOWED_ORIGIN) || "*",
   };
 }

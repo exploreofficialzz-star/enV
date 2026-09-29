@@ -27,6 +27,8 @@ export async function proxyRequest(request: Request, upstream: string) {
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("content-length");
+  const processorSecret = backendConfig().processorSecret;
+  if (processorSecret) headers.set("x-processor-key", processorSecret);
   const response = await fetch(upstream, {
     method: request.method,
     headers,
