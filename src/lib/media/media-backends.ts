@@ -52,8 +52,8 @@ export function getServerMediaConfig(): ServerMediaConfig {
   const nodeEndpoint = typeof process !== "undefined" && typeof process.env?.VITE_MEDIA_PROCESSOR_URL === "string"
     ? String(process.env.VITE_MEDIA_PROCESSOR_URL).trim()
     : "";
-  const endpoint = viteEndpoint || nodeEndpoint;
-  return { endpoint, configured: Boolean(endpoint) };
+  const endpoint = viteEndpoint || nodeEndpoint || "/api/backend/media";
+  return { endpoint, configured: true };
 }
 
 export function createServerMediaAdapter(): MediaRuntimeAdapter {

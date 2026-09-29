@@ -9,7 +9,7 @@ function endpoint() {
   const value = typeof import.meta !== "undefined" && typeof import.meta.env?.VITE_TRANSCRIBE_URL === "string"
     ? String(import.meta.env.VITE_TRANSCRIBE_URL).trim()
     : "";
-  return value.replace(/\/$/, "");
+  return value.replace(/\/$/, "") || "/api/backend";
 }
 
 export function TranscriptionEngine({ mode, format }: Props) {

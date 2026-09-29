@@ -11,7 +11,7 @@ export function getUrlMediaConfig() {
   const endpoint = typeof import.meta !== "undefined" && typeof import.meta.env?.VITE_URL_MEDIA_PROCESSOR_URL === "string"
     ? String(import.meta.env.VITE_URL_MEDIA_PROCESSOR_URL).trim()
     : "";
-  return { endpoint, configured: Boolean(endpoint) };
+  return { endpoint: endpoint || "/api/backend/url-media", configured: true };
 }
 
 export async function downloadUrlMedia(request: UrlMediaRequest, signal?: AbortSignal, onProgress?: (value: number) => void) {
