@@ -1043,6 +1043,7 @@ for (const tool of RAW) {
 // Accessibility/communication/streaming.
 addCross("accessibility", ["Contrast", "Color Blindness", "Font Size", "Line Height", "Text Readability", "Alt Text", "ARIA", "Form", "Keyboard Navigation", "Focus State", "Accessible Color", "Motion"], ["Checker", "Generator", "Simulator", "Helper", "Preview"], "An accessibility {platform} utility.");
 addCross("communication", ["Email", "Message", "SMS", "Meeting", "Agenda", "Minutes", "Signature", "Invitation", "Announcement", "Thank You", "Follow Up", "Reminder"], ["Generator", "Template", "Builder", "Planner", "Formatter"], "A communication {platform} utility.");
+add([["instant-contact-exchange", "Instant Contact Exchange", "communication", "Configure a contact card once and exchange only the fields you authorize with other intentionally active participants.", "custom", "instant-contact-exchange", "contact exchange vcard nearby share phone email whatsapp", 1, 97, "n"]]);
 addCross("streaming", ["YouTube Live", "Twitch", "TikTok Live", "Instagram Live", "Facebook Live", "Kick", "Podcast Live"], ["Bitrate Calculator", "Resolution Helper", "Stream Schedule", "Title Generator", "Description Generator", "Overlay Planner", "Stream Checklist", "Revenue Calculator", "Aspect Ratio Helper"], "A streaming {platform} utility.");
 
 // More image/video/audio families.

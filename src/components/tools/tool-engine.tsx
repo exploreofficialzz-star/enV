@@ -40,6 +40,7 @@ import { SocialEngine } from "@/components/engines/social-engine";
 import { PlannedLocalEngine } from "@/components/engines/planned-local-engine";
 import { TranscriptionEngine } from "@/components/engines/transcription-engine";
 import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
+import { ContactExchangeEngine } from "@/components/engines/contact-exchange-engine";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
   // Mockups are backed by the shared mockup engine, including catalog entries that
@@ -106,6 +107,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       return <UrlMediaInfoEngine provider={tool.engine.provider} />;
     case "custom":
       if (["image-comparison", "image-screenshot", "image-print-layout"].includes(tool.engine.id)) return <ImageToolsEngine op={tool.engine.id} />;
+      if (tool.engine.id === "instant-contact-exchange") return <ContactExchangeEngine />;
       if (tool.engine.id === "transcription") {
         const format = tool.id.endsWith("-subtitles") ? "srt" : "txt";
         return <TranscriptionEngine mode={tool.category === "audio" ? "audio" : "video"} format={format} />;
