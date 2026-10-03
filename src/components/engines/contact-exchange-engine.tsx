@@ -8,17 +8,12 @@ import { ResultPanel } from "@/components/engines/result-panel";
 import { downloadText } from "@/lib/utils";
 
 const PROFILE_KEY = "env-contact-exchange-profile-v1";
-const SESSION_KEY = "env-contact-exchange-session-v1";
-const CHANNEL_NAME = "env-contact-exchange-v1";
-const SESSION_TTL = 5 * 60 * 1000;
 
 type ShareField = "fullName" | "phone" | "whatsapp" | "email" | "company" | "jobTitle" | "website" | "socialLinks" | "notes";
 type Profile = Record<ShareField, string>;
 type Participant = { participantId: string; card: Partial<Profile>; seenAt: number };
-type ExchangeMessage =
-  | { type: "hello"; sessionId: string; participantId: string; card: Partial<Profile>; sentAt: number }
-  | { type: "card"; sessionId: string; participantId: string; card: Partial<Profile>; sentAt: number }
-  | { type: "leave"; sessionId: string; participantId: string };
+type NativeWebView = { postMessage: (message: string) => void };
+type ContactExchangeWindow = Window & { ReactNativeWebView?: NativeWebView };
 
 const FIELDS: { key: ShareField; label: string; placeholder: string; multiline?: boolean }[] = [
   { key: "fullName", label: "Full name", placeholder: "Alex Morgan" },
@@ -69,20 +64,6 @@ function vCard(card: Partial<Profile>) {
   return lines.join("\r\n");
 }
 
-function newId(prefix: string) {
-  return `${prefix}-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-}
-
-function getSession() {
-  if (typeof window === "undefined") return null;
-  try {
-    const value = JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? "null") as { sessionId: string; expiresAt: number } | null;
-    return value && value.expiresAt > Date.now() ? value : null;
-  } catch {
-    return null;
-  }
-}
-
 function ReceivedContact({ participantId, card }: { participantId: string; card: Partial<Profile> }) {
   const contactCard = vCard(card);
   const filename = `${(card.fullName || "contact").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.vcf`;
@@ -110,14 +91,15 @@ export function ContactExchangeEngine() {
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [enabled, setEnabled] = useState<Set<ShareField>>(new Set(["fullName", "phone", "email"]));
   const [active, setActive] = useState(false);
-  const [sessionId, setSessionId] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [notice, setNotice] = useState("Set up your card, choose the fields allowed to share, then press Exchange.");
+  const [nativeAvailable, setNativeAvailable] = useState(false);
 
   useEffect(() => {
     setProfile(readStoredProfile());
     if (typeof window !== "undefined") {
+      setNativeAvailable(Boolean((window as ContactExchangeWindow).ReactNativeWebView));
       try {
         const storedEnabled = JSON.parse(window.localStorage.getItem(`${PROFILE_KEY}-fields`) ?? "null");
         if (Array.isArray(storedEnabled)) setEnabled(new Set(storedEnabled));
@@ -125,38 +107,43 @@ export function ContactExchangeEngine() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!nativeAvailable) return undefined;
+    const onNativeMessage = (event: MessageEvent<string>) => {
+      let payload: { type?: string; event?: { type?: string; data?: { participantId?: string; card?: string; message?: string } } };
+      try { payload = JSON.parse(event.data); } catch { return; }
+      if (payload.type !== "env-contact-exchange-event") return;
+      const nativeEvent = payload.event;
+      if (!nativeEvent) return;
+      if (nativeEvent.type === "active") {
+        setActive(true);
+        if (nativeEvent.data?.participantId) setParticipantId(nativeEvent.data.participantId);
+        setNotice("Searching for active nearby Exchange participants…");
+      } else if (nativeEvent.type === "permission-needed") {
+        setNotice("Nearby permissions are required. Grant them in the system prompt, then press Exchange again.");
+      } else if (nativeEvent.type === "connected") {
+        setNotice("Connected — authorized contact cards are exchanged automatically with active nearby participants.");
+      } else if (nativeEvent.type === "contact-received" && nativeEvent.data?.participantId && nativeEvent.data.card) {
+        try {
+          const received = JSON.parse(nativeEvent.data.card) as Partial<Profile>;
+          setParticipants((current) => ({ ...current, [nativeEvent.data!.participantId!]: { participantId: nativeEvent.data!.participantId!, card: received, seenAt: Date.now() } }));
+          setNotice("Contact received from an active nearby participant.");
+        } catch { setNotice("A nearby participant sent an invalid contact card."); }
+      } else if (nativeEvent.type === "stopped") {
+        setActive(false);
+        setParticipants({});
+        setNotice("Exchange stopped. Nothing is shared while Exchange is off.");
+      } else if (nativeEvent.type === "error") {
+        setNotice(nativeEvent.data?.message || "Nearby exchange encountered an error.");
+      }
+    };
+    window.addEventListener("message", onNativeMessage);
+    return () => window.removeEventListener("message", onNativeMessage);
+  }, [nativeAvailable]);
+
   const card = useMemo(() => selectedCard(profile, enabled), [enabled, profile]);
   const cardReady = Object.keys(card).length > 0;
   const exchangeCards = Object.values(participants).filter((participant) => participant.participantId !== participantId);
-
-  useEffect(() => {
-    if (!active || !sessionId || !participantId || typeof window === "undefined") return;
-    const channel = "BroadcastChannel" in window ? new BroadcastChannel(CHANNEL_NAME) : null;
-    const message: ExchangeMessage = { type: "hello", sessionId, participantId, card, sentAt: Date.now() };
-    channel?.postMessage(message);
-    const onMessage = (event: MessageEvent<ExchangeMessage>) => {
-      const incoming = event.data;
-      if (!incoming || incoming.sessionId !== sessionId || incoming.participantId === participantId) return;
-      if (incoming.type === "leave") {
-        setParticipants((current) => {
-          const next = { ...current };
-          delete next[incoming.participantId];
-          return next;
-        });
-        return;
-      }
-      setParticipants((current) => ({ ...current, [incoming.participantId]: { participantId: incoming.participantId, card: incoming.card, seenAt: Date.now() } }));
-      if (incoming.type === "hello") channel?.postMessage({ type: "card", sessionId, participantId, card, sentAt: Date.now() } satisfies ExchangeMessage);
-      setNotice("Connected — authorized contact cards are exchanged automatically with active participants.");
-    };
-    channel?.addEventListener("message", onMessage);
-    const heartbeat = window.setInterval(() => channel?.postMessage({ type: "card", sessionId, participantId, card, sentAt: Date.now() } satisfies ExchangeMessage), 30_000);
-    return () => {
-      window.clearInterval(heartbeat);
-      channel?.postMessage({ type: "leave", sessionId, participantId } satisfies ExchangeMessage);
-      channel?.close();
-    };
-  }, [active, card, participantId, sessionId]);
 
   const updateProfile = (key: ShareField, value: string) => {
     setProfile((current) => {
@@ -176,7 +163,12 @@ export function ContactExchangeEngine() {
   };
 
   const toggleExchange = () => {
+    if (!nativeAvailable) {
+      setNotice("Phone-to-phone Exchange is available in the enV Android/iOS app. The web version only configures and exports your card.");
+      return;
+    }
     if (active) {
+      (window as ContactExchangeWindow).ReactNativeWebView?.postMessage(JSON.stringify({ type: "env-contact-exchange-stop" }));
       setActive(false);
       setParticipants({});
       setNotice("Exchange stopped. Nothing is shared while Exchange is off.");
@@ -186,21 +178,15 @@ export function ContactExchangeEngine() {
       setNotice("Add at least one value and enable that field before exchanging.");
       return;
     }
-    const current = getSession();
-    const nextSession = current?.sessionId ?? newId("session");
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ sessionId: nextSession, expiresAt: Date.now() + SESSION_TTL }));
-    setSessionId(nextSession);
-    setParticipantId(newId("participant"));
-    setParticipants({});
-    setActive(true);
-    setNotice("Searching for active Exchange participants…");
+    (window as ContactExchangeWindow).ReactNativeWebView?.postMessage(JSON.stringify({ type: "env-contact-exchange-start", profile: JSON.stringify(profile), fields: [...enabled] }));
+    setNotice("Requesting nearby permissions and starting Exchange…");
   };
 
   return <div className="space-y-6">
     <div className="rounded-xl border border-border bg-surface-2 p-4">
       <p className="text-sm font-semibold">Instant Contact Exchange</p>
       <p className="mt-1 text-sm text-muted">Configure once. Only the fields you enable are shared, and only while you deliberately keep Exchange active.</p>
-      <p className="mt-2 text-xs text-subtle">Browser transport: active same-origin tabs/windows use a temporary local session. Native nearby Bluetooth/Wi‑Fi transport belongs in the mobile implementation and is not simulated here.</p>
+      <p className="mt-2 text-xs text-subtle">{nativeAvailable ? "Native transport: encrypted Android Nearby Connections or iOS MultipeerConnectivity over the best available nearby path." : "Web mode: configure and export your card here. Open the enV Android/iOS app for encrypted phone-to-phone Exchange."}</p>
     </div>
 
     <section className="space-y-4">

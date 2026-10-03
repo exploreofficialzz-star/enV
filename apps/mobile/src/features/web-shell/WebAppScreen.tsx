@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConnectionErrorView } from "@/features/web-shell/ConnectionErrorView";
 import { BLOB_DOWNLOAD_BRIDGE_SCRIPT } from "@/features/web-shell/blob-download-bridge";
+import ContactExchangeModule from "../../../modules/contact-exchange/src/ContactExchangeModule";
 import {
   BRAND_STATUS_BAR_COLOR,
   MAX_NATIVE_DOWNLOAD_BYTES,
@@ -43,7 +44,10 @@ type BridgeMessage = {
   size?: number;
   base64?: string;
   message?: string;
+  profile?: string;
+  fields?: string[];
 };
+
 
 function safeFilename(value: string): string {
   const leaf = value.replaceAll("\\", "/").split("/").pop() ?? "";
@@ -135,6 +139,21 @@ export default function WebAppScreen() {
       return;
     }
 
+    if (message.type === "env-contact-exchange-start") {
+      if (typeof message.profile !== "string" || !Array.isArray(message.fields)) {
+        Alert.alert("Exchange unavailable", "The native nearby exchange transport is not available in this build.");
+        return;
+      }
+      void ContactExchangeModule.startExchange(message.profile, message.fields).catch((error: unknown) => {
+        Alert.alert("Exchange unavailable", error instanceof Error ? error.message : "Nearby exchange could not start.");
+      });
+      return;
+    }
+    if (message.type === "env-contact-exchange-stop") {
+      void ContactExchangeModule.stopExchange();
+      return;
+    }
+
     if (message.type === "env-download-error") {
       Alert.alert("Download unavailable", message.message || "The generated file could not be prepared.");
       return;
@@ -218,6 +237,14 @@ export default function WebAppScreen() {
       });
     }
   }, [enqueueFileOperation, shareLocalFile]);
+
+  useEffect(() => {
+    const subscription = ContactExchangeModule.addListener("onContactExchangeEvent", (event: unknown) => {
+      const payload = JSON.stringify({ type: "env-contact-exchange-event", event });
+      webViewRef.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent("message", { data: ${JSON.stringify(payload)} })); true;`);
+    });
+    return () => subscription.remove();
+  }, []);
 
   const handleShouldStartLoad = useCallback((request: { url: string }) => {
     if (isInternalWebUrl(request.url)) return true;

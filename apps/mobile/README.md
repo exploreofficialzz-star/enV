@@ -1,11 +1,12 @@
 # enV Mobile
 
-`apps/mobile/` is the native mobile app shell for enV, built with Expo, React Native, Expo Router, and `react-native-webview`. Android is the first generated native target. The shared app code and configuration are iOS-ready; the iOS native project is intentionally deferred until that platform is requested. The existing root Vite/TanStack application remains the canonical web app and Vercel deployment.
+`apps/mobile/` is the native mobile app shell for enV, built with Expo, React Native, Expo Router, and `react-native-webview`. The existing root Vite/TanStack application remains the canonical web app and Vercel deployment.
 
 ## Architecture
 
 - `src/app/` contains Expo Router routes and the root safe-area/status-bar layout.
 - `src/features/web-shell/` owns the native WebView screen, connection/retry state, navigation, and generated-file bridge.
+- `modules/contact-exchange/` is a local Expo module with one TypeScript contract and platform-native transports: Google Nearby Connections in Kotlin on Android and MultipeerConnectivity in Swift on iOS. The WebView sends explicit Exchange commands through the native shell; it does not claim browser phone-to-phone transport.
 - `src/lib/web-app-config.ts` validates the public HTTPS site URL and restricts in-app navigation to that origin.
 - `android/` contains the generated Android Studio/Gradle/Kotlin project. It is checked in so the native app source is available immediately; regenerate it from `app.json` with `npm run prebuild:android` rather than making untracked edits to generated files.
 - `plugins/withUnsignedAndroidRelease.js` keeps the release build unsigned across clean prebuilds and fails loudly if the generated Gradle signing template changes.
@@ -38,9 +39,9 @@ The release APK/AAB are signed only when a separate production keystore and prot
 
 The default public site is `https://en-v-6h2l.vercel.app`. To use another HTTPS deployment, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_WEB_URL`. This is public build-time app configuration; never put secrets in `EXPO_PUBLIC_*` values.
 
-## Future iOS target
+## iOS target
 
-The React Native screens, URL policy, share bridge, and iOS bundle identifier are already configured for a future iOS target. Generate that native project on a macOS build host with `npm run prebuild:ios`, then build with Xcode. The repository does not currently contain or claim a generated iOS project.
+The iOS native project is generated on a macOS build host with `npm run prebuild:ios`, then built with Xcode. The contact exchange module supplies the Swift implementation and the required `NSLocalNetworkUsageDescription` and Bonjour service configuration through `app.json`; physical iOS devices are required to validate the MultipeerConnectivity transport.
 
 ## Release and signing
 

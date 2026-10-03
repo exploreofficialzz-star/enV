@@ -10,7 +10,11 @@
     "ios": {
       "bundleIdentifier": "com.chastech.env",
       "supportsTablet": true,
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "enV uses your local network and nearby devices only while you activate Contact Exchange to share the fields you choose.",
+        "NSBonjourServices": ["_env-contact._tcp"]
+      }
     },
     "android": {
       "package": "com.chastech.env",
