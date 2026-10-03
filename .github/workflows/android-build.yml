@@ -122,7 +122,7 @@ jobs:
       - name: Check mobile configuration and native sources
         run: npm run check:mobile
 
-      - name: Configure production release signing
+      - name: Configure release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -139,13 +139,34 @@ jobs:
               echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
               echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
             } >> "$GITHUB_ENV"
-            echo "Production signing configured; release APK/AAB will be installable/submittable for the configured key."
+            echo "Production signing configured; release APK/AAB use the stable production key."
+          elif [ -z "$ANDROID_KEYSTORE_BASE64" ] && [ -z "$ANDROID_KEYSTORE_PASSWORD" ] && [ -z "$ANDROID_KEY_ALIAS" ] && [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            keystore_path="$RUNNER_TEMP/env-ci-test.keystore"
+            test_password="$(openssl rand -hex 24)"
+            keytool -genkeypair -noprompt -storetype PKCS12 -keystore "$keystore_path" \
+              -storepass "$test_password" -keypass "$test_password" -alias env-ci-test \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=enV CI Test Build, OU=CI, O=enV, C=US"
+            {
+              echo "ANDROID_KEYSTORE_FILE=$keystore_path"
+              echo "ANDROID_KEYSTORE_PASSWORD=$test_password"
+              echo "ANDROID_KEY_ALIAS=env-ci-test"
+              echo "ANDROID_KEY_PASSWORD=$test_password"
+            } >> "$GITHUB_ENV"
+            echo "Production signing secrets are absent; a temporary test-only key will make the fresh-install APK installable."
           else
-            echo "No production keystore secrets configured; release APK/AAB will be unsigned validation artifacts."
+            echo "Some Android production signing secrets are missing; refusing to build with an incomplete signing configuration." >&2
+            exit 1
           fi
 
       - name: Build release APK and AAB
         run: ./android/gradlew --no-daemon --max-workers=2 --stacktrace -p android :app:assembleRelease :app:bundleRelease
+
+      - name: Verify release APK signature
+        run: |
+          apk="$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$apk" && test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
 
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

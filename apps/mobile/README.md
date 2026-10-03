@@ -6,10 +6,10 @@
 
 - `src/app/` contains Expo Router routes and the root safe-area/status-bar layout.
 - `src/features/web-shell/` owns the native WebView screen, connection/retry state, navigation, and generated-file bridge.
-- `modules/contact-exchange/` is a local Expo module with one TypeScript contract and platform-native transports: Google Nearby Connections in Kotlin on Android and MultipeerConnectivity in Swift on iOS. The WebView sends explicit Exchange commands through the native shell; it does not claim browser phone-to-phone transport.
+- `modules/contact-exchange/` is a local Expo module with one TypeScript contract and platform-native transports: Google Nearby Connections in Kotlin on Android and MultipeerConnectivity in Swift on iOS. TypeScript selects and calls the platform module; browser builds use a web implementation. The WebView sends explicit Exchange commands through the native shell; it does not claim browser phone-to-phone transport.
 - `src/lib/web-app-config.ts` validates the public HTTPS site URL and restricts in-app navigation to that origin.
 - `android/` contains the generated Android Studio/Gradle/Kotlin project. It is checked in so the native app source is available immediately; regenerate it from `app.json` with `npm run prebuild:android` rather than making untracked edits to generated files.
-- `plugins/withUnsignedAndroidRelease.js` keeps the release build unsigned across clean prebuilds and fails loudly if the generated Gradle signing template changes.
+- `plugins/withUnsignedAndroidRelease.js` keeps release signing environment-driven across clean prebuilds and fails loudly if the generated Gradle signing template changes.
 
 The initial Android application loads the live enV site in a native WebView so the full existing tool catalog and responsive UI remain shared rather than being reimplemented. Android back navigates WebView history; external links open outside the app. Site-generated `blob:` downloads are transferred through a size-limited bridge into app cache and opened with the native share sheet. The bridge rejects malformed or oversized transfers; its limit is 100 MiB. Web file-input behavior is delegated to the platform WebView and must be verified on a physical Android device before release.
 
@@ -33,11 +33,11 @@ npm run android
 
 ## GitHub Actions builds
 
-`.github/workflows/android-build.yml` runs on mobile-app changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds a standalone release APK and `app-release.aab` with the committed Gradle wrapper. The release APK/AAB are uploaded as a 14-day workflow artifact named `env-android-<commit-sha>`. The debug APK is intentionally not uploaded: debug builds expect a Metro development server and are not standalone app packages.
+`.github/workflows/android-build.yml` runs on mobile-app changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds a standalone release APK and `app-release.aab` with the committed Gradle wrapper. CI verifies the APK signature before upload. Artifacts are uploaded for 14 days as `env-android-<commit-sha>`. The debug APK is intentionally not uploaded: debug builds expect a Metro development server and are not standalone app packages.
 
-The release APK/AAB are signed only when a separate production keystore and protected signing secrets are configured. Without them, CI produces unsigned release validation artifacts that are not installable/submittable production packages. Never use the debug key as a release signing identity.
+When all four protected production signing secrets are configured, the APK/AAB use that stable production signing identity and can upgrade prior installs using the same key. If production secrets are absent (for example, on a forked pull request), CI creates a temporary test key so the APK remains installable for a fresh test install; that temporary key is not retained, so its APK cannot upgrade an existing install or be submitted to an app store. Never use the debug key or the temporary test key as a production signing identity.
 
-The default public site is `https://en-v-6h2l.vercel.app`. To use another HTTPS deployment, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_WEB_URL`. This is public build-time app configuration; never put secrets in `EXPO_PUBLIC_*` values.
+The default public site is `https://en-v.vercel.app` (the repository homepage). To use another HTTPS deployment, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_WEB_URL`. This is public build-time app configuration; never put secrets in `EXPO_PUBLIC_*` values.
 
 ## iOS target
 
@@ -45,4 +45,4 @@ The iOS native project is generated on a macOS build host with `npm run prebuild
 
 ## Release and signing
 
-The Android application ID is `com.chastech.env`, derived from the repository namespace. Confirm that identifier before publishing because changing it after store release creates a separate app. The workflow accepts the protected GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`; when all four are present, the release APK and AAB are signed with that production key. Without them, CI still builds `app-release-unsigned.apk` and `app-release.aab` as validation artifacts, but those files are not installable/submittable production packages. Never commit a keystore or signing credentials.
+The Android application ID is `com.chastech.env`, derived from the repository namespace. Confirm that identifier before publishing because changing it after store release creates a separate app. The workflow accepts the protected GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Configure all four with the long-lived production keystore for stable updates and store releases; never commit a keystore or signing credentials.

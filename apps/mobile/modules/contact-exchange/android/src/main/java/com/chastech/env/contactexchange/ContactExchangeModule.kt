@@ -170,9 +170,10 @@ class ContactExchangeModule : Module() {
       add(Manifest.permission.BLUETOOTH_SCAN)
       add(Manifest.permission.BLUETOOTH_CONNECT)
       add(Manifest.permission.BLUETOOTH_ADVERTISE)
+      if (Build.VERSION.SDK_INT == 31) add(Manifest.permission.ACCESS_FINE_LOCATION)
     } else if (Build.VERSION.SDK_INT >= 29) add(Manifest.permission.ACCESS_FINE_LOCATION)
     else add(Manifest.permission.ACCESS_COARSE_LOCATION)
-    if (Build.VERSION.SDK_INT >= 32) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+    if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
   }
 
   private fun hasPermissions() = requiredPermissions().all { context().checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }

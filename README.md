@@ -1,6 +1,5 @@
 # enV — Browser Toolkit
 
-
 **Useful tools. One place.** enV is a responsive collection of browser-based tools for everyday calculations, conversions, color and CSS work, QR codes, image tasks, and mockups. Wherever possible, processing happens in the visitor's browser rather than uploading files to a server.
 
 ## Requirements
@@ -63,12 +62,11 @@ Never prefix secrets with `VITE_` and never commit their values. Keep preview an
 
 ## Mobile app
 
-`apps/mobile/` is a separate Expo/React Native app for Android, with iOS support configured for a later native target. It hosts the existing enV web experience in a native WebView so the full tool catalog remains shared; the root web application and its Vercel deployment are unchanged. The generated Android Studio/Gradle/Kotlin project is checked in under `apps/mobile/android/`. GitHub Actions builds and uploads a test APK and an unsigned release AAB. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, artifact/signing details, the public site URL configuration, and known device-validation requirements.
+`apps/mobile/` is a separate Expo/React Native shell for Android and iOS. TypeScript owns the shared UI/orchestration and calls native platform modules where needed; Android contact exchange is Kotlin and iOS contact exchange is Swift. The shell hosts the existing enV experience in a native WebView so the full tool catalog remains shared. GitHub Actions builds and uploads a signed Android APK and AAB; production signing is used when configured, with temporary test signing for CI-only builds. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, signing limits, the public site URL, and device-validation requirements.
 
 ## Privacy and security
 
 The project does not require an account for its browser-based utilities. Keep file handling local to the browser unless a specific feature clearly requires server processing. Review changes to authentication, migrations, and external network requests carefully.
-
 
 ## Category 20 — AI micro-tools
 
@@ -91,6 +89,7 @@ Multi-file uploads are sent as repeated `files` multipart fields and are subject
 `script/transcription-processor.mjs` provides a separate, isolated speech-to-text service for future Audio to Text, Audio to Subtitles, Video to Text, and Video to Subtitles tools. It is deliberately not activated in the catalog until a real Whisper-compatible executable and model are configured.
 
 Environment:
+
 - `WHISPER_BIN` — Whisper-compatible CLI, default `whisper-cli`
 - `WHISPER_MODEL` — path to the downloaded Whisper model
 - `TRANSCRIBE_PORT` — default `8788`
@@ -98,6 +97,7 @@ Environment:
 - `TRANSCRIBE_ALLOWED_ORIGIN` — CORS origin
 
 Endpoints:
+
 - `GET /health` — reports executable/model readiness
 - `POST /transcribe` — multipart `file`, with `format=txt|srt|vtt`, optional `language`, and optional `translate=true`
 
@@ -108,6 +108,7 @@ The service uses an allowlisted command shape, isolated temporary directories, b
 `URL_MEDIA_PROCESSOR_URL` is the optional enV URL-media backend endpoint. The service in `scripts/url-media-processor.mjs` currently defines provider adapters for YouTube, TikTok, Facebook, Instagram, and X and uses `yt-dlp` only when the deployment explicitly provides that executable.
 
 Security boundaries include:
+
 - HTTPS/HTTP only
 - explicit provider-host allowlist
 - DNS resolution with private/local IP rejection

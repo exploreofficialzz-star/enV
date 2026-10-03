@@ -4,8 +4,8 @@ const { withAppBuildGradle } = require("@expo/config-plugins");
 
 const RELEASE_BLOCK = /^([ \t]*release[ \t]*\{[ \t]*\r?\n)([\s\S]*?)(\r?\n[ \t]*\})/m;
 const DEBUG_SIGNING_LINE = /^[ \t]*signingConfig[ \t]+signingConfigs\.debug[ \t]*$/m;
-const UNSIGNED_MARKER = "// enV: Release artifacts intentionally remain unsigned until a production keystore is configured.";
-const RELEASE_SIGNING_MARKER = "// enV: Production signing is supplied by CI or a local environment, never committed.";
+const UNSIGNED_MARKER = "// enV: Release signing is injected by CI or local environment; no signing key is committed.";
+const RELEASE_SIGNING_MARKER = "// enV: Release signing credentials are supplied by CI or a local environment; never committed.";
 const RELEASE_SIGNING_CONFIG = `        ${RELEASE_SIGNING_MARKER}
         release {
             if (System.getenv('ANDROID_KEYSTORE_FILE') && System.getenv('ANDROID_KEYSTORE_PASSWORD') && System.getenv('ANDROID_KEY_ALIAS') && System.getenv('ANDROID_KEY_PASSWORD')) {

@@ -1,4 +1,4 @@
-export const DEFAULT_WEB_APP_URL = "https://en-v-6h2l.vercel.app";
+export const DEFAULT_WEB_APP_URL = "https://en-v.vercel.app";
 export const BRAND_STATUS_BAR_COLOR = "#0D9A8D";
 export const MAX_NATIVE_DOWNLOAD_BYTES = 100 * 1024 * 1024;
 
