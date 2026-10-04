@@ -1,0 +1,178 @@
+import Foundation
+import Combine
+
+struct Catalog: Decodable {
+    let schemaVersion: Int
+    let catalogVersion: String
+    let counts: CatalogCounts
+    let categories: [ToolCategory]
+    let tools: [Tool]
+}
+
+struct CatalogCounts: Codable {
+    let total: Int
+    let active: Int
+    let planned: Int
+    let categories: Int
+}
+
+struct ToolCategory: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String
+    let blurb: String
+    let icon: String
+}
+
+enum CatalogJSONValue: Decodable, Hashable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: CatalogJSONValue])
+    case array([CatalogJSONValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if value.decodeNil() { self = .null }
+        else if let item = try? value.decode(Bool.self) { self = .bool(item) }
+        else if let item = try? value.decode(Double.self) { self = .number(item) }
+        else if let item = try? value.decode(String.self) { self = .string(item) }
+        else if let item = try? value.decode([String: CatalogJSONValue].self) { self = .object(item) }
+        else if let item = try? value.decode([CatalogJSONValue].self) { self = .array(item) }
+        else { throw DecodingError.dataCorruptedError(in: value, debugDescription: "Unsupported catalog JSON value") }
+    }
+}
+
+private struct EngineCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+    init?(stringValue: String) { self.stringValue = stringValue; self.intValue = nil }
+    init?(intValue: Int) { self.stringValue = String(intValue); self.intValue = intValue }
+}
+
+struct ToolEngine: Decodable, Hashable {
+    let type: String?
+    let id: String?
+    let op: String?
+    let configuration: [String: CatalogJSONValue]
+
+    init(type: String?, id: String?, op: String?) {
+        self.type = type
+        self.id = id
+        self.op = op
+        self.configuration = [:]
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: EngineCodingKey.self)
+        type = try values.decodeIfPresent(String.self, forKey: EngineCodingKey(stringValue: "type")!)
+        id = try values.decodeIfPresent(String.self, forKey: EngineCodingKey(stringValue: "id")!)
+        op = try values.decodeIfPresent(String.self, forKey: EngineCodingKey(stringValue: "op")!)
+        var extras: [String: CatalogJSONValue] = [:]
+        for key in values.allKeys where !["type", "id", "op"].contains(key.stringValue) {
+            extras[key.stringValue] = try values.decode(CatalogJSONValue.self, forKey: key)
+        }
+        configuration = extras
+    }
+}
+
+struct Tool: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let slug: String
+    let description: String
+    let category: String
+    let keywords: [String]
+    let tags: [String]
+    let icon: String
+    let popularity: Int
+    let featured: Bool
+    let clientSide: Bool
+    let requiresBackend: Bool
+    let requiresAuth: Bool
+    let status: String
+    let related: [String]
+    let engine: ToolEngine
+
+    var isPlanned: Bool { status.lowercased() == "planned" }
+    var searchText: String {
+        ([id, slug, name, description, category, keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
+    }
+}
+
+enum CatalogLoadState: Equatable {
+    case loading
+    case ready
+    case failed
+}
+
+enum CatalogLoader {
+    static func load(from bundle: Bundle = .main) throws -> Catalog {
+        guard let url = bundle.url(forResource: "catalog", withExtension: "json") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let data = try Data(contentsOf: url)
+        let catalog = try JSONDecoder().decode(Catalog.self, from: data)
+        guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+        return catalog
+    }
+}
+
+final class CatalogStore: ObservableObject {
+    @Published private(set) var catalog: Catalog
+    @Published private(set) var loadState: CatalogLoadState
+    @Published var query = ""
+    @Published var selectedCategory: String?
+    @Published private(set) var favoriteIDs: Set<String>
+
+    private let favoritesKey = "env.favoriteToolIDs"
+
+    private let bundle: Bundle
+
+    init(catalog: Catalog? = nil, bundle: Bundle = .main) {
+        self.bundle = bundle
+        self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [])
+        self.loadState = catalog == nil ? .loading : .ready
+        self.favoriteIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
+        if catalog == nil { reloadCatalog() }
+    }
+
+    func reloadCatalog() {
+        loadState = .loading
+        let sourceBundle = bundle
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try CatalogLoader.load(from: sourceBundle) }
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let loaded):
+                    self.catalog = loaded
+                    self.loadState = .ready
+                case .failure:
+                    self.loadState = .failed
+                }
+            }
+        }
+    }
+
+    var categories: [ToolCategory] { catalog.categories }
+    var favoriteTools: [Tool] { catalog.tools.filter { favoriteIDs.contains($0.id) }.sorted { $0.name < $1.name } }
+    var featuredTools: [Tool] { catalog.tools.filter(\.featured).sorted { $0.popularity > $1.popularity } }
+    var popularTools: [Tool] { catalog.tools.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
+
+    func tools(matching query: String = "", category: String? = nil) -> [Tool] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return catalog.tools.filter { tool in
+            (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
+        }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
+    }
+
+    func toggleFavorite(_ tool: Tool) {
+        if favoriteIDs.contains(tool.id) { favoriteIDs.remove(tool.id) } else { favoriteIDs.insert(tool.id) }
+        UserDefaults.standard.set(Array(favoriteIDs).sorted(), forKey: favoritesKey)
+        objectWillChange.send()
+    }
+
+    func isFavorite(_ tool: Tool) -> Bool { favoriteIDs.contains(tool.id) }
+    func category(named id: String) -> ToolCategory? { categories.first { $0.id == id } }
+}

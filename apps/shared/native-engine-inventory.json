@@ -1,0 +1,363 @@
+{
+  "catalogVersion": "223b1017cc66",
+  "source": "src/data/catalog.ts",
+  "platforms": {
+    "android": "Kotlin",
+    "ios": "Swift"
+  },
+  "families": [
+    {
+      "family": "ai",
+      "total": 28,
+      "active": 28,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 28
+    },
+    {
+      "family": "audio",
+      "total": 86,
+      "active": 84,
+      "planned": 2,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 85
+    },
+    {
+      "family": "barcode",
+      "total": 16,
+      "active": 16,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 16
+    },
+    {
+      "family": "business",
+      "total": 104,
+      "active": 104,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 29
+    },
+    {
+      "family": "calculator",
+      "total": 6539,
+      "active": 6539,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 6537
+    },
+    {
+      "family": "codec",
+      "total": 17,
+      "active": 17,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 17
+    },
+    {
+      "family": "color",
+      "total": 16,
+      "active": 16,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 3
+    },
+    {
+      "family": "converter",
+      "total": 122,
+      "active": 122,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 120
+    },
+    {
+      "family": "creator",
+      "total": 118,
+      "active": 118,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 118
+    },
+    {
+      "family": "cssgen",
+      "total": 105,
+      "active": 105,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 98
+    },
+    {
+      "family": "custom",
+      "total": 1792,
+      "active": 1013,
+      "planned": 779,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 1792
+    },
+    {
+      "family": "datetime",
+      "total": 14,
+      "active": 14,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 14
+    },
+    {
+      "family": "developer",
+      "total": 446,
+      "active": 19,
+      "planned": 427,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 446
+    },
+    {
+      "family": "device",
+      "total": 9,
+      "active": 9,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 9
+    },
+    {
+      "family": "document",
+      "total": 1,
+      "active": 0,
+      "planned": 1,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 1
+    },
+    {
+      "family": "file-converter",
+      "total": 22,
+      "active": 22,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 20
+    },
+    {
+      "family": "generator",
+      "total": 135,
+      "active": 135,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 135
+    },
+    {
+      "family": "image",
+      "total": 197,
+      "active": 197,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 187
+    },
+    {
+      "family": "mime",
+      "total": 2,
+      "active": 2,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 1
+    },
+    {
+      "family": "mockup",
+      "total": 19,
+      "active": 19,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 19
+    },
+    {
+      "family": "network",
+      "total": 37,
+      "active": 37,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 37
+    },
+    {
+      "family": "pdf",
+      "total": 23,
+      "active": 21,
+      "planned": 2,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 15
+    },
+    {
+      "family": "post",
+      "total": 8,
+      "active": 8,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 8
+    },
+    {
+      "family": "qr",
+      "total": 36,
+      "active": 36,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 26
+    },
+    {
+      "family": "seo",
+      "total": 20,
+      "active": 20,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 20
+    },
+    {
+      "family": "text",
+      "total": 40,
+      "active": 40,
+      "planned": 0,
+      "androidImplemented": 40,
+      "iosImplemented": 40,
+      "uniqueConfigurations": 36
+    },
+    {
+      "family": "url-media",
+      "total": 7,
+      "active": 7,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 6
+    },
+    {
+      "family": "url-media-info",
+      "total": 1,
+      "active": 1,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 1
+    },
+    {
+      "family": "video",
+      "total": 41,
+      "active": 41,
+      "planned": 0,
+      "androidImplemented": 0,
+      "iosImplemented": 0,
+      "uniqueConfigurations": 37
+    }
+  ],
+  "androidToolIds": [
+    "camel-case-converter",
+    "character-counter",
+    "css-formatter",
+    "css-minifier",
+    "css-minifier-advanced",
+    "extract-emails",
+    "extract-urls",
+    "find-and-replace",
+    "html-formatter",
+    "html-minifier",
+    "javascript-formatter",
+    "javascript-minifier",
+    "json-to-xml",
+    "json-to-yaml",
+    "kebab-case-converter",
+    "keyword-density-calculator",
+    "list-generator",
+    "lowercase-converter",
+    "paragraph-counter",
+    "reading-time-calculator",
+    "remove-duplicate-lines",
+    "remove-line-breaks",
+    "remove-spaces",
+    "reverse-text",
+    "sentence-case-converter",
+    "sentence-counter",
+    "slug-generator",
+    "snake-case-converter",
+    "sort-lines",
+    "sql-formatter",
+    "text-diff",
+    "title-case-converter",
+    "uppercase-converter",
+    "word-counter",
+    "word-frequency",
+    "wrap-text",
+    "xml-formatter",
+    "xml-to-json",
+    "yaml-formatter",
+    "yaml-to-json"
+  ],
+  "iosToolIds": [
+    "camel-case-converter",
+    "character-counter",
+    "css-formatter",
+    "css-minifier",
+    "css-minifier-advanced",
+    "extract-emails",
+    "extract-urls",
+    "find-and-replace",
+    "html-formatter",
+    "html-minifier",
+    "javascript-formatter",
+    "javascript-minifier",
+    "json-to-xml",
+    "json-to-yaml",
+    "kebab-case-converter",
+    "keyword-density-calculator",
+    "list-generator",
+    "lowercase-converter",
+    "paragraph-counter",
+    "reading-time-calculator",
+    "remove-duplicate-lines",
+    "remove-line-breaks",
+    "remove-spaces",
+    "reverse-text",
+    "sentence-case-converter",
+    "sentence-counter",
+    "slug-generator",
+    "snake-case-converter",
+    "sort-lines",
+    "sql-formatter",
+    "text-diff",
+    "title-case-converter",
+    "uppercase-converter",
+    "word-counter",
+    "word-frequency",
+    "wrap-text",
+    "xml-formatter",
+    "xml-to-json",
+    "yaml-formatter",
+    "yaml-to-json"
+  ],
+  "summary": {
+    "totalTools": 10001,
+    "activeTools": 8790,
+    "plannedTools": 1211,
+    "engineFamilies": 29,
+    "androidImplemented": 40,
+    "iosImplemented": 40
+  }
+}
