@@ -50,6 +50,8 @@ struct SearchResultsView: View {
     var body: some View { VStack(spacing: 0) { Picker("Category", selection: $category) { Text("All categories").tag(String?.none); ForEach(store.categories) { Text($0.name).tag(Optional($0.id)) } }.pickerStyle(.menu).padding(.horizontal); if results.isEmpty { EmptyStateView(title: "No tools found", systemImage: "magnifyingglass", message: "Try another name, keyword, tag, or category.") } else { ScrollView { ToolList(tools: results).padding() } } }.searchable(text: $text, prompt: "Search names, descriptions, keywords, tags").navigationTitle("Search").navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
 }
 
+}
+
 struct SavedView: View {
     @EnvironmentObject private var store: CatalogStore
     var body: some View { NavigationStack { Group { if store.favoriteTools.isEmpty { EmptyStateView(title: "Nothing saved yet", systemImage: "heart", message: "Tap the heart on any tool to keep it here.") } else { ScrollView { ToolList(tools: store.favoriteTools).padding() } } }.navigationTitle("Saved").navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) } } }
