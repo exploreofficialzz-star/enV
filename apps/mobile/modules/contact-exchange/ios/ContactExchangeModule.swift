@@ -1,7 +1,55 @@
 import ExpoModulesCore
 import MultipeerConnectivity
 
-public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate {
+private final class ContactExchangePeerDelegate: NSObject, MCSessionDelegate, MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate {
+  weak var module: ContactExchangeModule?
+
+  init(module: ContactExchangeModule) {
+    self.module = module
+  }
+
+  func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+    module?.acceptInvitation(invitationHandler)
+  }
+
+  func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+    module?.advertiserDidFail(error)
+  }
+
+  func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
+    module?.foundPeer(peerID)
+  }
+
+  func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+    module?.lostPeer(peerID)
+  }
+
+  func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+    module?.browserDidFail(error)
+  }
+
+  func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
+    module?.peerStateChanged(peerID, state: state)
+  }
+
+  func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
+    module?.received(data, from: peerID)
+  }
+
+  func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
+
+  func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
+
+  func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
+
+  func session(_ session: MCSession, didReceiveCertificate certificate: [Any]?, fromPeer peerID: MCPeerID, certificateHandler: @escaping (Bool) -> Void) {
+    // Multipeer Connectivity uses ephemeral peer certificates for this local exchange.
+    // MCSession encryption is required, and all received payloads are validated before use.
+    certificateHandler(true)
+  }
+}
+
+public class ContactExchangeModule: Module {
   private let serviceType = "env-contact"
   private let protocolVersion = 1
   private let maxCardBytes = 30_000
@@ -12,6 +60,7 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
   private var session: MCSession?
   private var advertiser: MCNearbyServiceAdvertiser?
   private var browser: MCNearbyServiceBrowser?
+  private var peerDelegate: ContactExchangePeerDelegate?
 
   public func definition() -> ModuleDefinition {
     Name("ContactExchange")
@@ -57,15 +106,21 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
   private func startTransport() {
     let peer = MCPeerID(displayName: "enV Exchange \(participantId.prefix(8))")
     let nextSession = MCSession(peer: peer, securityIdentity: nil, encryptionPreference: .required)
-    nextSession.delegate = self
+    let delegate = ContactExchangePeerDelegate(module: self)
+    peerDelegate = delegate
+    nextSession.delegate = delegate
     session = nextSession
+
     let nextAdvertiser = MCNearbyServiceAdvertiser(peer: peer, discoveryInfo: ["v": String(protocolVersion)], serviceType: serviceType)
-    nextAdvertiser.delegate = self
+    nextAdvertiser.delegate = delegate
     advertiser = nextAdvertiser
-    browser = MCNearbyServiceBrowser(peer: peer, serviceType: serviceType)
-    browser?.delegate = self
+
+    let nextBrowser = MCNearbyServiceBrowser(peer: peer, serviceType: serviceType)
+    nextBrowser.delegate = delegate
+    browser = nextBrowser
+
     nextAdvertiser.startAdvertisingPeer()
-    browser?.startBrowsingForPeers()
+    nextBrowser.startBrowsingForPeers()
   }
 
   private func stopTransport() {
@@ -76,6 +131,7 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
     advertiser = nil
     browser = nil
     session = nil
+    peerDelegate = nil
     receivedParticipants.removeAll()
     emit(type: "stopped", data: [:])
   }
@@ -91,23 +147,28 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
     sendEvent("onContactExchangeEvent", ["type": type, "data": data])
   }
 
-  public func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+  func acceptInvitation(_ invitationHandler: @escaping (Bool, MCSession?) -> Void) {
     invitationHandler(active, session)
   }
-  public func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+
+  func advertiserDidFail(_ error: Error) {
     emit(type: "error", data: ["message": error.localizedDescription])
   }
-  public func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
+
+  func foundPeer(_ peerID: MCPeerID) {
     guard active, let session else { return }
-    browser.invitePeer(peerID, to: session, withContext: nil, timeout: 30)
+    browser?.invitePeer(peerID, to: session, withContext: nil, timeout: 30)
   }
-  public func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+
+  func lostPeer(_ peerID: MCPeerID) {
     emit(type: "participant-left", data: ["peer": peerID.displayName])
   }
-  public func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+
+  func browserDidFail(_ error: Error) {
     emit(type: "error", data: ["message": error.localizedDescription])
   }
-  public func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
+
+  func peerStateChanged(_ peerID: MCPeerID, state: MCSessionState) {
     if state == .connected {
       sendCard(to: [peerID])
       emit(type: "connected", data: ["peer": peerID.displayName])
@@ -115,7 +176,8 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
       emit(type: "participant-left", data: ["peer": peerID.displayName])
     }
   }
-  public func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
+
+  func received(_ data: Data, from peerID: MCPeerID) {
     guard data.count <= maxCardBytes,
           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           object["version"] as? Int == protocolVersion,
@@ -126,7 +188,4 @@ public class ContactExchangeModule: Module, MCSessionDelegate, MCNearbyServiceAd
           receivedParticipants.insert(remoteId).inserted else { return }
     emit(type: "contact-received", data: ["participantId": remoteId, "card": remoteCard])
   }
-  public func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
-  public func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
-  public func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
 }

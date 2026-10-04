@@ -179,6 +179,16 @@ assert.ok(
   "iOS contact exchange must use the Swift MultipeerConnectivity implementation.",
 );
 assert.ok(
+  iosNativeModule.includes(
+    "private final class ContactExchangePeerDelegate: NSObject, MCSessionDelegate",
+  ) &&
+    iosNativeModule.includes(
+      "didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?",
+    ) &&
+    iosNativeModule.includes("peerDelegate = delegate"),
+  "iOS MultipeerConnectivity delegates must use a retained NSObject adapter with the complete invitation signature.",
+);
+assert.ok(
   webNativeModule.includes("registerWebModule"),
   "Browser builds must use the TypeScript web fallback rather than requiring a native module.",
 );
