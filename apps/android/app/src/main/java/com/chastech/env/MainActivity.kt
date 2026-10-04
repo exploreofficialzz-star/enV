@@ -259,8 +259,12 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
             Text(tool.description, style = MaterialTheme.typography.bodyLarge)
             DetailRow("Category", tool.category)
             DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
-            DetailRow("Availability", if (tool.status == "planned") "Coming soon" else "Foundation catalog entry")
-            DetailRow("Privacy", if (tool.requiresBackend) "Requires a backend" else "Designed for local use")
+            DetailRow("Native execution", when {
+                tool.status == "planned" -> "Coming soon"
+                tool.engine.type == "text" && NativeTextEngine.operationForTool(tool.id) != null -> "Available offline"
+                else -> "Not ported yet"
+            })
+            DetailRow("Web version", if (tool.clientSide) "Runs in the browser" else "Uses backend services")
             if (tool.status == "planned") Text("This tool is planned and not available yet.", color = Teal, fontWeight = FontWeight.SemiBold)
             else if (tool.engine.type == "text" && NativeTextEngine.operationForTool(tool.id) != null) NativeTextToolForm(tool.id)
             else Text("Native engine migration status: not yet ported. This shell does not claim active-engine parity.", color = Color.Gray)

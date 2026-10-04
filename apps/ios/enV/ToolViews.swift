@@ -88,7 +88,8 @@ struct ToolDetailView: View {
                     metadataRow("Status", tool.status.capitalized)
                     metadataRow("Engine", tool.engine.type ?? "Unknown")
                     metadataRow("Popularity", "\(tool.popularity)")
-                    metadataRow("Runs locally", tool.clientSide ? "Yes" : "No")
+                    metadataRow("Native execution", nativeExecutionStatus)
+                    metadataRow("Web version", tool.clientSide ? "Runs in the browser" : "Uses backend services")
                     if tool.requiresBackend { metadataRow("Backend", "Required") }
                 }
                 .padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
@@ -103,6 +104,12 @@ struct ToolDetailView: View {
         }
         .navigationTitle("Tool details")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var nativeExecutionStatus: String {
+        if tool.isPlanned { return "Coming soon" }
+        if tool.engine.type == "text" && NativeTextEngine.operation(forToolID: tool.id) != nil { return "Available offline" }
+        return "Not ported yet"
     }
 
     private func metadataRow(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).fontWeight(.medium) } }

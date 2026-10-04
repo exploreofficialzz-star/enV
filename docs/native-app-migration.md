@@ -70,3 +70,8 @@ Port image/PDF/file, QR/barcode, networking, security, mockup, and domain-specif
 - No active tool is marked covered until both platform implementations pass its shared fixtures or explicitly approved platform-specific equivalents.
 - Web CI and deployment continue to run independently.
 - Each milestone records exact tool-ID coverage, remaining platform gaps, test evidence, build artifacts, and any server/API dependencies.
+
+## CI runner notes
+
+- The first `macos-26` simulator run exposed Xcode but no iOS Simulator destination. GitHub's runner-images issue [#13853](https://github.com/actions/runner-images/issues/13853) documents the same missing-runtime condition on `macos-26-arm64`; iOS Simulator CI therefore uses `macos-15` for now. If that runner is unavailable later, Apple documents `xcodebuild -downloadPlatform iOS` and `xcodebuild -importPlatform` for installing a simulator runtime: [Apple Xcode components](https://developer.apple.com/documentation/xcode/downloading-and-installing-additional-xcode-components).
+- `android-actions/setup-android@v4` expects the `packages` input as a space-separated SDK package string (for example, `platform-tools emulator`), not a multiline YAML list: [action README](https://github.com/android-actions/setup-android/blob/main/README.md).

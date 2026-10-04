@@ -99,10 +99,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
       - name: Set up Gradle caching
         uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
       - name: Run Kotlin unit tests and Android lint
