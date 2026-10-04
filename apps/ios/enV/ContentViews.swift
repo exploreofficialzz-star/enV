@@ -17,7 +17,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Private, practical, in-browser tools")
+                        Text("Private, practical, on-device tools")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.envAccent)
                         Text("A focused toolkit for everyday work.")

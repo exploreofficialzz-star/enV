@@ -243,7 +243,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, onBrowseTools: 
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Private, practical, in-browser tools", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                Text("Private, practical, on-device tools", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                 Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
                 Text("Convert, calculate, generate, and transform without sending your files or text away.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = onBrowseTools, modifier = Modifier.padding(top = 4.dp), shape = RoundedCornerShape(8.dp)) { Text("Browse all tools") }
@@ -377,7 +377,7 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
                 Text(tool.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (tool.status == "planned") StatusPill(tool.status)
+        if (tool.status == "planned") StatusPill("Coming soon")
         Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
         DetailRow("Native execution", when {
@@ -386,7 +386,7 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
             remoteOnly -> "Remote metadata service required"
             else -> "Not ported yet"
         })
-        DetailRow("Web version", if (tool.clientSide) "Runs in the browser" else "Uses backend services")
+        DetailRow("Processing", if (tool.clientSide) "Runs on this device" else "Uses backend services")
         when {
             tool.status == "planned" -> Text("This tool is planned and not available yet.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             supported -> NativeToolForm(tool)
@@ -635,7 +635,7 @@ private fun NativeMimeToolForm(toolId: String) {
             if (fileName.isNotBlank()) Text(fileName, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
         InputField(fileName, { fileName = it }, "Filename", placeholder = "report.pdf")
-        InputField(browserMime, { browserMime = it }, "Browser MIME (optional)", placeholder = "application/pdf")
+        InputField(browserMime, { browserMime = it }, "Declared MIME (optional)", placeholder = "application/pdf")
         InputField(bytesHex, { bytesHex = it }, "Byte hex (optional)", placeholder = "25 50 44 46", minLines = 2)
         ActionRow(
             onRun = {
@@ -694,8 +694,10 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                 }
                 Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                 Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                if (tool.status == "planned" || tool.clientSide) {
-                    StatusPill(tool.status, Modifier.padding(top = 10.dp))
+                if (tool.status == "planned") {
+                    StatusPill("Coming soon", Modifier.padding(top = 10.dp))
+                } else if (tool.clientSide && !tool.requiresBackend) {
+                    StatusPill("On device", Modifier.padding(top = 10.dp))
                 }
             }
             IconButton(onClick = { onToggle(tool.id) }, modifier = Modifier.semantics { contentDescription = if (favorite) "Remove ${tool.name} from saved" else "Save ${tool.name}" }) {
@@ -743,7 +745,7 @@ private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholde
         subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-@Composable private fun StatusPill(status: String, modifier: Modifier = Modifier) { Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(5.dp)) { Text(if (status == "planned") "Coming soon" else "IN-BROWSER", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) } }
+@Composable private fun StatusPill(text: String, modifier: Modifier = Modifier) { Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(5.dp)) { Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) } }
 @Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp)) } }
 @Composable private fun SettingCard(title: String, detail: String, iconName: String, onClick: (() -> Unit)? = null) {
     val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().clickable(onClick = onClick)

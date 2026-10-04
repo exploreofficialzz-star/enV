@@ -99,6 +99,54 @@ struct Tool: Decodable, Identifiable, Hashable {
     var searchText: String {
         ([id, slug, name, description, category, keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
     }
+
+    func nativeFacing() -> Tool {
+        Tool(
+            id: id,
+            name: name,
+            slug: slug,
+            description: NativeCopy.text(description),
+            category: category,
+            keywords: keywords,
+            tags: tags,
+            icon: icon,
+            popularity: popularity,
+            featured: featured,
+            clientSide: clientSide,
+            requiresBackend: requiresBackend,
+            requiresAuth: requiresAuth,
+            status: status,
+            related: related,
+            engine: engine
+        )
+    }
+}
+
+extension ToolCategory {
+    func nativeFacing() -> ToolCategory {
+        ToolCategory(
+            id: id,
+            name: name,
+            description: NativeCopy.text(description),
+            blurb: NativeCopy.text(blurb),
+            icon: icon
+        )
+    }
+}
+
+extension Catalog {
+    func nativeFacing() -> Catalog {
+        let nativeTools = tools.filter { !NativeCopy.isWebRuntimeOnly($0.id) }.map { $0.nativeFacing() }
+        let planned = nativeTools.filter(\.isPlanned).count
+        let active = nativeTools.filter { !$0.isPlanned }.count
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: nativeTools.count, active: active, planned: planned, categories: categories.count),
+            categories: categories.map { $0.nativeFacing() },
+            tools: nativeTools
+        )
+    }
 }
 
 enum CatalogLoadState: Equatable {
@@ -115,7 +163,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog
+        return catalog.nativeFacing()
     }
 }
 

@@ -25,8 +25,8 @@ struct ToolCard: View {
                         .padding(.top, 4)
                     if tool.isPlanned {
                         StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
-                    } else if tool.clientSide {
-                        Text("IN-BROWSER")
+                    } else if tool.clientSide && !tool.requiresBackend {
+                        Text("ON DEVICE")
                             .font(.system(size: 9, weight: .medium))
                             .tracking(0.5)
                             .foregroundStyle(Color.envSubtle)
@@ -98,7 +98,7 @@ struct ToolDetailView: View {
                     metadataRow("Engine", tool.engine.type ?? "Unknown")
                     metadataRow("Popularity", "\(tool.popularity)")
                     metadataRow("Native execution", NativeCoverage.status(for: tool))
-                    metadataRow("Web version", tool.clientSide ? "Runs in the browser" : "Uses backend services")
+                    metadataRow("Processing", tool.clientSide ? "Runs on this device" : "Uses backend services")
                     if tool.requiresBackend { metadataRow("Backend", "Required") }
                 }
                 .padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
@@ -413,7 +413,7 @@ struct NativeMimeToolView: View {
                 HStack(spacing: 8) { EnVIcon(name: "FilePlus2", size: 16, tint: .envAccent); Text(fileName.isEmpty ? "Choose a local file" : "Choose another file") }
             }.buttonStyle(.bordered)
             TextField("File name", text: $fileName).textFieldStyle(.roundedBorder)
-            TextField("Browser MIME", text: $browserMime).textFieldStyle(.roundedBorder)
+            TextField("Declared MIME", text: $browserMime).textFieldStyle(.roundedBorder)
             TextField("Bytes as hex (e.g. 89 50 4e 47)", text: $bytesHex).textFieldStyle(.roundedBorder)
             NativeActionRow(output: output, run: run, reset: reset)
             NativeOutputView(output: output, error: error)

@@ -42,8 +42,11 @@ private fun JSONObject.stringList(key: String): List<String> = optJSONArray(key)
 } ?: emptyList()
 
 fun JSONObject.toCategory() = Category(
-    id = stringOrEmpty("id"), name = stringOrEmpty("name"), description = stringOrEmpty("description"),
-    blurb = stringOrEmpty("blurb"), icon = stringOrEmpty("icon")
+    id = stringOrEmpty("id"),
+    name = stringOrEmpty("name"),
+    description = NativeCopy.text(stringOrEmpty("description")),
+    blurb = NativeCopy.text(stringOrEmpty("blurb")),
+    icon = stringOrEmpty("icon"),
 )
 
 fun JSONObject.toToolRecord(): ToolRecord {
@@ -52,7 +55,7 @@ fun JSONObject.toToolRecord(): ToolRecord {
     val extras = engineJson.keys().asSequence().filterNot(knownEngineKeys::contains).associateWith { engineJson.optString(it) }
     return ToolRecord(
         id = stringOrEmpty("id"), name = stringOrEmpty("name"), slug = stringOrEmpty("slug"),
-        description = stringOrEmpty("description"), category = stringOrEmpty("category"),
+        description = NativeCopy.text(stringOrEmpty("description")), category = stringOrEmpty("category"),
         keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
@@ -63,14 +66,23 @@ fun JSONObject.toToolRecord(): ToolRecord {
 
 fun Catalog.Companion.fromJson(raw: String): Catalog {
     val root = JSONObject(raw)
-    val countJson = root.optJSONObject("counts") ?: JSONObject()
     val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
     val toolsJson = root.optJSONArray("tools") ?: JSONArray()
+    val categories = buildList(categoriesJson.length()) { for (i in 0 until categoriesJson.length()) add(categoriesJson.getJSONObject(i).toCategory()) }
+    val tools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) add(toolsJson.getJSONObject(i).toToolRecord()) }
+        .filterNot { NativeCopy.isWebRuntimeOnly(it.id) }
+    val planned = tools.count { it.status.equals("planned", ignoreCase = true) }
+    val active = tools.count { it.status.equals("active", ignoreCase = true) }
     return Catalog(
         schemaVersion = root.optInt("schemaVersion", 1), catalogVersion = root.stringOrEmpty("catalogVersion"),
-        counts = CatalogCounts(countJson.optInt("total", toolsJson.length()), countJson.optInt("active", 0), countJson.optInt("planned", 0), countJson.optInt("categories", categoriesJson.length())),
-        categories = buildList(categoriesJson.length()) { for (i in 0 until categoriesJson.length()) add(categoriesJson.getJSONObject(i).toCategory()) },
-        tools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) add(toolsJson.getJSONObject(i).toToolRecord()) }
+        counts = CatalogCounts(
+            total = tools.size,
+            active = active,
+            planned = planned,
+            categories = categories.size,
+        ),
+        categories = categories,
+        tools = tools,
     )
 }
 

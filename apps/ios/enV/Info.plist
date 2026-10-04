@@ -6,6 +6,8 @@
 	<string>enV</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.chastech.env</string>
 	<key>CFBundlePackageType</key>

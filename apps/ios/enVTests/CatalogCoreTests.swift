@@ -50,4 +50,20 @@ final class CatalogCoreTests: XCTestCase {
         store.toggleFavorite(tool)
         XCTAssertFalse(store.isFavorite(tool))
     }
+
+    func testNativeCopyRewritesWebsiteLanguageAndDropsWebRuntimeTools() throws {
+        XCTAssertEqual(NativeCopy.text("Encode text to Base64 locally in your browser."), "Encode text to Base64 locally on this device.")
+        XCTAssertEqual(NativeCopy.text("Requires a headless browser on a server."), "Requires a headless browser on a server.")
+        XCTAssertEqual(NativeCopy.text("Place a screenshot inside a Chrome Browser frame. Processed locally."), "Place a screenshot inside a Chrome Browser frame. Processed locally.")
+        XCTAssertEqual(NativeCopy.text("Parse a user-agent string into browser, OS, and device hints."), "Parse a user-agent string into browser, OS, and device hints.")
+        let json = Data("""
+        {"schemaVersion":1,"catalogVersion":"test","counts":{"total":2,"active":2,"planned":0,"categories":1},"categories":[{"id":"network","name":"Network","description":"All in the browser","blurb":"in-browser checks","icon":"Globe"}],"tools":[{"id":"json-formatter","name":"JSON Formatter","slug":"json-formatter","description":"Pretty-print JSON entirely in your browser.","category":"network","keywords":[],"tags":[],"icon":"Code2","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"developer","id":"json-formatter"}},{"id":"connection-info","name":"Browser Connection Info","slug":"connection-info","description":"Show browser-exposed online status.","category":"network","keywords":["browser"],"tags":[],"icon":"Globe","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"network","id":"connection-info"}}]}
+        """.utf8)
+        let catalog = try JSONDecoder().decode(Catalog.self, from: json).nativeFacing()
+        XCTAssertEqual(catalog.tools.map(\.id), ["json-formatter"])
+        XCTAssertEqual(catalog.tools.first?.description, "Pretty-print JSON entirely on this device.")
+        XCTAssertEqual(catalog.categories.first?.description, "All on this device")
+        XCTAssertEqual(catalog.categories.first?.blurb, "on-device checks")
+        XCTAssertTrue(NativeCopy.isWebRuntimeOnly("webcodecs-audio-checker"))
+    }
 }

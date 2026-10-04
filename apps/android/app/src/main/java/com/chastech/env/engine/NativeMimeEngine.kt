@@ -84,7 +84,7 @@ object NativeMimeEngine {
         val output = buildString {
             rows.forEach { append(".").append(it.ext).append("\t").append(it.mime).append("\t").append(it.name).append("\t").append(it.group).append("\n") }
             inspection?.let { i ->
-                append("Filename: ").append(i.fileName).append("\nBrowser MIME: ").append(i.browserMime).append("\nExtension: .").append(if (i.extension.isEmpty()) "none" else i.extension)
+                append("Filename: ").append(i.fileName).append("\nDeclared MIME: ").append(i.browserMime).append("\nExtension: .").append(if (i.extension.isEmpty()) "none" else i.extension)
                 append("\nSignature match: ").append(i.entry?.let { "${it.name} (${it.mime})" } ?: "Unknown signature")
                 append("\nBytes: ").append(i.bytesHex)
                 if (i.mismatch) append("\nThe detected signature does not match the filename extension.")
