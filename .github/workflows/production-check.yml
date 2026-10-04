@@ -32,5 +32,18 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Start browser-audit server
+        run: |
+          npm run dev > /tmp/enV-dev.log 2>&1 &
+          echo $! > /tmp/enV-dev.pid
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/enV-dev.log
+          exit 1
+
       - name: Verify production
         run: npm run verify
