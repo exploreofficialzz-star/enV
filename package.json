@@ -26,6 +26,8 @@
     "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs",
     "update:home-tools": "node scripts/update-home-tools.mjs",
     "export:native-catalog": "node scripts/export-native-catalog.mjs",
+    "export:native-icons": "node scripts/export-native-icons.mjs",
+    "check:native-icons": "node scripts/check-native-icons.mjs",
     "check:calculators": "node scripts/check-calculators.mjs",
     "check:converters": "node scripts/check-converters.mjs",
     "check:text": "node scripts/check-text.mjs",

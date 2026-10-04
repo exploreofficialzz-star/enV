@@ -6,6 +6,8 @@ on:
     paths:
       - "apps/ios/**"
       - "apps/shared/**"
+      - "scripts/check-native-icons.mjs"
+      - "package.json"
       - "scripts/export-native-catalog.mjs"
       - "scripts/catalog-reader.mjs"
       - "src/data/catalog.ts"
@@ -15,6 +17,8 @@ on:
     paths:
       - "apps/ios/**"
       - "apps/shared/**"
+      - "scripts/check-native-icons.mjs"
+      - "package.json"
       - "scripts/export-native-catalog.mjs"
       - "scripts/catalog-reader.mjs"
       - "src/data/catalog.ts"
@@ -49,6 +53,9 @@ jobs:
       - name: Regenerate shared offline catalog
         working-directory: ${{ github.workspace }}
         run: npm run export:native-catalog && git diff --exit-code -- apps/shared/catalog.json apps/shared/native-engine-inventory.json
+      - name: Verify shared native brand assets
+        working-directory: ${{ github.workspace }}
+        run: npm run check:native-icons
       - name: Record iOS build toolchain
         run: |
           xcodebuild -version

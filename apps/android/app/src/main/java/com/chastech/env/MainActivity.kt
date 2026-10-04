@@ -53,6 +53,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
@@ -91,6 +92,8 @@ import com.chastech.env.engine.NativeColorEngine
 import com.chastech.env.engine.NativeDateTimeEngine
 import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeTextEngine
+import com.chastech.env.ui.EnVIcon
+import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,22 +101,21 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 
-private val Teal = Color(0xFF0D9F8A)
-private val LightSurface = Color(0xFFF8FAF9)
-private val SoftTeal = Color(0xFFE1F4EF)
-private val ErrorSurface = Color(0xFFFFEAE7)
-private val ErrorText = Color(0xFF9B2C24)
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val favorites = FavoritesStore(applicationContext)
-        setContent { EnVTheme { CatalogGate(favorites) } }
+        setContent {
+            var darkMode by rememberSaveable { mutableStateOf(false) }
+            EnVTheme(darkTheme = darkMode) {
+                CatalogGate(favorites, darkMode, onToggleTheme = { darkMode = !darkMode })
+            }
+        }
     }
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, onToggleTheme: () -> Unit) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -129,7 +131,7 @@ private fun CatalogGate(favorites: FavoritesStore) {
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites)
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, onToggleTheme)
         loadFailed -> CatalogFailureScreen { retryCount += 1 }
         else -> NativeLaunchScreen()
     }
@@ -137,93 +139,157 @@ private fun CatalogGate(favorites: FavoritesStore) {
 
 @Composable
 private fun NativeLaunchScreen() {
-    Surface(Modifier.fillMaxSize(), color = LightSurface) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Text("enV", style = MaterialTheme.typography.displaySmall, color = Teal, fontWeight = FontWeight.Bold)
-            Text("Useful tools, ready when you are.", color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+            EnVLogo(Modifier.width(112.dp).height(75.dp))
+            Text("Useful tools, ready when you are.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
 
 @Composable
 private fun CatalogFailureScreen(onRetry: () -> Unit) {
-    Surface(Modifier.fillMaxSize(), color = LightSurface) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Text("enV", style = MaterialTheme.typography.headlineLarge, color = Teal, fontWeight = FontWeight.Bold)
+            EnVLogo(Modifier.width(112.dp).height(75.dp))
             Text("The offline catalog couldn't be opened.", modifier = Modifier.padding(top = 12.dp))
             Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) { Text("Retry") }
         }
     }
 }
 
-private enum class AppTab(val label: String) { Home("Home"), Tools("Tools"), Search("Search"), Saved("Saved"), Account("Account") }
+private enum class AppTab(val label: String, val iconName: String) {
+    Home("Home", "Home"), Tools("Tools", "LayoutGrid"), Search("Search", "Search"),
+    Saved("Saved", "Heart"), Account("Account", "User")
+}
 
 @Composable
-private fun EnVApp(catalog: Catalog, favorites: FavoritesStore) {
+private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, onToggleTheme: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
-    if (selected != null) {
-        BackHandler { selectedId = null }
-        ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
-        return
-    }
-    if (category != null) BackHandler { category = null }
+    if (selected != null) BackHandler { selectedId = null }
+    else if (category != null) BackHandler { category = null }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
     Scaffold(
-        containerColor = LightSurface,
-        topBar = { TopAppBar(title = { Text("enV", fontWeight = FontWeight.Bold) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = LightSurface)) },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { EnVLogo(Modifier.width(84.dp).height(56.dp)) },
+                actions = {
+                    IconButton(onClick = onToggleTheme, modifier = Modifier.semantics { contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode" }) {
+                        EnVIcon(if (darkMode) "Sun" else "Moon", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
         bottomBar = {
-            androidx.compose.material3.NavigationBar(containerColor = Color.White, modifier = Modifier.navigationBarsPadding()) {
-                AppTab.entries.forEach { item ->
-                    NavigationBarItem(selected = currentTab == item, onClick = { tab = item.name; if (item != AppTab.Search) query = "" }, icon = { Icon(item.icon(), contentDescription = item.label) }, label = { Text(item.label) })
+            Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).navigationBarsPadding()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Row(Modifier.fillMaxWidth().height(56.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    AppTab.entries.forEach { item ->
+                        val isSelected = currentTab == item
+                        Column(
+                            Modifier.weight(1f).fillMaxSize().clickable { tab = item.name; selectedId = null; if (item != AppTab.Search) query = "" }.semantics { contentDescription = item.label },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            EnVIcon(item.iconName, tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(item.label, style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            when (currentTab) {
-                AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it; tab = AppTab.Search.name }, category, { category = it; tab = AppTab.Tools.name }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                AppTab.Account -> AccountScreen(catalog)
+            if (selected != null) {
+                ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
+            } else {
+                when (currentTab) {
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, { tab = AppTab.Tools.name }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Account -> AccountScreen(catalog)
+                }
             }
         }
     }
 }
 
-private fun AppTab.icon() = when (this) {
-    AppTab.Home -> Icons.Default.Home
-    AppTab.Tools -> Icons.Default.Build
-    AppTab.Search -> Icons.Default.Search
-    AppTab.Saved -> Icons.Default.Favorite
-    AppTab.Account -> Icons.Default.AccountCircle
-}
-
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onSearch: (String) -> Unit, category: String?, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Make space for useful tools.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        item { Text("Browse the catalog offline. Native tools run locally on this device.", color = Color.Gray) }
-        item { SearchBox(query, onSearch, "Search 10,001 tools") }
-        item { SectionTitle("Featured and popular") }
-        item { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { catalog.featuredOrPopular().forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) } } }
-        item { SectionTitle("Browse categories") }
-        item { CategoryGrid(catalog, category, onCategory) }
-        item { Text("${catalog.counts.total} tools · ${catalog.counts.categories} categories · catalog available offline", color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp)) }
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, onBrowseTools: () -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
+    val featured = remember(catalog) { catalog.tools.filter { it.featured }.sortedByDescending { it.popularity }.take(6) }
+    val popular = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Private, practical, in-browser tools", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                Text("Convert, calculate, generate, and transform without sending your files or text away.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onBrowseTools, modifier = Modifier.padding(top = 4.dp), shape = RoundedCornerShape(8.dp)) { Text("Browse all tools") }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionTitle("Featured tools", "Hand-picked starting points")
+                featured.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionTitle("Popular tools", "Useful tools people return to")
+                popular.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+            }
+        }
     }
 }
 
 @Composable
 private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        Text("Tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-        CategoryGrid(catalog, category, onCategory, compact = true)
-        ToolList(catalog.search("", category), favorites, onTool, onToggleFavorite, Modifier.weight(1f), "No tools in this category")
+    val suggested = remember(catalog) { catalog.search("").take(6) }
+    if (category != null) {
+        val selectedCategory = catalog.categories.find { it.id == category }
+        Column(Modifier.fillMaxSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)) {
+                IconButton(onClick = { onCategory(null) }, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
+                    EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            }
+            selectedCategory?.description?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            }
+            ToolList(catalog.search("", category), favorites, onTool, onToggleFavorite, Modifier.weight(1f), "No tools in this category")
+        }
+    } else {
+        LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("All tools", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Browse the complete enV toolkit, including the growing Coming Soon catalog.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionTitle("Suggested tools", "Start with a popular tool")
+                    suggested.forEach { ToolCard(it, it.id in favorites, onTool, onToggleFavorite) }
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionTitle("Browse categories", "Choose a category to explore")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        catalog.categories.forEach { item -> CategoryCard(item, onClick = { onCategory(item.id) }) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -234,7 +300,7 @@ private fun SearchScreen(catalog: Catalog, query: String, category: String?, fav
         SearchBox(query, onQuery, "Search names, descriptions, tags")
         CategoryGrid(catalog, category, onCategory, compact = true)
         val results = catalog.search(query, category)
-        Text("${results.size} results", color = Color.Gray, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        Text("${results.size} results", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         ToolList(results, favorites, onTool, onToggleFavorite, Modifier.weight(1f), "Try a different search or category")
     }
 }
@@ -253,10 +319,10 @@ private fun AccountScreen(catalog: Catalog) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", Icons.Default.Build)
-        SettingCard("Favorites", "Stored locally with SharedPreferences", Icons.Default.Favorite)
-        SettingCard("Migration status", "89 active tools run natively and offline. URL media inspection still needs a remote metadata service.", Icons.Default.Tune)
-        SettingCard("About enV", "Version 1.1.0 (6) · native Android", Icons.Default.Settings)
+        SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
+        SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
+        SettingCard("Migration status", "89 active tools run natively and offline. URL media inspection still needs a remote metadata service.", "Hammer")
+        SettingCard("About enV", "Version 1.1.0 (6) · native Android", "Info")
     }
 }
 
@@ -273,30 +339,41 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when (tool.engine.type)
 private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
     val supported = nativeSupported(tool)
     val remoteOnly = tool.engine.type == "url-media-info"
-    Scaffold(
-        containerColor = LightSurface,
-        topBar = { TopAppBar(title = { Text(tool.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }, actions = { IconButton(onClick = onToggleFavorite, modifier = Modifier.semantics { contentDescription = if (isFavorite) "Remove from saved" else "Save tool" }) { Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = Teal) } }) }
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatusPill(tool.status)
-            Text(tool.description, style = MaterialTheme.typography.bodyLarge)
-            DetailRow("Category", tool.category)
-            DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
-            DetailRow("Native execution", when {
-                tool.status == "planned" -> "Coming soon"
-                supported -> "Available offline"
-                remoteOnly -> "Remote metadata service required"
-                else -> "Not ported yet"
-            })
-            DetailRow("Web version", if (tool.clientSide) "Runs in the browser" else "Uses backend services")
-            when {
-                tool.status == "planned" -> Text("This tool is planned and not available yet.", color = Teal, fontWeight = FontWeight.SemiBold)
-                supported -> NativeToolForm(tool)
-                remoteOnly -> Text("URL media inspection requires its remote metadata service and isn't available offline.", color = Color.Gray)
-                else -> Text("Native engine migration status: not yet ported. This app does not claim that unsupported IDs execute offline.", color = Color.Gray)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) { EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface) }
+            Text("Tool details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onToggleFavorite, modifier = Modifier.semantics { contentDescription = if (isFavorite) "Remove from saved" else "Save tool" }) {
+                EnVIcon("Heart", tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = Color.Gray)
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(56.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp)) {
+                Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
+            }
+            Column(Modifier.padding(start = 12.dp)) {
+                Text(tool.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(tool.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (tool.status == "planned") StatusPill(tool.status)
+        Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
+        DetailRow("Native execution", when {
+            tool.status == "planned" -> "Coming soon"
+            supported -> "Available offline"
+            remoteOnly -> "Remote metadata service required"
+            else -> "Not ported yet"
+        })
+        DetailRow("Web version", if (tool.clientSide) "Runs in the browser" else "Uses backend services")
+        when {
+            tool.status == "planned" -> Text("This tool is planned and not available yet.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            supported -> NativeToolForm(tool)
+            remoteOnly -> Text("URL media inspection requires its remote metadata service and isn't available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Text("Native engine migration status: not yet ported. This app does not claim that unsupported IDs execute offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -308,7 +385,7 @@ private fun NativeToolForm(tool: ToolRecord) {
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
         "mime" -> NativeMimeToolForm(tool.id)
-        else -> Text("This native engine is not available offline.", color = Color.Gray)
+        else -> Text("This native engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -348,8 +425,8 @@ private fun NativeTextToolForm(toolId: String) {
         if (op == "reading-time-calculator") InputField(wpm, { wpm = it }, "Reading speed (words/min)", singleLine = true)
         if (op == "word-counter" || op == "character-counter") InputField(limit, { limit = it }, "Target limit", singleLine = true)
         if (counter) {
-            Text("${stats.words} words · ${stats.characters} characters · ${stats.sentences} sentences · ${stats.paragraphs} paragraphs", color = Teal, fontWeight = FontWeight.SemiBold)
-            Text("${if (op == "word-counter") stats.words else if (op == "character-counter") stats.characters else if (op == "sentence-counter") stats.sentences else if (op == "paragraph-counter") stats.paragraphs else stats.readingMinutes} ${if (op == "reading-time-calculator") "min" else "matched"} · ${stats.readingMinutes} min reading time", color = Color.Gray)
+            Text("${stats.words} words · ${stats.characters} characters · ${stats.sentences} sentences · ${stats.paragraphs} paragraphs", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Text("${if (op == "word-counter") stats.words else if (op == "character-counter") stats.characters else if (op == "sentence-counter") stats.sentences else if (op == "paragraph-counter") stats.paragraphs else stats.readingMinutes} ${if (op == "reading-time-calculator") "min" else "matched"} · ${stats.readingMinutes} min reading time", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         ActionRow(
             onRun = { runCatching { NativeTextEngine.run(toolId, input, compare, options) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run tool" }) },
@@ -411,11 +488,11 @@ private fun NativeColorToolForm(toolId: String) {
             onReset = { input = "#0D9F8A"; foreground = "#16181D"; background = "#FFFFFF"; output = ""; error = ""; paletteText = "" }
         )
         if (paletteText.isNotEmpty()) {
-            Text("Palette swatches · tap to apply", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+            Text("Palette swatches · tap to apply", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 paletteText.split(',').filter(String::isNotBlank).forEach { swatch ->
                     val parsed = runCatching { NativeColorEngine.parseHex(swatch) }.getOrNull()
-                    val swatchColor = parsed?.let { Color(it.r / 255f, it.g / 255f, it.b / 255f) } ?: Color.Gray
+                    val swatchColor = parsed?.let { Color(it.r / 255f, it.g / 255f, it.b / 255f) } ?: MaterialTheme.colorScheme.onSurfaceVariant
                     AssistChip(onClick = { input = swatch; runColor(swatch) }, label = { Text(swatch) }, leadingIcon = { Box(Modifier.size(16.dp).background(swatchColor, RoundedCornerShape(4.dp))) })
                 }
             }
@@ -535,7 +612,7 @@ private fun NativeMimeToolForm(toolId: String) {
         Text("Optional file inspection", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Choose local file") }
-            if (fileName.isNotBlank()) Text(fileName, color = Teal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (fileName.isNotBlank()) Text(fileName, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
         InputField(fileName, { fileName = it }, "Filename", placeholder = "report.pdf")
         InputField(browserMime, { browserMime = it }, "Browser MIME (optional)", placeholder = "application/pdf")
@@ -571,10 +648,10 @@ private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
 
 @Composable
 private fun ResultBox(output: String, error: String, onCopy: (String) -> Unit) {
-    if (error.isNotEmpty()) Surface(color = ErrorSurface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text("Check your input: $error", color = ErrorText, modifier = Modifier.padding(12.dp)) }
-    if (output.isNotEmpty()) Surface(color = Color.White, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+    if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text("Check your input: $error", color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp)) }
+    if (output.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text("Result", style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.SemiBold)
+            Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             Text(output, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Button(onClick = { onCopy(output) }) { Text("Copy output") } }
         }
@@ -583,20 +660,27 @@ private fun ResultBox(output: String, error: String, onCopy: (String) -> Unit) {
 
 @Composable
 private fun ToolList(tools: List<ToolRecord>, favorites: Set<String>, onTool: (String) -> Unit, onToggle: (String) -> Unit, modifier: Modifier = Modifier, emptyMessage: String = "Nothing to show") {
-    if (tools.isEmpty()) Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(emptyMessage, color = Color.Gray, modifier = Modifier.padding(32.dp)) }
-    else LazyColumn(modifier, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { items(tools, key = { it.id }) { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggle) } }
+    if (tools.isEmpty()) Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(emptyMessage, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(32.dp)) }
+    else LazyColumn(modifier, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(tools, key = { it.id }) { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggle) } }
 }
 
 @Composable
 private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).clickable { onTool(tool.id) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) { Text(tool.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Spacer(Modifier.width(8.dp)); if (tool.status == "planned") StatusPill("planned") }
-                Text(tool.description, color = Color.Gray, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                Text("${tool.category} · popularity ${tool.popularity}", style = MaterialTheme.typography.labelSmall, color = Teal, modifier = Modifier.padding(top = 8.dp))
+                Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                    Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+                }
+                Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+                Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                if (tool.status == "planned" || tool.clientSide) {
+                    StatusPill(tool.status, Modifier.padding(top = 10.dp))
+                }
             }
-            IconButton(onClick = { onToggle(tool.id) }, modifier = Modifier.semantics { contentDescription = if (favorite) "Remove ${tool.name} from saved" else "Save ${tool.name}" }) { Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = Teal) }
+            IconButton(onClick = { onToggle(tool.id) }, modifier = Modifier.semantics { contentDescription = if (favorite) "Remove ${tool.name} from saved" else "Save ${tool.name}" }) {
+                EnVIcon("Heart", tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -604,17 +688,41 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
 @Composable
 private fun CategoryGrid(catalog: Catalog, selected: String?, onSelected: (String?) -> Unit, compact: Boolean = false) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 20.dp)) {
-        if (!compact) AssistChip(onClick = { onSelected(null) }, label = { Text("All") }, leadingIcon = { Icon(Icons.Default.Build, null) })
-        catalog.categories.forEach { category -> FilterChip(selected = selected == category.id, onClick = { onSelected(if (selected == category.id) null else category.id) }, label = { Text(category.name) }) }
+        if (!compact) AssistChip(onClick = { onSelected(null) }, label = { Text("All") }, leadingIcon = { EnVIcon("LayoutGrid", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) })
+        catalog.categories.forEach { category -> FilterChip(selected = selected == category.id, onClick = { onSelected(if (selected == category.id) null else category.id) }, label = { Text(category.name) }, leadingIcon = { EnVIcon(category.icon, Modifier.size(16.dp), tint = if (selected == category.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }) }
+    }
+}
+
+@Composable
+private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -> Unit) {
+    Card(
+        Modifier.width(160.dp).clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                Box(contentAlignment = Alignment.Center) { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+            }
+            Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(category.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
 @Composable
 private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String) {
-    OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { Icon(Icons.Default.Search, "Search") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+    OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { EnVIcon("Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = "Search") }, singleLine = true, shape = RoundedCornerShape(12.dp))
 }
 
-@Composable private fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
-@Composable private fun StatusPill(status: String) { Surface(color = if (status == "planned") Color(0xFFFFF0D7) else SoftTeal, shape = RoundedCornerShape(20.dp)) { Text(if (status == "planned") "Coming soon" else "Catalog", color = if (status == "planned") Color(0xFF986700) else Teal, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) } }
-@Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = Color.Gray); Text(value, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp)) } }
-@Composable private fun SettingCard(title: String, detail: String, icon: androidx.compose.ui.graphics.vector.ImageVector) { Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, title, tint = Teal); Column(Modifier.padding(start = 14.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = Color.Gray) } } } }
+@Composable private fun SectionTitle(text: String, subtitle: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 4.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+@Composable private fun StatusPill(status: String, modifier: Modifier = Modifier) { Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(5.dp)) { Text(if (status == "planned") "Coming soon" else "IN-BROWSER", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) } }
+@Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp)) } }
+@Composable private fun SettingCard(title: String, detail: String, iconName: String) { Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { EnVIcon(iconName, tint = MaterialTheme.colorScheme.primary); Column(Modifier.padding(start = 14.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant) } } } }

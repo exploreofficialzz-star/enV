@@ -7,40 +7,50 @@ struct ToolCard: View {
     let tool: Tool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             NavigationLink(value: tool) {
-                HStack(spacing: 14) {
-                    Image(systemName: iconName(for: tool.icon))
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.envTeal)
-                        .frame(width: 42, height: 42)
-                        .background(Color.envTeal.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(tool.name).font(.headline).foregroundStyle(Color.envInk)
-                            if tool.isPlanned { StatusPill(text: "Coming soon", color: .orange) }
-                        }
-                        Text(tool.description).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                VStack(alignment: .leading, spacing: 0) {
+                    iconTile(tool.icon)
+                    Text(tool.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .tracking(-0.15)
+                        .foregroundStyle(Color.envInk)
+                        .lineLimit(1)
+                        .padding(.top, 12)
+                    Text(tool.description)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.envMuted)
+                        .lineLimit(2)
+                        .lineSpacing(2)
+                        .padding(.top, 4)
+                    if tool.isPlanned {
+                        StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
+                    } else if tool.clientSide {
+                        Text("IN-BROWSER")
+                            .font(.system(size: 9, weight: .medium))
+                            .tracking(0.5)
+                            .foregroundStyle(Color.envSubtle)
+                            .padding(.top, 10)
                     }
-                    Spacer(minLength: 4)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             Button {
                 store.toggleFavorite(tool)
             } label: {
-                Image(systemName: store.isFavorite(tool) ? "heart.fill" : "heart")
-                    .foregroundStyle(store.isFavorite(tool) ? .pink : .secondary)
-                    .frame(width: 40, height: 40)
+                EnVIcon(name: "Heart", size: 18, tint: store.isFavorite(tool) ? .envAccent : .envMuted)
+                    .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(store.isFavorite(tool) ? "Remove \(tool.name) from saved" : "Save \(tool.name)")
         }
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18))
+        .padding(16)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .opacity(tool.isPlanned ? 0.72 : 1)
         .accessibilityElement(children: .contain)
     }
 }
@@ -49,7 +59,7 @@ struct StatusPill: View {
     let text: String
     let color: Color
     var body: some View {
-        Text(text).font(.caption2.weight(.semibold)).foregroundStyle(color).padding(.horizontal, 7).padding(.vertical, 4).background(color.opacity(0.12), in: Capsule())
+        Text(text).font(.system(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -68,13 +78,15 @@ struct ToolDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
-                    Image(systemName: iconName(for: tool.icon)).font(.largeTitle).foregroundStyle(Color.envTeal).frame(width: 64, height: 64).background(Color.envTeal.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
+                    EnVIcon(name: tool.icon, size: 26, tint: .envAccent).frame(width: 56, height: 56).background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 10))
                     VStack(alignment: .leading, spacing: 6) { Text(tool.name).font(.title2.bold()); Text(store.category(named: tool.category)?.name ?? tool.category).foregroundStyle(.secondary) }
                     Spacer()
                 }
                 if tool.isPlanned {
-                    Label("Coming soon", systemImage: "clock")
-                        .font(.headline).foregroundStyle(.orange)
+                    HStack(spacing: 8) {
+                        EnVIcon(name: "Clock3", size: 16, tint: .envMuted)
+                        Text("Coming soon").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envMuted)
+                    }
                     Text("This entry is planned. Its engine is not available in the native iOS app yet.").foregroundStyle(.secondary)
                 } else {
                     NativeFamilyToolView(tool: tool)
@@ -91,7 +103,10 @@ struct ToolDetailView: View {
                 }
                 .padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
                 Button { store.toggleFavorite(tool) } label: {
-                    Label(store.isFavorite(tool) ? "Remove from Saved" : "Save tool", systemImage: store.isFavorite(tool) ? "heart.fill" : "heart")
+                    HStack(spacing: 8) {
+                        EnVIcon(name: "Heart", size: 16, tint: .white)
+                        Text(store.isFavorite(tool) ? "Remove from Saved" : "Save tool")
+                    }
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                 }
                 .buttonStyle(.borderedProminent)
@@ -99,7 +114,7 @@ struct ToolDetailView: View {
             }
             .padding()
         }
-        .navigationTitle("Tool details")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -152,14 +167,14 @@ struct NativeFamilyToolView: View {
             case "mime": NativeMimeToolView(tool: tool)
             case "url-media-info":
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Remote service required", systemImage: "network")
+                    HStack(spacing: 8) { EnVIcon(name: "Globe", size: 16, tint: .envMuted); Text("Remote service required") }
                         .font(.headline).foregroundStyle(.orange)
                     Text("URL media inspection is not available offline. The remote metadata service is required for title, duration, codecs, thumbnails, and formats.")
                         .foregroundStyle(.secondary)
                 }
             default:
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Native engine migration in progress", systemImage: "hammer")
+                    HStack(spacing: 8) { EnVIcon(name: "Hammer", size: 16, tint: .envMuted); Text("Native engine migration in progress") }
                         .font(.headline).foregroundStyle(Color.envTeal)
                     Text("This catalog entry is not yet implemented as a native iOS engine.").foregroundStyle(.secondary)
                 }
@@ -178,7 +193,7 @@ private struct NativeActionRow: View {
             Button("Run", action: run).buttonStyle(.borderedProminent)
             Button("Reset", action: reset).buttonStyle(.bordered)
             Button { UIPasteboard.general.string = output } label: {
-                Label("Copy", systemImage: "doc.on.doc")
+                HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); Text("Copy") }
             }.buttonStyle(.bordered).disabled(output.isEmpty)
         }
     }
@@ -395,7 +410,7 @@ struct NativeMimeToolView: View {
             TextField("Search extension, MIME, name, or group", text: $query).textFieldStyle(.roundedBorder)
             Text("Optional signature inspection").font(.subheadline.weight(.semibold))
             Button { showingFileImporter = true } label: {
-                Label(fileName.isEmpty ? "Choose a local file" : "Choose another file", systemImage: "doc.badge.plus")
+                HStack(spacing: 8) { EnVIcon(name: "FilePlus2", size: 16, tint: .envAccent); Text(fileName.isEmpty ? "Choose a local file" : "Choose another file") }
             }.buttonStyle(.bordered)
             TextField("File name", text: $fileName).textFieldStyle(.roundedBorder)
             TextField("Browser MIME", text: $browserMime).textFieldStyle(.roundedBorder)
@@ -460,7 +475,11 @@ struct NativeTextToolView: View {
             ForEach(optionNames, id: \.self) { name in TextField(label(name), text: Binding(get: { options[name, default: defaultValue(name)] }, set: { options[name] = $0 })).textFieldStyle(.roundedBorder) }
             if isCounter { let s = NativeTextEngine.statistics(input, wpm: options["wpm"] ?? "200"); LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], alignment: .leading) { stat("Words", s.words); stat("Characters", s.characters); stat("No spaces", s.charactersWithoutSpaces); stat("Sentences", s.sentences); stat("Paragraphs", s.paragraphs); stat("Reading", "\(s.readingMinutes) min") } }
             if tool.id == "word-counter" || tool.id == "character-counter" { let s = NativeTextEngine.statistics(input); let metric = tool.id == "word-counter" ? s.words : s.characters; let limit = max(1, Int(options["limit"] ?? "1") ?? 1); Text(metric <= limit ? "\(limit - metric) remaining" : "\(metric - limit) over").font(.subheadline).foregroundStyle(.secondary) }
-            HStack { Button("Run", action: run).buttonStyle(.borderedProminent); Button("Reset", action: reset).buttonStyle(.bordered); Button { UIPasteboard.general.string = output } label: { Label("Copy output", systemImage: "doc.on.doc") }.disabled(output.isEmpty) }
+            HStack {
+                Button(action: run) { HStack(spacing: 6) { EnVIcon(name: "Play", size: 14, tint: .white); Text("Run") } }.buttonStyle(.borderedProminent)
+                Button(action: reset) { HStack(spacing: 6) { EnVIcon(name: "RotateCcw", size: 14, tint: .envMuted); Text("Reset") } }.buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = output } label: { HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); Text("Copy output") } }.disabled(output.isEmpty)
+            }
             if let error { Text(error).foregroundStyle(.red).font(.footnote) }
             if let diffSummary { Text(diffSummary).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envTeal) }
             if !output.isEmpty { TextEditor(text: .constant(output)).font(.system(.body, design: .monospaced)).frame(minHeight: 150).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35))) }
@@ -475,9 +494,4 @@ struct NativeTextToolView: View {
     private func defaultValue(_ name: String) -> String { name == "flags" ? "g" : name == "width" ? "80" : name == "wpm" ? "200" : name == "limit" ? "280" : name == "style" ? "bullets" : "" }
     private func run() { do { let r = try NativeTextEngine.run(toolID: tool.id, input: input, compare: compare, options: options); output = r.output; diffSummary = isDiff ? "Added: \(r.added) · Removed: \(r.removed) · Unchanged: \(r.unchanged)" : nil; error = nil } catch let caughtError { output = ""; diffSummary = nil; error = caughtError.localizedDescription } }
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
-}
-
-func iconName(for catalogIcon: String) -> String {
-    let map = ["Accessibility":"accessibility", "Sparkles":"sparkles", "Calculator":"plus.forwardslash.minus", "Code2":"chevron.left.forwardslash.chevron.right", "Palette":"paintpalette", "Calendar":"calendar", "Heart":"heart", "Search":"magnifyingglass", "Folder":"folder", "Wand2":"wand.and.stars", "Image":"photo", "Shield":"shield", "Type":"textformat", "Plane":"airplane", "Globe":"globe", "Timer":"timer", "Video":"video", "AudioLines":"waveform", "Briefcase":"briefcase", "UserRound":"person", "Dices":"dice", "Gamepad2":"gamecontroller", "ShoppingCart":"cart", "QrCode":"qrcode"]
-    return map[catalogIcon] ?? "wrench.and.screwdriver"
 }
