@@ -50,8 +50,8 @@ public enum NativeDateTimeEngine {
             let days = calendar(.gregorian).dateComponents([.day], from: birth, to: today).day ?? 0
             return result(("Age (years)", String(years)), ("Days lived", String(days)), ("Next birthday in", "\(365 - (days % 365)) days (approx.)"))
         case "date-diff":
-            let from = try dateOnly(options["from"] ?? "", label: "start date")
-            let to = try dateOnly(options["to"] ?? "", label: "end date")
+            let from = try parseDate(options["from"] ?? "", label: "start date")
+            let to = try parseDate(options["to"] ?? "", label: "end date")
             let days = calendar(.gregorian).dateComponents([.day], from: from, to: to).day ?? 0
             return result(("Days", String(days)), ("Weeks", String(format: "%.1f", Double(days) / 7)))
         case "workday":
