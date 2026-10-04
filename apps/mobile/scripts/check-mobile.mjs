@@ -207,6 +207,19 @@ assert.ok(
   "WebView HTTP failures and native renderer crashes must have an in-app recovery path.",
 );
 assert.doesNotMatch(
+  webShell,
+  /ActivityIndicator|Loading enV|startInLoadingState|renderLoading|loadingOverlay/,
+  "The native WebView must not cover the app with a blocking loading screen.",
+);
+assert.ok(
+  webShell.includes('allowsBackForwardNavigationGestures={Platform.OS === "ios"}') &&
+    webShell.includes('BackHandler.addEventListener("hardwareBackPress"') &&
+    webShell.includes("webViewRef.current?.goBack()") &&
+    webShell.includes("onOpenWindow={handleOpenWindow}") &&
+    webShell.includes("setSupportMultipleWindows"),
+  "iOS gestures, Android back, and WebView link navigation must remain available.",
+);
+assert.doesNotMatch(
   `${webShell}\n${connectionErrorView}`,
   /onOpenBrowser|Open enV in browser|openURL\(WEB_APP_URL\)/,
   "Connection and navigation recovery must not escape to an external browser.",

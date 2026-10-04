@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   BackHandler,
   Linking,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
@@ -18,7 +16,6 @@ import { ConnectionErrorView } from "@/features/web-shell/ConnectionErrorView";
 import { BLOB_DOWNLOAD_BRIDGE_SCRIPT } from "@/features/web-shell/blob-download-bridge";
 import ContactExchangeModule from "../../../modules/contact-exchange/src/ContactExchangeModule";
 import {
-  BRAND_STATUS_BAR_COLOR,
   MAX_NATIVE_DOWNLOAD_BYTES,
   WEB_APP_URL,
   isInternalWebUrl,
@@ -70,7 +67,6 @@ export default function WebAppScreen() {
   const transfersRef = useRef(new Map<string, NativeDownload>());
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [canGoBack, setCanGoBack] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,7 +84,6 @@ export default function WebAppScreen() {
   const startLoadTimeout = useCallback(() => {
     clearLoadTimeout();
     loadTimeoutRef.current = setTimeout(() => {
-      setIsLoading(false);
       setLoadError(true);
     }, WEBVIEW_LOAD_TIMEOUT_MS);
   }, [clearLoadTimeout]);
@@ -283,7 +278,6 @@ export default function WebAppScreen() {
     clearLoadTimeout();
     activePageUrlRef.current = WEB_APP_URL;
     setLoadError(false);
-    setIsLoading(true);
     setCanGoBack(false);
     setRetryKey((current) => current + 1);
   }, [clearLoadTimeout]);
@@ -314,22 +308,19 @@ export default function WebAppScreen() {
           }}
           onLoadStart={(event) => {
             activePageUrlRef.current = event.nativeEvent.url;
-            setIsLoading(true);
             setLoadError(false);
             startLoadTimeout();
           }}
-          onLoadEnd={() => { clearLoadTimeout(); setIsLoading(false); }}
+          onLoadEnd={clearLoadTimeout}
           onError={(event) => {
             if (event.nativeEvent.url !== activePageUrlRef.current) return;
             clearLoadTimeout();
-            setIsLoading(false);
             setLoadError(true);
           }}
           onHttpError={(event) => {
             const { url, statusCode } = event.nativeEvent;
             if (url !== activePageUrlRef.current || statusCode < 400) return;
             clearLoadTimeout();
-            setIsLoading(false);
             setLoadError(true);
           }}
           onRenderProcessGone={retry}
@@ -344,21 +335,8 @@ export default function WebAppScreen() {
           allowsBackForwardNavigationGestures={Platform.OS === "ios"}
           pullToRefreshEnabled
           setSupportMultipleWindows
-          startInLoadingState
-          renderLoading={() => (
-            <View style={styles.loadingView}>
-              <ActivityIndicator size="large" color={BRAND_STATUS_BAR_COLOR} />
-              <Text style={styles.loadingText}>Loading enV…</Text>
-            </View>
-          )}
           style={styles.webView}
         />
-        {isLoading ? (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={BRAND_STATUS_BAR_COLOR} />
-            <Text style={styles.loadingText}>Loading enV…</Text>
-          </View>
-        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -368,7 +346,4 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F7F7F4" },
   webViewContainer: { flex: 1, backgroundColor: "#F7F7F4" },
   webView: { flex: 1, backgroundColor: "#F7F7F4" },
-  loadingView: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#F7F7F4" },
-  loadingOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#F7F7F4" },
-  loadingText: { color: "#53615B", fontSize: 15, fontWeight: "600" },
 });
