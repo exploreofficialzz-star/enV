@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
@@ -31,18 +31,33 @@ if (missingCategories.length) {
 const active = tools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = tools.length - active;
 const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
-const readImplementedIds = (relativePath) => {
-  const path = new URL(relativePath, root);
-  if (!existsSync(path)) return new Set();
+const readImplementedIds = (...relativePaths) => {
+  const paths = relativePaths.flatMap((relativePath) => {
+    const path = new URL(relativePath, root);
+    if (!existsSync(path)) return [];
+    if (!statSync(path).isDirectory()) return [path];
+    return readdirSync(fileURLToPath(path), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".txt"))
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((entry) => new URL(`${relativePath}/${entry.name}`, root));
+  });
   return new Set(
-    readFileSync(path, "utf8")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#")),
+    paths.flatMap((path) =>
+      readFileSync(path, "utf8")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#")),
+    ),
   );
 };
-const androidToolIds = readImplementedIds("apps/android/native-tool-coverage.txt");
-const iosToolIds = readImplementedIds("apps/ios/native-tool-coverage.txt");
+const androidToolIds = readImplementedIds(
+  "apps/android/native-tool-coverage.txt",
+  "apps/android/native-family-coverage",
+);
+const iosToolIds = readImplementedIds(
+  "apps/ios/native-tool-coverage.txt",
+  "apps/ios/native-family-coverage",
+);
 const toolsById = new Map(tools.map((tool) => [tool.id, tool]));
 for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]) {
   const invalid = [...ids].filter((id) => !toolsById.has(id) || toolsById.get(id).status === "planned");

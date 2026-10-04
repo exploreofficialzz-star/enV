@@ -17,9 +17,9 @@ The canonical web catalog currently contains **10,001 entries** across **43 decl
 ## Current status (2026-10-04)
 
 - The independent Kotlin/Compose Android and SwiftUI iOS projects now have native five-tab navigation, offline catalog browsing/search/categories, locally persisted favorites, and no WebView dependency in the native app sources.
-- The first functional engine family is **Text: 40/40 active text tool IDs are registered on both platforms**, with native forms and platform unit tests. The shared inventory records these IDs exactly.
-- The other **8,750 active catalog tools are still in migration**. Their catalog details are available, but the native apps deliberately show an explicit not-yet-ported state rather than claiming execution support.
-- Web build, typecheck, lint, and test checks passed during the native-only work. Android Gradle and iOS XCTest still require the GitHub Actions SDK/Xcode build to validate the final native changes; the sandbox itself has neither Android SDK nor Xcode.
+- Native forms and engine implementations now cover **89 active tool IDs on each platform**: Text (40), Codec (17), Color (16), Date/time (14), and MIME (2). The native apps also provide an offline 10,001-entry catalog, working five-tab navigation, search/category routes, saved tools, and local MIME file inspection limited to the first 64 bytes.
+- The other **8,701 active catalog tools remain in migration**. Their catalog details are available, but the native apps deliberately show an explicit not-yet-ported or remote-service-required state rather than claiming execution support.
+- Web build, typecheck, lint, and tests passed during the native-only work. This Linux sandbox lacks the Android SDK and Xcode; GitHub Actions must still compile Android/iOS and run their native unit-test suites before the milestone is treated as released.
 - The existing web app and its deployment remain unchanged and independent.
 
 Both apps must share the same information architecture, labels, content, palette, and interaction outcomes:
@@ -46,7 +46,7 @@ Back navigation, safe areas, large text, keyboard behavior, accessibility labels
 
 Port and behavior-test the most reused deterministic families first: text/codec, date-time, unit conversion, common calculators, generators, and developer utilities. Preserve input validation, units, rounding, locale behavior, copy/share, and save/recent semantics. Each port registers the exact tool IDs and supported operations; do not infer support from a family name alone.
 
-**Progress:** Text transforms, counters, formatters, text diff, and JSON/CSV/YAML/XML conversions are the first slice. Android and iOS each list exactly the 40 active text tool IDs; verify their native CI suites before treating this slice as released coverage. Date/time, unit conversion, calculators, generators, and other developer utilities remain upcoming.
+**Progress:** The first slice now includes text transforms/counters/formatters/diff and JSON/CSV/YAML/XML conversions, codecs, color conversion/palettes/contrast, date/time utilities, and MIME lookup/local signature inspection. Android and iOS each list exactly the same 89 active IDs. Verify native CI before treating this coverage as released. Unit conversion, calculators, generators, and other developer utilities remain upcoming.
 
 ### 2. Domain, document, and media engines
 

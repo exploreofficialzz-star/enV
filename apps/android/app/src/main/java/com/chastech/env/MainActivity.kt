@@ -1,11 +1,19 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
+
 package com.chastech.env
 
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,31 +26,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -59,9 +64,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,15 +84,25 @@ import com.chastech.env.data.Catalog
 import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
+import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
+import com.chastech.env.engine.NativeCodecEngine
+import com.chastech.env.engine.NativeColorEngine
+import com.chastech.env.engine.NativeDateTimeEngine
+import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeTextEngine
 import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
 
 private val Teal = Color(0xFF0D9F8A)
 private val LightSurface = Color(0xFFF8FAF9)
 private val SoftTeal = Color(0xFFE1F4EF)
+private val ErrorSurface = Color(0xFFFFEAE7)
+private val ErrorText = Color(0xFF9B2C24)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,7 +118,6 @@ private fun CatalogGate(favorites: FavoritesStore) {
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
     var retryCount by rememberSaveable { mutableIntStateOf(0) }
-
     LaunchedEffect(retryCount) {
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
@@ -110,10 +126,8 @@ private fun CatalogGate(favorites: FavoritesStore) {
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
-        val loaded = result.getOrNull()
-        if (loaded == null) loadFailed = true else catalog = loaded
+        result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
-
     when {
         catalog != null -> EnVApp(catalog!!, favorites)
         loadFailed -> CatalogFailureScreen { retryCount += 1 }
@@ -152,22 +166,18 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore) {
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
-
     if (selected != null) {
         BackHandler { selectedId = null }
-        ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = {
-            favoriteIds = favorites.toggle(selected.id)
-        })
+        ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
         return
     }
     if (category != null) BackHandler { category = null }
-
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
     Scaffold(
         containerColor = LightSurface,
         topBar = { TopAppBar(title = { Text("enV", fontWeight = FontWeight.Bold) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = LightSurface)) },
         bottomBar = {
-            BottomAppBar(containerColor = Color.White, modifier = Modifier.navigationBarsPadding()) {
+            androidx.compose.material3.NavigationBar(containerColor = Color.White, modifier = Modifier.navigationBarsPadding()) {
                 AppTab.entries.forEach { item ->
                     NavigationBarItem(selected = currentTab == item, onClick = { tab = item.name; if (item != AppTab.Search) query = "" }, icon = { Icon(item.icon(), contentDescription = item.label) }, label = { Text(item.label) })
                 }
@@ -198,7 +208,7 @@ private fun AppTab.icon() = when (this) {
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onSearch: (String) -> Unit, category: String?, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Make space for useful tools.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        item { Text("Browse the catalog offline. Native tool execution is being added by category.", color = Color.Gray) }
+        item { Text("Browse the catalog offline. Native tools run locally on this device.", color = Color.Gray) }
         item { SearchBox(query, onSearch, "Search 10,001 tools") }
         item { SectionTitle("Featured and popular") }
         item { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { catalog.featuredOrPopular().forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) } } }
@@ -213,8 +223,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
     Column(Modifier.fillMaxSize()) {
         Text("Tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
         CategoryGrid(catalog, category, onCategory, compact = true)
-        val list = catalog.search("", category)
-        ToolList(list, favorites, onTool, onToggleFavorite, Modifier.weight(1f), emptyMessage = "No tools in this category")
+        ToolList(catalog.search("", category), favorites, onTool, onToggleFavorite, Modifier.weight(1f), "No tools in this category")
     }
 }
 
@@ -246,30 +255,60 @@ private fun AccountScreen(catalog: Catalog) {
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", Icons.Default.Build)
         SettingCard("Favorites", "Stored locally with SharedPreferences", Icons.Default.Favorite)
-        SettingCard("Migration status", "40 text tools run natively. Other active tool engines are still being ported.", Icons.Default.Tune)
+        SettingCard("Migration status", "89 active tools run natively and offline. URL media inspection still needs a remote metadata service.", Icons.Default.Tune)
         SettingCard("About enV", "Version 1.1.0 (6) · native Android", Icons.Default.Settings)
     }
 }
 
+private fun nativeSupported(tool: ToolRecord): Boolean = when (tool.engine.type) {
+    "text" -> NativeTextEngine.operationForTool(tool.id) != null
+    "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
+    "color" -> NativeColorEngine.operationForTool(tool.id) != null
+    "datetime" -> NativeDateTimeEngine.operationForTool(tool.id) != null
+    "mime" -> NativeMimeEngine.operationForTool(tool.id) != null
+    else -> false
+}
+
 @Composable
 private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
-    Scaffold(containerColor = LightSurface, topBar = { TopAppBar(title = { Text(tool.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }, actions = { IconButton(onClick = onToggleFavorite, modifier = Modifier.semantics { contentDescription = if (isFavorite) "Remove from saved" else "Save tool" }) { Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = Teal) } }) }) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val supported = nativeSupported(tool)
+    val remoteOnly = tool.engine.type == "url-media-info"
+    Scaffold(
+        containerColor = LightSurface,
+        topBar = { TopAppBar(title = { Text(tool.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }, actions = { IconButton(onClick = onToggleFavorite, modifier = Modifier.semantics { contentDescription = if (isFavorite) "Remove from saved" else "Save tool" }) { Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = Teal) } }) }
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             StatusPill(tool.status)
             Text(tool.description, style = MaterialTheme.typography.bodyLarge)
             DetailRow("Category", tool.category)
             DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
             DetailRow("Native execution", when {
                 tool.status == "planned" -> "Coming soon"
-                tool.engine.type == "text" && NativeTextEngine.operationForTool(tool.id) != null -> "Available offline"
+                supported -> "Available offline"
+                remoteOnly -> "Remote metadata service required"
                 else -> "Not ported yet"
             })
             DetailRow("Web version", if (tool.clientSide) "Runs in the browser" else "Uses backend services")
-            if (tool.status == "planned") Text("This tool is planned and not available yet.", color = Teal, fontWeight = FontWeight.SemiBold)
-            else if (tool.engine.type == "text" && NativeTextEngine.operationForTool(tool.id) != null) NativeTextToolForm(tool.id)
-            else Text("Native engine migration status: not yet ported. This shell does not claim active-engine parity.", color = Color.Gray)
+            when {
+                tool.status == "planned" -> Text("This tool is planned and not available yet.", color = Teal, fontWeight = FontWeight.SemiBold)
+                supported -> NativeToolForm(tool)
+                remoteOnly -> Text("URL media inspection requires its remote metadata service and isn't available offline.", color = Color.Gray)
+                else -> Text("Native engine migration status: not yet ported. This app does not claim that unsupported IDs execute offline.", color = Color.Gray)
+            }
             if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = Color.Gray)
         }
+    }
+}
+
+@Composable
+private fun NativeToolForm(tool: ToolRecord) {
+    when (tool.engine.type) {
+        "text" -> NativeTextToolForm(tool.id)
+        "codec" -> NativeCodecToolForm(tool.id)
+        "color" -> NativeColorToolForm(tool.id)
+        "datetime" -> NativeDateTimeToolForm(tool.id)
+        "mime" -> NativeMimeToolForm(tool.id)
+        else -> Text("This native engine is not available offline.", color = Color.Gray)
     }
 }
 
@@ -280,6 +319,7 @@ private fun NativeTextToolForm(toolId: String) {
     var input by rememberSaveable(toolId) { mutableStateOf("") }
     var compare by rememberSaveable(toolId) { mutableStateOf("") }
     var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
     var find by rememberSaveable(toolId) { mutableStateOf("") }
     var replacement by rememberSaveable(toolId) { mutableStateOf("") }
     var width by rememberSaveable(toolId) { mutableStateOf("80") }
@@ -294,32 +334,249 @@ private fun NativeTextToolForm(toolId: String) {
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (op == "find-replace") {
-            OutlinedTextField(find, { find = it }, Modifier.fillMaxWidth(), label = { Text("Find") })
-            OutlinedTextField(replacement, { replacement = it }, Modifier.fillMaxWidth(), label = { Text("Replace with") })
+            InputField(find, { find = it }, "Find")
+            InputField(replacement, { replacement = it }, "Replace with")
         }
-        if (op == "wrap") OutlinedTextField(width, { width = it }, Modifier.fillMaxWidth(), label = { Text("Column width") }, singleLine = true)
+        if (op == "wrap") InputField(width, { width = it }, "Column width", singleLine = true)
         if (op == "list") {
             Text("Style", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("bullets", "numbered", "comma").forEach { value -> FilterChip(selected = style == value, onClick = { style = value }, label = { Text(value.replaceFirstChar { it.uppercase() }) }) } }
         }
-        if (op == "keyword-density") OutlinedTextField(keyword, { keyword = it }, Modifier.fillMaxWidth(), label = { Text("Keyword (optional)") })
-        OutlinedTextField(input, { input = it }, Modifier.fillMaxWidth().height(if (diff) 180.dp else 160.dp), label = { Text(if (counter) "Text" else "Input") }, minLines = 5)
-        if (diff) OutlinedTextField(compare, { compare = it }, Modifier.fillMaxWidth().height(180.dp), label = { Text("New text") }, minLines = 5)
-        if (op == "reading-time-calculator") OutlinedTextField(wpm, { wpm = it }, Modifier.fillMaxWidth(), label = { Text("Reading speed (words/min)") }, singleLine = true)
-        if (op == "word-counter" || op == "character-counter") OutlinedTextField(limit, { limit = it }, Modifier.fillMaxWidth(), label = { Text("Target limit") }, singleLine = true)
+        if (op == "keyword-density") InputField(keyword, { keyword = it }, "Keyword (optional)")
+        InputField(input, { input = it }, if (counter) "Text" else "Input", minLines = 5, tall = true)
+        if (diff) InputField(compare, { compare = it }, "New text", minLines = 5, tall = true)
+        if (op == "reading-time-calculator") InputField(wpm, { wpm = it }, "Reading speed (words/min)", singleLine = true)
+        if (op == "word-counter" || op == "character-counter") InputField(limit, { limit = it }, "Target limit", singleLine = true)
         if (counter) {
             Text("${stats.words} words · ${stats.characters} characters · ${stats.sentences} sentences · ${stats.paragraphs} paragraphs", color = Teal, fontWeight = FontWeight.SemiBold)
             Text("${if (op == "word-counter") stats.words else if (op == "character-counter") stats.characters else if (op == "sentence-counter") stats.sentences else if (op == "paragraph-counter") stats.paragraphs else stats.readingMinutes} ${if (op == "reading-time-calculator") "min" else "matched"} · ${stats.readingMinutes} min reading time", color = Color.Gray)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { output = runCatching { NativeTextEngine.run(toolId, input, compare, options) }.getOrElse { "Error: ${it.message ?: "Unable to run tool"}" } }) { Text("Run") }
-            Button(onClick = { input = ""; compare = ""; output = ""; find = ""; replacement = ""; width = "80"; style = "bullets"; keyword = ""; wpm = "200"; limit = "280" }) { Text("Reset") }
+        ActionRow(
+            onRun = { runCatching { NativeTextEngine.run(toolId, input, compare, options) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run tool" }) },
+            onReset = { input = ""; compare = ""; output = ""; error = ""; find = ""; replacement = ""; width = "80"; style = "bullets"; keyword = ""; wpm = "200"; limit = "280" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeCodecToolForm(toolId: String) {
+    val context = LocalContext.current
+    val op = NativeCodecEngine.operationForTool(toolId) ?: return
+    var input by rememberSaveable(toolId) { mutableStateOf(if (op == "base-convert") "255" else "Hello, enV!") }
+    var a by rememberSaveable(toolId) { mutableStateOf("hello") }
+    var b by rememberSaveable(toolId) { mutableStateOf("hello") }
+    var value by rememberSaveable(toolId) { mutableStateOf("255") }
+    var fromBase by rememberSaveable(toolId) { mutableStateOf("10") }
+    var toBase by rememberSaveable(toolId) { mutableStateOf("16") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when (op) {
+            "hash-compare" -> { InputField(a, { a = it }, "Hash or value A"); InputField(b, { b = it }, "Hash or value B") }
+            "base-convert" -> { InputField(value, { value = it }, "Value", placeholder = "255 or ff"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { InputField(fromBase, { fromBase = it }, "From base", singleLine = true, modifier = Modifier.weight(1f)); InputField(toBase, { toBase = it }, "To base", singleLine = true, modifier = Modifier.weight(1f)) } }
+            else -> InputField(input, { input = it }, "Input", placeholder = "Enter text to convert", minLines = 5, tall = true)
         }
-        if (output.isNotEmpty()) Surface(color = Color.White, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp)) {
-                Text(output, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Button(onClick = { copy(output) }) { Text("Copy output") } }
+        ActionRow(
+            onRun = {
+                val options = when (op) { "hash-compare" -> mapOf("a" to a, "b" to b); "base-convert" -> mapOf("value" to value, "fromBase" to fromBase, "toBase" to toBase); else -> emptyMap() }
+                runCatching { NativeCodecEngine.run(toolId, input, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run codec" })
+            },
+            onReset = { input = if (op == "base-convert") "255" else "Hello, enV!"; a = "hello"; b = "hello"; value = "255"; fromBase = "10"; toBase = "16"; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeColorToolForm(toolId: String) {
+    val context = LocalContext.current
+    val op = NativeColorEngine.operationForTool(toolId) ?: return
+    var input by rememberSaveable(toolId) { mutableStateOf("#0D9F8A") }
+    var foreground by rememberSaveable(toolId) { mutableStateOf("#16181D") }
+    var background by rememberSaveable(toolId) { mutableStateOf("#FFFFFF") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    var paletteText by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    fun runColor(value: String = input) {
+        runCatching { NativeColorEngine.run(toolId, value, foreground, background) }.fold({ result -> output = result.output; paletteText = result.palette.joinToString(","); error = "" }, { error = it.message ?: "Unable to read color"; output = ""; paletteText = "" })
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (op == "contrast") { InputField(foreground, { foreground = it }, "Foreground", placeholder = "#16181D"); InputField(background, { background = it }, "Background", placeholder = "#FFFFFF") }
+        else InputField(input, { input = it }, if (op == "palette") "Base color / palette input" else "Color input", placeholder = "#0D9F8A")
+        ActionRow(
+            onRun = { runColor() },
+            onReset = { input = "#0D9F8A"; foreground = "#16181D"; background = "#FFFFFF"; output = ""; error = ""; paletteText = "" }
+        )
+        if (paletteText.isNotEmpty()) {
+            Text("Palette swatches · tap to apply", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                paletteText.split(',').filter(String::isNotBlank).forEach { swatch ->
+                    val parsed = runCatching { NativeColorEngine.parseHex(swatch) }.getOrNull()
+                    val swatchColor = parsed?.let { Color(it.r / 255f, it.g / 255f, it.b / 255f) } ?: Color.Gray
+                    AssistChip(onClick = { input = swatch; runColor(swatch) }, label = { Text(swatch) }, leadingIcon = { Box(Modifier.size(16.dp).background(swatchColor, RoundedCornerShape(4.dp))) })
+                }
             }
+        }
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeDateTimeToolForm(toolId: String) {
+    val context = LocalContext.current
+    val op = NativeDateTimeEngine.operationForTool(toolId) ?: return
+    val today = remember(toolId) { LocalDate.now().toString() }
+    val now = remember(toolId) { Instant.now() }
+    var input by rememberSaveable(toolId) { mutableStateOf(today) }
+    var from by rememberSaveable(toolId) { mutableStateOf(today) }
+    var to by rememberSaveable(toolId) { mutableStateOf(today) }
+    var start by rememberSaveable(toolId) { mutableStateOf(today) }
+    var days by rememberSaveable(toolId) { mutableStateOf("5") }
+    var target by rememberSaveable(toolId) { mutableStateOf(now.plusSeconds(3600).toString()) }
+    var zones by rememberSaveable(toolId) { mutableStateOf("UTC\nAmerica/New_York\nAsia/Tokyo") }
+    var time by rememberSaveable(toolId) { mutableStateOf(now.toString()) }
+    var toTz by rememberSaveable(toolId) { mutableStateOf("America/Los_Angeles") }
+    var value by rememberSaveable(toolId) { mutableStateOf(now.epochSecond.toString()) }
+    var pattern by rememberSaveable(toolId) { mutableStateOf("yyyy-MM-dd") }
+    var year by rememberSaveable(toolId) { mutableStateOf("2024") }
+    var birth by rememberSaveable(toolId) { mutableStateOf("1990-01-01") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when (op) {
+            "date-diff", "business-days" -> { InputField(from, { from = it }, "From", placeholder = "YYYY-MM-DD"); InputField(to, { to = it }, "To", placeholder = "YYYY-MM-DD") }
+            "workday" -> { InputField(start, { start = it }, "Workday start", placeholder = "YYYY-MM-DD"); InputField(days, { days = it }, "Business days to add", singleLine = true) }
+            "countdown" -> InputField(target, { target = it }, "Target date and time", placeholder = "ISO-8601")
+            "world-clock" -> InputField(zones, { zones = it }, "IANA time zones", placeholder = "UTC, Europe/London", minLines = 3, tall = true)
+            "timezone" -> { InputField(time, { time = it }, "Time", placeholder = "ISO-8601"); InputField(toTz, { toTz = it }, "Convert to time zone", placeholder = "UTC") }
+            "unix" -> InputField(value, { value = it }, "Date or Unix timestamp", placeholder = "1710000000 or ISO-8601")
+            "format" -> { InputField(value, { value = it }, "Date", placeholder = "ISO-8601"); InputField(pattern, { pattern = it }, "Pattern", placeholder = "yyyy-MM-dd") }
+            "weekday", "week-number" -> InputField(value, { value = it }, "Date", placeholder = "ISO-8601")
+            "leap" -> InputField(year, { year = it }, "Year", singleLine = true)
+            "birthday" -> InputField(birth, { birth = it }, "Birth date", placeholder = "YYYY-MM-DD")
+            "time-until", "deadline" -> InputField(target, { target = it }, "Target date", placeholder = "YYYY-MM-DD")
+            else -> InputField(input, { input = it }, "Input", placeholder = "YYYY-MM-DD")
+        }
+        ActionRow(
+            onRun = {
+                val options = when (op) {
+                    "date-diff", "business-days" -> mapOf("from" to from, "to" to to)
+                    "workday" -> mapOf("start" to start, "days" to days)
+                    "countdown", "time-until", "deadline" -> mapOf("target" to target)
+                    "world-clock" -> mapOf("zones" to zones)
+                    "timezone" -> mapOf("time" to time, "toTz" to toTz)
+                    "unix", "weekday", "week-number", "format" -> if (op == "format") mapOf("value" to value, "pattern" to pattern) else mapOf("value" to value)
+                    "leap" -> mapOf("year" to year)
+                    "birthday" -> mapOf("birth" to birth)
+                    else -> emptyMap()
+                }
+                runCatching { NativeDateTimeEngine.run(toolId, input, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run date/time tool" })
+            },
+            onReset = { input = today; from = today; to = today; start = today; days = "5"; target = now.plusSeconds(3600).toString(); zones = "UTC\nAmerica/New_York\nAsia/Tokyo"; time = now.toString(); toTz = "America/Los_Angeles"; value = now.epochSecond.toString(); pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeMimeToolForm(toolId: String) {
+    val context = LocalContext.current
+    if (NativeMimeEngine.operationForTool(toolId) == null) return
+    val scope = rememberCoroutineScope()
+    var query by rememberSaveable(toolId) { mutableStateOf("") }
+    var fileName by rememberSaveable(toolId) { mutableStateOf("") }
+    var browserMime by rememberSaveable(toolId) { mutableStateOf("") }
+    var bytesHex by rememberSaveable(toolId) { mutableStateOf("") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val selected = withContext(Dispatchers.IO) {
+                        val resolver = context.contentResolver
+                        var displayName = ""
+                        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                if (index >= 0) displayName = cursor.getString(index).orEmpty()
+                            }
+                        }
+                        val mime = resolver.getType(uri).orEmpty()
+                        val bytes = ByteArray(64)
+                        val count = resolver.openInputStream(uri)?.use { stream ->
+                            var total = 0
+                            while (total < bytes.size) {
+                                val read = stream.read(bytes, total, bytes.size - total)
+                                if (read <= 0) break
+                                total += read
+                            }
+                            total
+                        } ?: 0
+                        Triple(displayName, mime, bytes.copyOf(count).joinToString(" ") { (it.toInt() and 0xff).toString(16).padStart(2, '0') })
+                    }
+                    fileName = selected.first
+                    browserMime = selected.second
+                    bytesHex = selected.third
+                    error = ""
+                } catch (exception: Exception) {
+                    error = exception.message ?: "Unable to read the selected file."
+                }
+            }
+        }
+    }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        InputField(query, { query = it }, "Search extension, MIME, or format", placeholder = "pdf or image")
+        Text("Optional file inspection", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Choose local file") }
+            if (fileName.isNotBlank()) Text(fileName, color = Teal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        }
+        InputField(fileName, { fileName = it }, "Filename", placeholder = "report.pdf")
+        InputField(browserMime, { browserMime = it }, "Browser MIME (optional)", placeholder = "application/pdf")
+        InputField(bytesHex, { bytesHex = it }, "Byte hex (optional)", placeholder = "25 50 44 46", minLines = 2)
+        ActionRow(
+            onRun = {
+                val options = buildMap {
+                    if (query.isNotBlank()) put("query", query)
+                    if (fileName.isNotBlank()) put("fileName", fileName)
+                    if (browserMime.isNotBlank()) put("browserMime", browserMime)
+                    if (bytesHex.isNotBlank()) put("bytesHex", bytesHex)
+                }
+                runCatching { NativeMimeEngine.run(toolId, query, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run MIME lookup" })
+            },
+            onReset = { query = ""; fileName = ""; browserMime = ""; bytesHex = ""; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun InputField(value: String, onValueChange: (String) -> Unit, label: String, placeholder: String? = null, minLines: Int = 1, singleLine: Boolean = false, tall: Boolean = false, modifier: Modifier = Modifier) {
+    OutlinedTextField(value, onValueChange, modifier.fillMaxWidth().then(if (tall) Modifier.height(170.dp) else Modifier), label = { Text(label) }, placeholder = placeholder?.let { { Text(it) } }, minLines = minLines, singleLine = singleLine)
+}
+
+@Composable
+private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onRun) { Text("Run") }
+        Button(onClick = onReset) { Text("Reset") }
+    }
+}
+
+@Composable
+private fun ResultBox(output: String, error: String, onCopy: (String) -> Unit) {
+    if (error.isNotEmpty()) Surface(color = ErrorSurface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text("Check your input: $error", color = ErrorText, modifier = Modifier.padding(12.dp)) }
+    if (output.isNotEmpty()) Surface(color = Color.White, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Result", style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.SemiBold)
+            Text(output, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Button(onClick = { onCopy(output) }) { Text("Copy output") } }
         }
     }
 }
@@ -332,9 +589,9 @@ private fun ToolList(tools: List<ToolRecord>, favorites: Set<String>, onTool: (S
 
 @Composable
 private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable { onTool(tool.id) }, colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).clickable { onTool(tool.id) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Text(tool.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Spacer(Modifier.width(8.dp)); if (tool.status == "planned") StatusPill("planned") }
                 Text(tool.description, color = Color.Gray, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                 Text("${tool.category} · popularity ${tool.popularity}", style = MaterialTheme.typography.labelSmall, color = Teal, modifier = Modifier.padding(top = 8.dp))
@@ -354,7 +611,7 @@ private fun CategoryGrid(catalog: Catalog, selected: String?, onSelected: (Strin
 
 @Composable
 private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { Icon(Icons.Default.Search, "Search") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+    OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { Icon(Icons.Default.Search, "Search") }, singleLine = true, shape = RoundedCornerShape(16.dp))
 }
 
 @Composable private fun SectionTitle(text: String) { Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }

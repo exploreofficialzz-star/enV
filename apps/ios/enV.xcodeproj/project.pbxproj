@@ -10,9 +10,19 @@
         152525252525252525252525 /* ContentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121212121212121212121212 /* ContentViews.swift */; };
         153535353535353535353535 /* ToolViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131313131313131313131313 /* ToolViews.swift */; };
         154545454545454545454545 /* enVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141414141414141414141414 /* enVApp.swift */; };
-        181818222222222222222222 /* NativeTextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181818111111111111111111 /* NativeTextEngine.swift */; };
-        191919222222222222222222 /* NativeTextEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191919111111111111111111 /* NativeTextEngineTests.swift */; };
-	161616161616161616161616 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 888888888888888888888888 /* catalog.json */; };
+	        181818222222222222222222 /* NativeTextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 181818111111111111111111 /* NativeTextEngine.swift */; };
+	        191919222222222222222222 /* NativeTextEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191919111111111111111111 /* NativeTextEngineTests.swift */; };
+	        A10000000000000000000001 /* NativeCodecEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* NativeCodecEngine.swift */; };
+	        A10000000000000000000002 /* NativeColorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* NativeColorEngine.swift */; };
+	        A10000000000000000000003 /* NativeDateTimeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* NativeDateTimeEngine.swift */; };
+	        A10000000000000000000004 /* NativeMimeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* NativeMimeEngine.swift */; };
+	        A10000000000000000000005 /* NativeUrlMediaInfoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* NativeUrlMediaInfoEngine.swift */; };
+	        A10000000000000000000006 /* NativeCodecEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* NativeCodecEngineTests.swift */; };
+	        A10000000000000000000007 /* NativeColorEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* NativeColorEngineTests.swift */; };
+	        A10000000000000000000008 /* NativeDateTimeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* NativeDateTimeEngineTests.swift */; };
+	        A10000000000000000000009 /* NativeMimeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* NativeMimeEngineTests.swift */; };
+	        A1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift */; };
+		161616161616161616161616 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 888888888888888888888888 /* catalog.json */; };
 	171717171717171717171717 /* CatalogCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -23,9 +33,19 @@
 	121212121212121212121212 /* ContentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViews.swift; sourceTree = "<group>"; };
 	131313131313131313131313 /* ToolViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolViews.swift; sourceTree = "<group>"; };
 	141414141414141414141414 /* enVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = enVApp.swift; sourceTree = "<group>"; };
-        181818111111111111111111 /* NativeTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextEngine.swift; sourceTree = "<group>"; };
-        191919111111111111111111 /* NativeTextEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextEngineTests.swift; sourceTree = "<group>"; };
-	888888888888888888888888 /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = catalog.json; path = ../shared/catalog.json; sourceTree = "<group>"; };
+	        181818111111111111111111 /* NativeTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextEngine.swift; sourceTree = "<group>"; };
+	        191919111111111111111111 /* NativeTextEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextEngineTests.swift; sourceTree = "<group>"; };
+	        B10000000000000000000001 /* NativeCodecEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCodecEngine.swift; sourceTree = "<group>"; };
+	        B10000000000000000000002 /* NativeColorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeColorEngine.swift; sourceTree = "<group>"; };
+	        B10000000000000000000003 /* NativeDateTimeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDateTimeEngine.swift; sourceTree = "<group>"; };
+	        B10000000000000000000004 /* NativeMimeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMimeEngine.swift; sourceTree = "<group>"; };
+	        B10000000000000000000005 /* NativeUrlMediaInfoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUrlMediaInfoEngine.swift; sourceTree = "<group>"; };
+	        B10000000000000000000006 /* NativeCodecEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCodecEngineTests.swift; sourceTree = "<group>"; };
+	        B10000000000000000000007 /* NativeColorEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeColorEngineTests.swift; sourceTree = "<group>"; };
+	        B10000000000000000000008 /* NativeDateTimeEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDateTimeEngineTests.swift; sourceTree = "<group>"; };
+	        B10000000000000000000009 /* NativeMimeEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMimeEngineTests.swift; sourceTree = "<group>"; };
+	        B1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUrlMediaInfoEngineTests.swift; sourceTree = "<group>"; };
+		888888888888888888888888 /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = catalog.json; path = ../shared/catalog.json; sourceTree = "<group>"; };
 	999999999999999999999999 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 	AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogCoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -37,8 +57,8 @@
 
 /* Begin PBXGroup section */
         222222222222222222222222 = {isa = PBXGroup; children = (333333333333333333333333,444444444444444444444444,555555555555555555555555,888888888888888888888888,); sourceTree = "<group>"; };
-        333333333333333333333333 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,131313131313131313131313,141414141414141414141414,181818111111111111111111,999999999999999999999999,); path = enV; sourceTree = "<group>"; };
-        444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (AAAAAAAAAAAAAAAAAAAAAAAA,191919111111111111111111,); path = enVTests; sourceTree = "<group>"; };
+        333333333333333333333333 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,131313131313131313131313,141414141414141414141414,181818111111111111111111,B10000000000000000000001,B10000000000000000000002,B10000000000000000000003,B10000000000000000000004,B10000000000000000000005,999999999999999999999999,); path = enV; sourceTree = "<group>"; };
+        444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (AAAAAAAAAAAAAAAAAAAAAAAA,191919111111111111111111,B10000000000000000000006,B10000000000000000000007,B10000000000000000000008,B10000000000000000000009,B1000000000000000000000A,); path = enVTests; sourceTree = "<group>"; };
 	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -56,8 +76,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-        DDDDDDDDDDDDDDDDDDDDDDDD /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,153535353535353535353535,154545454545454545454545,181818222222222222222222,); runOnlyForDeploymentPostprocessing = 0; };
-        EEEEEEEEEEEEEEEEEEEEEEEE /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (171717171717171717171717 /* CatalogCoreTests.swift in Sources */,191919222222222222222222 /* NativeTextEngineTests.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
+        DDDDDDDDDDDDDDDDDDDDDDDD /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,153535353535353535353535,154545454545454545454545,181818222222222222222222,A10000000000000000000001,A10000000000000000000002,A10000000000000000000003,A10000000000000000000004,A10000000000000000000005,); runOnlyForDeploymentPostprocessing = 0; };
+        EEEEEEEEEEEEEEEEEEEEEEEE /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (171717171717171717171717 /* CatalogCoreTests.swift in Sources */,191919222222222222222222 /* NativeTextEngineTests.swift in Sources */,A10000000000000000000006,A10000000000000000000007,A10000000000000000000008,A10000000000000000000009,A1000000000000000000000A,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -69,10 +89,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin XCBuildConfiguration section */
-	F80000000000000000000000 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SWIFT_VERSION = 5.0;}; name = Debug; };
-	F90000000000000000000000 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SWIFT_VERSION = 5.0;}; name = Release; };
-	FA0000000000000000000000 /* Test Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Debug; };
-	FB0000000000000000000000 /* Test Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Release; };
+		F80000000000000000000000 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Debug; };
+		F90000000000000000000000 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Release; };
+		FA0000000000000000000000 /* Test Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Debug; };
+		FB0000000000000000000000 /* Test Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */

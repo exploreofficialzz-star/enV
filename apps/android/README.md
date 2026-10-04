@@ -10,7 +10,7 @@ Standalone native Android foundation for enV, written in **Kotlin + Jetpack Comp
 - Offline catalog source: `../../shared/catalog.json` is included directly as an Android asset through `sourceSets`; it is not duplicated.
 - Native shell: Home, Tools, Search, Saved, Account
 - Local favorites: Android `SharedPreferences`
-- The Text family has native execution for 40 active tool IDs. Other active entries remain catalog-only until their Android engine is implemented and tested. Planned records visibly show **Coming soon**.
+- Native execution currently covers 89 active IDs across Text (40), Codec (17), Color (16), Date/time (14), and MIME (2). Each supported tool has an Android-local form; URL media inspection is explicitly remote-only, and other active entries remain marked not ported. Planned records visibly show **Coming soon**.
 
 ## Build, run, and test
 
@@ -37,4 +37,4 @@ The project uses Gradle Wrapper 8.9, Android Gradle Plugin 8.7.3, Kotlin 2.0.21,
 
 ## Validation note
 
-The shared catalog was checked before implementation: **10,001 records**, **43 categories**, **8,790 active**, and **1,211 planned**. The execution environment has Java but no local Android SDK and no system Gradle installation. The wrapper and project files are included for a machine with SDK platforms/build-tools installed; a full APK build, emulator run, and Android instrumentation test could not be executed here without that SDK. JVM catalog tests are included under `app/src/test` and should run with `./gradlew test` in an Android-capable environment.
+The shared catalog contains **10,001 records**, **43 categories**, **8,790 active**, and **1,211 planned**. The execution sandbox has no local Android SDK; native Gradle/unit-test and signed APK validation therefore run in GitHub Actions. Android JVM catalog and engine tests are included under `app/src/test` and run with `./gradlew test` in an Android-capable environment.
