@@ -1,0 +1,38 @@
+import sys
+sys.path.insert(0, "/tmp/h")
+from run import *
+from PIL import Image
+import numpy as np
+res=[]
+def check(n, ok, d=""): res.append(ok); print(("PASS " if ok else "FAIL ") + n + (" — " + d if d else ""))
+# a 2-colour image: 75% red (200,30,30), 25% blue (20,40,210)
+a = np.zeros((100, 200, 3), "uint8"); a[:] = (200, 30, 30); a[:, 150:] = (20, 40, 210); Image.fromarray(a).save("/tmp/h/img/twocolor.png")
+with sync_playwright() as p:
+    b, c, pg, errs = open_tool(p, "image-image-dominant-color-finder", "/tmp/h/img/twocolor.png"); pg.wait_for_selector("text=Dominant colour"); pg.wait_for_timeout(500)
+    check("dominant colour finder → #c81e1e at ~75%", pg.get_by_text("#c81e1e").count() > 0 and pg.get_by_text("75.0%").count() > 0, pg.locator("code").first.inner_text())
+    b.close()
+    b, c, pg, errs = open_tool(p, "image-image-palette-extractor", "/tmp/h/img/twocolor.png"); pg.wait_for_selector("text=Number of colours"); pg.get_by_label("Number of colours value", exact=True).fill("2"); pg.get_by_label("Number of colours value", exact=True).blur(); pg.wait_for_timeout(500)
+    check("palette extractor (2 colours) lists both real colours", pg.get_by_text("#c81e1e").count() > 0 and pg.get_by_text("#1428d2").count() > 0)
+    pg.get_by_role("radio", name="CSS").click(); check("CSS export block", "--color-1: #c81e1e" in pg.locator("pre").first.inner_text())
+    b.close()
+    b, c, pg, errs = open_tool(p, "histogram", "/tmp/h/img/twocolor.png"); pg.wait_for_selector("text=Measurements"); pg.wait_for_timeout(500)
+    check("histogram stats shown (pixel count = 20,000)", pg.get_by_text("20,000 opaque pixels").count() > 0)
+    b.close()
+    b, c, pg, errs = open_tool(p, "image-image-color-sampler", "/tmp/h/img/twocolor.png"); pg.wait_for_selector("text=Sample area"); pg.wait_for_timeout(300)
+    cv = pg.locator("canvas[role=application]"); box = cv.bounding_box()
+    cv.click(position={"x": box["width"] * 0.25, "y": box["height"] * 0.5}); pg.get_by_role("button", name="Add sample at", exact=False).click()
+    cv.click(position={"x": box["width"] * 0.95, "y": box["height"] * 0.5}); pg.get_by_role("button", name="Add sample at", exact=False).click(); pg.wait_for_timeout(300)
+    check("sampler: two samples with exact hex values", pg.get_by_text("#c81e1e").count() > 0 and pg.get_by_text("#1428d2").count() > 0)
+    check("sampler: WCAG contrast shown", pg.get_by_text("Contrast (WCAG)").count() == 1)
+    b.close()
+    b, c, pg, errs = open_tool(p, "pick-color", "/tmp/h/img/twocolor.png"); pg.wait_for_selector("text=Sample area"); pg.wait_for_timeout(300)
+    cv = pg.locator("canvas[role=application]"); box = cv.bounding_box(); cv.click(position={"x": box["width"] * 0.9, "y": box["height"] * 0.5}); pg.wait_for_timeout(300)
+    check("picker reads #1428d2 from the original pixels", pg.get_by_text("#1428D2").count() > 0)
+    b.close()
+    b, c, pg, errs = open_tool(p, "image-image-transparency-checker", "/tmp/h/img/transparent.png"); pg.wait_for_selector("text=Has transparency"); pg.wait_for_timeout(300)
+    check("transparency checker: Yes + soft-edge advice", pg.get_by_text("soft (partial) transparency").count() + pg.get_by_text("on/off only").count() > 0 and pg.get_by_text("Yes", exact=True).count() > 0)
+    b.close()
+    b, c, pg, errs = open_tool(p, "image-image-alpha-preview", "/tmp/h/img/transparent.png"); pg.wait_for_selector("text=Viewing options"); pg.wait_for_timeout(300)
+    check("alpha preview opens with view options", pg.get_by_role("radio", name="Alpha only").count() == 1)
+    b.close()
+print(f"{sum(res)}/{len(res)} passed")

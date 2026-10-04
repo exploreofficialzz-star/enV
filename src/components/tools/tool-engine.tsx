@@ -4,7 +4,7 @@ import { ConverterEngine } from "@/components/engines/converter-engine";
 import { ColorEngine } from "@/components/engines/color-engine";
 import { CssGenEngine } from "@/components/engines/cssgen-engine";
 import { ImageEngine } from "@/components/engines/image-engine";
-import { MockupEngine, PostEngine, DeviceEngine } from "@/components/engines/mockup-engine";
+import { MockupEngine, PostEngine } from "@/components/engines/mockup-engine";
 import { QrEngine, BarcodeEngine } from "@/components/engines/qr-engine";
 import { TextEngine, CodecEngine, GeneratorEngine, DateTimeEngine, SeoEngine } from "@/components/engines/io-engines";
 import { ComingSoonPanel } from "@/components/tools/coming-soon";
@@ -40,12 +40,13 @@ import { SocialEngine } from "@/components/engines/social-engine";
 import { PlannedLocalEngine } from "@/components/engines/planned-local-engine";
 import { TranscriptionEngine } from "@/components/engines/transcription-engine";
 import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
-import { ContactExchangeEngine } from "@/components/engines/contact-exchange-engine";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
   // Mockups are backed by the shared mockup engine, including catalog entries that
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
+  // Every Screenshot-category tool is rendered by the shared screenshot studio.
+  if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
 
   switch (tool.engine.type) {
@@ -66,15 +67,13 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
     case "barcode":
       return <BarcodeEngine format={tool.engine.format} />;
     case "image":
-      return <ImageEngine op={tool.engine.op} />;
+      return <ImageEngine op={tool.engine.op} category={tool.category} toolId={tool.id} />;
     case "cssgen":
       return <CssGenEngine op={tool.engine.op} />;
     case "mockup":
       return <MockupEngine variant={tool.engine.variant} />;
     case "post":
       return <PostEngine variant={tool.engine.variant} />;
-    case "device":
-      return <DeviceEngine variant={tool.engine.variant} />;
     case "datetime":
       return <DateTimeEngine op={tool.engine.op} />;
     case "seo":
@@ -107,7 +106,6 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       return <UrlMediaInfoEngine provider={tool.engine.provider} />;
     case "custom":
       if (["image-comparison", "image-screenshot", "image-print-layout"].includes(tool.engine.id)) return <ImageToolsEngine op={tool.engine.id} />;
-      if (tool.engine.id === "instant-contact-exchange") return <ContactExchangeEngine />;
       if (tool.engine.id === "transcription") {
         const format = tool.id.endsWith("-subtitles") ? "srt" : "txt";
         return <TranscriptionEngine mode={tool.category === "audio" ? "audio" : "video"} format={format} />;
@@ -124,7 +122,6 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       if (tool.category === "relationships") return <RelationshipEngine toolId={tool.id} />;
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
-      if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
       if (["events","celebrations","food","travel","photography","video"].includes(tool.category) && tool.engine.id.startsWith("planned-local:")) return <PlannedLocalEngine toolId={tool.id} />;
       return <ComingSoonPanel tool={tool} />;

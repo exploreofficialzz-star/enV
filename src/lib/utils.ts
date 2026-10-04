@@ -46,11 +46,7 @@ export function downloadBlob(blob: Blob, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  const nativeBridgeOwnsUrl = Boolean(
-    (window as Window & { __envBlobDownloadBridgeInstalled?: boolean })
-      .__envBlobDownloadBridgeInstalled,
-  );
-  if (!nativeBridgeOwnsUrl) setTimeout(() => URL.revokeObjectURL(url), 1500);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 export function downloadText(text: string, filename: string, type = "text/plain") {

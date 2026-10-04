@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { parseGeneratedCatalog } from './catalog-reader.mjs';
 
+const root = new URL('../', import.meta.url);
 const catalog = parseGeneratedCatalog(fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8'));
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));

@@ -1,15 +1,262 @@
 import type { CalculatorDef, CalcOutput, Field } from "./formulas";
 import mathExpansion from "@/data/math-expansion.json";
+import {
+  CalcInputError,
+  formatCalcNumber,
+  isBlank,
+  numericOutput,
+  parseCalcNumber,
+  requireFiniteResult,
+} from "@/lib/calc/numeric";
+import { EXPANSION_FAMILIES, describeExpansion } from "@/lib/calc/expansion-rows.mjs";
 
 const f = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "number", ...extra });
-const n = (v: Record<string,string>, key: string): number => {
-  const x = Number(String(v[key] ?? "").replace(/,/g, "").trim());
-  if (!Number.isFinite(x)) throw new Error(`Enter a valid ${key}.`);
-  return x;
-};
-const out = (label: string, value: number, primary = true, hint?: string): CalcOutput => ({ label, value: Number.isFinite(value) ? String(Number(value.toPrecision(12))) : "Undefined", primary, hint });
 
-type Spec = { key: string; name: string; fields: Field[]; formula: string; solve: Record<string,(v:Record<string,string>)=>number>; labels: Record<string,string> };
+/** On-screen labels of the inputs of the calculator that is computing, so errors name the field the user sees. */
+let activeLabels: Record<string, string> = {};
+function withLabels<T>(labels: Record<string, string>, run: () => T): T {
+  const previous = activeLabels;
+  activeLabels = labels;
+  try {
+    return run();
+  } finally {
+    activeLabels = previous;
+  }
+}
+/** Strict numeric input: a blank or malformed value is an error naming the field, never 0. */
+const n = (v: Record<string, string>, key: string): number => parseCalcNumber(v[key], activeLabels[key] ?? key);
+/** Twelve significant digits hides floating-point noise (0.30000000000000004) without inventing precision. */
+const out = (label: string, value: number | string, primary = true, hint?: string): CalcOutput =>
+  numericOutput(label, value, { primary, hint, maxSignificantDigits: 12, grouping: false });
+const fmt = (x: number): string => formatCalcNumber(x, { maxSignificantDigits: 12, grouping: false });
+const rad = (degrees: number): number => (degrees * Math.PI) / 180;
+const deg = (radians: number): number => (radians * 180) / Math.PI;
+const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+
+type Values = Record<string, string>;
+type Spec = {
+  key: string;
+  name: string;
+  fields: Field[];
+  formula: string;
+  solve: Record<string, (v: Values) => number>;
+  labels: Record<string, string>;
+  /** Unknowns whose equation has several valid real solutions: return every valid one. */
+  all?: Record<string, (v: Values) => CalcOutput[]>;
+  /** Cross-field validation that throws CalcInputError for impossible combinations. */
+  check?: (v: Values, target: string) => void;
+};
+
+// Helpers for unknowns that are not a single number. They are function declarations so the
+// spec table below can reference them while it is being built.
+
+/** Both real roots, computed without the cancellation of the textbook formula. */
+function quadraticRoots(a: number, b: number, c: number) {
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return { discriminant, plus: Number.NaN, minus: Number.NaN };
+  const root = Math.sqrt(discriminant);
+  const q = -(b + (b < 0 ? -root : root)) / 2;
+  if (q === 0) return { discriminant, plus: 0, minus: 0 };
+  const viaQ = q / a;
+  const viaC = c / q;
+  return b < 0 ? { discriminant, plus: viaQ, minus: viaC } : { discriminant, plus: viaC, minus: viaQ };
+}
+
+function quadraticOutputs(v: Values): CalcOutput[] {
+  const a = n(v, "a"), b = n(v, "b"), c = n(v, "c");
+  if (a === 0) throw new CalcInputError("Coefficient a must not be 0: with a = 0 the equation is linear, not quadratic.", "a");
+  const { discriminant, plus, minus } = quadraticRoots(a, b, c);
+  const dHint = `discriminant b² − 4ac = ${fmt(discriminant)}`;
+  if (discriminant < 0) {
+    const re = -b / (2 * a);
+    const im = Math.sqrt(-discriminant) / (2 * Math.abs(a));
+    return [
+      out("Root x₁", `${fmt(re)} + ${fmt(im)}i`, true, `complex roots — no real solution (${dHint})`),
+      out("Root x₂", `${fmt(re)} − ${fmt(im)}i`, false, "complex conjugate"),
+    ];
+  }
+  if (discriminant === 0) return [out("Root x (double root)", plus, true, dHint)];
+  return [out("Root x₁", plus, true, `(−b + √D) / 2a · ${dHint}`), out("Root x₂", minus, false, "(−b − √D) / 2a")];
+}
+
+/** ±√radicand for unknowns such as velocity or a vector component, where the sign is a direction. */
+function signedRoot(label: string, radicand: number, expression: string): CalcOutput[] {
+  if (radicand < 0) {
+    throw new CalcInputError(`No real ${label.toLowerCase()} exists: ${expression} = ${fmt(radicand)} is negative, so its square root is not a real number.`);
+  }
+  const root = Math.sqrt(radicand);
+  if (root === 0) return [out(label, 0, true)];
+  return [out(`${label} (+)`, root, true, "positive direction"), out(`${label} (−)`, -root, false, "negative direction")];
+}
+
+function percentErrorCheck(v: Values): number {
+  const error = n(v, "error");
+  if (error < 0) throw new CalcInputError("Percent error must be 0 or greater: it is an absolute value.", "error");
+  return error;
+}
+const percentErrorOf = (experimental: number, accepted: number): number => (Math.abs(experimental - accepted) / Math.abs(accepted)) * 100;
+
+/** |experimental − accepted| / |accepted| = e/100 has two solutions: accepted × (1 ± e/100). */
+function percentErrorExperimental(v: Values): CalcOutput[] {
+  const error = percentErrorCheck(v);
+  const accepted = n(v, "accepted");
+  if (accepted === 0) throw new CalcInputError("Accepted value must not be 0: percent error divides by it.", "accepted");
+  const candidates = [accepted * (1 + error / 100), accepted * (1 - error / 100)].filter((x, i, all) => all.findIndex((y) => near(x, y)) === i);
+  return candidates.map((x, i) => out(candidates.length > 1 ? `Experimental (${x > accepted ? "above" : "below"} accepted)` : "Experimental", x, i === 0));
+}
+
+/** Solve |experimental − accepted| / |accepted| = e/100 for accepted; keep only candidates that reproduce e. */
+function percentErrorAccepted(v: Values): CalcOutput[] {
+  const error = percentErrorCheck(v);
+  const experimental = n(v, "experimental");
+  const candidates = [experimental / (1 + error / 100), error === 100 ? Number.NaN : experimental / (1 - error / 100)]
+    .filter((x) => Number.isFinite(x) && x !== 0 && near(percentErrorOf(experimental, x), error))
+    .filter((x, i, all) => all.findIndex((y) => near(x, y)) === i);
+  if (!candidates.length) throw new CalcInputError("No accepted value gives that percent error for this experimental value. Check the experimental value and the percent error.");
+  return candidates.map((x, i) => out(candidates.length > 1 ? `Accepted (solution ${i + 1})` : "Accepted", x, i === 0));
+}
+
+/**
+ * Solve P(1 + r/n)^(nt) = A for the compounding frequency n. There is no closed form, so this
+ * bisects h(n) = n·ln(1 + r/n), which increases with n, against ln(A/P)/t.
+ */
+function compoundingPeriods(A: number, P: number, r: number, t: number): number {
+  if (!(A > 0) || !(P > 0)) throw new CalcInputError("Final amount and initial amount must both be greater than 0.");
+  if (!(t > 0)) throw new CalcInputError("Years must be greater than 0.", "t");
+  if (r === 0) throw new CalcInputError("With a rate of 0 the amount never changes, so the compounding frequency cannot be determined.", "r");
+  const target = Math.log(A / P) / t;
+  const limit = r; // n → ∞ (continuous compounding)
+  const attainable = r > 0 ? target > 0 && target < limit : target < limit;
+  if (!attainable) {
+    const bound = P * Math.exp(r * t);
+    throw new CalcInputError(
+      r > 0
+        ? `No compounding frequency gives that result: with rate ${fmt(r)} the final amount must lie between the initial amount ${fmt(P)} and ${fmt(bound)} (continuous compounding).`
+        : `No compounding frequency gives that result: with rate ${fmt(r)} the final amount must be below ${fmt(bound)} (continuous compounding).`,
+    );
+  }
+  const h = (periods: number) => periods * Math.log1p(r / periods);
+  let lo = r > 0 ? 1e-9 : -r * (1 + 1e-12);
+  let hi = 1e12;
+  if (h(hi) < target) throw new CalcInputError("The result is so close to continuous compounding that the frequency exceeds 10¹² periods per year.");
+  for (let i = 0; i < 300; i++) {
+    const mid = Math.sqrt(lo * hi);
+    if (h(mid) < target) lo = mid;
+    else hi = mid;
+  }
+  return Math.sqrt(lo * hi);
+}
+
+function compoundingPeriodOutputs(v: Values): CalcOutput[] {
+  const A = n(v, "A"), P = n(v, "P"), r = n(v, "r"), t = n(v, "t");
+  const periods = compoundingPeriods(A, P, r, t);
+  const whole = Math.max(1, Math.round(periods));
+  const items = [out("Periods/year", periods, true, "real-valued solution, found numerically")];
+  if (Math.abs(periods - whole) > 1e-6) {
+    items.push(out("Nearest whole number of periods/year", whole, false), out("Final amount with that whole number", P * (1 + r / whole) ** (whole * t), false, "for comparison"));
+  }
+  return items;
+}
+
+function checkTriangleAngle(name: "A" | "B" | "C") {
+  return (v: Values, target: string) => {
+    if (target === name) return;
+    const angle = n(v, name);
+    if (!(angle > 0 && angle < 180)) throw new CalcInputError(`Angle ${name} must be greater than 0° and less than 180°.`, name);
+  };
+}
+
+function positiveSide(v: Values, name: string): number {
+  const side = n(v, name);
+  if (!(side > 0)) throw new CalcInputError(`Side ${name} must be greater than 0.`, name);
+  return side;
+}
+
+/** c² = a² + b² − 2ab·cos C is quadratic in a (or b): up to two positive sides fit (the SSA case). */
+function lawOfCosinesSide(unknown: "a" | "b") {
+  const known = unknown === "a" ? "b" : "a";
+  return (v: Values): CalcOutput[] => {
+    const other = positiveSide(v, known);
+    const c = positiveSide(v, "c");
+    const angle = rad(n(v, "C"));
+    const height = other * Math.sin(angle);
+    const discriminant = c * c - height * height;
+    if (discriminant < 0) {
+      throw new CalcInputError(`No triangle exists: side c (${fmt(c)}) is shorter than side ${known} × sin C = ${fmt(height)}, the shortest distance from that vertex to the opposite ray.`);
+    }
+    const root = Math.sqrt(discriminant);
+    const base = other * Math.cos(angle);
+    const sides = [base + root, base - root]
+      .filter((x) => x > 0)
+      .filter((x, i, all) => all.findIndex((y) => near(x, y)) === i);
+    if (!sides.length) throw new CalcInputError("No triangle exists with these measurements.");
+    return sides.map((x, i) =>
+      out(sides.length > 1 ? `Side ${unknown} (solution ${i + 1})` : `Side ${unknown}`, x, i === 0, sides.length > 1 ? "two triangles fit these measurements (side-side-angle case)" : undefined),
+    );
+  };
+}
+
+function lawOfCosinesAngle(v: Values): CalcOutput[] {
+  const a = positiveSide(v, "a"), b = positiveSide(v, "b"), c = positiveSide(v, "c");
+  const cosine = (a * a + b * b - c * c) / (2 * a * b);
+  if (cosine < -1 || cosine > 1) throw new CalcInputError(`These sides cannot form a triangle: ${fmt(a)}, ${fmt(b)} and ${fmt(c)} break the triangle inequality.`);
+  return [out("Angle C", deg(Math.acos(cosine)), true, "degrees")];
+}
+
+/** sin A = a·sin B / b has an acute and an obtuse solution when both leave room for angle B. */
+function lawOfSinesAngle(unknown: "A" | "B") {
+  const [opposite, side, knownAngle] = unknown === "A" ? (["a", "b", "B"] as const) : (["b", "a", "A"] as const);
+  return (v: Values): CalcOutput[] => {
+    const sideOpposite = positiveSide(v, opposite);
+    const sideKnown = positiveSide(v, side);
+    const angle = n(v, knownAngle);
+    const sine = (sideOpposite * Math.sin(rad(angle))) / sideKnown;
+    if (sine > 1 + 1e-12) throw new CalcInputError(`No triangle exists: these sides and angle ${knownAngle} would need sin ${unknown} = ${fmt(sine)}, which is greater than 1.`);
+    const acute = deg(Math.asin(Math.min(1, sine)));
+    const angles = [acute, 180 - acute]
+      .filter((x) => x + angle < 180 - 1e-9)
+      .filter((x, i, all) => all.findIndex((y) => near(x, y)) === i);
+    if (!angles.length) throw new CalcInputError(`No triangle exists: angle ${unknown} plus angle ${knownAngle} would be 180° or more.`);
+    return angles.map((x, i) =>
+      out(angles.length > 1 ? `Angle ${unknown} (${i === 0 ? "acute" : "obtuse"})` : `Angle ${unknown}`, x, i === 0, angles.length > 1 ? "degrees · two triangles fit (side-side-angle case)" : "degrees"),
+    );
+  };
+}
+
+function checkSnell(v: Values, target: string): void {
+  for (const name of ["n1", "n2"]) {
+    if (name !== target && !(n(v, name) > 0)) throw new CalcInputError("Refractive indices must be greater than 0.", name);
+  }
+  for (const name of ["theta1", "theta2"]) {
+    if (name === target) continue;
+    const angle = n(v, name);
+    if (!(angle >= 0 && angle <= 90)) throw new CalcInputError("Angles are measured from the normal and must be between 0° and 90°.", name);
+  }
+  if (target === "theta1" || target === "theta2") {
+    const sine = target === "theta1"
+      ? (n(v, "n2") * Math.sin(rad(n(v, "theta2")))) / n(v, "n1")
+      : (n(v, "n1") * Math.sin(rad(n(v, "theta1")))) / n(v, "n2");
+    if (sine > 1) throw new CalcInputError(`Total internal reflection: sin θ would be ${fmt(sine)} (greater than 1), so no refracted ray exists.`);
+  }
+}
+
+function checkScientificExponent(v: Values, target: string): void {
+  if (target !== "e") return;
+  const ratio = n(v, "x") / n(v, "m");
+  if (!(ratio > 0)) throw new CalcInputError("Number and mantissa must be non-zero and have the same sign to solve for the exponent.");
+}
+
+function checkPythagorean(v: Values, target: string): void {
+  if (target === "c") return;
+  const other = target === "a" ? "b" : "a";
+  if (!(n(v, "c") > n(v, other))) throw new CalcInputError(`The hypotenuse must be longer than leg ${other}.`, "c");
+}
+
+function checkLogProduct(v: Values): void {
+  const base = n(v, "a");
+  if (!(base > 0) || base === 1) throw new CalcInputError("Base must be greater than 0 and not equal to 1.", "a");
+  if (!(n(v, "x") > 0) || !(n(v, "y") > 0)) throw new CalcInputError("x and y must both be greater than 0 for a real logarithm.");
+}
 
 // Reusable school/college STEM relationships. Each relationship becomes one
 // calculator per unknown, so students can practice rearranging equations as
@@ -33,7 +280,7 @@ const specs: Spec[] = [
   { key:"heat", name:"Heat Energy", fields:[f("Q","Heat energy"),f("m","Mass"),f("c","Specific heat"),f("deltaT","Temperature change")], formula:"Q = mcΔT", labels:{Q:"Heat energy",m:"Mass",c:"Specific heat",deltaT:"Temperature change"}, solve:{Q:v=>n(v,"m")*n(v,"c")*n(v,"deltaT"),m:v=>n(v,"Q")/(n(v,"c")*n(v,"deltaT")),c:v=>n(v,"Q")/(n(v,"m")*n(v,"deltaT")),deltaT:v=>n(v,"Q")/(n(v,"m")*n(v,"c"))} },
   { key:"ideal-gas", name:"Ideal Gas Law", fields:[f("P","Pressure"),f("V","Volume"),f("n","Amount"),f("R","Gas constant"),f("T","Temperature")], formula:"PV = nRT", labels:{P:"Pressure",V:"Volume",n:"Amount",R:"Gas constant",T:"Temperature"}, solve:{P:v=>n(v,"n")*n(v,"R")*n(v,"T")/n(v,"V"),V:v=>n(v,"n")*n(v,"R")*n(v,"T")/n(v,"P"),n:v=>n(v,"P")*n(v,"V")/(n(v,"R")*n(v,"T")),R:v=>n(v,"P")*n(v,"V")/(n(v,"n")*n(v,"T")),T:v=>n(v,"P")*n(v,"V")/(n(v,"n")*n(v,"R"))} },
   { key:"simple-interest", name:"Simple Interest", fields:[f("I","Interest"),f("P","Principal"),f("r","Rate"),f("t","Time")], formula:"I = Prt", labels:{I:"Interest",P:"Principal",r:"Rate",t:"Time"}, solve:{I:v=>n(v,"P")*n(v,"r")*n(v,"t"),P:v=>n(v,"I")/(n(v,"r")*n(v,"t")),r:v=>n(v,"I")/(n(v,"P")*n(v,"t")),t:v=>n(v,"I")/(n(v,"P")*n(v,"r"))} },
-  { key:"compound-growth", name:"Compound Growth", fields:[f("A","Final amount"),f("P","Initial amount"),f("r","Rate"),f("n","Periods per year"),f("t","Years")], formula:"A = P(1+r/n)^(nt)", labels:{A:"Final amount",P:"Initial amount",r:"Rate",n:"Periods/year",t:"Years"}, solve:{A:v=>n(v,"P")*(1+n(v,"r")/n(v,"n"))**(n(v,"n")*n(v,"t")),P:v=>n(v,"A")/(1+n(v,"r")/n(v,"n"))**(n(v,"n")*n(v,"t")),r:v=>n(v,"n")*((n(v,"A")/n(v,"P"))**(1/(n(v,"n")*n(v,"t")))-1),t:v=>Math.log(n(v,"A")/n(v,"P"))/(n(v,"n")*Math.log(1+n(v,"r")/n(v,"n")))} },
+  { key:"compound-growth", name:"Compound Growth", fields:[f("A","Final amount"),f("P","Initial amount"),f("r","Rate"),f("n","Periods per year"),f("t","Years")], formula:"A = P(1+r/n)^(nt)", labels:{A:"Final amount",P:"Initial amount",r:"Rate",n:"Periods/year",t:"Years"}, solve:{A:v=>n(v,"P")*(1+n(v,"r")/n(v,"n"))**(n(v,"n")*n(v,"t")),P:v=>n(v,"A")/(1+n(v,"r")/n(v,"n"))**(n(v,"n")*n(v,"t")),r:v=>n(v,"n")*((n(v,"A")/n(v,"P"))**(1/(n(v,"n")*n(v,"t")))-1),t:v=>Math.log(n(v,"A")/n(v,"P"))/(n(v,"n")*Math.log(1+n(v,"r")/n(v,"n"))),n:v=>compoundingPeriods(n(v,"A"),n(v,"P"),n(v,"r"),n(v,"t"))}, all:{n:compoundingPeriodOutputs} },
   { key:"cagr", name:"CAGR", fields:[f("A","Ending value"),f("P","Beginning value"),f("t","Years"),f("cagr","CAGR rate")], formula:"CAGR = (A/P)^(1/t) − 1", labels:{A:"Ending value",P:"Beginning value",t:"Years",cagr:"CAGR rate"}, solve:{A:v=>n(v,"P")*(1+n(v,"cagr"))**n(v,"t"),P:v=>n(v,"A")/(1+n(v,"cagr"))**n(v,"t"),t:v=>Math.log(n(v,"A")/n(v,"P"))/Math.log(1+n(v,"cagr")),cagr:v=>(n(v,"A")/n(v,"P"))**(1/n(v,"t"))-1} },
   { key:"rectangle-area", name:"Rectangle Area", fields:[f("A","Area"),f("l","Length"),f("w","Width")], formula:"A = lw", labels:{A:"Area",l:"Length",w:"Width"}, solve:{A:v=>n(v,"l")*n(v,"w"),l:v=>n(v,"A")/n(v,"w"),w:v=>n(v,"A")/n(v,"l")} },
   { key:"triangle-area", name:"Triangle Area", fields:[f("A","Area"),f("b","Base"),f("h","Height")], formula:"A = bh/2", labels:{A:"Area",b:"Base",h:"Height"}, solve:{A:v=>n(v,"b")*n(v,"h")/2,b:v=>2*n(v,"A")/n(v,"h"),h:v=>2*n(v,"A")/n(v,"b")} },
@@ -43,7 +290,7 @@ const specs: Spec[] = [
   { key:"cylinder-volume", name:"Cylinder Volume", fields:[f("V","Volume"),f("r","Radius"),f("h","Height")], formula:"V = πr²h", labels:{V:"Volume",r:"Radius",h:"Height"}, solve:{V:v=>Math.PI*n(v,"r")**2*n(v,"h"),r:v=>Math.sqrt(n(v,"V")/(Math.PI*n(v,"h"))),h:v=>n(v,"V")/(Math.PI*n(v,"r")**2)} },
   { key:"cone-volume", name:"Cone Volume", fields:[f("V","Volume"),f("r","Radius"),f("h","Height")], formula:"V = πr²h/3", labels:{V:"Volume",r:"Radius",h:"Height"}, solve:{V:v=>Math.PI*n(v,"r")**2*n(v,"h")/3,r:v=>Math.sqrt(3*n(v,"V")/(Math.PI*n(v,"h"))),h:v=>3*n(v,"V")/(Math.PI*n(v,"r")**2)} },
   { key:"trapezoid-area", name:"Trapezoid Area", fields:[f("A","Area"),f("a","Parallel side a"),f("b","Parallel side b"),f("h","Height")], formula:"A = (a+b)h/2", labels:{A:"Area",a:"Parallel side a",b:"Parallel side b",h:"Height"}, solve:{A:v=>(n(v,"a")+n(v,"b"))*n(v,"h")/2,a:v=>2*n(v,"A")/n(v,"h")-n(v,"b"),b:v=>2*n(v,"A")/n(v,"h")-n(v,"a"),h:v=>2*n(v,"A")/(n(v,"a")+n(v,"b"))} },
-  { key:"pythagorean", name:"Pythagorean Theorem", fields:[f("c","Hypotenuse"),f("a","Leg a"),f("b","Leg b")], formula:"c² = a² + b²", labels:{c:"Hypotenuse",a:"Leg a",b:"Leg b"}, solve:{c:v=>Math.hypot(n(v,"a"),n(v,"b")),a:v=>Math.sqrt(n(v,"c")**2-n(v,"b")**2),b:v=>Math.sqrt(n(v,"c")**2-n(v,"a")**2)} },
+  { key:"pythagorean", name:"Pythagorean Theorem", fields:[f("c","Hypotenuse"),f("a","Leg a"),f("b","Leg b")], formula:"c² = a² + b²", labels:{c:"Hypotenuse",a:"Leg a",b:"Leg b"}, solve:{c:v=>Math.hypot(n(v,"a"),n(v,"b")),a:v=>Math.sqrt(n(v,"c")**2-n(v,"b")**2),b:v=>Math.sqrt(n(v,"c")**2-n(v,"a")**2)}, check:checkPythagorean },
   { key:"slope", name:"Slope", fields:[f("m","Slope"),f("x1","x₁"),f("y1","y₁"),f("x2","x₂"),f("y2","y₂")], formula:"m = (y₂−y₁)/(x₂−x₁)", labels:{m:"Slope"}, solve:{m:v=>(n(v,"y2")-n(v,"y1"))/(n(v,"x2")-n(v,"x1"))} },
   { key:"distance-coordinate", name:"Coordinate Distance", fields:[f("d","Distance"),f("x1","x₁"),f("y1","y₁"),f("x2","x₂"),f("y2","y₂")], formula:"d = √((x₂−x₁)²+(y₂−y₁)²)", labels:{d:"Distance"}, solve:{d:v=>Math.hypot(n(v,"x2")-n(v,"x1"),n(v,"y2")-n(v,"y1"))} },
   { key:"midpoint-x", name:"Midpoint X", fields:[f("mx","Midpoint x"),f("x1","x₁"),f("x2","x₂")], formula:"mx = (x₁+x₂)/2", labels:{mx:"Midpoint x"}, solve:{mx:v=>(n(v,"x1")+n(v,"x2"))/2} },
@@ -52,7 +299,7 @@ const specs: Spec[] = [
   { key:"arithmetic-sum", name:"Arithmetic Series Sum", fields:[f("S","Sum"),f("n","Terms"),f("a1","First term"),f("an","Last term")], formula:"S = n(a₁+aₙ)/2", labels:{S:"Sum",n:"Terms",a1:"First term",an:"Last term"}, solve:{S:v=>n(v,"n")*(n(v,"a1")+n(v,"an"))/2,n:v=>2*n(v,"S")/(n(v,"a1")+n(v,"an")),a1:v=>2*n(v,"S")/n(v,"n")-n(v,"an"),an:v=>2*n(v,"S")/n(v,"n")-n(v,"a1")} },
   { key:"geometric-sequence", name:"Geometric Sequence", fields:[f("an","nth term"),f("a1","First term"),f("r","Ratio"),f("n","Term number")], formula:"aₙ = a₁r^(n−1)", labels:{an:"nth term",a1:"First term",r:"Ratio",n:"Term number"}, solve:{an:v=>n(v,"a1")*n(v,"r")**(n(v,"n")-1),a1:v=>n(v,"an")/n(v,"r")**(n(v,"n")-1),r:v=>(n(v,"an")/n(v,"a1"))**(1/(n(v,"n")-1)),n:v=>Math.log(n(v,"an")/n(v,"a1"))/Math.log(n(v,"r"))+1} },
   { key:"geometric-sum", name:"Finite Geometric Sum", fields:[f("S","Sum"),f("a","First term"),f("r","Ratio"),f("n","Terms")], formula:"S = a(rⁿ−1)/(r−1)", labels:{S:"Sum"}, solve:{S:v=>{const r=n(v,"r"),a=n(v,"a"),k=n(v,"n"); return Math.abs(r-1)<1e-12?a*k:a*(r**k-1)/(r-1)}} },
-  { key:"simple-average", name:"Weighted Average", fields:[f("x","Value"),f("w","Weight")], formula:"weighted contribution = xw", labels:{x:"Value",w:"Weight"}, solve:{x:v=>n(v,"x")*n(v,"w"),w:v=>n(v,"x")*n(v,"w")} },
+  { key:"simple-average", name:"Weighted Average", fields:[f("x","Value"),f("w","Weight"),f("c","Weighted contribution")], formula:"weighted contribution = value × weight", labels:{x:"Value",w:"Weight",c:"Weighted contribution"}, solve:{x:v=>n(v,"c")/n(v,"w"),w:v=>n(v,"c")/n(v,"x")} },
   { key:"z-score", name:"Z Score", fields:[f("z","Z score"),f("x","Value"),f("mu","Mean"),f("sigma","Standard deviation")], formula:"z = (x−μ)/σ", labels:{z:"Z score"}, solve:{z:v=>(n(v,"x")-n(v,"mu"))/n(v,"sigma"),x:v=>n(v,"mu")+n(v,"z")*n(v,"sigma"),mu:v=>n(v,"x")-n(v,"z")*n(v,"sigma"),sigma:v=>(n(v,"x")-n(v,"mu"))/n(v,"z")} },
   { key:"variance-population", name:"Population Variance", fields:[f("sigma2","Variance"),f("sumSq","Sum squared deviations"),f("N","Population size")], formula:"σ² = Σ(x−μ)²/N", labels:{sigma2:"Variance",sumSq:"Sum squared deviations",N:"Population size"}, solve:{sigma2:v=>n(v,"sumSq")/n(v,"N"),sumSq:v=>n(v,"sigma2")*n(v,"N"),N:v=>n(v,"sumSq")/n(v,"sigma2")} },
   { key:"standard-error", name:"Standard Error", fields:[f("SE","Standard error"),f("s","Standard deviation"),f("n","Sample size")], formula:"SE = s/√n", labels:{SE:"Standard error",s:"Standard deviation",n:"Sample size"}, solve:{SE:v=>n(v,"s")/Math.sqrt(n(v,"n")),s:v=>n(v,"SE")*Math.sqrt(n(v,"n")),n:v=>(n(v,"s")/n(v,"SE"))**2} },
@@ -76,19 +323,19 @@ const specs: Spec[] = [
   { key:"power-factor", name:"Power Factor", fields:[f("pf","Power factor"),f("P","Real power"),f("S","Apparent power")], formula:"PF = P/S", labels:{pf:"Power factor"}, solve:{pf:v=>n(v,"P")/n(v,"S"),P:v=>n(v,"pf")*n(v,"S"),S:v=>n(v,"P")/n(v,"pf")} },
   { key:"wavelength", name:"Wavelength", fields:[f("lambda","Wavelength"),f("v","Wave speed"),f("f","Frequency")], formula:"λ = v/f", labels:{lambda:"Wavelength"}, solve:{lambda:v=>n(v,"v")/n(v,"f"),v:v=>n(v,"lambda")*n(v,"f"),f:v=>n(v,"v")/n(v,"lambda")} },
   { key:"lens", name:"Thin Lens", fields:[f("f","Focal length"),f("u","Object distance"),f("v","Image distance")], formula:"1/f = 1/u + 1/v", labels:{f:"Focal length",u:"Object distance",v:"Image distance"}, solve:{f:v=>1/(1/n(v,"u")+1/n(v,"v")),u:v=>1/(1/n(v,"f")-1/n(v,"v")),v:v=>1/(1/n(v,"f")-1/n(v,"u"))} },
-  { key:"snell", name:"Snell's Law", fields:[f("n1","Refractive index 1"),f("theta1","Angle 1"),f("n2","Refractive index 2"),f("theta2","Angle 2")], formula:"n₁sinθ₁ = n₂sinθ₂", labels:{n1:"Index 1",theta1:"Angle 1",n2:"Index 2",theta2:"Angle 2"}, solve:{n1:v=>n(v,"n2")*Math.sin(n(v,"theta2")*Math.PI/180)/Math.sin(n(v,"theta1")*Math.PI/180),n2:v=>n(v,"n1")*Math.sin(n(v,"theta1")*Math.PI/180)/Math.sin(n(v,"theta2")*Math.PI/180),theta1:v=>Math.asin(n(v,"n2")*Math.sin(n(v,"theta2")*Math.PI/180)/n(v,"n1"))*180/Math.PI,theta2:v=>Math.asin(n(v,"n1")*Math.sin(n(v,"theta1")*Math.PI/180)/n(v,"n2"))*180/Math.PI} },
+  { key:"snell", name:"Snell's Law", fields:[f("n1","Refractive index 1"),f("theta1","Angle 1"),f("n2","Refractive index 2"),f("theta2","Angle 2")], formula:"n₁sinθ₁ = n₂sinθ₂", labels:{n1:"Index 1",theta1:"Angle 1",n2:"Index 2",theta2:"Angle 2"}, solve:{n1:v=>n(v,"n2")*Math.sin(n(v,"theta2")*Math.PI/180)/Math.sin(n(v,"theta1")*Math.PI/180),n2:v=>n(v,"n1")*Math.sin(n(v,"theta1")*Math.PI/180)/Math.sin(n(v,"theta2")*Math.PI/180),theta1:v=>Math.asin(n(v,"n2")*Math.sin(n(v,"theta2")*Math.PI/180)/n(v,"n1"))*180/Math.PI,theta2:v=>Math.asin(n(v,"n1")*Math.sin(n(v,"theta1")*Math.PI/180)/n(v,"n2"))*180/Math.PI}, check:checkSnell },
 
     { key:"quadratic-discriminant", name:"Quadratic Discriminant", fields:[f("D","Discriminant"),f("b","Coefficient b"),f("a","Coefficient a"),f("c","Constant c")], formula:"D = b² − 4ac", labels:{D:"Discriminant"}, solve:{D:v=>n(v,"b")**2-4*n(v,"a")*n(v,"c")} },
-  { key:"quadratic-root", name:"Quadratic Root", fields:[f("x","Root"),f("a","Coefficient a"),f("b","Coefficient b"),f("c","Coefficient c")], formula:"x = (−b ± √(b²−4ac))/(2a)", labels:{x:"Root"}, solve:{x:v=>(-n(v,"b")+Math.sqrt(n(v,"b")**2-4*n(v,"a")*n(v,"c")))/(2*n(v,"a"))} },
+  { key:"quadratic-root", name:"Quadratic Root", fields:[f("x","Root"),f("a","Coefficient a"),f("b","Coefficient b"),f("c","Coefficient c")], formula:"x = (−b ± √(b²−4ac))/(2a)", labels:{x:"Root"}, solve:{x:v=>quadraticRoots(n(v,"a"),n(v,"b"),n(v,"c")).plus}, all:{x:quadraticOutputs} },
   { key:"vertex-x", name:"Quadratic Vertex X", fields:[f("h","Vertex x"),f("a","Coefficient a"),f("b","Coefficient b")], formula:"h = −b/(2a)", labels:{h:"Vertex x"}, solve:{h:v=>-n(v,"b")/(2*n(v,"a")),b:v=>-2*n(v,"a")*n(v,"h"),a:v=>-n(v,"b")/(2*n(v,"h"))} },
   { key:"vertex-y", name:"Quadratic Vertex Y", fields:[f("k","Vertex y"),f("a","Coefficient a"),f("h","Vertex x"),f("b","Coefficient b"),f("c","Constant c")], formula:"k = ah² + bh + c", labels:{k:"Vertex y"}, solve:{k:v=>n(v,"a")*n(v,"h")**2+n(v,"b")*n(v,"h")+n(v,"c"),c:v=>n(v,"k")-n(v,"a")*n(v,"h")**2-n(v,"b")*n(v,"h"),a:v=>(n(v,"k")-n(v,"b")*n(v,"h")-n(v,"c"))/n(v,"h")**2,b:v=>(n(v,"k")-n(v,"a")*n(v,"h")**2-n(v,"c"))/n(v,"h")} },
   { key:"trig-sine", name:"Sine Ratio", fields:[f("sin","sin θ"),f("opposite","Opposite"),f("hypotenuse","Hypotenuse")], formula:"sin θ = opposite/hypotenuse", labels:{sin:"Sine"}, solve:{sin:v=>n(v,"opposite")/n(v,"hypotenuse"),opposite:v=>n(v,"sin")*n(v,"hypotenuse"),hypotenuse:v=>n(v,"opposite")/n(v,"sin")} },
   { key:"trig-cosine", name:"Cosine Ratio", fields:[f("cos","cos θ"),f("adjacent","Adjacent"),f("hypotenuse","Hypotenuse")], formula:"cos θ = adjacent/hypotenuse", labels:{cos:"Cosine"}, solve:{cos:v=>n(v,"adjacent")/n(v,"hypotenuse"),adjacent:v=>n(v,"cos")*n(v,"hypotenuse"),hypotenuse:v=>n(v,"adjacent")/n(v,"cos")} },
   { key:"trig-tangent", name:"Tangent Ratio", fields:[f("tan","tan θ"),f("opposite","Opposite"),f("adjacent","Adjacent")], formula:"tan θ = opposite/adjacent", labels:{tan:"Tangent"}, solve:{tan:v=>n(v,"opposite")/n(v,"adjacent"),opposite:v=>n(v,"tan")*n(v,"adjacent"),adjacent:v=>n(v,"opposite")/n(v,"tan")} },
-  { key:"law-of-sines", name:"Law of Sines", fields:[f("a","Side a"),f("A","Angle A"),f("b","Side b"),f("B","Angle B")], formula:"a/sin A = b/sin B", labels:{a:"Side a",b:"Side b"}, solve:{a:v=>n(v,"b")*Math.sin(n(v,"A")*Math.PI/180)/Math.sin(n(v,"B")*Math.PI/180),b:v=>n(v,"a")*Math.sin(n(v,"B")*Math.PI/180)/Math.sin(n(v,"A")*Math.PI/180),A:v=>Math.asin(n(v,"a")*Math.sin(n(v,"B")*Math.PI/180)/n(v,"b"))*180/Math.PI,B:v=>Math.asin(n(v,"b")*Math.sin(n(v,"A")*Math.PI/180)/n(v,"a"))*180/Math.PI} },
-  { key:"law-of-cosines", name:"Law of Cosines", fields:[f("c","Side c"),f("a","Side a"),f("b","Side b"),f("C","Angle C")], formula:"c² = a²+b²−2ab cos C", labels:{c:"Side c"}, solve:{c:v=>Math.sqrt(n(v,"a")**2+n(v,"b")**2-2*n(v,"a")*n(v,"b")*Math.cos(n(v,"C")*Math.PI/180)),a:v=>n(v,"b")*Math.cos(n(v,"C")*Math.PI/180)+Math.sqrt(n(v,"c")**2-n(v,"b")**2*Math.sin(n(v,"C")*Math.PI/180)**2),b:v=>n(v,"a")*Math.cos(n(v,"C")*Math.PI/180)+Math.sqrt(n(v,"c")**2-n(v,"a")**2*Math.sin(n(v,"C")*Math.PI/180)**2),C:v=>Math.acos((n(v,"a")**2+n(v,"b")**2-n(v,"c")**2)/(2*n(v,"a")*n(v,"b")))*180/Math.PI} },
-  { key:"arc-length", name:"Arc Length", fields:[f("s","Arc length"),f("r","Radius"),f("theta","Central angle" )], formula:"s = rθ", labels:{s:"Arc length"}, solve:{s:v=>n(v,"r")*n(v,"theta")*Math.PI/180,r:v=>n(v,"s")/(n(v,"theta")*Math.PI/180),theta:v=>n(v,"s")/n(v,"r")*180/Math.PI} },
-  { key:"sector-area", name:"Sector Area", fields:[f("A","Sector area"),f("r","Radius"),f("theta","Central angle")], formula:"A = θr²/2", labels:{A:"Sector area"}, solve:{A:v=>n(v,"theta")*Math.PI/360*n(v,"r")**2,r:v=>Math.sqrt(n(v,"A")*360/(n(v,"theta")*Math.PI)),theta:v=>n(v,"A")*360/(Math.PI*n(v,"r")**2)} },
+  { key:"law-of-sines", name:"Law of Sines", fields:[f("a","Side a"),f("A","Angle A"),f("b","Side b"),f("B","Angle B")], formula:"a/sin A = b/sin B", labels:{a:"Side a",b:"Side b"}, solve:{a:v=>n(v,"b")*Math.sin(n(v,"A")*Math.PI/180)/Math.sin(n(v,"B")*Math.PI/180),b:v=>n(v,"a")*Math.sin(n(v,"B")*Math.PI/180)/Math.sin(n(v,"A")*Math.PI/180),A:v=>Math.asin(n(v,"a")*Math.sin(n(v,"B")*Math.PI/180)/n(v,"b"))*180/Math.PI,B:v=>Math.asin(n(v,"b")*Math.sin(n(v,"A")*Math.PI/180)/n(v,"a"))*180/Math.PI}, all:{A:lawOfSinesAngle("A"),B:lawOfSinesAngle("B")}, check:(v,t)=>{checkTriangleAngle("A")(v,t);checkTriangleAngle("B")(v,t);} },
+  { key:"law-of-cosines", name:"Law of Cosines", fields:[f("c","Side c"),f("a","Side a"),f("b","Side b"),f("C","Angle C")], formula:"c² = a²+b²−2ab cos C", labels:{c:"Side c"}, solve:{c:v=>Math.sqrt(n(v,"a")**2+n(v,"b")**2-2*n(v,"a")*n(v,"b")*Math.cos(n(v,"C")*Math.PI/180)),a:v=>n(v,"b")*Math.cos(n(v,"C")*Math.PI/180)+Math.sqrt(n(v,"c")**2-n(v,"b")**2*Math.sin(n(v,"C")*Math.PI/180)**2),b:v=>n(v,"a")*Math.cos(n(v,"C")*Math.PI/180)+Math.sqrt(n(v,"c")**2-n(v,"a")**2*Math.sin(n(v,"C")*Math.PI/180)**2),C:v=>Math.acos((n(v,"a")**2+n(v,"b")**2-n(v,"c")**2)/(2*n(v,"a")*n(v,"b")))*180/Math.PI}, all:{a:lawOfCosinesSide("a"),b:lawOfCosinesSide("b"),C:lawOfCosinesAngle}, check:checkTriangleAngle("C") },
+  { key:"arc-length", name:"Arc Length", fields:[f("s","Arc length"),f("r","Radius"),f("theta","Central angle" )], formula:"s = rθ·π/180 (θ in degrees)", labels:{s:"Arc length"}, solve:{s:v=>n(v,"r")*n(v,"theta")*Math.PI/180,r:v=>n(v,"s")/(n(v,"theta")*Math.PI/180),theta:v=>n(v,"s")/n(v,"r")*180/Math.PI} },
+  { key:"sector-area", name:"Sector Area", fields:[f("A","Sector area"),f("r","Radius"),f("theta","Central angle")], formula:"A = (θ/360)·πr² (θ in degrees)", labels:{A:"Sector area"}, solve:{A:v=>n(v,"theta")*Math.PI/360*n(v,"r")**2,r:v=>Math.sqrt(n(v,"A")*360/(n(v,"theta")*Math.PI)),theta:v=>n(v,"A")*360/(Math.PI*n(v,"r")**2)} },
   { key:"rectangular-prism-volume", name:"Rectangular Prism Volume", fields:[f("V","Volume"),f("l","Length"),f("w","Width"),f("h","Height")], formula:"V = lwh", labels:{V:"Volume"}, solve:{V:v=>n(v,"l")*n(v,"w")*n(v,"h"),l:v=>n(v,"V")/(n(v,"w")*n(v,"h")),w:v=>n(v,"V")/(n(v,"l")*n(v,"h")),h:v=>n(v,"V")/(n(v,"l")*n(v,"w"))} },
   { key:"cylinder-surface-area", name:"Cylinder Surface Area", fields:[f("A","Surface area"),f("r","Radius"),f("h","Height")], formula:"A = 2πr² + 2πrh", labels:{A:"Surface area"}, solve:{A:v=>2*Math.PI*n(v,"r")**2+2*Math.PI*n(v,"r")*n(v,"h"),h:v=>(n(v,"A")-2*Math.PI*n(v,"r")**2)/(2*Math.PI*n(v,"r")),r:v=>{const h=n(v,"h"),A=n(v,"A"); return (-2*Math.PI*h+Math.sqrt((2*Math.PI*h)**2+8*Math.PI*A))/(4*Math.PI)}} },
   { key:"sphere-surface-area", name:"Sphere Surface Area", fields:[f("A","Surface area"),f("r","Radius")], formula:"A = 4πr²", labels:{A:"Surface area"}, solve:{A:v=>4*Math.PI*n(v,"r")**2,r:v=>Math.sqrt(n(v,"A")/(4*Math.PI))} },
@@ -96,10 +343,10 @@ const specs: Spec[] = [
   { key:"rectangle-diagonal", name:"Rectangle Diagonal", fields:[f("d","Diagonal"),f("l","Length"),f("w","Width")], formula:"d = √(l²+w²)", labels:{d:"Diagonal"}, solve:{d:v=>Math.hypot(n(v,"l"),n(v,"w")),l:v=>Math.sqrt(n(v,"d")**2-n(v,"w")**2),w:v=>Math.sqrt(n(v,"d")**2-n(v,"l")**2)} },
   { key:"triangle-perimeter", name:"Triangle Perimeter", fields:[f("P","Perimeter"),f("a","Side a"),f("b","Side b"),f("c","Side c")], formula:"P = a+b+c", labels:{P:"Perimeter"}, solve:{P:v=>n(v,"a")+n(v,"b")+n(v,"c"),a:v=>n(v,"P")-n(v,"b")-n(v,"c"),b:v=>n(v,"P")-n(v,"a")-n(v,"c"),c:v=>n(v,"P")-n(v,"a")-n(v,"b")} },
   { key:"heron-area", name:"Heron's Formula", fields:[f("A","Area"),f("a","Side a"),f("b","Side b"),f("c","Side c")], formula:"A = √(s(s−a)(s−b)(s−c))", labels:{A:"Area"}, solve:{A:v=>{const a=n(v,"a"),b=n(v,"b"),c=n(v,"c"),s=(a+b+c)/2; return Math.sqrt(s*(s-a)*(s-b)*(s-c));}} },
-  { key:"percent-error", name:"Percent Error", fields:[f("error","Percent error"),f("experimental","Experimental"),f("accepted","Accepted")], formula:"% error = |experimental−accepted|/accepted × 100", labels:{error:"Percent error"}, solve:{error:v=>Math.abs(n(v,"experimental")-n(v,"accepted"))/Math.abs(n(v,"accepted"))*100,experimental:v=>n(v,"accepted")*(1+n(v,"error")/100),accepted:v=>n(v,"experimental")/(1+n(v,"error")/100)} },
+  { key:"percent-error", name:"Percent Error", fields:[f("error","Percent error"),f("experimental","Experimental"),f("accepted","Accepted")], formula:"% error = |experimental−accepted|/accepted × 100", labels:{error:"Percent error"}, solve:{error:v=>Math.abs(n(v,"experimental")-n(v,"accepted"))/Math.abs(n(v,"accepted"))*100,experimental:v=>n(v,"accepted")*(1+n(v,"error")/100),accepted:v=>n(v,"experimental")/(1+n(v,"error")/100)}, all:{experimental:percentErrorExperimental,accepted:percentErrorAccepted} },
   { key:"relative-error", name:"Relative Error", fields:[f("error","Relative error"),f("absolute","Absolute error"),f("true","True value")], formula:"relative error = absolute/true", labels:{error:"Relative error"}, solve:{error:v=>Math.abs(n(v,"absolute")/n(v,"true")),absolute:v=>n(v,"error")*n(v,"true"),true:v=>n(v,"absolute")/n(v,"error")} },
-  { key:"scientific-notation", name:"Scientific Notation", fields:[f("x","Number"),f("m","Mantissa"),f("e","Exponent")], formula:"x = m × 10^e", labels:{x:"Number"}, solve:{x:v=>n(v,"m")*10**n(v,"e"),m:v=>n(v,"x")/10**n(v,"e"),e:v=>Math.log10(Math.abs(n(v,"x")/n(v,"m")))} },
-  { key:"log-product", name:"Logarithm Product Rule", fields:[f("L","Log result"),f("a","Base"),f("x","x"),f("y","y")], formula:"log_a(xy)=log_a(x)+log_a(y)", labels:{L:"Log result"}, solve:{L:v=>Math.log(n(v,"x")*n(v,"y"))/Math.log(n(v,"a"))} },
+  { key:"scientific-notation", name:"Scientific Notation", fields:[f("x","Number"),f("m","Mantissa"),f("e","Exponent")], formula:"x = m × 10^e", labels:{x:"Number"}, solve:{x:v=>n(v,"m")*10**n(v,"e"),m:v=>n(v,"x")/10**n(v,"e"),e:v=>Math.log10(n(v,"x")/n(v,"m"))}, check:checkScientificExponent },
+  { key:"log-product", name:"Logarithm Product Rule", fields:[f("L","Log result"),f("a","Base"),f("x","x"),f("y","y")], formula:"log_a(xy)=log_a(x)+log_a(y)", labels:{L:"Log result"}, solve:{L:v=>Math.log(n(v,"x")*n(v,"y"))/Math.log(n(v,"a"))}, check:checkLogProduct },
   { key:"exponential-growth", name:"Exponential Growth", fields:[f("A","Final amount"),f("P","Initial amount"),f("r","Growth rate"),f("t","Time")], formula:"A = Pe^(rt)", labels:{A:"Final amount"}, solve:{A:v=>n(v,"P")*Math.exp(n(v,"r")*n(v,"t")),P:v=>n(v,"A")/Math.exp(n(v,"r")*n(v,"t")),r:v=>Math.log(n(v,"A")/n(v,"P"))/n(v,"t"),t:v=>Math.log(n(v,"A")/n(v,"P"))/n(v,"r")} },
   { key:"doubling-time", name:"Doubling Time", fields:[f("t","Doubling time"),f("r","Growth rate")], formula:"t = ln(2)/r", labels:{t:"Doubling time"}, solve:{t:v=>Math.log(2)/n(v,"r"),r:v=>Math.log(2)/n(v,"t")} },
   { key:"arithmetic-mean", name:"Arithmetic Mean", fields:[f("mean","Mean"),f("sum","Sum"),f("n","Count")], formula:"mean = sum/n", labels:{mean:"Mean"}, solve:{mean:v=>n(v,"sum")/n(v,"n"),sum:v=>n(v,"mean")*n(v,"n"),n:v=>n(v,"sum")/n(v,"mean")} },
@@ -111,12 +358,12 @@ const specs: Spec[] = [
   { key:"permutation", name:"Permutation", fields:[f("P","Permutations"),f("n","Total items"),f("r","Selected items")], formula:"P(n,r)=n!/(n−r)!", labels:{P:"Permutations"}, solve:{P:v=>{let r=1;for(let i=0;i<Math.round(n(v,"r"));i++)r*=n(v,"n")-i;return r;}} },
   { key:"combination", name:"Combination", fields:[f("C","Combinations"),f("n","Total items"),f("r","Selected items")], formula:"C(n,r)=n!/(r!(n−r)!)", labels:{C:"Combinations"}, solve:{C:v=>{const N=Math.round(n(v,"n"));let R=Math.round(n(v,"r")); if(R>N) throw new Error("r cannot exceed n."); R=Math.min(R,N-R); let c=1;for(let i=1;i<=R;i++)c=c*(N-R+i)/i;return c;}} },
   { key:"simple-linear-regression", name:"Linear Prediction", fields:[f("y","Predicted y"),f("m","Slope"),f("x","x"),f("b","Intercept")], formula:"y = mx+b", labels:{y:"Predicted y"}, solve:{y:v=>n(v,"m")*n(v,"x")+n(v,"b"),m:v=>(n(v,"y")-n(v,"b"))/n(v,"x"),x:v=>(n(v,"y")-n(v,"b"))/n(v,"m"),b:v=>n(v,"y")-n(v,"m")*n(v,"x")} },
-  { key:"vector-magnitude", name:"Vector Magnitude", fields:[f("mag","Magnitude"),f("x","x component"),f("y","y component")], formula:"|v| = √(x²+y²)", labels:{mag:"Magnitude"}, solve:{mag:v=>Math.hypot(n(v,"x"),n(v,"y")),x:v=>Math.sqrt(n(v,"mag")**2-n(v,"y")**2),y:v=>Math.sqrt(n(v,"mag")**2-n(v,"x")**2)} },
+  { key:"vector-magnitude", name:"Vector Magnitude", fields:[f("mag","Magnitude"),f("x","x component"),f("y","y component")], formula:"|v| = √(x²+y²)", labels:{mag:"Magnitude"}, solve:{mag:v=>Math.hypot(n(v,"x"),n(v,"y")),x:v=>Math.sqrt(n(v,"mag")**2-n(v,"y")**2),y:v=>Math.sqrt(n(v,"mag")**2-n(v,"x")**2)}, all:{x:v=>signedRoot("x component",n(v,"mag")**2-n(v,"y")**2,"magnitude² − y²"),y:v=>signedRoot("y component",n(v,"mag")**2-n(v,"x")**2,"magnitude² − x²")} },
   { key:"vector-dot", name:"Vector Dot Product", fields:[f("dot","Dot product"),f("ax","aₓ"),f("ay","aᵧ"),f("bx","bₓ"),f("by","bᵧ")], formula:"a·b = axbx + ayby", labels:{dot:"Dot product"}, solve:{dot:v=>n(v,"ax")*n(v,"bx")+n(v,"ay")*n(v,"by")} },
   { key:"work-angle", name:"Work at an Angle", fields:[f("W","Work"),f("F","Force"),f("d","Distance"),f("theta","Angle")], formula:"W = Fd cosθ", labels:{W:"Work"}, solve:{W:v=>n(v,"F")*n(v,"d")*Math.cos(n(v,"theta")*Math.PI/180),F:v=>n(v,"W")/(n(v,"d")*Math.cos(n(v,"theta")*Math.PI/180)),d:v=>n(v,"W")/(n(v,"F")*Math.cos(n(v,"theta")*Math.PI/180))} },
   { key:"gravitational-force", name:"Gravitational Force", fields:[f("F","Force"),f("G","G"),f("m1","Mass 1"),f("m2","Mass 2"),f("r","Distance")], formula:"F = Gm₁m₂/r²", labels:{F:"Gravitational force"}, solve:{F:v=>n(v,"G")*n(v,"m1")*n(v,"m2")/n(v,"r")**2,m1:v=>n(v,"F")*n(v,"r")**2/(n(v,"G")*n(v,"m2")),m2:v=>n(v,"F")*n(v,"r")**2/(n(v,"G")*n(v,"m1")),r:v=>Math.sqrt(n(v,"G")*n(v,"m1")*n(v,"m2")/n(v,"F"))} },
   { key:"kinematic-displacement", name:"Kinematic Displacement", fields:[f("s","Displacement"),f("u","Initial velocity"),f("t","Time"),f("a","Acceleration")], formula:"s = ut + ½at²", labels:{s:"Displacement"}, solve:{s:v=>n(v,"u")*n(v,"t")+.5*n(v,"a")*n(v,"t")**2,u:v=>(n(v,"s")-.5*n(v,"a")*n(v,"t")**2)/n(v,"t"),a:v=>2*(n(v,"s")-n(v,"u")*n(v,"t"))/n(v,"t")**2,t:v=>{const u=n(v,"u"),a=n(v,"a"),s=n(v,"s");return (-u+Math.sqrt(u*u+2*a*s))/a;}} },
-  { key:"kinematic-final-velocity", name:"Kinematic Final Velocity", fields:[f("v","Final velocity"),f("u","Initial velocity"),f("a","Acceleration"),f("s","Displacement")], formula:"v² = u² + 2as", labels:{v:"Final velocity"}, solve:{v:v=>Math.sqrt(n(v,"u")**2+2*n(v,"a")*n(v,"s")),u:v=>Math.sqrt(n(v,"v")**2-2*n(v,"a")*n(v,"s")),a:v=>(n(v,"v")**2-n(v,"u")**2)/(2*n(v,"s")),s:v=>(n(v,"v")**2-n(v,"u")**2)/(2*n(v,"a"))} },
+  { key:"kinematic-final-velocity", name:"Kinematic Final Velocity", fields:[f("v","Final velocity"),f("u","Initial velocity"),f("a","Acceleration"),f("s","Displacement")], formula:"v² = u² + 2as", labels:{v:"Final velocity",u:"Initial velocity"}, solve:{v:v=>Math.sqrt(n(v,"u")**2+2*n(v,"a")*n(v,"s")),u:v=>Math.sqrt(n(v,"v")**2-2*n(v,"a")*n(v,"s")),a:v=>(n(v,"v")**2-n(v,"u")**2)/(2*n(v,"s")),s:v=>(n(v,"v")**2-n(v,"u")**2)/(2*n(v,"a"))}, all:{v:v=>signedRoot("Final velocity",n(v,"u")**2+2*n(v,"a")*n(v,"s"),"u² + 2as"),u:v=>signedRoot("Initial velocity",n(v,"v")**2-2*n(v,"a")*n(v,"s"),"v² − 2as")} },
   { key:"ideal-efficiency", name:"Energy Efficiency", fields:[f("eta","Efficiency"),f("out","Output energy"),f("in","Input energy")], formula:"η = output/input × 100%", labels:{eta:"Efficiency"}, solve:{eta:v=>n(v,"out")/n(v,"in")*100,out:v=>n(v,"eta")/100*n(v,"in"),in:v=>n(v,"out")/(n(v,"eta")/100)} },
   { key:"electric-resistance-series", name:"Series Resistance", fields:[f("R","Total resistance"),f("R1","R1"),f("R2","R2"),f("R3","R3")], formula:"R = R₁+R₂+R₃", labels:{R:"Total resistance"}, solve:{R:v=>n(v,"R1")+n(v,"R2")+n(v,"R3"),R1:v=>n(v,"R")-n(v,"R2")-n(v,"R3"),R2:v=>n(v,"R")-n(v,"R1")-n(v,"R3"),R3:v=>n(v,"R")-n(v,"R1")-n(v,"R2")} },
   { key:"electric-resistance-parallel", name:"Parallel Resistance", fields:[f("R","Equivalent resistance"),f("R1","R1"),f("R2","R2")], formula:"1/R = 1/R₁ + 1/R₂", labels:{R:"Equivalent resistance"}, solve:{R:v=>1/(1/n(v,"R1")+1/n(v,"R2")),R1:v=>1/(1/n(v,"R")-1/n(v,"R2")),R2:v=>1/(1/n(v,"R")-1/n(v,"R1"))} },
@@ -150,61 +397,131 @@ const specs: Spec[] = [
 
 ];
 
+
+/** Inputs that cannot be negative (lengths, areas, volumes, density, magnitudes), checked before solving. */
+const NONNEGATIVE: Record<string, string[]> = {
+  "rectangle-area": ["A", "l", "w"],
+  "triangle-area": ["A", "b", "h"],
+  "circle-area": ["A", "r"],
+  "circle-circumference": ["C", "r"],
+  "sphere-volume": ["V", "r"],
+  "cylinder-volume": ["V", "r", "h"],
+  "cone-volume": ["V", "r", "h"],
+  "trapezoid-area": ["A", "a", "b", "h"],
+  "pythagorean": ["c", "a", "b"],
+  "rectangular-prism-volume": ["V", "l", "w", "h"],
+  "cylinder-surface-area": ["A", "r", "h"],
+  "sphere-surface-area": ["A", "r"],
+  "prism-surface-area": ["A", "base", "perimeter", "h"],
+  "rectangle-diagonal": ["d", "l", "w"],
+  "triangle-perimeter": ["P", "a", "b", "c"],
+  "heron-area": ["A", "a", "b", "c"],
+  "arc-length": ["s", "r"],
+  "sector-area": ["A", "r"],
+  "density": ["rho", "m", "V"],
+  "vector-magnitude": ["mag"],
+};
+
+/** Visible assumptions: units, angle mode, rate conventions and well-known constants. */
+const FIELD_HINTS: Record<string, Record<string, string>> = {
+  "simple-interest": { r: "Rate per time period as a decimal (0.05 = 5%)", t: "Number of periods, in the same time unit as the rate" },
+  "compound-growth": { r: "Nominal annual rate as a decimal (0.05 = 5%)", n: "Compounding periods per year (12 = monthly)", t: "Years" },
+  "cagr": { cagr: "Annual growth rate as a decimal (0.08 = 8%)", t: "Years" },
+  "exponential-growth": { r: "Continuous growth rate per unit time, as a decimal (0.03 = 3%)" },
+  "doubling-time": { r: "Continuous growth rate per unit time, as a decimal (0.03 = 3%)" },
+  "present-value": { r: "Rate per period as a decimal (0.05 = 5%)" },
+  "annuity-future-value": { r: "Rate per period as a decimal (0.05 = 5%)", PMT: "Payment made at the end of every period" },
+  "annuity-present-value": { r: "Rate per period as a decimal (0.05 = 5%)", PMT: "Payment made at the end of every period" },
+  "apy": { r: "Nominal annual rate as a decimal (0.05 = 5%)", n: "Compounding periods per year" },
+  "markup-price": { markup: "Markup on cost as a decimal (0.25 = 25%)" },
+  "snell": { theta1: "Degrees, measured from the normal", theta2: "Degrees, measured from the normal" },
+  "law-of-sines": { A: "Degrees", B: "Degrees" },
+  "law-of-cosines": { C: "Degrees" },
+  "arc-length": { theta: "Central angle in degrees" },
+  "sector-area": { theta: "Central angle in degrees" },
+  "work-angle": { theta: "Angle between force and displacement, in degrees" },
+  "angular-speed": { theta: "Angle in radians (gives ω in rad/s)" },
+  "ideal-gas": { R: "8.314462618 J/(mol·K) with pressure in Pa, volume in m³, temperature in K", T: "Absolute temperature (kelvin)" },
+  "pe": { g: "Standard gravity is 9.80665 m/s²" },
+  "gravitational-force": { G: "≈ 6.6743 × 10⁻¹¹ m³/(kg·s²) in SI units" },
+  "gas-density": { R: "8.314462618 J/(mol·K) with pressure in Pa, molar mass in kg/mol and temperature in K", T: "Absolute temperature (kelvin)" },
+  "derivative-linear": { x: "Not needed: the derivative of mx + b is m for every x", b: "Not needed: the derivative of mx + b is m" },
+};
+
+function withHints(spec: Spec, fields: Field[]): Field[] {
+  const hints = FIELD_HINTS[spec.key];
+  if (!hints) return fields;
+  return fields.map((field) => (hints[field.name] ? { ...field, hint: hints[field.name] } : field));
+}
+
 export function registerMathExerciseCalculators(calculators: Record<string, CalculatorDef>) {
   for (const spec of specs) {
+    const labelOf = Object.fromEntries(spec.fields.map((field) => [field.name, field.label]));
     for (const [target, solve] of Object.entries(spec.solve)) {
       const key = `exercise-${spec.key}-${target}`;
+      const resultLabel = spec.labels[target] ?? labelOf[target] ?? target;
       calculators[key] = {
-        fields: spec.fields.filter((field) => field.name !== target),
+        fields: withHints(spec, spec.fields.filter((field) => field.name !== target)),
         formula: `${spec.formula} · solve for ${target}`,
-        compute: (v) => [out(spec.labels[target] ?? target, solve(v), true)],
+        compute: (v) =>
+          withLabels(labelOf, () => {
+            for (const name of NONNEGATIVE[spec.key] ?? []) {
+              if (name !== target && !isBlank(v[name]) && n(v, name) < 0) throw new CalcInputError(`${labelOf[name]} must be 0 or greater.`, name);
+            }
+            spec.check?.(v, target);
+            const all = spec.all?.[target];
+            if (all) return all(v);
+            return [out(resultLabel, requireFiniteResult(solve(v), resultLabel.toLowerCase(), spec.formula), true)];
+          }),
       };
     }
   }
   registerExpansionCalculators(calculators);
 }
 
-
 type Expansion = { product: string[][]; sum: string[][]; ratio: string[][] };
 const expansion = mathExpansion as Expansion;
-const fieldFor = (name: string): Field => f(name, name.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+type Slot = "a" | "b" | "c";
+const SLOTS: readonly Slot[] = ["a", "b", "c"];
+
+/** How each unknown is obtained from the other two, per relationship family. */
+const REARRANGEMENT: Record<"product" | "sum" | "ratio", Record<Slot, { x: Slot; op: string; y: Slot }>> = {
+  product: { c: { x: "a", op: "×", y: "b" }, a: { x: "c", op: "÷", y: "b" }, b: { x: "c", op: "÷", y: "a" } },
+  sum: { c: { x: "a", op: "+", y: "b" }, a: { x: "c", op: "−", y: "b" }, b: { x: "c", op: "−", y: "a" } },
+  ratio: { c: { x: "a", op: "÷", y: "b" }, a: { x: "c", op: "×", y: "b" }, b: { x: "a", op: "÷", y: "c" } },
+};
+
+function applyOperator(op: string, x: number, y: number): number {
+  return op === "×" ? x * y : op === "÷" ? x / y : op === "+" ? x + y : x - y;
+}
 
 function registerExpansionCalculators(calculators: Record<string, CalculatorDef>) {
-  for (const [key, aLabel, bLabel, cLabel] of expansion.product) {
-    const a = "a", b = "b", c = "c";
-    for (const target of [a, b, c]) {
-      const id = `exp-product-${key}-${target}`;
-      calculators[id] = {
-        fields: [fieldFor(a), fieldFor(b), fieldFor(c)].filter((x) => x.name !== target),
-        formula: `${cLabel} = ${aLabel} × ${bLabel} · solve for ${target === a ? aLabel : target === b ? bLabel : cLabel}`,
-        compute: (v) => {
-          const av = target === a ? n(v, b) && 0 : n(v, a);
-          const bv = target === b ? 0 : n(v, b);
-          if (target === c) return [out(cLabel, av * bv)];
-          if (target === a) return [out(aLabel, n(v, c) / n(v, b))];
-          return [out(bLabel, n(v, c) / n(v, a))];
-        },
-      };
-    }
-  }
-  for (const [key, aLabel, bLabel, cLabel] of expansion.sum) {
-    for (const target of ["a", "b", "c"]) {
-      const id = `exp-sum-${key}-${target}`;
-      calculators[id] = {
-        fields: [fieldFor("a"), fieldFor("b"), fieldFor("c")].filter((x) => x.name !== target),
-        formula: `${cLabel} = ${aLabel} + ${bLabel} · solve for ${target}`,
-        compute: (v) => target === "c" ? [out(cLabel, n(v,"a") + n(v,"b"))] : target === "a" ? [out(aLabel, n(v,"c") - n(v,"b"))] : [out(bLabel, n(v,"c") - n(v,"a"))],
-      };
-    }
-  }
-  for (const [key, aLabel, bLabel, cLabel] of expansion.ratio) {
-    for (const target of ["a", "b", "c"]) {
-      const id = `exp-ratio-${key}-${target}`;
-      calculators[id] = {
-        fields: [fieldFor("a"), fieldFor("b"), fieldFor("c")].filter((x) => x.name !== target),
-        formula: `${cLabel} = ${aLabel} ÷ ${bLabel} · solve for ${target}`,
-        compute: (v) => target === "c" ? [out(cLabel, n(v,"a") / n(v,"b"))] : target === "a" ? [out(aLabel, n(v,"c") * n(v,"b"))] : [out(bLabel, n(v,"a") / n(v,"c"))],
-      };
+  for (const family of EXPANSION_FAMILIES) {
+    for (const row of expansion[family]) {
+      const info = describeExpansion(family, row);
+      for (const target of SLOTS) {
+        const step = REARRANGEMENT[family][target];
+        const id = `exp-${family}-${info.key}-${target}`;
+        const solveValue = (v: Values): number => {
+          const x = n(v, step.x);
+          const y = n(v, step.y);
+          if (step.op === "÷" && y === 0) {
+            throw new CalcInputError(`Cannot divide by zero: ${info.labels[step.y]} must not be 0 when solving for ${info.labels[target].toLowerCase()}.`, step.y);
+          }
+          return applyOperator(step.op, x, y);
+        };
+        calculators[id] = {
+          fields: SLOTS.filter((slot) => slot !== target).map((slot) => f(slot, info.labels[slot])),
+          formula: `${info.relation} · solve for ${info.labels[target].toLowerCase()}`,
+          compute: (v) => withLabels(info.labels, () => [out(info.labels[target], requireFiniteResult(solveValue(v), info.labels[target].toLowerCase(), info.relation), true)]),
+          explain: (v) =>
+            withLabels(info.labels, () => [
+              `Relationship: ${info.relation}`,
+              `Rearranged: ${info.labels[target]} = ${info.labels[step.x]} ${step.op} ${info.labels[step.y]}`,
+              `Substituted: ${info.labels[target]} = ${fmt(n(v, step.x))} ${step.op} ${fmt(n(v, step.y))}`,
+            ]),
+        };
+      }
     }
   }
 }

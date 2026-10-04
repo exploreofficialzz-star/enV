@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import type { ToolMeta } from "@/types/tool";
-import { copyToClipboard } from "@/lib/utils";
 
 type MetricValue = { label: string; value: string; note?: string };
 type Calculation = { metrics: MetricValue[]; formula: string };
@@ -249,7 +248,12 @@ export function BusinessEngine({ tool }: { tool: ToolMeta }) {
   }, [op, A, B, C, D, E]);
 
   const copy = async (text: string) => {
-    setCopyMessage(await copyToClipboard(text) ? "Copied" : "Clipboard access is unavailable; select and copy the output instead.");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyMessage("Copied");
+    } catch {
+      setCopyMessage("Clipboard access is unavailable; select and copy the output instead.");
+    }
   };
 
   if (contentMode) {

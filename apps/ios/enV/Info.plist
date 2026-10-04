@@ -27,6 +27,8 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>ENV_API_BASE_URL</key>
+	<string>$(ENV_API_BASE_URL)</string>
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
 </dict>

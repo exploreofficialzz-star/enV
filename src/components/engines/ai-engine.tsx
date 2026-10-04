@@ -154,7 +154,7 @@ export function AiEngine({ op }: { op: string }) {
     catch (e) { setError(e instanceof Error ? e.message : "Could not run AI micro-tool."); }
   };
   return <div className="space-y-4">
-    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">This enV tool runs locally with deterministic templates. It does not send your text to an AI provider or claim to be an LLM.</div>
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">The Generate button here runs locally with deterministic templates. It does not send your text anywhere and does not claim to be an LLM.</div>
     <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((x) => ({ ...x, [name]: value }))} />
     <div className="flex flex-wrap gap-2"><Button type="button" onClick={runTool}>Generate</Button><Button type="button" variant="ghost" onClick={() => { setOut(""); setError(null); }}>Clear</Button></div>
     <ErrorBanner message={error} />

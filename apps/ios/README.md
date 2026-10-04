@@ -30,3 +30,8 @@ The native execution manifests are generated/audited from the same catalog as An
 ## Linux limitation
 
 This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a full iOS application build/test cannot be performed here. Standalone Swift engine source validation is used in this environment; the committed macOS CI workflow remains the authoritative iOS build/test path.
+
+
+## Native AI
+
+AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The provider keys remain server-only. Configure the native `ENV_API_BASE_URL` for the deployed enV backend; do not put OpenRouter, Groq, or Gemini keys in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client. The current native/default backend is `https://env-q3mq.onrender.com`; Android still supports a Gradle `-PENV_API_BASE_URL=...` override, and iOS exposes the same setting through `ENV_API_BASE_URL`.

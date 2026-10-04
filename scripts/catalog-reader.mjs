@@ -1,4 +1,8 @@
-/** Parse the generated catalog payload without depending on application imports. */
+/**
+ * Parse the generated catalog payload without depending on application imports.
+ * @param {string} source contents of src/data/catalog.ts
+ * @returns {any[]}
+ */
 export function parseGeneratedCatalog(source) {
   const match = source.match(/const catalogJson = \[\n([\s\S]*?)\n\]\.join\(""\);/);
   if (!match) throw new Error("Could not locate the generated catalog payload.");

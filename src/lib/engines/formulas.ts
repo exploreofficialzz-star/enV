@@ -1,4 +1,5 @@
-import { formatNumber } from "@/lib/utils";
+import { CalcInputError, formatCalcNumber, numericOutput, parseCalcNumber } from "@/lib/calc/numeric";
+import { readList, trackCalculatorInputs } from "@/lib/calc/input-context";
 import { advancedCalculators } from "./advanced-calculators";
 import { regularCalculators } from "./regular-calculators";
 import { registerMathExerciseCalculators } from "./math-exercise-calculators";
@@ -17,37 +18,28 @@ export type Field = {
   hint?: string;
   placeholder?: string;
 };
-export type CalcOutput = { label: string; value: string; hint?: string; primary?: boolean };
+export type CalcOutput = { label: string; value: string; hint?: string; primary?: boolean; /** Unrounded number behind `value`, for re-formatting. */ raw?: number; unit?: string };
 export type CalculatorDef = {
   fields: Field[];
   compute: (v: Record<string, string>) => CalcOutput[];
   formula?: string;
+  /** Optional calculation steps (rearrangement, substitution) shown on request. Called only after `compute` succeeded. */
+  explain?: (v: Record<string, string>) => string[];
 };
 
 function n(v: unknown, label = "value"): number {
-  const raw = typeof v === "number" ? String(v) : String(v ?? "").replace(/,/g, "").trim();
-  if (raw === "") throw new Error(`Enter a valid ${label}.`);
-  const x = typeof v === "number" ? v : Number(raw);
-  if (!Number.isFinite(x)) throw new Error(`Enter a valid ${label}.`);
-  return x;
+  return parseCalcNumber(v, label);
 }
 function pos(v: unknown, label = "value"): number {
   const x = n(v, label);
-  if (x <= 0) throw new Error(`${label} must be greater than 0.`);
+  if (x <= 0) throw new CalcInputError(`${label} must be greater than 0.`, label);
   return x;
 }
 function list(v: unknown): number[] {
-  const parts = String(v ?? "")
-    .split(/[\s,;]+/)
-    .filter(Boolean)
-    .map((s) => Number(s.replace(/,/g, "")));
-  if (!parts.length || parts.some((x) => !Number.isFinite(x))) {
-    throw new Error("Enter a list of numbers separated by commas or spaces.");
-  }
-  return parts;
+  return readList(v);
 }
 function out(label: string, value: number | string, extra?: Partial<CalcOutput>): CalcOutput {
-  return { label, value: typeof value === "number" ? formatNumber(value) : value, ...extra };
+  return numericOutput(label, value, { primary: extra?.primary, hint: extra?.hint, unit: extra?.unit });
 }
 function gcd(a: number, b: number): number {
   a = Math.abs(Math.round(a));
@@ -223,7 +215,7 @@ export const calculators: Record<string, CalculatorDef> = {
       } else {
         const re = -b / (2 * a);
         const im = Math.sqrt(-d) / (2 * a);
-        items.push(out("Roots", `${formatNumber(re)} ± ${formatNumber(im)}i`, { primary: true }));
+        items.push(out("Roots", `${formatCalcNumber(re, { maxFractionDigits: 6 })} ± ${formatCalcNumber(im, { maxFractionDigits: 6 })}i`, { primary: true }));
       }
       return items;
     },
@@ -913,3 +905,4 @@ calculators.lbm = { fields: [f("weightKg", "Weight", { suffix: "kg" }), f("heigh
 
 registerMathExerciseCalculators(calculators);
 Object.assign(calculators, stemCalculators);
+trackCalculatorInputs(calculators);

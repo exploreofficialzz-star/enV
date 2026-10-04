@@ -3,19 +3,23 @@ import { Heart } from "lucide-react";
 import { useEffect } from "react";
 import { disclaimerText } from "@/lib/content";
 import { toolIcon } from "@/lib/icons";
-import { useToolIndex } from "@/hooks/use-catalog-data";
-import { getRelatedTools } from "@/lib/registry";
-import { toolPath } from "@/lib/tool-path";
+import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
+import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 
-export function ToolShell({ tool, children }: { tool: ToolMeta; children: React.ReactNode }) {
+export function ToolShell({
+  tool,
+  children,
+}: {
+  tool: ToolMeta;
+  children: React.ReactNode;
+}) {
   const Icon = toolIcon(tool.icon);
-  const { data: toolIndex } = useToolIndex();
-  const related = getRelatedTools(tool, toolIndex);
+  const related = getRelatedTools(tool);
   const note = disclaimerText(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
@@ -53,10 +57,7 @@ export function ToolShell({ tool, children }: { tool: ToolMeta; children: React.
             <Icon className="size-5" />
           </span>
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>
-              {tool.status === "planned" ? <ComingSoonBadge /> : null}
-            </div>
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>{tool.status === "planned" ? <ComingSoonBadge /> : null}</div>
             <p className="mt-1 max-w-2xl text-sm text-muted">{tool.description}</p>
           </div>
         </div>
@@ -76,11 +77,7 @@ export function ToolShell({ tool, children }: { tool: ToolMeta; children: React.
         </Button>
       </header>
 
-      {storageError ? (
-        <p className="mt-3 text-sm text-danger" role="status">
-          {storageError}
-        </p>
-      ) : null}
+      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
 
@@ -88,11 +85,11 @@ export function ToolShell({ tool, children }: { tool: ToolMeta; children: React.
         {children}
       </section>
 
+      <AiAssistPanel toolId={tool.id} />
+
       <section className="mt-10">
         <h2 className="text-lg font-semibold">What this tool does</h2>
-        <p className="mt-3 text-sm text-muted">
-          {tool.description} Results can be copied or downloaded from this page.
-        </p>
+        <p className="mt-3 text-sm text-muted">{tool.description} Results can be copied or downloaded from this page.</p>
       </section>
 
       {related.length > 0 ? (

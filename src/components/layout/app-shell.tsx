@@ -6,9 +6,9 @@ import { useHydratePrefs } from "@/hooks/use-theme";
 export function AppShell({ children }: { children: React.ReactNode }) {
   useHydratePrefs();
   return (
-    <div className="flex min-h-dvh flex-col bg-bg pb-[calc(3.5625rem_+_env(safe-area-inset-bottom))] text-fg md:pb-0">
+    <div className="flex min-h-dvh flex-col bg-bg text-fg">
       <Header />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <Footer />
       <MobileNav />
     </div>

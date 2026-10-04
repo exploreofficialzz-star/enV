@@ -20,7 +20,7 @@ function cutout(device: DeviceTemplate, tokens: ThemeTokens) {
 
 function navigation(device: DeviceTemplate, tokens: ThemeTokens) {
   if (device.navigationBar === "gesture") return `<rect x="${device.width / 2 - 52}" y="${device.height - 17}" width="104" height="4" rx="2" fill="${tokens.secondaryText}" opacity=".65"/>`;
-  if (device.navigationBar === "three-button") return `<text x="${device.width / 2 - 38}" y="${device.height - 12}" font-size="11" fill="${tokens.secondaryText}">◁   ○   □</text>`;
+  if (device.navigationBar === "three-button") return `<text x="${device.width / 2 - 38}" y="${device.height - 12}" font-size="11" fill="${tokens.secondaryText}">◁　○　□</text>`;
   return "";
 }
 

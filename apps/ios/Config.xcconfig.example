@@ -1,0 +1,5 @@
+// Copy/set through the Xcode build configuration used by the app.
+ENV_API_BASE_URL = https://env-q3mq.onrender.com
+OCR_PROCESSOR_URL =
+DOCUMENT_PROCESSOR_URL =
+WEBSITE_SCREENSHOT_API_URL =

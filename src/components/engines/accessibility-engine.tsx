@@ -19,10 +19,21 @@ import {
   type RgbaColor,
   resolveRenderedPair,
 } from "@/lib/engines/accessibility-color";
-import { downloadText } from "@/lib/utils";
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
 const COLORS = ["#000000", "#ffffff", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e"];
+function downloadText(text: string, filename: string) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function clamp(n: number, min = 0, max = 255) { return Math.min(max, Math.max(min, n)); }
 function hexRgb(hex: string) {
@@ -346,13 +357,13 @@ function AccessibleColorChecker() {
       {rendered ? (
         <div className="grid overflow-hidden rounded-2xl border border-border sm:grid-cols-2">
           <div className="min-h-40 p-6" style={swatchStyle(rendered.background)}>
-            <div className="max-w-md rounded-xl bg-white/10 p-4" style={{ color: toHex(rendered.foreground) }}>
+            <div className="max-w-md rounded-xl bg-white/10 p-4" style={{ color: rendered.foreground }}>
               <p className="text-2xl font-semibold">Accessible color preview</p>
               <p className="mt-1 text-sm">The rendered pair used for the deterministic contrast calculation.</p>
               <button
                 type="button"
                 className="mt-4 rounded-md border px-3 py-2 text-sm font-medium"
-                style={{ borderColor: toHex(rendered.foreground), color: toHex(rendered.foreground) }}
+                style={{ borderColor: rendered.foreground, color: rendered.foreground }}
               >
                 Sample action
               </button>
@@ -493,12 +504,8 @@ function ColorInput({
 
 
 export function AccessibilityEngine({ toolId }: { toolId: string }) {
-  if (toolId === "accessible-color-checker") return <AccessibleColorChecker />;
-  return <LegacyAccessibilityEngine toolId={toolId} />;
-}
-
-function LegacyAccessibilityEngine({ toolId }: { toolId: string }) {
   const { kind, action } = parseToolId(toolId);
+  if (toolId === "accessible-color-checker") return <AccessibleColorChecker />;
   const [fg, setFg] = useState("#000000"); const [bg, setBg] = useState("#ffffff");
   const [text, setText] = useState(""); const [size, setSize] = useState("16px"); const [lineHeight, setLineHeight] = useState("1.5");
   const [html, setHtml] = useState(""); const [role, setRole] = useState("button");

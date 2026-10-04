@@ -40,21 +40,6 @@ export function detectMime(file: File, bytes?: Uint8Array) {
   return "";
 }
 
-function isImageBitmap(value: ImageBitmap | HTMLImageElement): value is ImageBitmap {
-  return typeof ImageBitmap !== "undefined" && value instanceof ImageBitmap;
-}
-
-async function decodeWithImageElement(objectUrl: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.decoding = "async";
-  image.src = objectUrl;
-  await new Promise<void>((resolve, reject) => {
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error("This browser could not decode the image format."));
-  });
-  return image;
-}
-
 export async function decodeImage(file: File): Promise<ImageAsset> {
   assertSafeInput(file);
   const header = new Uint8Array(await file.slice(0, 32).arrayBuffer());
@@ -68,18 +53,21 @@ export async function decodeImage(file: File): Promise<ImageAsset> {
       try {
         bitmap = await createImageBitmap(file, { imageOrientation: "from-image", colorSpaceConversion: "default" });
       } catch {
-        try {
-          bitmap = await createImageBitmap(file);
-        } catch {
-          bitmap = await decodeWithImageElement(objectUrl);
-        }
+        bitmap = await createImageBitmap(file);
       }
     } else {
-      bitmap = await decodeWithImageElement(objectUrl);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = objectUrl;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("This browser could not decode the image format."));
+      });
+      bitmap = img;
     }
 
-    const width = isImageBitmap(bitmap) ? bitmap.width : bitmap.naturalWidth;
-    const height = isImageBitmap(bitmap) ? bitmap.height : bitmap.naturalHeight;
+    const width = bitmap instanceof ImageBitmap ? bitmap.width : bitmap.naturalWidth;
+    const height = bitmap instanceof ImageBitmap ? bitmap.height : bitmap.naturalHeight;
     const pixels = assertSafeDimensions(width, height, "Decoded image");
     if (pixels > IMAGE_LIMITS.maxDecodedPixels) {
       throw new Error(`The image contains ${pixels.toLocaleString()} pixels, above the ${IMAGE_LIMITS.maxDecodedPixels.toLocaleString()} pixel safety limit.`);
@@ -111,12 +99,12 @@ export async function decodeImage(file: File): Promise<ImageAsset> {
 export function getBitmapDimensions(bitmap: ImageBitmap | HTMLImageElement | HTMLCanvasElement) {
   if (bitmap instanceof HTMLCanvasElement) return { width: bitmap.width, height: bitmap.height };
   return {
-    width: isImageBitmap(bitmap) ? bitmap.width : bitmap.naturalWidth,
-    height: isImageBitmap(bitmap) ? bitmap.height : bitmap.naturalHeight,
+    width: bitmap instanceof ImageBitmap ? bitmap.width : bitmap.naturalWidth,
+    height: bitmap instanceof ImageBitmap ? bitmap.height : bitmap.naturalHeight,
   };
 }
 
 export function closeImageAsset(asset: ImageAsset) {
-  if (isImageBitmap(asset.bitmap)) asset.bitmap.close();
+  if (asset.bitmap instanceof ImageBitmap) asset.bitmap.close();
   if (asset.objectUrl) URL.revokeObjectURL(asset.objectUrl);
 }

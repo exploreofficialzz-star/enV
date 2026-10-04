@@ -51,7 +51,7 @@ export async function downloadUrlMedia(
   }
   onProgress?.(100, { bytes, total: total ?? bytes });
   const type = response.headers.get("content-type") || "application/octet-stream";
-  return new Blob(chunks.map((chunk) => chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer), { type });
+  return new Blob(chunks, { type });
 }
 
 

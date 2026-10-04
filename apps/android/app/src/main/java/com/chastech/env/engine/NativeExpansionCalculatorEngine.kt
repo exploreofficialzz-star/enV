@@ -21,8 +21,8 @@ object NativeExpansionCalculatorEngine {
     fun operationForTool(id: String): Operation? = operations[id]
     fun supportedToolIds(): Set<String> = operations.keys
 
-    fun run(op: Operation, values: Map<Char, Double>): Pair<String, Double> {
-        fun v(c: Char): Double = values[c] ?: error("Enter a value for ${label(op.row, c)}.")
+    fun run(op: Operation, values: Map<Char, String>): Pair<String, Double> {
+        fun v(c: Char): Double = NativeNumberParser.parse(values[c], label(op.row, c))
         return when (op.row.family) {
             "product" -> when (op.target) {
                 'a' -> op.row.aLabel to v('c') / v('b')
@@ -52,7 +52,9 @@ object NativeExpansionCalculatorEngine {
                 buildList(arr.length()) {
                     for (i in 0 until arr.length()) {
                         val row = arr.getJSONArray(i)
-                        add(Row(family, row.getString(0), row.getString(1), row.getString(2), row.getString(3)))
+                        // Rows are [key, a, b, c] or [key, title, a, b, c].
+                        val offset = if (row.length() >= 5) 1 else 0
+                        add(Row(family, row.getString(0), row.getString(1 + offset), row.getString(2 + offset), row.getString(3 + offset)))
                     }
                 }
             }

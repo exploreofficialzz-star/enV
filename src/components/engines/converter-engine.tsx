@@ -183,8 +183,7 @@ export function ConverterEngine({ system, mode = "standard" }: { system: string;
     if (!text) return;
     const item = { amount, from, to, result: formatUnitValue(current as number) };
     const next = [item, ...history.filter(x => !(x.amount === item.amount && x.from === item.from && x.to === item.to))].slice(0, 8);
-    setHistory(next);
-    try { localStorage.setItem(`env-converter-history:${system}`, JSON.stringify(next)); } catch { /* Keep this conversion in memory when WebView storage is unavailable. */ }
+    setHistory(next); localStorage.setItem(`env-converter-history:${system}`, JSON.stringify(next));
   }
 
   function tableRows() {

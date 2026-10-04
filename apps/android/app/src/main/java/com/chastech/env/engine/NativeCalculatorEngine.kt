@@ -2,9 +2,6 @@ package com.chastech.env.engine
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.pow
 
@@ -46,12 +43,6 @@ object NativeCalculatorEngine {
     }
 
     private val operations: Map<String, Operation> by lazy { parseOperations() }
-    private val numberFormat: DecimalFormat by lazy {
-        DecimalFormat("#,##0.########", DecimalFormatSymbols(Locale.getDefault())).apply {
-            isGroupingUsed = true
-        }
-    }
-
     fun operationForTool(id: String): Operation? = operations[id]
     fun supportedToolIds(): Set<String> = operations.keys
 
@@ -114,13 +105,7 @@ object NativeCalculatorEngine {
         is Eval.TextValue -> value.value.toDoubleOrNull() ?: error("Expected a numeric result.")
     }
 
-    private fun parseNumber(raw: String?, label: String): Double {
-        val cleaned = raw.orEmpty().replace(",", "").trim()
-        if (cleaned.isEmpty()) error("Enter a valid $label.")
-        val value = cleaned.toDoubleOrNull() ?: error("Enter a valid $label.")
-        if (!value.isFinite()) error("Enter a valid $label.")
-        return value
-    }
+    private fun parseNumber(raw: String?, label: String): Double = NativeNumberParser.parse(raw, label)
 
     private fun validate(kind: String, value: Double, label: String): Double = when (kind) {
         "n" -> value
@@ -144,7 +129,7 @@ object NativeCalculatorEngine {
         value.isNaN() -> "NaN"
         value == Double.POSITIVE_INFINITY -> "∞"
         value == Double.NEGATIVE_INFINITY -> "-∞"
-        else -> numberFormat.format(value)
+        else -> NativeNumberParser.format(value)
     }
 
     private fun jsString(value: Double): String = when {

@@ -13,4 +13,3 @@ dist
 .env.*
 !.env.example
 src/routeTree.gen.ts
-/public/catalog-runtime/

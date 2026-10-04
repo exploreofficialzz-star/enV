@@ -92,13 +92,9 @@ import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
-import com.chastech.env.engine.NativeConverterEngine
 import com.chastech.env.engine.NativeDateTimeEngine
-import com.chastech.env.engine.NativeExpansionCalculatorEngine
-import com.chastech.env.engine.NativeMathExerciseEngine
 import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeTextEngine
-import com.chastech.env.engine.NativeUtilityEngine
 import com.chastech.env.ui.EnVIcon
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
@@ -352,7 +348,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> true; else -> when (tool.engine.type) {
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
@@ -361,8 +357,11 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when (tool.engine.type)
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
     "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityEngine.supports(tool)
-    else -> false
+    else -> NativeExpandedEngine.supports(tool)
+    }
 }
+
+private fun nativeBackendSupported(tool: ToolRecord): Boolean = NativeBackendEngine.supports(tool)
 
 @Composable
 private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
@@ -385,20 +384,15 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
                 Text(tool.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (tool.status == "planned") StatusPill("Coming soon")
+        val backend = nativeBackendSupported(tool)
+        val supported = nativeSupported(tool)
+        if (tool.status == "planned" && !supported && !backend) StatusPill("Coming soon")
         Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
-        DetailRow("Native execution", when {
-            tool.status == "planned" -> "Coming soon"
-            supported -> "Available offline"
-            else -> "Exact web engine in native shell (online)"
-        })
-        DetailRow("Processing", if (tool.clientSide) "Runs on this device" else "Uses backend services")
-        when {
-            tool.status == "planned" -> Text("This tool is planned and not available yet.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            supported -> NativeToolForm(tool)
-            else -> NativeWebFallbackTool(tool)
-        }
+        DetailRow("Native execution", when { supported -> "Available offline"; backend -> "Available online via enV backend"; else -> "Coming soon" })
+        DetailRow("Processing", if (backend) "Uses enV backend services" else "Runs on this device")
+        when { backend -> NativeExpandedToolForm(tool,true); supported -> NativeToolForm(tool); else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.primary) }
+        if (NativeAiEngine.supports(tool)) { NativeAiToolForm(tool) }
         if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -419,7 +413,7 @@ private fun NativeToolForm(tool: ToolRecord) {
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityToolForm(tool)
-        else -> Text("This native engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else -> NativeExpandedToolForm(tool,false)
     }
 }
 
@@ -428,7 +422,7 @@ private fun NativeToolForm(tool: ToolRecord) {
 private fun NativeConverterToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val operation = NativeConverterEngine.operationForTool(tool) ?: return
-    val units = NativeConverterEngine.systemsFor(operation)
+    val units = NativeConverterEngine.unitsFor(operation)
     var value by rememberSaveable(tool.id) { mutableStateOf("1") }
     var from by rememberSaveable(tool.id) { mutableStateOf(units.firstOrNull()?.id.orEmpty()) }
     var to by rememberSaveable(tool.id) { mutableStateOf(units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty()) }
@@ -492,7 +486,7 @@ private fun NativeExpansionCalculatorToolForm(toolId: String) {
         if (target != 'c') InputField(cText, { cText = it }, op.row.cLabel, singleLine = true)
         ActionRow(
             onRun = { runCatching {
-                val map = mapOf('a' to aText.toDouble(), 'b' to bText.toDouble(), 'c' to cText.toDouble())
+                val map = mapOf('a' to aText, 'b' to bText, 'c' to cText)
                 NativeExpansionCalculatorEngine.run(op, map)
             }.fold({ output = "${it.first}: ${it.second}"; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
             onReset = { aText = "2"; bText = "3"; cText = "6"; output = ""; error = "" }
@@ -513,7 +507,7 @@ private fun NativeMathExerciseToolForm(toolId: String) {
         Text(op.formula, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         op.fields.forEach { field -> InputField(values[field.name].orEmpty(), { next -> values = values.toMutableMap().apply { put(field.name, next) } }, field.label, singleLine = true) }
         ActionRow(
-            onRun = { runCatching { NativeMathExerciseEngine.run(op, values.mapValues { it.value.replace(",", "").toDouble() }) }.fold({ output = "${it.first}: ${it.second}"; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
+            onRun = { runCatching { NativeMathExerciseEngine.run(op, values) }.fold({ rows -> output = rows.joinToString("\n") { row -> "${row.label}: ${row.value}${row.hint?.let { " $it" } ?: ""}" }; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
             onReset = { values = op.fields.associate { it.name to "1" }; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)
@@ -777,7 +771,7 @@ private fun NativeUtilityToolForm(tool: ToolRecord) {
         Text("Native ${tool.engine.type} engine · op ${op ?: tool.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Text("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine’s flexible option model.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InputField(input, { input = it }, "Input", minLines = if (tool.engine.type == "generator") 2 else 4, tall = tool.engine.type != "generator")
-        InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{\"count\": 5, \"text\": \"hello\"}")
+        InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{"count": 5, "text": "hello"}")
         ActionRow(
             onRun = { runCatching { NativeUtilityEngine.run(tool, input, options) }.fold({ output = it.text; error = "" }, { output = ""; error = it.message ?: "Unable to run native utility" }) },
             onReset = { input = ""; options = "{}"; output = ""; error = "" }

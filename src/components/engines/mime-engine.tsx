@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Copy, FileSearch, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { copyToClipboard } from "@/lib/utils";
 
 type MimeEntry = { ext: string; mime: string; name: string; group: string; magic?: number[] };
 const TYPES: MimeEntry[] = [
@@ -16,7 +15,7 @@ export function MimeEngine(_props: { op: string }) {
   const [query,setQuery]=useState(""); const [file,setFile]=useState<File|null>(null); const [inspection,setInspection]=useState<{entry?:MimeEntry; browser:string; ext:string; bytes:string; mismatch:boolean}|null>(null); const [error,setError]=useState<string|null>(null);
   const results=useMemo(()=>{ const q=query.trim().toLowerCase(); return TYPES.filter(x=>!q||x.ext.includes(q)||x.mime.includes(q)||x.name.toLowerCase().includes(q)||x.group.includes(q)).slice(0,80); },[query]);
   async function inspect(f:File){ setFile(f); setError(null); const bytes=new Uint8Array(await f.slice(0,64).arrayBuffer()); const ext=(f.name.split(".").pop()||"").toLowerCase(); const candidates=TYPES.filter(x=>matches(bytes,x.magic)); const entry=candidates[0]; setInspection({entry,browser:f.type||"unknown",ext,bytes:hex(bytes),mismatch:!!entry&&!!ext&&entry.ext!==ext&&!(entry.ext==="jpg"&&ext==="jpeg")}); }
-  async function copy(v:string){ if (await copyToClipboard(v)) setError(null); else setError("Clipboard access is unavailable; select and copy the value instead."); }
+  async function copy(v:string){ try{await navigator.clipboard.writeText(v);}catch{setError("Clipboard access is unavailable; select and copy the value instead.");} }
   return <div className="space-y-5">
     <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="flex items-center gap-2 font-medium"><Search className="size-4"/> MIME reference</div><p className="mt-1 text-sm text-subtle">Search by extension, MIME type, name, or category. No network lookup is required.</p><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="e.g. .webp, image/png, pdf" className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"/></div>
     <div className="grid gap-2">{results.map(x=><div key={x.ext+x.mime} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-medium">.{x.ext} · {x.name}</div><div className="text-xs text-muted">{x.mime} · {x.group}</div></div><Button variant="outline" size="sm" onClick={()=>copy(x.mime)}><Copy className="mr-1 size-3"/>Copy MIME</Button></div>)}</div>

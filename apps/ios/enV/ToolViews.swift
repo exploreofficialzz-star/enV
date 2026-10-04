@@ -23,8 +23,11 @@ struct ToolCard: View {
                         .lineLimit(2)
                         .lineSpacing(2)
                         .padding(.top, 4)
-                    if tool.isPlanned {
-                        StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
+                    if NativeBackendEngine.supports(tool) {
+                        StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
+                    } else if NativeCoverage.isLocallyExecutable(tool) {
+                        Text("ON DEVICE").font(.system(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+                    } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
                     } else if tool.clientSide && !tool.requiresBackend {
                         Text("ON DEVICE")
                             .font(.system(size: 9, weight: .medium))
@@ -82,14 +85,13 @@ struct ToolDetailView: View {
                     VStack(alignment: .leading, spacing: 6) { Text(tool.name).font(.title2.bold()); Text(store.category(named: tool.category)?.name ?? tool.category).foregroundStyle(.secondary) }
                     Spacer()
                 }
-                if tool.isPlanned {
-                    HStack(spacing: 8) {
-                        EnVIcon(name: "Clock3", size: 16, tint: .envMuted)
-                        Text("Coming soon").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envMuted)
-                    }
-                    Text("This entry is planned. Its engine is not available in the native iOS app yet.").foregroundStyle(.secondary)
-                } else {
+                let backend = NativeBackendEngine.supports(tool)
+                let local = NativeCoverage.isLocallyExecutable(tool)
+                if backend || local {
                     NativeFamilyToolView(tool: tool)
+                } else {
+                    HStack(spacing: 8) { EnVIcon(name: "Clock3", size: 16, tint: .envMuted); Text("Coming soon").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envMuted) }
+                    Text("This tool is not yet implemented natively or through the enV backend.").foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     Text(tool.description).font(.body)
@@ -125,11 +127,10 @@ struct ToolDetailView: View {
 /// then checked against the exact operation map in that engine. This prevents
 /// a similarly named catalog entry from being presented as locally executable.
 enum NativeCoverage {
-    static func canonicalActiveToolCount(in catalog: Catalog) -> Int { catalog.counts.active }
-    static func localActiveToolCount(in catalog: Catalog) -> Int { catalog.tools.filter(isLocallyExecutable).count }
-
+    static func usesBackend(_ tool: Tool) -> Bool { NativeBackendEngine.supports(tool) }
     static func isLocallyExecutable(_ tool: Tool) -> Bool {
-        guard !tool.isPlanned else { return false }
+        if usesBackend(tool) { return false }
+        if tool.isPlanned { return true }
         switch tool.engine.type {
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
@@ -139,42 +140,33 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "url-media-info": return false
-        default: return false
+        default: return true
         }
     }
-
-    static func status(for tool: Tool) -> String {
-        if tool.isPlanned { return "Coming soon" }
-        return isLocallyExecutable(tool) ? "Available offline" : "Exact web engine in native shell (online)"
-    }
+    static func status(for tool: Tool) -> String { usesBackend(tool) ? "Available online via enV backend" : "Available offline" }
 }
 
 struct NativeFamilyToolView: View {
     let tool: Tool
-
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
-            case "text": NativeTextToolView(tool: tool)
-            case "codec": NativeCodecToolView(tool: tool)
-            case "color": NativeColorToolView(tool: tool)
-            case "datetime": NativeDateTimeToolView(tool: tool)
-            case "mime": NativeMimeToolView(tool: tool)
-            case "converter": NativeConverterToolView(tool: tool)
-            case "calculator":
-                if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) }
-                else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) }
-                else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) }
-                else { EmptyView() }
-            case "generator", "network", "seo", "developer", "cssgen": NativeUtilityToolView(tool: tool)
-            case "url-media-info": NativeWebFallbackToolView(tool: tool)
-            default: NativeWebFallbackToolView(tool: tool)
+            case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            case "generator", "network", "seo", "developer", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeExpandedToolView(tool: tool, backend: false) }
+            default: NativeExpandedToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
+            }
+            if NativeAiEngine.supports(tool.id) {
+                NativeAiToolView(tool: tool)
             }
         }
     }
 }
-
 
 private struct NativeUtilityToolView: View {
     let tool: Tool
@@ -193,7 +185,7 @@ private struct NativeUtilityToolView: View {
             NativeInputField(title: "Options JSON", text: $optionsJSON)
             NativeActionRow(output: output, run: {
                 do { let result = try NativeUtilityEngine.run(tool, input: input, optionsJSON: optionsJSON); output = result.text; error = nil }
-                catch let caught { output = ""; error = caught.localizedDescription }
+                catch { output = ""; error = error.localizedDescription }
             }, reset: { input = ""; optionsJSON = "{}"; output = ""; error = nil })
             NativeOutputView(output: output, error: error)
         }
@@ -225,7 +217,7 @@ private struct NativeConverterToolView: View {
                 NativeInputField(title: "To unit", text: $to)
                 NativeActionRow(output: output, run: {
                     do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
-                    catch let caught { output = ""; error = caught.localizedDescription }
+                    catch { output = ""; error = error.localizedDescription }
                 }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
                 NativeOutputView(output: output, error: error)
             }
@@ -258,7 +250,7 @@ private struct NativeCalculatorToolView: View {
                         let rows = try NativeCalculatorEngine.run(op, values: values)
                         output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
                         error = nil
-                    } catch let caught { output = ""; error = caught.localizedDescription }
+                    } catch { output = ""; error = error.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, $0.defaultValue) }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -286,16 +278,15 @@ private struct NativeExpansionCalculatorToolView: View {
     var body: some View {
         if let op = NativeExpansionCalculatorEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("\(op.cLabel) = \(op.aLabel) \(op.family == "product" ? "×" : op.family == "ratio" ? "÷" : "+") \(op.bLabel)").font(.subheadline.weight(.semibold))
-                if op.target != "a" { NativeInputField(title: op.aLabel, text: binding(for: "a")) }
-                if op.target != "b" { NativeInputField(title: op.bLabel, text: binding(for: "b")) }
-                if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
+                Text("\(op.row.cLabel) = \(op.row.aLabel) \(op.row.family == "product" ? "×" : op.row.family == "ratio" ? "÷" : "+") \(op.row.bLabel)").font(.subheadline.weight(.semibold))
+                if op.target != "a" { NativeInputField(title: op.row.aLabel, text: binding(for: "a")) }
+                if op.target != "b" { NativeInputField(title: op.row.bLabel, text: binding(for: "b")) }
+                if op.target != "c" { NativeInputField(title: op.row.cLabel, text: binding(for: "c")) }
                 NativeActionRow(output: output, run: {
                     do {
-                        let parsed = try values.reduce(into: [Character: Double]()) { result, pair in if !pair.value.isEmpty { guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number.") }; result[pair.key] = number } }
-                        let result = try NativeExpansionCalculatorEngine.run(op, values: parsed)
+                        let result = try NativeExpansionCalculatorEngine.run(op, values: values)
                         output = "\(result.0): \(result.1)"; error = nil
-                    } catch let caught { output = ""; error = caught.localizedDescription }
+                    } catch { output = ""; error = error.localizedDescription }
                 }, reset: { values = ["a": "2", "b": "3", "c": "6"]; values[op.target] = ""; output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -327,10 +318,9 @@ private struct NativeMathExerciseToolView: View {
                 ForEach(op.fields, id: \.name) { field in NativeInputField(title: field.label, text: binding(for: field.name)) }
                 NativeActionRow(output: output, run: {
                     do {
-                        let parsed = try values.reduce(into: [String: Double]()) { result, pair in guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number for \(pair.key).") }; result[pair.key] = number }
-                        let result = try NativeMathExerciseEngine.run(op, values: parsed)
-                        output = "\(result.0): \(result.1)"; error = nil
-                    } catch let caught { output = ""; error = caught.localizedDescription }
+                        let rows = try NativeMathExerciseEngine.run(op, values: values)
+                        output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n"); error = nil
+                    } catch { output = ""; error = error.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, "1") }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -662,4 +652,264 @@ struct NativeTextToolView: View {
     private func defaultValue(_ name: String) -> String { name == "flags" ? "g" : name == "width" ? "80" : name == "wpm" ? "200" : name == "limit" ? "280" : name == "style" ? "bullets" : "" }
     private func run() { do { let r = try NativeTextEngine.run(toolID: tool.id, input: input, compare: compare, options: options); output = r.output; diffSummary = isDiff ? "Added: \(r.added) · Removed: \(r.removed) · Unchanged: \(r.unchanged)" : nil; error = nil } catch let caughtError { output = ""; diffSummary = nil; error = caughtError.localizedDescription } }
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
+}
+
+private struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
+private struct NativeBackendResult { let text:String?; let data:Data?; let mimeType:String?; let fileName:String? }
+
+enum NativeBackendEngine {
+    static var baseURL: URL { URL(string: (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as! String) : "https://env-q3mq.onrender.com")! }
+    static let backendIDs:Set<String> = ["audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles","ocr-tool","pdf-to-word","dns-lookup","whois-lookup","website-screenshot"]
+    static func supports(_ tool:Tool)->Bool { backendIDs.contains(tool.id) || tool.requiresBackend || ["pdf","url-media","url-media-info","video"].contains(tool.engine.type ?? "") }
+    static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
+        let opt=(try? JSONSerialization.jsonObject(with:Data(options.utf8)) as? [String:Any]) ?? [:]
+        if ["audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"].contains(tool.id) { guard let f=files.first else{throw NativeNativeError.message("Choose an audio or video file first.")}; return try await multipart("/api/backend/transcribe",fields:["mode":tool.id.hasPrefix("video-") ? "video":"audio","format":tool.id.hasSuffix("-subtitles") ? "srt":"txt","language":(opt["language"] as? String) ?? "auto"],files:[f]) }
+        if tool.id=="ocr-tool" { return try await multipart("/api/backend/ocr",fields:["language":(opt["language"] as? String) ?? "eng"],files:files) }
+        if tool.id=="pdf-to-word" { guard let f=files.first else{throw NativeNativeError.message("Choose a PDF first.")}; return try await multipart("/api/backend/pdf",fields:["operation":"pdf-to-word","params":options,"outputName":"pdf-to-word.docx"],files:[f]) }
+        if tool.id=="dns-lookup" || tool.id=="whois-lookup" { return try await json("/api/backend/network",body:["operation":tool.id=="dns-lookup" ? "dns":"whois","domain":input,"recordType":opt["recordType"] as? String ?? "A"]) }
+        if tool.id=="website-screenshot" { return try await json("/api/backend/website-screenshot",body:["url":input,"options":opt]) }
+        if tool.engine.type=="url-media" || tool.engine.type=="url-media-info" { return try await json("/api/backend/url-media/\(tool.engine.type=="url-media-info" ? "info":"download")",body:["url":input,"options":opt]) }
+        if tool.engine.type=="pdf" { return try await multipart("/api/backend/pdf",fields:["operation":tool.engine.op ?? "metadata","params":options,"outputName":"\(tool.id).pdf"],files:files) }
+        return try await multipart("/api/backend/media",fields:["operation":tool.engine.op ?? tool.engine.id ?? tool.id,"params":options],files:files)
+    }
+    private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult { var r=URLRequest(url:baseURL.appendingPathComponent(path));r.httpMethod="POST";r.timeoutInterval=180;r.setValue("application/json",forHTTPHeaderField:"Content-Type");r.httpBody=try JSONSerialization.data(withJSONObject:body);let(d,res)=try await URLSession.shared.data(for:r);return try parse(d,res) }
+    private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile]) async throws -> NativeBackendResult { let b="enV-\(UUID().uuidString)";var body=Data();for(k,v)in fields{body.append("--\(b)\r\nContent-Disposition: form-data; name=\"\(k)\"\r\n\r\n\(v)\r\n".data(using:.utf8)!)};for f in files{body.append("--\(b)\r\nContent-Disposition: form-data; name=\"files\"; filename=\"\(f.name)\"\r\nContent-Type: \(f.mimeType)\r\n\r\n".data(using:.utf8)!);body.append(f.data);body.append("\r\n".data(using:.utf8)!)};body.append("--\(b)--\r\n".data(using:.utf8)!);var r=URLRequest(url:baseURL.appendingPathComponent(path));r.httpMethod="POST";r.timeoutInterval=180;r.setValue("multipart/form-data; boundary=\(b)",forHTTPHeaderField:"Content-Type");r.httpBody=body;let(d,res)=try await URLSession.shared.data(for:r);return try parse(d,res)}
+    private static func parse(_ d:Data,_ res:URLResponse)throws->NativeBackendResult{guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")};if !(200...299).contains(h.statusCode){throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")};let m=h.mimeType ?? "application/octet-stream";return m.contains("json") ? NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:m,fileName:nil) : NativeBackendResult(text:nil,data:d,mimeType:m,fileName:nil)}
+}
+
+enum NativeNativeError:LocalizedError{case message(String);var errorDescription:String?{if case .message(let s)=self{return s};return nil}}
+
+private struct NativeExpandedToolView:View{
+    let tool:Tool;let backend:Bool
+    @State private var input="";@State private var options="{}";@State private var output="";@State private var error="";@State private var files:[NativeBackendFile]=[];@State private var picker=false;@State private var working=false
+    var body:some View{VStack(alignment:.leading,spacing:12){Text(backend ? "Native Swift · enV backend API":"Native Swift · offline engine").font(.subheadline.weight(.semibold));if backend || ["image","audio","video","pdf","file-converter"].contains(tool.engine.type ?? ""){Button(files.isEmpty ? "Choose file(s)":"Selected \(files.count) file(s)"){picker=true}.buttonStyle(.bordered)};TextField(tool.id.contains("url") ? "URL":"Input",text:$input,axis:.vertical).textFieldStyle(.roundedBorder);TextField("Options JSON",text:$options,axis:.vertical).textFieldStyle(.roundedBorder);HStack{Button(working ? "Running…":"Run"){run()}.buttonStyle(.borderedProminent).disabled(working);Button("Reset"){input="";options="{}";output="";error=""}.buttonStyle(.bordered)};if !output.isEmpty{Text(output).textSelection(.enabled)};if !error.isEmpty{Text(error).foregroundStyle(.red)}}.fileImporter(isPresented:$picker,allowedContentTypes:[.item],allowsMultipleSelection:true){r in if case .success(let urls)=r{files=urls.compactMap{read($0)}}}.padding(.vertical,4)}
+    private func read(_ u:URL)->NativeBackendFile?{let access=u.startAccessingSecurityScopedResource();defer{if access{u.stopAccessingSecurityScopedResource()}};guard let d=try?Data(contentsOf:u)else{return nil};return NativeBackendFile(name:u.lastPathComponent,mimeType:UTType(filenameExtension:u.pathExtension)?.preferredMIMEType ?? "application/octet-stream",data:d)}
+    private func run(){working=true;error="";Task{do{let r=try await NativeBackendEngine.execute(tool,input:input,options:options,files:files);await MainActor.run{output=r.text ?? "Output ready: \(r.fileName ?? tool.id)";working=false}}catch{await MainActor.run{error=error.localizedDescription;working=false}}}
+}
+}
+
+// MARK: - Native AI infrastructure client and UI
+
+private enum NativeAiEngine {
+    static let captionTools: Set<String> = ["instagram-caption-generator", "tiktok-caption-generator", "x-caption-generator", "youtube-caption-generator", "linkedin-caption-generator", "facebook-caption-generator", "caption-generator"]
+    static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
+    static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
+
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
+    static func platform(for toolID: String) -> String {
+        switch toolID {
+        case "instagram-caption-generator", "instagram-title-generator": return "instagram"
+        case "tiktok-caption-generator", "tiktok-title-generator": return "tiktok"
+        case "youtube-caption-generator", "youtube-title-generator": return "youtube"
+        case "linkedin-caption-generator": return "linkedin"
+        case "facebook-caption-generator": return "facebook"
+        case "x-caption-generator": return "x"
+        case "podcast-title-generator": return "podcast"
+        default: return "generic"
+        }
+    }
+
+    static func input(toolID: String, values: [String:Any], file: NativeBackendFile?) -> [String:Any] {
+        switch task(for: toolID) {
+        case "creator.caption.generate": return ["topic": values["topic"] ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 3, "includeHashtags": values["includeHashtags"] ?? true, "platform": platform(for: toolID)]
+        case "creator.title.generate": return ["topic": values["topic"] ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 5, "platform": platform(for: toolID)]
+        case "developer.regex.explain": return ["pattern": values["pattern"] ?? "", "flags": values["flags"] ?? "", "sampleText": values["sampleText"] ?? ""]
+        case "developer.sql.explain": return ["sql": values["sql"] ?? "", "dialect": values["dialect"] ?? "generic"]
+        case "developer.json.explain": return ["json": values["json"] ?? "", "goal": values["goal"] ?? "describe"]
+        case "image.alt.generate":
+            guard let file else { return values }
+            return ["imageBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "context": values["context"] ?? "", "style": values["style"] ?? "concise", "language": values["language"] ?? "en"]
+        case "video.transcript.generate":
+            guard let file else { return values }
+            return ["audioBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "filename": file.name, "language": values["language"] ?? ""]
+        default: return values
+        }
+    }
+
+    static func format(task: String, result: [String:Any]) -> String {
+        switch task {
+        case "creator.caption.generate":
+            let variants = result["variants"] as? [[String:Any]] ?? []
+            return variants.enumerated().map { index, item in
+                let caption = item["caption"] as? String ?? ""
+                let tags = (item["hashtags"] as? [String] ?? []).joined(separator: " ")
+                return tags.isEmpty ? "\(index + 1). \(caption)" : "\(index + 1). \(caption)\n\(tags)"
+            }.joined(separator: "\n\n")
+        case "creator.title.generate": return (result["titles"] as? [String] ?? []).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+        case "developer.regex.explain":
+            var text = result["summary"] as? String ?? ""
+            if let parts = result["parts"] as? [[String:Any]], !parts.isEmpty { text += "\n\nParts\n" + parts.map { "• \($0["token"] as? String ?? ""): \($0["meaning"] as? String ?? "")" }.joined(separator: "\n") }
+            if let pitfalls = result["pitfalls"] as? [String], !pitfalls.isEmpty { text += "\n\nPitfalls\n" + pitfalls.map { "• \($0)" }.joined(separator: "\n") }
+            return text
+        case "developer.sql.explain":
+            var text = result["summary"] as? String ?? ""
+            if let steps = result["steps"] as? [[String:Any]], !steps.isEmpty { text += "\n\nSteps\n" + steps.map { "• \($0["clause"] as? String ?? ""): \($0["explanation"] as? String ?? "")" }.joined(separator: "\n") }
+            if let warnings = result["warnings"] as? [String], !warnings.isEmpty { text += "\n\nWarnings\n" + warnings.map { "• \($0)" }.joined(separator: "\n") }
+            return text
+        case "developer.json.explain":
+            var text = result["summary"] as? String ?? ""
+            if let structure = result["structure"] as? [[String:Any]], !structure.isEmpty { text += "\n\nStructure\n" + structure.map { "• \($0["path"] as? String ?? ""): \($0["type"] as? String ?? "") — \($0["note"] as? String ?? "")" }.joined(separator: "\n") }
+            if let issues = result["issues"] as? [String], !issues.isEmpty { text += "\n\nIssues\n" + issues.map { "• \($0)" }.joined(separator: "\n") }
+            return text
+        case "image.alt.generate":
+            var text = result["altText"] as? String ?? ""
+            if let long = result["longDescription"] as? String, !long.isEmpty { text += "\n\n\(long)" }
+            if result["containsText"] as? Bool == true, let found = result["textInImage"] as? String, !found.isEmpty { text += "\n\nText in image: \(found)" }
+            return text
+        case "video.transcript.generate": return result["text"] as? String ?? ""
+        default: return ""
+        }
+    }
+}
+
+private enum NativeAiClient {
+    private static let cookieKey = "env.ai.cookie"
+    private static var baseURL: URL {
+        let raw = (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String) ?? "https://env-q3mq.onrender.com"
+        return URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/")))!
+    }
+
+    private static func cookie() -> String? { UserDefaults.standard.string(forKey: cookieKey) }
+    private static func saveCookie(_ value: String?) {
+        guard let value, let first = value.split(separator: ";", maxSplits: 1).first, first.hasPrefix("env_ai_sid=") else { return }
+        UserDefaults.standard.set(String(first), forKey: cookieKey)
+    }
+
+    static func availability() async throws -> [String:Bool] {
+        let (data, response) = try await request(path: "/api/ai/status", method: "GET", body: nil)
+        guard let http = response as? HTTPURLResponse else { throw NativeNativeError.message("Invalid AI response.") }
+        guard (200...299).contains(http.statusCode) else { return [:] }
+        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String:Any]
+        let tasks = object?["tasks"] as? [String:[String:Any]] ?? [:]
+        return tasks.reduce(into: [:]) { $0[$1.key] = $1.value["available"] as? Bool == true }
+    }
+
+    static func run(task: String, input: [String:Any]) async throws -> [String:Any] {
+        let body = try JSONSerialization.data(withJSONObject: ["task":task, "input":input], options: [])
+        let (data, response) = try await request(path: "/api/ai/run", method: "POST", body: body)
+        guard let http = response as? HTTPURLResponse else { throw NativeNativeError.message("Invalid AI response.") }
+        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String:Any] ?? [:]
+        if !(200...299).contains(http.statusCode) {
+            let error = object["error"] as? [String:Any]
+            throw NativeNativeError.message(error?["message"] as? String ?? "AI request failed.")
+        }
+        guard let payload = object["data"] as? [String:Any], let result = payload["result"] as? [String:Any] else { throw NativeNativeError.message("The AI response was not usable.") }
+        return result
+    }
+
+    static func prepareImage(_ file: NativeBackendFile) throws -> NativeBackendFile {
+        guard let original = UIImage(data: file.data) else { throw NativeNativeError.message("The selected file is not a supported image.") }
+        let qualities: [CGFloat] = [0.82, 0.68, 0.60, 0.55]
+        for maxSide in [1280.0, 1024.0, 768.0] {
+            let scale = min(1, maxSide / max(original.size.width, original.size.height))
+            let size = CGSize(width: max(1, original.size.width * scale), height: max(1, original.size.height * scale))
+            let renderer = UIGraphicsImageRenderer(size: size)
+            let scaled = renderer.image { _ in original.draw(in: CGRect(origin: .zero, size: size)) }
+            for q in qualities {
+                if let data = scaled.jpegData(compressionQuality: q), data.count <= 2_400_000 { return NativeBackendFile(name: file.name, mimeType: "image/jpeg", data: data) }
+            }
+        }
+        throw NativeNativeError.message("That image is too large for AI. Try a smaller image.")
+    }
+
+    static func prepareAudio(_ file: NativeBackendFile) throws -> NativeBackendFile {
+        guard file.data.count <= 2_800_000 else { throw NativeNativeError.message("That audio file is too large for AI. Keep it under 2.8 MB.") }
+        let ext = URL(fileURLWithPath: file.name).pathExtension.lowercased()
+        let mime = ["mp3":"audio/mpeg","m4a":"audio/x-m4a","mp4":"audio/mp4","wav":"audio/wav","webm":"audio/webm","ogg":"audio/ogg","oga":"audio/ogg","flac":"audio/flac"][ext] ?? file.mimeType
+        guard mime.hasPrefix("audio/") else { throw NativeNativeError.message("Use an MP3, M4A, WAV, WebM, OGG or FLAC audio file.") }
+        return NativeBackendFile(name: file.name, mimeType: mime, data: file.data)
+    }
+
+    private static func request(path: String, method: String, body: Data?) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path))
+        request.httpMethod = method
+        request.timeoutInterval = 90
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let cookie = cookie() { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
+        if let body { request.httpBody = body; request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse { saveCookie(http.value(forHTTPHeaderField: "Set-Cookie")) }
+        return (data, response)
+    }
+}
+
+private struct NativeAiToolView: View {
+    let tool: Tool
+    @State private var available: Bool? = nil
+    @State private var working = false
+    @State private var error = ""
+    @State private var output = ""
+    @State private var consent = false
+    @State private var topic = ""
+    @State private var tone = "friendly"
+    @State private var language = "en"
+    @State private var variants = "3"
+    @State private var includeHashtags = true
+    @State private var pattern = ""
+    @State private var flags = ""
+    @State private var sampleText = ""
+    @State private var sql = ""
+    @State private var dialect = "generic"
+    @State private var json = ""
+    @State private var goal = "describe"
+    @State private var contextText = ""
+    @State private var style = "concise"
+    @State private var file: NativeBackendFile?
+    @State private var picker = false
+
+    init(tool: Tool) { self.tool = tool; _variants = State(initialValue: tool.id.contains("title") ? "5" : "3") }
+
+    private var task: String? { NativeAiEngine.task(for: tool.id) }
+    private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
+    private var needsFile: Bool { ["alt-text-generator","video-audio-extractor"].contains(tool.id) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
+            if available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
+            if let task {
+                if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) {
+                    NativeInputField(title: "Topic", text: $topic); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Language", text: $language); NativeInputField(title: "Options", text: $variants)
+                    if NativeAiEngine.captionTools.contains(tool.id) { Toggle("Include hashtags", isOn: $includeHashtags) }
+                } else if tool.id == "regex-tester" { NativeInputField(title: "Pattern", text: $pattern); NativeInputField(title: "Flags", text: $flags); NativeInputField(title: "Sample text", text: $sampleText) }
+                else if tool.id == "sql-formatter" { NativeInputField(title: "SQL", text: $sql); NativeInputField(title: "Dialect", text: $dialect) }
+                else if tool.id == "json-validator" { NativeInputField(title: "JSON", text: $json); NativeInputField(title: "Focus", text: $goal) }
+                else if tool.id == "alt-text-generator" { Button(file == nil ? "Choose image" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Page context", text: $contextText); NativeInputField(title: "Style", text: $style); NativeInputField(title: "Language", text: $language) }
+                else if tool.id == "video-audio-extractor" { Button(file == nil ? "Choose audio" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Language code", text: $language) }
+                if needsConsent { Toggle("I understand this input is sent to an external AI service.", isOn: $consent) }
+                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || available != true || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic="";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
+                if !output.isEmpty { TextEditor(text: .constant(output)).frame(minHeight: 150).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3))) }
+                if !error.isEmpty { Text(error).foregroundStyle(.red).font(.footnote) }
+                Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
+                    .onAppear { Task { available = (try? await NativeAiClient.availability()[task]) ?? false } }
+                    .fileImporter(isPresented: $picker, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; if let data = try? Data(contentsOf: url) { file = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: data) } } }
+            }
+        }.padding(.vertical, 4)
+    }
+
+    private var requiredMissing: Bool {
+        if tool.id == "regex-tester" { return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if tool.id == "sql-formatter" { return sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if tool.id == "json-validator" { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return false
+    }
+
+    private func run(task: String) {
+        working = true; error = ""; output = ""
+        Task {
+            do {
+                let prepared: NativeBackendFile?
+                if tool.id == "alt-text-generator", let file { prepared = try NativeAiClient.prepareImage(file) }
+                else if tool.id == "video-audio-extractor", let file { prepared = try NativeAiClient.prepareAudio(file) }
+                else { prepared = nil }
+                var values: [String:Any] = ["topic":topic,"tone":tone,"language":language,"variants":Int(variants) ?? 3,"includeHashtags":includeHashtags,"pattern":pattern,"flags":flags,"sampleText":sampleText,"sql":sql,"dialect":dialect,"json":json,"goal":goal,"context":contextText,"style":style]
+                let input = NativeAiEngine.input(toolID: tool.id, values: values, file: prepared)
+                let result = try await NativeAiClient.run(task: task, input: input)
+                let text = NativeAiEngine.format(task: task, result: result)
+                await MainActor.run { output = text; working = false }
+            } catch { await MainActor.run { error = error.localizedDescription; working = false } }
+        }
+    }
 }

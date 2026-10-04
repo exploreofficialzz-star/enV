@@ -223,7 +223,6 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
-    @EnvironmentObject private var store: CatalogStore
     @AppStorage("env.themeMode") private var themeMode = "system"
 
     var body: some View {

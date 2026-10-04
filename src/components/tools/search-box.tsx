@@ -1,10 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CATALOG_COUNTS } from "@/lib/catalog-data";
-import { useSearchIndex } from "@/hooks/use-catalog-data";
+import { getAllTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
-import { toolPath } from "@/lib/tool-path";
 import { cn } from "@/lib/utils";
 
 export function SearchBox({
@@ -25,25 +23,12 @@ export function SearchBox({
   const nav = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const {
-    data: searchIndex,
-    loading: searchLoading,
-    error: searchError,
-    retry,
-  } = useSearchIndex(Boolean(q.trim()));
 
-  const results = useMemo(
-    () => (q.trim() && !searchLoading ? searchTools(searchIndex, q, 8) : []),
-    [q, searchIndex, searchLoading],
-  );
+  const results = useMemo(() => (q.trim() ? searchTools(getAllTools(), q, 8) : []), [q]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (
-        e.key === "/" &&
-        !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
-      ) {
+      if (e.key === "/" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -72,7 +57,7 @@ export function SearchBox({
         value={q}
         autoFocus={autoFocus}
         autoComplete="off"
-        placeholder={`Search ${CATALOG_COUNTS.total.toLocaleString()} tools…`}
+        placeholder={`Search ${getAllTools().length.toLocaleString()} tools…`}
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
@@ -96,21 +81,8 @@ export function SearchBox({
           className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface py-1 shadow-[var(--shadow-border)]"
           role="listbox"
         >
-          {searchError ? (
-            <li className="px-4 py-3 text-sm text-danger" role="alert">
-              {searchError}{" "}
-              <button type="button" className="font-medium underline" onClick={retry}>
-                Retry
-              </button>
-            </li>
-          ) : searchLoading ? (
-            <li className="px-4 py-3 text-sm text-muted" role="status">
-              Loading search…
-            </li>
-          ) : results.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-muted">
-              No matching tools. Try “json”, “bmi”, or “qr”.
-            </li>
+          {results.length === 0 ? (
+            <li className="px-4 py-3 text-sm text-muted">No matching tools. Try “json”, “bmi”, or “qr”.</li>
           ) : (
             results.map((t) => (
               <li key={t.id}>
@@ -122,14 +94,7 @@ export function SearchBox({
                     setOpen(false);
                   }}
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    {t.name}
-                    {t.status === "planned" ? (
-                      <span className="text-[9px] font-semibold uppercase tracking-wide text-subtle">
-                        Coming soon
-                      </span>
-                    ) : null}
-                  </span>
+                  <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[9px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
                   <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
                 </button>
               </li>

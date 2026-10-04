@@ -24,5 +24,6 @@ test("operation families keep metadata cleaning executable", () => {
 test("platform registry is data-driven", () => {
   assert.equal(getPlatformPreset("youtube", "banner")?.dimensions?.width, 2560);
   assert.equal(getPresetForImageOp("discord-banner-resizer")?.contentType, "banner");
-  assert.equal(getPresetForImageOp("pinterest-banner-resizer"), undefined);
+  assert.equal(getPresetForImageOp("pinterest-banner-resizer")?.dimensions?.width, 1920, "Pinterest has a documented 16:9 profile cover");
+  assert.equal(getPresetForImageOp("not-a-platform-tool"), undefined);
 });

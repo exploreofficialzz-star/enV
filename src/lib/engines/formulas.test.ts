@@ -144,7 +144,9 @@ test("every calculator key is defined with fields and compute", () => {
     assert.ok(Array.isArray(def.fields) && def.fields.length > 0, `${key} has no fields`);
     assert.equal(typeof def.compute, "function", `${key} has no compute`);
   }
-  assert.equal(KEYS.length, Object.keys(calculators).length);
+  // KEYS lists the original hand-written calculators; the registry has since grown (formula exercises,
+  // STEM, expansion families). Catalog/registry parity is enforced by calculator-registry.test.ts.
+  assert.ok(Object.keys(calculators).length >= KEYS.length);
 });
 
 test("percentage of amount plus increase and decrease", () => {
@@ -172,7 +174,7 @@ test("bmi 70kg 175cm is about 22.9", () => {
 
 test("loan 100000 at 5% for 30 years monthly is about 536.82", () => {
   const payment = parseNum(
-    labeled("loan", { principal: "100000", annualRate: "5", years: "30" }, "payment").value,
+    labeled("loan", { principal: "100000", annualRate: "5", years: "30", paymentsPerYear: "12" }, "payment").value,
   );
   assert.ok(Math.abs(payment - 536.82) < 0.01);
 });
@@ -247,5 +249,5 @@ test("circle from radius 10", () => {
 test("throws short actionable errors", () => {
   assert.throws(() => run("bmi", { weightKg: "70", heightCm: "0" }), /Height must be greater than 0/);
   assert.throws(() => run("percentage", { amount: "abc", percent: "10" }), /Enter a valid number/);
-  assert.throws(() => run("ohms-law", { volts: "12" }), /Enter any two/);
+  assert.throws(() => run("ohms-law", { volts: "12" }), /any two of V, I, R, P/);
 });

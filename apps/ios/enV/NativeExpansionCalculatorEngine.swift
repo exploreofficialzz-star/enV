@@ -34,7 +34,8 @@ enum NativeExpansionCalculatorEngine {
         for (family, raw) in root {
             guard let rows = raw as? [[Any]] else { continue }
             for row in rows where row.count >= 4 {
-                guard let key = row[0] as? String, let a = row[1] as? String, let b = row[2] as? String, let c = row[3] as? String else { continue }
+                let offset = row.count >= 5 ? 1 : 0
+                guard let key = row[0] as? String, let a = row[1 + offset] as? String, let b = row[2 + offset] as? String, let c = row[3 + offset] as? String else { continue }
                 for target in [Character("a"), Character("b"), Character("c")] {
                     let id = "math-exp-\(family)-\(key)-\(target)"
                     output[id] = NativeExpansionOperation(id: id, family: family, key: key, aLabel: a, bLabel: b, cLabel: c, target: target)

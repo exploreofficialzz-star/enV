@@ -87,9 +87,7 @@ enum NativeCalculatorEngine {
     }
 
     private static func parseNumber(_ raw: String?, _ label: String) throws -> Double {
-        let cleaned = (raw ?? "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty, let value = Double(cleaned), value.isFinite else { throw calculatorError("Enter a valid \(label).") }
-        return value
+        try NativeNumberParser.parse(raw, label: label)
     }
 
     private static func validate(_ kind: String, _ value: Double, _ label: String) throws -> Double {
@@ -108,16 +106,7 @@ enum NativeCalculatorEngine {
     }
 
     private static func formatNumber(_ value: Double) -> String {
-        if value.isNaN { return "NaN" }
-        if value == .infinity { return "∞" }
-        if value == -.infinity { return "-∞" }
-        let formatter = NumberFormatter()
-        formatter.locale = Locale.current
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 8
-        formatter.minimumFractionDigits = 0
-        formatter.usesGroupingSeparator = true
-        return formatter.string(from: NSNumber(value: value)) ?? jsString(value)
+        NativeNumberParser.format(value)
     }
 
     private static func jsString(_ value: Double) -> String {

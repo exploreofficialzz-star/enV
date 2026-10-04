@@ -1,5 +1,6 @@
 # enV — Browser Toolkit
 
+
 **Useful tools. One place.** enV is a responsive collection of browser-based tools for everyday calculations, conversions, color and CSS work, QR codes, image tasks, and mockups. Wherever possible, processing happens in the visitor's browser rather than uploading files to a server.
 
 ## Requirements
@@ -50,6 +51,10 @@ Apply the committed SQL schema as a separate, deliberate release operation with 
 
 Never prefix secrets with `VITE_` and never commit their values. Keep preview and production credentials in their respective Vercel environments. OAuth and account creation remain unavailable until the corresponding provider and database settings are configured.
 
+## Optional AI features
+
+enV can add optional AI help (captions, titles, regex/SQL/JSON explanations, image alt text, short audio transcripts) through a server-side layer that routes to OpenRouter, Groq and Gemini with cost-aware fallback. It stays off until you set at least one provider key, and every deterministic tool works without it. Setup, costs, privacy, operations and how to extend it are in [docs/ai-infrastructure.md](docs/ai-infrastructure.md); the variables are listed in `.env.example`. Run `npm run check:ai` after changing anything under `src/lib/ai`.
+
 ## Project structure
 
 - `src/routes/` — route-level pages
@@ -60,21 +65,20 @@ Never prefix secrets with `VITE_` and never commit their values. Keep preview an
 - `migrations/` — SQL schema migrations
 - `scripts/` — build, migration, and quality tooling
 
-## Catalog performance
+## Native Android and iOS
 
-`src/data/catalog.ts` remains the canonical tool source. `npm run update:home-tools` refreshes the small Home snapshot and creates ignored runtime JSON data: the Tools index is fetched only when a catalog tab is opened, the search index only when a query is entered, and a tool detail page fetches only its 250-record shard. These URLs are content-versioned and cached immutably; `npm run build` validates every generated entry and shard. The Home route does not import the full catalog.
+Android and iOS are maintained as first-class native applications under `apps/android/` and `apps/ios/`. They do not embed the website. Offline-capable tools execute in Kotlin/Swift, server-dependent tools call the enV backend gateway directly, and AI-assisted features call `/api/ai/status` and `/api/ai/run` directly from Kotlin/Swift. Provider secrets never ship with the apps; only the backend URL is configured per native build.
 
-## Mobile app
-
-`apps/mobile/` is a separate Expo/React Native shell for Android and iOS. TypeScript owns the shared UI/orchestration and calls native platform modules where needed; Android contact exchange is Kotlin and iOS contact exchange is Swift. The shell hosts the existing enV experience in a native WebView; secure HTTPS links stay in-app, and native bridges are restricted to the enV origin. The responsive web app uses safe-area-aware bottom navigation and paginated tool lists. GitHub Actions builds and uploads an Android APK/AAB and compiles an iOS Simulator build; the latter is not a distribution-signed IPA. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, signing limits, the public site URL, and device-validation requirements.
+Native AI uses the same task contracts as the web layer: anonymous signed AI-session cookies are stored locally so the backend can apply per-session rate limits, while provider selection, fallback, structured-output validation, privacy routing, and spend limits remain server-side.
 
 ## Privacy and security
 
 The project does not require an account for its browser-based utilities. Keep file handling local to the browser unless a specific feature clearly requires server processing. Review changes to authentication, migrations, and external network requests carefully.
 
+
 ## Category 20 — AI micro-tools
 
-The AI micro-tools category provides local, deterministic writing templates for titles, captions, bios, product copy, email drafts, prompts, alt text, SEO descriptions, resume bullets, outlines, CTAs, hooks, FAQs, meeting notes, rewriting, shortening, expansion, decision worksheets, ideas, and content briefs. These tools do not call an AI provider or upload user text.
+The AI micro-tools category keeps its deterministic generators available offline. Optional AI assists are layered on top where they add material value: platform captions/titles, regex explanations, SQL explanations, JSON structure analysis, image alt text, and short audio transcription. Nothing leaves the device until the user explicitly invokes the AI assist. The same server-side AI task contract is used by the web, Android, and iOS clients.
 
 ## FFmpeg media processor
 
@@ -93,7 +97,6 @@ Multi-file uploads are sent as repeated `files` multipart fields and are subject
 `script/transcription-processor.mjs` provides a separate, isolated speech-to-text service for future Audio to Text, Audio to Subtitles, Video to Text, and Video to Subtitles tools. It is deliberately not activated in the catalog until a real Whisper-compatible executable and model are configured.
 
 Environment:
-
 - `WHISPER_BIN` — Whisper-compatible CLI, default `whisper-cli`
 - `WHISPER_MODEL` — path to the downloaded Whisper model
 - `TRANSCRIBE_PORT` — default `8788`
@@ -101,7 +104,6 @@ Environment:
 - `TRANSCRIBE_ALLOWED_ORIGIN` — CORS origin
 
 Endpoints:
-
 - `GET /health` — reports executable/model readiness
 - `POST /transcribe` — multipart `file`, with `format=txt|srt|vtt`, optional `language`, and optional `translate=true`
 
@@ -112,7 +114,6 @@ The service uses an allowlisted command shape, isolated temporary directories, b
 `URL_MEDIA_PROCESSOR_URL` is the optional enV URL-media backend endpoint. The service in `scripts/url-media-processor.mjs` currently defines provider adapters for YouTube, TikTok, Facebook, Instagram, and X and uses `yt-dlp` only when the deployment explicitly provides that executable.
 
 Security boundaries include:
-
 - HTTPS/HTTP only
 - explicit provider-host allowlist
 - DNS resolution with private/local IP rejection

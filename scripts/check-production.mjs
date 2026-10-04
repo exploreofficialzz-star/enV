@@ -28,7 +28,7 @@ for (const tool of tools) {
   if (!tool.engine?.type || !engineTypes.has(tool.engine.type)) errors.push(`${tool.id}: unknown engine type`);
   if (tool.status === "active" && tool.engine?.type === "custom" && tool.category !== "mockups") {
     const supported = new Set([
-      "productivity", "personal", "communication", "streaming", "marketing", "accessibility",
+      "productivity", "personal", "communication", "streaming", "marketing", "accessibility", "screenshots",
     ]);
     const plannedLocalCategories = new Set(["events", "celebrations", "food", "travel", "photography", "video"]);
     const explicitCustomDispatchers = new Set([

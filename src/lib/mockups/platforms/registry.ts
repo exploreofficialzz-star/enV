@@ -5,6 +5,7 @@ import { instagramAdapter } from "./instagram.ts";
 import { imessageAdapter } from "./imessage.ts";
 import { messengerAdapter } from "./messenger.ts";
 import { discordAdapter } from "./discord.ts";
+import { telegramAdapter } from "./telegram.ts";
 import { signalAdapter } from "./signal.ts";
 import { xAdapter } from "./x.ts";
 import { tiktokAdapter } from "./tiktok.ts";
@@ -84,12 +85,13 @@ function makeAdapter(id: Exclude<MockupPlatform, "whatsapp">, config: Config): P
   };
 }
 
-const explicitAdapters: Partial<Record<MockupPlatform, PlatformAdapter>> = {
+export const PLATFORM_ADAPTERS: Record<MockupPlatform, PlatformAdapter> = {
   whatsapp: whatsappAdapter,
   "instagram-dm": instagramAdapter,
   imessage: imessageAdapter,
   messenger: messengerAdapter,
   discord: discordAdapter,
+  telegram: telegramAdapter,
   signal: signalAdapter,
   "x-dm": xAdapter,
   "tiktok-chat": tiktokAdapter,
@@ -106,10 +108,7 @@ const explicitAdapters: Partial<Record<MockupPlatform, PlatformAdapter>> = {
   sms: smsAdapter,
   tinder: tinderAdapter,
   "youtube-community": youtubeAdapter,
+  ...(Object.fromEntries(Object.entries(configs)
+    .filter(([id]) => !["instagram-dm", "imessage", "messenger", "discord", "telegram", "signal", "x-dm", "tiktok-chat", "snapchat", "slack", "google-messages", "linkedin-dm", "reddit", "threads", "email", "gmail", "outlook", "ai-chat", "sms", "tinder", "youtube-community"].includes(id))
+    .map(([id, config]) => [id, makeAdapter(id as Exclude<MockupPlatform, "whatsapp">, config)])) as Record<Exclude<MockupPlatform, "whatsapp" | "instagram-dm" | "imessage" | "messenger" | "discord">, PlatformAdapter>),
 };
-export const PLATFORM_ADAPTERS: Record<MockupPlatform, PlatformAdapter> = explicitAdapters as Record<MockupPlatform, PlatformAdapter>;
-for (const [id, config] of Object.entries(configs)) {
-  if (!PLATFORM_ADAPTERS[id as MockupPlatform]) {
-    PLATFORM_ADAPTERS[id as MockupPlatform] = makeAdapter(id as Exclude<MockupPlatform, "whatsapp">, config);
-  }
-}

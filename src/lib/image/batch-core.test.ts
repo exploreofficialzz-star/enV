@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runBatch, type BatchItem } from "./batch-engine.ts";
+import { runBatch } from "./batch-engine.ts";
 
 test("batch runner reports per-file success", async () => {
   const files = [new File(["a"], "a.txt"), new File(["b"], "b.txt")];
-  const states: BatchItem<string>[][] = [];
+  const states = [];
   const result = await runBatch(files, async (file, signal, onProgress) => {
     assert.equal(signal.aborted, false);
     onProgress(50);

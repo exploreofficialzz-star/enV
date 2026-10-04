@@ -1,6 +1,25 @@
+import { tools as allTools } from "@/data/catalog";
 import { CATEGORY_MAP } from "@/data/categories";
-import type { CategoryId, ToolMeta, ToolSummary } from "@/types/tool";
-export { toolPath } from "@/lib/tool-path";
+import type { CategoryId, ToolMeta } from "@/types/tool";
+
+const byId = new Map(allTools.map((t) => [t.id, t]));
+const byPath = new Map(allTools.map((t) => [`${t.category}/${t.slug}`, t]));
+
+export function getAllTools(): ToolMeta[] {
+  return allTools;
+}
+
+export function getActiveTools(): ToolMeta[] {
+  return allTools.filter((t) => t.status === "active" || t.status === "beta");
+}
+
+export function getToolById(id: string): ToolMeta | undefined {
+  return byId.get(id);
+}
+
+export function getToolByPath(category: string, slug: string): ToolMeta | undefined {
+  return byPath.get(`${category}/${slug}`);
+}
 
 function alphabeticalKey(value: string): string {
   return value
@@ -11,87 +30,65 @@ function alphabeticalKey(value: string): string {
     .trim();
 }
 
-export function getAllTools(tools: readonly ToolSummary[]): readonly ToolSummary[] {
-  return tools;
-}
-
-export function getActiveTools(tools: readonly ToolSummary[]): ToolSummary[] {
-  return tools.filter((tool) => tool.status === "active" || tool.status === "beta");
-}
-
-export function getToolById(tools: readonly ToolSummary[], id: string): ToolSummary | undefined {
-  return tools.find((tool) => tool.id === id);
-}
-
-export function getToolByPath(
-  tools: readonly ToolSummary[],
-  category: string,
-  slug: string,
-): ToolSummary | undefined {
-  return tools.find((tool) => tool.category === category && tool.slug === slug);
-}
-
-export function getToolsByCategory(
-  tools: readonly ToolSummary[],
-  category: CategoryId,
-): ToolSummary[] {
-  return tools
-    .filter((tool) => tool.category === category)
-    .sort(
-      (a, b) =>
-        alphabeticalKey(a.name).localeCompare(alphabeticalKey(b.name)) || a.id.localeCompare(b.id),
+export function getToolsByCategory(category: CategoryId): ToolMeta[] {
+  return allTools
+    .filter((t) => t.category === category)
+    .slice()
+    .sort((a, b) =>
+      alphabeticalKey(a.name).localeCompare(alphabeticalKey(b.name)) ||
+      a.id.localeCompare(b.id),
     );
 }
 
-export function getFeaturedTools(tools: readonly ToolSummary[], limit = 8): ToolSummary[] {
-  return getActiveTools(tools)
-    .filter((tool) => tool.featured)
+export function getFeaturedTools(limit = 8): ToolMeta[] {
+  return getActiveTools()
+    .filter((t) => t.featured)
     .sort((a, b) => b.popularity - a.popularity)
     .slice(0, limit);
 }
 
-export function getPopularTools(tools: readonly ToolSummary[], limit = 12): ToolSummary[] {
-  return getActiveTools(tools)
+export function getPopularTools(limit = 12): ToolMeta[] {
+  return getActiveTools()
+    .slice()
     .sort((a, b) => b.popularity - a.popularity)
     .slice(0, limit);
 }
 
-export function getNewTools(tools: readonly ToolSummary[], limit = 8): ToolSummary[] {
-  return getActiveTools(tools)
-    .filter((tool) => tool.isNew)
+export function getNewTools(limit = 8): ToolMeta[] {
+  return getActiveTools()
+    .filter((t) => t.isNew)
     .sort((a, b) => b.popularity - a.popularity)
     .slice(0, limit);
 }
 
-export function getRelatedTools(
-  tool: ToolMeta,
-  tools: readonly ToolSummary[],
-  limit = 6,
-): ToolSummary[] {
-  const byId = new Map(tools.map((item) => [item.id, item]));
+export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
   const related = tool.related
     .map((id) => byId.get(id))
-    .filter((item): item is ToolSummary => Boolean(item && item.status !== "planned"));
+    .filter((t): t is ToolMeta => Boolean(t && t.status !== "planned"));
   if (related.length >= limit) return related.slice(0, limit);
-  const seen = new Set([tool.id, ...related.map((item) => item.id)]);
-  const rest = getToolsByCategory(tools, tool.category).filter(
-    (item) => !seen.has(item.id) && item.status !== "planned",
+  const seen = new Set([tool.id, ...related.map((t) => t.id)]);
+  const rest = getToolsByCategory(tool.category).filter(
+    (t) => !seen.has(t.id) && t.status !== "planned",
   );
   return [...related, ...rest].slice(0, limit);
 }
 
-export function activeCount(tools: readonly ToolSummary[]): number {
-  return tools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
+export function activeCount(): number {
+  return getActiveTools().length;
 }
 
-export function plannedCount(tools: readonly ToolSummary[]): number {
-  return tools.filter((tool) => tool.status === "planned").length;
+export function plannedCount(): number {
+  return allTools.filter((t) => t.status === "planned").length;
 }
 
-export function totalToolCount(tools: readonly ToolSummary[]): number {
-  return tools.length;
+export function totalToolCount(): number {
+  return allTools.length;
 }
 
 export function categoryLabel(id: CategoryId): string {
   return CATEGORY_MAP[id]?.name ?? id;
+}
+
+export function toolPath(tool: ToolMeta): string {
+  return `/tools/${tool.category}/${tool.slug}`;
 }

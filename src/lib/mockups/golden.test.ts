@@ -13,8 +13,8 @@ function hash(value: string) { return createHash("sha256").update(value).digest(
 test("golden render remains deterministic", () => {
   const project = createDefaultProject("whatsapp");
   const device = DEVICE_TEMPLATES.find((d) => d.id === project.deviceTemplate)!;
-  const svg1 = renderProjectSvg(project, device, platformTheme(project.platform, project.theme).tokens);
-  const svg2 = renderProjectSvg(project, device, platformTheme(project.platform, project.theme).tokens);
+  const svg1 = renderProjectSvg(project, device, platformTheme(project.platform, project.theme));
+  const svg2 = renderProjectSvg(project, device, platformTheme(project.platform, project.theme));
   assert.equal(hash(svg1), hash(svg2));
   assert.match(svg1, /<svg/);
   assert.match(svg1, /WhatsApp|Alex/);

@@ -119,7 +119,7 @@ function contentDispositionFilename(headers, fallbackUrl) {
   const disposition = headers.get("content-disposition") || "";
   const match = disposition.match(/filename\\*?=(?:UTF-8''|")?([^";]+)/i);
   if (match?.[1]) {
-    try { return safeName(decodeURIComponent(match[1].replace(/^"|"$/g, "")), "download.bin"); } catch { /* fall back to the URL-derived filename */ }
+    try { return safeName(decodeURIComponent(match[1].replace(/^"|"$/g, "")), "download.bin"); } catch {}
   }
   const fromUrl = path.basename(new URL(fallbackUrl).pathname);
   return safeName(fromUrl || "download.bin", "download.bin");
@@ -220,7 +220,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
     }
     res.end();
   } catch (error) {
-    try { res.destroy(); } catch { /* response is already closing */ }
+    try { res.destroy(); } catch {}
     throw error;
   }
 }

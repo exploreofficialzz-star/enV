@@ -1,0 +1,111 @@
+name: Native iOS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "apps/shared/**"
+      - "scripts/check-native-icons.mjs"
+      - "package.json"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/catalog-reader.mjs"
+      - "src/data/catalog.ts"
+      - "src/data/categories.ts"
+      - ".github/workflows/ios-native-build.yml"
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "apps/shared/**"
+      - "scripts/check-native-icons.mjs"
+      - "package.json"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/catalog-reader.mjs"
+      - "src/data/catalog.ts"
+      - "src/data/categories.ts"
+      - ".github/workflows/ios-native-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios-simulator:
+    name: Build and test native SwiftUI app
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Regenerate shared offline catalog
+        working-directory: ${{ github.workspace }}
+        run: npm run export:native-catalog && git diff --exit-code -- apps/shared/catalog.json apps/shared/native-engine-inventory.json
+      - name: Verify native engine and execution coverage
+        working-directory: ${{ github.workspace }}
+        run: |
+          npm run export:native-engine-data
+          npm run export:native-execution-matrix
+          npm run check:native-calculators
+          npm run check:native-coverage
+          npm run check:native-executability
+          git diff --exit-code -- apps/shared apps/*/native-family-coverage apps/*/native-tool-coverage.txt apps/*/backend-tool-coverage.txt
+      - name: Verify shared native brand assets
+        working-directory: ${{ github.workspace }}
+        run: npm run check:native-icons
+      - name: Record iOS build toolchain
+        run: |
+          xcodebuild -version
+          xcode-select -p
+          xcodebuild -showsdks | grep -E 'iOS|iOS Simulator'
+      - name: Build SwiftUI app for iOS Simulator
+        run: |
+          xcodebuild \
+            -project enV.xcodeproj \
+            -scheme enV \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/env-ios-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Select an available iPhone Simulator
+        run: |
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/env-simulators.json"
+          simulator_id="$(python3 - "$RUNNER_TEMP/env-simulators.json" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1], encoding='utf-8')).get('devices', {})
+          for runtime, entries in devices.items():
+              if 'iOS' not in runtime:
+                  continue
+              for entry in entries:
+                  if entry.get('isAvailable', True) and entry.get('name', '').startswith('iPhone'):
+                      print(entry['udid'])
+                      raise SystemExit(0)
+          raise SystemExit('No available iPhone Simulator found')
+          PY
+          )"
+          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+          echo "Using iPhone Simulator $simulator_id"
+      - name: Run iOS XCTest suite
+        run: |
+          xcodebuild \
+            -project enV.xcodeproj \
+            -scheme enV \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/env-ios-test-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            test

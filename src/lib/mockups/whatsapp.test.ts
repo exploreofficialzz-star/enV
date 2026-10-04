@@ -12,11 +12,11 @@ test("WhatsApp adapter exposes the benchmark feature surface", () => {
     assert.equal(features.has(feature), true, feature);
   }
   assert.deepEqual(whatsappAdapter.composer?.actions, ["emoji", "attachment", "camera", "microphone", "send"]);
-  assert.equal(whatsappAdapter.renderHeader({ id: "them", name: "Alex", status: "last seen recently" }, platformTheme("whatsapp", "light").tokens).notice, "Messages are end-to-end encrypted");
+  assert.equal(whatsappAdapter.renderHeader({ id: "them", name: "Alex", status: "last seen recently" }, platformTheme("whatsapp", "light")).notice, "Messages are end-to-end encrypted");
 });
 
 test("WhatsApp rendering preserves structured message states", () => {
-  const project = createDefaultProject("whatsapp");
+  const project = createDefaultProject("WhatsApp benchmark");
   project.platform = "whatsapp";
   project.deviceTemplate = "iphone-pro-dark";
   project.messages = [

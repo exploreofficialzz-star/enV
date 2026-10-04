@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { parseGeneratedCatalog } from './catalog-reader.mjs';
 
+const root = new URL('../', import.meta.url);
 const data = JSON.parse(fs.readFileSync(new URL('../apps/shared/native-calculators.json', import.meta.url), 'utf8'));
 const catalog = parseGeneratedCatalog(fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8'));
 const active = new Map(catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta').map((tool) => [tool.id, tool]));
@@ -25,11 +26,7 @@ for (const tool of data.tools) {
     if (node.kind === 'binary' && !['+', '-', '*', '/', '**'].includes(node.op)) invalid.push(`${tool.id}: unsupported binary operator ${node.op}`);
     if (node.kind === 'unary' && !['+', '-'].includes(node.op)) invalid.push(`${tool.id}: unsupported unary operator ${node.op}`);
     if (node.kind === 'call' && !['gcd'].includes(node.name)) invalid.push(`${tool.id}: unsupported call ${node.name}`);
-    for (const value of Object.values(node)) {
-      if (!value || typeof value !== 'object') continue;
-      if (Array.isArray(value)) value.forEach(walk);
-      else walk(value);
-    }
+    for (const value of Object.values(node)) if (value && typeof value === 'object') Array.isArray(value) ? value.forEach(walk) : walk(value);
   };
   tool.outputs.forEach((output) => walk(output.value));
 }

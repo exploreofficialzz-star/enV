@@ -1,13 +1,11 @@
 import type { CalculatorDef, Field } from './formulas';
+import { numericOutput } from '@/lib/calc/numeric';
+import { readNumber, readPositive } from '@/lib/calc/input-context';
 
-const n = (v: unknown, label = 'value') => {
-  const x = Number(String(v ?? '').replace(/,/g, '').trim());
-  if (!Number.isFinite(x)) throw new Error(`Enter a valid ${label}.`);
-  return x;
-};
-const pos = (v: unknown, label = 'value') => { const x = n(v, label); if (x <= 0) throw new Error(`${label} must be greater than 0.`); return x; };
+const n = readNumber;
+const pos = readPositive;
 const f = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: 'number', ...extra });
-const out = (label: string, value: number | string, primary = false, hint?: string) => ({ label, value: typeof value === 'number' ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 10 }).format(value) : value, primary, hint });
+const out = (label: string, value: number | string, primary = false, hint?: string) => numericOutput(label, value, { primary, hint, maxFractionDigits: 10 });
 const add = (m: Record<string, CalculatorDef>, id: string, fields: Field[], compute: CalculatorDef['compute'], formula?: string) => { m[id] = { fields, compute, formula }; };
 
 export const stemCalculators: Record<string, CalculatorDef> = {};

@@ -1,27 +1,11 @@
 import type { CalculatorDef, Field } from "./formulas";
+import { numericOutput } from "@/lib/calc/numeric";
+import { readInteger, readList, readNumber, readPositive } from "@/lib/calc/input-context";
 
-const n = (v: unknown, label = "value") => {
-  const raw = typeof v === "number" ? String(v) : String(v ?? "").replace(/,/g, "").trim();
-  if (raw === "") throw new Error(`Enter a valid ${label}.`);
-  const x = typeof v === "number" ? v : Number(raw);
-  if (!Number.isFinite(x)) throw new Error(`Enter a valid ${label}.`);
-  return x;
-};
-const pos = (v: unknown, label = "value") => {
-  const x = n(v, label);
-  if (x <= 0) throw new Error(`${label} must be greater than 0.`);
-  return x;
-};
-const integer = (v: unknown, label = "value") => {
-  const x = n(v, label);
-  if (!Number.isInteger(x)) throw new Error(`${label} must be a whole number.`);
-  return x;
-};
-const list = (v: unknown) => {
-  const xs = String(v ?? "").split(/[\s,;]+/).filter(Boolean).map((x) => Number(x.replace(/,/g, "")));
-  if (!xs.length || xs.some((x) => !Number.isFinite(x))) throw new Error("Enter numbers separated by commas or spaces.");
-  return xs;
-};
+const n = readNumber;
+const pos = readPositive;
+const integer = readInteger;
+const list = (v: unknown) => readList(v);
 const parseWeightedMasses = (v: unknown) => {
   const tokens = String(v ?? "").split(/[,;\n]|(?<!\*)\s+(?!\*)/).map((token) => token.trim()).filter(Boolean);
   if (!tokens.length) throw new Error("Enter molar masses separated by commas or spaces.");
@@ -38,7 +22,7 @@ const parseWeightedMasses = (v: unknown) => {
     return count * mass;
   });
 };
-const out = (label: string, value: number | string, primary = false, hint?: string) => ({ label, value: typeof value === "number" ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(value) : value, primary, hint });
+const out = (label: string, value: number | string, primary = false, hint?: string) => numericOutput(label, value, { primary, hint, maxFractionDigits: 8 });
 const f = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "number", ...extra });
 const text = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "text", ...extra });
 const ta = (name: string, label: string, extra: Partial<Field> = {}): Field => ({ name, label, type: "textarea", ...extra });

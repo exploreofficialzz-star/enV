@@ -1,10 +1,12 @@
 import type { CalculatorDef, Field } from "./formulas";
+import { numericOutput } from "@/lib/calc/numeric";
+import { readInteger, readList, readNumber, readPositive } from "@/lib/calc/input-context";
 const calculators: Record<string, CalculatorDef> = {};
-const n=(v:unknown,label="value")=>{const s=String(v??"").replace(/,/g,"").trim();if(s==="")throw new Error(`Enter a valid ${label}.`);const x=Number(s);if(!Number.isFinite(x))throw new Error(`Enter a valid ${label}.`);return x;};
-const pos=(v:unknown,label="value")=>{const x=n(v,label);if(x<=0)throw new Error(`${label} must be greater than 0.`);return x;};
-const integer=(v:unknown,label="value")=>{const x=n(v,label);if(!Number.isInteger(x))throw new Error(`${label} must be a whole number.`);return x;};
-const list=(v:unknown)=>{const xs=String(v??"").split(/[\s,;]+/).filter(Boolean).map(Number);if(!xs.length||xs.some(x=>!Number.isFinite(x)))throw new Error("Enter valid numbers separated by commas or spaces.");return xs;};
-const out=(label:string,value:number|string,primary=false,hint?:string)=>({label,value:typeof value==="number"?new Intl.NumberFormat(undefined,{maximumFractionDigits:8}).format(value):value,primary,hint});
+const n=readNumber;
+const pos=readPositive;
+const integer=readInteger;
+const list=(v:unknown)=>readList(v);
+const out=(label:string,value:number|string,primary=false,hint?:string)=>numericOutput(label,value,{primary,hint,maxFractionDigits:8});
 const f=(name:string,label:string,extra:Partial<Field>={})=>({name,label,type:"number",...extra} as Field);
 const text=(name:string,label:string,extra:Partial<Field>={})=>({name,label,type:"text",...extra} as Field);
 const ta=(name:string,label:string,extra:Partial<Field>={})=>({name,label,type:"textarea",...extra} as Field);

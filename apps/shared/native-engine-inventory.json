@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "6da86b90a18d",
+  "catalogVersion": "0ea1c183b9bc",
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
@@ -98,12 +98,12 @@
     },
     {
       "family": "custom",
-      "total": 1791,
-      "active": 1012,
-      "planned": 779,
+      "total": 1801,
+      "active": 1127,
+      "planned": 674,
       "androidImplemented": 0,
       "iosImplemented": 0,
-      "uniqueConfigurations": 1791
+      "uniqueConfigurations": 1801
     },
     {
       "family": "datetime",
@@ -122,15 +122,6 @@
       "androidImplemented": 19,
       "iosImplemented": 19,
       "uniqueConfigurations": 446
-    },
-    {
-      "family": "device",
-      "total": 9,
-      "active": 9,
-      "planned": 0,
-      "androidImplemented": 0,
-      "iosImplemented": 0,
-      "uniqueConfigurations": 9
     },
     {
       "family": "document",
@@ -161,12 +152,12 @@
     },
     {
       "family": "image",
-      "total": 197,
-      "active": 197,
+      "total": 196,
+      "active": 196,
       "planned": 0,
       "androidImplemented": 0,
       "iosImplemented": 0,
-      "uniqueConfigurations": 187
+      "uniqueConfigurations": 186
     },
     {
       "family": "mime",
@@ -13726,9 +13717,9 @@
   ],
   "summary": {
     "totalTools": 10000,
-    "activeTools": 8789,
-    "plannedTools": 1211,
-    "engineFamilies": 29,
+    "activeTools": 8894,
+    "plannedTools": 1106,
+    "engineFamilies": 28,
     "androidImplemented": 6726,
     "iosImplemented": 6726
   }
