@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Download, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { downloadBlob } from "@/lib/utils";
 
 const IMAGE_OPS = new Set(["jpg-to-png", "png-to-jpg", "png-to-webp", "webp-to-png", "jpg-to-webp", "webp-to-jpg", "svg-to-png", "png-to-svg"]);
 const ACCEPT: Record<string, string> = {
@@ -12,10 +13,28 @@ const ACCEPT: Record<string, string> = {
   "txt-to-csv": ".txt,text/plain", "csv-to-txt": ".csv,text/csv", "markdown-to-html": ".md,.markdown,text/markdown", "html-to-markdown": ".html,.htm,text/html",
 };
 
-function download(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("The selected file could not be read."));
+    reader.onerror = () => reject(reader.error ?? new Error("The selected file could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("The selected PNG could not be decoded on this device."));
+      image.src = url;
+    });
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function parseCsv(text: string, delimiter = ","): string[][] {
@@ -43,15 +62,46 @@ function htmlToMarkdown(text: string) { return text.replace(/<script[\s\S]*?<\/s
 
 export function FileConverterEngine({ op }: { op: string }) {
   const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState("");
-  useEffect(() => () => { if (output) URL.revokeObjectURL(URL.createObjectURL(output.blob)); }, [output]);
   const image = IMAGE_OPS.has(op); const accept = ACCEPT[op] ?? "*/*";
   const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
   async function run() {
     if (!file) { setError("Choose a file first."); return; } setError(null); setOutput(null);
     try {
       if (image) {
-        if (op === "png-to-svg") { const data = await file.arrayBuffer(); const b64 = btoa(String.fromCharCode(...new Uint8Array(data))); const img = await createImageBitmap(file); const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="data:image/png;base64,${b64}" width="100%" height="100%"/></svg>`; const blob = new Blob([svg], {type:"image/svg+xml"}); setOutput({blob,name:file.name.replace(/\.[^.]+$/, ".svg")}); setPreview(svg.slice(0,500)); return; }
-        const src = URL.createObjectURL(file); const img = new Image(); await new Promise((res, rej) => { img.onload=()=>res(null); img.onerror=rej; img.src=src; }); const canvas=document.createElement("canvas"); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; const ctx=canvas.getContext("2d"); if(!ctx) throw new Error("Your browser cannot create a canvas."); if(op.includes("jpg")) { ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); } ctx.drawImage(img,0,0); const mime=op.endsWith("png")?"image/png":op.endsWith("webp")?"image/webp":"image/jpeg"; const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,mime,0.92)); URL.revokeObjectURL(src); if(!blob) throw new Error("Could not encode the converted image."); const ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg"; setOutput({blob,name:file.name.replace(/\.[^.]+$/, `.${ext}`)}); return;
+        if (op === "png-to-svg") {
+          const { width, height } = await readImageDimensions(file);
+          const dataUrl = await readAsDataUrl(file);
+          if (!dataUrl.startsWith("data:image/png;base64,")) throw new Error("The PNG could not be encoded for SVG output.");
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><image href="${dataUrl}" width="100%" height="100%"/></svg>`;
+          const blob = new Blob([svg], { type: "image/svg+xml" });
+          setOutput({ blob, name: file.name.replace(/\.[^.]+$/, ".svg") });
+          setPreview(svg.slice(0, 500));
+          return;
+        }
+        const src = URL.createObjectURL(file);
+        try {
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error("The selected image could not be decoded on this device."));
+            img.src = src;
+          });
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Your browser cannot create a canvas.");
+          if (op.includes("jpg")) { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+          ctx.drawImage(img, 0, 0);
+          const mime = op.endsWith("png") ? "image/png" : op.endsWith("webp") ? "image/webp" : "image/jpeg";
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, 0.92));
+          if (!blob) throw new Error("Could not encode the converted image.");
+          const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+          setOutput({ blob, name: file.name.replace(/\.[^.]+$/, `.${ext}`) });
+          return;
+        } finally {
+          URL.revokeObjectURL(src);
+        }
       }
       const text=await file.text(); let result=""; let ext="txt";
       if(op==="csv-to-json") { result=csvToJson(text); ext="json"; } else if(op==="json-to-csv") { result=rowsToCsv(jsonToRows(text)); ext="csv"; } else if(op==="csv-to-tsv") { result=rowsToCsv(parseCsv(text),"\t"); ext="tsv"; } else if(op==="tsv-to-csv") { result=rowsToCsv(parseCsv(text,"\t")); ext="csv"; } else if(op==="xml-to-json") { const doc=new DOMParser().parseFromString(text,"application/xml"); if(doc.querySelector("parsererror")) throw new Error("Invalid XML."); result=JSON.stringify({[doc.documentElement.tagName]:xmlToObject(doc.documentElement)},null,2); ext="json"; } else if(op==="json-to-xml") { result='<?xml version="1.0" encoding="UTF-8"?>\n'+objectToXml(JSON.parse(text)); ext="xml"; } else if(op==="yaml-to-json") { result=JSON.stringify(simpleYamlParse(text),null,2); ext="json"; } else if(op==="json-to-yaml") { result=jsonToYaml(JSON.parse(text))+"\n"; ext="yaml"; } else if(op==="txt-to-csv") { result=rowsToCsv(text.split(/\r?\n/).filter(Boolean).map(x=>[x])); ext="csv"; } else if(op==="csv-to-txt") { result=parseCsv(text).map(r=>r.join(" ")).join("\n")+"\n"; ext="txt"; } else if(op==="markdown-to-html") { result='<!doctype html>\n<html><head><meta charset="utf-8"><title>Converted document</title></head><body>\n'+markdownToHtml(text)+'\n</body></html>\n'; ext="html"; } else if(op==="html-to-markdown") { result=htmlToMarkdown(text)+"\n"; ext="md"; } else throw new Error("Unsupported conversion.");
@@ -61,7 +111,7 @@ export function FileConverterEngine({ op }: { op: string }) {
   return <div className="space-y-5">
     <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="flex items-center gap-2 font-medium"><FileUp className="size-4" /> {label}</div><p className="mt-1 text-sm text-subtle">Processed entirely in your browser. Your file is not uploaded to enV.</p><input className="mt-4 block w-full text-sm" type="file" accept={accept} onChange={e=>{setFile(e.target.files?.[0]??null);setOutput(null);setPreview("");setError(null);}} /></div>
     <ErrorBanner message={error} />
-    <div className="flex gap-2"><Button onClick={run} disabled={!file}>Convert</Button>{output?<Button variant="outline" onClick={()=>download(output.blob,output.name)}><Download className="mr-2 size-4"/>Download {output.name}</Button>:null}</div>
+    <div className="flex gap-2"><Button onClick={run} disabled={!file}>Convert</Button>{output?<Button variant="outline" onClick={()=>downloadBlob(output.blob,output.name)}><Download className="mr-2 size-4"/>Download {output.name}</Button>:null}</div>
     {preview?<pre className="max-h-72 overflow-auto rounded-lg bg-surface-2 p-4 text-xs whitespace-pre-wrap">{preview}</pre>:null}
   </div>;
 }

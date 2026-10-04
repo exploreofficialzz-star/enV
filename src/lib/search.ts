@@ -1,4 +1,4 @@
-import type { ToolMeta } from "@/types/tool";
+import type { SearchTool } from "@/types/tool";
 
 const SYNONYMS: Record<string, string[]> = {
   photo: ["image", "picture", "pic"],
@@ -23,66 +23,148 @@ const SYNONYMS: Record<string, string[]> = {
   decode: ["decoding"],
 };
 
-function tokens(q: string): string[] {
-  return q
+type SearchRecord = {
+  tool: SearchTool;
+  index: number;
+  id: string;
+  name: string;
+  keywords: string[];
+  haystack: string;
+};
+
+type RankedTool = { tool: SearchTool; index: number; score: number };
+
+export type ToolSearchResults = {
+  tools: SearchTool[];
+  matchCount: number;
+};
+
+const indexCache = new WeakMap<readonly SearchTool[], SearchRecord[]>();
+
+function tokens(query: string): string[] {
+  return query
     .toLowerCase()
     .split(/[^a-z0-9%+]+/)
-    .filter((t) => t.length > 1 || t === "%");
+    .filter((token) => token.length > 1 || token === "%");
 }
 
-function expand(ts: string[]): string[] {
-  const out = new Set(ts);
-  for (const t of ts) {
-    const syn = SYNONYMS[t];
-    if (syn) syn.forEach((s) => out.add(s));
+function expand(queryTokens: string[]): string[] {
+  const expanded = new Set(queryTokens);
+  for (const token of queryTokens) {
+    for (const synonym of SYNONYMS[token] ?? []) expanded.add(synonym);
   }
-  return [...out];
+  return [...expanded];
 }
 
-function haystack(tool: ToolMeta): string {
-  return [
-    tool.name,
+function buildRecord(tool: SearchTool, index: number): SearchRecord {
+  const name = tool.name.toLowerCase();
+  const keywords = tool.keywords.map((keyword) => keyword.toLowerCase());
+  const haystack = [
+    name,
     tool.description,
     tool.category,
     tool.subcategory ?? "",
-    ...tool.keywords,
+    ...keywords,
     ...tool.tags,
     tool.id,
   ]
     .join(" ")
     .toLowerCase();
+  return { tool, index, id: tool.id.toLowerCase(), name, keywords, haystack };
 }
 
-export function scoreTool(tool: ToolMeta, query: string): number {
-  const q = query.trim().toLowerCase();
-  if (!q) return tool.popularity;
-  const name = tool.name.toLowerCase();
-  if (name === q || tool.id === q) return 2000 + tool.popularity;
-  if (name.startsWith(q)) return 1400 + tool.popularity;
-  if (tool.id.includes(q) || name.includes(q)) return 1000 + tool.popularity;
+function getIndex(tools: readonly SearchTool[]): SearchRecord[] {
+  const cached = indexCache.get(tools);
+  if (cached) return cached;
+  const index = tools.map(buildRecord);
+  indexCache.set(tools, index);
+  return index;
+}
 
-  const ts = expand(tokens(q));
-  const hay = haystack(tool);
+function scoreRecord(record: SearchRecord, query: string, queryTokens: string[]): number {
+  if (!query) return record.tool.popularity;
+  if (record.name === query || record.id === query) return 2000 + record.tool.popularity;
+  if (record.name.startsWith(query)) return 1400 + record.tool.popularity;
+  if (record.id.includes(query) || record.name.includes(query))
+    return 1000 + record.tool.popularity;
+
   let hits = 0;
-  for (const t of ts) {
-    if (name.includes(t)) hits += 8;
-    else if (tool.keywords.some((k) => k.toLowerCase().includes(t))) hits += 5;
-    else if (hay.includes(t)) hits += 2;
+  for (const token of queryTokens) {
+    if (record.name.includes(token)) hits += 8;
+    else if (record.keywords.some((keyword) => keyword.includes(token))) hits += 5;
+    else if (record.haystack.includes(token)) hits += 2;
   }
-  if (hits === 0) return 0;
-  return hits * 40 + tool.popularity;
+  return hits === 0 ? 0 : hits * 40 + record.tool.popularity;
 }
 
-export function searchTools(tools: ToolMeta[], query: string, limit = 40): ToolMeta[] {
-  const q = query.trim();
-  const pool = tools;
-  if (!q) {
-    return [...pool].sort((a, b) => b.popularity - a.popularity).slice(0, limit);
+function isWorse(left: RankedTool, right: RankedTool): boolean {
+  return left.score < right.score || (left.score === right.score && left.index > right.index);
+}
+
+function isBetter(left: RankedTool, right: RankedTool): boolean {
+  return left.score > right.score || (left.score === right.score && left.index < right.index);
+}
+
+function siftUpWorst(heap: RankedTool[], index: number): void {
+  let child = index;
+  while (child > 0) {
+    const parent = Math.floor((child - 1) / 2);
+    if (!isWorse(heap[child], heap[parent])) break;
+    [heap[parent], heap[child]] = [heap[child], heap[parent]];
+    child = parent;
   }
-  return pool
-    .map((t) => ({ t, s: scoreTool(t, q) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, limit)
-    .map((x) => x.t);
+}
+
+function siftDownWorst(heap: RankedTool[], index: number): void {
+  let parent = index;
+  while (true) {
+    const left = parent * 2 + 1;
+    const right = left + 1;
+    let worst = parent;
+    if (left < heap.length && isWorse(heap[left], heap[worst])) worst = left;
+    if (right < heap.length && isWorse(heap[right], heap[worst])) worst = right;
+    if (worst === parent) return;
+    [heap[parent], heap[worst]] = [heap[worst], heap[parent]];
+    parent = worst;
+  }
+}
+
+export function scoreTool(tool: SearchTool, query: string): number {
+  const normalized = query.trim().toLowerCase();
+  return scoreRecord(buildRecord(tool, 0), normalized, expand(tokens(normalized)));
+}
+
+export function searchToolResults(
+  tools: readonly SearchTool[],
+  query: string,
+  limit = 40,
+): ToolSearchResults {
+  const normalized = query.trim().toLowerCase();
+  const queryTokens = expand(tokens(normalized));
+  const capacity = Math.max(0, Math.floor(limit));
+  const heap: RankedTool[] = [];
+  let matchCount = 0;
+
+  for (const record of getIndex(tools)) {
+    const score = scoreRecord(record, normalized, queryTokens);
+    if (normalized && score <= 0) continue;
+    matchCount += 1;
+    if (capacity === 0) continue;
+
+    const ranked = { tool: record.tool, index: record.index, score };
+    if (heap.length < capacity) {
+      heap.push(ranked);
+      siftUpWorst(heap, heap.length - 1);
+    } else if (isBetter(ranked, heap[0])) {
+      heap[0] = ranked;
+      siftDownWorst(heap, 0);
+    }
+  }
+
+  heap.sort((a, b) => b.score - a.score || a.index - b.index);
+  return { tools: heap.map((item) => item.tool), matchCount };
+}
+
+export function searchTools(tools: readonly SearchTool[], query: string, limit = 40): SearchTool[] {
+  return searchToolResults(tools, query, limit).tools;
 }

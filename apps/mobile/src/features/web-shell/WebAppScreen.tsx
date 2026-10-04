@@ -22,6 +22,7 @@ import {
   MAX_NATIVE_DOWNLOAD_BYTES,
   WEB_APP_URL,
   isInternalWebUrl,
+  isSafeHttpsWebUrl,
 } from "@/lib/web-app-config";
 
 const WEBVIEW_LOAD_TIMEOUT_MS = 20_000;
@@ -73,6 +74,7 @@ export default function WebAppScreen() {
   const [loadError, setLoadError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activePageUrlRef = useRef(WEB_APP_URL);
 
   const clearLoadTimeout = useCallback(() => {
     if (loadTimeoutRef.current !== null) {
@@ -97,11 +99,12 @@ export default function WebAppScreen() {
     return next;
   }, []);
 
-  const openExternal = useCallback((url: string) => {
-    if (!/^(https?:\/\/|mailto:|tel:)/i.test(url)) return;
+  const openNativeLink = useCallback((url: string) => {
+    if (!/^(mailto:|tel:)/i.test(url)) return false;
     void Linking.openURL(url).catch(() => {
       Alert.alert("Unable to open link", "This link could not be opened on your device.");
     });
+    return true;
   }, []);
 
   const shareLocalFile = useCallback(async (uri: string, name: string, mimeType: string) => {
@@ -132,6 +135,7 @@ export default function WebAppScreen() {
   }, [shareLocalFile]);
 
   const handleBridgeMessage = useCallback((rawData: string) => {
+    if (!isInternalWebUrl(activePageUrlRef.current)) return;
     let message: BridgeMessage;
     try {
       message = JSON.parse(rawData) as BridgeMessage;
@@ -240,6 +244,7 @@ export default function WebAppScreen() {
 
   useEffect(() => {
     const subscription = ContactExchangeModule.addListener("onContactExchangeEvent", (event: unknown) => {
+      if (!isInternalWebUrl(activePageUrlRef.current)) return;
       const payload = JSON.stringify({ type: "env-contact-exchange-event", event });
       webViewRef.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent("message", { data: ${JSON.stringify(payload)} })); true;`);
     });
@@ -247,19 +252,23 @@ export default function WebAppScreen() {
   }, []);
 
   const handleShouldStartLoad = useCallback((request: { url: string }) => {
-    if (isInternalWebUrl(request.url)) return true;
-    openExternal(request.url);
+    if (isSafeHttpsWebUrl(request.url)) {
+      activePageUrlRef.current = request.url;
+      return true;
+    }
+    openNativeLink(request.url);
     return false;
-  }, [openExternal]);
+  }, [openNativeLink]);
 
   const handleOpenWindow = useCallback((event: { nativeEvent: { targetUrl: string } }) => {
     const targetUrl = event.nativeEvent.targetUrl;
-    if (isInternalWebUrl(targetUrl)) {
+    if (isSafeHttpsWebUrl(targetUrl)) {
+      activePageUrlRef.current = targetUrl;
       webViewRef.current?.injectJavaScript(`window.location.assign(${JSON.stringify(targetUrl)}); true;`);
       return;
     }
-    openExternal(targetUrl);
-  }, [openExternal]);
+    openNativeLink(targetUrl);
+  }, [openNativeLink]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -272,6 +281,7 @@ export default function WebAppScreen() {
 
   const retry = useCallback(() => {
     clearLoadTimeout();
+    activePageUrlRef.current = WEB_APP_URL;
     setLoadError(false);
     setIsLoading(true);
     setCanGoBack(false);
@@ -282,7 +292,6 @@ export default function WebAppScreen() {
     return (
       <ConnectionErrorView
         onRetry={retry}
-        onOpenBrowser={() => openExternal(WEB_APP_URL)}
       />
     );
   }
@@ -299,20 +308,41 @@ export default function WebAppScreen() {
           onOpenWindow={handleOpenWindow}
           onFileDownload={({ nativeEvent }) => { void handleDirectDownload(nativeEvent.downloadUrl); }}
           onMessage={(event) => handleBridgeMessage(event.nativeEvent.data)}
-          onNavigationStateChange={(navigationState) => setCanGoBack(navigationState.canGoBack)}
-          onLoadStart={() => { setIsLoading(true); setLoadError(false); startLoadTimeout(); }}
+          onNavigationStateChange={(navigationState) => {
+            activePageUrlRef.current = navigationState.url;
+            setCanGoBack(navigationState.canGoBack);
+          }}
+          onLoadStart={(event) => {
+            activePageUrlRef.current = event.nativeEvent.url;
+            setIsLoading(true);
+            setLoadError(false);
+            startLoadTimeout();
+          }}
           onLoadEnd={() => { clearLoadTimeout(); setIsLoading(false); }}
-          onError={() => { clearLoadTimeout(); setIsLoading(false); setLoadError(true); }}
-          onRenderProcessGone={() => { webViewRef.current?.reload(); }}
-          onContentProcessDidTerminate={() => { webViewRef.current?.reload(); }}
+          onError={(event) => {
+            if (event.nativeEvent.url !== activePageUrlRef.current) return;
+            clearLoadTimeout();
+            setIsLoading(false);
+            setLoadError(true);
+          }}
+          onHttpError={(event) => {
+            const { url, statusCode } = event.nativeEvent;
+            if (url !== activePageUrlRef.current || statusCode < 400) return;
+            clearLoadTimeout();
+            setIsLoading(false);
+            setLoadError(true);
+          }}
+          onRenderProcessGone={retry}
+          onContentProcessDidTerminate={retry}
           injectedJavaScriptBeforeContentLoaded={BLOB_DOWNLOAD_BRIDGE_SCRIPT}
           injectedJavaScript={BLOB_DOWNLOAD_BRIDGE_SCRIPT}
           javaScriptEnabled
           domStorageEnabled
+          cacheEnabled
           mixedContentMode="never"
           javaScriptCanOpenWindowsAutomatically={false}
           allowsBackForwardNavigationGestures={Platform.OS === "ios"}
-          pullToRefreshEnabled={Platform.OS === "ios"}
+          pullToRefreshEnabled
           setSupportMultipleWindows
           startInLoadingState
           renderLoading={() => (

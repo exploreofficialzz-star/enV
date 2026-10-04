@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { frameSpec, parseScreenshotToolId, validateImageFile, type ScreenshotFamily, type ScreenshotWorkflow } from "@/components/engines/screenshot-engine-utils";
+import { downloadBlob } from "@/lib/utils";
 
 function readImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -11,11 +12,6 @@ function readImage(file: File): Promise<HTMLImageElement> {
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("The image could not be decoded.")); };
     img.src = url;
   });
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob); const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
 }
 
 function familyTitle(family: ScreenshotFamily) {

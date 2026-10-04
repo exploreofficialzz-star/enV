@@ -1,13 +1,17 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getFeaturedTools, getPopularTools, toolPath } from "@/lib/registry";
+import homeTools from "@/data/home-tools.json";
+import { toolPath } from "@/lib/tool-path";
+import type { ToolMeta } from "@/types/tool";
+
+type HomeTool = Pick<ToolMeta, "id" | "name" | "description" | "category" | "slug">;
+const featuredTools = homeTools.featured as HomeTool[];
+const popularTools = homeTools.popular as HomeTool[];
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  const featured = getFeaturedTools();
-  const popular = getPopularTools(12);
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -16,13 +20,13 @@ function Home() {
         <p className="mt-4 max-w-2xl text-lg text-muted">Convert, calculate, generate, and transform without sending your files or text away.</p>
         <Link to="/tools" className="mt-6 inline-flex rounded-md bg-accent px-4 py-2 text-sm font-medium text-white">Browse all tools</Link>
       </section>
-      <ToolSection title="Featured tools" tools={featured} />
-      <ToolSection title="Popular tools" tools={popular} />
+      <ToolSection title="Featured tools" tools={featuredTools} />
+      <ToolSection title="Popular tools" tools={popularTools} />
     </AppShell>
   );
 }
 
-function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof getPopularTools> }) {
+function ToolSection({ title, tools }: { title: string; tools: readonly HomeTool[] }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <h2 className="text-xl font-semibold">{title}</h2>

@@ -34,6 +34,7 @@ function ratioLabel(w: number, h: number) {
 }
 
 function pickRecorderMime() {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return "";
   const candidates = [
     "audio/webm;codecs=opus",
     "audio/webm",
@@ -140,6 +141,9 @@ async function recordVideoSegment(file: File, start: number, end: number, playba
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is unavailable in this browser.");
+    if (typeof canvas.captureStream !== "function") {
+      throw new Error("This browser cannot export a locally edited video because canvas capture is unavailable.");
+    }
     const canvasStream = canvas.captureStream(30);
     let audioContext: AudioContext | null = null;
     let source: MediaElementAudioSourceNode | null = null;

@@ -5,10 +5,9 @@ import { BRAND_STATUS_BAR_COLOR } from "@/lib/web-app-config";
 
 type Props = {
   onRetry: () => void;
-  onOpenBrowser: () => void;
 };
 
-export function ConnectionErrorView({ onRetry, onOpenBrowser }: Props) {
+export function ConnectionErrorView({ onRetry }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -21,9 +20,6 @@ export function ConnectionErrorView({ onRetry, onOpenBrowser }: Props) {
         </Text>
         <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
           <Text style={styles.primaryButtonText}>Try again</Text>
-        </Pressable>
-        <Pressable accessibilityRole="link" onPress={onOpenBrowser} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-          <Text style={styles.secondaryButtonText}>Open enV in browser</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -39,7 +35,5 @@ const styles = StyleSheet.create({
   body: { color: "#5E6763", fontSize: 16, lineHeight: 24, textAlign: "center", marginTop: 10, marginBottom: 26 },
   primaryButton: { minHeight: 48, paddingHorizontal: 24, borderRadius: 14, backgroundColor: BRAND_STATUS_BAR_COLOR, alignItems: "center", justifyContent: "center", alignSelf: "stretch" },
   primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  secondaryButton: { minHeight: 48, paddingHorizontal: 24, alignItems: "center", justifyContent: "center", marginTop: 8 },
-  secondaryButtonText: { color: BRAND_STATUS_BAR_COLOR, fontSize: 15, fontWeight: "600" },
   pressed: { opacity: 0.75 },
 });

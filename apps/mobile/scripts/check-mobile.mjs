@@ -10,9 +10,14 @@ const require = createRequire(import.meta.url);
 const packageJson = JSON.parse(readFileSync(join(appRoot, "package.json"), "utf8"));
 const appConfig = JSON.parse(readFileSync(join(appRoot, "app.json"), "utf8")).expo;
 const gitignore = readFileSync(join(appRoot, ".gitignore"), "utf8");
+const iosWorkflow = readFileSync(resolve(appRoot, "../../.github/workflows/ios-build.yml"), "utf8");
 const webShell = readFileSync(join(appRoot, "src/features/web-shell/WebAppScreen.tsx"), "utf8");
 const bridge = readFileSync(
   join(appRoot, "src/features/web-shell/blob-download-bridge.ts"),
+  "utf8",
+);
+const connectionErrorView = readFileSync(
+  join(appRoot, "src/features/web-shell/ConnectionErrorView.tsx"),
   "utf8",
 );
 const webConfig = readFileSync(join(appRoot, "src/lib/web-app-config.ts"), "utf8");
@@ -94,6 +99,16 @@ assert.equal(
   appConfig.android.package,
   "iOS bundle ID must be ready to align with Android.",
 );
+assert.equal(
+  appConfig.ios.deploymentTarget,
+  "16.4",
+  "iOS deployment target must support the Expo native modules used by this app.",
+);
+assert.match(
+  appConfig.version,
+  /^\d+\.\d+\.\d+$/,
+  "Native app version must use semantic version formatting.",
+);
 assert.ok(
   Number.isSafeInteger(appConfig.android.versionCode) && appConfig.android.versionCode > 0,
   "Android versionCode must be a positive integer.",
@@ -134,6 +149,11 @@ assert.ok(
   "WebView must use a validated HTTPS origin.",
 );
 assert.ok(
+  webConfig.includes("function isSafeHttpsWebUrl") &&
+    webConfig.includes("!parsed.username && !parsed.password"),
+  "In-app navigation must reject non-HTTPS links and embedded credentials.",
+);
+assert.ok(
   webConfig.includes('DEFAULT_WEB_APP_URL = "https://en-v.vercel.app"'),
   "Default WebView origin must remain the verified live repository homepage.",
 );
@@ -163,8 +183,23 @@ assert.ok(
   "Browser builds must use the TypeScript web fallback rather than requiring a native module.",
 );
 assert.ok(
-  webShell.includes("onShouldStartLoadWithRequest") && webShell.includes("BackHandler"),
+  webShell.includes("onShouldStartLoadWithRequest") &&
+    webShell.includes("BackHandler") &&
+    webShell.includes("isSafeHttpsWebUrl") &&
+    webShell.includes('originWhitelist={["https://*"]}') &&
+    webShell.includes('allowsBackForwardNavigationGestures={Platform.OS === "ios"}'),
   "Native navigation controls are incomplete.",
+);
+assert.ok(
+  webShell.includes("onHttpError") &&
+    webShell.includes("onRenderProcessGone={retry}") &&
+    webShell.includes("onContentProcessDidTerminate={retry"),
+  "WebView HTTP failures and native renderer crashes must have an in-app recovery path.",
+);
+assert.doesNotMatch(
+  `${webShell}\n${connectionErrorView}`,
+  /onOpenBrowser|Open enV in browser|openURL\(WEB_APP_URL\)/,
+  "Connection and navigation recovery must not escape to an external browser.",
 );
 assert.ok(
   webShell.includes("onMessage") && webShell.includes("FileSystem.EncodingType.Base64"),
@@ -173,8 +208,17 @@ assert.ok(
 assert.ok(
   bridge.includes("a[download]") &&
     bridge.includes('indexOf("blob:")') &&
-    bridge.includes("env-download-chunk"),
-  "Blob download bridge must target generated blob anchors and transfer chunks.",
+    bridge.includes("env-download-chunk") &&
+    bridge.includes("window.location.origin") &&
+    bridge.includes("window.__envBlobDownloadBridgeInstalled = true"),
+  "Blob download bridge must transfer generated files only on the configured enV origin.",
+);
+assert.ok(
+  iosWorkflow.includes("runs-on: macos-15") &&
+    iosWorkflow.includes("pod install --project-directory=ios") &&
+    iosWorkflow.includes("xcodebuild") &&
+    iosWorkflow.includes("CODE_SIGNING_ALLOWED=NO"),
+  "iOS CI must compile the app for Simulator without pretending to produce a signed device IPA.",
 );
 
 const parsedQuery = require("query-string").parse("value=hello%20enV&malformed=%E0%A4%A");

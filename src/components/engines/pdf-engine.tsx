@@ -3,6 +3,7 @@ import { PDFDocument, degrees, rgb, StandardFonts } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/tools/copy-button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { downloadBlob } from "@/lib/utils";
 
 const PDF_OPS = new Set([
   "merge","split","rotate","images-to-pdf","extract","meta","compress","reorder",
@@ -11,8 +12,7 @@ const PDF_OPS = new Set([
 
 function download(bytes: Uint8Array, name: string, type = "application/pdf") {
   const blob = new Blob([bytes.buffer as ArrayBuffer], { type });
-  const url = URL.createObjectURL(blob); const a = document.createElement("a");
-  a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, name);
 }
 function baseName(name: string) { return name.replace(/\.[^.]+$/, ""); }
 async function loadPdf(file: File) { return PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: false }); }

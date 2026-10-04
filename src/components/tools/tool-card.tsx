@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { toolIcon } from "@/lib/icons";
-import { toolPath } from "@/lib/registry";
+import { toolPath } from "@/lib/tool-path";
 import type { ToolMeta } from "@/types/tool";
 import { cn } from "@/lib/utils";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
@@ -9,7 +9,10 @@ export function ToolCard({
   tool,
   className,
 }: {
-  tool: ToolMeta;
+  tool: Pick<
+    ToolMeta,
+    "id" | "name" | "slug" | "description" | "category" | "icon" | "clientSide" | "status"
+  >;
   className?: string;
 }) {
   const Icon = toolIcon(tool.icon);
@@ -31,7 +34,9 @@ export function ToolCard({
       </span>
       <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{tool.description}</span>
       {planned ? (
-        <span className="mt-3"><ComingSoonBadge /></span>
+        <span className="mt-3">
+          <ComingSoonBadge />
+        </span>
       ) : tool.clientSide ? (
         <span className="mt-3 text-[10px] font-medium uppercase tracking-wide text-subtle">
           In-browser

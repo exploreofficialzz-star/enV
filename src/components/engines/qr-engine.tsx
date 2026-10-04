@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
-import { downloadBlob, downloadText } from "@/lib/utils";
+import { copyToClipboard, downloadBlob, downloadText } from "@/lib/utils";
 import { Download, Copy } from "lucide-react";
 
 const COMMON_FIELDS: Record<string, UiField[]> = {
@@ -150,7 +150,7 @@ export function QrEngine({ preset }: { preset: string }) {
     <ErrorBanner message={error} />
     {info ? <div className="rounded-lg border p-3 text-sm">{info}</div> : null}
     {url ? <div className="space-y-3"><img src={url} alt="Generated QR code" className="size-56 rounded-lg bg-white p-2" /><div className="flex gap-2"><Button type="button" variant="outline" onClick={async()=>downloadBlob(await (await fetch(url)).blob(),"env-qr.png")}><Download className="size-4"/>Download PNG</Button></div></div> : null}
-    {svg ? <div className="space-y-3"><div className="max-w-md rounded-lg bg-white p-4" dangerouslySetInnerHTML={{__html:svg}}/><div className="flex gap-2"><Button type="button" variant="outline" onClick={()=>downloadText(svg,"env-qr.svg","image/svg+xml")}><Download className="size-4"/>Download SVG</Button><Button type="button" variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(svg)}catch{setError("Clipboard access is unavailable; use the download option instead.");}}}><Copy className="size-4"/>Copy SVG</Button></div></div> : null}
+    {svg ? <div className="space-y-3"><div className="max-w-md rounded-lg bg-white p-4" dangerouslySetInnerHTML={{__html:svg}}/><div className="flex gap-2"><Button type="button" variant="outline" onClick={()=>downloadText(svg,"env-qr.svg","image/svg+xml")}><Download className="size-4"/>Download SVG</Button><Button type="button" variant="outline" onClick={async()=>{if (!(await copyToClipboard(svg))) setError("Clipboard access is unavailable; use the download option instead.");}}><Copy className="size-4"/>Copy SVG</Button></div></div> : null}
     {batch.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{batch.map((src,i)=><div key={src} className="space-y-2 rounded-lg border p-2"><img src={src} alt={`QR ${i+1}`} className="w-full bg-white"/><Button type="button" variant="outline" className="w-full" onClick={async()=>downloadBlob(await (await fetch(src)).blob(),`env-qr-${i+1}.png`)}><Download className="size-4"/>PNG</Button></div>)}</div> : null}
   </div>;
 }

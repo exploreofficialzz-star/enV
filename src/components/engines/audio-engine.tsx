@@ -54,7 +54,10 @@ async function decodeAudioFile(file: File): Promise<AudioBuffer> {
 }
 
 function makeBufferLike(source: AudioBuffer, channels: number, frames = source.length) {
-  const ctx = new OfflineAudioContext(channels, frames, source.sampleRate);
+  const OfflineContext = window.OfflineAudioContext ??
+    (window as typeof window & { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+  if (!OfflineContext) throw new Error("This device does not support offline audio editing in the browser.");
+  const ctx = new OfflineContext(channels, frames, source.sampleRate);
   return ctx.createBuffer(channels, frames, source.sampleRate);
 }
 

@@ -39,11 +39,10 @@ function createId() {
 
 export function detectMediaRuntimes(): MediaRuntimeInfo[] {
   const browserAvailable = typeof window !== "undefined" && typeof document !== "undefined";
-  const nativeAvailable = typeof window !== "undefined" && Boolean((window as Window & { ReactNativeWebView?: unknown }).ReactNativeWebView);
   const serverAvailable = typeof import.meta !== "undefined" && typeof import.meta.env?.VITE_MEDIA_PROCESSOR_URL === "string" && Boolean(String(import.meta.env.VITE_MEDIA_PROCESSOR_URL).trim());
   return [
     { kind: "browser", available: browserAvailable, reason: browserAvailable ? "Browser media APIs are available." : "No browser runtime detected." },
-    { kind: "native", available: nativeAvailable, reason: nativeAvailable ? "The enV native WebView bridge is available." : "Native media bridge is not connected." },
+    { kind: "native", available: false, reason: "No native media-processing adapter is registered; the app bridge is used for contact exchange and file transfer." },
     { kind: "server", available: serverAvailable, reason: serverAvailable ? "A media processing service endpoint is configured." : "No media processing service is configured in this runtime." },
   ];
 }

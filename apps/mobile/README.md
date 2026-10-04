@@ -7,11 +7,11 @@
 - `src/app/` contains Expo Router routes and the root safe-area/status-bar layout.
 - `src/features/web-shell/` owns the native WebView screen, connection/retry state, navigation, and generated-file bridge.
 - `modules/contact-exchange/` is a local Expo module with one TypeScript contract and platform-native transports: Google Nearby Connections in Kotlin on Android and MultipeerConnectivity in Swift on iOS. TypeScript selects and calls the platform module; browser builds use a web implementation. The WebView sends explicit Exchange commands through the native shell; it does not claim browser phone-to-phone transport.
-- `src/lib/web-app-config.ts` validates the public HTTPS site URL and restricts in-app navigation to that origin.
+- `src/lib/web-app-config.ts` validates the public HTTPS site URL. HTTPS pages stay in the native WebView; native contact-exchange and file-download messages are accepted only from the configured enV origin. `mailto:` and `tel:` links use their native system handlers; website links do not launch an external browser.
 - `android/` contains the generated Android Studio/Gradle/Kotlin project. It is checked in so the native app source is available immediately; regenerate it from `app.json` with `npm run prebuild:android` rather than making untracked edits to generated files.
 - `plugins/withUnsignedAndroidRelease.js` keeps release signing environment-driven across clean prebuilds and fails loudly if the generated Gradle signing template changes.
 
-The initial Android application loads the live enV site in a native WebView so the full existing tool catalog and responsive UI remain shared rather than being reimplemented. Android back navigates WebView history; external links open outside the app. Site-generated `blob:` downloads are transferred through a size-limited bridge into app cache and opened with the native share sheet. The bridge rejects malformed or oversized transfers; its limit is 100 MiB. Web file-input behavior is delegated to the platform WebView and must be verified on a physical Android device before release.
+The Android and iOS applications load the live enV site in a native WebView so the full existing tool catalog and responsive UI remain shared rather than being reimplemented. Android back and the iOS back/forward gestures navigate WebView history; secure HTTPS links stay in the same WebView. The error screen retries in-app and never offers a browser escape. Site-generated `blob:` downloads are transferred through a size-limited bridge into app cache and opened with the native share sheet. The bridge rejects malformed, oversized, or off-origin transfers; its limit is 100 MiB. Web file-input behavior is delegated to the platform WebView and must be verified on physical Android and iOS devices before release.
 
 ## Development
 
@@ -33,7 +33,7 @@ npm run android
 
 ## GitHub Actions builds
 
-`.github/workflows/android-build.yml` runs on mobile-app changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds a standalone release APK and `app-release.aab` with the committed Gradle wrapper. CI verifies the APK signature before upload. Artifacts are uploaded for 14 days as `env-android-<commit-sha>`. The debug APK is intentionally not uploaded: debug builds expect a Metro development server and are not standalone app packages.
+`.github/workflows/android-build.yml` runs on web/mobile changes to `main`, pull requests, or manual dispatch. It installs the locked dependencies, checks Expo SDK compatibility, audits dependencies, lints and typechecks the app, then builds a standalone release APK and `app-release.aab` with the committed Gradle wrapper. CI verifies the APK signature before upload. Artifacts are uploaded for 14 days as `env-android-<commit-sha>`. The debug APK is intentionally not uploaded: debug builds expect a Metro development server and are not standalone app packages. `.github/workflows/ios-build.yml` generates the iOS project on macOS, installs CocoaPods, and compiles a Release configuration for the iOS Simulator.
 
 When all four protected production signing secrets are configured, the APK/AAB use that stable production signing identity and can upgrade prior installs using the same key. If production secrets are absent (for example, on a forked pull request), CI creates a temporary test key so the APK remains installable for a fresh test install; that temporary key is not retained, so its APK cannot upgrade an existing install or be submitted to an app store. Never use the debug key or the temporary test key as a production signing identity.
 
@@ -41,7 +41,7 @@ The default public site is `https://en-v.vercel.app` (the repository homepage). 
 
 ## iOS target
 
-The iOS native project is generated on a macOS build host with `npm run prebuild:ios`, then built with Xcode. The contact exchange module supplies the Swift implementation and the required `NSLocalNetworkUsageDescription` and Bonjour service configuration through `app.json`; physical iOS devices are required to validate the MultipeerConnectivity transport.
+The app targets iOS 16.4 and newer. The iOS native project is generated on a macOS build host with `npm run prebuild:ios`, then built with Xcode. The contact exchange module supplies the Swift implementation and the required `NSLocalNetworkUsageDescription` and Bonjour service configuration through `app.json`; physical iOS devices are required to validate the MultipeerConnectivity transport and final WebView/file-input behavior. The CI job compiles for Simulator only; it does not create a distribution-signed IPA or TestFlight release.
 
 ## Release and signing
 

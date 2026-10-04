@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
-
-function downloadBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+import { downloadBlob } from "@/lib/utils";
 
 async function loadImage(file: File): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);

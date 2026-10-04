@@ -60,9 +60,13 @@ Never prefix secrets with `VITE_` and never commit their values. Keep preview an
 - `migrations/` — SQL schema migrations
 - `scripts/` — build, migration, and quality tooling
 
+## Catalog performance
+
+`src/data/catalog.ts` remains the canonical tool source. `npm run update:home-tools` refreshes the small Home snapshot and creates ignored runtime JSON data: the Tools index is fetched only when a catalog tab is opened, the search index only when a query is entered, and a tool detail page fetches only its 250-record shard. These URLs are content-versioned and cached immutably; `npm run build` validates every generated entry and shard. The Home route does not import the full catalog.
+
 ## Mobile app
 
-`apps/mobile/` is a separate Expo/React Native shell for Android and iOS. TypeScript owns the shared UI/orchestration and calls native platform modules where needed; Android contact exchange is Kotlin and iOS contact exchange is Swift. The shell hosts the existing enV experience in a native WebView so the full tool catalog remains shared. GitHub Actions builds and uploads a signed Android APK and AAB; production signing is used when configured, with temporary test signing for CI-only builds. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, signing limits, the public site URL, and device-validation requirements.
+`apps/mobile/` is a separate Expo/React Native shell for Android and iOS. TypeScript owns the shared UI/orchestration and calls native platform modules where needed; Android contact exchange is Kotlin and iOS contact exchange is Swift. The shell hosts the existing enV experience in a native WebView; secure HTTPS links stay in-app, and native bridges are restricted to the enV origin. The responsive web app uses safe-area-aware bottom navigation and paginated tool lists. GitHub Actions builds and uploads an Android APK/AAB and compiles an iOS Simulator build; the latter is not a distribution-signed IPA. See [`apps/mobile/README.md`](apps/mobile/README.md) for setup, signing limits, the public site URL, and device-validation requirements.
 
 ## Privacy and security
 

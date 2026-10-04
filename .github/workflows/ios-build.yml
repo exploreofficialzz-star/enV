@@ -1,0 +1,78 @@
+name: iOS Simulator Build CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios-simulator:
+    name: Validate and build iOS Simulator app
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install locked mobile dependencies
+        run: npm ci
+
+      - name: Verify Expo SDK package compatibility
+        run: npx expo install --check
+
+      - name: Lint and verify native app configuration
+        run: |
+          npm run lint
+          npm run check:mobile
+          npm run typecheck
+
+      - name: Generate iOS project
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Install CocoaPods dependencies
+        run: pod install --project-directory=ios
+
+      - name: Build for iOS Simulator
+        run: |
+          workspace="$(find ios -maxdepth 2 -name '*.xcworkspace' -not -path '*/Pods/*' -print -quit)"
+          test -n "$workspace"
+          xcodebuild -list -workspace "$workspace" -json > "$RUNNER_TEMP/env-xcode-list.json"
+          scheme="$(python3 -c 'import json,sys; names=json.load(open(sys.argv[1]))["workspace"]["schemes"]; print(next((name for name in names if not name.startswith("Pods-")), ""))' "$RUNNER_TEMP/env-xcode-list.json")"
+          test -n "$scheme"
+          echo "Building workspace $workspace with scheme $scheme"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/env-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            build

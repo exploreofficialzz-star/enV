@@ -19,11 +19,16 @@ if (parsedWebAppUrl.protocol !== "https:" || parsedWebAppUrl.username || parsedW
 export const WEB_APP_URL = parsedWebAppUrl.toString();
 export const WEB_APP_ORIGIN = parsedWebAppUrl.origin;
 
-export function isInternalWebUrl(value: string): boolean {
+export function isSafeHttpsWebUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" && parsed.origin === WEB_APP_ORIGIN;
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password;
   } catch {
     return false;
   }
+}
+
+export function isInternalWebUrl(value: string): boolean {
+  if (!isSafeHttpsWebUrl(value)) return false;
+  return new URL(value).origin === WEB_APP_ORIGIN;
 }

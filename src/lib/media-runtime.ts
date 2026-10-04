@@ -35,7 +35,7 @@ export function getMediaCapabilities(): MediaCapability[] {
 }
 
 export function browserCodecSupport(): { type: string; mime: string; supported: boolean }[] {
-  if (typeof MediaRecorder === "undefined") return [];
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return [];
   const candidates = [
     ["WebM VP9 + Opus", "video/webm;codecs=vp9,opus"],
     ["WebM VP8 + Opus", "video/webm;codecs=vp8,opus"],

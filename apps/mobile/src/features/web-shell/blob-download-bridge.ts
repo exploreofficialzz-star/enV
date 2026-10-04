@@ -1,10 +1,11 @@
-import { MAX_NATIVE_DOWNLOAD_BYTES } from "@/lib/web-app-config";
+import { MAX_NATIVE_DOWNLOAD_BYTES, WEB_APP_ORIGIN } from "@/lib/web-app-config";
 
 const MAX_BYTES = MAX_NATIVE_DOWNLOAD_BYTES;
 
 export const BLOB_DOWNLOAD_BRIDGE_SCRIPT = `
 (function () {
   if (window.__envBlobDownloadBridgeInstalled) return true;
+  if (window.location.origin !== ${JSON.stringify(WEB_APP_ORIGIN)}) return true;
   window.__envBlobDownloadBridgeInstalled = true;
 
   var maxBytes = ${MAX_BYTES};
@@ -34,17 +35,20 @@ export const BLOB_DOWNLOAD_BRIDGE_SCRIPT = `
 
     var id = "env-" + Date.now() + "-" + Math.random().toString(16).slice(2, 10);
     var name = (anchor.getAttribute("download") || "env-download").slice(0, 180);
-    fetch(anchor.href)
+    var objectUrl = anchor.href;
+    fetch(objectUrl)
       .then(function (response) {
         if (!response.ok) throw new Error("The generated file could not be read.");
         return response.blob();
       })
       .then(async function (blob) {
         if (blob.size > maxBytes) {
+          window.URL.revokeObjectURL(objectUrl);
           post({ type: "env-download-error", message: "This file is larger than the 100 MB in-app sharing limit." });
           return;
         }
         var bytes = new Uint8Array(await blob.arrayBuffer());
+        window.URL.revokeObjectURL(objectUrl);
         post({
           type: "env-download-start",
           id: id,
@@ -59,6 +63,7 @@ export const BLOB_DOWNLOAD_BRIDGE_SCRIPT = `
         post({ type: "env-download-complete", id: id });
       })
       .catch(function (error) {
+        window.URL.revokeObjectURL(objectUrl);
         var message = error && error.message ? String(error.message) : "The file could not be prepared for sharing.";
         post({ type: "env-download-error", message: message.slice(0, 180) });
       });

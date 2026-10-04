@@ -2,13 +2,14 @@
   "expo": {
     "name": "enV",
     "slug": "env-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "env",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.chastech.env",
+      "deploymentTarget": "16.4",
       "supportsTablet": true,
       "icon": "./assets/images/icon.png",
       "infoPlist": {
@@ -18,7 +19,7 @@
     },
     "android": {
       "package": "com.chastech.env",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png"

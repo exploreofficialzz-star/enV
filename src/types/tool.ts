@@ -48,16 +48,15 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
 
 export type ToolStatus = "active" | "beta" | "planned";
 
-export type DisclaimerKind =
-  | "health"
-  | "finance"
-  | "earnings"
-  | "mockup"
-  | "estimate";
+export type DisclaimerKind = "health" | "finance" | "earnings" | "mockup" | "estimate";
 
 export type EngineRef =
   | { type: "calculator"; formula: string }
-  | { type: "converter"; system: string; mode?: "standard" | "table" | "quick" | "comparison" | "reference" }
+  | {
+      type: "converter";
+      system: string;
+      mode?: "standard" | "table" | "quick" | "comparison" | "reference";
+    }
   | { type: "file-converter"; op: string }
   | { type: "mime"; op: string }
   | { type: "security"; op: string }
@@ -82,8 +81,14 @@ export type EngineRef =
   | { type: "pdf"; op: string }
   | { type: "ai"; op: string }
   | { type: "video"; op: string }
-  | { type: "url-media"; provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" }
-  | { type: "url-media-info"; provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" }
+  | {
+      type: "url-media";
+      provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
+    }
+  | {
+      type: "url-media-info";
+      provider: "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
+    }
   | { type: "developer"; op: string }
   | { type: "custom"; id: string };
 
@@ -109,6 +114,41 @@ export interface ToolMeta {
   disclaimer?: DisclaimerKind;
   isNew?: boolean;
 }
+
+export type ToolSummary = Pick<
+  ToolMeta,
+  | "id"
+  | "name"
+  | "slug"
+  | "description"
+  | "category"
+  | "icon"
+  | "popularity"
+  | "featured"
+  | "clientSide"
+  | "status"
+> & {
+  detailShard: string;
+  isNew?: boolean;
+};
+
+export type SearchTool = Pick<
+  ToolMeta,
+  | "id"
+  | "name"
+  | "slug"
+  | "description"
+  | "category"
+  | "keywords"
+  | "tags"
+  | "icon"
+  | "popularity"
+  | "featured"
+  | "clientSide"
+  | "status"
+> & {
+  subcategory?: string;
+};
 
 export interface CategoryMeta {
   id: CategoryId;

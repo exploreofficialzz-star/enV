@@ -8,6 +8,7 @@ import { addTimelineEvent, evaluateTimeline } from "@/lib/mockups/timeline";
 import { DEVICE_TEMPLATES, DEVICE_TEMPLATE_MAP } from "@/lib/mockups/devices";
 import { PLATFORM_ADAPTERS } from "@/lib/mockups/platforms/registry";
 import { exportProject } from "@/lib/mockups/export";
+import { downloadBlob } from "@/lib/utils";
 import { fileToMediaAsset } from "@/lib/mockups/media";
 import { platformTheme } from "@/lib/mockups/themes";
 import type { Message, MockupProject } from "@/lib/mockups/schema";
@@ -30,12 +31,6 @@ function sceneFromTool(toolId: string): MockupProject["scene"] {
   if (parsed.kind === "conversation") return "conversation";
   if (toolId.includes("-post-mockup")) return "post";
   return "chat";
-}
-
-function download(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function MockupsCategoryEngine({ toolId }: { toolId: string }) {
@@ -116,7 +111,7 @@ export function MockupsCategoryEngine({ toolId }: { toolId: string }) {
     try {
       const blob = await exportProject(project, device, tokens);
       const ext = project.exportSettings.format;
-      download(blob, `env-${project.platform}-${project.scene}.${ext}`);
+      downloadBlob(blob, `env-${project.platform}-${project.scene}.${ext}`);
       setNotice(`Exported ${ext.toUpperCase()} at ${project.exportSettings.scale}×.`);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Export failed."); }
     finally { setBusy(false); }
@@ -132,7 +127,7 @@ export function MockupsCategoryEngine({ toolId }: { toolId: string }) {
     const saved = loadProjects().find((p) => p.id === id); if (!saved) return;
     setHistory((h) => [...h.slice(-49), project]); setFuture([]); setProject(saved); setNotice("Project loaded.");
   };
-  const exportJson = () => download(new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }), `${project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "mockup"}.json`);
+  const exportJson = () => downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }), `${project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "mockup"}.json`);
   const importJson = async (file: File) => {
     try { const parsed = JSON.parse(await file.text()); if (!validateProject(parsed)) throw new Error("This is not a valid enV Mockups project."); setProject(parsed); setNotice("Project imported."); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Could not import project."); }

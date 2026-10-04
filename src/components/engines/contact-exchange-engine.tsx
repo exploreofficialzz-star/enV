@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,15 @@ function readStoredProfile(): Profile {
     return { ...EMPTY_PROFILE, ...JSON.parse(window.localStorage.getItem(PROFILE_KEY) ?? "{}") };
   } catch {
     return EMPTY_PROFILE;
+  }
+}
+
+function storeProfile(profile: Profile): boolean {
+  try {
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -89,15 +98,21 @@ function ReceivedContact({ participantId, card }: { participantId: string; card:
 
 export function ContactExchangeEngine() {
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
+  const [profileHydrated, setProfileHydrated] = useState(false);
   const [enabled, setEnabled] = useState<Set<ShareField>>(new Set(["fullName", "phone", "email"]));
   const [active, setActive] = useState(false);
   const [participantId, setParticipantId] = useState("");
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [notice, setNotice] = useState("Set up your card, choose the fields allowed to share, then press Exchange.");
   const [nativeAvailable, setNativeAvailable] = useState(false);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   useEffect(() => {
-    setProfile(readStoredProfile());
+    const storedProfile = readStoredProfile();
+    profileRef.current = storedProfile;
+    setProfile(storedProfile);
+    setProfileHydrated(true);
     if (typeof window !== "undefined") {
       setNativeAvailable(Boolean((window as ContactExchangeWindow).ReactNativeWebView));
       try {
@@ -106,6 +121,18 @@ export function ContactExchangeEngine() {
       } catch { /* Use the safe defaults. */ }
     }
   }, []);
+
+  useEffect(() => {
+    if (!profileHydrated) return undefined;
+    const timeout = window.setTimeout(() => {
+      if (!storeProfile(profile)) {
+        setNotice("Contact details are available for this session, but browser storage is unavailable on this device.");
+      }
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [profile, profileHydrated]);
+
+  useEffect(() => () => { storeProfile(profileRef.current); }, []);
 
   useEffect(() => {
     if (!nativeAvailable) return undefined;
@@ -146,18 +173,18 @@ export function ContactExchangeEngine() {
   const exchangeCards = Object.values(participants).filter((participant) => participant.participantId !== participantId);
 
   const updateProfile = (key: ShareField, value: string) => {
-    setProfile((current) => {
-      const next = { ...current, [key]: value };
-      window.localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
-      return next;
-    });
+    setProfile((current) => ({ ...current, [key]: value }));
   };
 
   const toggleField = (key: ShareField) => {
     setEnabled((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key); else next.add(key);
-      window.localStorage.setItem(`${PROFILE_KEY}-fields`, JSON.stringify([...next]));
+      try {
+        window.localStorage.setItem(`${PROFILE_KEY}-fields`, JSON.stringify([...next]));
+      } catch {
+        setNotice("Your selected fields are available for this session, but browser storage is unavailable.");
+      }
       return next;
     });
   };

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/logo";
 import { CATEGORIES } from "@/data/categories";
-import { activeCount } from "@/lib/registry";
+import homeTools from "@/data/home-tools.json";
 
 const LINKS = [
   { to: "/about", label: "About" },
@@ -15,7 +15,7 @@ const LINKS = [
 ] as const;
 
 export function Footer() {
-  const count = activeCount();
+  const count = homeTools.counts.active;
   return (
     <footer className="mt-auto border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">

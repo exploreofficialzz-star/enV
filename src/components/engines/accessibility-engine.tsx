@@ -19,21 +19,10 @@ import {
   type RgbaColor,
   resolveRenderedPair,
 } from "@/lib/engines/accessibility-color";
+import { downloadText } from "@/lib/utils";
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
 const COLORS = ["#000000", "#ffffff", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e"];
-function downloadText(text: string, filename: string) {
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 function clamp(n: number, min = 0, max = 255) { return Math.min(max, Math.max(min, n)); }
 function hexRgb(hex: string) {
