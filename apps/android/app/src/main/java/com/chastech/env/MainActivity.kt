@@ -428,7 +428,7 @@ private fun NativeToolForm(tool: ToolRecord) {
 private fun NativeConverterToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val operation = NativeConverterEngine.operationForTool(tool) ?: return
-    val units = NativeConverterEngine.unitsFor(operation)
+    val units = NativeConverterEngine.systemsFor(operation)
     var value by rememberSaveable(tool.id) { mutableStateOf("1") }
     var from by rememberSaveable(tool.id) { mutableStateOf(units.firstOrNull()?.id.orEmpty()) }
     var to by rememberSaveable(tool.id) { mutableStateOf(units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty()) }

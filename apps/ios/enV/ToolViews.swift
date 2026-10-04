@@ -286,10 +286,10 @@ private struct NativeExpansionCalculatorToolView: View {
     var body: some View {
         if let op = NativeExpansionCalculatorEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("\(op.row.cLabel) = \(op.row.aLabel) \(op.row.family == "product" ? "×" : op.row.family == "ratio" ? "÷" : "+") \(op.row.bLabel)").font(.subheadline.weight(.semibold))
-                if op.target != "a" { NativeInputField(title: op.row.aLabel, text: binding(for: "a")) }
-                if op.target != "b" { NativeInputField(title: op.row.bLabel, text: binding(for: "b")) }
-                if op.target != "c" { NativeInputField(title: op.row.cLabel, text: binding(for: "c")) }
+                Text("\(op.cLabel) = \(op.aLabel) \(op.family == "product" ? "×" : op.family == "ratio" ? "÷" : "+") \(op.bLabel)").font(.subheadline.weight(.semibold))
+                if op.target != "a" { NativeInputField(title: op.aLabel, text: binding(for: "a")) }
+                if op.target != "b" { NativeInputField(title: op.bLabel, text: binding(for: "b")) }
+                if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
                 NativeActionRow(output: output, run: {
                     do {
                         let parsed = try values.reduce(into: [Character: Double]()) { result, pair in if !pair.value.isEmpty { guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number.") }; result[pair.key] = number } }
