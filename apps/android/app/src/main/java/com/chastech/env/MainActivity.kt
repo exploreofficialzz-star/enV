@@ -92,9 +92,13 @@ import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
+import com.chastech.env.engine.NativeConverterEngine
 import com.chastech.env.engine.NativeDateTimeEngine
+import com.chastech.env.engine.NativeExpansionCalculatorEngine
+import com.chastech.env.engine.NativeMathExerciseEngine
 import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeTextEngine
+import com.chastech.env.engine.NativeUtilityEngine
 import com.chastech.env.ui.EnVIcon
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
@@ -422,7 +426,7 @@ private fun NativeToolForm(tool: ToolRecord) {
 private fun NativeConverterToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val operation = NativeConverterEngine.operationForTool(tool) ?: return
-    val units = NativeConverterEngine.unitsFor(operation)
+    val units = NativeConverterEngine.systemsFor(operation)
     var value by rememberSaveable(tool.id) { mutableStateOf("1") }
     var from by rememberSaveable(tool.id) { mutableStateOf(units.firstOrNull()?.id.orEmpty()) }
     var to by rememberSaveable(tool.id) { mutableStateOf(units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty()) }
@@ -771,7 +775,7 @@ private fun NativeUtilityToolForm(tool: ToolRecord) {
         Text("Native ${tool.engine.type} engine · op ${op ?: tool.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Text("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine’s flexible option model.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InputField(input, { input = it }, "Input", minLines = if (tool.engine.type == "generator") 2 else 4, tall = tool.engine.type != "generator")
-        InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{"count": 5, "text": "hello"}")
+        InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{\"count\": 5, \"text\": \"hello\"}")
         ActionRow(
             onRun = { runCatching { NativeUtilityEngine.run(tool, input, options) }.fold({ output = it.text; error = "" }, { output = ""; error = it.message ?: "Unable to run native utility" }) },
             onReset = { input = ""; options = "{}"; output = ""; error = "" }

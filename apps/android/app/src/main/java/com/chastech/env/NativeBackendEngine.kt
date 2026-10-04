@@ -29,8 +29,8 @@ object NativeBackendEngine {
             tool.id=="dns-lookup" || tool.id=="whois-lookup" -> postJson("/api/backend/network",JSONObject().apply{put("operation",if(tool.id=="dns-lookup")"dns" else "whois");put("domain",input);put("recordType",options.optString("recordType","A"))})
             tool.id=="website-screenshot" -> postJson("/api/backend/website-screenshot",JSONObject().apply{put("url",input);put("options",options)})
             tool.engine.type=="url-media" || tool.engine.type=="url-media-info" -> postJson("/api/backend/url-media/${if(tool.engine.type=="url-media-info")"info" else "download"}",JSONObject().apply{put("url",input);put("options",options)})
-            tool.engine.type=="pdf" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files,mapOf("operation" to (tool.engine.op?:"metadata"),"params" to options.toString(),"outputName" to "${tool.id}.pdf")) }
-            tool.engine.type=="video" -> { require(files.isNotEmpty()){ "Choose a video first." }; multipart("/api/backend/media",files,mapOf("operation" to (tool.engine.op?:tool.id),"params" to options.toString())) }
+            tool.engine.type=="pdf" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files,mapOf("operation" to (tool.engine.extras["op"]?:"metadata"),"params" to options.toString(),"outputName" to "${tool.id}.pdf")) }
+            tool.engine.type=="video" -> { require(files.isNotEmpty()){ "Choose a video first." }; multipart("/api/backend/media",files,mapOf("operation" to (tool.engine.extras["op"]?:tool.id),"params" to options.toString())) }
             else -> error("This backend operation is not configured.")
         }
     }
@@ -47,6 +47,6 @@ object NativeBackendEngine {
         val c=(URL(base+path).openConnection() as HttpURLConnection).apply{requestMethod="POST";doOutput=true;connectTimeout=20000;readTimeout=180000;setRequestProperty("Content-Type",type);setRequestProperty("Accept","application/json,application/octet-stream,text/plain")}
         c.outputStream.use{it.write(body)}
         val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299){val msg=runCatching{JSONObject(String(data)).optString("error")}.getOrNull();throw IllegalStateException(msg?.takeIf{it.isNotBlank()}?:"Backend request failed (${c.responseCode}).")}
-        val mime=c.contentType?:"application/octet-stream"; return if(mime.contains("json"))Result(text=String(data),mimeType=mime) else Result(bytes=data,mimeType=mime,fileName=c.headerField("Content-Disposition")?.substringAfter("filename=\"")?.substringBefore('"'))
+        val mime=c.contentType?:"application/octet-stream"; return if(mime.contains("json"))Result(text=String(data),mimeType=mime) else Result(bytes=data,mimeType=mime,fileName=c.getHeaderField("Content-Disposition")?.substringAfter("filename=\"")?.substringBefore('"'))
     }
 }
