@@ -1,3 +1,5 @@
+import Foundation
+
 /// Boundary for the catalog's URL Media Inspector.
 ///
 /// The web implementation obtains title, uploader, duration, thumbnail, codecs,

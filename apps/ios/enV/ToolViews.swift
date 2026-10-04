@@ -243,7 +243,7 @@ struct NativeCodecToolView: View {
             if isBaseConverter { options = ["value": value, "fromBase": fromBase, "toBase": toBase] }
             output = try NativeCodecEngine.run(toolID: tool.id, input: input, options: options).output
             error = nil
-        } catch { output = ""; error = error.localizedDescription }
+        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
     }
 
     private func reset() {
@@ -309,7 +309,7 @@ struct NativeColorToolView: View {
         do {
             let result = try NativeColorEngine.run(toolID: tool.id, input: input, foreground: foreground, background: background)
             output = result.output; palette = result.palette; error = nil
-        } catch { output = ""; palette = []; error = error.localizedDescription }
+        } catch let caughtError { output = ""; palette = []; error = caughtError.localizedDescription }
     }
 
     private func reset() { input = "#0d9f8a"; foreground = "#16181d"; background = "#ffffff"; output = ""; error = nil; palette = [] }
@@ -363,7 +363,7 @@ struct NativeDateTimeToolView: View {
 
     private func run() {
         do { output = try NativeDateTimeEngine.run(toolID: tool.id, options: values).output; error = nil }
-        catch { output = ""; error = error.localizedDescription }
+        catch let caughtError { output = ""; error = caughtError.localizedDescription }
     }
 
     private func reset() { values = [:]; output = ""; error = nil }
@@ -413,7 +413,7 @@ struct NativeMimeToolView: View {
             if !browserMime.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { options["browserMime"] = browserMime }
             if !bytesHex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { options["bytesHex"] = bytesHex }
             output = try NativeMimeEngine.run(toolID: tool.id, options: options).output; error = nil
-        } catch { output = ""; error = error.localizedDescription }
+        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
     }
 
     private func reset() { query = ""; fileName = ""; browserMime = ""; bytesHex = ""; output = ""; error = nil }
@@ -435,7 +435,7 @@ struct NativeMimeToolView: View {
                 browserMime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "unknown"
                 bytesHex = prefix.map { String(format: "%02x", $0) }.joined(separator: " ")
                 error = nil
-            } catch { error = "Could not read file: \(error.localizedDescription)" }
+            } catch let caughtError { error = "Could not read file: \(caughtError.localizedDescription)" }
         }
     }
 }
@@ -473,7 +473,7 @@ struct NativeTextToolView: View {
     @ViewBuilder private func stat(_ name: String, _ value: some CustomStringConvertible) -> some View { VStack(alignment: .leading) { Text(name).font(.caption).foregroundStyle(.secondary); Text(value.description).font(.headline) }.padding(8).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8)) }
     private func label(_ name: String) -> String { ["find":"Find", "replace":"Replace", "flags":"Regex flags", "width":"Width", "style":"Style (bullets, numbered, comma)", "keyword":"Keyword (optional)", "wpm":"Reading speed (words/min)", "limit":"Target limit"][name] ?? name.capitalized }
     private func defaultValue(_ name: String) -> String { name == "flags" ? "g" : name == "width" ? "80" : name == "wpm" ? "200" : name == "limit" ? "280" : name == "style" ? "bullets" : "" }
-    private func run() { do { let r = try NativeTextEngine.run(toolID: tool.id, input: input, compare: compare, options: options); output = r.output; diffSummary = isDiff ? "Added: \(r.added) · Removed: \(r.removed) · Unchanged: \(r.unchanged)" : nil; error = nil } catch { output = ""; diffSummary = nil; error = error.localizedDescription } }
+    private func run() { do { let r = try NativeTextEngine.run(toolID: tool.id, input: input, compare: compare, options: options); output = r.output; diffSummary = isDiff ? "Added: \(r.added) · Removed: \(r.removed) · Unchanged: \(r.unchanged)" : nil; error = nil } catch let caughtError { output = ""; diffSummary = nil; error = caughtError.localizedDescription } }
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
 }
 

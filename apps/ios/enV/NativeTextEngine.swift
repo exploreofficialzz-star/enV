@@ -54,7 +54,7 @@ public enum NativeTextEngine {
     private static func sentenceCase(_ input:String)->String { let lower=input.lowercased(); return replaceMatches(lower,"(^\\s*[a-z])|([.!?]\\s+[a-z])"){$0.uppercased()} }
     private static func replaceMatches(_ input:String,_ pattern:String,_ body:(String)->String)->String { guard let r=try? NSRegularExpression(pattern:pattern) else{return input}; let ms=r.matches(in:input,range:NSRange(input.startIndex...,in:input)); var out="", pos=input.startIndex; for m in ms { guard let rr=Range(m.range,in:input) else{continue}; out += input[pos..<rr.lowerBound] + body(String(input[rr])); pos=rr.upperBound }; return out+input[pos...] }
     private static func caseWords(_ input:String,_ sep:String,_ camel:Bool=false)->String { splitWords(input).enumerated().map{camel && $0.offset>0 ? capitalize($0.element) : $0.element.lowercased()}.joined(separator:sep) }
-    private static func slug(_ input:String)->String { let s=input.folding(options:[.diacriticInsensitive,.widthInsensitive],locale:.en_US).lowercased(); return String(regexReplace(s,"[^a-z0-9]+","-").trimmingCharacters(in:CharacterSet(charactersIn:"-")).prefix(120)) }
+    private static func slug(_ input:String)->String { let s=input.folding(options:[.diacriticInsensitive,.widthInsensitive],locale:Locale(identifier:"en_US")).lowercased(); return String(regexReplace(s,"[^a-z0-9]+","-").trimmingCharacters(in:CharacterSet(charactersIn:"-")).prefix(120)) }
 
     private static func transform(_ op:String,_ input:String,_ o:[String:String]) throws -> String {
         switch op {
@@ -81,7 +81,7 @@ public enum NativeTextEngine {
 
     private static func sqlFormat(_ input:String)->String { let compact=regexReplace(input,"\\s+"," ").trimmingCharacters(in:.whitespacesAndNewlines);guard !compact.isEmpty else{return ""}; let p="\\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|OUTER JOIN|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE|UNION ALL|UNION)\\b"; var s=replaceMatches(compact,p){$0.uppercased()}; s=replaceMatches(s,p){"\n"+$0}; return s.replacingOccurrences(of:", ",with:",\n  ").trimmingCharacters(in:.whitespacesAndNewlines) }
     private static func markup(_ input:String)->String { let compact=regexReplace(input,">\\s+<", "><"); let tokens=regexReplace(compact,"(<[^>]+>)","\n$1\n").components(separatedBy:"\n").map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}; let voids=Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);var d=0,out=[String]();for t in tokens{let close=t.hasPrefix("</");let open=t.hasPrefix("<") && !close && !t.hasPrefix("<?") && !t.hasPrefix("<!") && !t.hasSuffix("/>");let name=regexReplace(t,"^</?([^\\s>/]+).*","$1").lowercased();if close{d=max(0,d-1)};out.append(String(repeating:"  ",count:d)+t);if open && !voids.contains(name){d += 1}};return out.joined(separator:"\n") }
-    private static func cssFormat(_ input:String)->String { var d=0,out=[String](),buf="";let src=regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," ").trimmingCharacters(in:.whitespacesAndNewlines);func flush(_ x:String){let t=x.trimmingCharacters(in:.whitespaces);if !t.isEmpty{out.append(String(repeating:"  ",count:max(0,d))+t)}};for ch in src{if ch=="{"{flush(buf+" {");buf="";d+=1}else if ch=="}"{if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf.hasSuffix(";") ? buf : buf+";")};buf="";d=max(0,d-1);out.append(String(repeating:"  ",count:d)+"}")}else if ch==";"{flush(buf.trimmingCharacters(in:.whites)+";");buf=""}else{buf.append(ch)}};if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf)};return out.joined(separator:"\n") }
+    private static func cssFormat(_ input:String)->String { var d=0,out=[String](),buf="";let src=regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," ").trimmingCharacters(in:.whitespacesAndNewlines);func flush(_ x:String){let t=x.trimmingCharacters(in:.whitespaces);if !t.isEmpty{out.append(String(repeating:"  ",count:max(0,d))+t)}};for ch in src{if ch=="{"{flush(buf+" {");buf="";d+=1}else if ch=="}"{if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf.hasSuffix(";") ? buf : buf+";")};buf="";d=max(0,d-1);out.append(String(repeating:"  ",count:d)+"}")}else if ch==";"{flush(buf.trimmingCharacters(in:.whitespaces)+";");buf=""}else{buf.append(ch)}};if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf)};return out.joined(separator:"\n") }
     private static func jsFormat(_ input:String)->String { var d=0,out="",quote:Character?=nil,line=false,block=false;var i=input.startIndex;while i<input.endIndex{let c=input[i],n=input.index(after:i)<input.endIndex ? input[input.index(after:i)] : "\0";if line{out.append(c);if c=="\n"{line=false};i=input.index(after:i);continue};if block{out.append(c);if c=="*" && n=="/"{out.append(n);i=input.index(i,offsetBy:2);block=false}else{i=input.index(after:i)};continue};if let q=quote{out.append(c);if c=="\\" && i != input.index(before:input.endIndex){let j=input.index(after:i);out.append(input[j]);i=input.index(after:j);continue};if c==q{quote=nil};i=input.index(after:i);continue};if c=="/" && n=="/"{line=true;out.append(c);i=input.index(after:i);continue};if c=="/" && n=="*"{block=true;out.append(c);i=input.index(after:i);continue};if c=="'" || c=="\"" || c=="`"{quote=c;out.append(c)}else if c=="{"{out += " {\n";d+=1;out += String(repeating:"  ",count:d)}else if c=="}"{d=max(0,d-1);out=out.trimmingCharacters(in:.whitespacesAndNewlines);out += "\n"+String(repeating:"  ",count:d)+"}";if n==";"{out.append(";");i=input.index(after:i)}}else if c==";"{out += ";\n"+String(repeating:"  ",count:d)}else{out.append(c)};i=input.index(after:i)};return regexReplace(regexReplace(out,"[ \\t]+\\n","\n"),"\\n{3,}","\n\n").trimmingCharacters(in:.whitespacesAndNewlines) }
     private static func yamlFormat(_ input:String)->String { input.components(separatedBy:"\n").map{$0.replacingOccurrences(of:"\t",with:"  ").trimmingCharacters(in:.whitespaces)}.joined(separator:"\n").replacingOccurrences(of:"\n{3,}",with:"\n\n",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines) }
     private static func jsMinify(_ input:String)->String {
@@ -102,9 +102,64 @@ public enum NativeTextEngine {
     private static func jsonObject(_ input:String)throws->Any { guard let d=input.trimmingCharacters(in:.whitespacesAndNewlines).data(using:.utf8),let v=try? JSONSerialization.jsonObject(with:d,options:[.fragmentsAllowed]) else{throw NativeTextError.invalidJSON};return v }
     private static func jsonData(_ v:Any,_ pretty:Bool=true)throws->String { let options:JSONSerialization.WritingOptions = pretty ? [.prettyPrinted,.fragmentsAllowed] : [.fragmentsAllowed]; guard let d=try? JSONSerialization.data(withJSONObject:v,options:options),let s=String(data:d,encoding:.utf8) else{throw NativeTextError.invalidJSON};return s }
     private static func csvEscape(_ v:String)->String { (v.contains(",")||v.contains("\n")||v.contains("\r")||v.contains("\"")) ? "\""+v.replacingOccurrences(of:"\"",with:"\"\"")+"\"" : v }
-    private static func jsonToCSV(_ input:String)throws->String { let data=try jsonObject(input);let rows=data is [Any] ? data as! [Any] : [data];guard !rows.isEmpty{throw NativeTextError.emptyCSV};var objects=[[String:Any]]();for r in rows{if let x=r as? [String:Any]{objects.append(x)}else{objects.append(["value":r])}};var keys=[String]();for o in objects{for k in o.keys where !keys.contains(k){keys.append(k)}};func val(_ x:Any?)->String{guard let x=x else{return ""};if x is NSNull{return ""};if let a=x as? [String:Any],let d=try? JSONSerialization.data(withJSONObject:a),let s=String(data:d,encoding:.utf8){return csvEscape(s)};if let a=x as? [Any],let d=try? JSONSerialization.data(withJSONObject:a),let s=String(data:d,encoding:.utf8){return csvEscape(s)};return csvEscape(String(describing:x))};return ([keys.map(csvEscape).joined(separator:",")]+objects.map{o in keys.map{val(o[$0])}.joined(separator:",")}).joined(separator:"\n") }
+    private static func jsonToCSV(_ input: String) throws -> String {
+        let data = try jsonObject(input)
+        let rows = (data as? [Any]) ?? [data]
+        guard !rows.isEmpty else { throw NativeTextError.emptyCSV }
+
+        var objects: [[String: Any]] = []
+        for row in rows {
+            if let object = row as? [String: Any] { objects.append(object) }
+            else { objects.append(["value": row]) }
+        }
+        var keys: [String] = []
+        for object in objects {
+            for key in object.keys where !keys.contains(key) { keys.append(key) }
+        }
+        func csvValue(_ value: Any?) -> String {
+            guard let value, !(value is NSNull) else { return "" }
+            if let object = value as? [String: Any],
+               let data = try? JSONSerialization.data(withJSONObject: object, options: [.fragmentsAllowed]),
+               let string = String(data: data, encoding: .utf8) { return csvEscape(string) }
+            if let array = value as? [Any],
+               let data = try? JSONSerialization.data(withJSONObject: array, options: [.fragmentsAllowed]),
+               let string = String(data: data, encoding: .utf8) { return csvEscape(string) }
+            return csvEscape(String(describing: value))
+        }
+        let header = keys.map(csvEscape).joined(separator: ",")
+        let records = objects.map { object in keys.map { csvValue(object[$0]) }.joined(separator: ",") }
+        return ([header] + records).joined(separator: "\n")
+    }
     private static func yamlScalar(_ x:Any)->String { if x is NSNull{return "null"};if let s=x as? String{if s.isEmpty || s.range(of:"[:#\n&*?|>!%@`'\"{},\\[\\]]",options:.regularExpression) != nil || s != s.trimmingCharacters(in:.whitespaces){return "\""+s.replacingOccurrences(of:"\"",with:"\\\"")+"\""};return s};return String(describing:x) }
-    private static func toYAML(_ x:Any,_ d:Int=0)->String { let pad=String(repeating:"  ",count:d);if let a=x as? [Any]{if a.isEmpty{return "[]"};return a.map{if $0 is [String:Any] || $0 is [Any]{let inner=toYAML($0,d+1);let p=inner.split(separator:"\n",omittingEmptySubsequences:false);return pad+"- "+(p.first.map(String.init) ?? "")+(p.dropFirst().isEmpty ? "" : "\n"+p.dropFirst().map(String.init).joined(separator:"\n"))}else{return pad+"- "+yamlScalar($0)}}.joined(separator:"\n")};if let o=x as? [String:Any]{if o.isEmpty{return "{}"};return o.map{(k,v) in let key=regexMatches(k,"^[A-Za-z_][\\w-]*$").isEmpty ? "\"\(k)\"" : k;if v is [String:Any] || v is [Any]{let inner=toYAML(v,d+1);return inner=="{}" || inner=="[]" ? pad+key+": "+inner : pad+key+":\n"+inner}else{return pad+key+": "+yamlScalar(v)}}.joined(separator:"\n")};return yamlScalar(x) }
+    private static func toYAML(_ value: Any, _ depth: Int = 0) -> String {
+        let indent = String(repeating: "  ", count: depth)
+        if let array = value as? [Any] {
+            if array.isEmpty { return "[]" }
+            return array.map { item -> String in
+                if item is [String: Any] || item is [Any] {
+                    let nested = toYAML(item, depth + 1)
+                    let parts = nested.components(separatedBy: "\n")
+                    guard let first = parts.first else { return "\(indent)-" }
+                    return "\(indent)- \(first)" + parts.dropFirst().map { "\n\($0)" }.joined()
+                }
+                return "\(indent)- \(yamlScalar(item))"
+            }.joined(separator: "\n")
+        }
+        if let object = value as? [String: Any] {
+            if object.isEmpty { return "{}" }
+            return object.keys.sorted().map { key -> String in
+                let safeKey = regexMatches(key, "^[A-Za-z_][\\w-]*$").isEmpty ? "\"\(key)\"" : key
+                guard let child = object[key] else { return "\(indent)\(safeKey): null" }
+                if child is [String: Any] || child is [Any] {
+                    let nested = toYAML(child, depth + 1)
+                    if nested == "{}" || nested == "[]" { return "\(indent)\(safeKey): \(nested)" }
+                    return "\(indent)\(safeKey):\n\(nested)"
+                }
+                return "\(indent)\(safeKey): \(yamlScalar(child))"
+            }.joined(separator: "\n")
+        }
+        return yamlScalar(value)
+    }
     private static func jsonToYAML(_ input:String)throws->String { return toYAML(try jsonObject(input)).trimmingCharacters(in:.whitespacesAndNewlines) }
     private static func yamlValue(_ s:String)->Any { let t=s.trimmingCharacters(in:.whitespaces);if t.isEmpty || t=="~" || t=="null"{return NSNull()};if t=="true"{return true};if t=="false"{return false};if let n=Double(t){return n};if (t.hasPrefix("\"")&&t.hasSuffix("\""))||(t.hasPrefix("'")&&t.hasSuffix("'")){return String(t.dropFirst().dropLast())};return t }
     private static func yamlToJSON(_ input:String)throws->String { let lines=input.replacingOccurrences(of:"\t",with:"  ").components(separatedBy:"\n").filter{let t=$0.trimmingCharacters(in:.whitespaces);return !t.isEmpty && !t.hasPrefix("#")};var root=[String:Any]();for line in lines{let t=line.trimmingCharacters(in:.whitespaces);guard let i=t.firstIndex(of:":") else{continue};let k=String(t[..<i]).trimmingCharacters(in:.whitespaces);let v=String(t[t.index(after:i)...]).trimmingCharacters(in:.whitespaces);root[k]=yamlValue(v)};return try jsonData(root) }

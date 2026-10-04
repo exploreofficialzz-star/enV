@@ -93,7 +93,9 @@ public enum NativeMimeEngine {
         let inspection: NativeMimeInspection? = (options["fileName"] != nil || !bytes.isEmpty) ? inspect(fileName: options["fileName"] ?? "", browserMime: options["browserMime"] ?? "unknown", bytes: bytes) : nil
         var lines = rows.map { ".\($0.ext)\t\($0.mime)\t\($0.name)\t\($0.group)" }
         if let i = inspection {
-            lines += ["Filename: \(i.fileName)", "Browser MIME: \(i.browserMime)", "Extension: .\(i.extension.isEmpty ? "none" : i.extension)", "Signature match: \(i.entry.map { "\($0.name) (\($0.mime))" } ?? "Unknown signature)", "Bytes: \(i.bytesHex)"]
+            let extensionName = i.extension.isEmpty ? "none" : i.extension
+            let signature = i.entry.map { "\($0.name) (\($0.mime))" } ?? "Unknown signature"
+            lines += ["Filename: \(i.fileName)", "Browser MIME: \(i.browserMime)", "Extension: .\(extensionName)", "Signature match: \(signature)", "Bytes: \(i.bytesHex)"]
             if i.mismatch { lines.append("The detected signature does not match the filename extension.") }
         }
         return NativeMimeResult(rows: rows, inspection: inspection, output: lines.joined(separator: "\n"))

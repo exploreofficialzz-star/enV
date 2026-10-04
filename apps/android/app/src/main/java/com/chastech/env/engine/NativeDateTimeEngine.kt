@@ -141,9 +141,9 @@ object NativeDateTimeEngine {
             if (Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(raw)) return LocalDate.parse(raw, dateOnly).atStartOfDay(UTC).toInstant()
             return try { Instant.parse(raw) } catch (_: Exception) {
                 val parsed = DateTimeFormatter.ISO_DATE_TIME.parse(raw)
-                    java.time.temporal.TemporalQueries.offset().queryFrom(parsed)?.let {
-                        java.time.OffsetDateTime.from(parsed).toInstant()
-                    } ?: java.time.LocalDateTime.from(parsed).atZone(ZoneId.systemDefault()).toInstant()
+                val offset = parsed.query(java.time.temporal.TemporalQueries.offset())
+                if (offset != null) java.time.OffsetDateTime.from(parsed).toInstant()
+                else java.time.LocalDateTime.from(parsed).atZone(ZoneId.systemDefault()).toInstant()
             }
         } catch (_: Exception) {
             throw IllegalArgumentException("Could not read that $label. Use YYYY-MM-DD.")

@@ -56,7 +56,45 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
-    var body: some View { NavigationStack { List { Section { Label("Offline catalog", systemImage: "checkmark.circle.fill").foregroundStyle(Color.envTeal); Text("The full catalog is bundled with the app. \(NativeCoverage.localActiveToolCount) of \(NativeCoverage.canonicalActiveToolCount) active tools execute locally across the native text, codec, color, datetime, and MIME families. URL media inspection still requires its remote metadata service. Favorites are stored on this device.").foregroundStyle(.secondary) } header: { Text("Your enV") }; Section("Settings") { NavigationLink { Text("Notifications are not configured in this foundation release.").padding() } label: { Label("Notifications", systemImage: "bell") }; NavigationLink { VStack(alignment: .leading, spacing: 12) { Text("Native migration status").font(.title3.bold()); Text("\(NativeCoverage.localActiveToolCount) active tools are available offline. Other active engine types remain in migration, and URL media inspection is explicitly remote-only.").foregroundStyle(.secondary) }.padding() } label: { Label("Native migration status", systemImage: "hammer") }; Label("Version 1.1.0 (6)", systemImage: "info.circle") } Section("Privacy") { Label("Local-first catalog browsing", systemImage: "lock.shield"); Text("No account is required to browse or save tools.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Account") } }
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Label("Offline catalog", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.envTeal)
+                    Text("The full catalog is bundled with the app. \(NativeCoverage.localActiveToolCount) of \(NativeCoverage.canonicalActiveToolCount) active tools execute locally across the native text, codec, color, datetime, and MIME families. URL media inspection still requires its remote metadata service. Favorites are stored on this device.")
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Your enV")
+                }
+                Section("Settings") {
+                    NavigationLink {
+                        Text("Notifications are not configured in this foundation release.").padding()
+                    } label: {
+                        Label("Notifications", systemImage: "bell")
+                    }
+                    NavigationLink {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Native migration status").font(.title3.bold())
+                            Text("\(NativeCoverage.localActiveToolCount) active tools are available offline. Other active engine types remain in migration, and URL media inspection is explicitly remote-only.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding()
+                    } label: {
+                        Label("Native migration status", systemImage: "hammer")
+                    }
+                    Label("Version 1.1.0 (6)", systemImage: "info.circle")
+                }
+                Section("Privacy") {
+                    Label("Local-first catalog browsing", systemImage: "lock.shield")
+                    Text("No account is required to browse or save tools.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Account")
+        }
+    }
 }
 
 private func sectionHeader(_ title: String, subtitle: String) -> some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(.title2.bold()); Text(subtitle).font(.subheadline).foregroundStyle(.secondary) } }
