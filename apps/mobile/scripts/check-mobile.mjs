@@ -214,7 +214,7 @@ assert.ok(
   "Blob download bridge must transfer generated files only on the configured enV origin.",
 );
 assert.ok(
-  iosWorkflow.includes("runs-on: macos-15") &&
+  iosWorkflow.includes("runs-on: macos-26") &&
     iosWorkflow.includes("pod install --project-directory=ios") &&
     iosWorkflow.includes("xcodebuild") &&
     iosWorkflow.includes("CODE_SIGNING_ALLOWED=NO"),
