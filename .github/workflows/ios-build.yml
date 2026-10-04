@@ -6,7 +6,8 @@ on:
     paths:
       - "apps/ios/**"
       - "apps/shared/**"
-      - "scripts/check-native-icons.mjs"
+      - "scripts/**"
+      - "src/lib/engines/**"
       - "package.json"
       - "scripts/export-native-catalog.mjs"
       - "scripts/catalog-reader.mjs"
@@ -17,7 +18,8 @@ on:
     paths:
       - "apps/ios/**"
       - "apps/shared/**"
-      - "scripts/check-native-icons.mjs"
+      - "scripts/**"
+      - "src/lib/engines/**"
       - "package.json"
       - "scripts/export-native-catalog.mjs"
       - "scripts/catalog-reader.mjs"
@@ -56,6 +58,15 @@ jobs:
       - name: Verify shared native brand assets
         working-directory: ${{ github.workspace }}
         run: npm run check:native-icons
+      - name: Verify native engine and execution coverage
+        working-directory: ${{ github.workspace }}
+        run: |
+          npm run export:native-engine-data
+          npm run export:native-execution-matrix
+          npm run check:native-calculators
+          npm run check:native-coverage
+          npm run check:native-executability
+          git diff --exit-code -- apps/shared apps/android/app/src/main/java/com/chastech/env/engine/NativeEngineData.kt apps/android/native-family-coverage apps/android/native-tool-coverage.txt apps/android/hybrid-tool-coverage.txt apps/ios/enV/NativeEngineData.swift apps/ios/native-family-coverage apps/ios/native-tool-coverage.txt apps/ios/hybrid-tool-coverage.txt
       - name: Record iOS build toolchain
         run: |
           xcodebuild -version

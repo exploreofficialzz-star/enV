@@ -1,9 +1,9 @@
 {
-  "version": "223b1017cc66",
+  "version": "6da86b90a18d",
   "counts": {
-    "active": 8790,
+    "active": 8789,
     "planned": 1211,
-    "total": 10001
+    "total": 10000
   },
   "featured": [
     {
@@ -23,7 +23,7 @@
     {
       "id": "image-compressor",
       "name": "Image Compressor",
-      "description": "Compress JPEG, PNG, or WebP in the browser to a target quality.",
+      "description": "Compress JPG, PNG or WebP with quality, resize, target size, metadata options and a zoomable before/after.",
       "category": "image",
       "slug": "image-compressor"
     },
@@ -81,7 +81,7 @@
     {
       "id": "image-compressor",
       "name": "Image Compressor",
-      "description": "Compress JPEG, PNG, or WebP in the browser to a target quality.",
+      "description": "Compress JPG, PNG or WebP with quality, resize, target size, metadata options and a zoomable before/after.",
       "category": "image",
       "slug": "image-compressor"
     },
@@ -142,11 +142,11 @@
       "slug": "tip-calculator"
     },
     {
-      "id": "instant-contact-exchange",
-      "name": "Instant Contact Exchange",
-      "description": "Configure a contact card once and exchange only the fields you authorize with other intentionally active participants.",
-      "category": "communication",
-      "slug": "instant-contact-exchange"
+      "id": "image-resizer",
+      "name": "Image Resizer",
+      "description": "Resize by exact size, percent, fit or fill in px/in/cm/mm, with resampling and sharpening choices.",
+      "category": "image",
+      "slug": "image-resizer"
     }
   ]
 }

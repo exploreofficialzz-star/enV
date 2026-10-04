@@ -67,7 +67,15 @@ object NativeCopy {
             "Client-side PDF utilities" to "On-device PDF utilities",
         )
         for ((from, to) in replacements) {
-            out = out.replace(from, to, ignoreCase = true)
+            val pattern = Regex(Regex.escape(from), RegexOption.IGNORE_CASE)
+            out = pattern.replace(out) { match ->
+                val original = match.value
+                when {
+                    original == original.uppercase() -> to.uppercase()
+                    original.firstOrNull()?.isUpperCase() == true -> to.replaceFirstChar { it.uppercase() }
+                    else -> to
+                }
+            }
         }
         placeholders.forEachIndexed { index, original ->
             out = out.replace("\u0000$index\u0000", original)

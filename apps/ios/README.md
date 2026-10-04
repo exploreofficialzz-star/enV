@@ -1,6 +1,13 @@
 # enV native iOS
 
-Standalone SwiftUI iOS application for the native migration foundation. This is not an Expo, React Native, WebView, or website wrapper.
+Standalone native iOS application for enV, written in **Swift + SwiftUI**. The native app keeps the project's existing catalog, shell, engine IDs, and shared generated data as its source of truth. It is not an Expo or React-Native app.
+
+The native layer has two execution tiers:
+
+- **Offline-native engines:** 6,726 of the 8,789 active catalog tools are implemented directly in Swift using the project's generated engine data and reusable native families.
+- **Exact web-engine fallback:** the remaining 2,063 active tools run their existing canonical web tool inside the native Swift shell when they require browser APIs, large media processors, URL/network backends, or other web-only capabilities. This fallback is online-only and is intentionally not counted as offline-native.
+
+Planned records remain visibly **Coming soon**. Android and iOS share the same execution-coverage audit, so an active tool cannot silently exist on only one native platform.
 
 ## Build and test (macOS with Xcode)
 
@@ -14,12 +21,12 @@ xcodebuild test -project enV.xcodeproj -scheme enV \
 
 The shared scheme is committed at `enV.xcodeproj/xcshareddata/xcschemes/enV.xcscheme`. The project uses iOS 16.4, marketing version `1.1.0`, build `6`, and bundle identifier `com.chastech.env`.
 
-## Catalog and scope
+## Catalog and execution
 
-`../shared/catalog.json` is added directly to the Xcode resource build phase; it is not copied or regenerated here. The app decodes the full offline snapshot (10,001 tools and 43 categories), searches names/descriptions/keywords/tags, filters by category, orders by popularity, shows details, and persists saved tools with `UserDefaults`.
+`../shared/catalog.json` is added directly to the Xcode resource build phase; it is not copied or regenerated here. The app decodes the full offline snapshot, searches names/descriptions/keywords/tags, filters by category, orders by popularity, and persists saved tools with `UserDefaults`.
 
-Planned entries are visibly marked **Coming soon**. Local execution currently covers 89 active IDs across Text (40), Codec (17), Color (16), Date/time (14), and MIME (2). URL media inspection is explicitly remote-only; other active entries show **Native engine migration in progress** until their iOS engine is ported and tested. This is a staged migration, not all 8,790 active engine ports.
+The native execution manifests are generated/audited from the same catalog as Android. Run `npm run check:native-coverage`, `npm run check:native-calculators`, and `npm run check:native-executability` from the repository root.
 
 ## Linux limitation
 
-This Linux sandbox does not contain Xcode, `xcodebuild`, or Swift, so native build/test validation runs on the configured macOS GitHub Actions runner. The project includes an iOS application target and XCTest target; the CI workflow builds the simulator app and runs the tests.
+This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a full iOS application build/test cannot be performed here. Standalone Swift engine source validation is used in this environment; the committed macOS CI workflow remains the authoritative iOS build/test path.

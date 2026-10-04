@@ -67,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,6 +89,7 @@ import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
 import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
+import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
 import com.chastech.env.engine.NativeDateTimeEngine
@@ -341,7 +343,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
-        SettingCard("Migration status", "89 active tools run natively and offline. URL media inspection still needs a remote metadata service.", "Hammer")
+        SettingCard("Migration status", "${catalog.tools.count(::nativeSupported)} of ${catalog.counts.active} active tools run natively and offline. URL media inspection still needs its remote metadata service.", "Hammer")
         SettingCard("About enV", "Version 1.1.0 (6) · native Android", "Info")
     }
 }
@@ -352,13 +354,15 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when (tool.engine.type)
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
     "datetime" -> NativeDateTimeEngine.operationForTool(tool.id) != null
     "mime" -> NativeMimeEngine.operationForTool(tool.id) != null
+    "converter" -> NativeConverterEngine.operationForTool(tool) != null
+    "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
+    "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityEngine.supports(tool)
     else -> false
 }
 
 @Composable
 private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
     val supported = nativeSupported(tool)
-    val remoteOnly = tool.engine.type == "url-media-info"
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) { EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface) }
@@ -383,15 +387,13 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
         DetailRow("Native execution", when {
             tool.status == "planned" -> "Coming soon"
             supported -> "Available offline"
-            remoteOnly -> "Remote metadata service required"
-            else -> "Not ported yet"
+            else -> "Exact web engine in native shell (online)"
         })
         DetailRow("Processing", if (tool.clientSide) "Runs on this device" else "Uses backend services")
         when {
             tool.status == "planned" -> Text("This tool is planned and not available yet.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             supported -> NativeToolForm(tool)
-            remoteOnly -> Text("URL media inspection requires its remote metadata service and isn't available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> Text("Native engine migration status: not yet ported. This app does not claim that unsupported IDs execute offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> NativeWebFallbackTool(tool)
         }
         if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -405,7 +407,112 @@ private fun NativeToolForm(tool: ToolRecord) {
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
         "mime" -> NativeMimeToolForm(tool.id)
+        "converter" -> NativeConverterToolForm(tool)
+        "calculator" -> when {
+            NativeCalculatorEngine.operationForTool(tool.id) != null -> NativeCalculatorToolForm(tool)
+            NativeExpansionCalculatorEngine.operationForTool(tool.id) != null -> NativeExpansionCalculatorToolForm(tool.id)
+            NativeMathExerciseEngine.operationForTool(tool.id) != null -> NativeMathExerciseToolForm(tool.id)
+            else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityToolForm(tool)
         else -> Text("This native engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+
+@Composable
+private fun NativeConverterToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    val operation = NativeConverterEngine.operationForTool(tool) ?: return
+    val units = NativeConverterEngine.unitsFor(operation)
+    var value by rememberSaveable(tool.id) { mutableStateOf("1") }
+    var from by rememberSaveable(tool.id) { mutableStateOf(units.firstOrNull()?.id.orEmpty()) }
+    var to by rememberSaveable(tool.id) { mutableStateOf(units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty()) }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        InputField(value, { value = it }, "Value", singleLine = true)
+        Text("From unit ID · ${units.take(5).joinToString { it.id }}${if (units.size > 5) " …" else ""}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InputField(from, { from = it.trim() }, "From unit", singleLine = true)
+        Text("To unit ID · ${units.take(5).joinToString { it.id }}${if (units.size > 5) " …" else ""}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InputField(to, { to = it.trim() }, "To unit", singleLine = true)
+        if (operation.mode != "standard") Text("Mode: ${operation.mode}. This mode returns the full reference/comparison set.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ActionRow(
+            onRun = { runCatching { NativeConverterEngine.run(operation, value, from, to) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run converter" }) },
+            onReset = { value = "1"; from = units.firstOrNull()?.id.orEmpty(); to = units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty(); output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeCalculatorToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    val operation = NativeCalculatorEngine.operationForTool(tool.id) ?: return
+    val values = remember(tool.id) { mutableStateMapOf<String, String>().apply { operation.fields.forEach { field -> put(field.name, field.defaultValue) } } }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        operation.formula?.takeIf { it.isNotBlank() }?.let { Text("Formula: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        operation.fields.forEach { field ->
+            InputField(values[field.name].orEmpty(), { values[field.name] = it }, field.label, singleLine = true)
+        }
+        ActionRow(
+            onRun = { runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
+                { rows -> output = rows.joinToString("\n") { row -> "${row.label}: ${row.value}${row.hint?.let { " $it" } ?: ""}" }; error = "" },
+                { output = ""; error = it.message ?: "Unable to run calculator" }
+            ) },
+            onReset = { operation.fields.forEach { values[it.name] = it.defaultValue }; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeExpansionCalculatorToolForm(toolId: String) {
+    val context = LocalContext.current
+    val op = NativeExpansionCalculatorEngine.operationForTool(toolId) ?: return
+    var aText by rememberSaveable(toolId) { mutableStateOf("2") }
+    var bText by rememberSaveable(toolId) { mutableStateOf("3") }
+    var cText by rememberSaveable(toolId) { mutableStateOf("6") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    val target = op.target
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("${op.row.cLabel} = ${op.row.aLabel} ${when(op.row.family) { "product" -> "×"; "ratio" -> "÷"; else -> "+" }} ${op.row.bLabel}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        if (target != 'a') InputField(aText, { aText = it }, op.row.aLabel, singleLine = true)
+        if (target != 'b') InputField(bText, { bText = it }, op.row.bLabel, singleLine = true)
+        if (target != 'c') InputField(cText, { cText = it }, op.row.cLabel, singleLine = true)
+        ActionRow(
+            onRun = { runCatching {
+                val map = mapOf('a' to aText.toDouble(), 'b' to bText.toDouble(), 'c' to cText.toDouble())
+                NativeExpansionCalculatorEngine.run(op, map)
+            }.fold({ output = "${it.first}: ${it.second}"; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
+            onReset = { aText = "2"; bText = "3"; cText = "6"; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeMathExerciseToolForm(toolId: String) {
+    val context = LocalContext.current
+    val op = NativeMathExerciseEngine.operationForTool(toolId) ?: return
+    var values by remember(toolId) { mutableStateOf(op.fields.associate { it.name to "1" }) }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(op.formula, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        op.fields.forEach { field -> InputField(values[field.name].orEmpty(), { next -> values = values.toMutableMap().apply { put(field.name, next) } }, field.label, singleLine = true) }
+        ActionRow(
+            onRun = { runCatching { NativeMathExerciseEngine.run(op, values.mapValues { it.value.replace(",", "").toDouble() }) }.fold({ output = "${it.first}: ${it.second}"; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
+            onReset = { values = op.fields.associate { it.name to "1" }; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
     }
 }
 
@@ -648,6 +755,28 @@ private fun NativeMimeToolForm(toolId: String) {
                 runCatching { NativeMimeEngine.run(toolId, query, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run MIME lookup" })
             },
             onReset = { query = ""; fileName = ""; browserMime = ""; bytesHex = ""; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeUtilityToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    val op = tool.engine.extras["op"] ?: tool.engine.id
+    var input by rememberSaveable(tool.id) { mutableStateOf("") }
+    var options by rememberSaveable(tool.id) { mutableStateOf("{}") }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Native ${tool.engine.type} engine · op ${op ?: tool.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine’s flexible option model.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InputField(input, { input = it }, "Input", minLines = if (tool.engine.type == "generator") 2 else 4, tall = tool.engine.type != "generator")
+        InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{"count": 5, "text": "hello"}")
+        ActionRow(
+            onRun = { runCatching { NativeUtilityEngine.run(tool, input, options) }.fold({ output = it.text; error = "" }, { output = ""; error = it.message ?: "Unable to run native utility" }) },
+            onReset = { input = ""; options = "{}"; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)
     }

@@ -72,7 +72,22 @@ enum NativeCopy {
             ("Client-side PDF utilities", "On-device PDF utilities"),
         ]
         for (from, to) in replacements {
-            out = out.replacingOccurrences(of: from, with: to, options: [.caseInsensitive])
+            guard let regex = try? NSRegularExpression(pattern: NSRegularExpression.escapedPattern(for: from), options: [.caseInsensitive]) else { continue }
+            let range = NSRange(out.startIndex..<out.endIndex, in: out)
+            for match in regex.matches(in: out, options: [], range: range).reversed() {
+                guard let swiftRange = Range(match.range, in: out) else { continue }
+                let original = String(out[swiftRange])
+                let letters = original.filter(\.isLetter)
+                let replacement: String
+                if !letters.isEmpty && letters.allSatisfy(\.isUppercase) {
+                    replacement = to.uppercased()
+                } else if original.first?.isUppercase == true {
+                    replacement = to.prefix(1).uppercased() + String(to.dropFirst())
+                } else {
+                    replacement = to
+                }
+                out.replaceSubrange(swiftRange, with: replacement)
+            }
         }
         for (index, original) in placeholders.enumerated() {
             out = out.replacingOccurrences(of: "\u{0}\(index)\u{0}", with: original)

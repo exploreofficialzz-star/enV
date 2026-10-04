@@ -234,7 +234,7 @@ struct AccountView: View {
                         .foregroundStyle(Color.envInk)
                     VStack(alignment: .leading, spacing: 12) {
                         settingsRow("CircleCheck", "Offline catalog", "The complete tool catalog is bundled on this device.")
-                        Text("\(NativeCoverage.localActiveToolCount) of \(NativeCoverage.canonicalActiveToolCount) active tools currently execute locally across native text, codec, color, date/time, and MIME families. URL media inspection still requires its remote service.")
+                        Text("\(NativeCoverage.localActiveToolCount(in: store.catalog)) of \(NativeCoverage.canonicalActiveToolCount(in: store.catalog)) active tools currently execute locally using the native engine families. URL media inspection still requires its remote service.")
                             .font(.footnote)
                             .foregroundStyle(Color.envMuted)
                     }

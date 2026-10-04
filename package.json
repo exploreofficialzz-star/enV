@@ -38,10 +38,15 @@
     "check:processor": "node --check processor/server.mjs && node --check scripts/media-processor.mjs && node --check scripts/url-media-processor.mjs && node --check scripts/media/provider-registry.mjs && node --check scripts/media/url-security.mjs && node --check scripts/transcription-processor.mjs",
     "check:developer": "node scripts/check-developer.mjs",
     "check:production": "node scripts/check-production.mjs",
-    "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
+    "verify": "npm run check:production && npm run check:catalog && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:converters && npm run check:developer && npm run export:native-engine-data && npm run export:native-execution-matrix && npm run check:native-calculators && npm run check:native-coverage && npm run check:native-executability && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
     "check:coming-soon": "node --experimental-strip-types scripts/coming-soon-audit.mjs",
     "audit:coming-soon:deep": "node scripts/coming-soon-deep-audit.mjs",
-    "audit:video": "node scripts/video-137-audit.mjs"
+    "audit:video": "node scripts/video-137-audit.mjs",
+    "check:native-coverage": "node scripts/check-native-coverage.mjs",
+    "check:native-executability": "node scripts/check-native-executability.mjs",
+    "export:native-engine-data": "node --experimental-strip-types scripts/export-native-engine-data.mjs",
+    "check:native-calculators": "node scripts/check-native-calculators.mjs",
+    "export:native-execution-matrix": "node scripts/export-native-execution-matrix.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

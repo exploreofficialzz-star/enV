@@ -125,12 +125,8 @@ struct ToolDetailView: View {
 /// then checked against the exact operation map in that engine. This prevents
 /// a similarly named catalog entry from being presented as locally executable.
 enum NativeCoverage {
-    static let canonicalActiveToolCount = 8_790
-    static let localActiveToolCount = NativeTextEngine.supportedToolIDs.count
-        + NativeCodecEngine.supportedToolIDs.count
-        + NativeColorEngine.supportedToolIDs.count
-        + NativeDateTimeEngine.supportedToolIDs.count
-        + NativeMimeEngine.supportedToolIDs.count
+    static func canonicalActiveToolCount(in catalog: Catalog) -> Int { catalog.counts.active }
+    static func localActiveToolCount(in catalog: Catalog) -> Int { catalog.tools.filter(isLocallyExecutable).count }
 
     static func isLocallyExecutable(_ tool: Tool) -> Bool {
         guard !tool.isPlanned else { return false }
@@ -140,6 +136,9 @@ enum NativeCoverage {
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
         case "datetime": return NativeDateTimeEngine.operation(forToolID: tool.id) != nil
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
+        case "converter": return NativeConverterEngine.operation(for: tool) != nil
+        case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
+        case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
         case "url-media-info": return false
         default: return false
         }
@@ -147,10 +146,7 @@ enum NativeCoverage {
 
     static func status(for tool: Tool) -> String {
         if tool.isPlanned { return "Coming soon" }
-        if tool.engine.type == "url-media-info" || NativeUrlMediaInfoEngine.canonicalToolIDs.contains(tool.id) {
-            return "Remote metadata service required"
-        }
-        return isLocallyExecutable(tool) ? "Available offline" : "Not ported yet"
+        return isLocallyExecutable(tool) ? "Available offline" : "Exact web engine in native shell (online)"
     }
 }
 
@@ -165,22 +161,194 @@ struct NativeFamilyToolView: View {
             case "color": NativeColorToolView(tool: tool)
             case "datetime": NativeDateTimeToolView(tool: tool)
             case "mime": NativeMimeToolView(tool: tool)
-            case "url-media-info":
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) { EnVIcon(name: "Globe", size: 16, tint: .envMuted); Text("Remote service required") }
-                        .font(.headline).foregroundStyle(.orange)
-                    Text("URL media inspection is not available offline. The remote metadata service is required for title, duration, codecs, thumbnails, and formats.")
-                        .foregroundStyle(.secondary)
-                }
-            default:
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) { EnVIcon(name: "Hammer", size: 16, tint: .envMuted); Text("Native engine migration in progress") }
-                        .font(.headline).foregroundStyle(Color.envTeal)
-                    Text("This catalog entry is not yet implemented as a native iOS engine.").foregroundStyle(.secondary)
-                }
+            case "converter": NativeConverterToolView(tool: tool)
+            case "calculator":
+                if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) }
+                else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) }
+                else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) }
+                else { EmptyView() }
+            case "generator", "network", "seo", "developer", "cssgen": NativeUtilityToolView(tool: tool)
+            case "url-media-info": NativeWebFallbackToolView(tool: tool)
+            default: NativeWebFallbackToolView(tool: tool)
             }
         }
     }
+}
+
+
+private struct NativeUtilityToolView: View {
+    let tool: Tool
+    @State private var input = ""
+    @State private var optionsJSON = "{}"
+    @State private var output = ""
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Native \(tool.engine.type ?? "utility") engine · op \(tool.engine.op ?? tool.engine.id ?? tool.id)")
+                .font(.subheadline.weight(.semibold))
+            Text("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine's flexible option model.")
+                .font(.caption).foregroundStyle(.secondary)
+            NativeInputField(title: "Input", text: $input)
+            NativeInputField(title: "Options JSON", text: $optionsJSON)
+            NativeActionRow(output: output, run: {
+                do { let result = try NativeUtilityEngine.run(tool, input: input, optionsJSON: optionsJSON); output = result.text; error = nil }
+                catch { output = ""; error = error.localizedDescription }
+            }, reset: { input = ""; optionsJSON = "{}"; output = ""; error = nil })
+            NativeOutputView(output: output, error: error)
+        }
+    }
+}
+
+private struct NativeConverterToolView: View {
+    let tool: Tool
+    @State private var value = "1"
+    @State private var from = ""
+    @State private var to = ""
+    @State private var output = ""
+    @State private var error = ""
+
+    init(tool: Tool) {
+        self.tool = tool
+        let units = NativeConverterEngine.operation(for: tool).map { NativeConverterEngine.units(for: $0) } ?? []
+        _from = State(initialValue: units.first?.id ?? "")
+        _to = State(initialValue: units.dropFirst().first?.id ?? units.first?.id ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let op = NativeConverterEngine.operation(for: tool) {
+                Text("System: \(op.systemID) · mode: \(op.mode)").font(.caption).foregroundStyle(.secondary)
+                NativeInputField(title: "Value", text: $value)
+                Text("Unit IDs are the same IDs used by the web engine (examples: \(NativeConverterEngine.units(for: op).prefix(5).map(\.id).joined(separator: ", ")) …)").font(.caption).foregroundStyle(.secondary)
+                NativeInputField(title: "From unit", text: $from)
+                NativeInputField(title: "To unit", text: $to)
+                NativeActionRow(output: output, run: {
+                    do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
+                    catch { output = ""; error = error.localizedDescription }
+                }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
+                NativeOutputView(output: output, error: error)
+            }
+        }
+    }
+}
+
+private struct NativeCalculatorToolView: View {
+    let tool: Tool
+    @State private var values: [String: String]
+    @State private var output = ""
+    @State private var error: String?
+
+    init(tool: Tool) {
+        self.tool = tool
+        let op = NativeCalculatorEngine.operation(for: tool.id)
+        _values = State(initialValue: Dictionary(uniqueKeysWithValues: (op?.fields ?? []).map { ($0.name, $0.defaultValue) }))
+        _error = State(initialValue: nil)
+    }
+
+    var body: some View {
+        if let op = NativeCalculatorEngine.operation(for: tool.id) {
+            VStack(alignment: .leading, spacing: 12) {
+                if let formula = op.formula, !formula.isEmpty { Text("Formula: \(formula)").font(.subheadline.weight(.semibold)) }
+                ForEach(op.fields, id: \.name) { field in
+                    NativeInputField(title: field.suffix.map { "\(field.label) (\($0))" } ?? field.label, text: binding(for: field.name))
+                }
+                NativeActionRow(output: output, run: {
+                    do {
+                        let rows = try NativeCalculatorEngine.run(op, values: values)
+                        output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
+                        error = nil
+                    } catch { output = ""; error = error.localizedDescription }
+                }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, $0.defaultValue) }); output = ""; error = nil })
+                NativeOutputView(output: output, error: error)
+            }
+        } else { EmptyView() }
+    }
+
+    private func binding(for key: String) -> Binding<String> { Binding(get: { values[key] ?? "" }, set: { values[key] = $0 }) }
+}
+
+private struct NativeExpansionCalculatorToolView: View {
+    let tool: Tool
+    @State private var values: [Character: String]
+    @State private var output = ""
+    @State private var error: String?
+
+    init(tool: Tool) {
+        self.tool = tool
+        let op = NativeExpansionCalculatorEngine.operation(for: tool.id)
+        var initial: [Character: String] = ["a": "2", "b": "3", "c": "6"]
+        if let op { initial[op.target] = "" }
+        _values = State(initialValue: initial)
+        _error = State(initialValue: nil)
+    }
+
+    var body: some View {
+        if let op = NativeExpansionCalculatorEngine.operation(for: tool.id) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("\(op.row.cLabel) = \(op.row.aLabel) \(op.row.family == "product" ? "×" : op.row.family == "ratio" ? "÷" : "+") \(op.row.bLabel)").font(.subheadline.weight(.semibold))
+                if op.target != "a" { NativeInputField(title: op.row.aLabel, text: binding(for: "a")) }
+                if op.target != "b" { NativeInputField(title: op.row.bLabel, text: binding(for: "b")) }
+                if op.target != "c" { NativeInputField(title: op.row.cLabel, text: binding(for: "c")) }
+                NativeActionRow(output: output, run: {
+                    do {
+                        let parsed = try values.reduce(into: [Character: Double]()) { result, pair in if !pair.value.isEmpty { guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number.") }; result[pair.key] = number } }
+                        let result = try NativeExpansionCalculatorEngine.run(op, values: parsed)
+                        output = "\(result.0): \(result.1)"; error = nil
+                    } catch { output = ""; error = error.localizedDescription }
+                }, reset: { values = ["a": "2", "b": "3", "c": "6"]; values[op.target] = ""; output = ""; error = nil })
+                NativeOutputView(output: output, error: error)
+            }
+        } else { EmptyView() }
+    }
+
+    private func binding(for key: Character) -> Binding<String> {
+        Binding(get: { values[key] ?? "" }, set: { values[key] = $0 })
+    }
+}
+
+private struct NativeMathExerciseToolView: View {
+    let tool: Tool
+    @State private var values: [String: String]
+    @State private var output = ""
+    @State private var error: String?
+
+    init(tool: Tool) {
+        self.tool = tool
+        let op = NativeMathExerciseEngine.operation(for: tool.id)
+        _values = State(initialValue: Dictionary(uniqueKeysWithValues: (op?.fields ?? []).map { ($0.name, "1") }))
+        _error = State(initialValue: nil)
+    }
+
+    var body: some View {
+        if let op = NativeMathExerciseEngine.operation(for: tool.id) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(op.formula).font(.subheadline.weight(.semibold))
+                ForEach(op.fields, id: \.name) { field in NativeInputField(title: field.label, text: binding(for: field.name)) }
+                NativeActionRow(output: output, run: {
+                    do {
+                        let parsed = try values.reduce(into: [String: Double]()) { result, pair in guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number for \(pair.key).") }; result[pair.key] = number }
+                        let result = try NativeMathExerciseEngine.run(op, values: parsed)
+                        output = "\(result.0): \(result.1)"; error = nil
+                    } catch { output = ""; error = error.localizedDescription }
+                }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, "1") }); output = ""; error = nil })
+                NativeOutputView(output: output, error: error)
+            }
+        } else { EmptyView() }
+    }
+
+    private func binding(for key: String) -> Binding<String> { Binding(get: { values[key] ?? "" }, set: { values[key] = $0 }) }
+}
+
+private struct NativeInputField: View {
+    let title: String
+    @Binding var text: String
+    var body: some View { TextField(title, text: $text).textFieldStyle(.roundedBorder) }
+}
+
+private enum NativeSimpleError: Error, LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 
 private struct NativeActionRow: View {
