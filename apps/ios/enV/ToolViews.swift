@@ -193,7 +193,7 @@ private struct NativeUtilityToolView: View {
             NativeInputField(title: "Options JSON", text: $optionsJSON)
             NativeActionRow(output: output, run: {
                 do { let result = try NativeUtilityEngine.run(tool, input: input, optionsJSON: optionsJSON); output = result.text; error = nil }
-                catch { output = ""; error = error.localizedDescription }
+                catch let caught { output = ""; error = caught.localizedDescription }
             }, reset: { input = ""; optionsJSON = "{}"; output = ""; error = nil })
             NativeOutputView(output: output, error: error)
         }
@@ -225,7 +225,7 @@ private struct NativeConverterToolView: View {
                 NativeInputField(title: "To unit", text: $to)
                 NativeActionRow(output: output, run: {
                     do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
-                    catch { output = ""; error = error.localizedDescription }
+                    catch let caught { output = ""; error = caught.localizedDescription }
                 }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
                 NativeOutputView(output: output, error: error)
             }
@@ -258,7 +258,7 @@ private struct NativeCalculatorToolView: View {
                         let rows = try NativeCalculatorEngine.run(op, values: values)
                         output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
                         error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caught { output = ""; error = caught.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, $0.defaultValue) }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -295,7 +295,7 @@ private struct NativeExpansionCalculatorToolView: View {
                         let parsed = try values.reduce(into: [Character: Double]()) { result, pair in if !pair.value.isEmpty { guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number.") }; result[pair.key] = number } }
                         let result = try NativeExpansionCalculatorEngine.run(op, values: parsed)
                         output = "\(result.0): \(result.1)"; error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caught { output = ""; error = caught.localizedDescription }
                 }, reset: { values = ["a": "2", "b": "3", "c": "6"]; values[op.target] = ""; output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -330,7 +330,7 @@ private struct NativeMathExerciseToolView: View {
                         let parsed = try values.reduce(into: [String: Double]()) { result, pair in guard let number = Double(pair.value.replacingOccurrences(of: ",", with: "")) else { throw NativeSimpleError.message("Enter a valid number for \(pair.key).") }; result[pair.key] = number }
                         let result = try NativeMathExerciseEngine.run(op, values: parsed)
                         output = "\(result.0): \(result.1)"; error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caught { output = ""; error = caught.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, "1") }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
