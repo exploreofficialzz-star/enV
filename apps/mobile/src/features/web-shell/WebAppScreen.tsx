@@ -24,6 +24,8 @@ import {
 
 const WEBVIEW_LOAD_TIMEOUT_MS = 20_000;
 
+type RecoveryReason = "connection" | "renderer";
+
 type NativeDownload = {
   id: string;
   uri: string;
@@ -66,9 +68,12 @@ export default function WebAppScreen() {
   const webViewRef = useRef<WebView>(null);
   const transfersRef = useRef(new Map<string, NativeDownload>());
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const hasLoadedPageRef = useRef(false);
+  const rendererRecoveryAttemptsRef = useRef(0);
   const [canGoBack, setCanGoBack] = useState(false);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<RecoveryReason | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [sourceUrl, setSourceUrl] = useState(WEB_APP_URL);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activePageUrlRef = useRef(WEB_APP_URL);
 
@@ -82,9 +87,10 @@ export default function WebAppScreen() {
   useEffect(() => clearLoadTimeout, [clearLoadTimeout, retryKey]);
 
   const startLoadTimeout = useCallback(() => {
+    if (hasLoadedPageRef.current) return;
     clearLoadTimeout();
     loadTimeoutRef.current = setTimeout(() => {
-      setLoadError(true);
+      if (!hasLoadedPageRef.current) setLoadError("connection");
     }, WEBVIEW_LOAD_TIMEOUT_MS);
   }, [clearLoadTimeout]);
 
@@ -276,8 +282,31 @@ export default function WebAppScreen() {
 
   const retry = useCallback(() => {
     clearLoadTimeout();
-    activePageUrlRef.current = WEB_APP_URL;
-    setLoadError(false);
+    const retryUrl = loadError === "renderer" && isSafeHttpsWebUrl(activePageUrlRef.current)
+      ? activePageUrlRef.current
+      : WEB_APP_URL;
+    hasLoadedPageRef.current = false;
+    rendererRecoveryAttemptsRef.current = 0;
+    activePageUrlRef.current = retryUrl;
+    setSourceUrl(retryUrl);
+    setLoadError(null);
+    setCanGoBack(false);
+    setRetryKey((current) => current + 1);
+  }, [clearLoadTimeout, loadError]);
+
+  const handleRendererTermination = useCallback(() => {
+    clearLoadTimeout();
+    if (rendererRecoveryAttemptsRef.current >= 1) {
+      setLoadError("renderer");
+      return;
+    }
+    rendererRecoveryAttemptsRef.current += 1;
+    const currentUrl = isSafeHttpsWebUrl(activePageUrlRef.current)
+      ? activePageUrlRef.current
+      : WEB_APP_URL;
+    hasLoadedPageRef.current = false;
+    setSourceUrl(currentUrl);
+    setLoadError(null);
     setCanGoBack(false);
     setRetryKey((current) => current + 1);
   }, [clearLoadTimeout]);
@@ -286,6 +315,7 @@ export default function WebAppScreen() {
     return (
       <ConnectionErrorView
         onRetry={retry}
+        reason={loadError}
       />
     );
   }
@@ -296,7 +326,7 @@ export default function WebAppScreen() {
         <WebView
           key={retryKey}
           ref={webViewRef}
-          source={{ uri: WEB_APP_URL }}
+          source={{ uri: sourceUrl }}
           originWhitelist={["https://*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
           onOpenWindow={handleOpenWindow}
@@ -306,25 +336,31 @@ export default function WebAppScreen() {
             activePageUrlRef.current = navigationState.url;
             setCanGoBack(navigationState.canGoBack);
           }}
+          onLoad={(event) => {
+            activePageUrlRef.current = event.nativeEvent.url;
+            hasLoadedPageRef.current = true;
+            rendererRecoveryAttemptsRef.current = 0;
+            clearLoadTimeout();
+          }}
           onLoadStart={(event) => {
             activePageUrlRef.current = event.nativeEvent.url;
-            setLoadError(false);
+            if (!hasLoadedPageRef.current) setLoadError(null);
             startLoadTimeout();
           }}
           onLoadEnd={clearLoadTimeout}
           onError={(event) => {
             if (event.nativeEvent.url !== activePageUrlRef.current) return;
             clearLoadTimeout();
-            setLoadError(true);
+            if (!hasLoadedPageRef.current) setLoadError("connection");
           }}
           onHttpError={(event) => {
             const { url, statusCode } = event.nativeEvent;
             if (url !== activePageUrlRef.current || statusCode < 400) return;
             clearLoadTimeout();
-            setLoadError(true);
+            if (!hasLoadedPageRef.current) setLoadError("connection");
           }}
-          onRenderProcessGone={retry}
-          onContentProcessDidTerminate={retry}
+          onRenderProcessGone={handleRendererTermination}
+          onContentProcessDidTerminate={handleRendererTermination}
           injectedJavaScriptBeforeContentLoaded={BLOB_DOWNLOAD_BRIDGE_SCRIPT}
           injectedJavaScript={BLOB_DOWNLOAD_BRIDGE_SCRIPT}
           javaScriptEnabled

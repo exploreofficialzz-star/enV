@@ -202,9 +202,19 @@ assert.ok(
 );
 assert.ok(
   webShell.includes("onHttpError") &&
-    webShell.includes("onRenderProcessGone={retry}") &&
-    webShell.includes("onContentProcessDidTerminate={retry"),
+    webShell.includes("onRenderProcessGone={handleRendererTermination}") &&
+    webShell.includes("onContentProcessDidTerminate={handleRendererTermination") &&
+    webShell.includes("hasLoadedPageRef.current") &&
+    webShell.includes("if (!hasLoadedPageRef.current) setLoadError("),
   "WebView HTTP failures and native renderer crashes must have an in-app recovery path.",
+);
+assert.ok(
+  webShell.includes("source={{ uri: sourceUrl }}") &&
+    webShell.includes("setSourceUrl(currentUrl)") &&
+    webShell.includes("rendererRecoveryAttemptsRef.current >= 1") &&
+    connectionErrorView.includes('reason: "connection" | "renderer"') &&
+    connectionErrorView.includes("enV stopped unexpectedly"),
+  "Renderer recovery must retry the current route once and report renderer failures accurately.",
 );
 assert.doesNotMatch(
   webShell,

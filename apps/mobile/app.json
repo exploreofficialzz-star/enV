@@ -2,7 +2,7 @@
   "expo": {
     "name": "enV",
     "slug": "env-mobile",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "env",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.chastech.env",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png"

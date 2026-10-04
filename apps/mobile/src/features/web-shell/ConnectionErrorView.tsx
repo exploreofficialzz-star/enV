@@ -5,18 +5,24 @@ import { BRAND_STATUS_BAR_COLOR } from "@/lib/web-app-config";
 
 type Props = {
   onRetry: () => void;
+  reason: "connection" | "renderer";
 };
 
-export function ConnectionErrorView({ onRetry }: Props) {
+export function ConnectionErrorView({ onRetry, reason }: Props) {
+  const rendererStopped = reason === "renderer";
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Text style={styles.markText}>enV</Text>
         </View>
-        <Text style={styles.title}>Can’t connect to enV</Text>
+        <Text style={styles.title}>
+          {rendererStopped ? "enV stopped unexpectedly" : "Can’t connect to enV"}
+        </Text>
         <Text style={styles.body}>
-          Check your internet connection and try again. Your in-progress changes may not be available until the page loads again.
+          {rendererStopped
+            ? "The app page closed unexpectedly. Try reloading it; changes that were not saved may be lost."
+            : "Check your internet connection and try again. Your in-progress changes may not be available until the page loads again."}
         </Text>
         <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
           <Text style={styles.primaryButtonText}>Try again</Text>
