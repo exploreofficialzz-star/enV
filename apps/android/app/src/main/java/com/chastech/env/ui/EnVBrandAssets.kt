@@ -53,9 +53,10 @@ fun EnVIcon(
 
 /** Uses the exact header image used by src/components/brand/logo.tsx. */
 @Composable
-fun EnVLogo(modifier: Modifier = Modifier) {
+fun EnVLogo(modifier: Modifier = Modifier, darkTheme: Boolean = false) {
     val context = LocalContext.current
-    val image = remember { loadNativeImage(context, "native-icons/logo-header-transparent.png") }
+    val logoPath = if (darkTheme) "native-icons/logo-header-dark.png" else "native-icons/logo-header-transparent.png"
+    val image = remember(darkTheme) { loadNativeImage(context, logoPath) }
     if (image != null) {
         Image(image, contentDescription = "enV home", modifier = modifier, contentScale = ContentScale.Fit)
     }

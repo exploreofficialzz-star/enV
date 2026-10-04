@@ -4,14 +4,12 @@ import UIKit
 @main
 struct enVApp: App {
     @StateObject private var store = CatalogStore()
-    @AppStorage("env.darkMode") private var isDarkMode = false
 
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .environmentObject(store)
                 .tint(Color.envAccent)
-                .preferredColorScheme(isDarkMode ? .dark : .light)
         }
     }
 }
@@ -69,7 +67,7 @@ private enum NativeTab: Int, CaseIterable {
 struct RootTabView: View {
     @EnvironmentObject private var store: CatalogStore
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
-    @AppStorage("env.darkMode") private var isDarkMode = false
+    @AppStorage("env.themeMode") private var themeMode = "system"
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -89,7 +87,7 @@ struct RootTabView: View {
             EnVBottomBar(selection: $selectedTab)
         }
         .background(Color.envSurface.ignoresSafeArea())
-        .preferredColorScheme(isDarkMode ? .dark : .light)
+        .preferredColorScheme(themeMode == "dark" ? .dark : themeMode == "light" ? .light : nil)
         .overlay {
             if store.loadState == .loading {
                 NativeLaunchView()
@@ -136,8 +134,9 @@ private struct EnVBottomBar: View {
 }
 
 struct EnVBrandNavigationStyle: ViewModifier {
-    @AppStorage("env.darkMode") private var isDarkMode = false
+    @AppStorage("env.themeMode") private var themeMode = "system"
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
@@ -150,13 +149,13 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("enV home")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { isDarkMode.toggle() } label: {
-                        EnVIcon(name: isDarkMode ? "Sun" : "Moon", size: 18, tint: .envMuted)
+                    Button { themeMode = colorScheme == .dark ? "light" : "dark" } label: {
+                        EnVIcon(name: colorScheme == .dark ? "Sun" : "Moon", size: 18, tint: .envMuted)
                             .frame(width: 36, height: 36)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isDarkMode ? "Switch to light mode" : "Switch to dark mode")
+                    .accessibilityLabel(colorScheme == .dark ? "Switch to light mode" : "Switch to dark mode")
                 }
             }
             .toolbarBackground(Color.envSurface, for: .navigationBar)
@@ -189,9 +188,11 @@ struct EnVIcon: View {
 }
 
 struct EnVLogo: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Group {
-            if let image = EnVNativeImages.logo {
+            if let image = EnVNativeImages.logo(dark: colorScheme == .dark) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
                 Text("enV").font(.system(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
@@ -213,7 +214,9 @@ private enum EnVNativeImages {
         return load(path: "native-icons/icons/\(slug).png")
     }
 
-    static var logo: UIImage? { load(path: "native-icons/logo-header-transparent.png") }
+    static func logo(dark: Bool) -> UIImage? {
+        load(path: dark ? "native-icons/logo-header-dark.png" : "native-icons/logo-header-transparent.png")
+    }
 
     private static func load(path: String) -> UIImage? {
         if let cached = cache.object(forKey: path as NSString) { return cached }

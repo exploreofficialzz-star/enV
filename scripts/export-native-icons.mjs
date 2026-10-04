@@ -1,10 +1,11 @@
-import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import React from "react";
 import * as Lucide from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const catalogPath = path.join(root, "apps/shared/catalog.json");
@@ -44,10 +45,22 @@ function assetName(name) {
 }
 
 mkdirSync(iconRoot, { recursive: true });
-copyFileSync(
-  path.join(root, "public/logo-header-transparent.png"),
-  path.join(outputRoot, "logo-header-transparent.png"),
-);
+const sourceLogo = path.join(root, "public/logo-header-transparent.png");
+const lightLogo = path.join(outputRoot, "logo-header-transparent.png");
+const darkLogo = path.join(outputRoot, "logo-header-dark.png");
+copyFileSync(sourceLogo, lightLogo);
+const logoPng = PNG.sync.read(readFileSync(sourceLogo));
+for (let offset = 0; offset < logoPng.data.length; offset += 4) {
+  const red = logoPng.data[offset];
+  const green = logoPng.data[offset + 1];
+  const blue = logoPng.data[offset + 2];
+  if (Math.max(red, green, blue) < 112 && Math.max(red, green, blue) - Math.min(red, green, blue) < 40) {
+    logoPng.data[offset] = 255;
+    logoPng.data[offset + 1] = 255;
+    logoPng.data[offset + 2] = 255;
+  }
+}
+writeFileSync(darkLogo, PNG.sync.write(logoPng));
 
 const executablePath = process.env.CHROMIUM_PATH || "/usr/bin/chromium";
 const browser = await chromium.launch({

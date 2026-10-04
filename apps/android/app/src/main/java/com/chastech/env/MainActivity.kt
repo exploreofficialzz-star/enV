@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,16 +107,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val favorites = FavoritesStore(applicationContext)
         setContent {
-            var darkMode by rememberSaveable { mutableStateOf(false) }
+            var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
+            val darkMode = when (themeMode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
             EnVTheme(darkTheme = darkMode) {
-                CatalogGate(favorites, darkMode, onToggleTheme = { darkMode = !darkMode })
+                CatalogGate(
+                    favorites,
+                    darkMode,
+                    themeMode,
+                    onToggleTheme = {
+                        themeMode = if (darkMode) "light" else "dark"
+                        favorites.setThemeMode(themeMode)
+                    },
+                    onUseSystemTheme = {
+                        themeMode = "system"
+                        favorites.setThemeMode(themeMode)
+                    },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, onToggleTheme: () -> Unit) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onToggleTheme: () -> Unit, onUseSystemTheme: () -> Unit) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -131,27 +145,27 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, onToggleTh
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites, darkMode, onToggleTheme)
-        loadFailed -> CatalogFailureScreen { retryCount += 1 }
-        else -> NativeLaunchScreen()
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onToggleTheme, onUseSystemTheme)
+        loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
+        else -> NativeLaunchScreen(darkMode)
     }
 }
 
 @Composable
-private fun NativeLaunchScreen() {
+private fun NativeLaunchScreen(darkMode: Boolean) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            EnVLogo(Modifier.width(112.dp).height(75.dp))
+            EnVLogo(Modifier.width(112.dp).height(75.dp), darkTheme = darkMode)
             Text("Useful tools, ready when you are.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
 
 @Composable
-private fun CatalogFailureScreen(onRetry: () -> Unit) {
+private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            EnVLogo(Modifier.width(112.dp).height(75.dp))
+            EnVLogo(Modifier.width(112.dp).height(75.dp), darkTheme = darkMode)
             Text("The offline catalog couldn't be opened.", modifier = Modifier.padding(top = 12.dp))
             Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) { Text("Retry") }
         }
@@ -164,7 +178,7 @@ private enum class AppTab(val label: String, val iconName: String) {
 }
 
 @Composable
-private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, onToggleTheme: () -> Unit) {
+private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onToggleTheme: () -> Unit, onUseSystemTheme: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
@@ -178,7 +192,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { EnVLogo(Modifier.width(84.dp).height(56.dp)) },
+                title = { EnVLogo(Modifier.width(84.dp).height(56.dp), darkTheme = darkMode) },
                 actions = {
                     IconButton(onClick = onToggleTheme, modifier = Modifier.semantics { contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode" }) {
                         EnVIcon(if (darkMode) "Sun" else "Moon", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -215,7 +229,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Account -> AccountScreen(catalog)
+                    AppTab.Account -> AccountScreen(catalog, themeMode, onUseSystemTheme)
                 }
             }
         }
@@ -315,10 +329,16 @@ private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (Strin
 }
 
 @Composable
-private fun AccountScreen(catalog: Catalog) {
+private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        SettingCard(
+            "Appearance",
+            if (themeMode == "system") "Following device light/dark setting" else "Custom theme active · tap to follow the device",
+            "Sun",
+            onClick = onUseSystemTheme,
+        )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
         SettingCard("Migration status", "89 active tools run natively and offline. URL media inspection still needs a remote metadata service.", "Hammer")
@@ -725,4 +745,15 @@ private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholde
 }
 @Composable private fun StatusPill(status: String, modifier: Modifier = Modifier) { Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(5.dp)) { Text(if (status == "planned") "Coming soon" else "IN-BROWSER", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) } }
 @Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp)) } }
-@Composable private fun SettingCard(title: String, detail: String, iconName: String) { Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { EnVIcon(iconName, tint = MaterialTheme.colorScheme.primary); Column(Modifier.padding(start = 14.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant) } } } }
+@Composable private fun SettingCard(title: String, detail: String, iconName: String, onClick: (() -> Unit)? = null) {
+    val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().clickable(onClick = onClick)
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            EnVIcon(iconName, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.padding(start = 14.dp)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}

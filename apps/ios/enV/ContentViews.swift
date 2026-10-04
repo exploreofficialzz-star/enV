@@ -223,6 +223,8 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
+    @AppStorage("env.themeMode") private var themeMode = "system"
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -242,6 +244,12 @@ struct AccountView: View {
 
                     sectionHeader("Settings", subtitle: "App information and preferences")
                     VStack(spacing: 0) {
+                        Button { themeMode = "system" } label: {
+                            settingsRow("Settings", "Appearance", themeMode == "system" ? "Following device light/dark setting" : "Tap to follow the device appearance")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(themeMode == "system")
+                        Divider().overlay(Color.envBorder)
                         settingsRow("Bell", "Notifications", "Notifications are not configured in this foundation release.")
                         Divider().overlay(Color.envBorder)
                         settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
