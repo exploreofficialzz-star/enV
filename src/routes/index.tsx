@@ -45,7 +45,10 @@ function Home() {
           </button>
         </form>
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
-          A focused toolkit for everyday work.
+          A focused toolkit for
+          <br className="sm:hidden" />
+          <span className="sm:hidden">everyday work.</span>
+          <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
       <ToolSection title="Trending tools" tools={trending} />

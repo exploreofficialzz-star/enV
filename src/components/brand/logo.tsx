@@ -5,10 +5,11 @@ type LogoSize = "header" | "search" | "hero";
 
 /** The canonical enV lockup used throughout the browser application. */
 export function Logo({ className, size = "header" }: { className?: string; size?: LogoSize }) {
+  const homeHero = size === "hero";
   const imageSize = {
     header: "h-14 w-[84px] sm:h-16 sm:w-24",
     search: "h-8 w-12",
-    hero: "h-[168px] w-[252px] sm:h-[192px] sm:w-[288px]",
+    hero: "h-[98px] w-[252px] sm:h-[112px] sm:w-[288px]",
   }[size];
 
   return (
@@ -18,17 +19,17 @@ export function Logo({ className, size = "header" }: { className?: string; size?
       aria-label="enV home"
     >
       <img
-        src="/logo-header-transparent.png"
+        src={homeHero ? "/logo-home-transparent.png" : "/logo-header-transparent.png"}
         alt=""
-        width={252}
-        height={168}
+        width={homeHero ? 813 : 960}
+        height={homeHero ? 317 : 640}
         className={cn("object-contain dark:hidden", imageSize)}
       />
       <img
-        src="/logo-header-dark.png"
+        src={homeHero ? "/logo-home-dark.png" : "/logo-header-dark.png"}
         alt=""
-        width={252}
-        height={168}
+        width={homeHero ? 813 : 960}
+        height={homeHero ? 317 : 640}
         className={cn("hidden object-contain dark:block", imageSize)}
       />
     </Link>

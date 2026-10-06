@@ -1,6 +1,5 @@
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
-import { MobileNav } from "@/components/layout/mobile-nav";
 import { useHydratePrefs } from "@/hooks/use-theme";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -8,9 +7,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-fg">
       <Header />
-      <main className="flex-1 pb-28 md:pb-0">{children}</main>
+      <main className="flex-1">{children}</main>
       <Footer />
-      <MobileNav />
     </div>
   );
 }

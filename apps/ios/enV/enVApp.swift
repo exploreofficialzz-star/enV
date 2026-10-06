@@ -40,19 +40,8 @@ extension Color {
     static let envAccentSoft = adaptive(light: 0xD8F3EE, dark: 0x14332F)
 }
 
-private enum NativeTab: Int, CaseIterable {
+private enum NativeTab: Int {
     case home, tools, search, saved, account
-
-    var title: String {
-        switch self {
-        case .home: "Home"
-        case .tools: "Tools"
-        case .search: "Search"
-        case .saved: "Saved"
-        case .account: "Account"
-        }
-    }
-
 }
 
 struct RootTabView: View {
@@ -75,9 +64,6 @@ struct RootTabView: View {
                 .tag(NativeTab.account.rawValue)
         }
         .toolbar(.hidden, for: .tabBar)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            EnVBottomBar(selection: $selectedTab)
-        }
         .background(Color.envSurface.ignoresSafeArea())
         .preferredColorScheme(themeMode == "dark" ? .dark : themeMode == "light" ? .light : nil)
         .overlay {
@@ -87,33 +73,6 @@ struct RootTabView: View {
                 CatalogFailureView(retry: store.reloadCatalog)
             }
         }
-    }
-}
-
-private struct EnVBottomBar: View {
-    @Binding var selection: Int
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(NativeTab.allCases, id: \.rawValue) { tab in
-                let selected = selection == tab.rawValue
-                Button { selection = tab.rawValue } label: {
-                    VStack(spacing: 3) {
-                        Text(tab.title)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(selected ? Color.envAccent : Color.envMuted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 64)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-        .padding(.top, 1)
-        .background(Color.envSurface.ignoresSafeArea(edges: .bottom))
     }
 }
 
@@ -187,10 +146,11 @@ struct EnVIcon: View {
 
 struct EnVLogo: View {
     @Environment(\.colorScheme) private var colorScheme
+    var homeHero: Bool = false
 
     var body: some View {
         Group {
-            if let image = EnVNativeImages.logo(dark: colorScheme == .dark) {
+            if let image = EnVNativeImages.logo(dark: colorScheme == .dark, homeHero: homeHero) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
                 Text("enV").font(.system(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
@@ -212,8 +172,11 @@ private enum EnVNativeImages {
         return load(path: "native-icons/icons/\(slug).png")
     }
 
-    static func logo(dark: Bool) -> UIImage? {
-        load(path: dark ? "native-icons/logo-header-dark.png" : "native-icons/logo-header-transparent.png")
+    static func logo(dark: Bool, homeHero: Bool = false) -> UIImage? {
+        if homeHero {
+            return load(path: dark ? "native-icons/logo-home-dark.png" : "native-icons/logo-home-transparent.png")
+        }
+        return load(path: dark ? "native-icons/logo-header-dark.png" : "native-icons/logo-header-transparent.png")
     }
 
     private static func load(path: String) -> UIImage? {

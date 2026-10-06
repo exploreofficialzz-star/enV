@@ -11,8 +11,11 @@ class MainActivityLaunchTest {
 
     @Test
     fun launchShowsNativeCatalogHome() {
-        composeRule.onNodeWithText("A focused toolkit for everyday work.").assertIsDisplayed()
+        composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
+        listOf("Home", "Tools", "Search", "Saved", "Account").forEach { label ->
+            composeRule.onNodeWithText(label).assertDoesNotExist()
+        }
     }
 }

@@ -18,7 +18,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     VStack(alignment: .center, spacing: 16) {
-                        EnVLogo().frame(width: 252, height: 168)
+                        EnVLogo(homeHero: true).frame(width: 252, height: 98)
                         HStack(spacing: 12) {
                             EnVLogo().frame(width: 40, height: 28)
                             TextField("Search for a tool", text: $searchText)
@@ -36,7 +36,7 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-                        Text("A focused toolkit for everyday work.")
+                        Text("A focused toolkit for\neveryday work.")
                             .font(.system(size: 28, weight: .semibold))
                             .tracking(-0.4)
                             .frame(maxWidth: .infinity, alignment: .leading)
