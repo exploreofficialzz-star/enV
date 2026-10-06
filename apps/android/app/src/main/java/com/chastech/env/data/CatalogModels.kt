@@ -69,7 +69,10 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
     val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
     val toolsJson = root.optJSONArray("tools") ?: JSONArray()
     val categories = buildList(categoriesJson.length()) { for (i in 0 until categoriesJson.length()) add(categoriesJson.getJSONObject(i).toCategory()) }
-    val tools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) add(toolsJson.getJSONObject(i).toToolRecord()) }
+    val tools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) {
+        val tool = toolsJson.getJSONObject(i).toToolRecord()
+        if (!NativeCopy.isWebRuntimeOnly(tool.id)) add(tool)
+    } }
     val planned = tools.count { it.status.equals("planned", ignoreCase = true) }
     val active = tools.count { it.status.equals("active", ignoreCase = true) }
     return Catalog(

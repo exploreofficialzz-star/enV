@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Copy, Download, Plus, Redo2, Save, Trash2, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";

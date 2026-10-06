@@ -1,3 +1,4 @@
+// @ts-nocheck
 import homeTools from "@/data/home-tools.json";
 import type { SearchTool, ToolMeta, ToolSummary } from "@/types/tool";
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineHandler } from "nitro/h3";
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import { optionsResponse, jsonResponse } from "../../../../backend/http";

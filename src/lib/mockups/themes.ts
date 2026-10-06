@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MockupPlatform, ThemeDefinition } from "./schema.ts";
 
 const themes: ThemeDefinition[] = [

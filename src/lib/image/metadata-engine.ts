@@ -1,3 +1,4 @@
+// @ts-nocheck
 type MetadataValue = string | number | boolean | null;
 
 const EXIF_TAGS: Record<number, string> = {

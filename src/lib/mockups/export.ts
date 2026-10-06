@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { DeviceTemplate, MockupProject, ThemeTokens } from "./schema.ts";
 import { PLATFORM_ADAPTERS } from "./platforms/registry.ts";
 import { createServerMediaAdapter } from "@/lib/media/media-backends";

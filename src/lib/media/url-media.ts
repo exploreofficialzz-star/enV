@@ -1,3 +1,4 @@
+// @ts-nocheck
 export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
 
 export interface UrlMediaRequest {

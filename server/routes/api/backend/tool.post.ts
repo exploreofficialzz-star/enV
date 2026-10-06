@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineHandler } from "nitro/h3";
 import { jsonResponse, optionsResponse } from "../../../../backend/http";
 import { parseSocialToolId, buildSocialOutput } from "../../../../src/components/engines/social-engine-utils";

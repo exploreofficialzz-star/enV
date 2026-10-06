@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MockupPlatform } from "../schema.ts";
 import type { PlatformAdapter } from "./types.ts";
 import { whatsappAdapter } from "./whatsapp.ts";

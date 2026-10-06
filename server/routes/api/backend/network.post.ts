@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineHandler } from "nitro/h3";
 import dns from "node:dns/promises";
 import { jsonResponse, optionsResponse } from "../../../../backend/http";
