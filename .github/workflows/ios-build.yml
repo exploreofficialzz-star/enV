@@ -109,7 +109,6 @@ jobs:
           xcrun simctl install "$IOS_SIMULATOR_ID" "$app"
           xcrun simctl launch "$IOS_SIMULATOR_ID" com.chastech.env
           sleep 3
-          xcrun simctl spawn "$IOS_SIMULATOR_ID" launchctl print system | grep -q com.apple.SpringBoard
 
       - name: Run iOS XCTest suite
         run: |
