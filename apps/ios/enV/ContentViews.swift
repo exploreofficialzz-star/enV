@@ -26,9 +26,8 @@ struct HomeView: View {
                                 .submitLabel(.search)
                                 .onSubmit { onSearch(searchText) }
                             Button { onSearch(searchText) } label: {
-                                EnVIcon(name: "Search", size: 18, tint: .white)
+                                EnVIcon(name: "Search", size: 24, tint: .envAccent)
                                     .frame(width: 42, height: 42)
-                                    .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Search")
@@ -40,7 +39,8 @@ struct HomeView: View {
                         Text("A focused toolkit for everyday work.")
                             .font(.system(size: 28, weight: .semibold))
                             .tracking(-0.4)
-                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .multilineTextAlignment(.trailing)
                             .foregroundStyle(Color.envInk)
                     }
 
@@ -50,7 +50,8 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
             .modifier(Screen())
             .navigationTitle("")

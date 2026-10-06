@@ -193,20 +193,20 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null }, modifier = Modifier.semantics { contentDescription = "Home" }) {
-                        EnVIcon("Home", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("Home", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
                     IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
-                        EnVIcon("Heart", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
-                        EnVIcon("LayoutGrid", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("LayoutGrid", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Box {
                         IconButton(onClick = { overflowExpanded = true }, modifier = Modifier.semantics { contentDescription = "More options" }) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                repeat(3) { Box(Modifier.size(3.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)) }
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                repeat(3) { Box(Modifier.size(4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)) }
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
@@ -221,7 +221,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         bottomBar = {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).navigationBarsPadding()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                Row(Modifier.fillMaxWidth().height(56.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(Modifier.fillMaxWidth().height(64.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     AppTab.entries.forEach { item ->
                         val isSelected = currentTab == item
                         Column(
@@ -229,7 +229,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            Text(item.label, style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(item.label, style = MaterialTheme.typography.bodySmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -255,7 +255,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 @Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
-    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
                 EnVLogo(Modifier.width(252.dp).height(168.dp), darkTheme = darkMode)
@@ -265,12 +265,13 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search for a tool") },
                     leadingIcon = { EnVLogo(Modifier.width(36.dp).height(24.dp), darkTheme = darkMode) },
+                    trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) } },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 )
-                Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.fillMaxWidth())
             }
         }
         item {

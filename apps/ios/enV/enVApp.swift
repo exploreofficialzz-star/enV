@@ -100,11 +100,11 @@ private struct EnVBottomBar: View {
                 Button { selection = tab.rawValue } label: {
                     VStack(spacing: 3) {
                         Text(tab.title)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(selected ? Color.envAccent : Color.envMuted)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 56)
+                    .frame(height: 64)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -125,19 +125,19 @@ struct EnVBrandNavigationStyle: ViewModifier {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { selectedTab = NativeTab.home.rawValue } label: {
-                        EnVIcon(name: "Home", size: 20, tint: .envMuted).frame(width: 36, height: 36)
+                        EnVIcon(name: "Home", size: 24, tint: .envMuted).frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Home")
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { selectedTab = NativeTab.saved.rawValue } label: {
-                        EnVIcon(name: "Heart", size: 19, tint: .envMuted).frame(width: 32, height: 36)
+                        EnVIcon(name: "Heart", size: 24, tint: .envMuted).frame(width: 36, height: 40)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Saved tools")
                     Button { selectedTab = NativeTab.tools.rawValue } label: {
-                        EnVIcon(name: "LayoutGrid", size: 19, tint: .envMuted).frame(width: 32, height: 36)
+                        EnVIcon(name: "LayoutGrid", size: 24, tint: .envMuted).frame(width: 36, height: 40)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Tools")
@@ -147,7 +147,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in
-                                Circle().fill(Color.envMuted).frame(width: 3, height: 3)
+                                Circle().fill(Color.envMuted).frame(width: 4, height: 4)
                             }
                         }
                             .frame(width: 32, height: 36)

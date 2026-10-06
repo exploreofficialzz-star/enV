@@ -13,7 +13,7 @@ export function MobileNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 pb-[max(env(safe-area-inset-bottom,0px),12px)] backdrop-blur-md md:hidden"
       aria-label="Mobile"
     >
       <ul className="grid grid-cols-5">
@@ -24,7 +24,7 @@ export function MobileNav() {
               <Link
                 to={item.to}
                 className={cn(
-                  "flex min-h-14 items-center justify-center px-1 text-[11px] font-medium",
+                  "flex min-h-16 items-center justify-center px-1 text-xs font-medium",
                   active ? "text-accent" : "text-muted",
                 )}
               >

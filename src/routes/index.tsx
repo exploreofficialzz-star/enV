@@ -20,7 +20,7 @@ function Home() {
 
   return (
     <AppShell>
-      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-5 text-center sm:px-6 sm:pt-8">
+      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-3">
         <Logo size="hero" />
         <form
           role="search"
@@ -39,12 +39,12 @@ function Home() {
           <button
             type="submit"
             aria-label="Search"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:brightness-95 focus-visible:outline-offset-4"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-accent transition hover:bg-surface-2 focus-visible:outline-offset-4"
           >
-            <Search className="size-5" />
+            <Search className="size-6" strokeWidth={2.5} />
           </button>
         </form>
-        <h1 className="mt-6 max-w-3xl text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
+        <h1 className="mt-6 w-full max-w-3xl self-end text-right text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for everyday work.
         </h1>
       </section>
