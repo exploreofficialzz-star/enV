@@ -16,11 +16,13 @@ const reportPath = option("report");
 const onlyIds = option("only")?.split(",").map((id) => id.trim()).filter(Boolean);
 const limit = Number(option("limit") ?? Infinity);
 const viewportWidth = Number(option("width") ?? 390);
+const concurrency = Number(option("concurrency") ?? process.env.BROWSER_AUDIT_CONCURRENCY ?? 8);
 const base = new URL(baseUrl);
 if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
   throw new Error("--base-url must be a plain http(s) URL without credentials.");
 }
 if (!Number.isInteger(viewportWidth) || viewportWidth < 320) throw new Error("--width must be an integer of at least 320px.");
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16) throw new Error("--concurrency must be an integer from 1 to 16.");
 
 const sampleOverrides = {
   percentage: { amount: "200", percent: "15" },
@@ -50,6 +52,35 @@ const sampleOverrides = {
   circle: { radius: "5", diameter: "", circumference: "", area: "" },
   "math-slope-calculator": { x1: "1", y1: "2", x2: "3", y2: "6" },
   "math-coordinate-geometry-calculator": { x1: "1", y1: "2", x2: "4", y2: "6" },
+  "math-matrix-2x2-inverse": { a: "1", b: "2", c: "3", d: "4" },
+  "calculus-mean-value-slope": { fA: "1", fB: "3", a: "0", b: "2" },
+  "automotive-wheel-torque-from-engine": { engineTorque: "100", gearRatio: "3", finalDrive: "4", efficiency: "0.9" },
+  "exercise-average-value-function-avg": { I: "10", a: "0", b: "2" },
+  "battery-runtime-calculator": { capacityWh: "500", loadWatts: "100", efficiency: "90" },
+  "exercise-break-even-units": { fixed: "100", price: "10", variable: "4" },
+  "calculus-logistic-growth": { K: "100", P0: "10", r: "0.1", t: "5" },
+  "calorie-deficit-calculator": { maintenance: "2000", deficit: "500" },
+  "exercise-compound-growth-n": { A: "1100", P: "1000", r: "0.05", t: "2" },
+  "exercise-electric-resistance-parallel-R1": { R: "4", R2: "10" },
+  "exercise-electric-resistance-parallel-R2": { R: "4", R1: "10" },
+  "engineering-bulk-modulus-from-youngs": { E: "200", nu: "0.3" },
+  "engineering-hollow-circle-section-modulus": { D: "10", d: "4" },
+  "engineering-shear-modulus-from-youngs": { E: "200", nu: "0.3" },
+  "engineering-hollow-circle-inertia": { D: "10", d: "4" },
+  "exercise-kinematic-final-velocity-u": { v: "10", a: "2", s: "10" },
+  "led-resistor-calculator": { supply: "5", ledVoltage: "2", currentMa: "20" },
+  "exercise-lens-u": { f: "10", v: "20" },
+  "exercise-lens-v": { f: "10", u: "20" },
+  "electrical-ohms-law": { V: "12", I: "2", R: "" },
+  "overtime-hours-calculator": { totalPay: "200", regularRate: "20", regularHours: "4", multiplier: "1.5" },
+  "electrical-ac-power-factor-correction-capacitor": { P: "1000", V: "240", f: "60", pf1: "0.7", pf2: "0.95" },
+  "exercise-pythagorean-a": { c: "5", b: "3" },
+  "exercise-pythagorean-b": { c: "5", a: "3" },
+  "exercise-slope-m": { x1: "1", y1: "2", x2: "3", y2: "6" },
+  "statistics-binomial-probability": { n: "10", k: "2", p: "0.3" },
+  "thermal-carnot-efficiency": { Th: "400", Tc: "300" },
+  "thermal-radiation-power": { emissivity: "0.8", area: "10", T: "300" },
+  "weighted-average-calculator": { values: "1, 2, 3", weights: "2, 3, 4" },
   "science-ohms-law-calculator": { voltage: "12", current: "2", resistance: "" },
   "science-gas-law-calculator": { p1: "2", v1: "3", t1: "300", p2: "4", v2: "5", t2: "" },
   "science-molar-mass-calculator": { masses: "12.01, 2*1.008, 16.00" },
@@ -76,6 +107,22 @@ function sampleForField(field, formula) {
 
 function alternateSampleForField(field, currentValue, formula) {
   if (field.type === "select" || !String(currentValue).trim()) return String(currentValue);
+  if (formula === "percentage-calorie-macro-calculator") {
+    const values = { proteinPercent: "25", carbPercent: "50", fatPercent: "25" };
+    if (Object.hasOwn(values, field.name)) return values[field.name];
+  }
+  if (formula === "electrical-ac-power-factor-correction-capacitor" && (field.name === "pf1" || field.name === "pf2")) {
+    return field.name === "pf1" ? "0.65" : "0.9";
+  }
+  if (formula === "statistics-binomial-probability" && field.name === "p") return "0.4";
+  if (formula === "weighted-average-calculator" && field.name === "weights") return "1, 3, 5";
+  if (formula === "tip-split-calculator" && field.name === "people") return String(Math.max(1, Math.round(Number(currentValue) + 1)));
+  if (formula === "sleep-duration-calculator" && /Hour$/.test(field.name)) return String((Number(currentValue) + 3) % 24);
+  if (formula === "work-hours-calculator" && /Hour$/.test(field.name)) return field.name === "startHour" ? "9" : "18";
+  if (/poisson ratio|\bnu\b/i.test(`${field.name} ${field.label}`)) return "0.25";
+  if (/emissivity/i.test(`${field.name} ${field.label}`)) return "0.75";
+  if (/power factor|\bpf\b/i.test(`${field.name} ${field.label}`)) return "0.8";
+  if (/efficiency/i.test(`${field.name} ${field.label}`)) return Number(currentValue) <= 1 ? "0.75" : "80";
   if (formula === "finance-irr-calculator" && field.name === "cashflows") return "-1200, 400, 500, 600";
   if (field.type === "textarea") {
     if (/probabilit/i.test(field.name + field.label)) return "0.1, 0.3, 0.6";
@@ -131,10 +178,9 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: viewportWidth, height: 844 } });
   const browserErrors = [];
-  let currentTool = "category index";
-  page.on("pageerror", (error) => browserErrors.push({ tool: currentTool, type: "pageerror", message: error.message }));
+  page.on("pageerror", (error) => browserErrors.push({ tool: "category index", type: "pageerror", message: error.message }));
   page.on("console", (message) => {
-    if (message.type() === "error") browserErrors.push({ tool: currentTool, type: "console", message: message.text() });
+    if (message.type() === "error") browserErrors.push({ tool: "category index", type: "console", message: message.text() });
   });
 
   const failures = [];
@@ -142,6 +188,7 @@ try {
   const categoryPath = `/tools/${encodeURIComponent(category)}`;
   try {
     const categoryResponse = await page.goto(new URL(categoryPath, base).href, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator("h1").first().waitFor({ state: "visible", timeout: 10000 });
     const categoryHeading = await page.locator("h1").first().textContent();
     if (!categoryResponse?.ok() || !categoryHeading?.trim()) {
       failures.push({ type: "category-index", status: categoryResponse?.status() ?? 0, heading: categoryHeading?.trim() ?? "" });
@@ -150,7 +197,17 @@ try {
     failures.push({ type: "category-index", error: String(error?.message ?? error) });
   }
 
-  for (let i = 0; i < tools.length; i++) {
+  let nextIndex = 0;
+  let completed = 0;
+  async function runWorker(page) {
+    let currentTool = "unknown calculator";
+    page.on("pageerror", (error) => browserErrors.push({ tool: currentTool, type: "pageerror", message: error.message }));
+    page.on("console", (message) => {
+      if (message.type() === "error") browserErrors.push({ tool: currentTool, type: "console", message: message.text() });
+    });
+    while (true) {
+    const i = nextIndex++;
+    if (i >= tools.length) break;
     const tool = tools[i];
     currentTool = tool.id;
     const formula = tool.engine?.formula;
@@ -276,11 +333,19 @@ try {
     } catch (error) {
       result.error = String(error?.message ?? error);
       failures.push(result);
+      console.error(`FAIL ${tool.id}: ${result.error}`);
     }
-    if ((i + 1) % 25 === 0 || i + 1 === tools.length) {
-      console.log(`Progress: ${i + 1}/${tools.length} calculator routes; passed ${tested}; failures ${failures.length}.`);
+    completed++;
+    if (completed % 25 === 0 || completed === tools.length) {
+      console.log(`Progress: ${completed}/${tools.length} calculator routes; passed ${tested}; failures ${failures.length}.`);
     }
   }
+  }
+
+  const workerPages = await Promise.all(
+    Array.from({ length: Math.min(concurrency, tools.length) }, () => browser.newPage({ viewport: { width: viewportWidth, height: 844 } })),
+  );
+  await Promise.all(workerPages.map(runWorker));
 
   const report = {
     baseUrl: base.origin,
