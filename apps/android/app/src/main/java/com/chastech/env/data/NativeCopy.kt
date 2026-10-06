@@ -36,6 +36,7 @@ object NativeCopy {
         protect(Regex("Browser frames", RegexOption.IGNORE_CASE))
 
         val replacements = listOf(
+            "All in the browser" to "All on this device",
             "locally in your browser" to "locally on this device",
             "locally in the browser" to "locally on this device",
             "entirely in your browser" to "entirely on this device",
