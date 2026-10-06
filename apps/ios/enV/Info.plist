@@ -29,7 +29,11 @@
 	<dict/>
 	<key>ENV_API_BASE_URL</key>
 	<string>$(ENV_API_BASE_URL)</string>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>enV uses your local network and nearby devices only while you activate Instant Contact Exchange.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_env-contact._tcp</string>
+	</array>
 </dict>
 </plist>

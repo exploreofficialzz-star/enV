@@ -8,7 +8,6 @@
 |---|---|---|
 | Category 1 — Calculators | Complete and deployed | 221/221 production browser checks passed; no failed tools or browser errors. |
 | Category 2 — Converters and shared tool UI | Complete and deployed | Commit `c240eee` is on `main`; 142/142 live browser checks passed; Vercel checks succeeded. |
-| Android app source | Generated locally, not yet pushed | Expo Android prebuild produced 44 Gradle/Kotlin/native source and build files; the native project checker passes. |
 | Android GitHub Actions build | Added locally, not yet pushed or run | `.github/workflows/android-build.yml` builds a debug APK and an unsigned release AAB, then uploads both artifacts. |
 | GitHub Actions / APK / AAB / Vercel verification for the mobile batch | Pending | Requires the native-app commit to be pushed and remote jobs to finish. |
 
@@ -26,15 +25,12 @@ The shared tool shell no longer renders “How to use” or FAQ sections. The du
 
 ## Android app and future iOS target
 
-The mobile project is a separate Expo/React Native app in `apps/mobile/`; the Vercel web app remains at the repository root. It is a native WebView shell over the existing enV site, not a rewrite of the full tool catalog as native screens. The app has an Expo Router entry, enV branding, a validated same-origin HTTPS navigation policy, Android back handling, connection retry UI, app icons, and a size-limited, chunked bridge for generated `blob:` downloads. The Android application ID and future iOS bundle ID are `com.exploreofficialzzstar.env`; the URL scheme is `env`. iOS native files have intentionally not been generated yet.
 
-Expo prebuild now generates a clean Android project with **44** Gradle/Kotlin/native files. The registered `plugins/withUnsignedAndroidRelease.js` config plugin removes debug-key signing from the release block, is idempotent, and fails if the expected Gradle template changes; the policy was confirmed after a clean prebuild. The current project uses Android compile/target SDK 36, Build Tools 36.0.0, NDK 27.1.12297006, and Gradle 9.3.1. Deprecated Expo status-bar options were removed; `expo-system-ui` is included for the configured light native chrome. The sandbox has JDK 21 but no Android SDK, `adb`, or `sdkmanager`, so native compilation must be verified on the GitHub-hosted Android runner.
 
 The generated test APK uses an ephemeral debug keystore created by CI; the keystore is ignored and is not committed. Release signing is intentionally not configured with the public debug key. The CI AAB is therefore **unsigned and for build validation only**, not ready for Google Play. Production signing requires a separate keystore and protected secrets.
 
 ## Android workflow and local validation
 
-The new `.github/workflows/android-build.yml` uses pinned action commit SHAs and read-only repository permissions. For changes under `apps/mobile/` or this workflow it installs the lockfile, checks Expo SDK compatibility, runs dependency audit, lint and the mobile type/native-source checker, provisions only the SDK 36/build-tools/NDK packages referenced by the project, and uses the committed Gradle wrapper to build `:app:assembleDebug` and `:app:bundleRelease`. It uploads both APK and AAB as a 14-day workflow artifact. Pull requests and manual dispatch are supported. Notes-only changes do not trigger another Android build.
 
 Completed local checks: clean `npm ci` (including reapplying the query-string compatibility patch), `npx expo install --check`, full `npm audit` with **zero vulnerabilities**, mobile lint, `npm run check:mobile` (typecheck plus all 44 Android files), clean Android prebuild with the persistent signing plugin, and `npx expo export --platform android` (1,259 modules bundled; 2.7 MB Hermes bundle). Workflow YAML, triggers, read-only permissions, and artifact paths were parsed and checked. The root web suite also passed `npm test`, lint, typecheck, converter catalog checks, `git diff --check`, and the production build. The build emitted nonfatal third-party “use client” directive warnings but completed successfully. No APK or AAB has been built yet because the local Android SDK is unavailable.
 
@@ -44,7 +40,6 @@ The original mobile dependency audit found moderate advisories in `decode-uri-co
 
 ## References
 
-Expo’s [Continuous Native Generation and prebuild guide](https://docs.expo.dev/workflow/prebuild/) describes generating Android sources. Expo’s [APK build reference](https://docs.expo.dev/build-reference/apk/) distinguishes directly installable APKs from Play-oriented AABs. CI structure follows GitHub’s [Gradle workflow guide](https://docs.github.com/actions/guides/building-and-testing-java-with-gradle); Android SDK setup and artifact upload use the documented [Android SDK setup action](https://github.com/android-actions/setup-android) and [upload-artifact action](https://github.com/actions/upload-artifact). Security advisory sources are [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr) and [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq).
 
 ## Next steps
 

@@ -1,5 +1,4 @@
 import type { MediaJobRequest, MediaRuntimeAdapter } from "./media-runtime";
-import { uploadMediaFile } from "./blob-upload";
 
 export interface FfmpegExecutionRequest {
   input: Blob;
@@ -76,37 +75,23 @@ export function createServerMediaAdapter(): MediaRuntimeAdapter {
       onProgress(5);
       const fileNames = Array.isArray(request.params?.fileNames) ? request.params.fileNames.map(String) : [];
       const sourceFiles = input instanceof Blob ? [{ value: input, name: String(request.params?.fileName ?? "input") }] : inputs.map((value, index) => ({ value, name: fileNames[index] ?? `input-${index + 1}` }));
-      let response: Response;
-      if (endpoint === "/api/backend/media") {
-        const uploaded = [];
-        for (const [index, file] of sourceFiles.entries()) {
-          const blob = await uploadMediaFile(Object.assign(file.value, { name: file.name }), signal);
-          uploaded.push({ url: blob.url, name: file.name, index });
-          onProgress(5 + Math.round(((index + 1) / sourceFiles.length) * 35));
-        }
-        response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toolId: request.toolId, operation: request.operation.replace(/^server-media:/, ""), outputName: String(request.params?.outputName ?? "output.bin"), params: safeParams, files: uploaded }), signal });
-      } else {
-        const form = new FormData();
-        if (input instanceof Blob) form.append("file", input, String(request.params?.fileName ?? "input"));
-        inputs.forEach((value, index) => form.append("files", value, fileNames[index] ?? `input-${index + 1}`));
-        form.append("toolId", request.toolId);
-        form.append("operation", request.operation.replace(/^server-media:/, ""));
-        form.append("outputName", String(request.params?.outputName ?? "output.bin"));
-        form.append("params", JSON.stringify(safeParams));
-        response = await fetch(endpoint, { method: "POST", body: form, signal });
+      const gatewayLimit = 4 * 1024 * 1024;
+      if (endpoint === "/api/backend/media" && sourceFiles.reduce((total, file) => total + file.value.size, 0) > gatewayLimit) {
+        throw new Error("This deployment's same-origin media gateway accepts files up to 4 MB. Configure a direct MEDIA_PROCESSOR_URL for larger files.");
       }
+      let response: Response;
+      const form = new FormData();
+      if (input instanceof Blob) form.append("file", input, String(request.params?.fileName ?? "input"));
+      inputs.forEach((value, index) => form.append("files", value, fileNames[index] ?? `input-${index + 1}`));
+      form.append("toolId", request.toolId);
+      form.append("operation", request.operation.replace(/^server-media:/, ""));
+      form.append("outputName", String(request.params?.outputName ?? "output.bin"));
+      form.append("params", JSON.stringify(safeParams));
+      onProgress(35);
+      response = await fetch(endpoint, { method: "POST", body: form, signal });
       if (!response.ok) throw new Error(`Media service returned HTTP ${response.status}.`);
       onProgress(90);
-      const contentType = response.headers.get("content-type") || "";
-      const blob = contentType.includes("application/json")
-        ? await (async () => {
-            const payload = await response.json() as { url?: string; error?: string };
-            if (!payload.url) throw new Error(payload.error || "Media service did not return a result file.");
-            const result = await fetch(payload.url, { signal });
-            if (!result.ok) throw new Error(`Media result download returned HTTP ${result.status}.`);
-            return result.blob();
-          })()
-        : await response.blob();
+      const blob = await response.blob();
       onProgress(100);
       return blob;
     },

@@ -3,7 +3,6 @@ color-blindness-simulator
 color-builder
 color-css-generator
 color-generator
-palette-generator
 color-picker
 color-preset-maker
 color-preview
@@ -12,5 +11,6 @@ color-token-generator
 contrast-checker
 hsl-converter
 hsv-converter
+palette-generator
 rgb-converter
 wcag-checker

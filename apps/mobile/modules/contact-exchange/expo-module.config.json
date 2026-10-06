@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android", "web"],
-  "apple": {
-    "modules": ["ContactExchangeModule"]
-  },
-  "android": {
-    "modules": ["com.chastech.env.contactexchange.ContactExchangeModule"]
-  }
-}

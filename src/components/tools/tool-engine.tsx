@@ -40,6 +40,8 @@ import { SocialEngine } from "@/components/engines/social-engine";
 import { PlannedLocalEngine } from "@/components/engines/planned-local-engine";
 import { TranscriptionEngine } from "@/components/engines/transcription-engine";
 import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
+import { DocumentToolsEngine } from "@/components/engines/document-tools-engine";
+import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
   // Mockups are backed by the shared mockup engine, including catalog entries that
@@ -48,6 +50,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
+  if (tool.requiresBackend && tool.engine.type === "custom") return <BackendToolEngine toolId={tool.id} category={tool.category} />;
 
   switch (tool.engine.type) {
     case "calculator":
@@ -123,10 +126,12 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
-      if (["events","celebrations","food","travel","photography","video"].includes(tool.category) && tool.engine.id.startsWith("planned-local:")) return <PlannedLocalEngine toolId={tool.id} />;
+      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <PlannedLocalEngine toolId={tool.id} />;
       return <ComingSoonPanel tool={tool} />;
     case "document":
       return <DocumentEngine op={tool.engine.op} />;
+    case "document-backend":
+      return <DocumentToolsEngine op={tool.engine.op} />;
     default:
       return <ComingSoonPanel tool={tool} />;
   }

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { downloadBlob } from "@/lib/utils";
-import { uploadMediaFile } from "@/lib/media/blob-upload";
 
 type Props = { mode: "audio" | "video"; format: "txt" | "srt" | "vtt" };
 
@@ -29,29 +28,22 @@ export function TranscriptionEngine({ mode, format }: Props) {
     if (!url) { setError("The enV transcription service is not configured. Set VITE_TRANSCRIBE_URL to a running transcription endpoint."); return; }
     setBusy(true);
     try {
+      if (url === "/api/backend" && file.size > 4 * 1024 * 1024) {
+        throw new Error("This deployment's same-origin transcription gateway accepts files up to 4 MB. Configure a direct VITE_TRANSCRIBE_URL for larger files.");
+      }
       const form = new FormData();
       form.append("file", file, file.name);
       form.append("format", format);
       form.append("language", language.trim() || "auto");
       form.append("translate", String(translate));
       form.append("outputName", `${file.name.replace(/\.[^.]+$/, "")}.${format}`);
-      const response = url === "/api/backend"
-        ? await fetch(`${url}/transcribe`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fileUrl: (await uploadMediaFile(file)).url, fileName: file.name, format, language: language.trim() || "auto", translate, outputName: `${file.name.replace(/\.[^.]+$/, "")}.${format}` }) })
-        : await fetch(`${url}/transcribe`, { method: "POST", body: form });
+      const response = await fetch(`${url === "/api/backend" ? `${url}/transcribe` : `${url}/transcribe`}`, { method: "POST", body: form });
       if (!response.ok) {
         let message = `Transcription service returned HTTP ${response.status}.`;
         try { const body = await response.json() as { error?: string }; if (body.error) message = body.error; } catch { /* non-JSON error */ }
         throw new Error(message);
       }
-      const blob = (response.headers.get("content-type") || "").includes("application/json")
-        ? await (async () => {
-            const payload = await response.json() as { url?: string; error?: string };
-            if (!payload.url) throw new Error(payload.error || "Transcription service did not return a result file.");
-            const result = await fetch(payload.url);
-            if (!result.ok) throw new Error(`Transcription result download returned HTTP ${result.status}.`);
-            return result.blob();
-          })()
-        : await response.blob();
+      const blob = await response.blob();
       const text = await blob.text();
       if (!text.trim()) throw new Error("The transcription service returned an empty result.");
       setOutput(text);

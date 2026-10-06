@@ -1,5 +1,4 @@
 import { backendConfig } from "./config";
-import { put } from "@vercel/blob";
 
 export function corsHeaders(contentType?: string) {
   const headers = new Headers({
@@ -50,17 +49,3 @@ export function unavailable(service: string, envVar: string) {
   }, 503);
 }
 
-export async function responseAsBlob(response: Response, prefix: string) {
-  if (!response.ok || !response.body) return response;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return unavailable("Vercel Blob result storage", "BLOB_READ_WRITE_TOKEN");
-  const result = await put(`env-results/${prefix}.bin`, response.body, {
-    access: "public",
-    addRandomSuffix: true,
-    contentType: response.headers.get("content-type") || "application/octet-stream",
-  });
-  return jsonResponse({
-    url: result.url,
-    contentType: response.headers.get("content-type") || "application/octet-stream",
-    contentDisposition: response.headers.get("content-disposition") || undefined,
-  });
-}

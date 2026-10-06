@@ -292,7 +292,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("All tools", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Browse the complete enV toolkit, including the growing Coming Soon catalog.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Browse the complete enV toolkit.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             item {
@@ -347,12 +347,13 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
-        SettingCard("Migration status", "${catalog.tools.count(::nativeSupported)} of ${catalog.counts.active} active tools run natively and offline. URL media inspection still needs its remote metadata service.", "Hammer")
+        SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact") { showExchange = true }
+        SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
         SettingCard("About enV", "Version 1.1.0 (6) · native Android", "Info")
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
@@ -361,7 +362,8 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEng
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
     "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityEngine.supports(tool)
-    else -> NativeExpandedEngine.supports(tool)
+    "custom" -> tool.category == "productivity"
+    else -> false
     }
 }
 
@@ -391,11 +393,12 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
         val backend = nativeBackendSupported(tool)
         val supported = nativeSupported(tool)
         if (tool.status == "planned" && !supported && !backend) StatusPill("Coming soon")
+        else if (tool.status != "planned" && !supported && !backend) StatusPill("Web only")
         Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
-        DetailRow("Native execution", when { supported -> "Available offline"; backend -> "Available online via enV backend"; else -> "Coming soon" })
+        DetailRow("Native execution", when { supported -> "Available offline"; backend -> "Available online via enV backend"; tool.status == "planned" -> "Coming soon"; else -> "Web only — no native implementation" })
         DetailRow("Processing", if (backend) "Uses enV backend services" else "Runs on this device")
-        when { backend -> NativeExpandedToolForm(tool,true); supported -> NativeToolForm(tool); else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.primary) }
+        when { backend -> NativeBackendToolForm(tool,true); supported -> NativeToolForm(tool); else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.primary) }
         if (NativeAiEngine.supports(tool)) { NativeAiToolForm(tool) }
         if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -417,10 +420,22 @@ private fun NativeToolForm(tool: ToolRecord) {
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityToolForm(tool)
-        else -> NativeExpandedToolForm(tool,false)
+    "custom" -> if (tool.category == "productivity") NativeProductivityToolForm(tool.id) else Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+
+@Composable
+private fun NativeProductivityToolForm(toolId:String) {
+    var running by rememberSaveable(toolId){ mutableStateOf(false) }
+    var elapsed by rememberSaveable(toolId){ mutableStateOf(0L) }
+    var phase by rememberSaveable(toolId){ mutableStateOf("focus") }
+    var remaining by rememberSaveable(toolId){ mutableStateOf(if(toolId=="pomodoro-timer")1500L else 3000L) }
+    LaunchedEffect(running, toolId, phase) { while(running) { kotlinx.coroutines.delay(1000); if(toolId=="stopwatch") elapsed++ else { if(remaining<=1){ phase=if(phase=="focus")"break" else "focus"; remaining=if(toolId=="pomodoro-timer") if(phase=="focus")1500 else 300 else if(phase=="focus")3000 else 600 } else remaining-- } } }
+    val display=if(toolId=="stopwatch") String.format("%02d:%02d",elapsed/60,elapsed%60) else String.format("%02d:%02d",remaining/60,remaining%60)
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)){ Text(if(toolId=="stopwatch")"Stopwatch" else if(toolId=="pomodoro-timer")"Pomodoro · ${phase.replaceFirstChar{it.uppercase()}}" else "Focus Timer",style=MaterialTheme.typography.titleMedium); Text(display,style=MaterialTheme.typography.displayLarge); Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button({running=!running}){Text(if(running)"Pause" else "Start")}; OutlinedButton({running=false;elapsed=0;phase="focus";remaining=if(toolId=="pomodoro-timer")1500 else 3000}){Text("Reset")}} }
+}
 
 @Composable
 private fun NativeConverterToolForm(tool: ToolRecord) {

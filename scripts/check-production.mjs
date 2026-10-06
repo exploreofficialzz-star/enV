@@ -17,7 +17,7 @@ const engineTypes = new Set([
   "calculator", "converter", "text", "generator", "codec", "color", "qr", "barcode", "image",
   "cssgen", "developer", "mime", "security", "mockup", "post", "device", "datetime", "seo",
   "creator", "business", "audio", "network", "file-converter", "document", "pdf", "ai", "video",
-  "url-media", "url-media-info", "custom",
+  "url-media", "url-media-info", "custom", "document-backend",
 ]);
 
 for (const tool of tools) {
@@ -28,11 +28,11 @@ for (const tool of tools) {
   if (!tool.engine?.type || !engineTypes.has(tool.engine.type)) errors.push(`${tool.id}: unknown engine type`);
   if (tool.status === "active" && tool.engine?.type === "custom" && tool.category !== "mockups") {
     const supported = new Set([
-      "productivity", "personal", "communication", "streaming", "marketing", "accessibility", "screenshots",
+      "productivity", "personal", "communication", "streaming", "marketing", "accessibility", "screenshots", "events", "celebrations", "food", "travel", "photography", "social", "gaming", "webdesign", "career", "ecommerce", "relationships", "interactive", "education", "network", "security",
     ]);
     const plannedLocalCategories = new Set(["events", "celebrations", "food", "travel", "photography", "video"]);
     const explicitCustomDispatchers = new Set([
-      "image-comparison-tool", "image-screenshot-tool", "image-print-layout-helper",
+      "image-comparison-tool", "image-screenshot-tool", "image-print-layout-helper", "transcription", "audio-to-text", "audio-to-subtitles", "video-to-text", "video-to-subtitles",
     ]);
     const isPlannedLocal = typeof tool.engine?.id === "string" && tool.engine.id.startsWith("planned-local:");
     if (!supported.has(tool.category) && !plannedLocalCategories.has(tool.category) && !explicitCustomDispatchers.has(tool.id) && !isPlannedLocal) {

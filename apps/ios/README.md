@@ -2,12 +2,15 @@
 
 Standalone native iOS application for enV, written in **Swift + SwiftUI**. The native app keeps the project's existing catalog, shell, engine IDs, and shared generated data as its source of truth. It is not an Expo or React-Native app.
 
-The native layer has two execution tiers:
+The native execution boundary is explicit:
 
-- **Offline-native engines:** 6,726 of the 8,789 active catalog tools are implemented directly in Swift using the project's generated engine data and reusable native families.
-- **Exact web-engine fallback:** the remaining 2,063 active tools run their existing canonical web tool inside the native Swift shell when they require browser APIs, large media processors, URL/network backends, or other web-only capabilities. This fallback is online-only and is intentionally not counted as offline-native.
+- **Offline-native:** 7,066 active catalog tools have verified Kotlin/Swift operation mappings and run without the website.
+- **Backend-native:** 2,934 active tools use the configured enV backend/processor contract.
+- **Planned:** 0 catalog entries are marked as unavailable.
 
-Planned records remain visibly **Coming soon**. Android and iOS share the same execution-coverage audit, so an active tool cannot silently exist on only one native platform.
+There is no WebView or website execution fallback in the standalone native products.
+
+No catalog record is currently marked Coming Soon. Android and iOS share the same execution-coverage audit, so an active tool cannot silently exist on only one native platform.
 
 ## Build and test (macOS with Xcode)
 
@@ -34,4 +37,4 @@ This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a fu
 
 ## Native AI
 
-AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The provider keys remain server-only. Configure the native `ENV_API_BASE_URL` for the deployed enV backend; do not put OpenRouter, Groq, or Gemini keys in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client. The current native/default backend is `https://env-q3mq.onrender.com`; Android still supports a Gradle `-PENV_API_BASE_URL=...` override, and iOS exposes the same setting through `ENV_API_BASE_URL`.
+AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The provider keys remain server-only. Configure the native `ENV_API_BASE_URL` for the deployed enV backend; do not put OpenRouter, Groq, or Gemini keys in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client. There is no hard-coded production backend URL in the native binaries; Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting.

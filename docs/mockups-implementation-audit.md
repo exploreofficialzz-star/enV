@@ -6,6 +6,10 @@ Date: 2026-09-29
 
 Implementation is based on `enV_Mockups_Master_Implementation_Prompt.txt` and the extracted enV repository.
 
+## Current verification status — 2026-10-06
+
+The generated catalog currently contains 160 active Mockups category records plus 19 dedicated mockup/post engine records. The production catalog has 0 planned records. Mockup rendering is backed by the structured project/adapter renderer and the backend can produce a real SVG export. Platform-specific recreations remain explicitly labeled as mockups rather than authentic vendor screenshots.
+
 ## Repository audit
 
 - Repository: `enV-current-clone`

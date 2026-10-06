@@ -3,15 +3,15 @@ base64-decoder
 base64-encoder
 binary-converter
 hash-compare
+hash-generator
 hex-converter
 html-decoder
 html-encoder
 md5-hash
+number-base-converter
 sha1-hash
 sha256-hash
 sha512-hash
 unicode-converter
 url-decoder
 url-encoder
-hash-generator
-number-base-converter

@@ -6,36 +6,32 @@ const m = text.match(/const catalogJson = \[([\s\S]*?)\]\.join\(""\);/);
 assert.ok(m, "catalog format");
 const tools = JSON.parse(JSON.parse(`[${m[1]}]`).join(""));
 
-const feasiblePromoted = tools.filter((t) => t.engine?.id?.startsWith("planned-local:"));
-assert.equal(feasiblePromoted.length, 484, "feasible Coming Soon promotion count");
-for (const t of feasiblePromoted) {
-  assert.equal(t.status, "active", t.id);
-  assert.equal(t.clientSide, true, t.id);
-  assert.equal(t.requiresBackend, false, t.id);
-}
+const genericLocal = tools.filter((t) => t.engine?.id?.startsWith("planned-local:"));
+assert.equal(genericLocal.length, 0, "generic planned-local catalog count");
+assert.equal(tools.filter((t) => t.status === "planned").length, 0, "all catalog tools must have a real implementation");
 
 const expected = {
-  "image-merger": ["active", "image", "merge"],
-  "image-watermark-tool": ["active", "image", "watermark"],
-  "image-metadata-tool": ["active", "image", "exif-view"],
-  "image-comparison-tool": ["active", "custom", "image-comparison"],
-  "image-screenshot-tool": ["active", "custom", "image-screenshot"],
-  "image-print-layout-helper": ["active", "custom", "image-print-layout"],
-  "document-merger": ["active", "pdf", "merge"],
-  "document-splitter": ["active", "pdf", "split"],
-  "document-compressor": ["active", "pdf", "compress"],
-  "document-page-extractor": ["active", "pdf", "extract"],
-  "document-page-reorder-tool": ["active", "pdf", "reorder"],
-  "document-page-numbering-tool": ["active", "pdf", "number"],
-  "document-watermark-tool": ["active", "pdf", "watermark"],
-  "document-metadata-tool": ["active", "pdf", "metadata"],
+  "document-merger": ["active", "document-backend", "document-merger"],
+  "document-splitter": ["active", "document-backend", "document-splitter"],
+  "document-compressor": ["active", "document-backend", "document-compressor"],
+  "document-page-extractor": ["active", "document-backend", "document-page-extractor"],
+  "document-page-reorder-tool": ["active", "document-backend", "document-page-reorder-tool"],
+  "document-page-numbering-tool": ["active", "document-backend", "document-page-numbering-tool"],
+  "document-watermark-tool": ["active", "document-backend", "document-watermark-tool"],
+  "document-metadata-tool": ["active", "document-backend", "document-metadata-tool"],
 };
+
 for (const [id, [status, type, op]] of Object.entries(expected)) {
   const t = tools.find((x) => x.id === id);
   assert.ok(t, `missing ${id}`);
   assert.equal(t.status, status, id);
-  assert.equal(t.clientSide, true, id);
-  assert.equal(t.requiresBackend, false, id);
+  if (type === "document-backend") {
+    assert.equal(t.clientSide, false, id);
+    assert.equal(t.requiresBackend, true, id);
+  } else {
+    assert.equal(t.clientSide, true, id);
+    assert.equal(t.requiresBackend, false, id);
+  }
   assert.equal(t.requiresAuth, false, id);
   assert.equal(t.engine?.type, type, id);
   assert.equal(type === "custom" ? t.engine?.id : t.engine?.op, op, id);
@@ -58,4 +54,4 @@ for (const id of protectedIds) {
   assert.equal(t.clientSide === false || t.requiresBackend === true, true, `protected tool unexpectedly local-active: ${id}`);
 }
 
-console.log(`Coming Soon deep audit PASS: ${Object.keys(expected).length} second-ZIP promotions verified; protected workflows are either still planned or backed by an existing verified v13 backend implementation; ${tools.filter((t) => t.status === "planned").length} total tools remain Coming Soon.`);
+console.log(`Coming Soon deep audit PASS: ${Object.keys(expected).length} domain assertions verified; no generic planned-local tools remain; all catalog entries are bound to an execution engine; protected workflows are either locally or backend executable; ${tools.filter((t) => t.status === "planned").length} total tools remain Coming Soon.`);

@@ -78,7 +78,7 @@ struct ToolsView: View {
                             .font(.system(size: 30, weight: .semibold))
                             .tracking(-0.4)
                             .foregroundStyle(Color.envInk)
-                        Text("Browse the complete enV toolkit, including the growing Coming Soon catalog.")
+                        Text("Browse the complete enV toolkit.")
                             .font(.subheadline)
                             .foregroundStyle(Color.envMuted)
                     }
@@ -223,6 +223,7 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
+    @EnvironmentObject private var store: CatalogStore
     @AppStorage("env.themeMode") private var themeMode = "system"
 
     var body: some View {
@@ -251,6 +252,9 @@ struct AccountView: View {
                         .disabled(themeMode == "system")
                         Divider().overlay(Color.envBorder)
                         settingsRow("Bell", "Notifications", "Notifications are not configured in this foundation release.")
+                        Divider().overlay(Color.envBorder)
+                        NavigationLink { ContactExchangeView() } label: { settingsRow("Contact", "Instant Contact Exchange", "Native nearby sharing with explicit activation and Contacts saving.") }
+                            .buttonStyle(.plain)
                         Divider().overlay(Color.envBorder)
                         settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
                         Divider().overlay(Color.envBorder)

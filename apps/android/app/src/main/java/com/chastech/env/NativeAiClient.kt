@@ -119,6 +119,7 @@ object NativeAiClient {
     private data class ResponseData(val code: Int, val text: String?, val contentType: String?)
 
     private fun request(context: Context, path: String, method: String, body: ByteArray?): ResponseData {
+        require(base.isNotBlank()) { "AI/backend API is not configured for this build." }
         val connection = (URL(base + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 15_000

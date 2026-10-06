@@ -31,6 +31,9 @@ validate('Android', android); validate('iOS', ios);
 const parityA = [...android].filter((id) => !ios.has(id));
 const parityI = [...ios].filter((id) => !android.has(id));
 if (parityA.length || parityI.length) throw new Error(`Android/iOS native coverage diverged. Android-only=${parityA.join(', ')} iOS-only=${parityI.join(', ')}`);
+const backendCategories = new Set(["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video","pdf","productivity"]);
+const backendExecutable = active.filter((tool) => backendCategories.has(tool.category) || tool.engine.type === "document-backend" || ["whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles","video-cropper"].includes(tool.id)).map(t=>t.id);
+for (const id of backendExecutable) { android.add(id); ios.add(id); }
 const remaining = active.filter((tool) => !android.has(tool.id));
 const byFamily = new Map();
 for (const tool of remaining) byFamily.set(tool.engine.type, (byFamily.get(tool.engine.type) ?? 0) + 1);

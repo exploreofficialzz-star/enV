@@ -13,9 +13,10 @@ object NativeBackendEngine {
     data class InputFile(val name:String,val mimeType:String,val bytes:ByteArray)
     data class Result(val text:String?=null,val bytes:ByteArray?=null,val mimeType:String?=null,val fileName:String?=null)
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
-    private val explicit = setOf("audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles","ocr-tool","pdf-to-word","dns-lookup","whois-lookup","website-screenshot")
+    private val explicit = setOf("youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader")
+    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video")
 
-    fun supports(tool:ToolRecord):Boolean = tool.id in explicit || tool.requiresBackend || tool.engine.type in setOf("pdf","url-media","url-media-info","video")
+    fun supports(tool:ToolRecord):Boolean = tool.id in explicit || tool.category in categoryBackend || tool.engine.type in setOf("developer","image","audio","video","mockup","post","pdf","document-backend")
 
     fun execute(tool:ToolRecord,input:String,optionsJson:String,files:List<InputFile>):Result {
         val options=runCatching{JSONObject(optionsJson.ifBlank{"{}"})}.getOrElse{JSONObject()}
@@ -29,7 +30,15 @@ object NativeBackendEngine {
             tool.id=="dns-lookup" || tool.id=="whois-lookup" -> postJson("/api/backend/network",JSONObject().apply{put("operation",if(tool.id=="dns-lookup")"dns" else "whois");put("domain",input);put("recordType",options.optString("recordType","A"))})
             tool.id=="website-screenshot" -> postJson("/api/backend/website-screenshot",JSONObject().apply{put("url",input);put("options",options)})
             tool.engine.type=="url-media" || tool.engine.type=="url-media-info" -> postJson("/api/backend/url-media/${if(tool.engine.type=="url-media-info")"info" else "download"}",JSONObject().apply{put("url",input);put("options",options)})
-            tool.engine.type=="pdf" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files,mapOf("operation" to (tool.engine.extras["op"]?:"metadata"),"params" to options.toString(),"outputName" to "${tool.id}.pdf")) }
+            tool.category=="qr" || tool.category=="barcode" -> postJson("/api/backend/barcodes",JSONObject().apply{put("format",tool.id);put("toolId",tool.id);put("value",input)})
+            tool.category=="mockups" -> postJson("/api/backend/mockups",JSONObject().apply{put("toolId",tool.id)})
+            tool.category=="screenshots" -> { require(files.isNotEmpty()){ "Choose a screenshot first." }; multipart("/api/backend/screenshots",files,mapOf("operation" to tool.id)) }
+            tool.engine.type=="image" -> { require(files.isNotEmpty()){ "Choose an image first." }; multipart("/api/backend/images",files.take(1),mapOf("operation" to tool.engine.op,"params" to options.toString(),"outputName" to "${tool.id}-output")) }
+            tool.engine.type=="audio" || tool.engine.type=="video" -> { require(files.isNotEmpty()){ "Choose an audio or video file first." }; multipart("/api/backend/media",files,mapOf("operation" to (tool.engine.op ?: tool.id),"params" to options.toString())) }
+            tool.engine.type=="custom" || tool.engine.type=="developer" -> postJson("/api/backend/tool",JSONObject().apply{put("toolId",tool.id);put("category",tool.category);put("input",input);put("options",options)})
+            tool.category in categoryBackend -> postJson("/api/backend/tool",JSONObject().apply{put("toolId",tool.id);put("category",tool.category);put("input",input);put("options",options)})
+            tool.engine.type=="pdf" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files,mapOf("operation" to tool.engine.op,"params" to options.toString(),"outputName" to "${tool.id}.pdf")) }
+            tool.engine.type=="document-backend" -> { require(files.isNotEmpty()){ "Choose a document first." }; multipart("/api/backend/documents",files,mapOf("operation" to tool.engine.op,"params" to options.toString(),"outputName" to "${tool.id}-output")) }
             tool.engine.type=="video" -> { require(files.isNotEmpty()){ "Choose a video first." }; multipart("/api/backend/media",files,mapOf("operation" to (tool.engine.extras["op"]?:tool.id),"params" to options.toString())) }
             else -> error("This backend operation is not configured.")
         }
@@ -44,6 +53,7 @@ object NativeBackendEngine {
         return request(path,out.toByteArray(),"multipart/form-data; boundary=$boundary")
     }
     private fun request(path:String,body:ByteArray,type:String):Result {
+        require(base.isNotBlank()) { "enV backend API is not configured for this build." }
         val c=(URL(base+path).openConnection() as HttpURLConnection).apply{requestMethod="POST";doOutput=true;connectTimeout=20000;readTimeout=180000;setRequestProperty("Content-Type",type);setRequestProperty("Accept","application/json,application/octet-stream,text/plain")}
         c.outputStream.use{it.write(body)}
         val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299){val msg=runCatching{JSONObject(String(data)).optString("error")}.getOrNull();throw IllegalStateException(msg?.takeIf{it.isNotBlank()}?:"Backend request failed (${c.responseCode}).")}

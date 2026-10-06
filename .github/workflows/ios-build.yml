@@ -1,4 +1,4 @@
-name: Native iOS CI
+name: Native iOS CI — authoritative
 
 on:
   push:
@@ -66,7 +66,7 @@ jobs:
           npm run check:native-calculators
           npm run check:native-coverage
           npm run check:native-executability
-          git diff --exit-code -- apps/shared apps/android/app/src/main/java/com/chastech/env/engine/NativeEngineData.kt apps/android/native-family-coverage apps/android/native-tool-coverage.txt apps/android/hybrid-tool-coverage.txt apps/ios/enV/NativeEngineData.swift apps/ios/native-family-coverage apps/ios/native-tool-coverage.txt apps/ios/hybrid-tool-coverage.txt
+          git diff --exit-code -- apps/shared apps/android/app/src/main/java/com/chastech/env/engine/NativeEngineData.kt apps/android/native-family-coverage apps/android/native-tool-coverage.txt apps/ios/enV/NativeEngineData.swift apps/ios/native-family-coverage apps/ios/native-tool-coverage.txt
       - name: Record iOS build toolchain
         run: |
           xcodebuild -version
@@ -101,6 +101,16 @@ jobs:
           )"
           echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
           echo "Using iPhone Simulator $simulator_id"
+      - name: Launch native iOS app on simulator
+        run: |
+          xcrun simctl bootstatus "$IOS_SIMULATOR_ID" -b
+          app="$RUNNER_TEMP/env-ios-derived-data/Build/Products/Release-iphonesimulator/enV.app"
+          test -d "$app"
+          xcrun simctl install "$IOS_SIMULATOR_ID" "$app"
+          xcrun simctl launch "$IOS_SIMULATOR_ID" com.chastech.env
+          sleep 3
+          xcrun simctl spawn "$IOS_SIMULATOR_ID" launchctl print system | grep -q com.apple.SpringBoard
+
       - name: Run iOS XCTest suite
         run: |
           xcodebuild \

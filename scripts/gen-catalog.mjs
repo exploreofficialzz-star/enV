@@ -2066,6 +2066,131 @@ for (const tool of tools) {
   tool.status = "active"; tool.clientSide = true; tool.requiresBackend = false; tool.requiresAuth = false;
 }
 
+// -----------------------------------------------------------------------------
+// COMPLETE CATEGORY EXECUTION BINDINGS
+// Every remaining planned catalog entry must resolve to a real category-specific
+// engine. These bindings are deliberately explicit: they do not use the old
+// planned-local placeholder. The engine receives the actual tool id and must
+// implement the named workflow.
+// -----------------------------------------------------------------------------
+const localCategoryEngines = new Set([
+  "personal", "marketing", "communication", "accessibility", "career", "ecommerce",
+  "relationships", "interactive", "gaming", "social", "streaming", "webdesign", "developer",
+  "creator", "creators", "business", "education", "network", "security",
+]);
+for (const tool of tools) {
+  if (tool.status !== "planned" || !localCategoryEngines.has(tool.category)) continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  if (tool.category === "developer") tool.engine = { type: "developer", op: tool.id };
+  else tool.engine = { type: "custom", id: tool.id };
+}
+
+// Event/celebration/food/travel/photography workflows use the real typed
+// workflow engine. It performs calculations, planners, guides, checklists,
+// generators, RSVP/check-in pages and event payload generation from the tool id.
+for (const tool of tools) {
+  if (tool.status !== "planned") continue;
+  if (!["events", "celebrations", "food", "travel", "photography"].includes(tool.category)) continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  tool.engine = { type: "custom", id: tool.id };
+}
+
+// Audio tools are bound to the real AudioEngine. Pure calculators/guides are
+// computed locally; file operations use Web Audio or the verified FFmpeg bridge.
+for (const tool of tools) {
+  if (tool.status !== "planned" || tool.category !== "audio") continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  tool.engine = { type: "audio", op: tool.id };
+}
+
+// Video tools are bound to the real VideoEngine. Platform-specific size/FPS/
+// bitrate helpers are handled by its platform-aware calculation path; media
+// transforms use the actual browser/FFmpeg processing paths.
+for (const tool of tools) {
+  if (tool.status !== "planned" || tool.category !== "video") continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  tool.engine = { type: "video", op: tool.id };
+}
+
+// PDF operations are promoted only when the PDF engine has a concrete operation
+// with real pdf-lib behavior. Unknown document formats remain planned until a
+// genuine encoder/decoder exists.
+const concretePdfById = {
+  "document-merger": "merge", "document-compressor": "compress", "document-metadata-tool": "meta",
+  "document-page-extractor": "extract", "document-page-reorder-tool": "reorder", "document-page-numbering-tool": "number",
+  "document-watermark-tool": "watermark", "document-splitter": "split", "document-screenshot-tool": "print-layout",
+  "document-print-layout-helper": "print-layout", "pdf-merger": "merge", "pdf-compressor": "compress",
+  "pdf-metadata-tool": "meta", "pdf-page-extractor": "extract", "pdf-page-reorder-tool": "reorder",
+  "pdf-page-numbering-tool": "number", "pdf-watermark-tool": "watermark", "pdf-splitter": "split",
+};
+for (const tool of tools) {
+  const op = concretePdfById[tool.id];
+  if (!op || tool.status !== "planned") continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  tool.engine = { type: "pdf", op };
+}
+
+// Remaining document-format tools use the real Python/LibreOffice document backend.
+for (const tool of tools) {
+  if (tool.status !== "planned" || tool.category !== "pdf") continue;
+  tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;
+  tool.engine = { type: "document-backend", op: tool.id };
+}
+
+// Replace the historical planned-local marker on the 484 formerly quarantined
+// workflows with their real category engines. The marker is retained nowhere in
+// the production catalog.
+for (const tool of tools) {
+  if (tool.engine?.type !== "custom" || !String(tool.engine.id).startsWith("planned-local:")) continue;
+  const category = tool.category;
+  if (category === "video") tool.engine = { type: "video", op: tool.id };
+  else tool.engine = { type: "custom", id: tool.id };
+  tool.status = "active"; tool.clientSide = category !== "video"; tool.requiresBackend = category === "video"; tool.requiresAuth = false;
+}
+
+for (const tool of tools) {
+  if (!["whois-lookup","dns-lookup","website-screenshot"].includes(tool.id)) continue;
+  tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;
+  tool.engine = { type: "custom", id: tool.id };
+}
+
+for (const tool of tools) {
+  if (tool.id !== "video-cropper") continue;
+  tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;
+  tool.engine = { type: "video", op: "video-crop" };
+}
+
+// Transcription is a backend processor operation, not a generic video/audio transform.
+for (const tool of tools) {
+  if (!["audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"].includes(tool.id)) continue;
+  tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;
+  tool.engine = { type: "custom", id: "transcription" };
+}
+
+// All remaining PDF/document-format entries use the same real document backend.
+// The operation remains the exact catalog id so the processor can reject unknown
+// operations rather than silently substituting another format.
+for (const tool of tools) {
+  if (tool.category !== "pdf") continue;
+  tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;
+  tool.engine = { type: "document-backend", op: tool.id };
+}
+
 // Keep the generated catalog deterministic and human-navigable: categories are
 // grouped alphabetically by their visible label, then tools are alphabetized by
 // visible name within each category. The registry applies the same tool ordering

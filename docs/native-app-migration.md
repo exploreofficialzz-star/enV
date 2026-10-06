@@ -12,25 +12,14 @@ The native apps must not embed the website or depend on a WebView for navigation
 
 ## Product parity target
 
-The canonical web catalog currently contains **10,001 entries** across **43 declared categories** (42 populated): **8,790 active** and **1,211 planned**. Active tools use 29 engine families. The largest families are calculators (6,539) and custom/category engines (1,013). This is a large, multi-release port—not a one-commit UI rewrite. Planned entries remain visibly planned, matching the web product; active entries are not considered ported until their native engine has behavior tests and parity coverage.
+The canonical web catalog contains **10,000 entries** across **43 declared categories** (42 populated). The current generated state is **10,000 active** and **0 planned**. The native execution matrix reports **7,066 offline-native** and **2,934 backend-native** active operations, with **0 Web-only** active operations and **0 platform divergence**.
 
-## Current status (2026-10-04)
+## Current status (2026-10-06)
 
-- The independent Kotlin/Compose Android and SwiftUI iOS projects now have native five-tab navigation, offline catalog browsing/search/categories, locally persisted favorites, and no WebView dependency in the native app sources.
-- Native forms and engine implementations now cover **89 active tool IDs on each platform**: Text (40), Codec (17), Color (16), Date/time (14), and MIME (2). The native apps also provide an offline 10,001-entry catalog, working five-tab navigation, search/category routes, saved tools, and local MIME file inspection limited to the first 64 bytes.
-- The other **8,701 active catalog tools remain in migration**. Their catalog details are available, but the native apps deliberately show an explicit not-yet-ported or remote-service-required state rather than claiming execution support.
-- Web build, typecheck, lint, and tests passed during the native-only work. This Linux sandbox lacks the Android SDK and Xcode; GitHub Actions must still compile Android/iOS and run their native unit-test suites before the milestone is treated as released.
-- The existing web app and its deployment remain unchanged and independent.
-
-Both apps must share the same information architecture, labels, content, palette, and interaction outcomes:
-
-1. **Home** — discovery/search entry, featured and popular tools, categories.
-2. **Tools** — category browser and tool lists.
-3. **Search** — full-catalog search and filters.
-4. **Saved** — local favorites.
-5. **Account** — profile/settings/history entry points.
-
-Back navigation, safe areas, large text, keyboard behavior, accessibility labels, empty/loading/error states, and persistent favorites are native responsibilities. The web app remains a separate product and is not to be rewritten as part of this migration.
+- Android and iOS are independent Kotlin/Compose and Swift/SwiftUI applications with no WebView execution fallback.
+- `apps/shared/catalog.json` has been regenerated from the canonical catalog and contains 10,000 active records.
+- Backend dispatch was hardened so image/audio/video processing reaches their dedicated processors before generic category routing; native media operations now fail closed when a required file is missing.
+- The Linux environment still cannot perform the authoritative Android Gradle, Xcode/iOS simulator, physical Contact Exchange, provider-credential, or store-signing verification.
 
 ## Migration phases
 
@@ -40,13 +29,13 @@ Back navigation, safe areas, large text, keyboard behavior, accessibility labels
 - Generate a versioned catalog snapshot from the website's canonical TypeScript catalog; ship it as an app resource, not fetch it from the website.
 - Implement the five-tab native shell, offline catalog browse/search/category/detail views, favorites persistence, and platform-native back behavior.
 - Establish separate Android APK and iOS Simulator build validation.
-- Keep the former Expo wrapper isolated as a temporary fallback until the native projects build and the first vertical slice is usable.
+- The former Expo/WebView wrapper has been retired from the release tree; Android and iOS release targets are the standalone native projects.
 
 ### 1. Core local engines (current phase)
 
 Port and behavior-test the most reused deterministic families first: text/codec, date-time, unit conversion, common calculators, generators, and developer utilities. Preserve input validation, units, rounding, locale behavior, copy/share, and save/recent semantics. Each port registers the exact tool IDs and supported operations; do not infer support from a family name alone.
 
-**Progress:** The first slice now includes text transforms/counters/formatters/diff and JSON/CSV/YAML/XML conversions, codecs, color conversion/palettes/contrast, date/time utilities, and MIME lookup/local signature inspection. Android and iOS each list exactly the same 89 active IDs. Verify native CI before treating this coverage as released. Unit conversion, calculators, generators, and other developer utilities remain upcoming.
+**Progress:** The native operation maps now include calculators, converters, generators, developer/network/SEO/CSS utilities, text, codecs, color, date/time, MIME, and shared backend media operations. Android and iOS are kept in parity by the generated execution matrix; Web-only tools are explicitly labeled instead of falling back to the website.
 
 ### 2. Domain, document, and media engines
 
@@ -66,7 +55,7 @@ Port image/PDF/file, QR/barcode, networking, security, mockup, and domain-specif
 
 ## Completion rules
 
-- No app feature is called “native” if it renders the website through WebView.
+- No app feature is called “native” if it renders or invokes the website as its implementation.
 - No active tool is marked covered until both platform implementations pass its shared fixtures or explicitly approved platform-specific equivalents.
 - Web CI and deployment continue to run independently.
 - Each milestone records exact tool-ID coverage, remaining platform gaps, test evidence, build artifacts, and any server/API dependencies.

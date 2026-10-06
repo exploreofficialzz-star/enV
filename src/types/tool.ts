@@ -79,6 +79,7 @@ export type EngineRef =
   | { type: "datetime"; op: string }
   | { type: "seo"; op: string }
   | { type: "document"; op: string }
+  | { type: "document-backend"; op: string }
   | { type: "pdf"; op: string }
   | { type: "ai"; op: string }
   | { type: "video"; op: string }

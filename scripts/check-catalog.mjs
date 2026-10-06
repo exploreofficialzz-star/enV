@@ -22,7 +22,7 @@ const categories = new Set([
 const statuses = new Set(["active", "beta", "planned"]);
 const engineTypes = new Set([
   "calculator", "converter", "text", "generator", "codec", "color", "qr", "barcode", "image",
-  "cssgen", "developer", "mime", "security", "mockup", "post", "device", "datetime", "seo", "creator","business","audio", "network", "file-converter", "document", "pdf", "ai", "video", "url-media", "url-media-info", "custom",
+  "cssgen", "developer", "mime", "security", "mockup", "post", "device", "datetime", "seo", "creator","business","audio", "network", "file-converter", "document", "pdf", "ai", "video", "url-media", "url-media-info", "custom", "document-backend",
 ]);
 
 for (const tool of tools) {

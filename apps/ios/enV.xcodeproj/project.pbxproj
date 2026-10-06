@@ -29,6 +29,14 @@
 		A30000000000000000000001 /* NativeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000001 /* NativeCopy.swift */; };
 		A30000000000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000002 /* Assets.xcassets */; };
 	171717171717171717171717 /* CatalogCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */; };
+        E20000000000000000000003 /* NativeCalculatorData.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000003 /* NativeCalculatorData.swift */; };
+        E20000000000000000000007 /* NativeConverterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000002 /* NativeConverterEngine.swift */; };
+        E2000000000000000000000A /* NativeEngineData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000001 /* NativeEngineData.swift */; };
+        E2000000000000000000000B /* NativeExpansionCalculatorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000003 /* NativeExpansionCalculatorEngine.swift */; };
+        E2000000000000000000000C /* NativeMathExerciseEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000004 /* NativeMathExerciseEngine.swift */; };
+        E2000000000000000000000E /* NativeNumberParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1000000000000000000000E /* NativeNumberParser.swift */; };
+        F20000000000000000000001 /* ContactExchangeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000001 /* ContactExchangeController.swift */; };
+        F20000000000000000000002 /* ContactExchangeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* ContactExchangeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +70,10 @@
         B40000000000000000000006 /* NativeCalculatorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCalculatorEngine.swift; sourceTree = "<group>"; };
 	999999999999999999999999 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 	AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogCoreTests.swift; sourceTree = "<group>"; };
+        E10000000000000000000003 /* NativeCalculatorData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCalculatorData.swift; sourceTree = "<group>"; };
+        E1000000000000000000000E /* NativeNumberParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeNumberParser.swift; sourceTree = "<group>"; };
+        F10000000000000000000001 /* ContactExchangeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactExchangeController.swift; sourceTree = "<group>"; };
+        F10000000000000000000002 /* ContactExchangeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactExchangeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,13 +82,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-        222222222222222222222222 = {isa = PBXGroup; children = (333333333333333333333333,444444444444444444444444,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,); sourceTree = "<group>"; };
+        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,); sourceTree = "<group>"; };
         444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (AAAAAAAAAAAAAAAAAAAAAAAA,191919111111111111111111,B10000000000000000000006,B10000000000000000000007,B10000000000000000000008,B10000000000000000000009,B1000000000000000000000A,); path = enVTests; sourceTree = "<group>"; };
 	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,); name = Products; sourceTree = "<group>"; };
+        C50000000000000000000001 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,E10000000000000000000003,B40000000000000000000006,B10000000000000000000001,B10000000000000000000002,B40000000000000000000002,C30000000000000000000001,B10000000000000000000003,B40000000000000000000001,B40000000000000000000003,B40000000000000000000004,B10000000000000000000004,E1000000000000000000000E,181818111111111111111111,B10000000000000000000005,B40000000000000000000005,131313131313131313131313,141414141414141414141414,F10000000000000000000001,F10000000000000000000002); path = enV; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-	BBBBBBBBBBBBBBBBBBBBBBBB /* enV */ = {isa = PBXNativeTarget; buildConfigurationList = F60000000000000000000000; buildPhases = (DDDDDDDDDDDDDDDDDDDDDDDD,F00000000000000000000000,F10000000000000000000000,); buildRules = (); dependencies = (); name = enV; productName = enV; productReference = 666666666666666666666666; productType = "com.apple.product-type.application"; };
+	BBBBBBBBBBBBBBBBBBBBBBBB /* enV */ = {isa = PBXNativeTarget; buildConfigurationList = F60000000000000000000000; buildPhases = (C50000000000000000000002,F00000000000000000000000,F10000000000000000000000,); buildRules = (); dependencies = (); name = enV; productName = enV; productReference = 666666666666666666666666; productType = "com.apple.product-type.application"; };
 	CCCCCCCCCCCCCCCCCCCCCCCC /* enVTests */ = {isa = PBXNativeTarget; buildConfigurationList = F70000000000000000000000; buildPhases = (EEEEEEEEEEEEEEEEEEEEEEEE,F20000000000000000000000,); buildRules = (); dependencies = (F40000000000000000000000,); name = enVTests; productName = enVTests; productReference = 777777777777777777777777; productType = "com.apple.product-type.bundle.unit-test"; };
 /* End PBXNativeTarget section */
 
@@ -90,6 +103,7 @@
 
 /* Begin PBXSourcesBuildPhase section */
         EEEEEEEEEEEEEEEEEEEEEEEE /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (171717171717171717171717 /* CatalogCoreTests.swift in Sources */,191919222222222222222222 /* NativeTextEngineTests.swift in Sources */,A10000000000000000000006,A10000000000000000000007,A10000000000000000000008,A10000000000000000000009,A1000000000000000000000A,); runOnlyForDeploymentPostprocessing = 0; };
+        C50000000000000000000002 /* App Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,E20000000000000000000003,A40000000000000000000006,A10000000000000000000001,A10000000000000000000002,E20000000000000000000007,A30000000000000000000001,A10000000000000000000003,E2000000000000000000000A,E2000000000000000000000B,E2000000000000000000000C,A10000000000000000000004,E2000000000000000000000E,181818222222222222222222,A10000000000000000000005,A40000000000000000000005,153535353535353535353535,154545454545454545454545,F20000000000000000000001,F20000000000000000000002); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -101,8 +115,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin XCBuildConfiguration section */
-		F80000000000000000000000 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ENABLE_TESTABILITY = YES; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; ENV_API_BASE_URL = https://env-q3mq.onrender.com; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Debug; };
-		F90000000000000000000000 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; ENV_API_BASE_URL = https://env-q3mq.onrender.com; SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Release; };
+		F80000000000000000000000 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ENABLE_TESTABILITY = YES; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; ENV_API_BASE_URL = ; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Debug; };
+		F90000000000000000000000 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; ENV_API_BASE_URL = ; SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Release; };
 		FA0000000000000000000000 /* Test Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Debug; };
 		FB0000000000000000000000 /* Test Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Release; };
 /* End XCBuildConfiguration section */
