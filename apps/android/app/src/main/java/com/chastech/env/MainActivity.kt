@@ -58,6 +58,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -189,6 +190,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showExchange by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
@@ -235,7 +237,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Account -> AccountScreen(catalog, themeMode, onUseSystemTheme)
+                    AppTab.Account -> if (showExchange) ContactExchangeScreen { showExchange = false } else AccountScreen(catalog, themeMode, onUseSystemTheme) { showExchange = true }
                 }
             }
         }
@@ -335,7 +337,7 @@ private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (Strin
 }
 
 @Composable
-private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit) {
+private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -347,7 +349,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
-        SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact") { showExchange = true }
+        SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
         SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
         SettingCard("About enV", "Version 1.1.0 (6) · native Android", "Info")
     }
