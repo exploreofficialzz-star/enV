@@ -39,8 +39,8 @@ struct HomeView: View {
                         Text("A focused toolkit for everyday work.")
                             .font(.system(size: 28, weight: .semibold))
                             .tracking(-0.4)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
                             .foregroundStyle(Color.envInk)
                     }
 
@@ -50,7 +50,6 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
                 .padding(.bottom, 24)
             }
             .modifier(Screen())

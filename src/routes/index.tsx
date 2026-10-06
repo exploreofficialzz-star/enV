@@ -20,7 +20,7 @@ function Home() {
 
   return (
     <AppShell>
-      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-3">
+      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-0 text-center sm:px-6 sm:pt-0">
         <Logo size="hero" />
         <form
           role="search"
@@ -44,7 +44,7 @@ function Home() {
             <Search className="size-6" strokeWidth={2.5} />
           </button>
         </form>
-        <h1 className="mt-6 w-full max-w-3xl self-end text-right text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
+        <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for everyday work.
         </h1>
       </section>
