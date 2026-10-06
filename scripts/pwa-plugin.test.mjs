@@ -61,14 +61,17 @@ test("manifest identifies enV and serves the canonical app icon", () => {
   assert.equal(manifest.display, "standalone");
 });
 
-test("all web brand lockups use the exact header image", () => {
+test("web brand lockups use the canonical light and dark assets in the home hero", () => {
   const logo = readFileSync(join(PROJECT_ROOT, "src/components/brand/logo.tsx"), "utf8");
   const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");
+  const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const footer = readFileSync(join(PROJECT_ROOT, "src/components/layout/footer.tsx"), "utf8");
   const install = readFileSync(join(PROJECT_ROOT, "scripts/install-page.html"), "utf8");
   assert.match(logo, /src="\/logo-header-transparent\.png"/);
+  assert.match(logo, /src="\/logo-header-dark\.png"/);
   assert.doesNotMatch(logo, /<svg/);
-  assert.match(header, /<Logo\s*\/>/);
+  assert.match(header, /aria-label="Home"/);
+  assert.match(home, /<Logo size="hero"\s*\/>/);
   assert.match(footer, /<Logo\s*\/>/);
   assert.match(install, /src="\/logo-header-transparent\.png"/);
 });

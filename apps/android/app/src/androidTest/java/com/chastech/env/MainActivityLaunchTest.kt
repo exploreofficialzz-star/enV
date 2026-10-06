@@ -11,6 +11,8 @@ class MainActivityLaunchTest {
 
     @Test
     fun launchShowsNativeCatalogHome() {
-        composeRule.onNodeWithText("Browse all tools").assertIsDisplayed()
+        composeRule.onNodeWithText("A focused toolkit for everyday work.").assertIsDisplayed()
+        composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
+        composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
     }
 }

@@ -53,29 +53,21 @@ private enum NativeTab: Int, CaseIterable {
         }
     }
 
-    var lucideIcon: String {
-        switch self {
-        case .home: "Home"
-        case .tools: "LayoutGrid"
-        case .search: "Search"
-        case .saved: "Heart"
-        case .account: "User"
-        }
-    }
 }
 
 struct RootTabView: View {
     @EnvironmentObject private var store: CatalogStore
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.themeMode") private var themeMode = "system"
+    @State private var searchQuery = ""
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView(onBrowseTools: { selectedTab = NativeTab.tools.rawValue })
+            HomeView(onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue })
                 .tag(NativeTab.home.rawValue)
             ToolsView()
                 .tag(NativeTab.tools.rawValue)
-            SearchView()
+            SearchView(query: $searchQuery)
                 .tag(NativeTab.search.rawValue)
             SavedView()
                 .tag(NativeTab.saved.rawValue)
@@ -107,11 +99,6 @@ private struct EnVBottomBar: View {
                 let selected = selection == tab.rawValue
                 Button { selection = tab.rawValue } label: {
                     VStack(spacing: 3) {
-                        EnVIcon(
-                            name: tab.lucideIcon,
-                            size: 20,
-                            tint: selected ? .envAccent : .envMuted
-                        )
                         Text(tab.title)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(selected ? Color.envAccent : Color.envMuted)
@@ -127,35 +114,45 @@ private struct EnVBottomBar: View {
         }
         .padding(.top, 1)
         .background(Color.envSurface.ignoresSafeArea(edges: .bottom))
-        .overlay(alignment: .top) {
-            Rectangle().fill(Color.envBorder).frame(height: 1)
-        }
     }
 }
 
 struct EnVBrandNavigationStyle: ViewModifier {
-    @AppStorage("env.themeMode") private var themeMode = "system"
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
-    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { selectedTab = NativeTab.home.rawValue } label: {
-                        EnVLogo().frame(width: 84, height: 56)
+                        Image(systemName: "house")
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 36, height: 36)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("enV home")
+                    .accessibilityLabel("Home")
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { themeMode = colorScheme == .dark ? "light" : "dark" } label: {
-                        EnVIcon(name: colorScheme == .dark ? "Sun" : "Moon", size: 18, tint: .envMuted)
-                            .frame(width: 36, height: 36)
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { selectedTab = NativeTab.saved.rawValue } label: {
+                        EnVIcon(name: "Heart", size: 19, tint: .envMuted).frame(width: 32, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Saved tools")
+                    Button { selectedTab = NativeTab.tools.rawValue } label: {
+                        EnVIcon(name: "LayoutGrid", size: 19, tint: .envMuted).frame(width: 32, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Tools")
+                    Menu {
+                        Button { selectedTab = NativeTab.account.rawValue } label: { Label("Account", systemImage: "person.crop.circle") }
+                        Button { selectedTab = NativeTab.search.rawValue } label: { Label("Search tools", systemImage: "magnifyingglass") }
+                    } label: {
+                        Image(systemName: "ellipsis.vertical")
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 32, height: 36)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(colorScheme == .dark ? "Switch to light mode" : "Switch to dark mode")
+                    .accessibilityLabel("More options")
                 }
             }
             .toolbarBackground(Color.envSurface, for: .navigationBar)

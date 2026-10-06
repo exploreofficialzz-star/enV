@@ -10,45 +10,44 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
-    let onBrowseTools: () -> Void
+    let onSearch: (String) -> Void
+    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Private, practical, on-device tools")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.envAccent)
-                        Text("A focused toolkit for everyday work.")
-                            .font(.system(size: 34, weight: .semibold))
-                            .tracking(-0.5)
-                            .foregroundStyle(Color.envInk)
-                        Text("Convert, calculate, generate, and transform without sending your files or text away.")
-                            .font(.body)
-                            .foregroundStyle(Color.envMuted)
-                        Button(action: onBrowseTools) {
-                            HStack(spacing: 8) {
-                                Text("Browse all tools")
-                                EnVIcon(name: "ArrowRight", size: 16, tint: .white)
+                    VStack(alignment: .center, spacing: 16) {
+                        EnVLogo().frame(width: 252, height: 168)
+                        HStack(spacing: 12) {
+                            EnVLogo().frame(width: 40, height: 28)
+                            TextField("Search for a tool", text: $searchText)
+                                .font(.body)
+                                .submitLabel(.search)
+                                .onSubmit { onSearch(searchText) }
+                            Button { onSearch(searchText) } label: {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 42, height: 42)
+                                    .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 12))
                             }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .frame(height: 44)
-                            .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 8))
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Search")
                         }
-                        .buttonStyle(.plain)
-                        .padding(.top, 4)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                        Text("A focused toolkit for everyday work.")
+                            .font(.system(size: 28, weight: .semibold))
+                            .tracking(-0.4)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(Color.envInk)
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Featured tools", subtitle: "Hand-picked starting points")
-                        ToolList(tools: Array(store.featuredTools.prefix(6)))
-                    }
-
-                    VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Popular tools", subtitle: "Useful tools people return to")
+                        sectionHeader("Trending tools", subtitle: "Useful tools to explore today")
                         ToolList(tools: Array(store.popularTools.prefix(6)))
                     }
                 }
@@ -151,9 +150,11 @@ struct CategoryView: View {
 }
 
 struct SearchView: View {
+    @Binding var query: String
+
     var body: some View {
         NavigationStack {
-            SearchResultsView()
+            SearchResultsView(text: $query)
         }
         .modifier(EnVBrandNavigationStyle())
     }
@@ -161,7 +162,7 @@ struct SearchView: View {
 
 struct SearchResultsView: View {
     @EnvironmentObject private var store: CatalogStore
-    @State private var text = ""
+    @Binding var text: String
     @State private var category: String?
 
     private var results: [Tool] { store.tools(matching: text, category: category) }

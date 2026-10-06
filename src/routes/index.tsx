@@ -1,23 +1,54 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Search } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { Logo } from "@/components/brand/logo";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getFeaturedTools, getPopularTools, toolPath } from "@/lib/registry";
+import { getPopularTools, toolPath } from "@/lib/registry";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  const featured = getFeaturedTools();
-  const popular = getPopularTools(12);
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const trending = getPopularTools(6);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void navigate({ to: "/search", search: { q: query.trim() } });
+  }
+
   return (
     <AppShell>
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <p className="text-sm font-medium text-accent">Private, practical, in-browser tools</p>
-        <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">A focused toolkit for everyday work.</h1>
-        <p className="mt-4 max-w-2xl text-lg text-muted">Convert, calculate, generate, and transform without sending your files or text away.</p>
-        <Link to="/tools" className="mt-6 inline-flex rounded-md bg-accent px-4 py-2 text-sm font-medium text-white">Browse all tools</Link>
+      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-5 text-center sm:px-6 sm:pt-8">
+        <Logo size="hero" />
+        <form
+          role="search"
+          onSubmit={submitSearch}
+          className="mt-3 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:mt-5 sm:h-[72px] sm:gap-4 sm:px-5"
+        >
+          <Logo size="search" className="shrink-0" />
+          <input
+            aria-label="Search tools"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search for a tool"
+            className="min-w-0 flex-1 bg-transparent text-left text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
+          />
+          <button
+            type="submit"
+            aria-label="Search"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:brightness-95 focus-visible:outline-offset-4"
+          >
+            <Search className="size-5" />
+          </button>
+        </form>
+        <h1 className="mt-6 max-w-3xl text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
+          A focused toolkit for everyday work.
+        </h1>
       </section>
-      <ToolSection title="Featured tools" tools={featured} />
-      <ToolSection title="Popular tools" tools={popular} />
+      <ToolSection title="Trending tools" tools={trending} />
     </AppShell>
   );
 }
@@ -25,16 +56,19 @@ function Home() {
 function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof getPopularTools> }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-      <h2 className="text-xl font-semibold">{title}</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex items-end justify-between gap-4">
+        <h2 className="text-xl font-semibold sm:text-2xl">{title}</h2>
+        <SeeMoreLink to="/tools">Explore all tools</SeeMoreLink>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tools.map((tool) => (
-          <Link key={tool.id} to={toolPath(tool)} className="rounded-xl bg-surface p-4 shadow-[var(--shadow-border)] hover:text-accent">
+          <Link key={tool.id} to={toolPath(tool)} className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent">
             <h3 className="font-medium">{tool.name}</h3>
             <p className="mt-1 text-sm text-muted">{tool.description}</p>
           </Link>
-          ))}
-        </div>
-        <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
-      </section>
+        ))}
+      </div>
+      <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
+    </section>
   );
 }

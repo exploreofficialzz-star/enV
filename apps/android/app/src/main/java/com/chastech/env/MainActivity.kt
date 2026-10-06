@@ -32,31 +32,29 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -82,6 +80,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chastech.env.data.Catalog
@@ -117,14 +116,10 @@ class MainActivity : ComponentActivity() {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
             val darkMode = when (themeMode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
             EnVTheme(darkTheme = darkMode) {
-                CatalogGate(
+            CatalogGate(
                     favorites,
                     darkMode,
                     themeMode,
-                    onToggleTheme = {
-                        themeMode = if (darkMode) "light" else "dark"
-                        favorites.setThemeMode(themeMode)
-                    },
                     onUseSystemTheme = {
                         themeMode = "system"
                         favorites.setThemeMode(themeMode)
@@ -136,7 +131,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onToggleTheme: () -> Unit, onUseSystemTheme: () -> Unit) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -152,7 +147,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onToggleTheme, onUseSystemTheme)
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
         else -> NativeLaunchScreen(darkMode)
     }
@@ -179,18 +174,18 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private enum class AppTab(val label: String, val iconName: String) {
-    Home("Home", "Home"), Tools("Tools", "LayoutGrid"), Search("Search", "Search"),
-    Saved("Saved", "Heart"), Account("Account", "User")
+private enum class AppTab(val label: String) {
+    Home("Home"), Tools("Tools"), Search("Search"), Saved("Saved"), Account("Account")
 }
 
 @Composable
-private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onToggleTheme: () -> Unit, onUseSystemTheme: () -> Unit) {
+private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var showExchange by rememberSaveable { mutableStateOf(false) }
+    var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
@@ -200,10 +195,27 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { EnVLogo(Modifier.width(84.dp).height(56.dp), darkTheme = darkMode) },
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null }, modifier = Modifier.semantics { contentDescription = "Home" }) {
+                        Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
                 actions = {
-                    IconButton(onClick = onToggleTheme, modifier = Modifier.semantics { contentDescription = if (darkMode) "Switch to light mode" else "Switch to dark mode" }) {
-                        EnVIcon(if (darkMode) "Sun" else "Moon", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
+                        Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
+                        Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Box {
+                        IconButton(onClick = { overflowExpanded = true }, modifier = Modifier.semantics { contentDescription = "More options" }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
+                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; overflowExpanded = false })
+                    }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -220,7 +232,6 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            EnVIcon(item.iconName, tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(item.label, style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -233,7 +244,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, { tab = AppTab.Tools.name }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -245,28 +256,30 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, onBrowseTools: () -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    val featured = remember(catalog) { catalog.tools.filter { it.featured }.sortedByDescending { it.popularity }.take(6) }
-    val popular = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
+    val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Private, practical, on-device tools", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-                Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-                Text("Convert, calculate, generate, and transform without sending your files or text away.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = onBrowseTools, modifier = Modifier.padding(top = 4.dp), shape = RoundedCornerShape(8.dp)) { Text("Browse all tools") }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+                EnVLogo(Modifier.width(252.dp).height(168.dp), darkTheme = darkMode)
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search for a tool") },
+                    leadingIcon = { EnVLogo(Modifier.width(36.dp).height(24.dp), darkTheme = darkMode) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                )
+                Text("A focused toolkit for everyday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle("Featured tools", "Hand-picked starting points")
-                featured.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
-            }
-        }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle("Popular tools", "Useful tools people return to")
-                popular.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+                SectionTitle("Trending tools", "")
+                trending.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
             }
         }
     }
