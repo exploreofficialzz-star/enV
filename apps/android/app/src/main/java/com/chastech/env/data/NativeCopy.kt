@@ -36,7 +36,6 @@ object NativeCopy {
         protect(Regex("Browser frames", RegexOption.IGNORE_CASE))
 
         val replacements = listOf(
-            "All in the browser" to "All on this device",
             "locally in your browser" to "locally on this device",
             "locally in the browser" to "locally on this device",
             "entirely in your browser" to "entirely on this device",
@@ -68,7 +67,10 @@ object NativeCopy {
             "Client-side PDF utilities" to "On-device PDF utilities",
         )
         for ((from, to) in replacements) {
-            out = out.replace(from, to, ignoreCase = true)
+            val pattern = Regex(Regex.escape(from), RegexOption.IGNORE_CASE)
+            out = pattern.replace(out) { match ->
+                if (match.value.firstOrNull()?.isUpperCase() == true) to.replaceFirstChar { it.uppercaseChar() } else to
+            }
         }
         placeholders.forEachIndexed { index, original ->
             out = out.replace("\u0000$index\u0000", original)
