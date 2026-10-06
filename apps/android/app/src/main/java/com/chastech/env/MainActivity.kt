@@ -37,13 +37,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -51,7 +47,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -198,19 +193,21 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null }, modifier = Modifier.semantics { contentDescription = "Home" }) {
-                        Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("Home", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
                     IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
-                        Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("Heart", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
-                        Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        EnVIcon("LayoutGrid", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Box {
                         IconButton(onClick = { overflowExpanded = true }, modifier = Modifier.semantics { contentDescription = "More options" }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                repeat(3) { Box(Modifier.size(3.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)) }
+                            }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
                             DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; overflowExpanded = false })

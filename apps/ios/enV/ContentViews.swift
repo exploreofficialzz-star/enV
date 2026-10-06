@@ -26,9 +26,7 @@ struct HomeView: View {
                                 .submitLabel(.search)
                                 .onSubmit { onSearch(searchText) }
                             Button { onSearch(searchText) } label: {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.white)
+                                EnVIcon(name: "Search", size: 18, tint: .white)
                                     .frame(width: 42, height: 42)
                                     .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 12))
                             }

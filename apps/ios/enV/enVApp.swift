@@ -125,9 +125,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { selectedTab = NativeTab.home.rawValue } label: {
-                        Image(systemName: "house")
-                            .font(.system(size: 18, weight: .medium))
-                            .frame(width: 36, height: 36)
+                        EnVIcon(name: "Home", size: 20, tint: .envMuted).frame(width: 36, height: 36)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Home")
@@ -144,11 +142,14 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Tools")
                     Menu {
-                        Button { selectedTab = NativeTab.account.rawValue } label: { Label("Account", systemImage: "person.crop.circle") }
-                        Button { selectedTab = NativeTab.search.rawValue } label: { Label("Search tools", systemImage: "magnifyingglass") }
+                        Button("Account") { selectedTab = NativeTab.account.rawValue }
+                        Button("Search tools") { selectedTab = NativeTab.search.rawValue }
                     } label: {
-                        Image(systemName: "ellipsis.vertical")
-                            .font(.system(size: 18, weight: .medium))
+                        VStack(spacing: 3) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle().fill(Color.envMuted).frame(width: 3, height: 3)
+                            }
+                        }
                             .frame(width: 32, height: 36)
                             .contentShape(Rectangle())
                     }
