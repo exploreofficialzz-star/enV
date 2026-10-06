@@ -203,7 +203,7 @@ private struct NativeBackendToolView: View {
     private func run() async {
         working = true; defer { working = false }
         do { let r = try await NativeBackendEngine.execute(tool,input:input,options:options,files:files); if let text=r.text { output=text } else { output="Output ready: \(r.fileName ?? tool.id) · \(r.data?.count ?? 0) bytes" }; error=nil }
-        catch { output=""; error=error.localizedDescription }
+        catch let caughtError { output=""; error=caughtError.localizedDescription }
     }
 }
 
@@ -235,7 +235,7 @@ private struct NativeUtilityToolView: View {
             NativeInputField(title: "Options JSON", text: $optionsJSON)
             NativeActionRow(output: output, run: {
                 do { let result = try NativeUtilityEngine.run(tool, input: input, optionsJSON: optionsJSON); output = result.text; error = nil }
-                catch { output = ""; error = error.localizedDescription }
+                catch let caughtError { output = ""; error = caughtError.localizedDescription }
             }, reset: { input = ""; optionsJSON = "{}"; output = ""; error = nil })
             NativeOutputView(output: output, error: error)
         }
@@ -267,7 +267,7 @@ private struct NativeConverterToolView: View {
                 NativeInputField(title: "To unit", text: $to)
                 NativeActionRow(output: output, run: {
                     do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
-                    catch { output = ""; error = error.localizedDescription }
+                    catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
                 NativeOutputView(output: output, error: error)
             }
@@ -300,7 +300,7 @@ private struct NativeCalculatorToolView: View {
                         let rows = try NativeCalculatorEngine.run(op, values: values)
                         output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
                         error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, $0.defaultValue) }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -328,15 +328,15 @@ private struct NativeExpansionCalculatorToolView: View {
     var body: some View {
         if let op = NativeExpansionCalculatorEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("\(op.row.cLabel) = \(op.row.aLabel) \(op.row.family == "product" ? "×" : op.row.family == "ratio" ? "÷" : "+") \(op.row.bLabel)").font(.subheadline.weight(.semibold))
-                if op.target != "a" { NativeInputField(title: op.row.aLabel, text: binding(for: "a")) }
-                if op.target != "b" { NativeInputField(title: op.row.bLabel, text: binding(for: "b")) }
-                if op.target != "c" { NativeInputField(title: op.row.cLabel, text: binding(for: "c")) }
+                Text("\(op.cLabel) = \(op.aLabel) \(op.family == "product" ? "×" : op.family == "ratio" ? "÷" : "+") \(op.bLabel)").font(.subheadline.weight(.semibold))
+                if op.target != "a" { NativeInputField(title: op.aLabel, text: binding(for: "a")) }
+                if op.target != "b" { NativeInputField(title: op.bLabel, text: binding(for: "b")) }
+                if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
                 NativeActionRow(output: output, run: {
                     do {
                         let result = try NativeExpansionCalculatorEngine.run(op, values: values)
                         output = "\(result.0): \(result.1)"; error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { values = ["a": "2", "b": "3", "c": "6"]; values[op.target] = ""; output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -370,7 +370,7 @@ private struct NativeMathExerciseToolView: View {
                     do {
                         let rows = try NativeMathExerciseEngine.run(op, values: values)
                         output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n"); error = nil
-                    } catch { output = ""; error = error.localizedDescription }
+                    } catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, "1") }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }
@@ -715,7 +715,7 @@ enum NativeBackendEngine {
     static let backendIDs:Set<String> = ["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader"]
     static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video"]
     static func supports(_ tool:Tool)->Bool { backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type) }
-    static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
+    fileprivate static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
         let opt=(try? JSONSerialization.jsonObject(with:Data(options.utf8)) as? [String:Any]) ?? [:]
         if ["audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"].contains(tool.id) { guard let f=files.first else{throw NativeNativeError.message("Choose an audio or video file first.")}; return try await multipart("/api/backend/transcribe",fields:["mode":tool.id.hasPrefix("video-") ? "video":"audio","format":tool.id.hasSuffix("-subtitles") ? "srt":"txt","language":(opt["language"] as? String) ?? "auto"],files:[f]) }
         if tool.id=="ocr-tool" { return try await multipart("/api/backend/ocr",fields:["language":(opt["language"] as? String) ?? "eng"],files:files) }
@@ -734,8 +734,37 @@ enum NativeBackendEngine {
         if tool.engine.type=="document-backend" { return try await multipart("/api/backend/documents",fields:["operation":tool.engine.op ?? tool.id,"params":options,"outputName":"\(tool.id)-output"],files:files) }
         return try await multipart("/api/backend/media",fields:["operation":tool.engine.op ?? tool.engine.id ?? tool.id,"params":options],files:files)
     }
-    private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult { var r=URLRequest(url:baseURL.appendingPathComponent(path));r.httpMethod="POST";r.timeoutInterval=180;r.setValue("application/json",forHTTPHeaderField:"Content-Type");r.httpBody=try JSONSerialization.data(withJSONObject:body);let(d,res)=try await URLSession.shared.data(for:r);return try parse(d,res) }
-    private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile]) async throws -> NativeBackendResult { let b="enV-\(UUID().uuidString)";var body=Data();for(k,v)in fields{body.append("--\(b)\r\nContent-Disposition: form-data; name=\"\(k)\"\r\n\r\n\(v)\r\n".data(using:.utf8)!)};for f in files{body.append("--\(b)\r\nContent-Disposition: form-data; name=\"files\"; filename=\"\(f.name)\"\r\nContent-Type: \(f.mimeType)\r\n\r\n".data(using:.utf8)!);body.append(f.data);body.append("\r\n".data(using:.utf8)!)};body.append("--\(b)--\r\n".data(using:.utf8)!);var r=URLRequest(url:baseURL.appendingPathComponent(path));r.httpMethod="POST";r.timeoutInterval=180;r.setValue("multipart/form-data; boundary=\(b)",forHTTPHeaderField:"Content-Type");r.httpBody=body;let(d,res)=try await URLSession.shared.data(for:r);return try parse(d,res)}
+    private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult {
+        guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 180
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try parse(data, response)
+    }
+    private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile]) async throws -> NativeBackendResult {
+        guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
+        let boundary = "enV-\(UUID().uuidString)"
+        var body = Data()
+        for (name, value) in fields {
+            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".data(using: .utf8)!)
+        }
+        for file in files {
+            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"files\"; filename=\"\(file.name)\"\r\nContent-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
+            body.append(file.data)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 180
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return try parse(data, response)
+    }
     private static func parse(_ d:Data,_ res:URLResponse)throws->NativeBackendResult{guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")};if !(200...299).contains(h.statusCode){throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")};let m=h.mimeType ?? "application/octet-stream";return m.contains("json") ? NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:m,fileName:nil) : NativeBackendResult(text:nil,data:d,mimeType:m,fileName:nil)}
 }
 
@@ -831,10 +860,7 @@ private enum NativeAiEngine {
 
 private enum NativeAiClient {
     private static let cookieKey = "env.ai.cookie"
-    private static var baseURL: URL {
-        guard let url = NativeBackendEngine.baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
-        return url
-    }
+    private static var baseURL: URL? { NativeBackendEngine.baseURL }
 
     private static func cookie() -> String? { UserDefaults.standard.string(forKey: cookieKey) }
     private static func saveCookie(_ value: String?) {
@@ -888,6 +914,7 @@ private enum NativeAiClient {
     }
 
     private static func request(path: String, method: String, body: Data?) async throws -> (Data, URLResponse) {
+        guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
         var request = URLRequest(url: baseURL.appendingPathComponent(path.hasPrefix("/") ? String(path.dropFirst()) : path))
         request.httpMethod = method
         request.timeoutInterval = 90
@@ -975,7 +1002,7 @@ private struct NativeAiToolView: View {
                 let result = try await NativeAiClient.run(task: task, input: input)
                 let text = NativeAiEngine.format(task: task, result: result)
                 await MainActor.run { output = text; working = false }
-            } catch { await MainActor.run { error = error.localizedDescription; working = false } }
+            } catch let caughtError { await MainActor.run { error = caughtError.localizedDescription; working = false } }
         }
     }
 }

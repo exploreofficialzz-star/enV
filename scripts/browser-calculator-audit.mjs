@@ -15,6 +15,8 @@ const baseUrl = option("base-url") ?? process.env.BROWSER_AUDIT_BASE_URL ?? "htt
 const reportPath = option("report");
 const onlyIds = option("only")?.split(",").map((id) => id.trim()).filter(Boolean);
 const limit = Number(option("limit") ?? Infinity);
+const sampleOption = option("sample") ?? process.env.BROWSER_AUDIT_SAMPLE;
+const sampleSize = sampleOption === undefined ? Infinity : Number(sampleOption);
 const viewportWidth = Number(option("width") ?? 390);
 const concurrency = Number(option("concurrency") ?? process.env.BROWSER_AUDIT_CONCURRENCY ?? 8);
 const base = new URL(baseUrl);
@@ -23,6 +25,7 @@ if (!["http:", "https:"].includes(base.protocol) || base.username || base.passwo
 }
 if (!Number.isInteger(viewportWidth) || viewportWidth < 320) throw new Error("--width must be an integer of at least 320px.");
 if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16) throw new Error("--concurrency must be an integer from 1 to 16.");
+if (sampleSize !== Infinity && (!Number.isInteger(sampleSize) || sampleSize < 1)) throw new Error("--sample must be a positive integer.");
 
 const sampleOverrides = {
   percentage: { amount: "200", percent: "15" },
@@ -51,6 +54,7 @@ const sampleOverrides = {
   "ohms-law": { volts: "12", amps: "2", ohms: "", watts: "" },
   circle: { radius: "5", diameter: "", circumference: "", area: "" },
   "math-slope-calculator": { x1: "1", y1: "2", x2: "3", y2: "6" },
+  "slope-calculator": { x1: "1", y1: "2", x2: "3", y2: "6" },
   "math-coordinate-geometry-calculator": { x1: "1", y1: "2", x2: "4", y2: "6" },
   "math-matrix-2x2-inverse": { a: "1", b: "2", c: "3", d: "4" },
   "calculus-mean-value-slope": { fA: "1", fB: "3", a: "0", b: "2" },
@@ -152,9 +156,17 @@ function visibleRows(form) {
 }
 
 const allTools = parseGeneratedCatalog(readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
-const tools = allTools
-  .filter((tool) => tool.category === category && tool.status === "active" && (!onlyIds || onlyIds.includes(tool.id)))
-  .slice(0, Number.isFinite(limit) ? limit : undefined);
+const activeTools = allTools.filter((tool) => tool.category === category && tool.status === "active");
+const requestedTools = activeTools.filter((tool) => !onlyIds || onlyIds.includes(tool.id));
+const mustAuditInBrowser = new Set(["science-gas-law-calculator", "science-molar-mass-calculator", "finance-irr-calculator"]);
+let browserTools = requestedTools;
+if (!onlyIds && Number.isFinite(sampleSize) && sampleSize < requestedTools.length) {
+  const selected = new Set();
+  for (let index = 0; index < sampleSize; index++) selected.add(requestedTools[Math.floor((index * requestedTools.length) / sampleSize)]);
+  for (const tool of requestedTools) if (mustAuditInBrowser.has(tool.id)) selected.add(tool);
+  browserTools = requestedTools.filter((tool) => selected.has(tool));
+}
+const tools = browserTools.slice(0, Number.isFinite(limit) ? limit : undefined);
 if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
 if (onlyIds) {
   const found = new Set(tools.map((tool) => tool.id));
@@ -171,6 +183,34 @@ const vite = await createServer({
 let browser;
 try {
   const { calculators } = await vite.ssrLoadModule("/src/lib/engines/formulas.ts");
+  const formulaFailures = [];
+  let formulaCases = 0;
+  for (const tool of activeTools) {
+    const formula = tool.engine?.formula;
+    const definition = tool.engine?.type === "calculator" ? calculators[formula] : null;
+    if (!definition) {
+      formulaFailures.push({ id: tool.id, formula, phase: "definition", error: "No calculator definition." });
+      continue;
+    }
+    for (const phase of ["sample", "alternate"]) {
+      const values = Object.fromEntries(definition.fields.map((field) => {
+        const sample = sampleForField(field, formula);
+        return [field.name, phase === "sample" ? sample : alternateSampleForField(field, sample, formula)];
+      }));
+      formulaCases++;
+      try {
+        const outputs = definition.compute(values);
+        if (!Array.isArray(outputs) || !outputs.length) throw new Error("Formula returned no outputs.");
+        if (outputs.some(({ value }) => !String(value ?? "").trim() || /NaN|Infinity|undefined/i.test(String(value)))) {
+          throw new Error("Formula returned an empty or non-finite output.");
+        }
+      } catch (error) {
+        formulaFailures.push({ id: tool.id, formula, phase, error: String(error?.message ?? error) });
+        console.error(`FORMULA FAIL ${tool.id} (${phase}): ${String(error?.message ?? error)}`);
+      }
+    }
+  }
+  console.log(`Formula preflight: ${formulaCases} sample cases across ${activeTools.length} active routes; failures ${formulaFailures.length}.`);
   browser = await chromium.launch({
     headless: true,
     executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
@@ -229,11 +269,14 @@ try {
         await form.locator(`[id="${field.name}"]`).fill("");
       }
       await form.getByRole("button", { name: "Calculate", exact: true }).click();
-      await page.waitForTimeout(20);
+      let blankErrorVisible = false;
+      try {
+        await form.locator('[role="alert"]').first().waitFor({ state: "visible", timeout: 1500 });
+        blankErrorVisible = true;
+      } catch {}
       const blankResultCount = await form.locator("dl").count();
       const blankHistoryCount = await form.locator('section[aria-label="Recent calculations"]').count();
-      const blankErrorCount = await form.locator('[role="alert"]').count();
-      if (!blankErrorCount) throw new Error("Blank submission did not show an accessible validation error.");
+      if (!blankErrorVisible) throw new Error(`Blank submission did not show an accessible validation error (results=${blankResultCount}, history=${blankHistoryCount}).`);
       if (blankResultCount || blankHistoryCount) {
         throw new Error(`Blank submission produced visible results/history (results=${blankResultCount}, history=${blankHistoryCount}).`);
       }
@@ -351,12 +394,15 @@ try {
     baseUrl: base.origin,
     category,
     viewport: { width: viewportWidth, height: 844 },
-    totalActive: tools.length,
+    totalActive: activeTools.length,
+    browserRoutesSelected: tools.length,
+    formulaCases,
+    formulaFailures,
     tested,
     passed: tested,
     failures,
     browserErrors,
-    ok: failures.length === 0 && browserErrors.length === 0,
+    ok: failures.length === 0 && formulaFailures.length === 0 && browserErrors.length === 0,
   };
   if (reportPath) {
     const destination = resolve(reportPath);

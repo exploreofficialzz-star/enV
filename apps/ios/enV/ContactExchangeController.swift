@@ -147,7 +147,7 @@ final class ContactExchangeController: ObservableObject {
               remoteID != participantID, receivedIDs.insert(remoteID).inserted,
               let card = object["card"] as? [String: String] else { error = "A nearby participant sent an invalid contact card."; return }
         let allowed = Set(["fullName", "phone", "email", "company", "jobTitle", "website"])
-        let safe = card.filter { allowed.contains($0.key) }.mapValues { String($0.value.prefix(2_000)) }
+        let safe = card.filter { allowed.contains($0.key) }.mapValues { String($0.prefix(2_000)) }
         received.append(ExchangeContact(id: remoteID, fullName: safe["fullName"] ?? "", phone: safe["phone"] ?? "", email: safe["email"] ?? "", company: safe["company"] ?? "", jobTitle: safe["jobTitle"] ?? "", website: safe["website"] ?? ""))
     }
 }
