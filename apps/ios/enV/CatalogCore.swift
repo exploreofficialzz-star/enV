@@ -136,7 +136,9 @@ extension ToolCategory {
 
 extension Catalog {
     func nativeFacing() -> Catalog {
-        let nativeTools = tools.map { $0.nativeFacing() }
+        let nativeTools = tools
+            .filter { !NativeCopy.isWebRuntimeOnly($0.id) }
+            .map { $0.nativeFacing() }
         let planned = nativeTools.filter(\.isPlanned).count
         let active = nativeTools.filter { !$0.isPlanned }.count
         return Catalog(
