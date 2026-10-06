@@ -20,7 +20,7 @@ function Home() {
 
   return (
     <AppShell>
-      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-0 text-center sm:px-6 sm:pt-0">
+      <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-2 text-center sm:px-6 sm:pt-2">
         <Logo size="hero" />
         <form
           role="search"

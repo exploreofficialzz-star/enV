@@ -234,10 +234,10 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 @Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
-    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
-                EnVLogo(Modifier.width(252.dp).height(98.dp), darkTheme = darkMode, homeHero = true)
+                EnVLogo(Modifier.width(228.dp).height(89.dp), darkTheme = darkMode, homeHero = true)
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQuery,

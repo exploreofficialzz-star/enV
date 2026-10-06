@@ -72,9 +72,11 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(logo, /logo-header-dark\.png/);
   assert.match(logo, /logo-home-transparent\.png/);
   assert.match(logo, /logo-home-dark\.png/);
+  assert.match(logo, /hero: "h-\[89px\] w-\[228px\] sm:h-\[101px\] sm:w-\[260px\]"/);
   assert.doesNotMatch(logo, /<svg/);
   assert.match(header, /aria-label="Home"/);
   assert.match(home, /<Logo size="hero"\s*\/>/);
+  assert.match(home, /pt-2/);
   assert.match(home, /<br className="sm:hidden"\s*\/>/);
   assert.doesNotMatch(shell, /MobileNav/);
   assert.match(footer, /<Logo\s*\/>/);
