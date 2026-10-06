@@ -334,7 +334,8 @@ private struct NativeExpansionCalculatorToolView: View {
                 if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
                 NativeActionRow(output: output, run: {
                     do {
-                        let result = try NativeExpansionCalculatorEngine.run(op, values: values)
+                        let numericValues = values.compactMapValues { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                        let result = try NativeExpansionCalculatorEngine.run(op, values: numericValues)
                         output = "\(result.0): \(result.1)"; error = nil
                     } catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { values = ["a": "2", "b": "3", "c": "6"]; values[op.target] = ""; output = ""; error = nil })
