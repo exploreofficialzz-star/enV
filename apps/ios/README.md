@@ -37,4 +37,4 @@ This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a fu
 
 ## Native AI
 
-AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The provider keys remain server-only. Configure the native `ENV_API_BASE_URL` for the deployed enV backend; do not put OpenRouter, Groq, or Gemini keys in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client. There is no hard-coded production backend URL in the native binaries; Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting.
+AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The native build defaults to `https://env-q3mq.onrender.com`; Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting to override it for another deployment. Provider keys remain server-only and must never be put in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client.
