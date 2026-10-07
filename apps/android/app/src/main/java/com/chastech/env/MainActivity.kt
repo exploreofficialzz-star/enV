@@ -7,6 +7,8 @@ package com.chastech.env
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -70,6 +72,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -97,6 +100,7 @@ import com.chastech.env.engine.NativeMathExerciseEngine
 import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeTextEngine
 import com.chastech.env.engine.NativeUtilityEngine
+import com.chastech.env.ui.ChasTechnologiesLogo
 import com.chastech.env.ui.EnVIcon
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
@@ -192,11 +196,13 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var showExchange by rememberSaveable { mutableStateOf(false) }
+    var showInformation by rememberSaveable { mutableStateOf(false) }
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
     else if (category != null) BackHandler { category = null }
+    else if (showExchange || showInformation) BackHandler { showExchange = false; showInformation = false }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -204,15 +210,15 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null }, modifier = Modifier.semantics { contentDescription = "Home" }) {
+                    IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Home" }) {
                         EnVIcon("Home", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
+                    IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
                         EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
+                    IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
                         EnVIcon("LayoutGrid", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Box {
@@ -222,8 +228,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
-                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                     }
                     }
                 },
@@ -240,7 +246,17 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Account -> if (showExchange) ContactExchangeScreen { showExchange = false } else AccountScreen(catalog, themeMode, onUseSystemTheme) { showExchange = true }
+                    AppTab.Account -> when {
+                        showExchange -> ContactExchangeScreen { showExchange = false }
+                        showInformation -> CompanyInformationScreen { showInformation = false }
+                        else -> AccountScreen(
+                            catalog = catalog,
+                            themeMode = themeMode,
+                            onUseSystemTheme = onUseSystemTheme,
+                            onOpenExchange = { showExchange = true },
+                            onOpenInformation = { showInformation = true },
+                        )
+                    }
                 }
             }
         }
@@ -251,6 +267,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
     val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
+    var homeSearchFocused by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
@@ -258,8 +275,8 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQuery,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search for a tool") },
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused },
+                    placeholder = { if (!homeSearchFocused) Text("Search for a tool") },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
                     leadingIcon = { EnVLogo(Modifier.width(36.dp).height(24.dp), darkTheme = darkMode) },
                     trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) } },
@@ -421,7 +438,7 @@ private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (Strin
 }
 
 @Composable
-private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit) {
+private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit, onOpenInformation: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -435,7 +452,94 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
         SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
         SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
-        SettingCard("About enV", "Version 1.1.0 (6) · native Android", "Info")
+        SettingCard("About enV & chAs Technologies LLC", "Company details, policies, and pricing", "Info", onClick = onOpenInformation)
+    }
+}
+
+@Composable
+private fun CompanyInformationScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back to Account" }) {
+                EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+            }
+            Text("About & policies", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
+        Surface(color = Color.White, shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            ChasTechnologiesLogo(Modifier.fillMaxWidth().height(112.dp).padding(8.dp))
+        }
+        InformationSection("About enV", listOf(
+            "A focused toolkit for everyday work across Web, Android, and iOS. enV is developed and operated by chAs Technologies LLC, registered in Delaware, USA.",
+            "Some tools process information on your device; connected features use the service or provider described for that feature.",
+        ))
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Contact", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("enV product support", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:envtoolkit@gmail.com"))) }) {
+                    Text("envtoolkit@gmail.com")
+                }
+                Text("Company inquiries · chAs Technologies LLC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:chastechnologiesllc@gmail.com"))) }) {
+                    Text("chastechnologiesllc@gmail.com")
+                }
+            }
+        }
+        InformationSection("Privacy", listOf(
+            "chAs Technologies LLC, the company behind enV, is registered in Delaware, USA.",
+            "enV is for people aged 13 or older and is not intended for children under 13. If you are under the age of majority where you live, local parent or guardian permission requirements still apply.",
+            "Favorites, recent tools, theme preferences, and the Web contact card are stored locally on your device until you clear app or browser data. Ordinary toolkit use does not require an account.",
+            "Some document and media tools upload selected files to the enV service or a processor configured for that deployment. The document endpoint uses a temporary working directory and removes it when the request finishes.",
+            "When AI is enabled, the task input is sent through the enV server to the configured provider. Supported providers include Groq, OpenRouter, and Google Gemini; routing and brief result caching depend on deployment settings. Provider retention policies apply.",
+            "Optional sign-in may process account and session information. Nearby Contact Exchange sends only the fields enabled in the feature to participating nearby devices while Exchange is active. Saving a received contact requires your separate action and permission.",
+            "For privacy requests, email envtoolkit@gmail.com. Provider and infrastructure retention may vary; do not send sensitive information to a connected feature unless you are comfortable with its handling.",
+        ))
+        InformationSection("Terms of Use", listOf(
+            "You must be at least 13 years old to use enV. If you are under the age of majority where you live, use enV only with any parent or guardian permission required by local law.",
+            "These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict-of-law principles. Subject to non-waivable consumer rights and mandatory laws that apply where you live, disputes relating to these Terms will be brought in state or federal courts located in Delaware. Nothing here limits a right or remedy that cannot lawfully be waived.",
+            "Use enV lawfully and responsibly. You are responsible for your inputs, permissions, and decisions based on tool results. Do not submit material you do not have permission to use or violate another person’s rights.",
+            "Outputs may be incomplete, inaccurate, or non-unique. Verify important results before relying on them. Some features depend on third-party services and may change or become unavailable.",
+            "Prices are listed in USD. The token schedule is planned only: this app has no token balance, purchase checkout, or reward issuance. When payments are enabled, checkout is intended to convert USD prices to local currency in countries supported by the selected gateway; the final amount and currency will be shown before payment. Availability and conversion rates depend on the provider. Future token, payment, expiry, refund, and eligibility terms will be displayed before activation.",
+            "To the extent allowed by applicable law, enV is provided as available and without warranties that cannot be disclaimed. Nothing here limits a right or liability that cannot legally be limited.",
+        ))
+        InformationSection("Disclaimer", listOf(
+            "enV provides general-purpose tools, not legal, medical, mental-health, financial, investment, tax, engineering, or safety-critical advice.",
+            "Calculations, generated content, and extracted data may be wrong or incomplete. Check inputs, assumptions, units, and outputs. Do not rely on a result as the sole basis for a high-stakes decision; consult a qualified professional when appropriate.",
+            "AI output may be biased, incorrect, incomplete, or similar to other output. Third-party service availability and handling are outside enV’s control.",
+        ))
+        InformationSection("Responsible Use", listOf(
+            "Do not use enV for unlawful activity, fraud, harassment, impersonation, unauthorized access, malware, spam, infringement, or to violate another person’s privacy or rights.",
+            "Only submit content you are permitted to use. Review connected-feature notices before sending files or text to a server or AI provider. In Contact Exchange, enable only fields you intend to share with nearby participants.",
+            "Keep a person responsible for reviewing results, especially for legal, medical, financial, tax, and safety-critical matters. Report safety or privacy concerns to envtoolkit@gmail.com.",
+        ))
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Pricing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Planned pricing — purchases are not available yet. The current app has no token balance, checkout, or referral-award system. Prices are listed in USD; when payments are enabled, checkout is intended to convert them to local currency in countries supported by the gateway and show the final amount and currency before payment.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                listOf("100 tokens" to "$0.30", "300 tokens" to "$0.50", "500 tokens" to "$0.80", "1,000 tokens" to "$1.20", "5,000 tokens" to "$5.00").forEach { (tokens, price) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(tokens, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(price, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
+                Text("Planned first sign-up bonus: 100 tokens · planned referral reward: 50 tokens. Eligibility and program rules will be published before rewards are enabled.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InformationSection(title: String, paragraphs: List<String>) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            paragraphs.forEach { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
 }
 

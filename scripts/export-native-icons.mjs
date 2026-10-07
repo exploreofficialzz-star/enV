@@ -49,7 +49,10 @@ mkdirSync(iconRoot, { recursive: true });
 const sourceLogo = path.join(root, "public/logo-header-transparent.png");
 const lightLogo = path.join(outputRoot, "logo-header-transparent.png");
 const darkLogo = path.join(outputRoot, "logo-header-dark.png");
+const companyLogo = path.join(root, "public/chas-technologies-logo.jpg");
+const sharedCompanyLogo = path.join(outputRoot, "chas-technologies-logo.jpg");
 copyFileSync(sourceLogo, lightLogo);
+copyFileSync(companyLogo, sharedCompanyLogo);
 const logoPng = PNG.sync.read(readFileSync(sourceLogo));
 for (let offset = 0; offset < logoPng.data.length; offset += 4) {
   const red = logoPng.data[offset];

@@ -26,6 +26,7 @@ function Home() {
         <SearchBox
           large
           variant="inline"
+          hidePlaceholderOnFocus
           value={query}
           onValueChange={setQuery}
           onEnter={openSearchResults}

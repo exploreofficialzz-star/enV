@@ -103,14 +103,65 @@ test("Home search shows live matches and opens full results only on explicit act
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const searchBox = readFileSync(join(PROJECT_ROOT, "src/components/tools/search-box.tsx"), "utf8");
   assert.match(home, /<SearchBox[\s\S]*?onValueChange=\{setQuery\}[\s\S]*?onEnter=\{openSearchResults\}/);
+  assert.match(home, /hidePlaceholderOnFocus/);
   assert.match(home, /to: "\/search", search: \{ q: searchQuery\.trim\(\) \}/);
   assert.doesNotMatch(home, /navigate\(\{ to: "\/tools"/);
   assert.match(home, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
   assert.match(home, /hidden md:flex/);
   assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
   assert.match(searchBox, /searchTools\(getAllTools\(\), q, 8\)/);
+  assert.match(searchBox, /placeholder=\{hidePlaceholderOnFocus && focused \? "" : placeholder\}/);
+  assert.match(searchBox, /setFocused\(true\);\s*setOpen\(true\);/);
   assert.match(searchBox, /See more results/);
   assert.match(searchBox, /nav\(\{ to: "\/search", search: \{ q \} \}\)/);
+});
+
+test("company pages use the supplied brand, distinct contact emails, and transparent token pricing", () => {
+  const about = readFileSync(join(PROJECT_ROOT, "src/routes/about.tsx"), "utf8");
+  const contact = readFileSync(join(PROJECT_ROOT, "src/routes/contact.tsx"), "utf8");
+  const pricing = readFileSync(join(PROJECT_ROOT, "src/routes/pricing.tsx"), "utf8");
+  const footer = readFileSync(join(PROJECT_ROOT, "src/components/layout/footer.tsx"), "utf8");
+  assert.match(about, /chas-technologies-logo\.jpg/);
+  assert.match(about, /chAs Technologies LLC/);
+  assert.match(about, /registered in Delaware, USA/);
+  assert.match(contact, /mailto:envtoolkit@gmail\.com/);
+  assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
+  assert.match(pricing, /Planned pricing — purchases are not available yet/);
+  for (const price of ["$0.30", "$0.50", "$0.80", "$1.20", "$5.00"]) assert.ok(pricing.includes(price), `Missing supplied token price ${price}`);
+  assert.match(pricing, /100 tokens/);
+  assert.match(pricing, /50 tokens/);
+  assert.match(footer, /chAs Technologies LLC · enV/);
+});
+
+test("Web information routes contain complete company, privacy, terms, disclaimer, and responsible-use content", () => {
+  const privacy = readFileSync(join(PROJECT_ROOT, "src/routes/privacy.tsx"), "utf8");
+  const terms = readFileSync(join(PROJECT_ROOT, "src/routes/terms.tsx"), "utf8");
+  const disclaimer = readFileSync(join(PROJECT_ROOT, "src/routes/disclaimer.tsx"), "utf8");
+  const responsibleUse = readFileSync(join(PROJECT_ROOT, "src/routes/responsible-use.tsx"), "utf8");
+  const pricing = readFileSync(join(PROJECT_ROOT, "src/routes/pricing.tsx"), "utf8");
+  for (const section of ["Information stored on your device", "Connected tools and service providers", "Cookies, sessions, and account requests", "Payments and tokens"]) {
+    assert.ok(privacy.includes(section), `Privacy page is missing ${section}`);
+  }
+  assert.match(privacy, /Groq, OpenRouter, and Google Gemini/);
+  assert.match(privacy, /aged 13 or older/);
+  assert.match(privacy, /chAs Technologies LLC/);
+  for (const section of ["Using enV", "Accounts and contact exchange", "Your content and tool results", "Availability and changes", "Tokens and pricing", "Disclaimer and limits"]) {
+    assert.ok(terms.includes(section), `Terms page is missing ${section}`);
+  }
+  assert.match(disclaimer, /Not professional advice/);
+  assert.match(disclaimer, /Verify every result/);
+  assert.match(responsibleUse, /Do not use enV to/);
+  assert.match(responsibleUse, /aged 13 or older/);
+  assert.match(responsibleUse, /Reporting a concern/);
+  assert.match(terms, /at least 13 years old/);
+  assert.match(terms, /listed reference prices are in USD/);
+  assert.match(terms, /final amount and currency will be shown before payment/);
+  assert.match(pricing, /Prices are listed in USD/);
+  assert.match(pricing, /final currency and total will be shown before you confirm payment/);
+  assert.match(privacy, /registered in Delaware, USA/);
+  assert.match(terms, /Governing Law and Venue/);
+  assert.match(terms, /governed by the laws of the State of Delaware, United States/);
+  assert.match(terms, /courts located in Delaware/);
 });
 
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {

@@ -66,3 +66,18 @@ fun EnVLogo(modifier: Modifier = Modifier, darkTheme: Boolean = false, homeHero:
         Image(image, contentDescription = "enV home", modifier = modifier, contentScale = ContentScale.Fit)
     }
 }
+
+/** The company logo supplied by chAs Technologies LLC, shared with the Web and iOS builds. */
+@Composable
+fun ChasTechnologiesLogo(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val image = remember { loadNativeImage(context, "native-icons/chas-technologies-logo.jpg") }
+    if (image != null) {
+        Image(
+            bitmap = image,
+            contentDescription = "chAs Technologies LLC",
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
+    }
+}

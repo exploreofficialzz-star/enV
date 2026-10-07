@@ -35,6 +35,11 @@ assertPng(path.join(sharedRoot, "logo-home-transparent.png"), [813, 317]);
 assertPng(path.join(sharedRoot, "logo-home-dark.png"), [813, 317]);
 assertPng(path.join(root, "public/logo-home-transparent.png"), [813, 317]);
 assertPng(path.join(root, "public/logo-home-dark.png"), [813, 317]);
+const webCompanyLogo = path.join(root, "public/chas-technologies-logo.jpg");
+const sharedCompanyLogo = path.join(sharedRoot, "chas-technologies-logo.jpg");
+assert.ok(existsSync(webCompanyLogo), "The public chAs Technologies LLC brand image is required");
+assert.ok(existsSync(sharedCompanyLogo), "The company brand image must be included in shared native assets");
+assert.deepEqual(readFileSync(sharedCompanyLogo), readFileSync(webCompanyLogo), "Web and native apps must use the same company brand image");
 for (const name of iconNames) {
   const file = path.join(sharedRoot, "icons", `${assetName(name)}.png`);
   assert.ok(existsSync(file), `Missing shared Lucide asset for ${name}: ${file}`);
@@ -55,6 +60,22 @@ const iosCards = readFileSync(path.join(root, "apps/ios/enV/ToolViews.swift"), "
 const xcodeProject = readFileSync(path.join(root, "apps/ios/enV.xcodeproj/project.pbxproj"), "utf8");
 assert.ok(androidAssets.includes('"native-icons/icons/'), "Android must read the shared icon assets");
 assert.ok(iosApp.includes('native-icons/icons/'), "iOS must read the shared icon assets");
+assert.ok(androidAssets.includes('"native-icons/chas-technologies-logo.jpg"') && androidAssets.includes("fun ChasTechnologiesLogo"), "Android must render the supplied company logo from shared native assets");
+assert.ok(iosApp.includes('native-icons/chas-technologies-logo.jpg') && iosApp.includes("struct ChasTechnologiesLogo"), "iOS must render the supplied company logo from shared native assets");
+assert.ok(androidHome.includes("CompanyInformationScreen") && androidHome.includes("onOpenInformation =") && androidHome.includes("envtoolkit@gmail.com") && androidHome.includes("chastechnologiesllc@gmail.com"), "Android Account must open native company and contact information");
+assert.ok(iosHome.includes("NavigationLink { CompanyInformationView() }") && iosHome.includes("ChasTechnologiesLogo()") && iosHome.includes("envtoolkit@gmail.com") && iosHome.includes("chastechnologiesllc@gmail.com"), "iOS Account must open native company and contact information");
+assert.ok(androidHome.includes("people aged 13 or older") && androidHome.includes("at least 13 years old") && androidHome.includes("Prices are listed in USD") && androidHome.includes("final amount and currency"), "Android information screen must preserve the confirmed age and currency terms");
+assert.ok(iosHome.includes("people aged 13 or older") && iosHome.includes("at least 13 years old") && iosHome.includes("Prices are listed in USD") && iosHome.includes("final amount and currency"), "iOS information screen must preserve the confirmed age and currency terms");
+assert.ok(androidHome.includes("registered in Delaware, USA") && androidHome.includes("governed by the laws of the State of Delaware, United States") && androidHome.includes("courts located in Delaware"), "Android information screen must identify Delaware registration and governing law");
+assert.ok(iosHome.includes("registered in Delaware, USA") && iosHome.includes("governed by the laws of the State of Delaware, United States") && iosHome.includes("courts located in Delaware"), "iOS information screen must identify Delaware registration and governing law");
+for (const section of ["About enV", "Privacy", "Terms of Use", "Disclaimer", "Responsible Use", "Pricing"]) {
+  assert.ok(androidHome.includes(`InformationSection(\"${section}\"`) || (section === "Pricing" && androidHome.includes('Text("Pricing"')), `Android information screen is missing ${section}`);
+  assert.ok(iosHome.includes(`title: \"${section}\"`) || (section === "Pricing" && iosHome.includes('Text("Pricing")')), `iOS information screen is missing ${section}`);
+}
+for (const offer of ["$0.30", "$0.50", "$0.80", "$1.20", "$5.00"]) {
+  assert.ok(androidHome.includes(offer), `Android pricing is missing ${offer}`);
+  assert.ok(iosHome.includes(offer), `iOS pricing is missing ${offer}`);
+}
 assert.ok(androidAssets.includes('"native-icons/logo-header-dark.png"'), "Android must use the contrast-safe dark logo");
 assert.ok(iosApp.includes('"native-icons/logo-header-dark.png"'), "iOS must use the contrast-safe dark logo");
 assert.ok(androidAssets.includes('"native-icons/logo-home-transparent.png"') && androidAssets.includes('"native-icons/logo-home-dark.png"'), "Android must load cropped home logo variants");
@@ -78,7 +99,7 @@ assert.ok(androidToolCard.includes('EnVIcon("ArrowRight"') && androidToolCard.in
 assert.ok(iosCards.includes('EnVIcon(name: "ArrowRight"') && iosCards.includes('tint: .primary') && iosCards.indexOf('EnVIcon(name: "ArrowRight"') > iosCards.indexOf('StatusPill(text: "WEB ONLY"'), "iOS tool cards must show an adaptive arrow at the bottom-right after tool details");
 assert.ok(androidHome.includes('AppTab.Home -> HomeScreen') && androidHome.includes('category = null; tab = AppTab.Search.name') && androidHome.includes('catalog.search(query).take(5)') && androidHome.includes('Text("See more results"'), "Android Home must show live tool suggestions and open full Search results only on an explicit action");
 assert.ok(iosHome.includes('private var searchSuggestions: [Tool]') && iosHome.includes('ForEach(searchSuggestions)') && iosHome.includes('Text("See more results")') && iosApp.includes('HomeView(onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue })') && iosApp.includes('SearchView(query: $searchQuery)'), "iOS Home must show live tool suggestions and open the full Search results view only on an explicit action");
-assert.ok(androidHome.includes('textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center)') && androidHome.includes('leadingIcon = { EnVLogo') && androidHome.includes('trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search"') && /TextField\("Search for a tool", text: \$searchText\)[\s\S]{0,140}\.multilineTextAlignment\(\.center\)/.test(iosHome), "Native Home search text must be centered between the left brand and right search controls");
+assert.ok(androidHome.includes('textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center)') && androidHome.includes('leadingIcon = { EnVLogo') && androidHome.includes('trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search"') && androidHome.includes('placeholder = { if (!homeSearchFocused) Text("Search for a tool") }') && /TextField\(isHomeSearchFocused \? "" : "Search for a tool", text: \$searchText\)[\s\S]{0,180}\.multilineTextAlignment\(\.center\)[\s\S]{0,80}\.focused\(\$isHomeSearchFocused\)/.test(iosHome), "Native Home search text must be centered between side controls and its placeholder must clear on focus");
 assert.ok(androidHome.includes("SideEffect {") && androidHome.includes("window.statusBarColor = systemBarColor") && androidHome.includes("WindowCompat.getInsetsController") && androidHome.includes("isAppearanceLightStatusBars = !darkMode"), "Android status and navigation bars must follow the active theme with readable system icons");
 assert.ok(!androidBaseStyles.includes("windowLightNavigationBar") && androidApi27Styles.includes("android:windowLightNavigationBar") && androidHome.includes("Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1"), "Android light-navigation styling must be API-27-qualified for minSdk 26");
 assert.ok(iosApp.includes("envChrome = adaptive(light: 0xFFFFFF, dark: 0x000000)") && iosApp.includes(".toolbarBackground(Color.envChrome, for: .navigationBar)"), "iOS browser-like navigation and safe-area chrome must be white in light mode and black in dark mode");
@@ -91,4 +112,4 @@ assert.ok(!iosApp.includes("Image(systemName:"), "iOS icons must not fall back t
 assert.ok(xcodeProject.includes("../shared/native-icons"), "Xcode must bundle the shared icon folder");
 assert.ok(xcodeProject.includes("native-icons in Resources"), "Xcode resource phase must include the shared icon folder");
 
-console.log(`Validated the shared enV logo and ${iconNames.size} Lucide icons across Android and iOS.`);
+console.log(`Validated the shared enV and company brand images plus ${iconNames.size} Lucide icons across Android and iOS.`);

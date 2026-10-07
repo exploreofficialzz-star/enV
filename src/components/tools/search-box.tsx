@@ -9,6 +9,7 @@ export function SearchBox({
   large = false,
   autoFocus = false,
   variant = "default",
+  hidePlaceholderOnFocus = false,
   value,
   onValueChange,
   onEnter,
@@ -23,6 +24,7 @@ export function SearchBox({
   large?: boolean;
   autoFocus?: boolean;
   variant?: "default" | "inline";
+  hidePlaceholderOnFocus?: boolean;
   value?: string;
   onValueChange?: (v: string) => void;
   onEnter?: (query: string) => void;
@@ -38,6 +40,7 @@ export function SearchBox({
   const q = value ?? inner;
   const setQ = onValueChange ?? setInner;
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const nav = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,12 +74,16 @@ export function SearchBox({
       value={q}
       autoFocus={autoFocus}
       autoComplete="off"
-      placeholder={placeholder}
+      placeholder={hidePlaceholderOnFocus && focused ? "" : placeholder}
       onChange={(e) => {
         setQ(e.target.value);
         setOpen(true);
       }}
-      onFocus={() => setOpen(true)}
+      onFocus={() => {
+        setFocused(true);
+        setOpen(true);
+      }}
+      onBlur={() => setFocused(false)}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();

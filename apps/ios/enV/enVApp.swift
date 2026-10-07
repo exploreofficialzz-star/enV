@@ -180,12 +180,31 @@ private enum EnVNativeImages {
         return load(path: dark ? "native-icons/logo-header-dark.png" : "native-icons/logo-header-transparent.png")
     }
 
+    static func companyLogo() -> UIImage? {
+        load(path: "native-icons/chas-technologies-logo.jpg")
+    }
+
     private static func load(path: String) -> UIImage? {
         if let cached = cache.object(forKey: path as NSString) { return cached }
         let url = Bundle.main.bundleURL.appendingPathComponent(path)
         guard let image = UIImage(contentsOfFile: url.path) else { return nil }
         cache.setObject(image, forKey: path as NSString)
         return image
+    }
+}
+
+struct ChasTechnologiesLogo: View {
+    var body: some View {
+        if let image = EnVNativeImages.companyLogo() {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .accessibilityLabel("chAs Technologies LLC")
+        } else {
+            Text("chAs Technologies LLC")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(Color.envInk)
+        }
     }
 }
 

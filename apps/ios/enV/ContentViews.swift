@@ -12,6 +12,7 @@ struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
     let onSearch: (String) -> Void
     @State private var searchText = ""
+    @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
 
@@ -23,9 +24,10 @@ struct HomeView: View {
                         EnVLogo(homeHero: true).frame(width: 142, height: 56)
                         HStack(spacing: 12) {
                             EnVLogo().frame(width: 40, height: 28)
-                            TextField("Search for a tool", text: $searchText)
+                            TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
                                 .font(.body)
                                 .multilineTextAlignment(.center)
+                                .focused($isHomeSearchFocused)
                                 .submitLabel(.search)
                                 .onSubmit { onSearch(searchText) }
                             Button { onSearch(searchText) } label: {
@@ -366,6 +368,9 @@ struct AccountView: View {
                         NavigationLink { ContactExchangeView() } label: { settingsRow("Contact", "Instant Contact Exchange", "Native nearby sharing with explicit activation and Contacts saving.") }
                             .buttonStyle(.plain)
                         Divider().overlay(Color.envBorder)
+                        NavigationLink { CompanyInformationView() } label: { settingsRow("Info", "About enV & chAs Technologies LLC", "Company details, policies, and pricing.") }
+                            .buttonStyle(.plain)
+                        Divider().overlay(Color.envBorder)
                         settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
                         Divider().overlay(Color.envBorder)
                         settingsRow("Info", "Version 1.1.0 (6)", "Separate native Android and iOS applications.")
@@ -384,6 +389,115 @@ struct AccountView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .modifier(EnVBrandNavigationStyle())
+    }
+}
+
+struct CompanyInformationView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("About & policies")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                ChasTechnologiesLogo()
+                    .frame(maxWidth: 520)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+
+                CompanyInformationCard(title: "About enV", paragraphs: [
+                    "A focused toolkit for everyday work across Web, Android, and iOS. enV is developed and operated by chAs Technologies LLC, registered in Delaware, USA.",
+                    "Some tools process information on your device; connected features use the service or provider described for that feature."
+                ])
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Contact").font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
+                    Text("enV product support").font(.footnote).foregroundStyle(Color.envMuted)
+                    Link("envtoolkit@gmail.com", destination: URL(string: "mailto:envtoolkit@gmail.com")!)
+                    Text("Company inquiries · chAs Technologies LLC").font(.footnote).foregroundStyle(Color.envMuted)
+                    Link("chastechnologiesllc@gmail.com", destination: URL(string: "mailto:chastechnologiesllc@gmail.com")!)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+
+                CompanyInformationCard(title: "Privacy", paragraphs: [
+                    "chAs Technologies LLC, the company behind enV, is registered in Delaware, USA.",
+                    "enV is for people aged 13 or older and is not intended for children under 13. If you are under the age of majority where you live, local parent or guardian permission requirements still apply.",
+                    "Favorites, recent tools, theme preferences, and the Web contact card are stored locally until you clear app or browser data. Ordinary toolkit use does not require an account.",
+                    "Some document and media tools upload selected files to the enV service or a processor configured for that deployment. The document endpoint removes its temporary working directory when processing finishes.",
+                    "When AI is enabled, task input is sent through the enV server to the configured provider. Supported providers include Groq, OpenRouter, and Google Gemini; routing and brief result caching depend on deployment settings. Provider retention policies apply.",
+                    "Optional sign-in may process account and session information. Nearby Contact Exchange sends enabled fields to participating nearby devices while active. Saving a received contact requires your separate action and permission.",
+                    "For privacy requests, email envtoolkit@gmail.com. Provider and infrastructure retention may vary; avoid sending sensitive information to connected features unless comfortable with that handling."
+                ])
+                CompanyInformationCard(title: "Terms of Use", paragraphs: [
+                    "You must be at least 13 years old to use enV. If you are under the age of majority where you live, use enV only with any parent or guardian permission required by local law.",
+                    "These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict-of-law principles. Subject to non-waivable consumer rights and mandatory laws that apply where you live, disputes relating to these Terms will be brought in state or federal courts located in Delaware. Nothing here limits a right or remedy that cannot lawfully be waived.",
+                    "Use enV lawfully and responsibly. You are responsible for your inputs, permissions, and decisions based on results. Do not submit material you are not permitted to use or violate another person’s rights.",
+                    "Outputs may be incomplete, inaccurate, or non-unique. Verify important results. Some features depend on third-party services and may change or become unavailable.",
+                    "Prices are listed in USD. The token schedule is planned only: this app has no token balance, purchase checkout, or reward issuance. When payments are enabled, checkout is intended to convert USD prices to local currency in countries supported by the selected gateway; the final amount and currency will be shown before payment. Availability and conversion rates depend on the provider. Future token, payment, expiry, refund, and eligibility terms will be shown before activation.",
+                    "To the extent allowed by applicable law, enV is provided as available without warranties that cannot be disclaimed. Nothing here limits a right or liability that cannot legally be limited."
+                ])
+                CompanyInformationCard(title: "Disclaimer", paragraphs: [
+                    "enV provides general-purpose tools, not legal, medical, mental-health, financial, investment, tax, engineering, or safety-critical advice.",
+                    "Calculations, generated content, and extracted data may be wrong or incomplete. Check inputs, assumptions, units, and outputs. Do not rely on a result as the sole basis for a high-stakes decision; consult a qualified professional when appropriate.",
+                    "AI output may be biased, incorrect, incomplete, or similar to other output. Third-party service availability and handling are outside enV’s control."
+                ])
+                CompanyInformationCard(title: "Responsible Use", paragraphs: [
+                    "Do not use enV for unlawful activity, fraud, harassment, impersonation, unauthorized access, malware, spam, infringement, or to violate another person’s privacy or rights.",
+                    "Only submit content you are permitted to use. Review connected-feature notices before sending files or text to a server or AI provider. In Contact Exchange, enable only the fields you intend to share with nearby participants.",
+                    "Keep a person responsible for reviewing results, especially for legal, medical, financial, tax, and safety-critical matters. Report safety or privacy concerns to envtoolkit@gmail.com."
+                ])
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Pricing").font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
+                    Text("Planned pricing — purchases are not available yet. The current app has no token balance, checkout, or referral-award system. Prices are listed in USD; when payments are enabled, checkout is intended to convert them to local currency in countries supported by the gateway and show the final amount and currency before payment.").font(.subheadline).foregroundStyle(Color.envMuted)
+                    pricingRow("100 tokens", "$0.30")
+                    pricingRow("300 tokens", "$0.50")
+                    pricingRow("500 tokens", "$0.80")
+                    pricingRow("1,000 tokens", "$1.20")
+                    pricingRow("5,000 tokens", "$5.00")
+                    Divider().overlay(Color.envBorder)
+                    Text("Planned first sign-up bonus: 100 tokens · planned referral reward: 50 tokens. Eligibility and program rules will be published before rewards are enabled.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.envMuted)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            }
+            .padding(16)
+        }
+        .modifier(Screen())
+        .navigationTitle("Company information")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct CompanyInformationCard: View {
+    let title: String
+    let paragraphs: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
+            ForEach(paragraphs, id: \.self) { paragraph in
+                Text(paragraph).font(.subheadline).foregroundStyle(Color.envMuted)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+}
+
+private func pricingRow(_ tokens: String, _ price: String) -> some View {
+    HStack {
+        Text(tokens).foregroundStyle(Color.envMuted)
+        Spacer()
+        Text(price).fontWeight(.semibold).foregroundStyle(Color.envInk)
     }
 }
 
