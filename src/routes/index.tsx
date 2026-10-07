@@ -11,7 +11,7 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const trending = getPopularTools(6);
+  const trending = getPopularTools(12);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,7 +25,7 @@ function Home() {
         <form
           role="search"
           onSubmit={submitSearch}
-          className="mt-2 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:h-[72px] sm:gap-4 sm:px-5"
+          className="mt-5 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:mt-6 sm:h-[72px] sm:gap-4 sm:px-5"
         >
           <Logo size="search" className="shrink-0" />
           <input
@@ -61,11 +61,10 @@ function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
         <h2 className="text-xl font-semibold sm:text-2xl">{title}</h2>
-        <SeeMoreLink to="/tools">Explore all tools</SeeMoreLink>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {tools.map((tool) => (
-          <Link key={tool.id} to={toolPath(tool)} className="rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent">
+        {tools.map((tool, index) => (
+          <Link key={tool.id} to={toolPath(tool)} className={`rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent ${index >= 6 ? "hidden lg:block" : ""}`}>
             <h3 className="font-medium">{tool.name}</h3>
             <p className="mt-1 text-sm text-muted">{tool.description}</p>
           </Link>

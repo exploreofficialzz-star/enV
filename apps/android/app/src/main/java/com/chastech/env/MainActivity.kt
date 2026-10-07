@@ -236,8 +236,8 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                EnVLogo(Modifier.width(228.dp).height(89.dp), darkTheme = darkMode, homeHero = true)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+                EnVLogo(Modifier.padding(bottom = 6.dp).width(228.dp).height(89.dp), darkTheme = darkMode, homeHero = true)
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQuery,
@@ -250,7 +250,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 )
-                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
             }
         }
         item {

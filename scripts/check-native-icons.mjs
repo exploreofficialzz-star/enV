@@ -52,8 +52,8 @@ assert.ok(androidAssets.includes('"native-icons/logo-home-transparent.png"') && 
 assert.ok(iosApp.includes('native-icons/logo-home-transparent.png') && iosApp.includes('native-icons/logo-home-dark.png'), "iOS must load cropped home logo variants");
 assert.ok(androidHome.includes("homeHero = true"), "Android home must use the cropped hero logo");
 assert.ok(iosHome.includes("EnVLogo(homeHero: true)"), "iOS home must use the cropped hero logo");
-assert.ok(androidHome.includes("top = 8.dp") && androidHome.includes("Arrangement.spacedBy(8.dp)") && androidHome.includes("Modifier.width(228.dp).height(89.dp)"), "Android home must keep equal header and brand-to-search gaps at the reduced hero size");
-assert.ok(iosHome.includes(".padding(.top, 8)") && iosHome.includes("VStack(alignment: .center, spacing: 8)") && iosHome.includes(".frame(width: 228, height: 89)"), "iOS home must keep equal header and brand-to-search gaps at the reduced hero size");
+assert.ok(androidHome.includes("top = 8.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 6.dp).width(228.dp).height(89.dp)"), "Android home must keep the header gap and enlarged brand-to-search spacing");
+assert.ok(iosHome.includes(".padding(.top, 8)") && iosHome.includes("VStack(alignment: .center, spacing: 16)") && iosHome.includes(".frame(width: 228, height: 89).padding(.bottom, 4)"), "iOS home must keep the header gap and enlarged brand-to-search spacing");
 assert.ok(!androidHome.includes("bottomBar = {"), "Android must not render a bottom navigation bar");
 assert.ok(!iosApp.includes("EnVBottomBar") && !iosApp.includes(".safeAreaInset(edge: .bottom"), "iOS must not render a bottom navigation bar");
 assert.ok(!androidAssets.includes("Icons.Default."), "Android icons must not fall back to platform-specific Material symbols");
