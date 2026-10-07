@@ -17,15 +17,14 @@ final class NativeDeveloperToolTests: XCTestCase {
         Tool(id:op,name:op,slug:op,description:"",category:category,keywords:[],tags:[],icon:"Code2",popularity:0,featured:false,clientSide:true,requiresBackend:false,requiresAuth:false,status:status,related:[],engine:ToolEngine(type:engineType,id:op,op:op))
     }
 
-    func testExactNativeDeveloperOperationsPreferLocalExecutionAndKeepFallback() {
-        let operations=["cron-generator","cron-parser","data-uri-generator","http-status-lookup","json-beautifier","json-formatter","json-minifier","json-validator","jwt-decoder","jwt-expiration-checker","markdown-preview","markdown-to-html","query-string-parser","regex-replace","regex-tester","url-parser","user-agent-parser","uuid-generator","uuid-validator"]
+    func testAllDeveloperOperationsPreferLocalExecutionOverCategoryBackend() {
+        let operations=["cron-generator","data-uri-generator","http-status-lookup","json-formatter","regex-tester","url-parser","uuid-validator","ascii-encoder","csv-formatter","mime-validator","xml-validator","file-hash-calculator","future-developer-operation"]
         for op in operations {
             let candidate=tool(op)
             XCTAssertTrue(NativeUtilityEngine.supports(candidate),op)
             XCTAssertFalse(NativeBackendEngine.supports(candidate),op)
             XCTAssertTrue(NativeCoverage.isLocallyExecutable(candidate),op)
         }
-        XCTAssertTrue(NativeBackendEngine.supports(tool("not-yet-native")))
         XCTAssertFalse(NativeBackendEngine.supports(tool("unrelated",category:"misc",engineType:"custom")))
     }
 
@@ -75,5 +74,16 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertEqual(try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text,"Mozilla/5.0")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("cron-parser"),input:"").text,"Cron: \nFive-field format: minute hour day-of-month month day-of-week")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<div>\n  <p>\n    Hello\n  </p>\n</div>")
+    }
+
+    func testBrowserVerifiedEncodingCsvMimeMarkupAndFallbacks() throws {
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"4869")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("csv-formatter"),input:"name,age\nAda,36\nGrace,40").text,"name,age\nAda,36\nGrace,40")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("mime-validator"),input:"pdf").text,"application/pdf")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("xml-validator"),input:"<root><child>ok</child></root>").text,"Valid markup/XML.")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("developer-api-mock-response-generator"),input:"  template  ").text,"template")
+        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello"))
+        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("file-hash-calculator"),input:"hello"))
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"422").text,"422 Unprocessable Content")
     }
 }

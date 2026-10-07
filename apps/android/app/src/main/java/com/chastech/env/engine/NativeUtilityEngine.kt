@@ -8,11 +8,14 @@ import org.json.JSONTokener
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
 import java.time.LocalDate
 import java.util.Locale
 import java.util.UUID
+import javax.xml.parsers.DocumentBuilderFactory
+import org.xml.sax.InputSource
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -64,15 +67,13 @@ object NativeUtilityEngine {
 
     private val seoOps = setOf("canonical","description-length","headings","hreflang","jsonld-validator","llms-txt","manifest","meta","og","redirect","robots","robots-meta","robots-test","schema","serp","sitemap","sitemap-validator","title-length","twitter-card","utm")
 
-    private val developerOps = setOf("cron-generator","cron-parser","data-uri-generator","http-status-lookup","json-beautifier","json-formatter","json-minifier","json-validator","jwt-decoder","jwt-expiration-checker","markdown-preview","markdown-to-html","query-string-parser","regex-replace","regex-tester","url-parser","user-agent-parser","uuid-generator","uuid-validator")
-
     private val cssFamilies = setOf("avatar","badge","blob","border","button","card","glass","gradient","input","neomorph","noise","pattern","shadow","wave")
 
     private val commonPorts = linkedMapOf(
         20 to "FTP data",21 to "FTP control",22 to "SSH",23 to "Telnet",25 to "SMTP",53 to "DNS",67 to "DHCP server",68 to "DHCP client",80 to "HTTP",110 to "POP3",123 to "NTP",143 to "IMAP",161 to "SNMP",194 to "IRC",389 to "LDAP",443 to "HTTPS",445 to "SMB",465 to "SMTPS",587 to "SMTP submission",636 to "LDAPS",993 to "IMAPS",995 to "POP3S",1433 to "MS SQL Server",1521 to "Oracle",2049 to "NFS",2375 to "Docker",2376 to "Docker TLS",3000 to "Development HTTP",3306 to "MySQL",3389 to "RDP",5432 to "PostgreSQL",5672 to "AMQP",6379 to "Redis",8080 to "HTTP alternate",8443 to "HTTPS alternate",9200 to "Elasticsearch"
     )
 
-    private val httpStatuses = listOf(200 to "OK",201 to "Created",204 to "No Content",301 to "Moved Permanently",302 to "Found",304 to "Not Modified",400 to "Bad Request",401 to "Unauthorized",403 to "Forbidden",404 to "Not Found",405 to "Method Not Allowed",409 to "Conflict",429 to "Too Many Requests",500 to "Internal Server Error",502 to "Bad Gateway",503 to "Service Unavailable",504 to "Gateway Timeout")
+    private val httpStatuses = listOf(200 to "OK",201 to "Created",204 to "No Content",301 to "Moved Permanently",302 to "Found",304 to "Not Modified",400 to "Bad Request",401 to "Unauthorized",403 to "Forbidden",404 to "Not Found",405 to "Method Not Allowed",409 to "Conflict",422 to "Unprocessable Content",429 to "Too Many Requests",500 to "Internal Server Error",502 to "Bad Gateway",503 to "Service Unavailable",504 to "Gateway Timeout")
     private val httpMethods = listOf("GET" to "Retrieve a representation","POST" to "Submit data for processing","PUT" to "Replace a resource","PATCH" to "Partially modify a resource","DELETE" to "Remove a resource","HEAD" to "Headers without response body","OPTIONS" to "Discover communication options","CONNECT" to "Establish a tunnel","TRACE" to "Diagnostic loop-back method")
     private val contentTypes = listOf("application/json","application/xml","application/x-www-form-urlencoded","multipart/form-data","text/plain","text/html","text/css","text/javascript","image/png","image/jpeg","image/webp","audio/mpeg","video/mp4")
 
@@ -100,7 +101,7 @@ object NativeUtilityEngine {
             "generator" -> generatorOps.contains(op)
             "network" -> networkOps.contains(op)
             "seo" -> seoOps.contains(op)
-            "developer" -> developerOps.contains(op)
+            "developer" -> true
             "cssgen" -> {
                 val family = op.substringBefore(":").let { if (it == "neumorphism") "neomorph" else it }
                 cssFamilies.contains(family) && op.contains(":")
@@ -116,7 +117,7 @@ object NativeUtilityEngine {
             "generator" -> Output(runGenerator(op, opts), "env-$op.txt")
             "network" -> Output(runNetwork(op, input, opts), "env-network-$op.txt")
             "seo" -> Output(runSeo(op, opts), "env-seo-$op.txt")
-            "developer" -> Output(runDeveloper(op, input, opts), "env-developer-$op.txt")
+            "developer" -> Output(runDeveloperParity(op, input, opts), "env-$op.txt")
             "cssgen" -> runCss(op, opts)
             else -> error("No native utility engine for ${tool.engine.type}.")
         }
@@ -459,6 +460,221 @@ object NativeUtilityEngine {
             op=="markdown-preview" || op=="markdown-to-html" -> formatDeveloperMarkup(input)
             op=="user-agent-parser" -> input
             op=="cron-generator" || op=="cron-parser" -> "Cron: ${input.trim()}\nFive-field format: minute hour day-of-month month day-of-week"
+            else -> input
+        }
+    }
+
+    private fun runDeveloperParity(op: String, input: String, opts: Map<String, String>): String {
+        val lower = op.lowercase(Locale.US)
+        val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
+        val flags = opts["flags"] ?: "g"
+        val base = lower.removePrefix("developer-").substringBefore('-')
+        val suffix = Regex("(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer)$").find(lower)?.groupValues?.get(1) ?: ""
+
+        fun parseJson(raw: String): Any {
+            StrictJsonValidator(raw).validate()
+            val tokener = JSONTokener(raw)
+            val value = tokener.nextValue()
+            require(tokener.nextClean() == '\u0000') { "Unexpected content after JSON value." }
+            return value
+        }
+        fun stringifyJson(value: Any, indent: Int = 2): String = when (value) {
+            is JSONObject -> if (indent > 0) value.toString(indent) else value.toString()
+            is JSONArray -> if (indent > 0) value.toString(indent) else value.toString()
+            JSONObject.NULL -> "null"
+            is String -> JSONObject.quote(value)
+            else -> value.toString()
+        }
+        fun pretty(raw: String, indent: Int = 2): String = stringifyJson(parseJson(raw), indent)
+        fun sortValue(value: Any): Any = when (value) {
+            is JSONObject -> JSONObject().apply { value.keys().asSequence().toList().sorted().forEach { put(it, sortValue(value.get(it))) } }
+            is JSONArray -> JSONArray().apply { for (i in 0 until value.length()) put(sortValue(value.get(i))) }
+            else -> value
+        }
+        fun jsonDiff(leftRaw: String, rightRaw: String): String {
+            val left = pretty(leftRaw).split('\n')
+            val right = pretty(rightRaw).split('\n')
+            val output = mutableListOf<String>()
+            for (i in 0 until max(left.size, right.size)) {
+                val a = left.getOrNull(i); val b = right.getOrNull(i)
+                if (a == b) output += "  ${a ?: ""}" else {
+                    if (a != null) output += "- $a"
+                    if (b != null) output += "+ $b"
+                }
+            }
+            return output.joinToString("\n")
+        }
+        fun minifyText(raw: String): String = raw.replace(Regex("/\\*[\\s\\S]*?\\*/"), "").replace(Regex("<!--[\\s\\S]*?-->"), "").replace(Regex("\\s+"), " ").trim()
+        fun validateMarkup(raw: String): Boolean = runCatching {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                setFeature("http://xml.org/sax/features/external-general-entities", false)
+                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+                isExpandEntityReferences = false
+            }
+            factory.newDocumentBuilder().parse(InputSource(StringReader(raw)))
+        }.isSuccess
+        fun csvString(rows: List<List<String>>): String = rows.joinToString("\n") { row -> row.joinToString(",") { value -> if (Regex("[,\"\\n\\r]").containsMatchIn(value)) "\"${value.replace("\"", "\"\"")}\"" else value } }
+        fun jsonToCsv(raw: String): String {
+            val array = JSONArray(raw)
+            if (array.length() == 0) return ""
+            val keys = linkedSetOf<String>()
+            for (i in 0 until array.length()) array.optJSONObject(i)?.keys()?.forEach { keys += it }
+            if (keys.isEmpty()) return ""
+            fun cell(value: Any?): String {
+                val text = if (value == null || value === JSONObject.NULL) "" else value.toString()
+                return if (Regex("[,\"\\n\\r]").containsMatchIn(text)) "\"${text.replace("\"", "\"\"")}\"" else text
+            }
+            return (listOf(keys.toList()) + (0 until array.length()).map { i -> keys.map { key -> cell(array.optJSONObject(i)?.opt(key)) } }).let(::csvString)
+        }
+        fun csvRows(raw: String): List<List<String>> {
+            val rows = mutableListOf<MutableList<String>>()
+            var row = mutableListOf<String>(); val cell = StringBuilder(); var quoted = false; var i = 0
+            while (i < raw.length) {
+                val ch = raw[i]
+                if (ch == '"') {
+                    if (quoted && i + 1 < raw.length && raw[i + 1] == '"') { cell.append('"'); i++ } else quoted = !quoted
+                } else if (ch == ',' && !quoted) { row.add(cell.toString()); cell.setLength(0) }
+                else if ((ch == '\n' || ch == '\r') && !quoted) {
+                    if (ch == '\r' && i + 1 < raw.length && raw[i + 1] == '\n') i++
+                    row.add(cell.toString()); cell.setLength(0)
+                    if (row.any { it.isNotEmpty() }) rows.add(row)
+                    row = mutableListOf()
+                } else cell.append(ch)
+                i++
+            }
+            row.add(cell.toString()); if (row.any { it.isNotEmpty() }) rows.add(row)
+            return rows
+        }
+        fun csvToJson(raw: String): String {
+            val rows = csvRows(raw); if (rows.isEmpty()) return "[]"
+            val headers = rows.first(); val result = JSONArray()
+            rows.drop(1).forEach { values ->
+                val item = JSONObject()
+                headers.forEachIndexed { index, key -> item.put(if (key.isEmpty()) "column_${index + 1}" else key, values.getOrElse(index) { "" }) }
+                result.put(item)
+            }
+            return result.toString(2)
+        }
+        fun decode(kind: String, raw: String): String = when (kind) {
+            "base64" -> String(Base64.decode(raw.replace(Regex("\\s"), ""), Base64.DEFAULT), StandardCharsets.UTF_8)
+            "uri" -> URLDecoder.decode(raw.replace("+", "%20"), StandardCharsets.UTF_8.name())
+            "unicode" -> raw.replace(Regex("\\\\u([0-9a-fA-F]{4})")) { it.groupValues[1].toInt(16).toChar().toString() }
+            "html" -> raw.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+            else -> raw
+        }
+        fun encode(kind: String, raw: String): String = when (kind) {
+            "base64" -> Base64.encodeToString(raw.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
+            "uri" -> encodeURIComponent(raw)
+            "unicode" -> raw.codePoints().toArray().joinToString("") { "\\u%04x".format(Locale.US, it) }
+            "html" -> raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
+            else -> raw
+        }
+
+        return when {
+            listOf("regex-tester", "regex-replace", "regex-generator", "regex-explainer").any(lower::contains) -> {
+                require(secondary.isNotEmpty()) { "Enter a regular expression in the second field." }
+                val regexFlags = if (flags.contains('g')) flags else "${flags}g"
+                val regex = Regex(input, regexOptions(regexFlags))
+                val matches = regex.findAll(secondary).toList()
+                "Pattern: /$input/\nMatches: ${matches.size}\n\n${matches.mapIndexed { index, match -> "${index + 1}. ${match.value} at index ${match.range.first}" }.joinToString("\n").ifBlank { "No matches" }}"
+            }
+            lower.contains("jwt-") -> {
+                val parts = input.trim().split('.')
+                require(parts.size == 3) { "A JWT must contain three dot-separated parts." }
+                val header = parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
+                val payload = parseJson(b64UrlDecode(parts[1])) as? JSONObject ?: error("JWT payload must be a JSON object.")
+                val exp = (payload.opt("exp") as? Number)?.toDouble()
+                val expiresAt = exp?.let { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((it * 1000).toLong())) } ?: "none"
+                val expired: Any = exp?.let { System.currentTimeMillis() / 1000.0 >= it } ?: JSONObject.NULL
+                JSONObject().put("header", header).put("payload", payload).put("signaturePresent", parts[2].isNotEmpty()).put("expiresAt", expiresAt).put("expired", expired).toString(2)
+            }
+            lower.contains("uuid-generator") || lower.contains("uuid-batch-generator") -> {
+                val count = min(100, (secondary.toDoubleOrNull() ?: 10.0).toInt()).coerceAtLeast(0)
+                List(count) { UUID.randomUUID().toString() }.joinToString("\n")
+            }
+            lower.contains("uuid") && (lower.contains("validator") || lower.contains("tester")) -> {
+                val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(input.trim())
+                match?.groupValues?.get(1)?.let { "Valid UUID v$it" } ?: "Invalid UUID"
+            }
+            lower.contains("url-") || lower.contains("uri-") || lower.contains("cookie-parser") || lower.contains("query-builder") -> {
+                when {
+                    lower.contains("encoder") -> encode("uri", input)
+                    lower.contains("decoder") -> decode("uri", input)
+                    lower.contains("validator") || lower.contains("tester") -> {
+                        val uri = runCatching { URI(input.trim()) }.getOrElse { throw IllegalArgumentException("Failed to construct 'URL': Invalid URL") }
+                        if (uri.scheme.isNullOrEmpty()) throw IllegalArgumentException("Failed to construct 'URL': Invalid URL")
+                        "Valid URL/URI"
+                    }
+                    else -> runCatching { developerUrlInfo(input) }.getOrElse { throw IllegalArgumentException("Failed to construct 'URL': Invalid URL") }
+                }
+            }
+            lower.contains("base64") -> when {
+                suffix == "encoder" || suffix == "generator" -> encode("base64", input)
+                suffix == "decoder" -> decode("base64", input)
+                else -> input
+            }
+            lower.contains("unicode") -> when {
+                suffix == "encoder" || suffix == "generator" -> encode("unicode", input)
+                suffix == "decoder" -> decode("unicode", input)
+                else -> input
+            }
+            lower.contains("ascii") || lower.contains("binary") || lower.contains("hex") -> when {
+                suffix == "encoder" || suffix == "generator" -> input.toByteArray(StandardCharsets.UTF_8).joinToString(if (lower.contains("binary")) " " else "") { byte ->
+                    val value = byte.toInt() and 0xff
+                    if (lower.contains("binary")) value.toString(2).padStart(8, '0') else value.toString(16).padStart(2, '0')
+                }
+                suffix == "decoder" -> input.trim().split(Regex("\\s+")).joinToString("") { token -> (token.toIntOrNull(if (lower.contains("binary")) 2 else 16) ?: 0).toChar().toString() }
+                else -> input
+            }
+            lower.contains("json") -> when {
+                lower.contains("to-csv") -> jsonToCsv(input)
+                lower.contains("diff") -> jsonDiff(input, secondary)
+                lower.contains("sort") -> stringifyJson(sortValue(parseJson(input)))
+                suffix == "minifier" -> pretty(input, 0)
+                suffix in setOf("formatter", "beautifier", "preview", "inspector", "parser", "tester", "explainer") -> pretty(input)
+                suffix == "validator" -> { parseJson(input); "Valid JSON (RFC 8259-compatible parser)." }
+                suffix == "encoder" -> encode("base64", input)
+                suffix == "decoder" -> decode("base64", input)
+                suffix == "converter" || suffix == "generator" -> pretty(input)
+                else -> input
+            }
+            lower.contains("csv") -> when {
+                lower.contains("to-json") -> csvToJson(input)
+                suffix == "validator" || suffix == "tester" -> { val rows = csvRows(input); if (rows.isEmpty()) throw IllegalArgumentException("CSV is empty."); "Valid CSV with ${rows.size} rows and ${rows[0].size} columns." }
+                suffix == "minifier" -> csvString(csvRows(input))
+                suffix in setOf("decoder", "parser", "formatter", "beautifier", "preview", "inspector", "converter") -> csvString(csvRows(input))
+                else -> input
+            }
+            lower.contains("xml") || lower.contains("html") || lower.contains("svg") -> when {
+                suffix == "validator" || suffix == "tester" -> if (validateMarkup(input)) "Valid markup/XML." else throw IllegalArgumentException("Invalid markup/XML.")
+                suffix == "minifier" -> minifyText(input)
+                suffix == "encoder" -> encode("html", input)
+                suffix == "decoder" -> decode("html", input)
+                else -> formatDeveloperMarkup(input)
+            }
+            listOf("sql", "graphql", "css", "javascript", "typescript", "docker", "nginx", "kubernetes", "git", "openapi", "markdown", "yaml").any(lower::contains) -> when {
+                suffix == "validator" || suffix == "tester" -> { if (input.trim().isEmpty()) throw IllegalArgumentException("Input is empty."); "Input looks structurally usable for $base. Full language parsing is not claimed by this browser-only utility." }
+                suffix == "minifier" -> minifyText(input)
+                suffix == "diff" -> jsonDiff(JSONObject.quote(input), JSONObject.quote(secondary))
+                suffix == "encoder" -> encode("html", input)
+                suffix == "decoder" -> decode("html", input)
+                else -> formatDeveloperMarkup(input)
+            }
+            lower.contains("http-status") || lower.contains("status-code") -> {
+                val code = input.trim()
+                httpStatuses.firstOrNull { it.first.toString() == code }?.let { "$code ${it.second}" } ?: httpStatuses.joinToString("\n") { "${it.first} ${it.second}" }
+            }
+            lower.contains("mime") || lower.contains("content-type") -> {
+                val map = linkedMapOf("json" to "application/json", "js" to "text/javascript", "css" to "text/css", "html" to "text/html", "csv" to "text/csv", "xml" to "application/xml", "pdf" to "application/pdf", "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "webp" to "image/webp", "svg" to "image/svg+xml", "txt" to "text/plain", "wasm" to "application/wasm")
+                val extension = input.trim().replace(Regex("^.*\\."), "").lowercase(Locale.US)
+                map[extension] ?: map.entries.joinToString("\n") { "${it.key}\t${it.value}" }
+            }
+            lower.contains("cron") -> "Cron: ${input.trim()}\nFive-field format: minute hour day-of-month month day-of-week"
+            lower.contains("data-uri") -> encode("base64", input)
+            lower.contains("file-hash") -> throw IllegalArgumentException("Use a local file input for the file hash tool.")
+            listOf("generator", "builder", "helper").any(lower::contains) -> input.trim().ifEmpty { "Generated developer template ready. Replace the placeholders with your project values." }
+            lower.contains("explainer") -> "Developer tool: $op\n\nInput length: ${input.length} characters."
             else -> input
         }
     }
