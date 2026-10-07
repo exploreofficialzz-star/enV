@@ -299,12 +299,12 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
         LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
                         OutlinedTextField(
                             value = query,
                             onValueChange = onQuery,
-                            modifier = Modifier.width(176.dp).height(56.dp).semantics { contentDescription = "Search all tools" },
+                            modifier = Modifier.width(160.dp).height(56.dp).semantics { contentDescription = "Search all tools" },
                             placeholder = { Text("Search", maxLines = 1, style = MaterialTheme.typography.bodySmall) },
                             leadingIcon = { EnVIcon("Search", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             singleLine = true,

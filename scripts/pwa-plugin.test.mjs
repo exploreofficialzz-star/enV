@@ -71,7 +71,8 @@ test("browser chrome metadata follows the active light or dark theme", () => {
 
 test("All Tools puts search on the heading row and removes the suggested-tools promotion", () => {
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
-  assert.match(tools, /flex items-center gap-3/);
+  assert.match(tools, /flex items-center gap-4/);
+  assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
   assert.match(tools, /searchTools\(byAvailability, query/);
   assert.doesNotMatch(tools, /Suggested tools|See more tools|suggested-tools-heading/);

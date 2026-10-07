@@ -37,9 +37,9 @@ function Tools() {
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
-          <div className="ml-auto min-w-0 flex-1 max-w-sm">
+          <div className="ml-auto min-w-0 w-[52vw] shrink-0 max-w-[18rem]">
             <SearchBox value={query} onValueChange={(value) => { setQuery(value); setPage(1); }} />
           </div>
         </div>

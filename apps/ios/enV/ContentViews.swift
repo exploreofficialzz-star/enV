@@ -81,7 +81,7 @@ struct ToolsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 16) {
                             Text("All tools")
                                 .font(.system(size: 28, weight: .semibold))
                                 .tracking(-0.4)
@@ -98,7 +98,7 @@ struct ToolsView: View {
                                     .accessibilityLabel("Search all tools")
                             }
                             .padding(.horizontal, 10)
-                            .frame(width: 164, height: 44)
+                            .frame(width: 148, height: 44)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
                         }
