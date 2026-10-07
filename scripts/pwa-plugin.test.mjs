@@ -69,13 +69,28 @@ test("browser chrome metadata follows the active light or dark theme", () => {
   assert.match(theme, /dark \? "black-translucent" : "default"/);
 });
 
-test("All Tools puts search on the heading row and removes the suggested-tools promotion", () => {
+test("All Tools groups results by category and progressively expands without global filters or counts", () => {
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
   assert.match(tools, /flex items-center gap-4/);
   assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
-  assert.match(tools, /searchTools\(byAvailability, query/);
-  assert.doesNotMatch(tools, /Suggested tools|See more tools|suggested-tools-heading/);
+  assert.match(tools, /CATEGORIES\.map/);
+  assert.match(tools, /INITIAL_TOOLS_PER_CATEGORY = 3/);
+  assert.match(tools, /MORE_TOOLS_PER_CLICK = 6/);
+  assert.match(tools, /See more tools/);
+  assert.match(tools, /ChevronDown/);
+  assert.doesNotMatch(tools, /Tool availability filter|Coming Soon \(|PAGE_SIZE|Showing \d+–|Page \{safePage\}/);
+});
+
+test("tool and category cards use theme-aware icon strokes and directional click affordances", () => {
+  const toolCard = readFileSync(join(PROJECT_ROOT, "src/components/tools/tool-card.tsx"), "utf8");
+  const categoryCard = readFileSync(join(PROJECT_ROOT, "src/components/tools/category-card.tsx"), "utf8");
+  assert.match(toolCard, /toolIcon\(tool\.icon\)/);
+  assert.match(toolCard, /ArrowRight/);
+  assert.match(toolCard, /text-black dark:text-white/);
+  assert.match(categoryCard, /toolIcon\(category\.icon\)/);
+  assert.match(categoryCard, /ArrowRight/);
+  assert.match(categoryCard, /text-black dark:text-white/);
 });
 
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {

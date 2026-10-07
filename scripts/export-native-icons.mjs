@@ -19,6 +19,7 @@ const iconNames = new Set([
   "Home",
   "LayoutGrid",
   "Search",
+  "ChevronDown",
   "Heart",
   "User",
   "Moon",

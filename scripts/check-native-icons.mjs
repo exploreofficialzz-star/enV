@@ -6,11 +6,13 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const catalog = JSON.parse(readFileSync(path.join(root, "apps/shared/catalog.json"), "utf8"));
 const sharedRoot = path.join(root, "apps/shared/native-icons");
+const webIconSource = readFileSync(path.join(root, "src/lib/icons.ts"), "utf8");
+const webIconMap = webIconSource.match(/const MAP: Record<string, LucideIcon> = \{([\s\S]*?)\n\};/)?.[1] ?? "";
 const iconNames = new Set([
   ...catalog.tools.map((tool) => tool.icon),
   ...catalog.categories.map((category) => category.icon),
   "Home", "LayoutGrid", "Search", "Heart", "User", "Moon", "Sun",
-  "ArrowLeft", "ArrowRight", "Wrench", "Settings", "Bell", "Info",
+  "ArrowLeft", "ArrowRight", "ChevronDown", "Wrench", "Settings", "Bell", "Info",
   "ShieldCheck", "CircleCheck", "Clock3", "Copy", "RotateCcw", "Play",
   "Globe", "FilePlus2", "Hammer",
 ]);
@@ -38,11 +40,15 @@ for (const name of iconNames) {
   assert.ok(existsSync(file), `Missing shared Lucide asset for ${name}: ${file}`);
   assertPng(file, [96, 96]);
 }
+for (const name of new Set([...catalog.tools, ...catalog.categories].map((entry) => entry.icon))) {
+  assert.ok(new RegExp(`\\b${name}\\b`).test(webIconMap), `Web must map the catalog icon ${name} to a real Lucide component`);
+}
 
 const androidAssets = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt"), "utf8");
 const androidHome = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), "utf8");
 const iosApp = readFileSync(path.join(root, "apps/ios/enV/enVApp.swift"), "utf8");
 const iosHome = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
+const iosCards = readFileSync(path.join(root, "apps/ios/enV/ToolViews.swift"), "utf8");
 const xcodeProject = readFileSync(path.join(root, "apps/ios/enV.xcodeproj/project.pbxproj"), "utf8");
 assert.ok(androidAssets.includes('"native-icons/icons/'), "Android must read the shared icon assets");
 assert.ok(iosApp.includes('native-icons/icons/'), "iOS must read the shared icon assets");
@@ -61,8 +67,10 @@ assert.ok(androidHome.includes("modifier.height(40.dp)"), "Android preview bars 
 assert.ok(iosHome.includes(".frame(height: 40)"), "iOS preview bars must be smaller than the search field");
 assert.ok(androidHome.includes('SectionTitle("Trending tools", accent = true)') && androidHome.includes("if (accent) MaterialTheme.colorScheme.primary"), "Android Trending title must use the accent color");
 assert.ok(iosHome.includes('sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)') && iosHome.includes("accent ? Color.envAccent : Color.envInk"), "iOS Trending title must use the accent color");
-assert.ok(androidHome.includes('Text("All tools"') && androidHome.includes('contentDescription = "Search all tools"') && androidHome.includes("catalog.search(query)") && androidHome.includes("Arrangement.spacedBy(16.dp)") && androidHome.includes("Modifier.width(160.dp)") && !androidHome.includes('SectionTitle("Suggested tools"'), "Android All Tools must pair a right-aligned search control with the heading and omit Suggested tools");
-assert.ok(iosHome.includes('Text("All tools")') && iosHome.includes('TextField("Search", text: $toolsQuery)') && iosHome.includes("store.tools(matching: toolsQuery)") && iosHome.includes("HStack(spacing: 16)") && iosHome.includes(".frame(width: 148, height: 44)") && !iosHome.includes('sectionHeader("Suggested tools"'), "iOS All Tools must pair a right-aligned search control with the heading and omit Suggested tools");
+assert.ok(androidHome.includes('Text("All tools"') && androidHome.includes('contentDescription = "Search all tools"') && androidHome.includes('groupCategory.icon') && androidHome.includes('"See more tools"') && androidHome.includes('"ChevronDown"') && !androidHome.includes('"Available (') && !androidHome.includes('"Coming Soon ('), "Android All Tools must group tools under category icons with progressive See more and no availability filters");
+assert.ok(iosHome.includes('Text("All tools")') && iosHome.includes('TextField("Search", text: $toolsQuery)') && iosHome.includes("store.tools(matching: toolsQuery)") && iosHome.includes("group.category.icon") && iosHome.includes("See more tools") && iosHome.includes('"ChevronDown"') && !iosHome.includes('Text("\\(matchingTools.count) results")'), "iOS All Tools must group tools under category icons with progressive See more and no global results count");
+assert.ok(androidHome.includes('EnVIcon("ArrowRight"') && androidHome.includes('tint = MaterialTheme.colorScheme.onSurface'), "Android tool cards must show adaptive native tool icons and a visible click arrow");
+assert.ok(iosCards.includes('EnVIcon(name: "ArrowRight"') && iosCards.includes('tint: .primary'), "iOS tool cards must show adaptive native tool icons and a visible click arrow");
 assert.ok(androidHome.includes("SideEffect {") && androidHome.includes("window.statusBarColor = systemBarColor") && androidHome.includes("WindowCompat.getInsetsController") && androidHome.includes("isAppearanceLightStatusBars = !darkMode"), "Android status and navigation bars must follow the active theme with readable system icons");
 assert.ok(iosApp.includes("envChrome = adaptive(light: 0xFFFFFF, dark: 0x000000)") && iosApp.includes(".toolbarBackground(Color.envChrome, for: .navigationBar)"), "iOS browser-like navigation and safe-area chrome must be white in light mode and black in dark mode");
 assert.ok(androidHome.includes("top = 4.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 2.dp).width(142.dp).height(56.dp)"), "Android home must use 4dp header spacing and 16dp brand-to-search spacing");

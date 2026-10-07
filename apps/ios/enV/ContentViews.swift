@@ -69,17 +69,31 @@ struct HomeView: View {
     }
 }
 
+private struct ToolCategoryGroup: Identifiable {
+    let category: ToolCategory
+    let tools: [Tool]
+    var id: String { category.id }
+}
+
 struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
     @State private var toolsQuery = ""
+    @State private var visibleByCategory: [String: Int] = [:]
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
     private var matchingTools: [Tool] { store.tools(matching: toolsQuery) }
+    private var categoryGroups: [ToolCategoryGroup] {
+        let toolsByCategory = Dictionary(grouping: matchingTools, by: \.category)
+        return store.categories.compactMap { category in
+            guard let tools = toolsByCategory[category.id], !tools.isEmpty else { return nil }
+            return ToolCategoryGroup(category: category, tools: tools)
+        }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                LazyVStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 16) {
                             Text("All tools")
@@ -96,52 +110,58 @@ struct ToolsView: View {
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
                                     .accessibilityLabel("Search all tools")
+                                    .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
                             .padding(.horizontal, 10)
                             .frame(width: 148, height: 44)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
                         }
-                        Text("Browse the complete enV toolkit.")
+                        Text("Browse tools by category or search by name.")
                             .font(.subheadline)
                             .foregroundStyle(Color.envMuted)
                     }
-                    if toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        VStack(alignment: .leading, spacing: 14) {
-                            sectionHeader("Browse categories", subtitle: "Choose a category to explore")
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(store.categories) { category in
-                                    NavigationLink(value: category.id) {
-                                        VStack(alignment: .leading, spacing: 9) {
-                                            iconTile(category.icon)
-                                            Text(category.name)
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(Color.envInk)
-                                            Text(category.blurb)
-                                                .font(.caption)
-                                                .foregroundStyle(Color.envMuted)
-                                                .lineLimit(2)
-                                                .multilineTextAlignment(.leading)
+                    if categoryGroups.isEmpty {
+                        EmptyStateView(title: "No tools found", lucideIcon: "Search", message: "Try another name or keyword.")
+                    } else {
+                        ForEach(categoryGroups) { group in
+                            let visibleCount = min(visibleByCategory[group.id] ?? 3, group.tools.count)
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 10) {
+                                    iconTile(group.category.icon)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(group.category.name)
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(Color.envInk)
+                                        Text(group.category.blurb)
+                                            .font(.caption)
+                                            .foregroundStyle(Color.envMuted)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                LazyVGrid(columns: columns, spacing: 12) {
+                                    ForEach(group.tools.prefix(visibleCount)) { tool in ToolCard(tool: tool) }
+                                }
+                                if visibleCount < group.tools.count {
+                                    Button {
+                                        visibleByCategory[group.id] = min(visibleCount + 6, group.tools.count)
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Text("See more tools")
+                                            Spacer(minLength: 0)
+                                            EnVIcon(name: "ChevronDown", size: 16, tint: .primary)
                                         }
-                                        .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-                                        .padding(14)
-                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-                                        .contentShape(RoundedRectangle(cornerRadius: 12))
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(Color.envInk)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 10)
+                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Browse \(category.name)")
+                                    .accessibilityLabel("See more \(group.category.name) tools")
                                 }
                             }
-                        }
-                    } else {
-                        Text("\(matchingTools.count) results")
-                            .font(.caption)
-                            .foregroundStyle(Color.envMuted)
-                        if matchingTools.isEmpty {
-                            EmptyStateView(title: "No matching tools", lucideIcon: "Search", message: "Try a different name or keyword.")
-                        } else {
-                            ToolList(tools: Array(matchingTools.prefix(60)))
                         }
                     }
                 }
@@ -160,17 +180,41 @@ struct ToolsView: View {
 
 struct CategoryView: View {
     @EnvironmentObject private var store: CatalogStore
+    @State private var visibleCount = 6
     let categoryID: String
+    private var categoryTools: [Tool] { store.tools(category: categoryID) }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 if let category = store.category(named: categoryID) {
                     Text(category.description)
                         .font(.subheadline)
                         .foregroundStyle(Color.envMuted)
                 }
-                ToolList(tools: store.tools(category: categoryID))
+                if categoryTools.isEmpty {
+                    EmptyStateView(title: "No tools in this category", lucideIcon: "Folder", message: "Check back as the enV toolkit grows.")
+                } else {
+                    ToolList(tools: Array(categoryTools.prefix(visibleCount)))
+                }
+                if visibleCount < categoryTools.count {
+                    Button {
+                        visibleCount = min(visibleCount + 6, categoryTools.count)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("See more tools")
+                            Spacer(minLength: 0)
+                            EnVIcon(name: "ChevronDown", size: 16, tint: .primary)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.envInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(16)
         }
@@ -337,7 +381,7 @@ private struct HomePreviewBar: View {
 }
 
 func iconTile(_ iconName: String) -> some View {
-    EnVIcon(name: iconName, size: 16, tint: .envAccent)
+    EnVIcon(name: iconName, size: 16, tint: .primary)
         .frame(width: 36, height: 36)
         .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 6))
 }

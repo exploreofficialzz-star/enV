@@ -1,38 +1,31 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
-import { SeeMoreLink } from "@/components/tools/see-more-link";
+import { CATEGORIES } from "@/data/categories";
 import { getAllTools } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
+import { toolIcon } from "@/lib/icons";
 
 export const Route = createFileRoute("/tools/")({ component: Tools });
 
-const PAGE_SIZE = 60;
-
-type Filter = "all" | "available" | "coming-soon";
+const INITIAL_TOOLS_PER_CATEGORY = 3;
+const MORE_TOOLS_PER_CLICK = 6;
 
 function Tools() {
   const all = getAllTools();
-  const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const filtered = useMemo(() => {
-    const byAvailability = filter === "available"
-      ? all.filter((tool) => tool.status !== "planned")
-      : filter === "coming-soon"
-        ? all.filter((tool) => tool.status === "planned")
-        : all;
-    return query.trim() ? searchTools(byAvailability, query, byAvailability.length) : byAvailability;
-  }, [all, filter, query]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const setFilterAndReset = (next: Filter) => {
-    setFilter(next);
-    setPage(1);
-  };
+  const [visibleByCategory, setVisibleByCategory] = useState<Record<string, number>>({});
+  const matchingTools = useMemo(() => searchTools(all, query, all.length), [all, query]);
+  const sections = useMemo(
+    () => CATEGORIES.map((category) => ({
+      category,
+      tools: matchingTools.filter((tool) => tool.category === category.id),
+    })).filter((section) => section.tools.length > 0),
+    [matchingTools],
+  );
 
   return (
     <AppShell>
@@ -40,34 +33,51 @@ function Tools() {
         <div className="flex items-center gap-4">
           <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
           <div className="ml-auto min-w-0 w-[52vw] shrink-0 max-w-[18rem]">
-            <SearchBox value={query} onValueChange={(value) => { setQuery(value); setPage(1); }} />
+            <SearchBox value={query} onValueChange={(value) => { setQuery(value); setVisibleByCategory({}); }} />
           </div>
         </div>
-        <p className="mt-2 text-muted">Browse the complete enV toolkit, including the growing Coming Soon catalog.</p>
-        <div className="mt-5 flex flex-wrap items-center gap-2" role="group" aria-label="Tool availability filter">
-          {(["all", "available", "coming-soon"] as Filter[]).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilterAndReset(value)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium shadow-[var(--shadow-border)] ${filter === value ? "bg-ink text-white" : "bg-surface text-muted hover:text-fg"}`}
-            >
-              {value === "all" ? `All (${all.length.toLocaleString()})` : value === "available" ? `Available (${all.filter((t) => t.status !== "planned").length.toLocaleString()})` : `Coming Soon (${all.filter((t) => t.status === "planned").length.toLocaleString()})`}
-            </button>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-subtle">{filtered.length ? `Showing ${((safePage - 1) * PAGE_SIZE) + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length.toLocaleString()}.` : "No tools match this search and filter."}</p>
-        <div id="all-tools" className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
-        </div>
-        {visible.length > 0 ? <div className="mt-5"><SeeMoreLink to="#all-tools">See more on this page</SeeMoreLink></div> : null}
-        {pageCount > 1 ? (
-          <nav className="mt-8 flex items-center justify-between gap-3" aria-label="Tool pages">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded-md bg-surface px-3 py-2 text-sm shadow-[var(--shadow-border)] disabled:opacity-40">Previous</button>
-            <span className="text-xs text-muted">Page {safePage} of {pageCount}</span>
-            <button type="button" disabled={safePage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded-md bg-surface px-3 py-2 text-sm shadow-[var(--shadow-border)] disabled:opacity-40">Next</button>
-          </nav>
-        ) : null}
+        <p className="mt-2 text-muted">Find a tool by name or browse the categories below.</p>
+        {sections.length === 0 ? (
+          <p className="mt-8 rounded-xl bg-surface p-6 text-sm text-muted shadow-[var(--shadow-border)]">No tools match your search. Try another name or keyword.</p>
+        ) : (
+          <div id="all-tools" className="mt-8 space-y-10">
+            {sections.map(({ category, tools }) => {
+              const Icon = toolIcon(category.icon);
+              const visibleCount = visibleByCategory[category.id] ?? INITIAL_TOOLS_PER_CATEGORY;
+              const visibleTools = tools.slice(0, visibleCount);
+              return (
+                <section key={category.id} id={`category-${category.id}`} className="scroll-mt-24">
+                  <div className="mb-4 flex items-center gap-3">
+                    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-black dark:text-white">
+                      <Icon className="size-5" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-semibold text-fg">{category.name}</h2>
+                      <p className="text-xs text-muted">{category.blurb}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {visibleTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                  </div>
+                  {visibleCount < tools.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleByCategory((current) => ({
+                        ...current,
+                        [category.id]: Math.min(visibleCount + MORE_TOOLS_PER_CLICK, tools.length),
+                      }))}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-medium text-fg shadow-[var(--shadow-border)] transition-colors hover:bg-surface-2"
+                      aria-label={`See more ${category.name} tools`}
+                    >
+                      See more tools
+                      <ChevronDown className="size-4" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </section>
+              );
+            })}
+          </div>
+        )}
       </section>
     </AppShell>
   );

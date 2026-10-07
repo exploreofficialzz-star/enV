@@ -9,30 +9,33 @@ struct ToolCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             NavigationLink(value: tool) {
-                VStack(alignment: .leading, spacing: 0) {
-                    iconTile(tool.icon)
-                    Text(tool.name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .tracking(-0.15)
-                        .foregroundStyle(Color.envInk)
-                        .lineLimit(1)
-                        .padding(.top, 12)
-                    Text(tool.description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.envMuted)
-                        .lineLimit(2)
-                        .lineSpacing(2)
-                        .padding(.top, 4)
-                    if NativeBackendEngine.supports(tool) {
-                        StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
-                    } else if NativeCoverage.isLocallyExecutable(tool) {
-                        Text("ON DEVICE").font(.system(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
-                    } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
-                    } else {
-                        StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        iconTile(tool.icon)
+                        Text(tool.name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .tracking(-0.15)
+                            .foregroundStyle(Color.envInk)
+                            .lineLimit(1)
+                            .padding(.top, 12)
+                        Text(tool.description)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.envMuted)
+                            .lineLimit(2)
+                            .lineSpacing(2)
+                            .padding(.top, 4)
+                        if NativeBackendEngine.supports(tool) {
+                            StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
+                        } else if NativeCoverage.isLocallyExecutable(tool) {
+                            Text("ON DEVICE").font(.system(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+                        } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
+                        } else {
+                            StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    EnVIcon(name: "ArrowRight", size: 16, tint: .primary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

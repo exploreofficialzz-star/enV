@@ -280,20 +280,48 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
 
 @Composable
 private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    val matchingTools = remember(catalog, query) { catalog.search(query) }
+    val visibleCounts = remember { mutableStateMapOf<String, Int>() }
+    LaunchedEffect(query) { visibleCounts.clear() }
+    val groupedTools = remember(catalog, query, category) {
+        if (category != null) emptyList()
+        else {
+            val byCategory = catalog.search(query).groupBy { it.category }
+            catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+        }
+    }
     if (category != null) {
         val selectedCategory = catalog.categories.find { it.id == category }
-        Column(Modifier.fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)) {
-                IconButton(onClick = { onCategory(null) }, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
-                    EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+        val categoryTools = remember(catalog, category) { catalog.search("", category) }
+        val visibleCount = minOf(visibleCounts[category] ?: 6, categoryTools.size)
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 0.dp, end = 4.dp)) {
+                        IconButton(onClick = { onCategory(null) }, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
+                            EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                    }
+                    selectedCategory?.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             }
-            selectedCategory?.description?.takeIf { it.isNotBlank() }?.let {
-                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            if (categoryTools.isEmpty()) {
+                item { Text("No tools in this category yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
             }
-            ToolList(catalog.search("", category), favorites, onTool, onToggleFavorite, Modifier.weight(1f), "No tools in this category")
+            items(categoryTools.take(visibleCount), key = { it.id }) { tool ->
+                ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite)
+            }
+            if (visibleCount < categoryTools.size) {
+                item {
+                    OutlinedButton(onClick = { visibleCounts[category] = minOf(visibleCount + 6, categoryTools.size) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("See more tools")
+                        Spacer(Modifier.width(8.dp))
+                        EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
         }
     } else {
         LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -315,21 +343,32 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
                     Text("Browse the complete enV toolkit.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (query.isBlank()) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        SectionTitle("Browse categories", "Choose a category to explore")
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            catalog.categories.forEach { item -> CategoryCard(item, onClick = { onCategory(item.id) }) }
+            if (groupedTools.isEmpty()) {
+                item { Text("No tools match your search. Try another name or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
+            } else {
+                items(groupedTools, key = { it.first.id }) { group ->
+                    val groupCategory = group.first
+                    val tools = group.second
+                    val visible = minOf(visibleCounts[groupCategory.id] ?: 3, tools.size)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(Modifier.size(40.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
+                                Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        tools.take(visible).forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+                        if (visible < tools.size) {
+                            OutlinedButton(onClick = { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }) {
+                                Text("See more tools")
+                                Spacer(Modifier.width(8.dp))
+                                EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                            }
                         }
                     }
-                }
-            } else {
-                item { Text("${matchingTools.size} results", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium) }
-                if (matchingTools.isEmpty()) {
-                    item { Text("No matching tools. Try a different search.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
-                } else {
-                    items(matchingTools, key = { it.id }) { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
                 }
             }
         }
@@ -857,17 +896,20 @@ private fun ToolList(tools: List<ToolRecord>, favorites: Set<String>, onTool: (S
 private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f).clickable { onTool(tool.id) }) {
-                Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
-                    Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+            Row(Modifier.weight(1f).clickable { onTool(tool.id) }, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                        Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
+                    }
+                    Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+                    Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    if (tool.status == "planned") {
+                        StatusPill("Coming soon", Modifier.padding(top = 10.dp))
+                    } else if (tool.clientSide && !tool.requiresBackend) {
+                        StatusPill("On device", Modifier.padding(top = 10.dp))
+                    }
                 }
-                Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
-                Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                if (tool.status == "planned") {
-                    StatusPill("Coming soon", Modifier.padding(top = 10.dp))
-                } else if (tool.clientSide && !tool.requiresBackend) {
-                    StatusPill("On device", Modifier.padding(top = 10.dp))
-                }
+                EnVIcon("ArrowRight", Modifier.padding(start = 8.dp).size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
             }
             IconButton(onClick = { onToggle(tool.id) }, modifier = Modifier.semantics { contentDescription = if (favorite) "Remove ${tool.name} from saved" else "Save ${tool.name}" }) {
                 EnVIcon("Heart", tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -879,8 +921,8 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
 @Composable
 private fun CategoryGrid(catalog: Catalog, selected: String?, onSelected: (String?) -> Unit, compact: Boolean = false) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 20.dp)) {
-        if (!compact) AssistChip(onClick = { onSelected(null) }, label = { Text("All") }, leadingIcon = { EnVIcon("LayoutGrid", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) })
-        catalog.categories.forEach { category -> FilterChip(selected = selected == category.id, onClick = { onSelected(if (selected == category.id) null else category.id) }, label = { Text(category.name) }, leadingIcon = { EnVIcon(category.icon, Modifier.size(16.dp), tint = if (selected == category.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }) }
+        if (!compact) AssistChip(onClick = { onSelected(null) }, label = { Text("All") }, leadingIcon = { EnVIcon("LayoutGrid", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) })
+        catalog.categories.forEach { category -> FilterChip(selected = selected == category.id, onClick = { onSelected(if (selected == category.id) null else category.id) }, label = { Text(category.name) }, leadingIcon = { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }) }
     }
 }
 
@@ -895,7 +937,7 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
-                Box(contentAlignment = Alignment.Center) { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+                Box(contentAlignment = Alignment.Center) { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
             }
             Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(category.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
