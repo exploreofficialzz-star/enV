@@ -4,6 +4,7 @@ import android.util.Base64
 import com.chastech.env.data.ToolRecord
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -380,9 +381,26 @@ object NativeUtilityEngine {
             val normalized = value.replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
             return String(Base64.decode(normalized, Base64.DEFAULT), StandardCharsets.UTF_8)
         }
-        fun pretty(raw: String, indent: Int = 2): String = JSONObject(raw).toString(indent)
-        fun jsonMin(raw: String): String = JSONObject(raw).toString()
-        fun uuidValid(raw: String): String = if (Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][89ab][0-9a-f]{3}-[89ab][0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matches(raw.trim())) "Valid UUID" else "Invalid UUID"
+        fun parseJson(raw: String): Any {
+            StrictJsonValidator(raw).validate()
+            val tokener = JSONTokener(raw)
+            val value = tokener.nextValue()
+            require(tokener.nextClean() == '\u0000') { "Unexpected content after JSON value." }
+            return value
+        }
+        fun stringifyJson(raw: String, indent: Int): String = when (val value = parseJson(raw)) {
+            is JSONObject -> if (indent > 0) value.toString(indent) else value.toString()
+            is JSONArray -> if (indent > 0) value.toString(indent) else value.toString()
+            JSONObject.NULL -> "null"
+            is String -> JSONObject.quote(value)
+            else -> value.toString()
+        }
+        fun pretty(raw: String, indent: Int = 2): String = stringifyJson(raw, indent)
+        fun jsonMin(raw: String): String = stringifyJson(raw, 0)
+        fun uuidValid(raw: String): String {
+            val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(raw.trim())
+            return match?.groupValues?.get(1)?.let { "Valid UUID v$it" } ?: "Invalid UUID"
+        }
         fun uuid(): String = UUID.randomUUID().toString()
         fun decode(kind: String, raw: String): String = when(kind) {
             "base64" -> String(Base64.decode(raw.replace(Regex("\\s"), ""), Base64.DEFAULT), StandardCharsets.UTF_8)
@@ -411,20 +429,151 @@ object NativeUtilityEngine {
         }
         fun csvToJson(raw:String):String { val rows=csvRows(raw); if(rows.isEmpty()) return "[]"; val h=rows.first(); val out=JSONArray(); rows.drop(1).forEach{r-> val o=JSONObject(); h.forEachIndexed{i,k->o.put(if(k.isBlank())"column_${i+1}" else k,r.getOrElse(i){""})}; out.put(o)}; return out.toString(2) }
         return when {
-            op.startsWith("regex-") -> { val subject=secondary.ifBlank{input}; val re=Regex(input, regexOptions(flags)); val matches=re.findAll(subject).toList(); if(op=="regex-replace") subject.replace(re, opts["replacement"] ?: "") else "Pattern: /$input/\nMatches: ${matches.size}\n\n${matches.mapIndexed{i,m->"${i+1}. ${m.value} at index ${m.range.first}"}.joinToString("\n").ifBlank{"No matches"}}" }
-            op=="jwt-decoder" || op=="jwt-expiration-checker" -> { val parts=input.trim().split('.'); require(parts.size==3){"A JWT must contain three dot-separated parts."}; val payload=JSONObject(b64UrlDecode(parts[1])); val exp=payload.optLong("exp",Long.MIN_VALUE); JSONObject(mapOf("payload" to payload.toString(),"signaturePresent" to parts[2].isNotBlank(),"expiresAt" to if(exp==Long.MIN_VALUE)"none" else java.time.Instant.ofEpochSecond(exp).toString(),"expired" to if(exp==Long.MIN_VALUE)null else System.currentTimeMillis()/1000 >= exp)).toString(2) }
+            op.startsWith("regex-") -> {
+                require(secondary.isNotEmpty()) { "Enter a regular expression in the second field." }
+                val re = Regex(input, regexOptions(flags))
+                val matches = re.findAll(secondary).toList()
+                "Pattern: /$input/\nMatches: ${matches.size}\n\n${matches.mapIndexed { i, m -> "${i + 1}. ${m.value} at index ${m.range.first}" }.joinToString("\n").ifBlank { "No matches" }}"
+            }
+            op=="jwt-decoder" || op=="jwt-expiration-checker" -> {
+                val parts=input.trim().split('.')
+                require(parts.size==3){"A JWT must contain three dot-separated parts."}
+                val header=parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
+                val payload=parseJson(b64UrlDecode(parts[1])) as? JSONObject ?: error("JWT payload must be a JSON object.")
+                val exp=(payload.opt("exp") as? Number)?.toDouble()
+                val expiresAt=exp?.let { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((it*1000).toLong())) } ?: "none"
+                val expired: Any = exp?.let { System.currentTimeMillis()/1000.0 >= it } ?: JSONObject.NULL
+                JSONObject().put("header",header).put("payload",payload).put("signaturePresent",parts[2].isNotEmpty()).put("expiresAt",expiresAt).put("expired",expired).toString(2)
+            }
             op=="uuid-generator" -> List(max(1, min(100, (opts["count"]?.toIntOrNull() ?: 10)))) { uuid() }.joinToString("\n")
             op=="uuid-validator" -> uuidValid(input)
-            op=="json-beautifier" || op=="json-formatter" || op=="json-minifier" || op=="json-validator" -> { if(op=="json-validator"){JSONObject(input);"Valid JSON."} else if(op=="json-minifier") jsonMin(input) else pretty(input) }
-            op=="query-string-parser" -> { val u=URI(input.ifBlank{"https://example.com/?a=1&b=2"}); (u.rawQuery ?: "").split('&').filter{it.isNotBlank()}.joinToString("\n"){val p=it.split('=',limit=2); "${decodeURIComponent(p[0])} = ${if(p.size>1)decodeURIComponent(p[1]) else ""}"} }
-            op=="url-parser" -> runNetwork("url-parser", input, opts)
-            op=="http-status-lookup" -> runNetwork("http-status-reference", "", opts).lineSequence().firstOrNull{it.startsWith(input.trim()+":") || it.startsWith(input.trim()+" ")} ?: "Unknown status code"
+            op=="json-beautifier" || op=="json-formatter" || op=="json-minifier" || op=="json-validator" -> { if(op=="json-validator"){parseJson(input);"Valid JSON (RFC 8259-compatible parser)."} else if(op=="json-minifier") jsonMin(input) else pretty(input) }
+            op=="query-string-parser" -> input
+            op=="url-parser" -> developerUrlInfo(input)
+            op=="http-status-lookup" -> {
+                val code=input.trim()
+                httpStatuses.firstOrNull { it.first.toString()==code }?.let { "$code ${it.second}" }
+                    ?: httpStatuses.joinToString("\n") { "${it.first} ${it.second}" }
+            }
             op=="data-uri-generator" -> "data:text/plain;base64,${encode("base64",input)}"
-            op=="markdown-preview" || op=="markdown-to-html" -> input.replace(Regex("\\*\\*(.+?)\\*\\*"),"<strong>$1</strong>").replace(Regex("`(.+?)`"),"<code>$1</code>").replace(Regex("^# (.+)$",RegexOption.MULTILINE),"<h1>$1</h1>").replace(Regex("\\n\\n+"),"<br><br>")
-            op=="user-agent-parser" -> { val ua=if(input.isBlank())"Mozilla/5.0" else input; "User-Agent: $ua\nPlatform: ${when{ua.contains("Android",true)->"Android";ua.contains("iPhone",true)->"iOS";ua.contains("Windows",true)->"Windows";ua.contains("Mac OS",true)->"macOS";ua.contains("Linux",true)->"Linux";else->"Unknown"}}" }
-            op=="cron-generator" || op=="cron-parser" -> "Cron: ${input.ifBlank{"* * * * *"}}\nFive-field format: minute hour day-of-month month day-of-week"
+            op=="markdown-preview" || op=="markdown-to-html" -> formatDeveloperMarkup(input)
+            op=="user-agent-parser" -> input
+            op=="cron-generator" || op=="cron-parser" -> "Cron: ${input.trim()}\nFive-field format: minute hour day-of-month month day-of-week"
             else -> input
         }
+    }
+
+    private fun formatDeveloperMarkup(input: String): String {
+        val tokens = input.replace(Regex(">\\s+<"), "><").replace(Regex("(<[^>]+>)"), "\n$1\n")
+            .split("\n").map(String::trim).filter(String::isNotEmpty)
+        val voidish = Regex("^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$", RegexOption.IGNORE_CASE)
+        var depth = 0
+        return tokens.joinToString("\n") { token ->
+            val close = token.startsWith("</")
+            if (close) depth = max(0, depth - 1)
+            val line = "  ".repeat(depth) + token
+            val open = token.startsWith("<") && !token.startsWith("</") && !token.startsWith("<!") && !token.endsWith("/>")
+            val name = token.replace(Regex("^</?([^\\s>/]+).*$"), "\$1")
+            if (open && !voidish.matches(name)) depth += 1
+            line
+        }
+    }
+
+    private fun developerUrlInfo(raw: String): String {
+        val uri = URI(raw.trim())
+        val scheme = uri.scheme?.lowercase(Locale.US) ?: error("Enter a valid absolute URL.")
+        val hostname = uri.host?.lowercase(Locale.US) ?: error("Enter a valid absolute URL.")
+        val port = uri.port
+        val effectivePort = if ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) -1 else port
+        val portText = if (effectivePort < 0) "" else ":$effectivePort"
+        val username = uri.rawUserInfo?.substringBefore(':') ?: ""
+        val userInfo = uri.rawUserInfo?.let { "$it@" } ?: ""
+        val path = uri.rawPath?.ifEmpty { "/" } ?: "/"
+        val query = uri.rawQuery
+        val hash = uri.rawFragment
+        val href = "$scheme://${userInfo}${hostname}$portText$path${query?.let { "?$it" } ?: ""}${hash?.let { "#$it" } ?: ""}"
+        val params = JSONObject()
+        query?.split('&')?.filter { it.isNotEmpty() }?.forEach { pair ->
+            val parts = pair.split('=', limit = 2)
+            val key = URLDecoder.decode(parts[0], StandardCharsets.UTF_8.name())
+            val value = if (parts.size > 1) URLDecoder.decode(parts[1], StandardCharsets.UTF_8.name()) else ""
+            params.put(key, value)
+        }
+        return JSONObject().put("href", href).put("protocol", "$scheme:").put("username", username)
+            .put("hostname", hostname).put("port", if (effectivePort < 0) "" else effectivePort.toString())
+            .put("pathname", path).put("search", query?.takeIf { it.isNotEmpty() }?.let { "?$it" } ?: "")
+            .put("hash", hash?.takeIf { it.isNotEmpty() }?.let { "#$it" } ?: "").put("origin", "$scheme://$hostname$portText")
+            .put("params", params).toString(2)
+    }
+
+    private class StrictJsonValidator(private val source: String) {
+        private var index = 0
+        fun validate() {
+            value()
+            whitespace()
+            require(index == source.length) { "Unexpected content after JSON value." }
+        }
+        private fun whitespace() { while (index < source.length && source[index] in charArrayOf(' ', '\t', '\r', '\n')) index++ }
+        private fun take(char: Char): Boolean { if (index < source.length && source[index] == char) { index++; return true }; return false }
+        private fun expect(char: Char) { require(take(char)) { "Invalid JSON." } }
+        private fun value() {
+            whitespace()
+            require(index < source.length) { "Invalid JSON." }
+            when (source[index]) {
+                '{' -> obj()
+                '[' -> array()
+                '"' -> string()
+                't' -> literal("true")
+                'f' -> literal("false")
+                'n' -> literal("null")
+                '-', in '0'..'9' -> number()
+                else -> error("Invalid JSON.")
+            }
+        }
+        private fun obj() {
+            expect('{'); whitespace(); if (take('}')) return
+            while (true) {
+                whitespace(); require(index < source.length && source[index] == '"') { "Invalid JSON object key." }
+                string(); whitespace(); expect(':'); value(); whitespace()
+                if (take('}')) return
+                expect(',')
+            }
+        }
+        private fun array() {
+            expect('['); whitespace(); if (take(']')) return
+            while (true) { value(); whitespace(); if (take(']')) return; expect(',') }
+        }
+        private fun string() {
+            expect('"')
+            while (index < source.length) {
+                val c = source[index++]
+                when {
+                    c == '"' -> return
+                    c == '\\' -> {
+                        require(index < source.length) { "Invalid JSON string escape." }
+                        when (source[index++]) {
+                            '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> Unit
+                            'u' -> repeat(4) { require(index < source.length && source[index].digitToIntOrNull(16) != null) { "Invalid JSON Unicode escape." }; index++ }
+                            else -> error("Invalid JSON string escape.")
+                        }
+                    }
+                    c.code < 0x20 -> error("Unescaped control character in JSON string.")
+                }
+            }
+            error("Unterminated JSON string.")
+        }
+        private fun number() {
+            take('-')
+            require(index < source.length) { "Invalid JSON number." }
+            if (take('0')) require(index == source.length || source[index] !in '0'..'9') { "Leading zero in JSON number." }
+            else { require(index < source.length && source[index] in '1'..'9') { "Invalid JSON number." }; while (index < source.length && source[index] in '0'..'9') index++ }
+            if (take('.')) { require(index < source.length && source[index] in '0'..'9') { "Invalid JSON fraction." }; while (index < source.length && source[index] in '0'..'9') index++ }
+            if (index < source.length && source[index] in 'e'..'e' || index < source.length && source[index] in 'E'..'E') {
+                index++; if (index < source.length && source[index] in "+-") index++
+                require(index < source.length && source[index] in '0'..'9') { "Invalid JSON exponent." }; while (index < source.length && source[index] in '0'..'9') index++
+            }
+        }
+        private fun literal(expected: String) { require(source.regionMatches(index, expected, 0, expected.length)) { "Invalid JSON literal." }; index += expected.length }
     }
 
     private fun runSeo(op: String, opts: Map<String, String>): String {

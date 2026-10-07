@@ -222,20 +222,51 @@ enum NativeUtilityEngine {
         func b64(_ value:String)->String { let normalized=value.replacingOccurrences(of:"-",with:"+").replacingOccurrences(of:"_",with:"/"); let padded=normalized + String(repeating:"=", count:(4-normalized.count%4)%4); return String(data:Data(base64Encoded:padded) ?? Data(),encoding:.utf8) ?? "" }
         func enc(_ kind:String,_ value:String)->String { switch kind { case "base64": return Data(value.utf8).base64EncodedString(); case "uri": return value.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed) ?? value; case "unicode": return value.unicodeScalars.map{String(format:"\\u%04x",$0.value)}.joined(); case "html": return value.replacingOccurrences(of:"&",with:"&amp;").replacingOccurrences(of:"<",with:"&lt;").replacingOccurrences(of:">",with:"&gt;").replacingOccurrences(of:"\"",with:"&quot;").replacingOccurrences(of:"'",with:"&#39;"); default:return value } }
         func dec(_ kind:String,_ value:String)->String { switch kind { case "base64": return String(data:Data(base64Encoded:value.filter{!$0.isWhitespace}) ?? Data(),encoding:.utf8) ?? ""; case "uri": return value.removingPercentEncoding ?? value; case "unicode": return value.replacingOccurrences(of:"\\u",with:" ").split(separator:" ").compactMap{UInt32($0,radix:16).flatMap(UnicodeScalar.init)}.map(String.init).joined(); case "html": return value.replacingOccurrences(of:"&lt;",with:"<").replacingOccurrences(of:"&gt;",with:"> ").replacingOccurrences(of:"&quot;",with:"\"").replacingOccurrences(of:"&#39;",with:"'").replacingOccurrences(of:"&amp;",with:"&"); default:return value } }
-        if op.hasPrefix("regex-") { let pattern=try NSRegularExpression(pattern:input,options:[]); let target=secondary; let matches=pattern.matches(in:target,range:NSRange(target.startIndex...,in:target)); if op=="regex-replace" { let replacement=o["replacement"] ?? ""; return pattern.stringByReplacingMatches(in:target,range:NSRange(target.startIndex...,in:target),withTemplate:replacement) }; return "Pattern: /\(input)/\nMatches: \(matches.count)\n\n" + matches.enumerated().map{ "\($0.offset+1). \(target[Range($0.element.range,in:target)!])" }.joined(separator:"\n") }
-        if op=="jwt-decoder" || op=="jwt-expiration-checker" { let p=input.split(separator:"."); guard p.count==3 else {throw NativeSimpleError.message("A JWT must contain three dot-separated parts.")}; let payload=try JSONSerialization.jsonObject(with:Data(b64(String(p[1])).utf8)) as? [String:Any] ?? [:]; let exp=payload["exp"] as? Double; return prettyJSONObject(["payload":payload,"signaturePresent":!p[2].isEmpty,"expired":exp.map{Date().timeIntervalSince1970 >= $0} as Any]) }
+        if op.hasPrefix("regex-") {
+            guard !secondary.isEmpty else { throw NativeSimpleError.message("Enter a regular expression in the second field.") }
+            let flags=o["flags"] ?? "g"
+            var regexOptions=NSRegularExpression.Options()
+            if flags.contains("i") { regexOptions.insert(.caseInsensitive) }
+            if flags.contains("m") { regexOptions.insert(.anchorsMatchLines) }
+            if flags.contains("s") { regexOptions.insert(.dotMatchesLineSeparators) }
+            let pattern=try NSRegularExpression(pattern:input,options:regexOptions)
+            let range=NSRange(secondary.startIndex...,in:secondary)
+            let matches=pattern.matches(in:secondary,range:range)
+            let rows=matches.enumerated().map { index, match in
+                "\(index+1). \(String(secondary[Range(match.range,in:secondary)!])) at index \(match.range.location)"
+            }.joined(separator:"\n")
+            return "Pattern: /\(input)/\nMatches: \(matches.count)\n\n\(rows.isEmpty ? "No matches" : rows)"
+        }
+        if op=="jwt-decoder" || op=="jwt-expiration-checker" {
+            let parts=input.trimmingCharacters(in:.whitespacesAndNewlines).split(separator:".")
+            guard parts.count==3 else { throw NativeSimpleError.message("A JWT must contain three dot-separated parts.") }
+            let header=try JSONSerialization.jsonObject(with:Data(b64(String(parts[0])).utf8),options:[.fragmentsAllowed])
+            let payload=try JSONSerialization.jsonObject(with:Data(b64(String(parts[1])).utf8),options:[.fragmentsAllowed])
+            let exp=(payload as? [String:Any])?["exp"] as? Double
+            let expiresAt:String
+            let expired:Any
+            if let exp {
+                let formatter=ISO8601DateFormatter(); formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+                expiresAt=formatter.string(from:Date(timeIntervalSince1970:exp)); expired=Date().timeIntervalSince1970 >= exp
+            } else { expiresAt="none"; expired=NSNull() }
+            return prettyJSONObject(["header":header,"payload":payload,"signaturePresent":!parts[2].isEmpty,"expiresAt":expiresAt,"expired":expired])
+        }
         if op=="uuid-generator" { let count=max(1,min(100,Int(o["count"] ?? "10") ?? 10)); return (0..<count).map{_ in UUID().uuidString.lowercased()}.joined(separator:"\n") }
-        if op=="uuid-validator" { return UUID(uuidString:input.trimmingCharacters(in:.whitespacesAndNewlines)) != nil ? "Valid UUID" : "Invalid UUID" }
-        if op=="json-validator" { _=try JSONSerialization.jsonObject(with:Data(input.utf8)); return "Valid JSON." }
-        if op=="json-beautifier" || op=="json-formatter" { let obj=try JSONSerialization.jsonObject(with:Data(input.utf8)); return String(data:try JSONSerialization.data(withJSONObject:obj,options:.prettyPrinted),encoding:.utf8)! }
-        if op=="json-minifier" { let obj=try JSONSerialization.jsonObject(with:Data(input.utf8)); return String(data:try JSONSerialization.data(withJSONObject:obj,options:[]),encoding:.utf8)! }
-        if op=="query-string-parser" { let comps=URLComponents(string:input.isEmpty ? "https://example.com/?a=1&b=2" : input); return (comps?.queryItems ?? []).map{"\($0.name) = \($0.value ?? "")"}.joined(separator:"\n") }
-        if op=="url-parser" { return try runNetwork("url-parser",input:input,options:o) }
-        if op=="http-status-lookup" { let code=input.trimmingCharacters(in:.whitespacesAndNewlines); let map=["200":"OK","201":"Created","204":"No Content","301":"Moved Permanently","302":"Found","304":"Not Modified","400":"Bad Request","401":"Unauthorized","403":"Forbidden","404":"Not Found","405":"Method Not Allowed","409":"Conflict","422":"Unprocessable Content","429":"Too Many Requests","500":"Internal Server Error","502":"Bad Gateway","503":"Service Unavailable","504":"Gateway Timeout"]; return map[code].map{ "\(code) \($0)" } ?? "Unknown status code" }
+        if op=="uuid-validator" { return Self.uuidValidation(input) }
+        if op=="json-validator" { _=try Self.jsonValue(input,pretty:false); return "Valid JSON (RFC 8259-compatible parser)." }
+        if op=="json-beautifier" || op=="json-formatter" { return try Self.jsonValue(input,pretty:true) }
+        if op=="json-minifier" { return try Self.jsonValue(input,pretty:false) }
+        if op=="query-string-parser" { return input }
+        if op=="url-parser" { return try Self.developerURLInfo(input) }
+        if op=="http-status-lookup" {
+            let rows=[("200","OK"),("201","Created"),("204","No Content"),("301","Moved Permanently"),("302","Found"),("304","Not Modified"),("400","Bad Request"),("401","Unauthorized"),("403","Forbidden"),("404","Not Found"),("405","Method Not Allowed"),("409","Conflict"),("422","Unprocessable Content"),("429","Too Many Requests"),("500","Internal Server Error"),("502","Bad Gateway"),("503","Service Unavailable"),("504","Gateway Timeout")]
+            let code=input.trimmingCharacters(in:.whitespacesAndNewlines)
+            return rows.first(where:{$0.0==code}).map{"\($0.0) \($0.1)"} ?? rows.map{"\($0.0) \($0.1)"}.joined(separator:"\n")
+        }
         if op=="data-uri-generator" { return "data:text/plain;base64,\(enc("base64",input))" }
-        if op=="markdown-preview" || op=="markdown-to-html" { return input.replacingOccurrences(of:#"\*\*(.+?)\*\*"#,with:"<strong>$1</strong>",options:.regularExpression).replacingOccurrences(of:#"`(.+?)`"#,with:"<code>$1</code>",options:.regularExpression).replacingOccurrences(of:#"^# (.+)$"#,with:"<h1>$1</h1>",options:[.regularExpression,.anchored]) }
-        if op=="user-agent-parser" { let ua=input.isEmpty ? "Mozilla/5.0" : input; let platform: String = ua.localizedCaseInsensitiveContains("Android") ? "Android" : ua.localizedCaseInsensitiveContains("iPhone") ? "iOS" : ua.localizedCaseInsensitiveContains("Windows") ? "Windows" : ua.localizedCaseInsensitiveContains("Mac OS") ? "macOS" : ua.localizedCaseInsensitiveContains("Linux") ? "Linux" : "Unknown"; return "User-Agent: \(ua)\nPlatform: \(platform)" }
-        if op=="cron-generator" || op=="cron-parser" { return "Cron: \(input.isEmpty ? "* * * * *" : input)\nFive-field format: minute hour day-of-month month day-of-week" }
+        if op=="markdown-preview" || op=="markdown-to-html" { return Self.formatDeveloperMarkup(input) }
+        if op=="user-agent-parser" { return input }
+        if op=="cron-generator" || op=="cron-parser" { return "Cron: \(input.trimmingCharacters(in:.whitespacesAndNewlines))\nFive-field format: minute hour day-of-month month day-of-week" }
         return input
     }
 
@@ -243,6 +274,50 @@ enum NativeUtilityEngine {
     private static func esc(_ s:String)->String { s.replacingOccurrences(of:"&",with:"&amp;").replacingOccurrences(of:"<",with:"&lt;").replacingOccurrences(of:">",with:"&gt;").replacingOccurrences(of:"\"",with:"&quot;") }
     private static func prettyJSONObject(_ obj:[String:Any])->String { String(data:try! JSONSerialization.data(withJSONObject:obj,options:[.prettyPrinted]),encoding:.utf8)! }
     private static func lengthJSON(_ text:String,_ maxCount:Int,_ ok:String,_ bad:String)->String { prettyJSONObject(["characters":text.count,"guidance":text.count <= maxCount ? ok : bad]) }
+
+    private static func jsonValue(_ raw:String,pretty:Bool) throws -> String {
+        let value=try JSONSerialization.jsonObject(with:Data(raw.utf8),options:[.fragmentsAllowed])
+        let options:JSONSerialization.WritingOptions = pretty ? [.prettyPrinted,.fragmentsAllowed] : [.fragmentsAllowed]
+        return String(data:try JSONSerialization.data(withJSONObject:value,options:options),encoding:.utf8) ?? ""
+    }
+    private static func uuidValidation(_ raw:String) -> String {
+        let value=raw.trimmingCharacters(in:.whitespacesAndNewlines)
+        let regex=try! NSRegularExpression(pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",options:[.caseInsensitive])
+        let range=NSRange(value.startIndex...,in:value)
+        guard let match=regex.firstMatch(in:value,range:range),match.range==range,let versionRange=Range(match.range(at:1),in:value) else { return "Invalid UUID" }
+        return "Valid UUID v\(value[versionRange])"
+    }
+    private static func formatDeveloperMarkup(_ input:String) -> String {
+        let normalized=input.replacingOccurrences(of:">\\s+<",with:"><",options:.regularExpression)
+        let tokens=normalized.replacingOccurrences(of:"(<[^>]+>)",with:"\n$1\n",options:.regularExpression).components(separatedBy:"\n").map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}
+        let voidish=try! NSRegularExpression(pattern:"^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$",options:[.caseInsensitive])
+        var depth=0
+        return tokens.map { token in
+            let close=token.hasPrefix("</")
+            if close { depth=max(0,depth-1) }
+            let line=String(repeating:"  ",count:depth)+token
+            let open=token.hasPrefix("<") && !token.hasPrefix("</") && !token.hasPrefix("<!") && !token.hasSuffix("/>")
+            let name=token.replacingOccurrences(of:"^</?([^\\s>/]+).*$",with:"$1",options:.regularExpression)
+            if open && voidish.firstMatch(in:name,range:NSRange(name.startIndex...,in:name)) == nil { depth += 1 }
+            return line
+        }.joined(separator:"\n")
+    }
+    private static func developerURLInfo(_ raw:String) throws -> String {
+        guard var components=URLComponents(string:raw.trimmingCharacters(in:.whitespacesAndNewlines)),let rawScheme=components.scheme,let rawHost=components.host else { throw NativeSimpleError.message("Enter a valid absolute URL.") }
+        let scheme=rawScheme.lowercased(),host=rawHost.lowercased(),port=components.port
+        let effectivePort=(scheme=="http" && port==80)||(scheme=="https" && port==443) ? nil : port
+        components.scheme=scheme; components.host=host; components.port=effectivePort
+        if components.percentEncodedPath.isEmpty { components.percentEncodedPath="/" }
+        let portText=effectivePort.map{":\($0)"} ?? ""
+        let params=(components.queryItems ?? []).reduce(into:[String:String]()) { $0[$1.name]=$1.value ?? "" }
+        return prettyJSONObject([
+            "href":components.string ?? raw,"protocol":"\(scheme):","username":components.user ?? "",
+            "hostname":host,"port":effectivePort.map(String.init) ?? "","pathname":components.percentEncodedPath,
+            "search":components.percentEncodedQuery.flatMap { query in query.isEmpty ? nil : "?\(query)" } ?? "",
+            "hash":components.percentEncodedFragment.flatMap { fragment in fragment.isEmpty ? nil : "#\(fragment)" } ?? "",
+            "origin":"\(scheme)://\(host)\(portText)","params":params
+        ])
+    }
     private static func robotsTest(_ o:[String:String]) throws -> String { let rules=lines(o["robots"] ?? ""); let path=o["path"] ?? "/"; let agent=(o["agent"] ?? "*").lowercased(); var allowed=true; var best = -1; var matched:String?; var agents:[String]=[]; for line in rules { let p=line.split(separator:":",maxSplits:1).map(String.init); guard p.count==2 else {continue}; let k=p[0].lowercased().trimmingCharacters(in:.whitespaces); let v=p[1].trimmingCharacters(in:.whitespaces); if k=="user-agent" {agents=[v.lowercased()]; continue}; if (k=="allow"||k=="disallow") && (agents.contains("*")||agents.contains(agent)) && !v.isEmpty { let pattern="^"+NSRegularExpression.escapedPattern(for:v).replacingOccurrences(of:"\\*",with:".*"); if path.range(of:pattern,options:.regularExpression) != nil && v.count>=best {best=v.count; allowed=k=="allow"; matched=v} } }; return prettyJSONObject(["agent":agent,"path":path,"allowed":allowed,"matchedRule":matched as Any]) }
     private static func sitemapValidator(_ o:[String:String]) throws -> String { let xml=o["xml"] ?? ""; guard !xml.isEmpty else {throw NativeSimpleError.message("Paste sitemap XML first.")}; let root=try? NSRegularExpression(pattern:"<\\s*([A-Za-z0-9:_-]+)",options:[]); let range=NSRange(xml.startIndex..<xml.endIndex,in:xml); let rootName=root?.firstMatch(in:xml,options:[],range:range).flatMap{Range($0.range(at:1),in:xml).map{String(xml[$0])}}?.split(separator:":").last.map(String.init); guard rootName=="urlset"||rootName=="sitemapindex" else {throw NativeSimpleError.message("Root element must be <urlset> or <sitemapindex>.")}; let re=try! NSRegularExpression(pattern:"<loc>(.*?)</loc>",options:.dotMatchesLineSeparators); var urls:[String]=[]; for m in re.matches(in:xml,range:range) {if let r=Range(m.range(at:1),in:xml){urls.append(String(xml[r]).trimmingCharacters(in:.whitespacesAndNewlines))}}; let invalid=urls.filter{URL(string:$0)==nil}; return prettyJSONObject(["valid":invalid.isEmpty,"type":rootName! as String,"urlCount":urls.count,"duplicateCount":urls.count-Set(urls).count,"invalidUrlCount":invalid.count,"invalidUrls":Array(invalid.prefix(20))]) }
     private static func jsonldValidator(_ o:[String:String]) throws -> String { let raw=o["jsonld"] ?? ""; guard let data=raw.data(using:.utf8) else {throw NativeSimpleError.message("Paste JSON-LD first.")}; guard let object=try? JSONSerialization.jsonObject(with:data) else {throw NativeSimpleError.message("Invalid JSON: fix the JSON syntax before validating JSON-LD.")}; let nodes:[[String:Any]] = (object as? [[String:Any]]) ?? [(object as? [String:Any]) ?? [:]]; let missing=nodes.filter{ $0["@context"] == nil }.count; let types=nodes.compactMap{ $0["@type"] as? String }; return prettyJSONObject(["validJson":true,"hasSchemaContext":missing==0,"types":types,"nodeCount":nodes.count]) }

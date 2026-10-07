@@ -2,6 +2,7 @@ package com.chastech.env
 
 import android.os.Build
 import com.chastech.env.data.ToolRecord
+import com.chastech.env.engine.NativeUtilityEngine
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -16,7 +17,10 @@ object NativeBackendEngine {
     private val explicit = setOf("youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader")
     private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video")
 
-    fun supports(tool:ToolRecord):Boolean = tool.id in explicit || tool.category in categoryBackend || tool.engine.type in setOf("developer","image","audio","video","mockup","post","pdf","document-backend")
+    fun supports(tool:ToolRecord):Boolean {
+        if (tool.engine.type == "developer" && NativeUtilityEngine.supports(tool)) return false
+        return tool.id in explicit || tool.category in categoryBackend || tool.engine.type in setOf("developer","image","audio","video","mockup","post","pdf","document-backend")
+    }
 
     fun execute(tool:ToolRecord,input:String,optionsJson:String,files:List<InputFile>):Result {
         val options=runCatching{JSONObject(optionsJson.ifBlank{"{}"})}.getOrElse{JSONObject()}

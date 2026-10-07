@@ -170,7 +170,8 @@ struct NativeFamilyToolView: View {
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "generator", "network", "seo", "developer", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "custom": if tool.category == "productivity" { NativeProductivityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
@@ -247,6 +248,81 @@ private struct NativeUtilityToolView: View {
             NativeOutputView(output: output, error: error)
         }
     }
+}
+
+enum NativeDeveloperToolFormPolicy {
+    static func needsSecondInput(_ op:String) -> Bool { ["diff","regex","replace","compare"].contains { op.contains($0) } }
+    static func needsRegexFlags(_ op:String) -> Bool { op.contains("regex") }
+}
+
+private struct NativePlainTextDocument: FileDocument {
+    static var readableContentTypes:[UTType] { [.plainText] }
+    let text:String
+    init(text:String) { self.text=text }
+    init(configuration:ReadConfiguration) throws { text=String(decoding:configuration.file.regularFileContents ?? Data(),as:UTF8.self) }
+    func fileWrapper(configuration:WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents:Data(text.utf8)) }
+}
+
+private struct NativeDeveloperTextArea: View {
+    let title:String
+    @Binding var text:String
+    var placeholder:String=""
+    var body:some View {
+        VStack(alignment:.leading,spacing:6) {
+            Text(title).font(.footnote.weight(.medium))
+            TextEditor(text:$text).font(.system(.body,design:.monospaced)).scrollContentBackground(.hidden)
+                .frame(minHeight:170).padding(4)
+                .overlay(RoundedRectangle(cornerRadius:10).stroke(Color.envTeal.opacity(0.35)))
+                .overlay(alignment:.topLeading) {
+                    if text.isEmpty && !placeholder.isEmpty { Text(placeholder).font(.system(.body,design:.monospaced)).foregroundStyle(.secondary).padding(.leading,10).padding(.top,12).allowsHitTesting(false) }
+                }
+        }
+    }
+}
+
+private struct NativeDeveloperToolView: View {
+    let tool:Tool
+    @State private var input=""
+    @State private var secondary=""
+    @State private var flags="g"
+    @State private var output=""
+    @State private var error:String?
+    @State private var isExporting=false
+    private var op:String { tool.engine.op ?? tool.engine.id ?? tool.id }
+
+    var body:some View {
+        VStack(alignment:.leading,spacing:12) {
+            NativeDeveloperTextArea(title:"Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
+            if NativeDeveloperToolFormPolicy.needsSecondInput(op) { NativeDeveloperTextArea(title:"Second input / test string",text:$secondary) }
+            if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags",text:$flags) }
+            HStack(spacing:10) {
+                Button("Run tool",action:run).buttonStyle(.borderedProminent)
+                Button("Reset",action:reset).buttonStyle(.bordered)
+            }
+            if !output.isEmpty {
+                HStack(spacing:10) {
+                    Button("Copy") { UIPasteboard.general.string=output }.buttonStyle(.bordered)
+                    Button("Download") { isExporting=true }.buttonStyle(.bordered)
+                }
+            }
+            NativeOutputView(output:output,error:error)
+        }
+        .fileExporter(isPresented:$isExporting,document:NativePlainTextDocument(text:output),contentType:.plainText,defaultFilename:"env-\(op).txt") { result in
+            if case let .failure(caughtError)=result { error=caughtError.localizedDescription }
+        }
+    }
+
+    private func run() {
+        var options=[String:String]()
+        if NativeDeveloperToolFormPolicy.needsSecondInput(op) { options["secondary"]=secondary }
+        if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { options["flags"]=flags }
+        do {
+            let data=try JSONSerialization.data(withJSONObject:options,options:[.sortedKeys])
+            let raw=String(data:data,encoding:.utf8) ?? "{}"
+            output=try NativeUtilityEngine.run(tool,input:input,optionsJSON:raw).text; error=nil
+        } catch let caughtError { output=""; error=caughtError.localizedDescription }
+    }
+    private func reset() { input=""; secondary=""; output=""; error=nil }
 }
 
 private struct NativeConverterToolView: View {
@@ -722,7 +798,10 @@ enum NativeBackendEngine {
     }
     static let backendIDs:Set<String> = ["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader"]
     static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video"]
-    static func supports(_ tool:Tool)->Bool { backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type) }
+    static func supports(_ tool:Tool)->Bool {
+        if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
+        return backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type)
+    }
     fileprivate static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
         let opt=(try? JSONSerialization.jsonObject(with:Data(options.utf8)) as? [String:Any]) ?? [:]
         if ["audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"].contains(tool.id) { guard let f=files.first else{throw NativeNativeError.message("Choose an audio or video file first.")}; return try await multipart("/api/backend/transcribe",fields:["mode":tool.id.hasPrefix("video-") ? "video":"audio","format":tool.id.hasSuffix("-subtitles") ? "srt":"txt","language":(opt["language"] as? String) ?? "auto"],files:[f]) }

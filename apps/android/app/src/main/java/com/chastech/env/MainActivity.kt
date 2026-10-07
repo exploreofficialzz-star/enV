@@ -107,6 +107,7 @@ import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 
@@ -613,7 +614,8 @@ private fun NativeToolForm(tool: ToolRecord) {
             NativeMathExerciseEngine.operationForTool(tool.id) != null -> NativeMathExerciseToolForm(tool.id)
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityToolForm(tool)
+        "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
+        "developer" -> NativeDeveloperToolForm(tool)
     "custom" -> if (tool.category == "productivity") NativeProductivityToolForm(tool.id) else Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -990,6 +992,62 @@ private fun NativeUtilityToolForm(tool: ToolRecord) {
             onReset = { input = ""; options = "{}"; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)
+    }
+}
+
+internal object NativeDeveloperToolFormPolicy {
+    fun needsSecondInput(op: String): Boolean = listOf("diff", "regex", "replace", "compare").any(op::contains)
+    fun needsRegexFlags(op: String): Boolean = op.contains("regex")
+}
+
+@Composable
+private fun NativeDeveloperToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    val op = tool.engine.extras["op"] ?: tool.engine.id
+    var input by rememberSaveable(tool.id) { mutableStateOf("") }
+    var secondary by rememberSaveable(tool.id) { mutableStateOf("") }
+    var flags by rememberSaveable(tool.id) { mutableStateOf("g") }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(output.toByteArray(Charsets.UTF_8)) }
+                ?: throw IllegalStateException("Could not open the selected file.")
+        }.onFailure { error = it.message ?: "Unable to save output." }
+    }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        InputField(input, { input = it }, "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+        if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) {
+            InputField(secondary, { secondary = it }, "Second input / test string", minLines = 5, tall = true)
+        }
+        if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) {
+            InputField(flags, { flags = it }, "Regex flags", minLines = 1, singleLine = true)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val options = JSONObject().apply {
+                    if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) put("secondary", secondary)
+                    if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) put("flags", flags)
+                }.toString()
+                runCatching { NativeUtilityEngine.run(tool, input, options) }
+                    .fold({ output = it.text; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
+            }) { Text("Run tool") }
+            Button(onClick = { input = ""; secondary = ""; output = ""; error = "" }) { Text("Reset") }
+        }
+        if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))
+        }
+        if (output.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp)) {
+                Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(output, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                    OutlinedButton(onClick = { copy(output) }) { Text("Copy") }
+                    OutlinedButton(onClick = { saveLauncher.launch("env-$op.txt") }) { Text("Download") }
+                }
+            }
+        }
     }
 }
 
