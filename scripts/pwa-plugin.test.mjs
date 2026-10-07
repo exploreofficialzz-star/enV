@@ -102,12 +102,15 @@ test("tool and category cards use theme-aware icon strokes and directional click
 test("Home search shows live matches and opens full results only on explicit action", () => {
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const searchBox = readFileSync(join(PROJECT_ROOT, "src/components/tools/search-box.tsx"), "utf8");
+  const brand = readFileSync(join(PROJECT_ROOT, "src/components/brand/logo.tsx"), "utf8");
   assert.match(home, /<SearchBox[\s\S]*?onValueChange=\{setQuery\}[\s\S]*?onEnter=\{openSearchResults\}/);
   assert.match(home, /hidePlaceholderOnFocus/);
   assert.match(home, /to: "\/search", search: \{ q: searchQuery\.trim\(\) \}/);
   assert.doesNotMatch(home, /navigate\(\{ to: "\/tools"/);
   assert.match(home, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
   assert.match(home, /hidden md:flex/);
+  assert.match(home, /leading=\{<Logo size="search"/);
+  assert.match(brand, /search: "h-9 w-14"/);
   assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
   assert.match(searchBox, /searchTools\(getAllTools\(\), q, 8\)/);
   assert.match(searchBox, /placeholder=\{hidePlaceholderOnFocus && focused \? "" : placeholder\}/);
