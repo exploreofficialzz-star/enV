@@ -131,6 +131,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /pt-1/);
   assert.match(home, /sm:pt-1/);
   assert.match(home, /className="mt-4 max-w-3xl sm:mt-5"/);
+  assert.match(home, /pl-\[76px\]/);
   assert.match(home, /sm:mt-5/);
   assert.match(home, /getPopularTools\(12\)/);
   assert.match(home, /index >= 6 \? "hidden md:flex"/);

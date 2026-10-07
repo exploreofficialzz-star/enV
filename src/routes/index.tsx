@@ -32,7 +32,7 @@ function Home() {
           leading={<Logo size="search" className="shrink-0" />}
           showSearchIcon={false}
           className="mt-4 max-w-3xl sm:mt-5"
-          inputClassName="h-16 rounded-2xl border border-border-strong bg-surface px-4 pl-14 pr-14 text-base shadow-[var(--shadow-border)] transition focus-visible:ring-4 focus-visible:ring-accent/10 sm:h-[72px] sm:text-lg"
+          inputClassName="h-16 rounded-2xl border border-border-strong bg-surface px-4 pl-[76px] pr-14 text-base shadow-[var(--shadow-border)] transition focus-visible:ring-4 focus-visible:ring-accent/10 sm:h-[72px] sm:text-lg"
           trailing={(
             <button
               type="button"
