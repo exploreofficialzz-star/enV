@@ -77,6 +77,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -259,6 +260,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     onValueChange = onQuery,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search for a tool") },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
                     leadingIcon = { EnVLogo(Modifier.width(36.dp).height(24.dp), darkTheme = darkMode) },
                     trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) } },
                     singleLine = true,

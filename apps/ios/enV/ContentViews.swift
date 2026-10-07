@@ -25,6 +25,7 @@ struct HomeView: View {
                             EnVLogo().frame(width: 40, height: 28)
                             TextField("Search for a tool", text: $searchText)
                                 .font(.body)
+                                .multilineTextAlignment(.center)
                                 .submitLabel(.search)
                                 .onSubmit { onSearch(searchText) }
                             Button { onSearch(searchText) } label: {

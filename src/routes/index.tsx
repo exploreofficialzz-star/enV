@@ -33,7 +33,7 @@ function Home() {
           leading={<Logo size="search" className="shrink-0" />}
           className="mt-4 max-w-3xl sm:mt-5"
           containerClassName="flex h-16 w-full items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:h-[72px] sm:gap-4 sm:px-5"
-          inputClassName="min-w-0 flex-1 bg-transparent text-left text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
+          inputClassName="min-w-0 flex-1 bg-transparent text-center text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
           trailing={(
             <button
               type="button"
