@@ -4,9 +4,20 @@ import XCTest
 final class NativeMimeEngineTests: XCTestCase {
     private let activeIDs: Set<String> = ["mime-lookup", "mime-type-lookup"]
 
+    private func tool(_ id: String, category: String) -> Tool {
+        Tool(id: id, name: id, slug: id, description: "", category: category, keywords: [], tags: [], icon: "File", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "mime", id: "lookup", op: "lookup"))
+    }
+
     func testCanonicalActiveMimeIDsHaveTheSameLocalLookupOperation() {
         XCTAssertEqual(NativeMimeEngine.supportedToolIDs, activeIDs)
         activeIDs.forEach { XCTAssertEqual(NativeMimeEngine.operation(forToolID: $0), "lookup") }
+    }
+
+    func testActiveMimeToolsBypassBroadCategoryBackendRouting() {
+        for candidate in [tool("mime-lookup", category: "developer"), tool("mime-type-lookup", category: "files")] {
+            XCTAssertFalse(NativeBackendEngine.supports(candidate), candidate.id)
+            XCTAssertTrue(NativeCoverage.isLocallyExecutable(candidate), candidate.id)
+        }
     }
 
     func testLookupSearchesExtensionMimeNameAndGroupOffline() throws {
