@@ -7,6 +7,7 @@ package com.chastech.env
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
@@ -112,12 +113,13 @@ class MainActivity : ComponentActivity() {
             val darkMode = when (themeMode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
             SideEffect {
                 val systemBarColor = if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                val supportsLightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1
                 window.statusBarColor = systemBarColor
-                window.navigationBarColor = systemBarColor
+                window.navigationBarColor = if (darkMode || !supportsLightNavigationBar) android.graphics.Color.BLACK else android.graphics.Color.WHITE
                 window.decorView.setBackgroundColor(systemBarColor)
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !darkMode
-                    isAppearanceLightNavigationBars = !darkMode
+                    isAppearanceLightNavigationBars = !darkMode && supportsLightNavigationBar
                 }
             }
             EnVTheme(darkTheme = darkMode) {

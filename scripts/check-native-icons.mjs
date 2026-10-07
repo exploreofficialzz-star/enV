@@ -46,6 +46,8 @@ for (const name of new Set([...catalog.tools, ...catalog.categories].map((entry)
 
 const androidAssets = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt"), "utf8");
 const androidHome = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), "utf8");
+const androidBaseStyles = readFileSync(path.join(root, "apps/android/app/src/main/res/values/styles.xml"), "utf8");
+const androidApi27Styles = readFileSync(path.join(root, "apps/android/app/src/main/res/values-v27/styles.xml"), "utf8");
 const iosApp = readFileSync(path.join(root, "apps/ios/enV/enVApp.swift"), "utf8");
 const iosHome = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
 const iosCards = readFileSync(path.join(root, "apps/ios/enV/ToolViews.swift"), "utf8");
@@ -72,6 +74,7 @@ assert.ok(iosHome.includes('Text("All tools")') && iosHome.includes('TextField("
 assert.ok(androidHome.includes('EnVIcon("ArrowRight"') && androidHome.includes('tint = MaterialTheme.colorScheme.onSurface'), "Android tool cards must show adaptive native tool icons and a visible click arrow");
 assert.ok(iosCards.includes('EnVIcon(name: "ArrowRight"') && iosCards.includes('tint: .primary'), "iOS tool cards must show adaptive native tool icons and a visible click arrow");
 assert.ok(androidHome.includes("SideEffect {") && androidHome.includes("window.statusBarColor = systemBarColor") && androidHome.includes("WindowCompat.getInsetsController") && androidHome.includes("isAppearanceLightStatusBars = !darkMode"), "Android status and navigation bars must follow the active theme with readable system icons");
+assert.ok(!androidBaseStyles.includes("windowLightNavigationBar") && androidApi27Styles.includes("android:windowLightNavigationBar") && androidHome.includes("Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1"), "Android light-navigation styling must be API-27-qualified for minSdk 26");
 assert.ok(iosApp.includes("envChrome = adaptive(light: 0xFFFFFF, dark: 0x000000)") && iosApp.includes(".toolbarBackground(Color.envChrome, for: .navigationBar)"), "iOS browser-like navigation and safe-area chrome must be white in light mode and black in dark mode");
 assert.ok(androidHome.includes("top = 4.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 2.dp).width(142.dp).height(56.dp)"), "Android home must use 4dp header spacing and 16dp brand-to-search spacing");
 assert.ok(iosHome.includes(".padding(.top, 4)") && iosHome.includes("VStack(alignment: .center, spacing: 16)") && iosHome.includes(".frame(width: 142, height: 56)"), "iOS home must use 4pt header spacing and 16pt brand-to-search spacing");
