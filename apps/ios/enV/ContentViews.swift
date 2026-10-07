@@ -38,10 +38,10 @@ struct HomeView: View {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
                         HStack(spacing: 8) {
                             HomePreviewBar(title: "AI assistant").frame(maxWidth: .infinity)
-                            HomePreviewBar(title: "Token = 100").frame(maxWidth: .infinity)
+                            HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 20)
                         .padding(.top, 4)
                         Text("A focused toolkit for\neveryday work.")
                             .font(.system(size: 28, weight: .semibold))
@@ -296,13 +296,13 @@ private struct HomePreviewBar: View {
 
     var body: some View {
         Text(title)
-            .font(.subheadline.weight(.medium))
+            .font(.caption.weight(.medium))
             .foregroundStyle(Color.envMuted)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .frame(height: 40)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))

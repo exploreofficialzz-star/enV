@@ -83,10 +83,10 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /index >= 6 \? "hidden md:block"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI assistant/);
-  assert.match(home, /Token = 100/);
-  assert.match(home, /mt-4 grid w-\[92%\] max-w-\[44rem\] grid-cols-2 gap-2/);
+  assert.match(home, /Total token = 100/);
+  assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
-  assert.match(home, /text-center text-xs/);
+  assert.match(home, /text-center text-\[10px\]/);
   assert.match(home, /md:grid-cols-3/);
   assert.doesNotMatch(home, /Explore all tools/);
   assert.match(home, /<br className="sm:hidden"\s*\/>/);

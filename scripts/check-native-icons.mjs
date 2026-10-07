@@ -52,10 +52,10 @@ assert.ok(androidAssets.includes('"native-icons/logo-home-transparent.png"') && 
 assert.ok(iosApp.includes('native-icons/logo-home-transparent.png') && iosApp.includes('native-icons/logo-home-dark.png'), "iOS must load cropped home logo variants");
 assert.ok(androidHome.includes("homeHero = true"), "Android home must use the cropped hero logo");
 assert.ok(iosHome.includes("EnVLogo(homeHero: true)"), "iOS home must use the cropped hero logo");
-assert.ok(androidHome.includes('HomePreviewBar("AI assistant", Modifier.weight(1f))') && androidHome.includes('HomePreviewBar("Token = 100", Modifier.weight(1f))'), "Android home must include equal-width horizontal preview bars with the requested labels");
-assert.ok(iosHome.includes('HomePreviewBar(title: "AI assistant").frame(maxWidth: .infinity)') && iosHome.includes('HomePreviewBar(title: "Token = 100").frame(maxWidth: .infinity)'), "iOS home must include equal-width horizontal preview bars with the requested labels");
-assert.ok(androidHome.includes("padding(start = 12.dp, top = 6.dp, end = 12.dp)") && androidHome.includes("contentAlignment = Alignment.Center"), "Android preview bars must be inset and center their text");
-assert.ok(iosHome.includes(".padding(.horizontal, 10)") && iosHome.includes("alignment: .center") && iosHome.includes("multilineTextAlignment(.center)"), "iOS preview bars must be inset and center their text");
+assert.ok(androidHome.includes('HomePreviewBar("AI assistant", Modifier.weight(1f))') && androidHome.includes('HomePreviewBar("Total token = 100", Modifier.weight(1f))'), "Android home must include equal-width horizontal preview bars with the requested labels");
+assert.ok(iosHome.includes('HomePreviewBar(title: "AI assistant").frame(maxWidth: .infinity)') && iosHome.includes('HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)'), "iOS home must include equal-width horizontal preview bars with the requested labels");
+assert.ok(androidHome.includes("padding(start = 20.dp, top = 6.dp, end = 20.dp)") && androidHome.includes("contentAlignment = Alignment.Center"), "Android preview bars must have wider side insets and centered text");
+assert.ok(iosHome.includes(".padding(.horizontal, 20)") && iosHome.includes("alignment: .center") && iosHome.includes("multilineTextAlignment(.center)"), "iOS preview bars must have wider side insets and centered text");
 assert.ok(androidHome.includes("Arrangement.spacedBy(8.dp)") && iosHome.includes("HStack(spacing: 8)"), "Native preview bars must be separated from each other");
 assert.ok(androidHome.includes("modifier.height(40.dp)"), "Android preview bars must be smaller than the search field");
 assert.ok(iosHome.includes(".frame(height: 40)"), "iOS preview bars must be smaller than the search field");
