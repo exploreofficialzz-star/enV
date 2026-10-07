@@ -17,20 +17,12 @@ class NativeDeveloperToolTest {
         status = "active", related = emptyList(), engine = EngineInfo(engineType, op, mapOf("op" to op)),
     )
 
-    @Test fun exactLocalDeveloperOperationsBypassCategoryBackendWithoutBroadeningFallback() {
-        val operations = listOf(
-            "cron-generator", "cron-parser", "data-uri-generator", "http-status-lookup",
-            "json-beautifier", "json-formatter", "json-minifier", "json-validator",
-            "jwt-decoder", "jwt-expiration-checker", "markdown-preview", "markdown-to-html",
-            "query-string-parser", "regex-replace", "regex-tester", "url-parser",
-            "user-agent-parser", "uuid-generator", "uuid-validator",
-        )
-        operations.forEach { op ->
+    @Test fun allDeveloperOperationsRemainNativeLocalAndBypassCategoryBackend() {
+        listOf("cron-generator", "json-formatter", "regex-tester", "url-parser", "uuid-validator", "ascii-encoder", "csv-formatter", "mime-validator", "xml-validator", "file-hash-calculator", "future-developer-operation").forEach { op ->
             val candidate = tool(op)
-            assertTrue("$op needs its exact local engine", NativeUtilityEngine.supports(candidate))
-            assertFalse("$op must not be sent to the generic backend", NativeBackendEngine.supports(candidate))
+            assertTrue("$op needs its local Developer engine", NativeUtilityEngine.supports(candidate))
+            assertFalse("$op must not be sent to generic backend", NativeBackendEngine.supports(candidate))
         }
-        assertTrue("unimplemented Developer tools keep the backend fallback", NativeBackendEngine.supports(tool("not-yet-native")))
         assertFalse(NativeBackendEngine.supports(tool("unrelated", engineType = "custom", category = "misc")))
     }
 
@@ -61,7 +53,7 @@ class NativeDeveloperToolTest {
         assertEquals(expected, NativeUtilityEngine.run(tool("regex-replace"), "cat", options).text)
     }
 
-    @Test fun urlParserReturnsTheBrowserJsonContractAndLastDuplicateQueryValue() {
+    @Test fun urlParserReturnsBrowserJsonContractAndLastDuplicateQueryValue() {
         val output = NativeUtilityEngine.run(tool("url-parser"), "https://example.com:8080/path?q=1&q=2#top").text
         val json = JSONObject(output)
         assertEquals("https://example.com:8080/path?q=1&q=2#top", json.getString("href"))
@@ -75,8 +67,19 @@ class NativeDeveloperToolTest {
         assertEquals("2", json.getJSONObject("params").getString("q"))
     }
 
-    @Test fun developerFallbacksAndValidatorsMatchTheWebOutput() {
-        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
+    @Test fun browserVerifiedEncodingCsvMimeMarkupAndFallbacksMatch() {
+        assertEquals("4869", NativeUtilityEngine.run(tool("ascii-encoder"), "Hi").text)
+        assertEquals("name,age\nAda,36\nGrace,40", NativeUtilityEngine.run(tool("csv-formatter"), "name,age\nAda,36\nGrace,40").text)
+        assertEquals("application/pdf", NativeUtilityEngine.run(tool("mime-validator"), "pdf").text)
+        assertEquals("Valid markup/XML.", NativeUtilityEngine.run(tool("xml-validator"), "<root><child>ok</child></root>").text)
+        assertEquals("template", NativeUtilityEngine.run(tool("developer-api-mock-response-generator"), "  template  ").text)
+        val invalidUrl = runCatching { NativeUtilityEngine.run(tool("data-uri-generator"), "hello") }.exceptionOrNull()
+        assertTrue(invalidUrl?.message?.contains("Failed to construct 'URL': Invalid URL") == true)
+        assertEquals("Use a local file input for the file hash tool.", runCatching { NativeUtilityEngine.run(tool("file-hash-calculator"), "hello") }.exceptionOrNull()?.message)
+        assertEquals("422 Unprocessable Content", NativeUtilityEngine.run(tool("http-status-lookup"), "422").text)
+    }
+
+    @Test fun webDocumentedValidatorsStatusAndFallbacksMatch() {
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
         assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "not-a-uuid").text)
