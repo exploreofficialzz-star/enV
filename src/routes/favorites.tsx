@@ -26,7 +26,7 @@ function Favorites() {
           <div className="mt-8 rounded-xl bg-surface p-6 text-sm shadow-[var(--shadow-border)]">
             <p className="font-medium">No saved tools yet.</p>
             <p className="mt-1 text-muted">Open a tool and press Save to keep it here.</p>
-            <Link to="/tools" className="mt-4 inline-flex rounded-md bg-accent px-4 py-2 font-medium text-white">Browse tools</Link>
+            <Link to="/tools" search={{ q: "" }} className="mt-4 inline-flex rounded-md bg-accent px-4 py-2 font-medium text-white">Browse tools</Link>
           </div>
         ) : (
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

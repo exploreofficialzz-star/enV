@@ -54,6 +54,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -234,7 +235,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Tools.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -302,7 +303,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
                         IconButton(onClick = { onCategory(null) }, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
                             EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
                         }
-                        Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     selectedCategory?.description?.takeIf { it.isNotBlank() }?.let {
                         Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -317,10 +318,12 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
             }
             if (visibleCount < categoryTools.size) {
                 item {
-                    OutlinedButton(onClick = { visibleCounts[category] = minOf(visibleCount + 6, categoryTools.size) }, modifier = Modifier.fillMaxWidth()) {
-                        Text("See more tools")
-                        Spacer(Modifier.width(8.dp))
-                        EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        TextButton(onClick = { visibleCounts[category] = minOf(visibleCount + 6, categoryTools.size) }) {
+                            Text("See more tools", color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             }
@@ -358,16 +361,18 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
                                 Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text(groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         tools.take(visible).forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
                         if (visible < tools.size) {
-                            OutlinedButton(onClick = { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }) {
-                                Text("See more tools")
-                                Spacer(Modifier.width(8.dp))
-                                EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                TextButton(onClick = { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }) {
+                                    Text("See more tools", color = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
@@ -898,7 +903,7 @@ private fun ToolList(tools: List<ToolRecord>, favorites: Set<String>, onTool: (S
 private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-            Row(Modifier.weight(1f).clickable { onTool(tool.id) }, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).clickable { onTool(tool.id) }, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                         Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
@@ -910,8 +915,10 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                     } else if (tool.clientSide && !tool.requiresBackend) {
                         StatusPill("On device", Modifier.padding(top = 10.dp))
                     }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
+                        EnVIcon("ArrowRight", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
-                EnVIcon("ArrowRight", Modifier.padding(start = 8.dp).size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
             }
             IconButton(onClick = { onToggle(tool.id) }, modifier = Modifier.semantics { contentDescription = if (favorite) "Remove ${tool.name} from saved" else "Save ${tool.name}" }) {
                 EnVIcon("Heart", tint = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)

@@ -74,11 +74,16 @@ test("All Tools groups results by category and progressively expands without glo
   assert.match(tools, /flex items-center gap-4/);
   assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
+  assert.match(tools, /validateSearch: \(search: Record<string, unknown>\).*q:/s);
+  assert.match(tools, /const \{ q \} = Route\.useSearch\(\)/);
   assert.match(tools, /CATEGORIES\.map/);
   assert.match(tools, /INITIAL_TOOLS_PER_CATEGORY = 3/);
   assert.match(tools, /MORE_TOOLS_PER_CLICK = 6/);
   assert.match(tools, /See more tools/);
   assert.match(tools, /ChevronDown/);
+  assert.match(tools, /text-lg font-bold text-accent/);
+  assert.match(tools, /flex justify-end/);
+  assert.match(tools, /text-accent/);
   assert.doesNotMatch(tools, /Tool availability filter|Coming Soon \(|PAGE_SIZE|Showing \d+–|Page \{safePage\}/);
 });
 
@@ -88,9 +93,17 @@ test("tool and category cards use theme-aware icon strokes and directional click
   assert.match(toolCard, /toolIcon\(tool\.icon\)/);
   assert.match(toolCard, /ArrowRight/);
   assert.match(toolCard, /text-black dark:text-white/);
+  assert.ok(toolCard.indexOf('className="mt-auto flex justify-end pt-3"') > toolCard.indexOf("tool.description"), "Tool arrow should sit at the bottom-right after the description");
   assert.match(categoryCard, /toolIcon\(category\.icon\)/);
   assert.match(categoryCard, /ArrowRight/);
   assert.match(categoryCard, /text-black dark:text-white/);
+});
+
+test("Home trending cards show tool arrows and Home search opens the filtered All Tools catalog", () => {
+  const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
+  assert.match(home, /navigate\(\{ to: "\/tools", search: \{ q: query\.trim\(\) \} \}\)/);
+  assert.match(home, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
+  assert.match(home, /hidden md:flex/);
 });
 
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {
@@ -113,7 +126,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /className="mt-4 flex h-16/);
   assert.match(home, /sm:mt-5/);
   assert.match(home, /getPopularTools\(12\)/);
-  assert.match(home, /index >= 6 \? "hidden md:block"/);
+  assert.match(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI assistant/);
   assert.match(home, /Total token = 100/);

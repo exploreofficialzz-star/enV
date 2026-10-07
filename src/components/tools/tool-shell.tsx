@@ -40,7 +40,7 @@ export function ToolShell({
           Home
         </Link>
         <span aria-hidden="true">/</span>
-        <Link to="/tools" className="hover:text-fg">
+        <Link to="/tools" search={{ q: "" }} className="hover:text-fg">
           Tools
         </Link>
         <span aria-hidden="true">/</span>

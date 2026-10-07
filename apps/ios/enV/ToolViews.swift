@@ -9,7 +9,7 @@ struct ToolCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             NavigationLink(value: tool) {
-                HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         iconTile(tool.icon)
                         Text(tool.name)
@@ -34,7 +34,11 @@ struct ToolCard: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    EnVIcon(name: "ArrowRight", size: 16, tint: .primary)
+                    HStack {
+                        Spacer(minLength: 0)
+                        EnVIcon(name: "ArrowRight", size: 16, tint: .primary)
+                    }
+                    .padding(.top, 10)
                 }
                 .contentShape(Rectangle())
             }

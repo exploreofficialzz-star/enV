@@ -23,7 +23,7 @@ function Category() {
         <div className="flex items-center gap-3">
           <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-black dark:text-white"><Icon className="size-5" aria-hidden="true" /></span>
           <div>
-            <h1 className="text-3xl font-semibold">{meta?.name ?? category}</h1>
+            <h1 className="text-3xl font-bold text-accent">{meta?.name ?? category}</h1>
             <p className="mt-1 text-muted">{meta?.description ?? "Tools in this category."}</p>
           </div>
         </div>
@@ -35,10 +35,12 @@ function Category() {
               {tools.slice(0, visibleCount).map((tool) => <ToolCard key={tool.id} tool={tool} />)}
             </div>
             {visibleCount < tools.length ? (
-              <button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, tools.length))} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-medium text-fg shadow-[var(--shadow-border)] hover:bg-surface-2">
-                See more tools
-                <ChevronDown className="size-4 text-black dark:text-white" aria-hidden="true" />
-              </button>
+              <div className="mt-4 flex justify-end">
+                <button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, tools.length))} className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] hover:bg-surface-2">
+                  See more tools
+                  <ChevronDown className="size-4 text-accent" aria-hidden="true" />
+                </button>
+              </div>
             ) : null}
           </>
         )}

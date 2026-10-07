@@ -25,6 +25,7 @@ export function Header() {
           </Link>
           <Link
             to="/tools"
+            search={{ q: "" }}
             aria-label="Tools"
             title="Tools"
             className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg"

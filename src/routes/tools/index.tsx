@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
@@ -9,14 +9,19 @@ import { getAllTools } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 
-export const Route = createFileRoute("/tools/")({ component: Tools });
+export const Route = createFileRoute("/tools/")({
+  validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
+  component: Tools,
+});
 
 const INITIAL_TOOLS_PER_CATEGORY = 3;
 const MORE_TOOLS_PER_CLICK = 6;
 
 function Tools() {
   const all = getAllTools();
-  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const { q } = Route.useSearch();
+  const query = q;
   const [visibleByCategory, setVisibleByCategory] = useState<Record<string, number>>({});
   const matchingTools = useMemo(() => searchTools(all, query, all.length), [all, query]);
   const sections = useMemo(
@@ -33,7 +38,7 @@ function Tools() {
         <div className="flex items-center gap-4">
           <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
           <div className="ml-auto min-w-0 w-[52vw] shrink-0 max-w-[18rem]">
-            <SearchBox value={query} onValueChange={(value) => { setQuery(value); setVisibleByCategory({}); }} />
+            <SearchBox value={query} onValueChange={(value) => { setVisibleByCategory({}); void navigate({ to: "/tools", search: { q: value }, replace: true }); }} />
           </div>
         </div>
         <p className="mt-2 text-muted">Find a tool by name or browse the categories below.</p>
@@ -52,7 +57,7 @@ function Tools() {
                       <Icon className="size-5" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <h2 className="text-lg font-semibold text-fg">{category.name}</h2>
+                      <h2 className="text-lg font-bold text-accent">{category.name}</h2>
                       <p className="text-xs text-muted">{category.blurb}</p>
                     </div>
                   </div>
@@ -60,18 +65,20 @@ function Tools() {
                     {visibleTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
                   </div>
                   {visibleCount < tools.length ? (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleByCategory((current) => ({
-                        ...current,
-                        [category.id]: Math.min(visibleCount + MORE_TOOLS_PER_CLICK, tools.length),
-                      }))}
-                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-medium text-fg shadow-[var(--shadow-border)] transition-colors hover:bg-surface-2"
-                      aria-label={`See more ${category.name} tools`}
-                    >
-                      See more tools
-                      <ChevronDown className="size-4" aria-hidden="true" />
-                    </button>
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleByCategory((current) => ({
+                          ...current,
+                          [category.id]: Math.min(visibleCount + MORE_TOOLS_PER_CLICK, tools.length),
+                        }))}
+                        className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] transition-colors hover:bg-surface-2"
+                        aria-label={`See more ${category.name} tools`}
+                      >
+                        See more tools
+                        <ChevronDown className="size-4 text-accent" aria-hidden="true" />
+                      </button>
+                    </div>
                   ) : null}
                 </section>
               );

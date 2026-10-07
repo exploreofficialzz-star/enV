@@ -1,10 +1,11 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
+import { ToolCard } from "@/components/tools/tool-card";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getPopularTools, toolPath } from "@/lib/registry";
+import { getPopularTools } from "@/lib/registry";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -15,7 +16,7 @@ function Home() {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void navigate({ to: "/search", search: { q: query.trim() } });
+    void navigate({ to: "/tools", search: { q: query.trim() } });
   }
 
   return (
@@ -67,12 +68,7 @@ function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof
         <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        {tools.map((tool, index) => (
-          <Link key={tool.id} to={toolPath(tool)} className={`rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent ${index >= 6 ? "hidden md:block" : ""}`}>
-            <h3 className="font-medium">{tool.name}</h3>
-            <p className="mt-1 text-sm text-muted">{tool.description}</p>
-          </Link>
-        ))}
+        {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
       </div>
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
     </section>

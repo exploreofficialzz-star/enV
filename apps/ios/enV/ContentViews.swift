@@ -77,7 +77,7 @@ private struct ToolCategoryGroup: Identifiable {
 
 struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
-    @State private var toolsQuery = ""
+    @Binding var toolsQuery: String
     @State private var visibleByCategory: [String: Int] = [:]
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
@@ -131,8 +131,8 @@ struct ToolsView: View {
                                     iconTile(group.category.icon)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(group.category.name)
-                                            .font(.headline.weight(.semibold))
-                                            .foregroundStyle(Color.envInk)
+                                            .font(.headline.weight(.bold))
+                                            .foregroundStyle(Color.envAccent)
                                         Text(group.category.blurb)
                                             .font(.caption)
                                             .foregroundStyle(Color.envMuted)
@@ -143,23 +143,25 @@ struct ToolsView: View {
                                     ForEach(group.tools.prefix(visibleCount)) { tool in ToolCard(tool: tool) }
                                 }
                                 if visibleCount < group.tools.count {
-                                    Button {
-                                        visibleByCategory[group.id] = min(visibleCount + 6, group.tools.count)
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Text("See more tools")
-                                            Spacer(minLength: 0)
-                                            EnVIcon(name: "ChevronDown", size: 16, tint: .primary)
+                                    HStack {
+                                        Spacer()
+                                        Button {
+                                            visibleByCategory[group.id] = min(visibleCount + 6, group.tools.count)
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Text("See more tools")
+                                                EnVIcon(name: "ChevronDown", size: 16, tint: .envAccent)
+                                            }
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(Color.envAccent)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 10)
+                                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                                         }
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(Color.envInk)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("See more \(group.category.name) tools")
                                     }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("See more \(group.category.name) tools")
                                 }
                             }
                         }
@@ -198,22 +200,24 @@ struct CategoryView: View {
                     ToolList(tools: Array(categoryTools.prefix(visibleCount)))
                 }
                 if visibleCount < categoryTools.count {
-                    Button {
-                        visibleCount = min(visibleCount + 6, categoryTools.count)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("See more tools")
-                            Spacer(minLength: 0)
-                            EnVIcon(name: "ChevronDown", size: 16, tint: .primary)
+                    HStack {
+                        Spacer()
+                        Button {
+                            visibleCount = min(visibleCount + 6, categoryTools.count)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("See more tools")
+                                EnVIcon(name: "ChevronDown", size: 16, tint: .envAccent)
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.envAccent)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                         }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.envInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(16)

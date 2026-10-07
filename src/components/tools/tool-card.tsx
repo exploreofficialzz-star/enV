@@ -24,11 +24,8 @@ export function ToolCard({
         className,
       )}
     >
-      <span className="flex items-start justify-between gap-3">
-        <span className="inline-flex size-9 items-center justify-center rounded-md bg-accent-soft text-black dark:text-white">
-          <Icon className="size-4" aria-hidden="true" />
-        </span>
-        <ArrowRight className="mt-1 size-4 shrink-0 text-black dark:text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      <span className="inline-flex size-9 items-center justify-center rounded-md bg-accent-soft text-black dark:text-white">
+        <Icon className="size-4" aria-hidden="true" />
       </span>
       <span className="mt-3 text-sm font-semibold tracking-tight text-fg group-hover:text-accent">
         {tool.name}
@@ -41,6 +38,9 @@ export function ToolCard({
           In-browser
         </span>
       ) : null}
+      <span className="mt-auto flex justify-end pt-3">
+        <ArrowRight className="size-4 text-black dark:text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </span>
     </Link>
   );
 }
