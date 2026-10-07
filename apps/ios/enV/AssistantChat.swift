@@ -5,6 +5,7 @@ struct AssistantChatMessage: Identifiable, Equatable {
     let id = UUID()
     let role: String
     let content: String
+    var recommendedToolIds: [String] = []
 
     var isUser: Bool { role == "user" }
 }
@@ -14,22 +15,21 @@ private struct AssistantPayloadMessage: Encodable {
     let content: String
 }
 
+private struct AssistantPayloadCandidate: Encodable {
+    let id: String
+    let name: String
+    let description: String
+    let category: String
+}
+
 private struct AssistantRunInput: Encodable {
     let messages: [AssistantPayloadMessage]
+    let candidates: [AssistantPayloadCandidate]
 }
 
 private struct AssistantRunRequest: Encodable {
     let task: String
     let input: AssistantRunInput
-}
-
-private struct AssistantTaskAvailability: Decodable {
-    let available: Bool
-}
-
-private struct AssistantStatusEnvelope: Decodable {
-    let ok: Bool
-    let tasks: [String: AssistantTaskAvailability]?
 }
 
 private struct AssistantServiceError: Decodable {
@@ -38,6 +38,7 @@ private struct AssistantServiceError: Decodable {
 
 private struct AssistantReply: Decodable {
     let reply: String
+    let recommendedToolIds: [String]
 }
 
 private struct AssistantRunData: Decodable {
@@ -57,14 +58,25 @@ private enum AssistantClientError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingServer: return "The enV AI server is not configured for this app build."
+        case .missingServer: return "Assistant is unavailable in this build."
         case .unavailable(let message): return message
         case .invalidReply: return "The assistant response was not usable. Please try again."
         }
     }
 }
 
-/// Native iOS client. Provider keys never leave the server; URLSession handles the server session cookie.
+private struct PendingAssistantRequest {
+    let history: [AssistantChatMessage]
+    let conversation: [AssistantChatMessage]
+    let candidates: [AssistantPayloadCandidate]
+}
+
+private struct ScoredAssistantTool {
+    let tool: Tool
+    let score: Int
+}
+
+/// Native iOS client. Provider keys never leave the server; URLSession handles the enV session cookie.
 private enum NativeAssistantClient {
     private static var baseURL: URL? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
@@ -74,21 +86,20 @@ private enum NativeAssistantClient {
         return url
     }
 
-    static func isAvailable() async throws -> Bool {
-        let data = try await sendRequest(path: ["api", "ai", "status"], method: "GET", body: nil)
-        let envelope = try JSONDecoder().decode(AssistantStatusEnvelope.self, from: data)
-        return envelope.ok && envelope.tasks?["assistant.chat"]?.available == true
-    }
-
-    static func reply(to messages: [AssistantChatMessage]) async throws -> String {
-        let input = AssistantRunInput(messages: messages.map { AssistantPayloadMessage(role: $0.role, content: $0.content) })
+    static func reply(to messages: [AssistantChatMessage], candidates: [AssistantPayloadCandidate]) async throws -> AssistantReply {
+        let input = AssistantRunInput(
+            messages: messages.map { AssistantPayloadMessage(role: $0.role, content: $0.content) },
+            candidates: candidates
+        )
         let body = try JSONEncoder().encode(AssistantRunRequest(task: "assistant.chat", input: input))
         let data = try await sendRequest(path: ["api", "ai", "run"], method: "POST", body: body)
         let envelope = try JSONDecoder().decode(AssistantRunEnvelope.self, from: data)
-        guard envelope.ok, let reply = envelope.data?.result.reply.trimmingCharacters(in: .whitespacesAndNewlines), !reply.isEmpty else {
+        guard envelope.ok,
+              let result = envelope.data?.result,
+              !result.reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AssistantClientError.unavailable(envelope.error?.message ?? AssistantClientError.invalidReply.localizedDescription)
         }
-        return reply
+        return result
     }
 
     private static func sendRequest(path: [String], method: String, body: Data?) async throws -> Data {
@@ -102,12 +113,11 @@ private enum NativeAssistantClient {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        // URLSession.shared uses the app's standard cookie store for the enV session cookie.
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AssistantClientError.invalidReply }
         guard (200...299).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode(AssistantRunEnvelope.self, from: data).error?.message)
-                ?? "The AI assistant is temporarily unavailable. Please try again."
+                ?? "The assistant is temporarily unavailable. Please try again."
             throw AssistantClientError.unavailable(message)
         }
         return data
@@ -115,56 +125,42 @@ private enum NativeAssistantClient {
 }
 
 struct AssistantChatView: View {
+    @EnvironmentObject private var store: CatalogStore
     @Binding var messages: [AssistantChatMessage]
     @State private var draft = ""
-    @State private var available: Bool?
-    @State private var availabilityAttempt = 0
-    @State private var consented = false
     @State private var isSending = false
     @State private var errorMessage: String?
-    @State private var retryHistory: [AssistantChatMessage]?
-    @State private var retryConversation: [AssistantChatMessage]?
+    @State private var retryRequest: PendingAssistantRequest?
     @State private var activeRequest: Task<Void, Never>?
 
     private let messageLimit = 3_000
     private let historyLimit = 12_000
     private let contextMessageLimit = 12
-    private let starters = ["Help me plan my day", "Explain a difficult idea simply", "Draft a professional email"]
+    private let candidateLimit = 8
+    private let synonyms: [String: [String]] = [
+        "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
+        "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"],
+        "resize": ["scale", "dimensions", "size"], "json": ["javascript object"],
+        "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
+        "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
+        "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
+        "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"],
+        "pdf": ["document"], "encode": ["encoding", "base64"], "decode": ["decoding"],
+    ]
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
                         Text("AI assistant").font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
-                        Text("Questions, planning, writing, and everyday work.").font(.footnote).foregroundStyle(Color.envMuted)
                     }
                     Spacer()
                     Button(action: startNewChat) {
-                        Label("New chat", systemImage: "trash").font(.footnote.weight(.medium))
+                        Label("New chat", systemImage: "square.and.pencil").font(.footnote.weight(.medium))
                     }
-                        .disabled(messages.isEmpty || isSending)
-                }
-
-                Text("Messages and recent context are sent to enV’s configured AI provider to generate replies. Avoid passwords and sensitive or confidential information. This chat is not saved to an account.")
-                    .font(.footnote)
-                    .foregroundStyle(Color.envMuted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-
-                if available == nil {
-                    HStack(spacing: 8) { ProgressView(); Text("Checking assistant availability…").font(.footnote).foregroundStyle(Color.envMuted) }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else if available == false {
-                    HStack(spacing: 10) {
-                        Text("The AI assistant is not available on this server right now.").font(.footnote).foregroundStyle(Color.envMuted)
-                        Spacer(minLength: 4)
-                        Button("Check again") { availabilityAttempt += 1 }
-                            .font(.footnote.weight(.semibold))
-                    }
-                    .padding(12)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                    .disabled(messages.isEmpty || isSending)
                 }
 
                 ScrollViewReader { proxy in
@@ -177,35 +173,54 @@ struct AssistantChatView: View {
                                         .foregroundStyle(Color.envAccent)
                                         .frame(width: 52, height: 52)
                                         .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 16))
-                                    Text("How can I help?").font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
-                                    Text("Choose a starting point or write your own message.").font(.footnote).foregroundStyle(Color.envMuted)
-                                    ForEach(starters, id: \.self) { prompt in
-                                        Button(prompt) { draft = prompt }
-                                            .buttonStyle(.bordered)
-                                            .tint(Color.envAccent)
-                                            .disabled(available != true || isSending)
-                                    }
+                                    Text("What can I help with?").font(.title3.weight(.semibold)).foregroundStyle(Color.envMuted)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 28)
+                                .padding(.vertical, 32)
                             } else {
                                 ForEach(messages) { message in
-                                    HStack {
-                                        if message.isUser { Spacer(minLength: 28) }
-                                        VStack(alignment: .leading, spacing: 5) {
-                                            Text(message.isUser ? "You" : "enV assistant")
-                                                .font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
-                                            Text(message.content)
-                                                .font(.body).foregroundStyle(Color.envInk)
-                                                .textSelection(.enabled)
-                                                .fixedSize(horizontal: false, vertical: true)
+                                    VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+                                        HStack {
+                                            if message.isUser { Spacer(minLength: 28) }
+                                            VStack(alignment: .leading, spacing: 5) {
+                                                Text(message.isUser ? "You" : "enV")
+                                                    .font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                                Text(message.content)
+                                                    .font(.body).foregroundStyle(Color.envInk)
+                                                    .textSelection(.enabled)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                            }
+                                            .padding(12)
+                                            .frame(maxWidth: 520, alignment: .leading)
+                                            .background(message.isUser ? Color.envAccentSoft : Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                                            if !message.isUser { Spacer(minLength: 28) }
                                         }
-                                        .padding(12)
-                                        .frame(maxWidth: 500, alignment: .leading)
-                                        .background(message.isUser ? Color.envAccentSoft : Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-                                        if !message.isUser { Spacer(minLength: 28) }
+                                        if !message.isUser {
+                                            ForEach(message.recommendedToolIds, id: \.self) { toolId in
+                                                if let tool = store.catalog.tools.first(where: { $0.id == toolId && ($0.status == "active" || $0.status == "beta") }) {
+                                                    NavigationLink(value: tool) {
+                                                        HStack(spacing: 10) {
+                                                            EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
+                                                            VStack(alignment: .leading, spacing: 3) {
+                                                                Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                                                Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                                            }
+                                                            Spacer(minLength: 4)
+                                                            Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                                        }
+                                                        .padding(12)
+                                                        .frame(maxWidth: 520, alignment: .leading)
+                                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                                                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                            }
+                                        }
                                     }
+                                    .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
                                     .id(message.id)
                                 }
                             }
@@ -230,41 +245,32 @@ struct AssistantChatView: View {
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
                         Text(errorMessage).font(.footnote).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
-                        if let retryHistory, let retryConversation {
-                            Button("Retry") { runRequest(history: retryHistory, conversation: retryConversation) }
-                                .font(.footnote.weight(.semibold))
+                        if let retryRequest {
+                            Button("Retry") { runRequest(retryRequest) }.font(.footnote.weight(.semibold))
                         }
                     }
                     .padding(12)
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
                 }
 
-                Toggle(isOn: $consented) {
-                    Text("I agree that my message and recent chat context are sent to the configured AI provider.")
-                        .font(.caption)
-                        .foregroundStyle(Color.envMuted)
-                }
-                .tint(Color.envAccent)
-                .disabled(available != true || isSending)
-
                 HStack(alignment: .bottom, spacing: 10) {
-                    TextField("Message the enV assistant…", text: $draft, axis: .vertical)
-                        .lineLimit(1...4)
-                        .textFieldStyle(.roundedBorder)
-                        .submitLabel(.send)
-                        .onSubmit(sendDraft)
-                        .disabled(available != true || isSending)
+                    TextField("Ask about enV tools or the brand…", text: Binding(
+                        get: { draft },
+                        set: { draft = String($0.prefix(messageLimit)) }
+                    ), axis: .vertical)
+                    .lineLimit(1...4)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.send)
+                    .onSubmit(sendDraft)
+                    .disabled(isSending)
                     Button(action: sendDraft) {
                         Image(systemName: isSending ? "hourglass" : "arrow.up.circle.fill")
                             .font(.system(size: 28, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
                     }
                     .accessibilityLabel("Send message")
-                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !consented || available != true || isSending)
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
                 }
-                Text("\(draft.count)/\(messageLimit) · AI responses can be inaccurate; verify important information.")
-                    .font(.caption2).foregroundStyle(Color.envSubtle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
@@ -272,22 +278,13 @@ struct AssistantChatView: View {
             .background(Color.envSurface.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
         .modifier(EnVBrandNavigationStyle())
-        .task(id: availabilityAttempt) { await refreshAvailability() }
         .onDisappear {
             activeRequest?.cancel()
             activeRequest = nil
             isSending = false
-        }
-    }
-
-    private func refreshAvailability() async {
-        available = nil
-        do {
-            available = try await NativeAssistantClient.isAvailable()
-        } catch {
-            available = false
         }
     }
 
@@ -296,35 +293,71 @@ struct AssistantChatView: View {
         var characters = 0
         for message in conversation.suffix(contextMessageLimit).reversed() {
             if characters + message.content.count > historyLimit { break }
-            recent.append(message)
+            recent.append(AssistantChatMessage(role: message.role, content: message.content))
             characters += message.content.count
         }
         return recent.reversed()
     }
 
+    private func candidates(for conversation: [AssistantChatMessage]) -> [AssistantPayloadCandidate] {
+        let query = conversation.filter { $0.role == "user" }.suffix(3).map(\.content).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return [] }
+        let tokenSet = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "%+"))
+        let baseTokens = query.components(separatedBy: tokenSet.inverted).filter { $0.count > 1 || $0 == "%" }
+        let tokens = Array(Set(baseTokens + baseTokens.flatMap { synonyms[$0] ?? [] }))
+        let ranked = store.catalog.tools.filter { $0.status == "active" || $0.status == "beta" }.compactMap { tool -> ScoredAssistantTool? in
+            let name = tool.name.lowercased()
+            let id = tool.id.lowercased()
+            let score: Int
+            if name == query || id == query { score = 2_000 + tool.popularity }
+            else if name.hasPrefix(query) { score = 1_400 + tool.popularity }
+            else if name.contains(query) || id.contains(query) { score = 1_000 + tool.popularity }
+            else {
+                let haystack = tool.searchText
+                var hits = 0
+                for token in tokens {
+                    if name.contains(token) { hits += 8 }
+                    else if tool.keywords.contains(where: { $0.lowercased().contains(token) }) { hits += 5 }
+                    else if haystack.contains(token) { hits += 2 }
+                }
+                guard hits > 0 else { return nil }
+                score = hits * 40 + tool.popularity
+            }
+            return ScoredAssistantTool(tool: tool, score: score)
+        }
+        return ranked.sorted {
+            if $0.score != $1.score { return $0.score > $1.score }
+            if $0.tool.popularity != $1.tool.popularity { return $0.tool.popularity > $1.tool.popularity }
+            return $0.tool.name < $1.tool.name
+        }.prefix(candidateLimit).map { tool in
+            AssistantPayloadCandidate(id: tool.tool.id, name: tool.tool.name, description: tool.tool.description, category: tool.tool.category)
+        }
+    }
+
     private func sendDraft() {
         let content = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !content.isEmpty, content.count <= messageLimit, consented, available == true, !isSending else { return }
+        guard !content.isEmpty, content.count <= messageLimit, !isSending else { return }
         let conversation = messages + [AssistantChatMessage(role: "user", content: content)]
+        let history = requestContext(conversation)
         messages = conversation
         draft = ""
         errorMessage = nil
-        runRequest(history: requestContext(conversation), conversation: conversation)
+        runRequest(PendingAssistantRequest(history: history, conversation: conversation, candidates: candidates(for: history)))
     }
 
-    private func runRequest(history: [AssistantChatMessage], conversation: [AssistantChatMessage]) {
+    private func runRequest(_ pending: PendingAssistantRequest) {
         activeRequest?.cancel()
         isSending = true
         errorMessage = nil
-        retryHistory = history
-        retryConversation = conversation
+        retryRequest = pending
         activeRequest = Task { @MainActor in
             do {
-                let reply = try await NativeAssistantClient.reply(to: history)
+                let result = try await NativeAssistantClient.reply(to: pending.history, candidates: pending.candidates)
                 guard !Task.isCancelled else { return }
-                messages = conversation + [AssistantChatMessage(role: "assistant", content: reply)]
-                retryHistory = nil
-                retryConversation = nil
+                let allowed = Set(pending.candidates.map(\.id))
+                let safeIds = result.recommendedToolIds.filter { allowed.contains($0) }
+                messages = pending.conversation + [AssistantChatMessage(role: "assistant", content: result.reply, recommendedToolIds: safeIds)]
+                retryRequest = nil
                 errorMessage = nil
             } catch is CancellationError {
                 // The user left the screen or started a new chat.
@@ -346,7 +379,6 @@ struct AssistantChatView: View {
         draft = ""
         isSending = false
         errorMessage = nil
-        retryHistory = nil
-        retryConversation = nil
+        retryRequest = nil
     }
 }

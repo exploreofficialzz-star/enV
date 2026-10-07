@@ -246,7 +246,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             } else {
                 when (currentTab) {
                     AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
-                    AppTab.Assistant -> AssistantScreen(assistantMessages, { assistantMessages = it })
+                    AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })

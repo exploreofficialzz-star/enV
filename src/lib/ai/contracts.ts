@@ -82,6 +82,7 @@ export interface TranscriptResult {
 }
 export interface AssistantChatResult {
   reply: string;
+  recommendedToolIds: string[];
 }
 
 export interface AiTaskResultMap {

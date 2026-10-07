@@ -1,60 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { ToolCard } from "@/components/tools/tool-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AI_LIMITS } from "@/lib/ai/contracts";
-import { AiClientError, fetchAiAvailability, runAiTask } from "@/lib/ai/client/ai-client";
+import { AiClientError, runAiTask } from "@/lib/ai/client/ai-client";
+import { getActiveTools, getToolById } from "@/lib/registry";
+import { searchTools } from "@/lib/search";
+import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/assistant")({ component: AssistantPage });
 
 type ChatRole = "user" | "assistant";
 type ChatMessage = { role: ChatRole; content: string };
+type ChatTurn = ChatMessage & { recommendedToolIds?: string[] };
+type ToolCandidate = Pick<ToolMeta, "id" | "name" | "description" | "category">;
+type AssistantRequest = { messages: ChatMessage[]; candidates: ToolCandidate[] };
 
-const STARTER_PROMPTS = [
-  "Help me plan my day",
-  "Explain a difficult idea simply",
-  "Draft a professional email",
-];
-
-function requestContext(messages: ChatMessage[]): ChatMessage[] {
+function requestContext(messages: ChatTurn[]): ChatMessage[] {
   const context: ChatMessage[] = [];
   let characters = 0;
   for (const message of messages.slice(-AI_LIMITS.assistantMessageCountMax).reverse()) {
     if (characters + message.content.length > AI_LIMITS.assistantHistoryMax) break;
-    context.push(message);
+    context.push({ role: message.role, content: message.content });
     characters += message.content.length;
   }
   return context.reverse();
 }
 
+function candidatesFor(messages: ChatMessage[]): ToolCandidate[] {
+  const query = messages.filter((message) => message.role === "user").slice(-3).map((message) => message.content).join(" ");
+  return searchTools(getActiveTools(), query, 8).map(({ id, name, description, category }) => ({ id, name, description, category }));
+}
+
 function AssistantPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState("");
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
-  const [consented, setConsented] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryHistory, setRetryHistory] = useState<ChatMessage[] | null>(null);
+  const [retryRequest, setRetryRequest] = useState<AssistantRequest | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setAvailable(null);
-    void fetchAiAvailability({ force: availabilityAttempt > 0 })
-      .then((tasks) => {
-        if (!cancelled) setAvailable(tasks["assistant.chat"] === true);
-      })
-      .catch(() => {
-        if (!cancelled) setAvailable(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [availabilityAttempt]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -62,18 +50,22 @@ function AssistantPage() {
 
   useEffect(() => () => activeRequest.current?.abort(), []);
 
-  async function requestReply(history: ChatMessage[]) {
+  async function requestReply(request: AssistantRequest) {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
     setBusy(true);
     setError(null);
-    setRetryHistory(history);
+    setRetryRequest(request);
     try {
-      const { result } = await runAiTask("assistant.chat", { messages: history }, { signal: controller.signal });
+      const { result } = await runAiTask("assistant.chat", request, { signal: controller.signal });
       if (activeRequest.current === controller) {
-        setMessages((current) => [...current, { role: "assistant", content: result.reply }]);
-        setRetryHistory(null);
+        const recommendedToolIds = result.recommendedToolIds.filter((id) => {
+          const tool = getToolById(id);
+          return tool && tool.status !== "planned";
+        });
+        setMessages((current) => [...current, { role: "assistant", content: result.reply, recommendedToolIds }]);
+        setRetryRequest(null);
       }
     } catch (cause) {
       if (activeRequest.current !== controller) return;
@@ -89,12 +81,13 @@ function AssistantPage() {
 
   function submitDraft() {
     const content = draft.trim();
-    if (!content || busy || available !== true || !consented) return;
+    if (!content || busy) return;
     const updated = [...messages, { role: "user" as const, content }];
+    const history = requestContext(updated);
     setMessages(updated);
     setDraft("");
     setError(null);
-    void requestReply(requestContext(updated));
+    void requestReply({ messages: history, candidates: candidatesFor(history) });
   }
 
   function startNewChat() {
@@ -103,70 +96,56 @@ function AssistantPage() {
     setMessages([]);
     setDraft("");
     setError(null);
-    setRetryHistory(null);
+    setRetryRequest(null);
     setBusy(false);
   }
 
   return (
     <AppShell>
-      <section className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-accent">
-              <Sparkles className="size-5" aria-hidden="true" />
-              <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">AI assistant</h1>
-            </div>
-            <p className="mt-2 text-sm text-muted">A practical assistant for questions, planning, writing, and everyday work.</p>
+      <section className="mx-auto flex min-h-[calc(100dvh-7rem)] w-full max-w-3xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-accent">
+            <Sparkles className="size-5" aria-hidden="true" />
+            <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">AI assistant</h1>
           </div>
           <Button variant="outline" size="sm" onClick={startNewChat} aria-label="Start a new chat">
-            <Trash2 aria-hidden="true" />
+            <SquarePen aria-hidden="true" />
             <span className="hidden sm:inline">New chat</span>
           </Button>
-        </div>
+        </header>
 
-        <div className="mt-5 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-muted">
-          Messages and recent conversation context are sent to enV’s configured AI provider to generate replies. Avoid passwords and sensitive or confidential information. This chat stays in this screen and is not saved to an account.
-        </div>
-
-        {available === false && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3" role="status">
-            <p className="text-sm text-muted">The AI assistant is not available on this server right now.</p>
-            <Button variant="outline" size="sm" onClick={() => setAvailabilityAttempt((count) => count + 1)}>
-              <RotateCcw aria-hidden="true" /> Check again
-            </Button>
-          </div>
-        )}
-        {available === null && <p className="mt-4 text-sm text-muted" role="status">Checking assistant availability…</p>}
-
-        <div className="mt-5 flex max-h-[55vh] min-h-[300px] flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-bg p-4 sm:p-5" role="log" aria-label="Assistant conversation" aria-live="polite">
+        <div className="mt-4 flex min-h-[320px] max-h-[68vh] flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-bg p-4 sm:p-5" role="log" aria-label="Assistant conversation" aria-live="polite">
           {messages.length === 0 ? (
-            <div className="my-auto py-8 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <div className="my-auto flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
                 <Sparkles className="size-6" aria-hidden="true" />
               </div>
-              <h2 className="mt-4 text-lg font-semibold text-fg">How can I help?</h2>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted">Ask a question or choose a starting point. You can refine your request in the conversation.</p>
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {STARTER_PROMPTS.map((prompt) => (
-                  <button key={prompt} type="button" onClick={() => setDraft(prompt)} className="rounded-full border border-border bg-surface px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                    {prompt}
-                  </button>
-                ))}
-              </div>
+              <h2 className="mt-4 text-lg font-semibold text-fg">What can I help with?</h2>
             </div>
           ) : (
-            messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[92%] rounded-2xl border px-4 py-3 text-sm leading-6 sm:max-w-[85%] ${message.role === "user" ? "border-accent/20 bg-accent/10 text-fg" : "border-border bg-surface text-fg"}`}>
-                  <p className="mb-1 text-xs font-semibold text-muted">{message.role === "user" ? "You" : "enV assistant"}</p>
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            messages.map((message, index) => {
+              const recommendedTools = (message.recommendedToolIds ?? [])
+                .map((id) => getToolById(id))
+                .filter((tool): tool is ToolMeta => Boolean(tool && tool.status !== "planned"));
+              return (
+                <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`w-fit max-w-[96%] rounded-2xl border px-4 py-3 text-sm leading-6 sm:max-w-[90%] ${message.role === "user" ? "border-accent/20 bg-accent/10 text-fg" : "border-border bg-surface text-fg"}`}>
+                    <p className="mb-1 text-xs font-semibold text-muted">{message.role === "user" ? "You" : "enV"}</p>
+                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                    {recommendedTools.length > 0 && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {recommendedTools.map((tool) => <ToolCard key={tool.id} tool={tool} className="min-w-0" />)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           {busy && (
             <div className="flex items-center gap-2 self-start rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted" role="status">
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Thinking…
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+              <span>Thinking…</span>
               <button type="button" className="ml-2 underline underline-offset-2" onClick={() => activeRequest.current?.abort()}>Stop</button>
             </div>
           )}
@@ -176,42 +155,33 @@ function AssistantPage() {
         {error && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm" role="alert">
             <p className="text-fg">{error}</p>
-            {retryHistory && <Button variant="outline" size="sm" onClick={() => void requestReply(retryHistory)}><RotateCcw aria-hidden="true" /> Retry</Button>}
+            {retryRequest && <Button variant="outline" size="sm" onClick={() => void requestReply(retryRequest)}><RotateCcw aria-hidden="true" /> Retry</Button>}
           </div>
         )}
 
-        <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); submitDraft(); }}>
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                submitDraft();
-              }
-            }}
-            placeholder="Message the enV assistant…"
-            aria-label="Message the enV assistant"
-            maxLength={AI_LIMITS.assistantMessageMax}
-            rows={3}
-            disabled={busy || available !== true}
-            className="min-h-24 resize-y"
-          />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex max-w-xl items-start gap-2 text-xs leading-5 text-muted">
-              <input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="mt-1 accent-[var(--color-accent)]" />
-              <span>I understand my message and recent chat context are sent to the configured AI provider to answer me.</span>
-            </label>
-            <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <span className="text-xs tabular-nums text-subtle">{draft.length}/{AI_LIMITS.assistantMessageMax}</span>
-              <Button type="submit" disabled={!draft.trim() || !consented || available !== true || busy}>
-                {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
-                Send
-              </Button>
-            </div>
+        <form className="mt-3" onSubmit={(event) => { event.preventDefault(); submitDraft(); }}>
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-surface p-2 shadow-[var(--shadow-border)] focus-within:ring-2 focus-within:ring-accent/40">
+            <Textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submitDraft();
+                }
+              }}
+              placeholder="Ask about enV tools or the enV brand…"
+              aria-label="Message the enV assistant"
+              maxLength={AI_LIMITS.assistantMessageMax}
+              rows={2}
+              disabled={busy}
+              className="min-h-12 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+            />
+            <Button type="submit" size="icon" aria-label="Send message" disabled={!draft.trim() || busy}>
+              {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
+            </Button>
           </div>
         </form>
-        <p className="mt-3 text-xs leading-5 text-subtle">AI responses can be inaccurate. Verify important information. Requests are subject to the service’s configured usage limits.</p>
       </section>
     </AppShell>
   );

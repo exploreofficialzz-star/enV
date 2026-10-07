@@ -17,7 +17,7 @@ const CANONICAL: Record<string, unknown> = {
   "developer.json.explain": { json: '{"items":[{"id":1,"name":"a"}],"total":1}', goal: "find-issues" },
   "image.alt.generate": { imageBase64: png, mimeType: "image/png", context: "hero image on a bakery homepage", style: "concise" },
   "video.transcript.generate": { audioBase64: mp3, mimeType: "audio/mpeg", language: "en" },
-  "assistant.chat": { messages: [{ role: "user", content: "Help me organize my week." }, { role: "assistant", content: "What are your main priorities?" }, { role: "user", content: "Work, exercise, and meal planning." }] },
+  "assistant.chat": { messages: [{ role: "user", content: "What enV tool can help me organize my work?" }, { role: "assistant", content: "I can suggest a matching tool." }, { role: "user", content: "I'd like to plan a busy day." }], candidates: [{ id: "work-planner", name: "Work Planner", description: "Organize daily work tasks.", category: "productivity" }] },
 };
 
 const SNAPSHOT = new URL("./prompt-snapshots.json", import.meta.url);
