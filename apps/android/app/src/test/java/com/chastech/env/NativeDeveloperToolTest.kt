@@ -76,7 +76,9 @@ class NativeDeveloperToolTest {
     }
 
     @Test fun developerFallbacksAndValidatorsMatchTheWebOutput() {
-        assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
+        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
+        assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
+        assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "not-a-uuid").text)
         assertEquals("404 Not Found", NativeUtilityEngine.run(tool("http-status-lookup"), "404").text)
         assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "418").text.contains("504 Gateway Timeout"))
