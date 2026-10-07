@@ -250,12 +250,16 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 )
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HomePreviewBar("AI help allocate tools")
+                    HomePreviewBar("Token usage counts")
+                }
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
             }
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle("Trending tools", "")
+                SectionTitle("Trending tools", accent = true)
                 trending.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
             }
         }
@@ -877,9 +881,22 @@ private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholde
     OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { EnVIcon("Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = "Search") }, singleLine = true, shape = RoundedCornerShape(12.dp))
 }
 
-@Composable private fun SectionTitle(text: String, subtitle: String? = null) {
+@Composable
+private fun HomePreviewBar(label: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(0.94f).height(40.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
+            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable private fun SectionTitle(text: String, subtitle: String? = null, accent: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 4.dp)) {
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

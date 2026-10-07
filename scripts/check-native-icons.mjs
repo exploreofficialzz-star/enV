@@ -52,6 +52,12 @@ assert.ok(androidAssets.includes('"native-icons/logo-home-transparent.png"') && 
 assert.ok(iosApp.includes('native-icons/logo-home-transparent.png') && iosApp.includes('native-icons/logo-home-dark.png'), "iOS must load cropped home logo variants");
 assert.ok(androidHome.includes("homeHero = true"), "Android home must use the cropped hero logo");
 assert.ok(iosHome.includes("EnVLogo(homeHero: true)"), "iOS home must use the cropped hero logo");
+assert.ok(androidHome.includes('HomePreviewBar("AI help allocate tools")') && androidHome.includes('HomePreviewBar("Token usage counts")'), "Android home must include both future-service preview bars");
+assert.ok(iosHome.includes('HomePreviewBar(title: "AI help allocate tools")') && iosHome.includes('HomePreviewBar(title: "Token usage counts")'), "iOS home must include both future-service preview bars");
+assert.ok(androidHome.includes("Modifier.fillMaxWidth(0.94f).height(40.dp)"), "Android preview bars must be smaller than the search field");
+assert.ok(iosHome.includes(".frame(height: 40)"), "iOS preview bars must be smaller than the search field");
+assert.ok(androidHome.includes('SectionTitle("Trending tools", accent = true)') && androidHome.includes("if (accent) MaterialTheme.colorScheme.primary"), "Android Trending title must use the accent color");
+assert.ok(iosHome.includes('sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)') && iosHome.includes("accent ? Color.envAccent : Color.envInk"), "iOS Trending title must use the accent color");
 assert.ok(androidHome.includes("top = 8.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 14.dp).width(228.dp).height(89.dp)"), "Android home must keep the header gap and enlarged brand-to-search spacing");
 assert.ok(iosHome.includes(".padding(.top, 8)") && iosHome.includes("VStack(alignment: .center, spacing: 16)") && iosHome.includes(".frame(width: 228, height: 89).padding(.bottom, 12)"), "iOS home must keep the header gap and enlarged brand-to-search spacing");
 assert.ok(!androidHome.includes("bottomBar = {"), "Android must not render a bottom navigation bar");

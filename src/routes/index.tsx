@@ -44,6 +44,10 @@ function Home() {
             <Search className="size-6" strokeWidth={2.5} />
           </button>
         </form>
+        <div className="mt-3 flex w-[94%] max-w-2xl flex-col gap-2">
+          <div className="flex h-10 items-center rounded-xl border border-border-strong bg-surface-2 px-4 text-left text-sm font-medium text-muted">AI help allocate tools</div>
+          <div className="flex h-10 items-center rounded-xl border border-border-strong bg-surface-2 px-4 text-left text-sm font-medium text-muted">Token usage counts</div>
+        </div>
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for
           <br className="sm:hidden" />
@@ -60,11 +64,11 @@ function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
-        <h2 className="text-xl font-semibold sm:text-2xl">{title}</h2>
+        <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
         {tools.map((tool, index) => (
-          <Link key={tool.id} to={toolPath(tool)} className={`rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent ${index >= 6 ? "hidden lg:block" : ""}`}>
+          <Link key={tool.id} to={toolPath(tool)} className={`rounded-xl bg-surface p-4 text-left shadow-[var(--shadow-border)] transition hover:-translate-y-0.5 hover:text-accent ${index >= 6 ? "hidden md:block" : ""}`}>
             <h3 className="font-medium">{tool.name}</h3>
             <p className="mt-1 text-sm text-muted">{tool.description}</p>
           </Link>

@@ -36,6 +36,11 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                        VStack(spacing: 8) {
+                            HomePreviewBar(title: "AI help allocate tools")
+                            HomePreviewBar(title: "Token usage counts")
+                        }
+                        .frame(maxWidth: .infinity)
                         Text("A focused toolkit for\neveryday work.")
                             .font(.system(size: 28, weight: .semibold))
                             .tracking(-0.4)
@@ -45,7 +50,7 @@ struct HomeView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Trending tools", subtitle: "Useful tools to explore today")
+                        sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
                         ToolList(tools: Array(store.popularTools.prefix(6)))
                     }
                 }
@@ -277,10 +282,26 @@ struct AccountView: View {
     }
 }
 
-private func sectionHeader(_ title: String, subtitle: String) -> some View {
+private func sectionHeader(_ title: String, subtitle: String, accent: Bool = false) -> some View {
     VStack(alignment: .leading, spacing: 3) {
-        Text(title).font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
+        Text(title).font(.title2.weight(.semibold)).foregroundStyle(accent ? Color.envAccent : Color.envInk)
         Text(subtitle).font(.subheadline).foregroundStyle(Color.envMuted)
+    }
+}
+
+private struct HomePreviewBar: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(Color.envMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            .padding(.horizontal, 8)
     }
 }
 
