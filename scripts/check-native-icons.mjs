@@ -61,8 +61,8 @@ assert.ok(androidHome.includes("modifier.height(40.dp)"), "Android preview bars 
 assert.ok(iosHome.includes(".frame(height: 40)"), "iOS preview bars must be smaller than the search field");
 assert.ok(androidHome.includes('SectionTitle("Trending tools", accent = true)') && androidHome.includes("if (accent) MaterialTheme.colorScheme.primary"), "Android Trending title must use the accent color");
 assert.ok(iosHome.includes('sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)') && iosHome.includes("accent ? Color.envAccent : Color.envInk"), "iOS Trending title must use the accent color");
-assert.ok(androidHome.includes("top = 8.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 14.dp).width(157.dp).height(62.dp)"), "Android home must keep its spacing with the reduced hero brand");
-assert.ok(iosHome.includes(".padding(.top, 8)") && iosHome.includes("VStack(alignment: .center, spacing: 16)") && iosHome.includes(".frame(width: 157, height: 62).padding(.bottom, 12)"), "iOS home must keep its spacing with the reduced hero brand");
+assert.ok(androidHome.includes("top = 8.dp") && androidHome.includes("Arrangement.spacedBy(14.dp)") && androidHome.includes("Modifier.padding(bottom = 10.dp).width(149.dp).height(59.dp)"), "Android home must keep the header gap and use a 24dp brand-to-search gap");
+assert.ok(iosHome.includes(".padding(.top, 8)") && iosHome.includes("VStack(alignment: .center, spacing: 16)") && iosHome.includes(".frame(width: 149, height: 59).padding(.bottom, 8)"), "iOS home must keep the header gap and use a 24pt brand-to-search gap");
 assert.ok(!androidHome.includes("bottomBar = {"), "Android must not render a bottom navigation bar");
 assert.ok(!iosApp.includes("EnVBottomBar") && !iosApp.includes(".safeAreaInset(edge: .bottom"), "iOS must not render a bottom navigation bar");
 assert.ok(!androidAssets.includes("Icons.Default."), "Android icons must not fall back to platform-specific Material symbols");

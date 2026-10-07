@@ -237,7 +237,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
-                EnVLogo(Modifier.padding(bottom = 14.dp).width(157.dp).height(62.dp), darkTheme = darkMode, homeHero = true)
+                EnVLogo(Modifier.padding(bottom = 10.dp).width(149.dp).height(59.dp), darkTheme = darkMode, homeHero = true)
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQuery,
