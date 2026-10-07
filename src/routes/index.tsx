@@ -25,7 +25,7 @@ function Home() {
         <form
           role="search"
           onSubmit={submitSearch}
-          className="mt-6 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:mt-7 sm:h-[72px] sm:gap-4 sm:px-5"
+          className="mt-5 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:mt-6 sm:h-[72px] sm:gap-4 sm:px-5"
         >
           <Logo size="search" className="shrink-0" />
           <input

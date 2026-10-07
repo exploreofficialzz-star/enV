@@ -9,7 +9,7 @@ export function Logo({ className, size = "header" }: { className?: string; size?
   const imageSize = {
     header: "h-14 w-[84px] sm:h-16 sm:w-24",
     search: "h-8 w-12",
-    hero: "h-[59px] w-[149px] sm:h-[67px] sm:w-[171px]",
+    hero: "h-[56px] w-[142px] sm:h-[64px] sm:w-[163px]",
   }[size];
 
   return (

@@ -18,7 +18,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     VStack(alignment: .center, spacing: 16) {
-                        EnVLogo(homeHero: true).frame(width: 149, height: 59).padding(.bottom, 8)
+                        EnVLogo(homeHero: true).frame(width: 142, height: 56).padding(.bottom, 4)
                         HStack(spacing: 12) {
                             EnVLogo().frame(width: 40, height: 28)
                             TextField("Search for a tool", text: $searchText)
