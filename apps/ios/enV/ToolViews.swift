@@ -810,7 +810,7 @@ enum NativeBackendEngine {
         if tool.id=="pdf-to-word" { guard let f=files.first else{throw NativeNativeError.message("Choose a PDF first.")}; return try await multipart("/api/backend/pdf",fields:["operation":"pdf-to-word","params":options,"outputName":"pdf-to-word.docx"],files:[f]) }
         if tool.id=="dns-lookup" || tool.id=="whois-lookup" { return try await json("/api/backend/network",body:["operation":tool.id=="dns-lookup" ? "dns":"whois","domain":input,"recordType":opt["recordType"] as? String ?? "A"]) }
         if tool.id=="website-screenshot" { return try await json("/api/backend/website-screenshot",body:["url":input,"options":opt]) }
-        if tool.engine.type=="url-media" || tool.engine.type=="url-media-info" { return try await json("/api/backend/url-media/\(tool.engine.type=="url-media-info" ? "info":"download")",body:["url":input,"options":opt]) }
+        if tool.engine.type=="url-media" || tool.engine.type=="url-media-info" { return try await json("/api/backend/url-media/\(tool.engine.type=="url-media-info" ? "info":"download")",body:urlMediaRequestBody(input: input, options: opt)) }
         if tool.category=="qr" || tool.category=="barcode" { return try await json("/api/backend/barcodes",body:["format":tool.id,"toolId":tool.id,"value":input]) }
         if tool.category=="mockups" { return try await json("/api/backend/mockups",body:["toolId":tool.id]) }
         if tool.category=="screenshots" { guard let f=files.first else { throw NativeNativeError.message("Choose a screenshot first.") }; return try await multipart("/api/backend/screenshots",fields:["operation":tool.id],files:[f]) }
@@ -821,6 +821,11 @@ enum NativeBackendEngine {
         if categoryBackend.contains(tool.category) { return try await json("/api/backend/tool",body:["toolId":tool.id,"category":tool.category,"input":input,"options":opt]) }
         if tool.engine.type=="document-backend" { return try await multipart("/api/backend/documents",fields:["operation":tool.engine.op ?? tool.id,"params":options,"outputName":"\(tool.id)-output"],files:files) }
         return try await multipart("/api/backend/media",fields:["operation":tool.engine.op ?? tool.engine.id ?? tool.id,"params":options],files:files)
+    }
+    static func urlMediaRequestBody(input: String, options: [String: Any]) -> [String: Any] {
+        var body = options
+        body["url"] = input
+        return body
     }
     private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult {
         guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }

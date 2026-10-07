@@ -35,7 +35,7 @@ object NativeBackendEngine {
             tool.id=="pdf-to-word" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files.take(1),mapOf("operation" to "pdf-to-word","params" to options.toString(),"outputName" to "pdf-to-word.docx")) }
             tool.id=="dns-lookup" || tool.id=="whois-lookup" -> postJson("/api/backend/network",JSONObject().apply{put("operation",if(tool.id=="dns-lookup")"dns" else "whois");put("domain",input);put("recordType",options.optString("recordType","A"))})
             tool.id=="website-screenshot" -> postJson("/api/backend/website-screenshot",JSONObject().apply{put("url",input);put("options",options)})
-            tool.engine.type=="url-media" || tool.engine.type=="url-media-info" -> postJson("/api/backend/url-media/${if(tool.engine.type=="url-media-info")"info" else "download"}",JSONObject().apply{put("url",input);put("options",options)})
+            tool.engine.type=="url-media" || tool.engine.type=="url-media-info" -> postJson("/api/backend/url-media/${if(tool.engine.type=="url-media-info")"info" else "download"}",urlMediaRequestBody(input,options))
             tool.category=="qr" || tool.category=="barcode" -> postJson("/api/backend/barcodes",JSONObject().apply{put("format",tool.id);put("toolId",tool.id);put("value",input)})
             tool.category=="mockups" -> postJson("/api/backend/mockups",JSONObject().apply{put("toolId",tool.id)})
             tool.category=="screenshots" -> { require(files.isNotEmpty()){ "Choose a screenshot first." }; multipart("/api/backend/screenshots",files,mapOf("operation" to tool.id)) }
@@ -50,6 +50,13 @@ object NativeBackendEngine {
         }
     }
 
+    internal fun urlMediaRequestBody(input:String, options:JSONObject):JSONObject {
+        val body=JSONObject()
+        val keys=options.keys()
+        while(keys.hasNext()) { val key=keys.next(); body.put(key,options.get(key)) }
+        body.put("url",input)
+        return body
+    }
     private fun postJson(path:String,body:JSONObject):Result=request(path,body.toString().toByteArray(StandardCharsets.UTF_8),"application/json")
     private fun multipart(path:String,files:List<InputFile>,fields:Map<String,String>):Result {
         val boundary="----enV-${UUID.randomUUID()}"; val out=ByteArrayOutputStream()
