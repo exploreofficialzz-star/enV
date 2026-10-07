@@ -468,6 +468,10 @@ object NativeUtilityEngine {
         val lower = op.lowercase(Locale.US)
         val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
         val flags = opts["flags"] ?: "g"
+        fun b64UrlDecode(value: String): String {
+            val normalized = value.replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
+            return String(Base64.decode(normalized, Base64.DEFAULT), StandardCharsets.UTF_8)
+        }
         val base = lower.removePrefix("developer-").substringBefore('-')
         val suffix = Regex("(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer)$").find(lower)?.groupValues?.get(1) ?: ""
 
