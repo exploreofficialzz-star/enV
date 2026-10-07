@@ -25,20 +25,21 @@ function Home() {
         <Logo size="hero" />
         <SearchBox
           large
+          variant="inline"
           value={query}
           onValueChange={setQuery}
           onEnter={openSearchResults}
           placeholder="Search for a tool"
           leading={<Logo size="search" className="shrink-0" />}
-          showSearchIcon={false}
           className="mt-4 max-w-3xl sm:mt-5"
-          inputClassName="h-16 rounded-2xl border border-border-strong bg-surface px-4 pl-[76px] pr-14 text-base shadow-[var(--shadow-border)] transition focus-visible:ring-4 focus-visible:ring-accent/10 sm:h-[72px] sm:text-lg"
+          containerClassName="flex h-16 w-full items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:h-[72px] sm:gap-4 sm:px-5"
+          inputClassName="min-w-0 flex-1 bg-transparent text-left text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
           trailing={(
             <button
               type="button"
               aria-label="Search all tools"
               onClick={() => openSearchResults(query)}
-              className="inline-flex size-11 items-center justify-center rounded-xl text-accent transition hover:bg-surface-2 focus-visible:outline-offset-4"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-accent transition hover:bg-surface-2 focus-visible:outline-offset-4"
             >
               <Search className="size-6" strokeWidth={2.5} />
             </button>

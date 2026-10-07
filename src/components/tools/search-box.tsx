@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export function SearchBox({
   large = false,
   autoFocus = false,
+  variant = "default",
   value,
   onValueChange,
   onEnter,
@@ -16,10 +17,12 @@ export function SearchBox({
   trailing,
   showSearchIcon = true,
   className,
+  containerClassName,
   inputClassName,
 }: {
   large?: boolean;
   autoFocus?: boolean;
+  variant?: "default" | "inline";
   value?: string;
   onValueChange?: (v: string) => void;
   onEnter?: (query: string) => void;
@@ -28,6 +31,7 @@ export function SearchBox({
   trailing?: ReactNode;
   showSearchIcon?: boolean;
   className?: string;
+  containerClassName?: string;
   inputClassName?: string;
 }) {
   const [inner, setInner] = useState(value ?? "");
@@ -59,43 +63,61 @@ export function SearchBox({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  const renderInput = (baseClassName: string) => (
+    <input
+      id="env-search"
+      ref={inputRef}
+      type={variant === "inline" ? "search" : "text"}
+      value={q}
+      autoFocus={autoFocus}
+      autoComplete="off"
+      placeholder={placeholder}
+      onChange={(e) => {
+        setQ(e.target.value);
+        setOpen(true);
+      }}
+      onFocus={() => setOpen(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (onEnter) onEnter(q);
+          else if (results[0]) nav({ to: toolPath(results[0]) });
+          else nav({ to: "/search", search: { q } });
+          setOpen(false);
+        }
+      }}
+      className={cn(baseClassName, inputClassName)}
+    />
+  );
+
   return (
-    <div ref={boxRef} className={cn("relative w-full", large ? "max-w-2xl" : "max-w-xl", className)}>
+    <div
+      ref={boxRef}
+      role={variant === "inline" ? "search" : undefined}
+      className={cn("relative w-full", large ? "max-w-2xl" : "max-w-xl", className)}
+    >
       <label className="sr-only" htmlFor="env-search">
         Search tools
       </label>
-      {leading ? <span className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2">{leading}</span> : null}
-      {!leading && showSearchIcon ? <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-subtle" /> : null}
-      <input
-        id="env-search"
-        ref={inputRef}
-        value={q}
-        autoFocus={autoFocus}
-        autoComplete="off"
-        placeholder={placeholder}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            if (onEnter) onEnter(q);
-            else if (results[0]) nav({ to: toolPath(results[0]) });
-            else nav({ to: "/search", search: { q } });
-            setOpen(false);
-          }
-        }}
-        className={cn(
-          "w-full rounded-full bg-surface text-fg shadow-[var(--shadow-border)] placeholder:text-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
-          large ? "h-14 pl-12 pr-4 text-base" : "h-11 pl-11 pr-3 text-sm",
-          leading || showSearchIcon ? "pl-12" : "pl-4",
-          trailing ? "pr-14" : "",
-          inputClassName,
-        )}
-      />
-      {trailing ? <span className="absolute top-1/2 right-2 z-10 -translate-y-1/2">{trailing}</span> : null}
+      {variant === "inline" ? (
+        <div className={containerClassName}>
+          {leading}
+          {renderInput("min-w-0 flex-1 bg-transparent text-left text-base text-fg outline-none placeholder:text-subtle sm:text-lg")}
+          {trailing}
+        </div>
+      ) : (
+        <>
+          {leading ? <span className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2">{leading}</span> : null}
+          {!leading && showSearchIcon ? <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-subtle" /> : null}
+          {renderInput(cn(
+            "w-full rounded-full bg-surface text-fg shadow-[var(--shadow-border)] placeholder:text-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+            large ? "h-14 pl-12 pr-4 text-base" : "h-11 pl-11 pr-3 text-sm",
+            leading || showSearchIcon ? "pl-12" : "pl-4",
+            trailing ? "pr-14" : "",
+          ))}
+          {trailing ? <span className="absolute top-1/2 right-2 z-10 -translate-y-1/2">{trailing}</span> : null}
+        </>
+      )}
       {open && q.trim() && (
         <ul
           className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface py-1 shadow-[var(--shadow-border)]"
