@@ -13,7 +13,7 @@ class MainActivityLaunchTest {
     fun launchShowsNativeCatalogHome() {
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
-        composeRule.onNodeWithText("AI help").assertIsDisplayed()
+        composeRule.onNodeWithText("AI assistant").assertIsDisplayed()
         composeRule.onNodeWithText("Token = 100").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
         listOf("Home", "Tools", "Search", "Saved", "Account").forEach { label ->
