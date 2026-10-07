@@ -69,6 +69,14 @@ test("browser chrome metadata follows the active light or dark theme", () => {
   assert.match(theme, /dark \? "black-translucent" : "default"/);
 });
 
+test("All Tools puts search on the heading row and removes the suggested-tools promotion", () => {
+  const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
+  assert.match(tools, /flex items-center gap-3/);
+  assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
+  assert.match(tools, /searchTools\(byAvailability, query/);
+  assert.doesNotMatch(tools, /Suggested tools|See more tools|suggested-tools-heading/);
+});
+
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {
   const logo = readFileSync(join(PROJECT_ROOT, "src/components/brand/logo.tsx"), "utf8");
   const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");

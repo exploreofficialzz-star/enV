@@ -71,51 +71,77 @@ struct HomeView: View {
 
 struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
+    @State private var toolsQuery = ""
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
+    private var matchingTools: [Tool] { store.tools(matching: toolsQuery) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("All tools")
-                            .font(.system(size: 30, weight: .semibold))
-                            .tracking(-0.4)
-                            .foregroundStyle(Color.envInk)
+                        HStack(spacing: 8) {
+                            Text("All tools")
+                                .font(.system(size: 28, weight: .semibold))
+                                .tracking(-0.4)
+                                .foregroundStyle(Color.envInk)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                            Spacer(minLength: 4)
+                            HStack(spacing: 6) {
+                                EnVIcon(name: "Search", size: 17, tint: .envMuted)
+                                TextField("Search", text: $toolsQuery)
+                                    .font(.system(size: 14))
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .accessibilityLabel("Search all tools")
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(width: 164, height: 44)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                        }
                         Text("Browse the complete enV toolkit.")
                             .font(.subheadline)
                             .foregroundStyle(Color.envMuted)
                     }
-                    VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Suggested tools", subtitle: "Start with a popular tool")
-                        ToolList(tools: Array(store.popularTools.prefix(6)))
-                    }
-                    VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Browse categories", subtitle: "Choose a category to explore")
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(store.categories) { category in
-                                NavigationLink(value: category.id) {
-                                    VStack(alignment: .leading, spacing: 9) {
-                                        iconTile(category.icon)
-                                        Text(category.name)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(Color.envInk)
-                                        Text(category.blurb)
-                                            .font(.caption)
-                                            .foregroundStyle(Color.envMuted)
-                                            .lineLimit(2)
-                                            .multilineTextAlignment(.leading)
+                    if toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        VStack(alignment: .leading, spacing: 14) {
+                            sectionHeader("Browse categories", subtitle: "Choose a category to explore")
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(store.categories) { category in
+                                    NavigationLink(value: category.id) {
+                                        VStack(alignment: .leading, spacing: 9) {
+                                            iconTile(category.icon)
+                                            Text(category.name)
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color.envInk)
+                                            Text(category.blurb)
+                                                .font(.caption)
+                                                .foregroundStyle(Color.envMuted)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                        }
+                                        .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
+                                        .padding(14)
+                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                                        .contentShape(RoundedRectangle(cornerRadius: 12))
                                     }
-                                    .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-                                    .padding(14)
-                                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-                                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Browse \(category.name)")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Browse \(category.name)")
                             }
+                        }
+                    } else {
+                        Text("\(matchingTools.count) results")
+                            .font(.caption)
+                            .foregroundStyle(Color.envMuted)
+                        if matchingTools.isEmpty {
+                            EmptyStateView(title: "No matching tools", lucideIcon: "Search", message: "Try a different name or keyword.")
+                        } else {
+                            ToolList(tools: Array(matchingTools.prefix(60)))
                         }
                     }
                 }

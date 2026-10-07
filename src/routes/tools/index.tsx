@@ -4,7 +4,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getAllTools, getPopularTools } from "@/lib/registry";
+import { getAllTools } from "@/lib/registry";
+import { searchTools } from "@/lib/search";
 
 export const Route = createFileRoute("/tools/")({ component: Tools });
 
@@ -14,14 +15,17 @@ type Filter = "all" | "available" | "coming-soon";
 
 function Tools() {
   const all = getAllTools();
-  const suggested = getPopularTools(6);
   const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const filtered = useMemo(() => {
-    if (filter === "available") return all.filter((tool) => tool.status !== "planned");
-    if (filter === "coming-soon") return all.filter((tool) => tool.status === "planned");
-    return all;
-  }, [all, filter]);
+    const byAvailability = filter === "available"
+      ? all.filter((tool) => tool.status !== "planned")
+      : filter === "coming-soon"
+        ? all.filter((tool) => tool.status === "planned")
+        : all;
+    return query.trim() ? searchTools(byAvailability, query, byAvailability.length) : byAvailability;
+  }, [all, filter, query]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -33,13 +37,13 @@ function Tools() {
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h1 className="text-3xl font-semibold">All tools</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
+          <div className="ml-auto min-w-0 flex-1 max-w-sm">
+            <SearchBox value={query} onValueChange={(value) => { setQuery(value); setPage(1); }} />
+          </div>
+        </div>
         <p className="mt-2 text-muted">Browse the complete enV toolkit, including the growing Coming Soon catalog.</p>
-        <section className="mt-8" aria-labelledby="suggested-tools-heading">
-          <div className="flex flex-wrap items-end justify-between gap-3"><h2 id="suggested-tools-heading" className="text-xl font-semibold">Suggested tools</h2><SeeMoreLink to="#all-tools">See more tools</SeeMoreLink></div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{suggested.map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
-        </section>
-        <div className="mt-6"><SearchBox large /></div>
         <div className="mt-5 flex flex-wrap items-center gap-2" role="group" aria-label="Tool availability filter">
           {(["all", "available", "coming-soon"] as Filter[]).map((value) => (
             <button
@@ -52,7 +56,7 @@ function Tools() {
             </button>
           ))}
         </div>
-        <p className="mt-4 text-xs text-subtle">Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()}.</p>
+        <p className="mt-4 text-xs text-subtle">{filtered.length ? `Showing ${((safePage - 1) * PAGE_SIZE) + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length.toLocaleString()}.` : "No tools match this search and filter."}</p>
         <div id="all-tools" className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
         </div>

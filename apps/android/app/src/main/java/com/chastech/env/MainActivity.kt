@@ -233,7 +233,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             } else {
                 when (currentTab) {
                     AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Account -> if (showExchange) ContactExchangeScreen { showExchange = false } else AccountScreen(catalog, themeMode, onUseSystemTheme) { showExchange = true }
@@ -279,8 +279,8 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    val suggested = remember(catalog) { catalog.search("").take(6) }
+private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
+    val matchingTools = remember(catalog, query) { catalog.search(query) }
     if (category != null) {
         val selectedCategory = catalog.categories.find { it.id == category }
         Column(Modifier.fillMaxSize()) {
@@ -299,22 +299,37 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
         LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("All tools", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = onQuery,
+                            modifier = Modifier.width(176.dp).height(56.dp).semantics { contentDescription = "Search all tools" },
+                            placeholder = { Text("Search", maxLines = 1, style = MaterialTheme.typography.bodySmall) },
+                            leadingIcon = { EnVIcon("Search", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            textStyle = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     Text("Browse the complete enV toolkit.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Suggested tools", "Start with a popular tool")
-                    suggested.forEach { ToolCard(it, it.id in favorites, onTool, onToggleFavorite) }
-                }
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    SectionTitle("Browse categories", "Choose a category to explore")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        catalog.categories.forEach { item -> CategoryCard(item, onClick = { onCategory(item.id) }) }
+            if (query.isBlank()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        SectionTitle("Browse categories", "Choose a category to explore")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            catalog.categories.forEach { item -> CategoryCard(item, onClick = { onCategory(item.id) }) }
+                        }
                     }
+                }
+            } else {
+                item { Text("${matchingTools.size} results", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium) }
+                if (matchingTools.isEmpty()) {
+                    item { Text("No matching tools. Try a different search.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
+                } else {
+                    items(matchingTools, key = { it.id }) { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
                 }
             }
         }
