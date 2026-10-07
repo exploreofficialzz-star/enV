@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
+import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { getPopularTools } from "@/lib/registry";
@@ -14,37 +15,35 @@ function Home() {
   const [query, setQuery] = useState("");
   const trending = getPopularTools(12);
 
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void navigate({ to: "/tools", search: { q: query.trim() } });
+  function openSearchResults(searchQuery: string) {
+    void navigate({ to: "/search", search: { q: searchQuery.trim() } });
   }
 
   return (
     <AppShell>
       <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-1">
         <Logo size="hero" />
-        <form
-          role="search"
-          onSubmit={submitSearch}
-          className="mt-4 flex h-16 w-full max-w-3xl items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:mt-5 sm:h-[72px] sm:gap-4 sm:px-5"
-        >
-          <Logo size="search" className="shrink-0" />
-          <input
-            aria-label="Search tools"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search for a tool"
-            className="min-w-0 flex-1 bg-transparent text-left text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
-          />
-          <button
-            type="submit"
-            aria-label="Search"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-accent transition hover:bg-surface-2 focus-visible:outline-offset-4"
-          >
-            <Search className="size-6" strokeWidth={2.5} />
-          </button>
-        </form>
+        <SearchBox
+          large
+          value={query}
+          onValueChange={setQuery}
+          onEnter={openSearchResults}
+          placeholder="Search for a tool"
+          leading={<Logo size="search" className="shrink-0" />}
+          showSearchIcon={false}
+          className="mt-4 max-w-3xl sm:mt-5"
+          inputClassName="h-16 rounded-2xl border border-border-strong bg-surface px-4 pl-14 pr-14 text-base shadow-[var(--shadow-border)] transition focus-visible:ring-4 focus-visible:ring-accent/10 sm:h-[72px] sm:text-lg"
+          trailing={(
+            <button
+              type="button"
+              aria-label="Search all tools"
+              onClick={() => openSearchResults(query)}
+              className="inline-flex size-11 items-center justify-center rounded-xl text-accent transition hover:bg-surface-2 focus-visible:outline-offset-4"
+            >
+              <Search className="size-6" strokeWidth={2.5} />
+            </button>
+          )}
+        />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
           <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[10px] font-medium text-muted sm:px-4 sm:text-sm">AI assistant</div>
           <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[10px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>

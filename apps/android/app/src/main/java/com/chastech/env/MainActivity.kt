@@ -235,7 +235,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Tools.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -249,6 +249,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 @Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
+    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
@@ -265,6 +266,20 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 )
+                if (query.isNotBlank()) {
+                    if (suggestions.isEmpty()) {
+                        Text("No matching tools. Try another name or keyword.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            suggestions.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+                            TextButton(onClick = onSearch, modifier = Modifier.align(Alignment.End)) {
+                                Text("See more results", color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
                 Row(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 6.dp, end = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     HomePreviewBar("AI assistant", Modifier.weight(1f))
                     HomePreviewBar("Total token = 100", Modifier.weight(1f))

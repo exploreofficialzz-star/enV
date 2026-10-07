@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,25 @@ export function SearchBox({
   autoFocus = false,
   value,
   onValueChange,
+  onEnter,
+  placeholder = `Search ${getAllTools().length.toLocaleString()} tools…`,
+  leading,
+  trailing,
+  showSearchIcon = true,
+  className,
+  inputClassName,
 }: {
   large?: boolean;
   autoFocus?: boolean;
   value?: string;
   onValueChange?: (v: string) => void;
+  onEnter?: (query: string) => void;
+  placeholder?: string;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  showSearchIcon?: boolean;
+  className?: string;
+  inputClassName?: string;
 }) {
   const [inner, setInner] = useState(value ?? "");
   const q = value ?? inner;
@@ -46,18 +60,19 @@ export function SearchBox({
   }, []);
 
   return (
-    <div ref={boxRef} className={cn("relative w-full", large ? "max-w-2xl" : "max-w-xl")}>
+    <div ref={boxRef} className={cn("relative w-full", large ? "max-w-2xl" : "max-w-xl", className)}>
       <label className="sr-only" htmlFor="env-search">
         Search tools
       </label>
-      <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-subtle" />
+      {leading ? <span className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2">{leading}</span> : null}
+      {!leading && showSearchIcon ? <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-subtle" /> : null}
       <input
         id="env-search"
         ref={inputRef}
         value={q}
         autoFocus={autoFocus}
         autoComplete="off"
-        placeholder={`Search ${getAllTools().length.toLocaleString()} tools…`}
+        placeholder={placeholder}
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
@@ -66,7 +81,8 @@ export function SearchBox({
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            if (results[0]) nav({ to: toolPath(results[0]) });
+            if (onEnter) onEnter(q);
+            else if (results[0]) nav({ to: toolPath(results[0]) });
             else nav({ to: "/search", search: { q } });
             setOpen(false);
           }
@@ -74,8 +90,12 @@ export function SearchBox({
         className={cn(
           "w-full rounded-full bg-surface text-fg shadow-[var(--shadow-border)] placeholder:text-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
           large ? "h-14 pl-12 pr-4 text-base" : "h-11 pl-11 pr-3 text-sm",
+          leading || showSearchIcon ? "pl-12" : "pl-4",
+          trailing ? "pr-14" : "",
+          inputClassName,
         )}
       />
+      {trailing ? <span className="absolute top-1/2 right-2 z-10 -translate-y-1/2">{trailing}</span> : null}
       {open && q.trim() && (
         <ul
           className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface py-1 shadow-[var(--shadow-border)]"

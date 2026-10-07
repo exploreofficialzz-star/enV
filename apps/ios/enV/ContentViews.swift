@@ -12,6 +12,8 @@ struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
     let onSearch: (String) -> Void
     @State private var searchText = ""
+    private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
 
     var body: some View {
         NavigationStack {
@@ -36,6 +38,32 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                        if hasSearchText {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if searchSuggestions.isEmpty {
+                                    Text("No matching tools. Try another name or keyword.")
+                                        .font(.footnote)
+                                        .foregroundStyle(Color.envMuted)
+                                } else {
+                                    ForEach(searchSuggestions) { tool in ToolCard(tool: tool) }
+                                    HStack {
+                                        Spacer()
+                                        Button { onSearch(searchText) } label: {
+                                            HStack(spacing: 6) {
+                                                Text("See more results")
+                                                EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
+                                            }
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(Color.envAccent)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                        }
                         HStack(spacing: 8) {
                             HomePreviewBar(title: "AI assistant").frame(maxWidth: .infinity)
                             HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)

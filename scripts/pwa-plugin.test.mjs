@@ -99,11 +99,18 @@ test("tool and category cards use theme-aware icon strokes and directional click
   assert.match(categoryCard, /text-black dark:text-white/);
 });
 
-test("Home trending cards show tool arrows and Home search opens the filtered All Tools catalog", () => {
+test("Home search shows live matches and opens full results only on explicit action", () => {
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
-  assert.match(home, /navigate\(\{ to: "\/tools", search: \{ q: query\.trim\(\) \} \}\)/);
+  const searchBox = readFileSync(join(PROJECT_ROOT, "src/components/tools/search-box.tsx"), "utf8");
+  assert.match(home, /<SearchBox[\s\S]*?onValueChange=\{setQuery\}[\s\S]*?onEnter=\{openSearchResults\}/);
+  assert.match(home, /to: "\/search", search: \{ q: searchQuery\.trim\(\) \}/);
+  assert.doesNotMatch(home, /navigate\(\{ to: "\/tools"/);
   assert.match(home, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
   assert.match(home, /hidden md:flex/);
+  assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
+  assert.match(searchBox, /searchTools\(getAllTools\(\), q, 8\)/);
+  assert.match(searchBox, /See more results/);
+  assert.match(searchBox, /nav\(\{ to: "\/search", search: \{ q \} \}\)/);
 });
 
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {
@@ -123,7 +130,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /<Logo size="hero"\s*\/>/);
   assert.match(home, /pt-1/);
   assert.match(home, /sm:pt-1/);
-  assert.match(home, /className="mt-4 flex h-16/);
+  assert.match(home, /className="mt-4 max-w-3xl sm:mt-5"/);
   assert.match(home, /sm:mt-5/);
   assert.match(home, /getPopularTools\(12\)/);
   assert.match(home, /index >= 6 \? "hidden md:flex"/);
