@@ -398,7 +398,7 @@ object NativeUtilityEngine {
         fun pretty(raw: String, indent: Int = 2): String = stringifyJson(raw, indent)
         fun jsonMin(raw: String): String = stringifyJson(raw, 0)
         fun uuidValid(raw: String): String {
-            val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(raw.trim())
+            val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{4}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(raw.trim())
             return match?.groupValues?.get(1)?.let { "Valid UUID v$it" } ?: "Invalid UUID"
         }
         fun uuid(): String = UUID.randomUUID().toString()

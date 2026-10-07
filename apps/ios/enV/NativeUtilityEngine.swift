@@ -282,7 +282,7 @@ enum NativeUtilityEngine {
     }
     private static func uuidValidation(_ raw:String) -> String {
         let value=raw.trimmingCharacters(in:.whitespacesAndNewlines)
-        let regex=try! NSRegularExpression(pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",options:[.caseInsensitive])
+        let regex=try! NSRegularExpression(pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{4}-[0-9a-f]{12}$",options:[.caseInsensitive])
         let range=NSRange(value.startIndex...,in:value)
         guard let match=regex.firstMatch(in:value,range:range),match.range==range,let versionRange=Range(match.range(at:1),in:value) else { return "Invalid UUID" }
         return "Valid UUID v\(value[versionRange])"

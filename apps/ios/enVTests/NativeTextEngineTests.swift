@@ -65,7 +65,9 @@ final class NativeDeveloperToolTests: XCTestCase {
     }
 
     func testDeveloperValidatorsStatusAndWebFallbacks() throws {
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Valid UUID v4")
+        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Invalid UUID")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Valid UUID v4")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"not-a-uuid").text,"Invalid UUID")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"404").text,"404 Not Found")
         XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"418").text.contains("504 Gateway Timeout"))
