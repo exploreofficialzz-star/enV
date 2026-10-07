@@ -187,7 +187,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private enum class AppTab { Home, Tools, Search, Saved, Account }
+private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
 @Composable
 private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
@@ -199,10 +199,12 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var showInformation by rememberSaveable { mutableStateOf(false) }
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
+    var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
     else if (category != null) BackHandler { category = null }
     else if (showExchange || showInformation) BackHandler { showExchange = false; showInformation = false }
+    else if (tab == AppTab.Assistant.name) BackHandler { tab = AppTab.Home.name }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -228,6 +230,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
+                            DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; selectedId = null; category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                     }
@@ -242,7 +245,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
+                    AppTab.Assistant -> AssistantScreen(assistantMessages, { assistantMessages = it })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -264,7 +268,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
     val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
     var homeSearchFocused by remember { mutableStateOf(false) }
@@ -300,7 +304,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 6.dp, end = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomePreviewBar("AI assistant", Modifier.weight(1f))
+                    HomePreviewBar("AI assistant", Modifier.weight(1f), onClick = onAssistant)
                     HomePreviewBar("Total token = 100", Modifier.weight(1f))
                 }
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
@@ -1081,9 +1085,9 @@ private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholde
 }
 
 @Composable
-private fun HomePreviewBar(label: String, modifier: Modifier = Modifier) {
+private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     Surface(
-        modifier = modifier.height(40.dp),
+        modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI assistant" },
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {

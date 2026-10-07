@@ -12,6 +12,7 @@ export const AI_TASK_IDS = [
   "developer.json.explain",
   "image.alt.generate",
   "video.transcript.generate",
+  "assistant.chat",
 ] as const;
 export type AiTaskId = (typeof AI_TASK_IDS)[number];
 
@@ -37,6 +38,10 @@ export const AI_LIMITS = {
   imageBase64Max: 3_300_000,
   audioBytesMax: 2_800_000,
   audioBase64Max: 3_800_000,
+  assistantMessageMax: 3_000,
+  assistantMessageCountMax: 12,
+  assistantHistoryMax: 12_000,
+  assistantReplyMax: 4_000,
 } as const;
 
 export interface CaptionResult {
@@ -75,6 +80,9 @@ export interface TranscriptResult {
   durationSeconds: number | null;
   segments: { start: number; end: number; text: string }[];
 }
+export interface AssistantChatResult {
+  reply: string;
+}
 
 export interface AiTaskResultMap {
   "creator.caption.generate": CaptionResult;
@@ -84,4 +92,5 @@ export interface AiTaskResultMap {
   "developer.json.explain": JsonExplainResult;
   "image.alt.generate": AltTextResult;
   "video.transcript.generate": TranscriptResult;
+  "assistant.chat": AssistantChatResult;
 }

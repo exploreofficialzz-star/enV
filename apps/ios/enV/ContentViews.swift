@@ -11,6 +11,7 @@ struct Screen: ViewModifier {
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
     let onSearch: (String) -> Void
+    let onAssistant: () -> Void
     @State private var searchText = ""
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -68,7 +69,7 @@ struct HomeView: View {
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
                         }
                         HStack(spacing: 8) {
-                            HomePreviewBar(title: "AI assistant").frame(maxWidth: .infinity)
+                            HomePreviewBar(title: "AI assistant", action: onAssistant).frame(maxWidth: .infinity)
                             HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)
                         }
                         .frame(maxWidth: .infinity)
@@ -510,8 +511,21 @@ private func sectionHeader(_ title: String, subtitle: String, accent: Bool = fal
 
 private struct HomePreviewBar: View {
     let title: String
+    var action: (() -> Void)? = nil
 
     var body: some View {
+        Group {
+            if let action {
+                Button(action: action) { content }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open AI assistant")
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
         Text(title)
             .font(.caption.weight(.medium))
             .foregroundStyle(Color.envMuted)

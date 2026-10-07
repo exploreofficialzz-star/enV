@@ -119,6 +119,25 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.match(searchBox, /nav\(\{ to: "\/search", search: \{ q \} \}\)/);
 });
 
+test("AI assistant uses the secured backend task and is reachable from Home and the header", () => {
+  const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
+  const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");
+  const assistant = readFileSync(join(PROJECT_ROOT, "src/routes/assistant.tsx"), "utf8");
+  const task = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/assistant.ts"), "utf8");
+  const registry = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/index.ts"), "utf8");
+  assert.match(home, /<Link to="\/assistant"[^>]*>AI assistant<\/Link>/);
+  assert.match(header, /to="\/assistant">AI assistant<\/Link>/);
+  assert.match(assistant, /runAiTask\("assistant\.chat"/);
+  assert.match(assistant, /fetchAiAvailability/);
+  assert.match(assistant, /I understand my message and recent chat context are sent/);
+  assert.match(assistant, /This chat stays in this screen and is not saved to an account/);
+  assert.match(task, /id: "assistant\.chat"/);
+  assert.match(task, /privacy: "sensitive"/);
+  assert.match(task, /redactSecrets/);
+  assert.match(task, /wrapUntrusted/);
+  assert.match(registry, /assistantChatTask/);
+});
+
 test("company pages use the supplied brand, distinct contact emails, and transparent token pricing", () => {
   const about = readFileSync(join(PROJECT_ROOT, "src/routes/about.tsx"), "utf8");
   const contact = readFileSync(join(PROJECT_ROOT, "src/routes/contact.tsx"), "utf8");

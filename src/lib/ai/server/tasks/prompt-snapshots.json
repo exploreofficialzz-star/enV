@@ -26,5 +26,9 @@
   "video.transcript.generate": {
     "version": "2026-09-30.1",
     "hash": "3a2fb21b1db79bfc"
+  },
+  "assistant.chat": {
+    "version": "2026-10-07.1",
+    "hash": "3210f2aaa153ba6a"
   }
 }

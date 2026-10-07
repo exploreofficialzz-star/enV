@@ -42,7 +42,7 @@ extension Color {
 }
 
 private enum NativeTab: Int {
-    case home, tools, search, saved, account
+    case home, tools, search, saved, account, assistant
 }
 
 struct RootTabView: View {
@@ -50,11 +50,17 @@ struct RootTabView: View {
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.themeMode") private var themeMode = "system"
     @State private var searchQuery = ""
+    @State private var assistantMessages: [AssistantChatMessage] = []
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView(onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue })
+            HomeView(
+                onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue },
+                onAssistant: { selectedTab = NativeTab.assistant.rawValue },
+            )
                 .tag(NativeTab.home.rawValue)
+            AssistantChatView(messages: $assistantMessages)
+                .tag(NativeTab.assistant.rawValue)
             ToolsView(toolsQuery: $searchQuery)
                 .tag(NativeTab.tools.rawValue)
             SearchView(query: $searchQuery)
@@ -102,6 +108,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Tools")
                     Menu {
+                        Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
                     } label: {

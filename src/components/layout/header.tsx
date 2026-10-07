@@ -41,6 +41,7 @@ export function Header() {
               <MoreVertical className="size-6" strokeWidth={2.4} />
             </summary>
             <div className="absolute right-0 top-full z-50 mt-2 min-w-44 rounded-xl border border-border bg-surface p-1.5 shadow-xl">
+              <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/assistant">AI assistant</Link>
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/account">Account</Link>
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/search" search={{ q: "" }}>Search tools</Link>
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/pricing">Pricing</Link>
