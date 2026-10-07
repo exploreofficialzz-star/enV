@@ -44,9 +44,9 @@ function Home() {
             <Search className="size-6" strokeWidth={2.5} />
           </button>
         </form>
-        <div className="mt-3 flex w-[94%] max-w-2xl flex-col gap-2">
-          <div className="flex h-10 items-center rounded-xl border border-border-strong bg-surface-2 px-4 text-left text-sm font-medium text-muted">AI help allocate tools</div>
-          <div className="flex h-10 items-center rounded-xl border border-border-strong bg-surface-2 px-4 text-left text-sm font-medium text-muted">Token usage counts</div>
+        <div className="mt-4 grid w-full max-w-3xl grid-cols-2 gap-2 sm:gap-3">
+          <div className="flex h-10 min-w-0 items-center rounded-xl border border-border-strong bg-surface-2 px-3 text-left text-xs font-medium text-muted sm:px-4 sm:text-sm">AI help</div>
+          <div className="flex h-10 min-w-0 items-center rounded-xl border border-border-strong bg-surface-2 px-3 text-left text-xs font-medium text-muted sm:px-4 sm:text-sm">Token = 100</div>
         </div>
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for

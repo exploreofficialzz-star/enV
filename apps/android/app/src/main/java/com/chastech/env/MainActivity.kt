@@ -250,9 +250,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 )
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomePreviewBar("AI help allocate tools")
-                    HomePreviewBar("Token usage counts")
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HomePreviewBar("AI help", Modifier.weight(1f))
+                    HomePreviewBar("Token = 100", Modifier.weight(1f))
                 }
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
             }
@@ -882,9 +882,9 @@ private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholde
 }
 
 @Composable
-private fun HomePreviewBar(label: String) {
+private fun HomePreviewBar(label: String, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth(0.94f).height(40.dp),
+        modifier = modifier.height(40.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {

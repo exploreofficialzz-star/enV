@@ -36,11 +36,12 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-                        VStack(spacing: 8) {
-                            HomePreviewBar(title: "AI help allocate tools")
-                            HomePreviewBar(title: "Token usage counts")
+                        HStack(spacing: 8) {
+                            HomePreviewBar(title: "AI help").frame(maxWidth: .infinity)
+                            HomePreviewBar(title: "Token = 100").frame(maxWidth: .infinity)
                         }
                         .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
                         Text("A focused toolkit for\neveryday work.")
                             .font(.system(size: 28, weight: .semibold))
                             .tracking(-0.4)
@@ -293,11 +294,16 @@ private struct HomePreviewBar: View {
     let title: String
 
     var body: some View {
-        Text(title)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(Color.envMuted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
+        HStack {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.envMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+        }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
             .frame(height: 40)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
