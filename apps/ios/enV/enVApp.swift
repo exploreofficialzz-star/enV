@@ -30,6 +30,7 @@ extension Color {
     static let envAccent = adaptive(light: 0x0D9F8A, dark: 0x2EC4B6)
     static let envTeal = envAccent
     static let envInk = adaptive(light: 0x16181D, dark: 0xEEF0F2)
+    static let envChrome = adaptive(light: 0xFFFFFF, dark: 0x000000)
     static let envSurface = adaptive(light: 0xF7F6F3, dark: 0x101214)
     static let envBg = envSurface
     static let envCard = adaptive(light: 0xFFFFFF, dark: 0x171B1E)
@@ -64,7 +65,7 @@ struct RootTabView: View {
                 .tag(NativeTab.account.rawValue)
         }
         .toolbar(.hidden, for: .tabBar)
-        .background(Color.envSurface.ignoresSafeArea())
+        .background(Color.envChrome.ignoresSafeArea())
         .preferredColorScheme(themeMode == "dark" ? .dark : themeMode == "light" ? .light : nil)
         .overlay {
             if store.loadState == .loading {
@@ -115,7 +116,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("More options")
                 }
             }
-            .toolbarBackground(Color.envSurface, for: .navigationBar)
+            .toolbarBackground(Color.envChrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
     }
 }

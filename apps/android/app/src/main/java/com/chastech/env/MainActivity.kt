@@ -57,6 +57,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -76,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.ToolRecord
@@ -108,6 +110,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
             val darkMode = when (themeMode) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+            SideEffect {
+                val systemBarColor = if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                window.statusBarColor = systemBarColor
+                window.navigationBarColor = systemBarColor
+                window.decorView.setBackgroundColor(systemBarColor)
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkMode
+                    isAppearanceLightNavigationBars = !darkMode
+                }
+            }
             EnVTheme(darkTheme = darkMode) {
             CatalogGate(
                     favorites,

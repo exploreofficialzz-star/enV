@@ -115,9 +115,6 @@ function siteTitle(site = {}) {
 export function renderWebManifest(_hostHeader = "", site = readOgSite()) {
   const name = siteTitle(site);
   const shortName = String(site.shortName ?? "enV").trim() || "enV";
-  const themeColor = /^#[0-9a-fA-F]{6}$/.test(String(site.color ?? ""))
-    ? site.color
-    : "#0d9f8a";
   return JSON.stringify(
     {
       name,
@@ -127,7 +124,7 @@ export function renderWebManifest(_hostHeader = "", site = readOgSite()) {
       scope: "/",
       display: "standalone",
       background_color: "#ffffff",
-      theme_color: themeColor,
+      theme_color: "#ffffff",
       icons: [
         { src: "/pwa/icon-180.png", sizes: "180x180", type: "image/png" },
         { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png" },
@@ -144,7 +141,7 @@ export function pwaHeadTags(appName = DEFAULT_APP_NAME) {
     ["apple-touch-icon", '<link rel="apple-touch-icon" href="/pwa/icon-180.png">'],
     ["apple-mobile-web-app-title", `<meta name="apple-mobile-web-app-title" content="${escapeHtml(appName)}">`],
     ["apple-mobile-web-app-status-bar-style", '<meta name="apple-mobile-web-app-status-bar-style" content="default">'],
-    ["theme-color", '<meta name="theme-color" content="#0d9f8a">'],
+    ["theme-color", '<meta name="theme-color" content="#ffffff">'],
   ];
 }
 

@@ -57,8 +57,16 @@ test("manifest identifies enV and serves the canonical app icon", () => {
   assert.equal(manifest.icons[1].src, "/pwa/icon-512.png");
   assert.ok(manifest.icons.every((icon) => icon.type === "image/png"));
   assert.equal(manifest.background_color, "#ffffff");
-  assert.equal(manifest.theme_color, "#0d9f8a");
+  assert.equal(manifest.theme_color, "#ffffff");
   assert.equal(manifest.display, "standalone");
+});
+
+test("browser chrome metadata follows the active light or dark theme", () => {
+  const root = readFileSync(join(PROJECT_ROOT, "src/routes/__root.tsx"), "utf8");
+  const theme = readFileSync(join(PROJECT_ROOT, "src/hooks/use-theme.ts"), "utf8");
+  assert.match(root, /name: "theme-color", content: "#ffffff"/);
+  assert.match(theme, /dark \? "#000000" : "#ffffff"/);
+  assert.match(theme, /dark \? "black-translucent" : "default"/);
 });
 
 test("web brand lockups use the canonical light and dark assets in the home hero", () => {
@@ -113,6 +121,8 @@ test("head injection escapes values, removes stale share tags, and is idempotent
   const once = injectPwaHead(input, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
   assert.match(once, /content="enV &quot;safe&quot;"/);
   assert.match(once, /content="Keep me"/);
+  assert.match(once, /name="theme-color" content="#ffffff"/);
+  assert.match(once, /name="apple-mobile-web-app-status-bar-style" content="default"/);
   assert.equal((once.match(/property="og:title"/g) ?? []).length, 1);
   const twice = injectPwaHead(once, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
   assert.equal((twice.match(/rel="manifest"/g) ?? []).length, 1);
