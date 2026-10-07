@@ -1,5 +1,8 @@
 package com.chastech.env.engine
 
+import com.chastech.env.NativeBackendEngine
+import com.chastech.env.data.EngineInfo
+import com.chastech.env.data.ToolRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -13,6 +16,19 @@ class NativeMimeEngineTest {
     @Test fun canonicalActiveMimeIdsHaveTheSameLocalLookupOperation() {
         assertEquals(activeIds, NativeMimeEngine.supportedToolIds)
         activeIds.forEach { assertEquals("lookup", NativeMimeEngine.operationForTool(it)) }
+    }
+
+    @Test fun activeMimeToolsBypassBroadCategoryBackendRouting() {
+        mapOf("mime-lookup" to "developer", "mime-type-lookup" to "files").forEach { (id, category) ->
+            val tool = ToolRecord(
+                id = id, name = id, slug = id, description = "", category = category,
+                keywords = emptyList(), tags = emptyList(), icon = "File", popularity = 0,
+                featured = false, clientSide = true, requiresBackend = false, requiresAuth = false,
+                status = "active", related = emptyList(), engine = EngineInfo("mime", "lookup", emptyMap()),
+            )
+            assertEquals("lookup", NativeMimeEngine.operationForTool(id))
+            assertFalse("$id must run locally, not through /api/backend/tool", NativeBackendEngine.supports(tool))
+        }
     }
 
     @Test fun lookupSearchesExtensionMimeNameAndGroupOffline() {
