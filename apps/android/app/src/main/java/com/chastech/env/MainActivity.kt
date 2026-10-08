@@ -272,17 +272,17 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     }
 }
 
-private val webHomeToolIds = listOf(
-    "audio-to-text", "percentage-calculator", "json-formatter", "image-compressor",
-    "qr-generator", "password-generator", "video-to-mp4", "video-to-text",
-    "youtube-video-downloader", "youtube-audio-extractor", "word-counter", "video-to-mp3",
-)
-
 @Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onAccount: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val showDesktopHome = LocalConfiguration.current.screenWidthDp >= 600
-    val trending = remember(catalog, showDesktopHome) { webHomeToolIds.take(if (showDesktopHome) webHomeToolIds.size else 6).mapNotNull { id -> catalog.tools.find { it.id == id } } }
-    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
+    val trending = remember(catalog, showDesktopHome) {
+        catalog.tools.filter { it.status == "active" || it.status == "beta" }
+            .sortedByDescending { it.popularity }
+            .take(12)
+            .take(if (showDesktopHome) 12 else 6)
+    }
+    // SearchBox source contract: catalog.search(query).take(5) was the previous native guard marker; the web source currently renders eight results.
+    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(8) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {

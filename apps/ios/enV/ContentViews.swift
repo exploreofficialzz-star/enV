@@ -18,10 +18,14 @@ struct HomeView: View {
     @State private var searchText = ""
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
+    private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(8)) : [] }
     private var homeTools: [Tool] {
-        let limit = horizontalSizeClass == .regular ? webHomeToolIDs.count : 6
-        return webHomeToolIDs.prefix(limit).compactMap { id in store.tools().first(where: { $0.id == id }) }
+        let limit = horizontalSizeClass == .regular ? 12 : 6
+        return store.tools()
+            .filter { $0.status == "active" || $0.status == "beta" }
+            .sorted { $0.popularity > $1.popularity }
+            .prefix(limit)
+            .map { $0 }
     }
 
     var body: some View {
@@ -127,12 +131,6 @@ struct HomeView: View {
     }
 }
 
-
-private let webHomeToolIDs = [
-    "audio-to-text", "percentage-calculator", "json-formatter", "image-compressor",
-    "qr-generator", "password-generator", "video-to-mp4", "video-to-text",
-    "youtube-video-downloader", "youtube-audio-extractor", "word-counter", "video-to-mp3",
-]
 
 private struct WebHomeToolCard: View {
     let tool: Tool
