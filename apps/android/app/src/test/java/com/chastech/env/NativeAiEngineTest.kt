@@ -39,4 +39,9 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localIdea(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses"))
         assertEquals("1. How-to: AI tools for creators for creators and small businesses\n\n2. Common mistake: AI tools for creators\n\n3. Case study: a real example of AI tools for creators\n\n4. Checklist: getting started with AI tools for creators\n\n5. Myth vs fact: AI tools for creators\n\n6. Quick tips: AI tools for creators\n\n7. Beginner guide: AI tools for creators\n\n8. Behind the scenes: working on AI tools for creators", output)
     }
+
+    @Test fun resumeBulletGeneratorMatchesDeterministicWebTemplates() {
+        val output = NativeAiEngine.localResume(mapOf("duty" to "Managed social media content and improved engagement", "result" to "increased engagement"))
+        assertEquals("1. Managed social media content and improved engagement, contributing to increased engagement.\n\n2. Led Managed social media content and improved engagement and delivered measurable progress toward increased engagement.\n\n3. Executed Managed social media content and improved engagement, helping the team achieve increased engagement.\n\n4. Owned Managed social media content and improved engagement with a focus on increased engagement.", output)
+    }
 }
