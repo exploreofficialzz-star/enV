@@ -56,6 +56,7 @@ struct RootTabView: View {
         TabView(selection: $selectedTab) {
             HomeView(
                 onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue },
+                onTools: { selectedTab = NativeTab.tools.rawValue },
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
                 .tag(NativeTab.home.rawValue)
