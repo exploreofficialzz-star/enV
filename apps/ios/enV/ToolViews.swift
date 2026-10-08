@@ -920,12 +920,14 @@ private struct NativeUnavailableToolView: View {
 enum NativeAiEngine {
     static let captionTools: Set<String> = ["instagram-caption-generator", "tiktok-caption-generator", "x-caption-generator", "youtube-caption-generator", "linkedin-caption-generator", "facebook-caption-generator", "caption-generator"]
     static let promptTools: Set<String> = ["prompt-generator"]
+    static let bioTools: Set<String> = ["bio-generator"]
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
     static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
 
-    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
     static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
+    static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
     static func localCaption(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
         let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
         let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -947,7 +949,15 @@ enum NativeAiEngine {
         let tone = ["professional": "clear and professional", "bold": "confident and direct", "playful": "light and playful", "friendly": "warm and friendly"][rawTone] ?? "natural and conversational"
         return "ROLE\nYou are a helpful specialist supporting \(audience).\n\nTASK\n\(task).\n\nSTYLE\nUse a \(tone) style.\n\nCONTEXT\nFocus on practical, accurate output. Avoid unnecessary filler and clearly state assumptions.\n\nOUTPUT\nReturn a useful, structured answer with headings or bullets where they improve readability.\n\nCHECK\nBefore answering, verify that the response directly addresses the task and is suitable for \(audience)."
     }
-    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
+    static func localBio(role rawRole: String, audience rawAudience: String, count rawCount: String) -> String {
+        let role = rawRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "creator" : rawRole.trimmingCharacters(in: .whitespacesAndNewlines)
+        let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
+        let count = min(5, max(1, Int(rawCount) ?? 5))
+        let topic = "your topic"
+        let lines = ["\(role) | Helping \(audience) learn, create & grow.", "\(role) • \(topic) • Building in public.", "Creating around \(topic). Sharing what I learn along the way.", "\(role) | Making \(topic) easier to understand.", "\(role) focused on practical ideas for \(audience)."]
+        return lines.prefix(count).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+    }
+    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
     static func platform(for toolID: String) -> String {
         switch toolID {
         case "instagram-caption-generator", "instagram-title-generator": return "instagram"
@@ -1108,14 +1118,15 @@ private struct NativeAiToolView: View {
     @State private var file: NativeBackendFile?
     @State private var picker = false
 
-    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : ""); _variants = State(initialValue: tool.id.contains("title") ? "5" : "5") }
+    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : ""); _variants = State(initialValue: tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
 
     private var task: String? { NativeAiEngine.task(for: tool.id) }
     private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
     private var needsFile: Bool { ["alt-text-generator","video-audio-extractor"].contains(tool.id) }
     private var localCaption: Bool { NativeAiEngine.isLocalCaption(tool.id) }
     private var localPrompt: Bool { NativeAiEngine.isLocalPrompt(tool.id) }
-    private var localDeterministic: Bool { localCaption || localPrompt }
+    private var localBio: Bool { NativeAiEngine.isLocalBio(tool.id) }
+    private var localDeterministic: Bool { localCaption || localPrompt || localBio }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1123,6 +1134,7 @@ private struct NativeAiToolView: View {
             if !localDeterministic && available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
             if let task {
                 if localPrompt { NativeInputField(title: "Task", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone) }
+                else if localBio { NativeInputField(title: "Role / what you do", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Options", text: $variants) }
                 else if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) {
                     NativeInputField(title: "Topic", text: $topic); if localCaption { NativeInputField(title: "Audience", text: $audience) }; NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Language", text: $language); NativeInputField(title: "Options", text: $variants)
                     if NativeAiEngine.captionTools.contains(tool.id) { Toggle("Include hashtags", isOn: $includeHashtags) }
@@ -1132,7 +1144,7 @@ private struct NativeAiToolView: View {
                 else if tool.id == "alt-text-generator" { Button(file == nil ? "Choose image" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Page context", text: $contextText); NativeInputField(title: "Style", text: $style); NativeInputField(title: "Language", text: $language) }
                 else if tool.id == "video-audio-extractor" { Button(file == nil ? "Choose audio" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Language code", text: $language) }
                 if needsConsent { Toggle("I understand this input is sent to an external AI service.", isOn: $consent) }
-                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic=localCaption ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : ""; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
+                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic=localCaption ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : localBio ? "AI music creator" : ""; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
                 if !output.isEmpty { TextEditor(text: .constant(output)).frame(minHeight: 150).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3))) }
                 if !error.isEmpty { Text(error).foregroundStyle(.red).font(.footnote) }
                 Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
@@ -1146,7 +1158,7 @@ private struct NativeAiToolView: View {
         if tool.id == "regex-tester" { return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "sql-formatter" { return sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "json-validator" { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return false
     }
 
@@ -1154,6 +1166,7 @@ private struct NativeAiToolView: View {
         working = true; error = ""; output = ""
         if localCaption { output = NativeAiEngine.localCaption(topic: topic, audience: audience, count: variants); working = false; return }
         if localPrompt { output = NativeAiEngine.localPrompt(task: topic, audience: audience, tone: tone); working = false; return }
+        if localBio { output = NativeAiEngine.localBio(role: topic, audience: audience, count: variants); working = false; return }
         Task {
             do {
                 let prepared: NativeBackendFile?

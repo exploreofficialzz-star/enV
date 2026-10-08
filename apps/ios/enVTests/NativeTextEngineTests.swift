@@ -56,6 +56,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("STYLE\nUse a natural and conversational style."))
     }
 
+    func testBioGeneratorMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localBio(role: "AI music creator", audience: "creators and small businesses", count: "5")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 5)
+        XCTAssertTrue(output.contains("AI music creator | Helping creators and small businesses learn, create & grow."))
+        XCTAssertTrue(output.contains("AI music creator focused on practical ideas for creators and small businesses."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text
