@@ -70,6 +70,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("A Practical AI tools for creators Guide for creators and small businesses"))
     }
 
+    func testProductDescriptionMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localProduct(product: "AI Music Generator Class", features: "Beginner friendly\nWorks from a smartphone\nUses accessible tools", audience: "creators and small businesses", tone: "natural")
+        XCTAssertTrue(output.hasPrefix("AI Music Generator Class\n\nA practical option for creators and small businesses who want a simple way to get started."))
+        XCTAssertTrue(output.contains("• Beginner friendly\n• Works from a smartphone\n• Uses accessible tools"))
+        XCTAssertTrue(output.contains("CTA: Get started and see what AI Music Generator Class can help you create."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text
