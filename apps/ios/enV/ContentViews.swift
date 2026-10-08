@@ -116,7 +116,7 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    WebHomeFooter(onAccount: onAccount)
+                    WebHomeFooter(activeCount: store.catalog.counts.active, categoryCount: store.catalog.categories.count, onAccount: onAccount)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -171,11 +171,13 @@ private struct WebHomeSearchSuggestion: View {
 }
 
 private struct WebHomeFooter: View {
+    let activeCount: Int
+    let categoryCount: Int
     let onAccount: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             EnVLogo().frame(width: 142, height: 48)
-            Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.footnote).foregroundStyle(Color.envMuted)
             Text("Product").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(["About", "Tools", "Pricing", "Contact"], id: \.self) { label in
@@ -189,7 +191,7 @@ private struct WebHomeFooter: View {
                 }
             }
             Text("© 2026 chAs Technologies LLC · enV").font(.footnote).foregroundStyle(Color.envMuted)
-            Text("43 categories · 10000 live tools").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("\(categoryCount) categories · \(activeCount) live tools").font(.footnote).foregroundStyle(Color.envMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

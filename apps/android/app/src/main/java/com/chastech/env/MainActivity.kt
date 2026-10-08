@@ -345,7 +345,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                 }
             }
         }
-        item { WebHomeFooter(onAccount) }
+        item { WebHomeFooter(catalog, onAccount) }
     }
 }
 
@@ -377,10 +377,10 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter(onAccount: () -> Unit) {
+private fun WebHomeFooter(catalog: Catalog, onAccount: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EnVLogo(Modifier.width(142.dp).height(48.dp))
-        Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Useful tools. One place. ${catalog.counts.active} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("Product", fontWeight = FontWeight.SemiBold)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             listOf("About", "Tools", "Pricing", "Contact").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
@@ -390,7 +390,7 @@ private fun WebHomeFooter(onAccount: () -> Unit) {
             listOf("Privacy", "Terms", "Disclaimer", "Responsible use").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
         }
         Text("© 2026 chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        Text("43 categories · 10000 live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("${catalog.categories.size} categories · ${catalog.counts.active} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
