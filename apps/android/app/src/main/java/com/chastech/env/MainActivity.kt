@@ -18,6 +18,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
@@ -235,6 +237,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; selectedId = null; category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Pricing") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                     }
                     }
                 },
@@ -247,7 +250,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { tab = AppTab.Account.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
                     AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -276,7 +279,7 @@ private val webHomeToolIds = listOf(
 )
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onAccount: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val showDesktopHome = LocalConfiguration.current.screenWidthDp >= 600
     val trending = remember(catalog, showDesktopHome) { webHomeToolIds.take(if (showDesktopHome) webHomeToolIds.size else 6).mapNotNull { id -> catalog.tools.find { it.id == id } } }
     val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
@@ -285,19 +288,31 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
                 EnVLogo(Modifier.padding(bottom = 2.dp).width(142.dp).height(56.dp), darkTheme = darkMode, homeHero = true)
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQuery,
-                    modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused },
-                    placeholder = { if (!homeSearchFocused) Text("Search for a tool") },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
-                    leadingIcon = { EnVLogo(Modifier.width(48.dp).height(32.dp), darkTheme = darkMode) },
-                    trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) } },
-                    singleLine = true,
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
                     shape = RoundedCornerShape(16.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                )
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                    shadowElevation = 1.dp,
+                ) {
+                    // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search") } }.
+                    Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        EnVLogo(Modifier.width(48.dp).height(32.dp), darkTheme = darkMode)
+                        Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+                            if (query.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                            BasicTextField(
+                                value = query,
+                                onValueChange = onQuery,
+                                modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused },
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                            )
+                        }
+                        IconButton(onClick = onSearch, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
+                    }
+                }
                 if (query.isNotBlank()) {
                     if (suggestions.isEmpty()) {
                         Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
@@ -330,7 +345,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                 }
             }
         }
-        item { WebHomeFooter() }
+        item { WebHomeFooter(onAccount) }
     }
 }
 
@@ -362,14 +377,18 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter() {
+private fun WebHomeFooter(onAccount: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EnVLogo(Modifier.width(142.dp).height(48.dp))
         Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("Product", fontWeight = FontWeight.SemiBold)
-        Text("About   Tools   Pricing   Contact", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf("About", "Tools", "Pricing", "Contact").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
+        }
         Text("Legal", fontWeight = FontWeight.SemiBold)
-        Text("Privacy   Terms   Disclaimer   Responsible use", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf("Privacy", "Terms", "Disclaimer", "Responsible use").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
+        }
         Text("© 2026 chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("43 categories · 10000 live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }

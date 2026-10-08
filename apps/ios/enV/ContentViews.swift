@@ -13,6 +13,7 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let onSearch: (String) -> Void
     let onTools: () -> Void
+    let onAccount: () -> Void
     let onAssistant: () -> Void
     @State private var searchText = ""
     @FocusState private var isHomeSearchFocused: Bool
@@ -44,10 +45,11 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Search")
                         }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, minHeight: 64, maxHeight: 64, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
@@ -110,7 +112,7 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    WebHomeFooter()
+                    WebHomeFooter(onAccount: onAccount)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -171,14 +173,23 @@ private struct WebHomeSearchSuggestion: View {
 }
 
 private struct WebHomeFooter: View {
+    let onAccount: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             EnVLogo().frame(width: 142, height: 48)
             Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.footnote).foregroundStyle(Color.envMuted)
             Text("Product").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-            Text("About   Tools   Pricing   Contact").font(.footnote).foregroundStyle(Color.envMuted)
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(["About", "Tools", "Pricing", "Contact"], id: \.self) { label in
+                    Button(label, action: onAccount).font(.footnote).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
+                }
+            }
             Text("Legal").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-            Text("Privacy   Terms   Disclaimer   Responsible use").font(.footnote).foregroundStyle(Color.envMuted)
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(["Privacy", "Terms", "Disclaimer", "Responsible use"], id: \.self) { label in
+                    Button(label, action: onAccount).font(.footnote).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
+                }
+            }
             Text("© 2026 chAs Technologies LLC · enV").font(.footnote).foregroundStyle(Color.envMuted)
             Text("43 categories · 10000 live tools").font(.footnote).foregroundStyle(Color.envMuted)
         }

@@ -57,6 +57,7 @@ struct RootTabView: View {
             HomeView(
                 onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue },
                 onTools: { selectedTab = NativeTab.tools.rawValue },
+                onAccount: { selectedTab = NativeTab.account.rawValue },
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
                 .tag(NativeTab.home.rawValue)
@@ -112,6 +113,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
+                        Button("Pricing") { selectedTab = NativeTab.account.rawValue }
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in
