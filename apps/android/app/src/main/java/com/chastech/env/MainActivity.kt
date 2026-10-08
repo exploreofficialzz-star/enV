@@ -100,6 +100,7 @@ import com.chastech.env.data.featuredOrPopular
 import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
+import com.chastech.env.engine.NativeBusinessEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
 import com.chastech.env.engine.NativeConverterEngine
@@ -625,6 +626,7 @@ private fun InformationSection(title: String, paragraphs: List<String>) {
 }
 
 private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
+    "business" -> NativeBusinessEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
@@ -679,6 +681,7 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
 @Composable
 private fun NativeToolForm(tool: ToolRecord) {
     when (tool.engine.type) {
+        "business" -> NativeBusinessToolForm(tool)
         "text" -> NativeTextToolForm(tool.id)
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)
@@ -1266,5 +1269,36 @@ private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, onClick
                 Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+
+@Composable
+private fun NativeBusinessToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    var a by rememberSaveable(tool.id) { mutableStateOf("1000") }
+    var b by rememberSaveable(tool.id) { mutableStateOf("600") }
+    var c by rememberSaveable(tool.id) { mutableStateOf("50") }
+    var d by rememberSaveable(tool.id) { mutableStateOf("10") }
+    var e by rememberSaveable(tool.id) { mutableStateOf("12") }
+    var seed by rememberSaveable(tool.id) { mutableStateOf("technology") }
+    var audience by rememberSaveable(tool.id) { mutableStateOf("customers") }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Native business engine · ${tool.engine.extras["op"] ?: tool.engine.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        InputField(a, { a = it }, "Revenue / amount", singleLine = true)
+        InputField(b, { b = it }, "Cost / rate / second value", singleLine = true)
+        InputField(c, { c = it }, "Variable cost / third value", singleLine = true)
+        InputField(d, { d = it }, "Fourth value", singleLine = true)
+        InputField(e, { e = it }, "Fifth value", singleLine = true)
+        InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
+        InputField(audience, { audience = it }, "Audience", singleLine = true)
+        ActionRow(
+            onRun = { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 10.0); put("e", e.toDoubleOrNull() ?: 12.0); put("seed", seed); put("audience", audience) }) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) },
+            onReset = { a="1000"; b="600"; c="50"; d="10"; e="12"; seed="technology"; audience="customers"; output=""; error="" }
+        )
+        ResultBox(output, error, ::copy)
     }
 }

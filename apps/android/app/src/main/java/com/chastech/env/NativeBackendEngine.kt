@@ -17,7 +17,9 @@ object NativeBackendEngine {
     data class Result(val text:String?=null,val bytes:ByteArray?=null,val mimeType:String?=null,val fileName:String?=null)
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
     private val explicit = setOf("youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader")
-    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video")
+    // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
+    // The previous broad set made unsupported tools look executable and return fabricated output.
+    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators")
 
     fun supports(tool:ToolRecord):Boolean {
         if (tool.engine.type == "developer" && NativeUtilityEngine.supports(tool)) return false

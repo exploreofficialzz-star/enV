@@ -136,6 +136,7 @@ enum NativeCoverage {
     static func isLocallyExecutable(_ tool: Tool) -> Bool {
         if usesBackend(tool) || tool.isPlanned { return false }
         switch tool.engine.type {
+        case "business": return NativeBusinessEngine.supports(tool)
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
@@ -164,6 +165,7 @@ struct NativeFamilyToolView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
+            case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -799,7 +801,9 @@ enum NativeBackendEngine {
         return raw.isEmpty ? nil : URL(string: raw.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     }
     static let backendIDs:Set<String> = ["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader"]
-    static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video"]
+    // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
+    // Unsupported tools must not appear executable in the native app.
+    static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
     static func supports(_ tool:Tool)->Bool {
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
@@ -1308,6 +1312,38 @@ private struct NativeAiToolView: View {
                 let text = NativeAiEngine.format(task: task, result: result)
                 await MainActor.run { output = text; working = false }
             } catch let caughtError { await MainActor.run { error = caughtError.localizedDescription; working = false } }
+        }
+    }
+}
+
+
+private struct NativeBusinessToolView: View {
+    let tool: Tool
+    @State private var a = "1000"
+    @State private var b = "600"
+    @State private var c = "50"
+    @State private var d = "10"
+    @State private var e = "12"
+    @State private var seed = "technology"
+    @State private var audience = "customers"
+    @State private var output = ""
+    @State private var error: String?
+    private var options: [String:String] { ["a":a,"b":b,"c":c,"d":d,"e":e,"seed":seed,"audience":audience] }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Native business engine · \(tool.engine.op ?? tool.engine.id ?? tool.id)").font(.subheadline.weight(.semibold))
+            NativeInputField(title: "Revenue / amount", text: $a)
+            NativeInputField(title: "Cost / rate / second value", text: $b)
+            NativeInputField(title: "Variable cost / third value", text: $c)
+            NativeInputField(title: "Fourth value", text: $d)
+            NativeInputField(title: "Fifth value", text: $e)
+            NativeInputField(title: "Seed / topic", text: $seed)
+            NativeInputField(title: "Audience", text: $audience)
+            NativeActionRow(output: output, run: {
+                do { output = try NativeBusinessEngine.run(tool, options: options); error = nil }
+                catch let caught { output = ""; error = caught.localizedDescription }
+            }, reset: { a="1000"; b="600"; c="50"; d="10"; e="12"; seed="technology"; audience="customers"; output=""; error=nil })
+            NativeOutputView(output: output, error: error)
         }
     }
 }
