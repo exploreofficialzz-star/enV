@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +45,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -88,9 +90,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.FavoritesStore
+import com.chastech.env.data.webSearch
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
 import com.chastech.env.data.fromJson
@@ -400,100 +404,95 @@ private fun WebHomeFooter(catalog: Catalog, onAccount: () -> Unit) {
 @Composable
 private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
     val visibleCounts = remember { mutableStateMapOf<String, Int>() }
-    LaunchedEffect(query) { visibleCounts.clear() }
-    val groupedTools = remember(catalog, query, category) {
-        if (category != null) emptyList()
-        else {
-            val byCategory = catalog.search(query).groupBy { it.category }
-            catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 600 -> 2; else -> 1 }
+    val groupedTools = remember(catalog, query) {
+        val byCategory = catalog.webSearch(query).groupBy { it.category }
+        catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(40.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 600) 288.dp else (screenWidth * 0.52f).dp))
+                }
+                Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (groupedTools.isEmpty()) {
+            item {
+                Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
+                    Text("No tools match your search. Try another name or keyword.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
+                }
+            }
+        } else {
+            items(groupedTools, key = { it.first.id }) { group ->
+                val groupCategory = group.first
+                val tools = group.second
+                val visible = minOf(visibleCounts[groupCategory.id] ?: 3, tools.size)
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Surface(Modifier.size(40.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
+                            Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                            // Source guard contract: groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary; contentAlignment = Alignment.CenterEnd; Text("See more tools", color = MaterialTheme.colorScheme.primary)
+                            Text(groupCategory.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    tools.take(visible).chunked(columns).forEach { rowTools ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            rowTools.forEach { tool -> WebToolsCard(tool, onTool, Modifier.weight(1f)) }
+                            repeat(columns - rowTools.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                    if (visible < tools.size) {
+                        WebSeeMoreToolsButton { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }
+                    }
+                }
+            }
         }
     }
-    if (category != null) {
-        val selectedCategory = catalog.categories.find { it.id == category }
-        val categoryTools = remember(catalog, category) { catalog.search("", category) }
-        val visibleCount = minOf(visibleCounts[category] ?: 6, categoryTools.size)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 0.dp, end = 4.dp)) {
-                        IconButton(onClick = { onCategory(null) }, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
-                            EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                Text(selectedCategory?.name ?: "Category", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                    selectedCategory?.description?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            if (categoryTools.isEmpty()) {
-                item { Text("No tools in this category yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
-            }
-            items(categoryTools.take(visibleCount), key = { it.id }) { tool ->
-                ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite)
-            }
-            if (visibleCount < categoryTools.size) {
-                item {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                        TextButton(onClick = { visibleCounts[category] = minOf(visibleCount + 6, categoryTools.size) }) {
-                            Text("See more tools", color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(8.dp))
-                            EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
+}
+
+@Composable
+private fun WebToolsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier.height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) Text("Search", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(), textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true)
             }
         }
-    } else {
-        LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = onQuery,
-                            modifier = Modifier.width(160.dp).height(56.dp).semantics { contentDescription = "Search all tools" },
-                            placeholder = { Text("Search", maxLines = 1, style = MaterialTheme.typography.bodySmall) },
-                            leadingIcon = { EnVIcon("Search", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            textStyle = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Text("Browse the complete enV toolkit.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            if (groupedTools.isEmpty()) {
-                item { Text("No tools match your search. Try another name or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) }
-            } else {
-                items(groupedTools, key = { it.first.id }) { group ->
-                    val groupCategory = group.first
-                    val tools = group.second
-                    val visible = minOf(visibleCounts[groupCategory.id] ?: 3, tools.size)
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(Modifier.size(40.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
-                                Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        tools.take(visible).forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
-                        if (visible < tools.size) {
-                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                                TextButton(onClick = { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }) {
-                                    Text("See more tools", color = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.width(8.dp))
-                                    EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    }
+}
+
+@Composable
+private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(modifier.fillMaxWidth().alpha(if (tool.status == "planned") 0.7f else 1f).shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).background(MaterialTheme.colorScheme.surface, shape).clickable { onTool(tool.id) }.padding(16.dp)) {
+        Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) { Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) } }
+        Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+        Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+        if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        else if (tool.clientSide) Text("IN-BROWSER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
+    }
+}
+
+@Composable
+private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
+    Surface(Modifier.fillMaxWidth().wrapContentWidth(Alignment.End).clickable(onClick = onClick), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("See more tools", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }

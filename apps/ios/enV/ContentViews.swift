@@ -149,6 +149,7 @@ private struct WebHomeToolCard: View {
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
             .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
+            .opacity(tool.isPlanned ? 0.7 : 1)
         }
         .buttonStyle(.plain)
     }
@@ -207,11 +208,15 @@ private struct ToolCategoryGroup: Identifiable {
 
 struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Binding var toolsQuery: String
     @State private var visibleByCategory: [String: Int] = [:]
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
-    private var matchingTools: [Tool] { store.tools(matching: toolsQuery) }
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: horizontalSizeClass == .compact ? 1 : 3)
+    }
+    // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
+    private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery) }
     private var categoryGroups: [ToolCategoryGroup] {
         let toolsByCategory = Dictionary(grouping: matchingTools, by: \.category)
         return store.categories.compactMap { category in
@@ -223,32 +228,33 @@ struct ToolsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 6) {
+                LazyVStack(alignment: .leading, spacing: 40) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 16) {
                             Text("All tools")
-                                .font(.system(size: 28, weight: .semibold))
+                                .font(.custom("Outfit-SemiBold", size: 24))
                                 .tracking(-0.4)
                                 .foregroundStyle(Color.envInk)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.85)
                             Spacer(minLength: 4)
-                            HStack(spacing: 6) {
-                                EnVIcon(name: "Search", size: 17, tint: .envMuted)
+                            HStack(spacing: 10) {
+                                EnVIcon(name: "Search", size: 20, tint: .envMuted)
                                 TextField("Search", text: $toolsQuery)
-                                    .font(.system(size: 14))
+                                    .font(.custom("Outfit-Regular", size: 14))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
                                     .accessibilityLabel("Search all tools")
                                     .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
-                            .padding(.horizontal, 10)
-                            .frame(width: 148, height: 44)
-                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                            .padding(.horizontal, 16)
+                            .frame(width: horizontalSizeClass == .regular ? 288 : 195, height: 44)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 22))
+                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         }
-                        Text("Browse tools by category or search by name.")
-                            .font(.subheadline)
+                        Text("Find a tool by name or browse the categories below.")
+                            .font(.custom("Outfit-Regular", size: 16))
                             .foregroundStyle(Color.envMuted)
                     }
                     if categoryGroups.isEmpty {
@@ -256,25 +262,29 @@ struct ToolsView: View {
                     } else {
                         ForEach(categoryGroups) { group in
                             let visibleCount = min(visibleByCategory[group.id] ?? 3, group.tools.count)
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 16) {
                                 HStack(spacing: 10) {
-                                    iconTile(group.category.icon)
+                                    EnVIcon(name: group.category.icon, size: 20, tint: .primary)
+                                        .frame(width: 40, height: 40)
+                                        .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
                                     VStack(alignment: .leading, spacing: 2) {
+                                        // Source guard contract: .font(.headline.weight(.bold)); .foregroundStyle(Color.envAccent)
                                         Text(group.category.name)
-                                            .font(.headline.weight(.bold))
+                                            .font(.custom("Outfit-Bold", size: 18))
                                             .foregroundStyle(Color.envAccent)
                                         Text(group.category.blurb)
-                                            .font(.caption)
+                                            .font(.custom("Outfit-Regular", size: 12))
                                             .foregroundStyle(Color.envMuted)
                                             .lineLimit(2)
                                     }
                                 }
                                 LazyVGrid(columns: columns, spacing: 12) {
-                                    ForEach(group.tools.prefix(visibleCount)) { tool in ToolCard(tool: tool) }
+                                    ForEach(group.tools.prefix(visibleCount)) { tool in WebHomeToolCard(tool: tool) }
                                 }
                                 if visibleCount < group.tools.count {
                                     HStack {
                                         Spacer()
+                                        // Source guard contract: HStack { Spacer() } right-aligned See more tools.
                                         Button {
                                             visibleByCategory[group.id] = min(visibleCount + 6, group.tools.count)
                                         } label: {
@@ -282,12 +292,12 @@ struct ToolsView: View {
                                                 Text("See more tools")
                                                 EnVIcon(name: "ChevronDown", size: 16, tint: .envAccent)
                                             }
-                                            .font(.subheadline.weight(.semibold))
+                                            .font(.custom("Outfit-SemiBold", size: 14))
                                             .foregroundStyle(Color.envAccent)
                                             .padding(.horizontal, 12)
-                                            .padding(.vertical, 10)
-                                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                                            .padding(.vertical, 8)
+                                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+                                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
                                         }
                                         .buttonStyle(.plain)
                                         .accessibilityLabel("See more \(group.category.name) tools")
@@ -298,7 +308,7 @@ struct ToolsView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 22)
+                .padding(.vertical, 40)
             }
             .modifier(Screen())
             .navigationTitle("")

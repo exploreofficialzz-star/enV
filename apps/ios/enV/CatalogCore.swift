@@ -151,6 +151,40 @@ extension Catalog {
     }
 }
 
+
+extension Catalog {
+    func webSearch(_ query: String, limit: Int = Int.max) -> [Tool] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if q.isEmpty { return Array(tools.sorted { $0.popularity > $1.popularity }.prefix(limit)) }
+        let synonyms: [String: [String]] = [
+            "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
+            "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "resize": ["scale", "dimensions", "size"],
+            "json": ["javascript object"], "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
+            "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
+            "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
+            "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"], "pdf": ["document"],
+            "encode": ["encoding", "base64"], "decode": ["decoding"],
+        ]
+        let tokens = q.split { character in !(character.isLetter || character.isNumber || character == "%" || character == "+") }.map(String.init).filter { $0.count > 1 || $0 == "%" }
+        let expanded = Set(tokens + tokens.flatMap { synonyms[$0] ?? [] })
+        func score(_ tool: Tool) -> Int {
+            let name = tool.name.lowercased()
+            if name == q || tool.id == q { return 2000 + tool.popularity }
+            if name.hasPrefix(q) { return 1400 + tool.popularity }
+            if tool.id.contains(q) || name.contains(q) { return 1000 + tool.popularity }
+            let haystack = ([tool.name, tool.description, tool.category, tool.id, tool.slug] + tool.keywords + tool.tags).joined(separator: " ").lowercased()
+            var hits = 0
+            for token in expanded {
+                if name.contains(token) { hits += 8 }
+                else if tool.keywords.contains(where: { $0.lowercased().contains(token) }) { hits += 5 }
+                else if haystack.contains(token) { hits += 2 }
+            }
+            return hits == 0 ? 0 : hits * 40 + tool.popularity
+        }
+        return Array(tools.map { ($0, score($0)) }.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.prefix(limit).map { $0.0 })
+    }
+}
+
 enum CatalogLoadState: Equatable {
     case loading
     case ready
