@@ -114,6 +114,11 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("The simple way to approach AI tools for creators."))
     }
 
+    func testAdCopyMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localAdCopy(topic: "AI tools for creators", audience: "creators and small businesses", benefit: "Save time and get started quickly")
+        XCTAssertEqual(output, "1. Stop overcomplicating AI tools for creators. Get Save time and get started quickly with a simple approach.\n\n2. AI tools for creators for creators and small businesses: practical, clear, and built around Save time and get started quickly.\n\n3. Ready to make AI tools for creators easier? Start with Save time and get started quickly and take the next step today.")
+    }
+
     func testContentBriefMatchesDeterministicWebTemplate() {
         let output = NativeAiEngine.localContentBrief(topic: "AI tools for creators", audience: "creators and small businesses", goal: "Educate and give the reader a practical next step", tone: "natural")
         XCTAssertEqual(output, "Content brief\nTopic: AI tools for creators\nAudience: creators and small businesses\nGoal: Educate and give the reader a practical next step\nTone: natural and conversational\n\nCore question: What does the reader need to know or do?\nPrimary sections: problem → context → solution → examples → next step\nCTA: Give the reader one clear action to take.")
