@@ -95,7 +95,7 @@ struct HomeView: View {
                         }
                         HStack {
                             Spacer()
-                            Button(action: onTools) label: {
+                            Button(action: onTools) {
                                 HStack(spacing: 6) {
                                     Text("See more tools")
                                     EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
