@@ -24,4 +24,9 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localBio(mapOf("role" to "AI music creator", "audience" to "creators and small businesses", "count" to 5))
         assertEquals("1. AI music creator | Helping creators and small businesses learn, create & grow.\n\n2. AI music creator • your topic • Building in public.\n\n3. Creating around your topic. Sharing what I learn along the way.\n\n4. AI music creator | Making your topic easier to understand.\n\n5. AI music creator focused on practical ideas for creators and small businesses.", output)
     }
+
+    @Test fun titleGeneratorMatchesDeterministicWebTemplates() {
+        val output = NativeAiEngine.localTitle(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses", "count" to 8))
+        assertEquals("1. AI tools for creators: What creators and small businesses Should Know\n\n2. How to Get Better Results With AI tools for creators\n\n3. The Simple Guide to AI tools for creators\n\n4. I Tried AI tools for creators — Here’s What I Learned\n\n5. AI tools for creators Explained Without the Jargon\n\n6. 5 Things creators and small businesses Should Know About AI tools for creators\n\n7. Before You Start With AI tools for creators, Read This\n\n8. A Practical AI tools for creators Guide for creators and small businesses", output)
+    }
 }
