@@ -13,6 +13,7 @@ object NativeAiEngine {
     private val rewriteTools = setOf("rewrite-helper")
     private val emailTools = setOf("email-generator")
     private val metaTools = setOf("meta-description-generator")
+    private val hookTools = setOf("social-hook-generator")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -22,7 +23,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
@@ -34,6 +35,7 @@ object NativeAiEngine {
     fun isLocalRewrite(toolId: String): Boolean = rewriteTools.contains(toolId)
     fun isLocalEmail(toolId: String): Boolean = emailTools.contains(toolId)
     fun isLocalMeta(toolId: String): Boolean = metaTools.contains(toolId)
+    fun isLocalHook(toolId: String): Boolean = hookTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -112,6 +114,11 @@ object NativeAiEngine {
         val page = values["page"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Explain the product, key benefits, and how visitors can get started."
         return "$topic — $page Start here for a concise overview and useful guidance."
     }
+    fun localHook(values: Map<String, Any?>): String {
+        val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        return listOf("Most people overcomplicate $topic.", "Before you try $topic, know this.", "Here's what I wish I knew about $topic.", "If you're a $audience, save this.", "The simple way to approach $topic.").mapIndexed { i, line -> "${i + 1}. $line" }.joinToString("\n\n")
+    }
 
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
@@ -123,6 +130,7 @@ object NativeAiEngine {
         rewriteTools.contains(toolId) -> "local.rewrite"
         emailTools.contains(toolId) -> "local.email"
         metaTools.contains(toolId) -> "local.meta"
+        hookTools.contains(toolId) -> "local.hook"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }
