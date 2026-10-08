@@ -21,6 +21,7 @@ object NativeAiEngine {
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
     fun isLocalBio(toolId: String): Boolean = bioTools.contains(toolId)
+    fun isLocalTitle(toolId: String): Boolean = toolId == "title-generator"
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -51,6 +52,14 @@ object NativeAiEngine {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
         val count = (values["count"] as? Number)?.toInt()?.coerceIn(1, 5) ?: 5
         return listOf("$role | Helping $audience learn, create & grow.", "$role • $topic • Building in public.", "Creating around $topic. Sharing what I learn along the way.", "$role | Making $topic easier to understand.", "$role focused on practical ideas for $audience.").take(count).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
+    }
+
+    fun localTitle(values: Map<String, Any?>): String {
+        val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val count = (values["count"] as? Number)?.toInt()?.coerceIn(1, 8) ?: 8
+        val lines = listOf("$topic: What $audience Should Know", "How to Get Better Results With $topic", "The Simple Guide to $topic", "I Tried $topic — Here’s What I Learned", "$topic Explained Without the Jargon", "5 Things $audience Should Know About $topic", "Before You Start With $topic, Read This", "A Practical $topic Guide for $audience")
+        return lines.take(count).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
 
     fun taskFor(toolId: String): String? = when {

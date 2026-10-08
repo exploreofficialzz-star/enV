@@ -32,11 +32,11 @@ fun NativeAiToolForm(tool: ToolRecord) {
     var error by remember(tool.id) { mutableStateOf("") }
     var output by remember(tool.id) { mutableStateOf("") }
     var consent by remember(tool.id) { mutableStateOf(false) }
-    var topic by remember(tool.id) { mutableStateOf(if (tool.id.contains("caption")) "AI tools for creators" else if (tool.id == "prompt-generator") "Create a launch plan for a digital product" else if (tool.id == "bio-generator") "AI music creator" else "") }
+    var topic by remember(tool.id) { mutableStateOf(if (tool.id.contains("caption") || tool.id == "title-generator") "AI tools for creators" else if (tool.id == "prompt-generator") "Create a launch plan for a digital product" else if (tool.id == "bio-generator") "AI music creator" else "") }
     var audience by remember(tool.id) { mutableStateOf("creators and small businesses") }
     var tone by remember(tool.id) { mutableStateOf("friendly") }
     var language by remember(tool.id) { mutableStateOf("en") }
-    var variants by remember(tool.id) { mutableStateOf(if (tool.id.contains("title") || tool.id.contains("caption")) "5" else "3") }
+    var variants by remember(tool.id) { mutableStateOf(if (tool.id == "title-generator") "8" else if (tool.id.contains("title") || tool.id.contains("caption")) "5" else "3") }
     var includeHashtags by remember(tool.id) { mutableStateOf(true) }
     var pattern by remember(tool.id) { mutableStateOf("") }
     var flags by remember(tool.id) { mutableStateOf("") }
@@ -53,14 +53,15 @@ fun NativeAiToolForm(tool: ToolRecord) {
     }
 
     LaunchedEffect(tool.id) {
-        if (!NativeAiEngine.isLocalCaption(tool.id) && !NativeAiEngine.isLocalPrompt(tool.id) && !NativeAiEngine.isLocalBio(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
+        if (!NativeAiEngine.isLocalCaption(tool.id) && !NativeAiEngine.isLocalPrompt(tool.id) && !NativeAiEngine.isLocalBio(tool.id) && !NativeAiEngine.isLocalTitle(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
     }
 
     val task = NativeAiEngine.taskFor(tool.id) ?: return
     val localCaption = NativeAiEngine.isLocalCaption(tool.id)
     val localPrompt = NativeAiEngine.isLocalPrompt(tool.id)
     val localBio = NativeAiEngine.isLocalBio(tool.id)
-    val localDeterministic = localCaption || localPrompt || localBio
+    val localTitle = NativeAiEngine.isLocalTitle(tool.id)
+    val localDeterministic = localCaption || localPrompt || localBio || localTitle
     val needsConsent = tool.id == "json-validator" || tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
     val isFileTool = tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
     val buttonEnabled = !working && (localDeterministic || available == true) && (!needsConsent || consent) && (!isFileTool || selectedFile != null) && when {
@@ -112,7 +113,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
             Button(enabled = buttonEnabled, onClick = {
                 error = ""; output = ""; working = true
                 if (localDeterministic) {
-                    output = when { localCaption -> NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localPrompt -> NativeAiEngine.localPrompt(mapOf("task" to topic, "audience" to audience, "tone" to tone)); else -> NativeAiEngine.localBio(mapOf("role" to topic, "audience" to audience, "count" to variants.toIntOrNull())) }
+                    output = when { localCaption -> NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localPrompt -> NativeAiEngine.localPrompt(mapOf("task" to topic, "audience" to audience, "tone" to tone)); localBio -> NativeAiEngine.localBio(mapOf("role" to topic, "audience" to audience, "count" to variants.toIntOrNull())); else -> NativeAiEngine.localTitle(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())) }
                     working = false
                     return@Button
                 }

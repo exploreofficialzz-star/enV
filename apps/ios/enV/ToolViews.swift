@@ -928,6 +928,7 @@ enum NativeAiEngine {
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
     static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
     static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
+    static func isLocalTitle(_ toolID: String) -> Bool { toolID == "title-generator" }
     static func localCaption(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
         let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
         let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -955,6 +956,13 @@ enum NativeAiEngine {
         let count = min(5, max(1, Int(rawCount) ?? 5))
         let topic = "your topic"
         let lines = ["\(role) | Helping \(audience) learn, create & grow.", "\(role) • \(topic) • Building in public.", "Creating around \(topic). Sharing what I learn along the way.", "\(role) | Making \(topic) easier to understand.", "\(role) focused on practical ideas for \(audience)."]
+        return lines.prefix(count).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+    }
+    static func localTitle(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
+        let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
+        let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
+        let count = min(8, max(1, Int(rawCount) ?? 8))
+        let lines = ["\(topic): What \(audience) Should Know", "How to Get Better Results With \(topic)", "The Simple Guide to \(topic)", "I Tried \(topic) — Here’s What I Learned", "\(topic) Explained Without the Jargon", "5 Things \(audience) Should Know About \(topic)", "Before You Start With \(topic), Read This", "A Practical \(topic) Guide for \(audience)"]
         return lines.prefix(count).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
     }
     static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
@@ -1118,7 +1126,7 @@ private struct NativeAiToolView: View {
     @State private var file: NativeBackendFile?
     @State private var picker = false
 
-    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : ""); _variants = State(initialValue: tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
+    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") || tool.id == "title-generator" ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : ""); _variants = State(initialValue: tool.id == "title-generator" ? "8" : tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
 
     private var task: String? { NativeAiEngine.task(for: tool.id) }
     private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
@@ -1126,7 +1134,8 @@ private struct NativeAiToolView: View {
     private var localCaption: Bool { NativeAiEngine.isLocalCaption(tool.id) }
     private var localPrompt: Bool { NativeAiEngine.isLocalPrompt(tool.id) }
     private var localBio: Bool { NativeAiEngine.isLocalBio(tool.id) }
-    private var localDeterministic: Bool { localCaption || localPrompt || localBio }
+    private var localTitle: Bool { NativeAiEngine.isLocalTitle(tool.id) }
+    private var localDeterministic: Bool { localCaption || localPrompt || localBio || localTitle }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1167,6 +1176,7 @@ private struct NativeAiToolView: View {
         if localCaption { output = NativeAiEngine.localCaption(topic: topic, audience: audience, count: variants); working = false; return }
         if localPrompt { output = NativeAiEngine.localPrompt(task: topic, audience: audience, tone: tone); working = false; return }
         if localBio { output = NativeAiEngine.localBio(role: topic, audience: audience, count: variants); working = false; return }
+        if localTitle { output = NativeAiEngine.localTitle(topic: topic, audience: audience, count: variants); working = false; return }
         Task {
             do {
                 let prepared: NativeBackendFile?
