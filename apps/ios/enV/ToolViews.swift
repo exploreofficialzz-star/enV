@@ -140,6 +140,7 @@ enum NativeCoverage {
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
         case "datetime": return NativeDateTimeEngine.operation(forToolID: tool.id) != nil
+        case "barcode": return NativeBarcodeEngine.supports(tool)
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
@@ -167,6 +168,7 @@ struct NativeFamilyToolView: View {
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "barcode": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -788,7 +790,7 @@ struct NativeTextToolView: View {
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
 }
 
-private struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
+struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
 private struct NativeBackendResult { let text:String?; let data:Data?; let mimeType:String?; let fileName:String? }
 
 enum NativeBackendEngine {
@@ -801,6 +803,8 @@ enum NativeBackendEngine {
     static func supports(_ tool:Tool)->Bool {
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
+        if tool.engine.type=="datetime" && NativeDateTimeEngine.operation(forToolID: tool.id) != nil { return false }
+        if NativeBarcodeEngine.supports(tool) { return false }
         return backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type)
     }
     fileprivate static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
@@ -861,7 +865,42 @@ enum NativeBackendEngine {
     private static func parse(_ d:Data,_ res:URLResponse)throws->NativeBackendResult{guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")};if !(200...299).contains(h.statusCode){throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")};let m=h.mimeType ?? "application/octet-stream";return m.contains("json") ? NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:m,fileName:nil) : NativeBackendResult(text:nil,data:d,mimeType:m,fileName:nil)}
 }
 
+enum NativeBarcodeEngine {
+    private static let ids: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator"]
+    static func supports(_ tool: Tool) -> Bool { ids.contains(tool.id) && tool.engine.type == "barcode" }
+    static func run(toolID: String, input: String) throws -> String {
+        guard ids.contains(toolID) else { throw NativeNativeError.message("Unknown barcode operation.") }
+        let digits = input.filter(\.isNumber)
+        if toolID == "gtin-validator" {
+            guard [8, 12, 13, 14].contains(digits.count) else { throw NativeNativeError.message("GTIN must contain 8, 12, 13 or 14 digits.") }
+            let expected = checkDigit(String(digits.dropLast()))
+            let supplied = Int(String(digits.last!))!
+            return "\(expected == supplied ? "Valid" : "Invalid"): Expected check digit: \(expected). Supplied: \(supplied)."
+        }
+        guard !digits.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
+        let body = toolID == "upc-check-digit" ? String(digits.prefix(11)) : String(digits.prefix(12))
+        guard !body.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
+        return "Calculated check digit: \(checkDigit(body)). Supplied check digit: \(digits.last!)."
+    }
+    private static func checkDigit(_ value: String) -> Int { var sum = 0; for (index, scalar) in value.unicodeScalars.reversed().enumerated() { sum += Int(scalar.value - 48) * (index % 2 == 0 ? 3 : 1) }; return (10 - sum % 10) % 10 }
+}
+
 enum NativeNativeError:LocalizedError{case message(String);var errorDescription:String?{if case .message(let s)=self{return s};return nil}}
+
+private struct NativeBarcodeToolView: View {
+    let tool: Tool
+    @State private var value = ""
+    @State private var output = ""
+    @State private var error: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            NativeInputField(title: "Value", text: $value)
+            NativeActionRow(output: output, run: { do { output = try NativeBarcodeEngine.run(toolID: tool.id, input: value); error = nil } catch let caughtError { output = ""; error = caughtError.localizedDescription } }, reset: { value = ""; output = ""; error = nil })
+            NativeOutputView(output: output, error: error)
+        }
+        .onAppear { if tool.id == "gtin-validator" && value.isEmpty { value = "ENV-12345" } }
+    }
+}
 
 private struct NativeUnavailableToolView: View {
     let tool: Tool
@@ -878,13 +917,47 @@ private struct NativeUnavailableToolView: View {
 
 // MARK: - Native AI infrastructure client and UI
 
-private enum NativeAiEngine {
+enum NativeAiEngine {
     static let captionTools: Set<String> = ["instagram-caption-generator", "tiktok-caption-generator", "x-caption-generator", "youtube-caption-generator", "linkedin-caption-generator", "facebook-caption-generator", "caption-generator"]
+    static let promptTools: Set<String> = ["prompt-generator"]
+    static let bioTools: Set<String> = ["bio-generator"]
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
     static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
 
-    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
-    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
+    static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
+    static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
+    static func localCaption(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
+        let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
+        let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
+        let count = min(15, max(1, Int(rawCount) ?? 5))
+        let lines = [
+            "\(topic) made simple. Save this for later.",
+            "If you're into \(topic), this one is for you.",
+            "A quick reminder for \(audience): you don't need to overcomplicate \(topic).",
+            "Learning \(topic) one step at a time. What would you add?",
+            "Here's the part about \(topic) people usually skip.",
+            "Small steps, better results. That's the goal with \(topic).",
+            "Trying to understand \(topic)? Start here."
+        ]
+        return lines.prefix(count).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+    }
+    static func localPrompt(task rawTask: String, audience rawAudience: String, tone rawTone: String) -> String {
+        let task = rawTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Complete the requested task" : rawTask.trimmingCharacters(in: .whitespacesAndNewlines)
+        let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tone = ["professional": "clear and professional", "bold": "confident and direct", "playful": "light and playful", "friendly": "warm and friendly"][rawTone] ?? "natural and conversational"
+        return "ROLE\nYou are a helpful specialist supporting \(audience).\n\nTASK\n\(task).\n\nSTYLE\nUse a \(tone) style.\n\nCONTEXT\nFocus on practical, accurate output. Avoid unnecessary filler and clearly state assumptions.\n\nOUTPUT\nReturn a useful, structured answer with headings or bullets where they improve readability.\n\nCHECK\nBefore answering, verify that the response directly addresses the task and is suitable for \(audience)."
+    }
+    static func localBio(role rawRole: String, audience rawAudience: String, count rawCount: String) -> String {
+        let role = rawRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "creator" : rawRole.trimmingCharacters(in: .whitespacesAndNewlines)
+        let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
+        let count = min(5, max(1, Int(rawCount) ?? 5))
+        let topic = "your topic"
+        let lines = ["\(role) | Helping \(audience) learn, create & grow.", "\(role) • \(topic) • Building in public.", "Creating around \(topic). Sharing what I learn along the way.", "\(role) | Making \(topic) easier to understand.", "\(role) focused on practical ideas for \(audience)."]
+        return lines.prefix(count).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+    }
+    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
     static func platform(for toolID: String) -> String {
         switch toolID {
         case "instagram-caption-generator", "instagram-title-generator": return "instagram"
@@ -1028,6 +1101,7 @@ private struct NativeAiToolView: View {
     @State private var output = ""
     @State private var consent = false
     @State private var topic = ""
+    @State private var audience = "creators and small businesses"
     @State private var tone = "friendly"
     @State private var language = "en"
     @State private var variants = "3"
@@ -1044,19 +1118,25 @@ private struct NativeAiToolView: View {
     @State private var file: NativeBackendFile?
     @State private var picker = false
 
-    init(tool: Tool) { self.tool = tool; _variants = State(initialValue: tool.id.contains("title") ? "5" : "3") }
+    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : ""); _variants = State(initialValue: tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
 
     private var task: String? { NativeAiEngine.task(for: tool.id) }
     private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
     private var needsFile: Bool { ["alt-text-generator","video-audio-extractor"].contains(tool.id) }
+    private var localCaption: Bool { NativeAiEngine.isLocalCaption(tool.id) }
+    private var localPrompt: Bool { NativeAiEngine.isLocalPrompt(tool.id) }
+    private var localBio: Bool { NativeAiEngine.isLocalBio(tool.id) }
+    private var localDeterministic: Bool { localCaption || localPrompt || localBio }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
-            if available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
+            Text(localDeterministic ? "Runs locally with deterministic templates" : "AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
+            if !localDeterministic && available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
             if let task {
-                if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) {
-                    NativeInputField(title: "Topic", text: $topic); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Language", text: $language); NativeInputField(title: "Options", text: $variants)
+                if localPrompt { NativeInputField(title: "Task", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone) }
+                else if localBio { NativeInputField(title: "Role / what you do", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Options", text: $variants) }
+                else if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) {
+                    NativeInputField(title: "Topic", text: $topic); if localCaption { NativeInputField(title: "Audience", text: $audience) }; NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Language", text: $language); NativeInputField(title: "Options", text: $variants)
                     if NativeAiEngine.captionTools.contains(tool.id) { Toggle("Include hashtags", isOn: $includeHashtags) }
                 } else if tool.id == "regex-tester" { NativeInputField(title: "Pattern", text: $pattern); NativeInputField(title: "Flags", text: $flags); NativeInputField(title: "Sample text", text: $sampleText) }
                 else if tool.id == "sql-formatter" { NativeInputField(title: "SQL", text: $sql); NativeInputField(title: "Dialect", text: $dialect) }
@@ -1064,11 +1144,11 @@ private struct NativeAiToolView: View {
                 else if tool.id == "alt-text-generator" { Button(file == nil ? "Choose image" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Page context", text: $contextText); NativeInputField(title: "Style", text: $style); NativeInputField(title: "Language", text: $language) }
                 else if tool.id == "video-audio-extractor" { Button(file == nil ? "Choose audio" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Language code", text: $language) }
                 if needsConsent { Toggle("I understand this input is sent to an external AI service.", isOn: $consent) }
-                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || available != true || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic="";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
+                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic=localCaption ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : localBio ? "AI music creator" : ""; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
                 if !output.isEmpty { TextEditor(text: .constant(output)).frame(minHeight: 150).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3))) }
                 if !error.isEmpty { Text(error).foregroundStyle(.red).font(.footnote) }
                 Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
-                    .onAppear { Task { available = (try? await NativeAiClient.availability()[task]) ?? false } }
+                    .onAppear { if !localDeterministic { Task { available = (try? await NativeAiClient.availability()[task]) ?? false } } }
                     .fileImporter(isPresented: $picker, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; if let data = try? Data(contentsOf: url) { file = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: data) } } }
             }
         }.padding(.vertical, 4)
@@ -1078,12 +1158,15 @@ private struct NativeAiToolView: View {
         if tool.id == "regex-tester" { return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "sql-formatter" { return sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "json-validator" { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return false
     }
 
     private func run(task: String) {
         working = true; error = ""; output = ""
+        if localCaption { output = NativeAiEngine.localCaption(topic: topic, audience: audience, count: variants); working = false; return }
+        if localPrompt { output = NativeAiEngine.localPrompt(task: topic, audience: audience, tone: tone); working = false; return }
+        if localBio { output = NativeAiEngine.localBio(role: topic, audience: audience, count: variants); working = false; return }
         Task {
             do {
                 let prepared: NativeBackendFile?

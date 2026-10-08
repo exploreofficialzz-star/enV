@@ -35,6 +35,34 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertFalse(NativeDeveloperToolFormPolicy.needsRegexFlags("json-formatter"))
     }
 
+    func testImplementedDatetimeAndBarcodeRecordsBypassGenericBackend() throws {
+        XCTAssertFalse(NativeBackendEngine.supports(tool("unix-timestamp-converter", category: "developer", engineType: "datetime")))
+        XCTAssertFalse(NativeBackendEngine.supports(tool("gtin-validator", category: "qr", engineType: "barcode")))
+        XCTAssertTrue(try NativeBarcodeEngine.run(toolID: "gtin-validator", input: "4006381333931").hasPrefix("Valid: Expected check digit: 1. Supplied: 1."))
+        XCTAssertTrue(try NativeBarcodeEngine.run(toolID: "gtin-validator", input: "4006381333930").hasPrefix("Invalid: Expected check digit: 1. Supplied: 0."))
+    }
+
+    func testCaptionGeneratorMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localCaption(topic: "AI tools for creators", audience: "creators and small businesses", count: "5")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 5)
+        XCTAssertTrue(output.contains("AI tools for creators made simple. Save this for later."))
+        XCTAssertTrue(output.contains("A quick reminder for creators and small businesses: you don't need to overcomplicate AI tools for creators."))
+    }
+
+    func testPromptGeneratorMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localPrompt(task: "Create a launch plan for a digital product", audience: "creators and small businesses", tone: "natural")
+        XCTAssertTrue(output.hasPrefix("ROLE\nYou are a helpful specialist supporting creators and small businesses."))
+        XCTAssertTrue(output.contains("TASK\nCreate a launch plan for a digital product."))
+        XCTAssertTrue(output.contains("STYLE\nUse a natural and conversational style."))
+    }
+
+    func testBioGeneratorMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localBio(role: "AI music creator", audience: "creators and small businesses", count: "5")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 5)
+        XCTAssertTrue(output.contains("AI music creator | Helping creators and small businesses learn, create & grow."))
+        XCTAssertTrue(output.contains("AI music creator focused on practical ideas for creators and small businesses."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text
