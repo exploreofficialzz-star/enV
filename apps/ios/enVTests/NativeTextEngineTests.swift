@@ -102,6 +102,11 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("• What it does\n• Who it is for\n• How to get started"))
     }
 
+    func testMetaDescriptionMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localMeta(topic: "AI tools for creators", page: "Explain the product, key benefits, and how visitors can get started.")
+        XCTAssertEqual(output, "AI tools for creators — Explain the product, key benefits, and how visitors can get started. Start here for a concise overview and useful guidance.")
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

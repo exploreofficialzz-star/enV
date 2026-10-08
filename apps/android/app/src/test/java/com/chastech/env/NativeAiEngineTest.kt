@@ -56,4 +56,9 @@ class NativeAiEngineTest {
         assertTrue(output.startsWith("Subject: Introduce a new digital product\n\nHi,"))
         assertTrue(output.contains("• What it does\n• Who it is for\n• How to get started"))
     }
+
+    @Test fun metaDescriptionMatchesDeterministicWebTemplate() {
+        val output = NativeAiEngine.localMeta(mapOf("topic" to "AI tools for creators", "page" to "Explain the product, key benefits, and how visitors can get started."))
+        assertEquals("AI tools for creators — Explain the product, key benefits, and how visitors can get started. Start here for a concise overview and useful guidance.", output)
+    }
 }

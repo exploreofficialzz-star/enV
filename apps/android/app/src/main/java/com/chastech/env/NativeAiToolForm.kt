@@ -35,6 +35,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
     var topic by remember(tool.id) { mutableStateOf(if (tool.id.contains("caption") || tool.id == "title-generator" || tool.id == "idea-generator") "AI tools for creators" else if (tool.id == "prompt-generator") "Create a launch plan for a digital product" else if (tool.id == "bio-generator") "AI music creator" else if (tool.id == "product-description-generator") "AI Music Generator Class" else if (tool.id == "resume-bullet-generator") "Managed social media content and improved engagement" else if (tool.id == "rewrite-helper") "We are launching a new product that helps people create useful content faster." else "") }
     var resultMetric by remember(tool.id) { mutableStateOf(if (tool.id == "resume-bullet-generator") "increased engagement" else "") }
     var emailPoints by remember(tool.id) { mutableStateOf(if (tool.id == "email-generator") "What it does\nWho it is for\nHow to get started" else "") }
+    var pageSummary by remember(tool.id) { mutableStateOf(if (tool.id == "meta-description-generator") "Explain the product, key benefits, and how visitors can get started." else "") }
     var features by remember(tool.id) { mutableStateOf(if (tool.id == "product-description-generator") "Beginner friendly\nWorks from a smartphone\nUses accessible tools" else "") }
     var audience by remember(tool.id) { mutableStateOf("creators and small businesses") }
     var tone by remember(tool.id) { mutableStateOf("friendly") }
@@ -56,7 +57,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
     }
 
     LaunchedEffect(tool.id) {
-        if (!NativeAiEngine.isLocalCaption(tool.id) && !NativeAiEngine.isLocalPrompt(tool.id) && !NativeAiEngine.isLocalBio(tool.id) && !NativeAiEngine.isLocalTitle(tool.id) && !NativeAiEngine.isLocalProduct(tool.id) && !NativeAiEngine.isLocalIdea(tool.id) && !NativeAiEngine.isLocalResume(tool.id) && !NativeAiEngine.isLocalRewrite(tool.id) && !NativeAiEngine.isLocalEmail(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
+        if (!NativeAiEngine.isLocalCaption(tool.id) && !NativeAiEngine.isLocalPrompt(tool.id) && !NativeAiEngine.isLocalBio(tool.id) && !NativeAiEngine.isLocalTitle(tool.id) && !NativeAiEngine.isLocalProduct(tool.id) && !NativeAiEngine.isLocalIdea(tool.id) && !NativeAiEngine.isLocalResume(tool.id) && !NativeAiEngine.isLocalRewrite(tool.id) && !NativeAiEngine.isLocalEmail(tool.id) && !NativeAiEngine.isLocalMeta(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
     }
 
     val task = NativeAiEngine.taskFor(tool.id) ?: return
@@ -69,7 +70,8 @@ fun NativeAiToolForm(tool: ToolRecord) {
     val localResume = NativeAiEngine.isLocalResume(tool.id)
     val localRewrite = NativeAiEngine.isLocalRewrite(tool.id)
     val localEmail = NativeAiEngine.isLocalEmail(tool.id)
-    val localDeterministic = localCaption || localPrompt || localBio || localTitle || localProduct || localIdea || localResume || localRewrite || localEmail
+    val localMeta = NativeAiEngine.isLocalMeta(tool.id)
+    val localDeterministic = localCaption || localPrompt || localBio || localTitle || localProduct || localIdea || localResume || localRewrite || localEmail || localMeta
     val needsConsent = tool.id == "json-validator" || tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
     val isFileTool = tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
     val buttonEnabled = !working && (localDeterministic || available == true) && (!needsConsent || consent) && (!isFileTool || selectedFile != null) && when {
@@ -82,6 +84,11 @@ fun NativeAiToolForm(tool: ToolRecord) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         Text(if (localDeterministic) "Runs locally with deterministic templates" else "AI assistance · native Kotlin → enV AI API", style = MaterialTheme.typography.labelLarge)
         when {
+            tool.id == "meta-description-generator" -> {
+                NativeAiField("Topic / subject", topic) { topic = it }
+                NativeAiField("Page purpose", pageSummary) { pageSummary = it }
+                NativeAiField("Tone", tone) { tone = it }
+            }
             tool.id == "email-generator" -> {
                 NativeAiField("Email purpose", topic) { topic = it }
                 NativeAiField("Key points", emailPoints) { emailPoints = it }
@@ -147,7 +154,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
             Button(enabled = buttonEnabled, onClick = {
                 error = ""; output = ""; working = true
                 if (localDeterministic) {
-                    output = when { localCaption -> NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localPrompt -> NativeAiEngine.localPrompt(mapOf("task" to topic, "audience" to audience, "tone" to tone)); localBio -> NativeAiEngine.localBio(mapOf("role" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localTitle -> NativeAiEngine.localTitle(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localProduct -> NativeAiEngine.localProduct(mapOf("product" to topic, "features" to features, "audience" to audience, "tone" to tone)); localIdea -> NativeAiEngine.localIdea(mapOf("topic" to topic, "audience" to audience)); localResume -> NativeAiEngine.localResume(mapOf("duty" to topic, "result" to resultMetric)); localRewrite -> NativeAiEngine.localRewrite(mapOf("text" to topic, "tone" to tone)); else -> NativeAiEngine.localEmail(mapOf("purpose" to topic, "points" to emailPoints)) }
+                    output = when { localCaption -> NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localPrompt -> NativeAiEngine.localPrompt(mapOf("task" to topic, "audience" to audience, "tone" to tone)); localBio -> NativeAiEngine.localBio(mapOf("role" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localTitle -> NativeAiEngine.localTitle(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())); localProduct -> NativeAiEngine.localProduct(mapOf("product" to topic, "features" to features, "audience" to audience, "tone" to tone)); localIdea -> NativeAiEngine.localIdea(mapOf("topic" to topic, "audience" to audience)); localResume -> NativeAiEngine.localResume(mapOf("duty" to topic, "result" to resultMetric)); localRewrite -> NativeAiEngine.localRewrite(mapOf("text" to topic, "tone" to tone)); localEmail -> NativeAiEngine.localEmail(mapOf("purpose" to topic, "points" to emailPoints)); else -> NativeAiEngine.localMeta(mapOf("topic" to topic, "page" to pageSummary)) }
                     working = false
                     return@Button
                 }
@@ -161,7 +168,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
                     }.fold({ output = it; working = false }, { error = it.message ?: "AI request failed."; working = false })
                 }
             }) { Text(if (working) "Working…" else "Generate") }
-            OutlinedButton(onClick = { topic=when { localCaption || localTitle || localIdea -> "AI tools for creators"; localPrompt -> "Create a launch plan for a digital product"; localBio -> "AI music creator"; localProduct -> "AI Music Generator Class"; localResume -> "Managed social media content and improved engagement"; localRewrite -> "We are launching a new product that helps people create useful content faster."; localEmail -> "Introduce a new digital product"; else -> "" }; emailPoints=if (localEmail) "What it does\nWho it is for\nHow to get started" else ""; resultMetric=if (localResume) "increased engagement" else ""; features=if (localProduct) "Beginner friendly\nWorks from a smartphone\nUses accessible tools" else ""; goal=if (localIdea) "Educate and give the reader a practical next step" else goal; audience="creators and small businesses"; pattern="";sql="";json="";output="";error="";selectedFile=null }) { Text("Reset") }
+            OutlinedButton(onClick = { topic=when { localCaption || localTitle || localIdea -> "AI tools for creators"; localPrompt -> "Create a launch plan for a digital product"; localBio -> "AI music creator"; localProduct -> "AI Music Generator Class"; localResume -> "Managed social media content and improved engagement"; localRewrite -> "We are launching a new product that helps people create useful content faster."; localEmail -> "Introduce a new digital product"; localMeta -> "AI tools for creators"; else -> "" }; pageSummary=if (localMeta) "Explain the product, key benefits, and how visitors can get started." else ""; emailPoints=if (localEmail) "What it does\nWho it is for\nHow to get started" else ""; resultMetric=if (localResume) "increased engagement" else ""; features=if (localProduct) "Beginner friendly\nWorks from a smartphone\nUses accessible tools" else ""; goal=if (localIdea) "Educate and give the reader a practical next step" else goal; audience="creators and small businesses"; pattern="";sql="";json="";output="";error="";selectedFile=null }) { Text("Reset") }
         }
         if (output.isNotBlank()) Text(output, style = MaterialTheme.typography.bodyMedium)
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
