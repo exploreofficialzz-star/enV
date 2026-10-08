@@ -33,6 +33,10 @@ class NativeDeveloperToolTest {
         assertFalse(NativeDeveloperToolFormPolicy.needsRegexFlags("json-formatter"))
     }
 
+    @Test fun implementedDatetimeRecordsDoNotUseTheRejectedDeveloperBackend() {
+        assertFalse(NativeBackendEngine.supports(tool("unix-timestamp-converter", engineType = "datetime")))
+    }
+
     @Test fun jsonToolsSupportObjectsArraysAndTopLevelScalarValues() {
         val formatter = tool("json-formatter")
         val objectOutput = NativeUtilityEngine.run(formatter, "{\"name\":\"enV\",\"count\":3}").text

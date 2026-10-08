@@ -140,6 +140,7 @@ enum NativeCoverage {
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
         case "datetime": return NativeDateTimeEngine.operation(forToolID: tool.id) != nil
+        case "barcode": return NativeBarcodeEngine.supports(tool)
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
@@ -167,6 +168,7 @@ struct NativeFamilyToolView: View {
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "barcode": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -801,6 +803,8 @@ enum NativeBackendEngine {
     static func supports(_ tool:Tool)->Bool {
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
+        if tool.engine.type=="datetime" && NativeDateTimeEngine.operation(forToolID: tool.id) != nil { return false }
+        if NativeBarcodeEngine.supports(tool) { return false }
         return backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type)
     }
     fileprivate static func execute(_ tool:Tool,input:String,options:String,files:[NativeBackendFile]) async throws -> NativeBackendResult {
@@ -861,7 +865,42 @@ enum NativeBackendEngine {
     private static func parse(_ d:Data,_ res:URLResponse)throws->NativeBackendResult{guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")};if !(200...299).contains(h.statusCode){throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")};let m=h.mimeType ?? "application/octet-stream";return m.contains("json") ? NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:m,fileName:nil) : NativeBackendResult(text:nil,data:d,mimeType:m,fileName:nil)}
 }
 
+enum NativeBarcodeEngine {
+    private static let ids: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator"]
+    static func supports(_ tool: Tool) -> Bool { ids.contains(tool.id) && tool.engine.type == "barcode" }
+    static func run(toolID: String, input: String) throws -> String {
+        guard ids.contains(toolID) else { throw NativeNativeError.message("Unknown barcode operation.") }
+        let digits = input.filter(\.isNumber)
+        if toolID == "gtin-validator" {
+            guard [8, 12, 13, 14].contains(digits.count) else { throw NativeNativeError.message("GTIN must contain 8, 12, 13 or 14 digits.") }
+            let expected = checkDigit(String(digits.dropLast()))
+            let supplied = Int(String(digits.last!))!
+            return "\(expected == supplied ? "Valid" : "Invalid"): Expected check digit: \(expected). Supplied: \(supplied)."
+        }
+        guard !digits.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
+        let body = toolID == "upc-check-digit" ? String(digits.prefix(11)) : String(digits.prefix(12))
+        guard !body.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
+        return "Calculated check digit: \(checkDigit(body)). Supplied check digit: \(digits.last!)."
+    }
+    private static func checkDigit(_ value: String) -> Int { var sum = 0; for (index, scalar) in value.unicodeScalars.reversed().enumerated() { sum += Int(scalar.value - 48) * (index % 2 == 0 ? 3 : 1) }; return (10 - sum % 10) % 10 }
+}
+
 enum NativeNativeError:LocalizedError{case message(String);var errorDescription:String?{if case .message(let s)=self{return s};return nil}}
+
+private struct NativeBarcodeToolView: View {
+    let tool: Tool
+    @State private var value = ""
+    @State private var output = ""
+    @State private var error: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            NativeInputField(title: "Value", text: $value)
+            NativeActionRow(output: output, run: { do { output = try NativeBarcodeEngine.run(toolID: tool.id, input: value); error = nil } catch { output = ""; error = error.localizedDescription } }, reset: { value = ""; output = ""; error = nil })
+            NativeOutputView(output: output, error: error)
+        }
+        .onAppear { if tool.id == "gtin-validator" && value.isEmpty { value = "ENV-12345" } }
+    }
+}
 
 private struct NativeUnavailableToolView: View {
     let tool: Tool

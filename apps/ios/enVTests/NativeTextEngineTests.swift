@@ -35,6 +35,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertFalse(NativeDeveloperToolFormPolicy.needsRegexFlags("json-formatter"))
     }
 
+    func testImplementedDatetimeAndBarcodeRecordsBypassGenericBackend() throws {
+        XCTAssertFalse(NativeBackendEngine.supports(tool("unix-timestamp-converter", category: "developer", engineType: "datetime")))
+        XCTAssertFalse(NativeBackendEngine.supports(tool("gtin-validator", category: "qr", engineType: "barcode")))
+        XCTAssertTrue(try NativeBarcodeEngine.run(toolID: "gtin-validator", input: "4006381333931").hasPrefix("Valid: Expected check digit: 1. Supplied: 1."))
+        XCTAssertTrue(try NativeBarcodeEngine.run(toolID: "gtin-validator", input: "4006381333930").hasPrefix("Invalid: Expected check digit: 1. Supplied: 0."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

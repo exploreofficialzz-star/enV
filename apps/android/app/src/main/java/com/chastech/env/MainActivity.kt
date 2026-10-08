@@ -553,6 +553,7 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEng
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
     "datetime" -> NativeDateTimeEngine.operationForTool(tool.id) != null
+    "barcode" -> NativeBarcodeEngine.supports(tool)
     "mime" -> NativeMimeEngine.operationForTool(tool.id) != null
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
@@ -606,6 +607,7 @@ private fun NativeToolForm(tool: ToolRecord) {
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
+        "barcode" -> NativeBarcodeToolForm(tool.id)
         "mime" -> NativeMimeToolForm(tool.id)
         "converter" -> NativeConverterToolForm(tool)
         "calculator" -> when {
@@ -631,6 +633,20 @@ private fun NativeProductivityToolForm(toolId:String) {
     LaunchedEffect(running, toolId, phase) { while(running) { kotlinx.coroutines.delay(1000); if(toolId=="stopwatch") elapsed++ else { if(remaining<=1){ phase=if(phase=="focus")"break" else "focus"; remaining=if(toolId=="pomodoro-timer") if(phase=="focus")1500 else 300 else if(phase=="focus")3000 else 600 } else remaining-- } } }
     val display=if(toolId=="stopwatch") String.format("%02d:%02d",elapsed/60,elapsed%60) else String.format("%02d:%02d",remaining/60,remaining%60)
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)){ Text(if(toolId=="stopwatch")"Stopwatch" else if(toolId=="pomodoro-timer")"Pomodoro · ${phase.replaceFirstChar{it.uppercase()}}" else "Focus Timer",style=MaterialTheme.typography.titleMedium); Text(display,style=MaterialTheme.typography.displayLarge); Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button({running=!running}){Text(if(running)"Pause" else "Start")}; OutlinedButton({running=false;elapsed=0;phase="focus";remaining=if(toolId=="pomodoro-timer")1500 else 3000}){Text("Reset")}} }
+}
+
+@Composable
+private fun NativeBarcodeToolForm(toolId: String) {
+    val context = LocalContext.current
+    var value by rememberSaveable(toolId) { mutableStateOf(if (toolId == "gtin-validator") "ENV-12345" else "") }
+    var output by rememberSaveable(toolId) { mutableStateOf("") }
+    var error by rememberSaveable(toolId) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        InputField(value, { value = it }, "Value", singleLine = true)
+        ActionRow(onRun = { runCatching { NativeBarcodeEngine.run(toolId, value) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to validate barcode" }) }, onReset = { value = if (toolId == "gtin-validator") "ENV-12345" else ""; output = ""; error = "" })
+        ResultBox(output, error, ::copy)
+    }
 }
 
 @Composable
