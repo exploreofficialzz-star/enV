@@ -49,4 +49,10 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localRewrite(mapOf("text" to "We are launching a new product that helps people create useful content faster.", "tone" to "natural"))
         assertEquals("Rewritten in a natural and conversational tone:\n\nWe are launching a new product that helps people create useful content faster.\n\nEdit for clarity, natural flow, and consistent tone before publishing.", output)
     }
+
+    @Test fun emailDraftMatchesDeterministicWebTemplate() {
+        val output = NativeAiEngine.localEmail(mapOf("purpose" to "Introduce a new digital product", "points" to "What it does\nWho it is for\nHow to get started"))
+        assertTrue(output.startsWith("Subject: Introduce a new digital product\n\nHi,"))
+        assertTrue(output.contains("• What it does\n• Who it is for\n• How to get started"))
+    }
 }
