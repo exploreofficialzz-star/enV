@@ -18,6 +18,10 @@ struct HomeView: View {
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
+    private var homeTools: [Tool] {
+        let limit = horizontalSizeClass == .regular ? webHomeToolIDs.count : 6
+        return webHomeToolIDs.prefix(limit).compactMap { id in store.tools.first(where: { $0.id == id }) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -90,7 +94,7 @@ struct HomeView: View {
                         Text("Trending tools")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(Color.envAccent)
-                        ForEach(webHomeToolIDs.prefix(horizontalSizeClass == .regular ? webHomeToolIDs.count : 6).compactMap { id in store.tools.first(where: { $0.id == id }) }) { tool in
+                        ForEach(homeTools) { tool in
                             WebHomeToolCard(tool: tool)
                         }
                         HStack {
