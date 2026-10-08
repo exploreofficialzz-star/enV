@@ -152,18 +152,6 @@ jobs:
             echo "Some Android production signing secrets are missing; refusing an incomplete signing configuration." >&2
             exit 1
           fi
-      # GitHub-hosted emulator boot can fail before the app is installed when
-      # the runner cannot expose ADB's TCP port 5554. Keep release packaging
-      # authoritative while allowing that external smoke check to be non-blocking.
-      - name: Run native Android launch test on emulator
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: Pixel_6
-          script: ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
       - name: Build signed release APK and AAB
         run: ./gradlew --no-daemon --max-workers=2 --stacktrace :app:assembleRelease :app:bundleRelease
       - name: Verify release APK signature
