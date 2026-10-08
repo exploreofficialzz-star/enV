@@ -790,7 +790,7 @@ struct NativeTextToolView: View {
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
 }
 
-private struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
+struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
 private struct NativeBackendResult { let text:String?; let data:Data?; let mimeType:String?; let fileName:String? }
 
 enum NativeBackendEngine {
