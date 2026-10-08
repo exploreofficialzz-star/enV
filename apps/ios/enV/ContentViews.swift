@@ -20,7 +20,7 @@ struct HomeView: View {
     private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
     private var homeTools: [Tool] {
         let limit = horizontalSizeClass == .regular ? webHomeToolIDs.count : 6
-        return webHomeToolIDs.prefix(limit).compactMap { id in store.tools.first(where: { $0.id == id }) }
+        return webHomeToolIDs.prefix(limit).compactMap { id in store.tools().first(where: { $0.id == id }) }
     }
 
     var body: some View {
