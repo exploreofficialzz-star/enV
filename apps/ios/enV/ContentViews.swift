@@ -10,6 +10,7 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let onSearch: (String) -> Void
     let onTools: () -> Void
     let onAssistant: () -> Void
@@ -46,11 +47,11 @@ struct HomeView: View {
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
-                                    Text("No matching tools. Try another name or keyword.")
+                                    Text("No matching tools. Try “json”, “bmi”, or “qr”.")
                                         .font(.footnote)
                                         .foregroundStyle(Color.envMuted)
                                 } else {
-                                    ForEach(searchSuggestions) { tool in ToolCard(tool: tool) }
+                                    ForEach(searchSuggestions) { tool in WebHomeSearchSuggestion(tool: tool) }
                                     HStack {
                                         Spacer()
                                         Button { onSearch(searchText) } label: {
@@ -88,7 +89,7 @@ struct HomeView: View {
                         Text("Trending tools")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(Color.envAccent)
-                        ForEach(webHomeToolIDs.compactMap { id in store.tools.first(where: { $0.id == id }) }) { tool in
+                        ForEach(webHomeToolIDs.prefix(horizontalSizeClass == .regular ? webHomeToolIDs.count : 6).compactMap { id in store.tools.first(where: { $0.id == id }) }) { tool in
                             WebHomeToolCard(tool: tool)
                         }
                         HStack {
@@ -122,7 +123,8 @@ struct HomeView: View {
 
 private let webHomeToolIDs = [
     "audio-to-text", "percentage-calculator", "json-formatter", "image-compressor",
-    "qr-generator", "password-generator",
+    "qr-generator", "password-generator", "video-to-mp4", "video-to-text",
+    "youtube-video-downloader", "youtube-audio-extractor", "word-counter", "video-to-mp3",
 ]
 
 private struct WebHomeToolCard: View {
@@ -140,6 +142,24 @@ private struct WebHomeToolCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct WebHomeSearchSuggestion: View {
+    let tool: Tool
+    var body: some View {
+        NavigationLink(value: tool) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(tool.name).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                    if tool.isPlanned { Text("Coming soon").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                }
+                Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 10)
         }
         .buttonStyle(.plain)
     }
