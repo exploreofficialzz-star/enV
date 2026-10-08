@@ -34,4 +34,9 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localProduct(mapOf("product" to "AI Music Generator Class", "features" to "Beginner friendly\nWorks from a smartphone\nUses accessible tools", "audience" to "creators and small businesses", "tone" to "natural"))
         assertEquals("AI Music Generator Class\n\nA practical option for creators and small businesses who want a simple way to get started.\n\nKey benefits:\n• Beginner friendly\n• Works from a smartphone\n• Uses accessible tools\n\nPositioning style: natural and conversational.\n\nCTA: Get started and see what AI Music Generator Class can help you create.", output)
     }
+
+    @Test fun ideaGeneratorMatchesDeterministicWebTemplates() {
+        val output = NativeAiEngine.localIdea(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses"))
+        assertEquals("1. How-to: AI tools for creators for creators and small businesses\n\n2. Common mistake: AI tools for creators\n\n3. Case study: a real example of AI tools for creators\n\n4. Checklist: getting started with AI tools for creators\n\n5. Myth vs fact: AI tools for creators\n\n6. Quick tips: AI tools for creators\n\n7. Beginner guide: AI tools for creators\n\n8. Behind the scenes: working on AI tools for creators", output)
+    }
 }
