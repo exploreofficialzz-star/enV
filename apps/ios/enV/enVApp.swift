@@ -38,6 +38,7 @@ extension Color {
     static let envMuted = adaptive(light: 0x5C636C, dark: 0xA7ADB4)
     static let envSubtle = adaptive(light: 0x8A9098, dark: 0x7C848C)
     static let envBorder = adaptive(light: 0xE4E0D8, dark: 0x2A3036)
+    static let envBorderStrong = adaptive(light: 0xCFC9BD, dark: 0x3C444C)
     static let envAccentSoft = adaptive(light: 0xD8F3EE, dark: 0x14332F)
 }
 

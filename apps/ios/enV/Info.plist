@@ -18,6 +18,13 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>fonts/Outfit-Regular.ttf</string>
+		<string>fonts/Outfit-Medium.ttf</string>
+		<string>fonts/Outfit-SemiBold.ttf</string>
+		<string>fonts/Outfit-Bold.ttf</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

@@ -37,7 +37,7 @@ struct HomeView: View {
                         HStack(spacing: 12) {
                             EnVLogo().frame(width: 48, height: 32)
                             TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
-                                .font(.body)
+                                .font(.custom("Outfit-Regular", size: 16))
                                 .multilineTextAlignment(.center)
                                 .focused($isHomeSearchFocused)
                                 .submitLabel(.search)
@@ -52,13 +52,13 @@ struct HomeView: View {
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, minHeight: 64, maxHeight: 64, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
                                     Text("No matching tools. Try “json”, “bmi”, or “qr”.")
-                                        .font(.footnote)
+                                        .font(.custom("Outfit-Regular", size: 14))
                                         .foregroundStyle(Color.envMuted)
                                 } else {
                                     ForEach(searchSuggestions) { tool in WebHomeSearchSuggestion(tool: tool) }
@@ -69,7 +69,7 @@ struct HomeView: View {
                                                 Text("See more results")
                                                 EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
                                             }
-                                            .font(.subheadline.weight(.semibold))
+                                            .font(.custom("Outfit-SemiBold", size: 14))
                                             .foregroundStyle(Color.envAccent)
                                         }
                                         .buttonStyle(.plain)
@@ -88,7 +88,7 @@ struct HomeView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 4)
                         Text("A focused toolkit for\neveryday work.")
-                            .font(.system(size: 28, weight: .semibold))
+                            .font(.custom("Outfit-SemiBold", size: 28))
                             .tracking(-0.4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
@@ -98,7 +98,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         // Source guard contract: sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
                         Text("Trending tools")
-                            .font(.title2.weight(.semibold))
+                            .font(.custom("Outfit-SemiBold", size: 20))
                             .foregroundStyle(Color.envAccent)
                         ForEach(homeTools) { tool in
                             WebHomeToolCard(tool: tool)
@@ -110,7 +110,7 @@ struct HomeView: View {
                                     Text("See more tools")
                                     EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
                                 }
-                                .font(.subheadline.weight(.semibold))
+                                .font(.custom("Outfit-SemiBold", size: 14))
                                 .foregroundStyle(Color.envAccent)
                             }
                             .buttonStyle(.plain)
@@ -138,15 +138,17 @@ private struct WebHomeToolCard: View {
         NavigationLink(value: tool) {
             VStack(alignment: .leading, spacing: 0) {
                 iconTile(tool.icon)
-                Text(tool.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
-                Text(tool.description).font(.system(size: 12)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
-                if tool.isPlanned { Text("Coming soon").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                else if tool.clientSide { Text("IN-BROWSER").font(.system(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                Text(tool.name).font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk).padding(.top, 12)
+                Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+                if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-Medium", size: 10)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                else if tool.clientSide { Text("IN-BROWSER").font(.custom("Outfit-Medium", size: 10)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
                 HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
         }
         .buttonStyle(.plain)
     }
@@ -158,10 +160,10 @@ private struct WebHomeSearchSuggestion: View {
         NavigationLink(value: tool) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(tool.name).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
-                    if tool.isPlanned { Text("Coming soon").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                    Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                    if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
                 }
-                Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(1)
+                Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -177,21 +179,21 @@ private struct WebHomeFooter: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             EnVLogo().frame(width: 142, height: 48)
-            Text("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.footnote).foregroundStyle(Color.envMuted)
-            Text("Product").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+            Text("Product").font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(["About", "Tools", "Pricing", "Contact"], id: \.self) { label in
-                    Button(label, action: onAccount).font(.footnote).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
+                    Button(label, action: onAccount).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
                 }
             }
-            Text("Legal").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text("Legal").font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(["Privacy", "Terms", "Disclaimer", "Responsible use"], id: \.self) { label in
-                    Button(label, action: onAccount).font(.footnote).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
+                    Button(label, action: onAccount).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
                 }
             }
-            Text("© 2026 chAs Technologies LLC · enV").font(.footnote).foregroundStyle(Color.envMuted)
-            Text("\(categoryCount) categories · \(activeCount) live tools").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("© 2026 chAs Technologies LLC · enV").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+            Text("\(categoryCount) categories · \(activeCount) live tools").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -623,7 +625,7 @@ private struct HomePreviewBar: View {
 
     private var content: some View {
         Text(title)
-            .font(.caption.weight(.medium))
+            .font(.custom("Outfit-Medium", size: 10))
             .foregroundStyle(Color.envMuted)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -632,7 +634,7 @@ private struct HomePreviewBar: View {
             .padding(.horizontal, 8)
             .frame(height: 40)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorderStrong, lineWidth: 1))
             .padding(.horizontal, 8)
     }
 }
