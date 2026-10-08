@@ -15,6 +15,7 @@ object NativeAiEngine {
     private val metaTools = setOf("meta-description-generator")
     private val hookTools = setOf("social-hook-generator")
     private val improverTools = setOf("prompt-improver")
+    private val contentBriefTools = setOf("content-brief-generator")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -24,7 +25,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || contentBriefTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
@@ -38,6 +39,7 @@ object NativeAiEngine {
     fun isLocalMeta(toolId: String): Boolean = metaTools.contains(toolId)
     fun isLocalHook(toolId: String): Boolean = hookTools.contains(toolId)
     fun isLocalImprover(toolId: String): Boolean = improverTools.contains(toolId)
+    fun isLocalContentBrief(toolId: String): Boolean = contentBriefTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -121,6 +123,13 @@ object NativeAiEngine {
         val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
         return listOf("Most people overcomplicate $topic.", "Before you try $topic, know this.", "Here's what I wish I knew about $topic.", "If you're a $audience, save this.", "The simple way to approach $topic.").mapIndexed { i, line -> "${i + 1}. $line" }.joinToString("\n\n")
     }
+    fun localContentBrief(values: Map<String, Any?>): String {
+        val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val goal = values["goal"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Educate and help the reader act"
+        val tone = when (values["tone"]?.toString()) { "professional" -> "clear and professional"; "bold" -> "confident and direct"; "playful" -> "light and playful"; "friendly" -> "warm and friendly"; else -> "natural and conversational" }
+        return "Content brief\nTopic: $topic\nAudience: $audience\nGoal: $goal\nTone: $tone\n\nCore question: What does the reader need to know or do?\nPrimary sections: problem → context → solution → examples → next step\nCTA: Give the reader one clear action to take."
+    }
     fun localImprover(values: Map<String, Any?>): String {
         val task = values["task"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your request"
         val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
@@ -140,6 +149,7 @@ object NativeAiEngine {
         metaTools.contains(toolId) -> "local.meta"
         hookTools.contains(toolId) -> "local.hook"
         improverTools.contains(toolId) -> "local.improver"
+        contentBriefTools.contains(toolId) -> "local.contentBrief"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }

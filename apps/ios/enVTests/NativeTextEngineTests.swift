@@ -114,6 +114,11 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("The simple way to approach AI tools for creators."))
     }
 
+    func testContentBriefMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localContentBrief(topic: "AI tools for creators", audience: "creators and small businesses", goal: "Educate and give the reader a practical next step", tone: "natural")
+        XCTAssertEqual(output, "Content brief\nTopic: AI tools for creators\nAudience: creators and small businesses\nGoal: Educate and give the reader a practical next step\nTone: natural and conversational\n\nCore question: What does the reader need to know or do?\nPrimary sections: problem → context → solution → examples → next step\nCTA: Give the reader one clear action to take.")
+    }
+
     func testPromptImproverMatchesDeterministicWebTemplate() {
         let output = NativeAiEngine.localImprover(task: "Write a good social media post about my product.", audience: "creators and small businesses", tone: "natural")
         XCTAssertTrue(output.hasPrefix("Improved prompt:\n\nRewrite the following request into a precise, natural and conversational instruction"))

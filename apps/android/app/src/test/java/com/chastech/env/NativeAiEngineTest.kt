@@ -67,6 +67,10 @@ class NativeAiEngineTest {
         assertEquals("1. Most people overcomplicate AI tools for creators.\n\n2. Before you try AI tools for creators, know this.\n\n3. Here's what I wish I knew about AI tools for creators.\n\n4. If you're a creators and small businesses, save this.\n\n5. The simple way to approach AI tools for creators.", output)
     }
 
+    @Test fun contentBriefMatchesDeterministicWebTemplate() {
+        assertEquals("Content brief\nTopic: AI tools for creators\nAudience: creators and small businesses\nGoal: Educate and give the reader a practical next step\nTone: natural and conversational\n\nCore question: What does the reader need to know or do?\nPrimary sections: problem → context → solution → examples → next step\nCTA: Give the reader one clear action to take.", NativeAiEngine.localContentBrief(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses", "goal" to "Educate and give the reader a practical next step", "tone" to "natural")))
+    }
+
     @Test fun promptImproverMatchesDeterministicWebTemplate() {
         val output = NativeAiEngine.localImprover(mapOf("task" to "Write a good social media post about my product.", "audience" to "creators and small businesses", "tone" to "natural"))
         assertEquals("Improved prompt:\n\nRewrite the following request into a precise, natural and conversational instruction for an AI assistant serving creators and small businesses. Preserve the original intent, add useful context placeholders where information is missing, specify the desired output format, and avoid inventing facts.\n\nOriginal request:\nWrite a good social media post about my product.\n\nSuggested output format:\n1. Goal\n2. Context\n3. Constraints\n4. Tone\n5. Deliverable\n6. Quality checks", output)
