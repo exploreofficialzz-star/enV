@@ -926,10 +926,11 @@ enum NativeAiEngine {
     static let resumeTools: Set<String> = ["resume-bullet-generator"]
     static let rewriteTools: Set<String> = ["rewrite-helper"]
     static let emailTools: Set<String> = ["email-generator"]
+    static let metaTools: Set<String> = ["meta-description-generator"]
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
     static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
 
-    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || rewriteTools.contains(toolID) || emailTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || rewriteTools.contains(toolID) || emailTools.contains(toolID) || metaTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
     static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
     static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
@@ -939,6 +940,7 @@ enum NativeAiEngine {
     static func isLocalResume(_ toolID: String) -> Bool { resumeTools.contains(toolID) }
     static func isLocalRewrite(_ toolID: String) -> Bool { rewriteTools.contains(toolID) }
     static func isLocalEmail(_ toolID: String) -> Bool { emailTools.contains(toolID) }
+    static func isLocalMeta(_ toolID: String) -> Bool { metaTools.contains(toolID) }
     static func localCaption(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
         let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
         let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1004,7 +1006,12 @@ enum NativeAiEngine {
         let points = rawPoints.split(whereSeparator: \.isNewline).map { "• \($0.trimmingCharacters(in: .whitespacesAndNewlines))" }.joined(separator: "\n")
         return "Subject: \(purpose)\n\nHi,\n\nI wanted to reach out about \(purpose).\n\n\(points)\n\nIf this is relevant to you, take a look and let me know what you think.\n\nBest,"
     }
-    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : productTools.contains(toolID) ? "local.product" : ideaTools.contains(toolID) ? "local.idea" : resumeTools.contains(toolID) ? "local.resume" : rewriteTools.contains(toolID) ? "local.rewrite" : emailTools.contains(toolID) ? "local.email" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
+    static func localMeta(topic rawTopic: String, page rawPage: String) -> String {
+        let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
+        let page = rawPage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Explain the product, key benefits, and how visitors can get started." : rawPage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(topic) — \(page) Start here for a concise overview and useful guidance."
+    }
+    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : productTools.contains(toolID) ? "local.product" : ideaTools.contains(toolID) ? "local.idea" : resumeTools.contains(toolID) ? "local.resume" : rewriteTools.contains(toolID) ? "local.rewrite" : emailTools.contains(toolID) ? "local.email" : metaTools.contains(toolID) ? "local.meta" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
     static func platform(for toolID: String) -> String {
         switch toolID {
         case "instagram-caption-generator", "instagram-title-generator": return "instagram"
@@ -1150,6 +1157,7 @@ private struct NativeAiToolView: View {
     @State private var topic = ""
     @State private var resultMetric = ""
     @State private var emailPoints = ""
+    @State private var pageSummary = ""
     @State private var features = ""
     @State private var audience = "creators and small businesses"
     @State private var tone = "friendly"
@@ -1168,7 +1176,7 @@ private struct NativeAiToolView: View {
     @State private var file: NativeBackendFile?
     @State private var picker = false
 
-    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") || tool.id == "title-generator" || tool.id == "idea-generator" ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : tool.id == "product-description-generator" ? "AI Music Generator Class" : tool.id == "resume-bullet-generator" ? "Managed social media content and improved engagement" : tool.id == "rewrite-helper" ? "We are launching a new product that helps people create useful content faster." : tool.id == "email-generator" ? "Introduce a new digital product" : ""); _resultMetric = State(initialValue: tool.id == "resume-bullet-generator" ? "increased engagement" : ""); _emailPoints = State(initialValue: tool.id == "email-generator" ? "What it does\nWho it is for\nHow to get started" : ""); _features = State(initialValue: tool.id == "product-description-generator" ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""); _variants = State(initialValue: tool.id == "title-generator" ? "8" : tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
+    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") || tool.id == "title-generator" || tool.id == "idea-generator" || tool.id == "meta-description-generator" ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : tool.id == "product-description-generator" ? "AI Music Generator Class" : tool.id == "resume-bullet-generator" ? "Managed social media content and improved engagement" : tool.id == "rewrite-helper" ? "We are launching a new product that helps people create useful content faster." : tool.id == "email-generator" ? "Introduce a new digital product" : ""); _resultMetric = State(initialValue: tool.id == "resume-bullet-generator" ? "increased engagement" : ""); _emailPoints = State(initialValue: tool.id == "email-generator" ? "What it does\nWho it is for\nHow to get started" : ""); _pageSummary = State(initialValue: tool.id == "meta-description-generator" ? "Explain the product, key benefits, and how visitors can get started." : ""); _features = State(initialValue: tool.id == "product-description-generator" ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""); _variants = State(initialValue: tool.id == "title-generator" ? "8" : tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
 
     private var task: String? { NativeAiEngine.task(for: tool.id) }
     private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
@@ -1182,14 +1190,16 @@ private struct NativeAiToolView: View {
     private var localResume: Bool { NativeAiEngine.isLocalResume(tool.id) }
     private var localRewrite: Bool { NativeAiEngine.isLocalRewrite(tool.id) }
     private var localEmail: Bool { NativeAiEngine.isLocalEmail(tool.id) }
-    private var localDeterministic: Bool { localCaption || localPrompt || localBio || localTitle || localProduct || localIdea || localResume || localRewrite || localEmail }
+    private var localMeta: Bool { NativeAiEngine.isLocalMeta(tool.id) }
+    private var localDeterministic: Bool { localCaption || localPrompt || localBio || localTitle || localProduct || localIdea || localResume || localRewrite || localEmail || localMeta }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(localDeterministic ? "Runs locally with deterministic templates" : "AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
             if !localDeterministic && available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
             if let task {
-                if localEmail { NativeInputField(title: "Email purpose", text: $topic); NativeInputField(title: "Key points", text: $emailPoints); NativeInputField(title: "Tone", text: $tone) }
+                if localMeta { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Page purpose", text: $pageSummary); NativeInputField(title: "Tone", text: $tone) }
+                else if localEmail { NativeInputField(title: "Email purpose", text: $topic); NativeInputField(title: "Key points", text: $emailPoints); NativeInputField(title: "Tone", text: $tone) }
                 else if localRewrite { NativeInputField(title: "Text", text: $topic); NativeInputField(title: "Tone", text: $tone) }
                 else if localResume { NativeInputField(title: "Duty / responsibility", text: $topic); NativeInputField(title: "Result or metric (optional)", text: $resultMetric); NativeInputField(title: "Tone", text: $tone) }
                 else if localIdea { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Goal", text: $goal) }
@@ -1219,7 +1229,7 @@ private struct NativeAiToolView: View {
         if tool.id == "regex-tester" { return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "sql-formatter" { return sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "json-validator" { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio || localProduct || localIdea || localResume || localRewrite || localEmail { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio || localProduct || localIdea || localResume || localRewrite || localEmail || localMeta { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return false
     }
 
@@ -1234,6 +1244,7 @@ private struct NativeAiToolView: View {
         if localResume { output = NativeAiEngine.localResume(duty: topic, result: resultMetric); working = false; return }
         if localRewrite { output = NativeAiEngine.localRewrite(text: topic, tone: tone); working = false; return }
         if localEmail { output = NativeAiEngine.localEmail(purpose: topic, points: emailPoints); working = false; return }
+        if localMeta { output = NativeAiEngine.localMeta(topic: topic, page: pageSummary); working = false; return }
         Task {
             do {
                 let prepared: NativeBackendFile?
