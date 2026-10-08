@@ -84,6 +84,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("Behind the scenes: working on AI tools for creators"))
     }
 
+    func testResumeBulletGeneratorMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localResume(duty: "Managed social media content and improved engagement", result: "increased engagement")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 4)
+        XCTAssertTrue(output.contains("Managed social media content and improved engagement, contributing to increased engagement."))
+        XCTAssertTrue(output.contains("Owned Managed social media content and improved engagement with a focus on increased engagement."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

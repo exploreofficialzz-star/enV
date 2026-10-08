@@ -9,6 +9,7 @@ object NativeAiEngine {
     private val bioTools = setOf("bio-generator")
     private val productTools = setOf("product-description-generator")
     private val ideaTools = setOf("idea-generator")
+    private val resumeTools = setOf("resume-bullet-generator")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -18,7 +19,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
@@ -26,6 +27,7 @@ object NativeAiEngine {
     fun isLocalTitle(toolId: String): Boolean = toolId == "title-generator"
     fun isLocalProduct(toolId: String): Boolean = productTools.contains(toolId)
     fun isLocalIdea(toolId: String): Boolean = ideaTools.contains(toolId)
+    fun isLocalResume(toolId: String): Boolean = resumeTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -81,12 +83,20 @@ object NativeAiEngine {
         return lines.mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
 
+    fun localResume(values: Map<String, Any?>): String {
+        val duty = values["duty"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "managed responsibilities"
+        val result = values["result"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "measurable progress"
+        val lines = listOf("$duty, contributing to $result.", "Led $duty and delivered measurable progress toward $result.", "Executed $duty, helping the team achieve $result.", "Owned $duty with a focus on $result.")
+        return lines.mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
+    }
+
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
         promptTools.contains(toolId) -> "local.prompt"
         bioTools.contains(toolId) -> "local.bio"
         productTools.contains(toolId) -> "local.product"
         ideaTools.contains(toolId) -> "local.idea"
+        resumeTools.contains(toolId) -> "local.resume"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }

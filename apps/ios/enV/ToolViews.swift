@@ -923,16 +923,18 @@ enum NativeAiEngine {
     static let bioTools: Set<String> = ["bio-generator"]
     static let productTools: Set<String> = ["product-description-generator"]
     static let ideaTools: Set<String> = ["idea-generator"]
+    static let resumeTools: Set<String> = ["resume-bullet-generator"]
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
     static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
 
-    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
     static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
     static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
     static func isLocalTitle(_ toolID: String) -> Bool { toolID == "title-generator" }
     static func isLocalProduct(_ toolID: String) -> Bool { productTools.contains(toolID) }
     static func isLocalIdea(_ toolID: String) -> Bool { ideaTools.contains(toolID) }
+    static func isLocalResume(_ toolID: String) -> Bool { resumeTools.contains(toolID) }
     static func localCaption(topic rawTopic: String, audience rawAudience: String, count rawCount: String) -> String {
         let topic = rawTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your topic" : rawTopic.trimmingCharacters(in: .whitespacesAndNewlines)
         let audience = rawAudience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "your audience" : rawAudience.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -982,7 +984,13 @@ enum NativeAiEngine {
         let lines = ["How-to: \(topic) for \(audience)", "Common mistake: \(topic)", "Case study: a real example of \(topic)", "Checklist: getting started with \(topic)", "Myth vs fact: \(topic)", "Quick tips: \(topic)", "Beginner guide: \(topic)", "Behind the scenes: working on \(topic)"]
         return lines.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
     }
-    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : productTools.contains(toolID) ? "local.product" : ideaTools.contains(toolID) ? "local.idea" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
+    static func localResume(duty rawDuty: String, result rawResult: String) -> String {
+        let duty = rawDuty.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "managed responsibilities" : rawDuty.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = rawResult.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "measurable progress" : rawResult.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lines = ["\(duty), contributing to \(result).", "Led \(duty) and delivered measurable progress toward \(result).", "Executed \(duty), helping the team achieve \(result).", "Owned \(duty) with a focus on \(result)."]
+        return lines.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n")
+    }
+    static func task(for toolID: String) -> String? { captionTools.contains(toolID) ? "creator.caption.generate" : promptTools.contains(toolID) ? "local.prompt" : bioTools.contains(toolID) ? "local.bio" : productTools.contains(toolID) ? "local.product" : ideaTools.contains(toolID) ? "local.idea" : resumeTools.contains(toolID) ? "local.resume" : titleTools.contains(toolID) ? "creator.title.generate" : exactTasks[toolID] }
     static func platform(for toolID: String) -> String {
         switch toolID {
         case "instagram-caption-generator", "instagram-title-generator": return "instagram"
@@ -1126,6 +1134,7 @@ private struct NativeAiToolView: View {
     @State private var output = ""
     @State private var consent = false
     @State private var topic = ""
+    @State private var resultMetric = ""
     @State private var features = ""
     @State private var audience = "creators and small businesses"
     @State private var tone = "friendly"
@@ -1144,7 +1153,7 @@ private struct NativeAiToolView: View {
     @State private var file: NativeBackendFile?
     @State private var picker = false
 
-    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") || tool.id == "title-generator" || tool.id == "idea-generator" ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : tool.id == "product-description-generator" ? "AI Music Generator Class" : ""); _features = State(initialValue: tool.id == "product-description-generator" ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""); _variants = State(initialValue: tool.id == "title-generator" ? "8" : tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
+    init(tool: Tool) { self.tool = tool; _topic = State(initialValue: tool.id.contains("caption") || tool.id == "title-generator" || tool.id == "idea-generator" ? "AI tools for creators" : tool.id == "prompt-generator" ? "Create a launch plan for a digital product" : tool.id == "bio-generator" ? "AI music creator" : tool.id == "product-description-generator" ? "AI Music Generator Class" : tool.id == "resume-bullet-generator" ? "Managed social media content and improved engagement" : ""); _resultMetric = State(initialValue: tool.id == "resume-bullet-generator" ? "increased engagement" : ""); _features = State(initialValue: tool.id == "product-description-generator" ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""); _variants = State(initialValue: tool.id == "title-generator" ? "8" : tool.id.contains("title") || tool.id == "bio-generator" ? "5" : "5") }
 
     private var task: String? { NativeAiEngine.task(for: tool.id) }
     private var needsConsent: Bool { ["json-validator","alt-text-generator","video-audio-extractor"].contains(tool.id) }
@@ -1155,14 +1164,16 @@ private struct NativeAiToolView: View {
     private var localTitle: Bool { NativeAiEngine.isLocalTitle(tool.id) }
     private var localProduct: Bool { NativeAiEngine.isLocalProduct(tool.id) }
     private var localIdea: Bool { NativeAiEngine.isLocalIdea(tool.id) }
-    private var localDeterministic: Bool { localCaption || localPrompt || localBio || localTitle || localProduct || localIdea }
+    private var localResume: Bool { NativeAiEngine.isLocalResume(tool.id) }
+    private var localDeterministic: Bool { localCaption || localPrompt || localBio || localTitle || localProduct || localIdea || localResume }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(localDeterministic ? "Runs locally with deterministic templates" : "AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
             if !localDeterministic && available == false { Text("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
             if let task {
-                if localIdea { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Goal", text: $goal) }
+                if localResume { NativeInputField(title: "Duty / responsibility", text: $topic); NativeInputField(title: "Result or metric (optional)", text: $resultMetric); NativeInputField(title: "Tone", text: $tone) }
+                else if localIdea { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Goal", text: $goal) }
                 else if localProduct { NativeInputField(title: "Product name", text: $topic); NativeInputField(title: "Features / benefits", text: $features); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone) }
                 else if localPrompt { NativeInputField(title: "Task", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone) }
                 else if localBio { NativeInputField(title: "Role / what you do", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Options", text: $variants) }
@@ -1175,7 +1186,7 @@ private struct NativeAiToolView: View {
                 else if tool.id == "alt-text-generator" { Button(file == nil ? "Choose image" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Page context", text: $contextText); NativeInputField(title: "Style", text: $style); NativeInputField(title: "Language", text: $language) }
                 else if tool.id == "video-audio-extractor" { Button(file == nil ? "Choose audio" : file!.name) { picker = true }.buttonStyle(.bordered); NativeInputField(title: "Language code", text: $language) }
                 if needsConsent { Toggle("I understand this input is sent to an external AI service.", isOn: $consent) }
-                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic=localCaption || localTitle || localIdea ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : localBio ? "AI music creator" : localProduct ? "AI Music Generator Class" : ""; features=localProduct ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""; goal=localIdea ? "Educate and give the reader a practical next step" : goal; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
+                HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; topic=localCaption || localTitle || localIdea ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : localBio ? "AI music creator" : localProduct ? "AI Music Generator Class" : localResume ? "Managed social media content and improved engagement" : ""; resultMetric=localResume ? "increased engagement" : ""; features=localProduct ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""; goal=localIdea ? "Educate and give the reader a practical next step" : goal; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
                 if !output.isEmpty { TextEditor(text: .constant(output)).frame(minHeight: 150).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3))) }
                 if !error.isEmpty { Text(error).foregroundStyle(.red).font(.footnote) }
                 Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
@@ -1189,7 +1200,7 @@ private struct NativeAiToolView: View {
         if tool.id == "regex-tester" { return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "sql-formatter" { return sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         if tool.id == "json-validator" { return json.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio || localProduct || localIdea { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if NativeAiEngine.captionTools.contains(tool.id) || NativeAiEngine.titleTools.contains(tool.id) || localPrompt || localBio || localProduct || localIdea || localResume { return topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return false
     }
 
@@ -1201,6 +1212,7 @@ private struct NativeAiToolView: View {
         if localTitle { output = NativeAiEngine.localTitle(topic: topic, audience: audience, count: variants); working = false; return }
         if localProduct { output = NativeAiEngine.localProduct(product: topic, features: features, audience: audience, tone: tone); working = false; return }
         if localIdea { output = NativeAiEngine.localIdea(topic: topic, audience: audience); working = false; return }
+        if localResume { output = NativeAiEngine.localResume(duty: topic, result: resultMetric); working = false; return }
         Task {
             do {
                 let prepared: NativeBackendFile?
