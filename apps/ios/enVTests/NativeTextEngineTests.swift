@@ -42,6 +42,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(try NativeBarcodeEngine.run(toolID: "gtin-validator", input: "4006381333930").hasPrefix("Invalid: Expected check digit: 1. Supplied: 0."))
     }
 
+    func testCaptionGeneratorMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localCaption(topic: "AI tools for creators", audience: "creators and small businesses", count: "5")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 5)
+        XCTAssertTrue(output.contains("AI tools for creators made simple. Save this for later."))
+        XCTAssertTrue(output.contains("A quick reminder for creators and small businesses: you don't need to overcomplicate AI tools for creators."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

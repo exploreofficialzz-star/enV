@@ -16,6 +16,24 @@ object NativeAiEngine {
 
     fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
+    fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
+
+    fun localCaption(values: Map<String, Any?>): String {
+        val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val count = (values["count"] as? Number)?.toInt()?.coerceIn(1, 15) ?: 5
+        val lines = listOf(
+            "$topic made simple. Save this for later.",
+            "If you're into $topic, this one is for you.",
+            "A quick reminder for $audience: you don't need to overcomplicate $topic.",
+            "Learning $topic one step at a time. What would you add?",
+            "Here's the part about $topic people usually skip.",
+            "Small steps, better results. That's the goal with $topic.",
+            "Trying to understand $topic? Start here."
+        )
+        return lines.take(count).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
+    }
+
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
         titleTools.contains(toolId) -> "creator.title.generate"
