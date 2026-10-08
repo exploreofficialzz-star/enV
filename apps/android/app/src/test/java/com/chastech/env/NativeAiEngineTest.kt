@@ -61,4 +61,9 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localMeta(mapOf("topic" to "AI tools for creators", "page" to "Explain the product, key benefits, and how visitors can get started."))
         assertEquals("AI tools for creators — Explain the product, key benefits, and how visitors can get started. Start here for a concise overview and useful guidance.", output)
     }
+
+    @Test fun socialHookMatchesDeterministicWebTemplates() {
+        val output = NativeAiEngine.localHook(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses"))
+        assertEquals("1. Most people overcomplicate AI tools for creators.\n\n2. Before you try AI tools for creators, know this.\n\n3. Here's what I wish I knew about AI tools for creators.\n\n4. If you're a creators and small businesses, save this.\n\n5. The simple way to approach AI tools for creators.", output)
+    }
 }

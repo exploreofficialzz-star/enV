@@ -107,6 +107,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertEqual(output, "AI tools for creators — Explain the product, key benefits, and how visitors can get started. Start here for a concise overview and useful guidance.")
     }
 
+    func testSocialHookMatchesDeterministicWebTemplates() {
+        let output = NativeAiEngine.localHook(topic: "AI tools for creators", audience: "creators and small businesses")
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 5)
+        XCTAssertTrue(output.contains("Most people overcomplicate AI tools for creators."))
+        XCTAssertTrue(output.contains("The simple way to approach AI tools for creators."))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text
