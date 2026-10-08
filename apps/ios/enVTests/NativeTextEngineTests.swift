@@ -114,6 +114,13 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("The simple way to approach AI tools for creators."))
     }
 
+    func testPromptImproverMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localImprover(task: "Write a good social media post about my product.", audience: "creators and small businesses", tone: "natural")
+        XCTAssertTrue(output.hasPrefix("Improved prompt:\n\nRewrite the following request into a precise, natural and conversational instruction"))
+        XCTAssertTrue(output.contains("Original request:\nWrite a good social media post about my product."))
+        XCTAssertTrue(output.contains("6. Quality checks"))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

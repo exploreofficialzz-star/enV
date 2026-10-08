@@ -1,0 +1,255 @@
+enV MASTER AGENT HANDOFF PROMPT
+Generated: 2026-10-08
+Repository: https://github.com/exploreofficialzz-star/enV
+Authorized branch target: main
+Working checkout: /home/ubuntu/enV
+
+============================================================
+MISSION
+============================================================
+Continue the enV native-parity backlog systematically and continuously. The web product is the source of truth. Every deterministic/local web tool audited for parity must be implemented natively on both Android and iOS, with regression tests, repository guards, a focused branch, a pull request, authoritative CI, and merge into main when green.
+
+Do not stop merely because a CI watcher is waiting. While one PR is running, audit the next deterministic candidate from the live web route and record its exact fields, defaults, reset state, and output. Do not merge a PR until authoritative checks are green. If a failure is unrelated/transient, inspect the logs and rerun only the failed workflow where appropriate. If a failure is caused by the patch, fix it, push the fix, and re-run CI.
+
+============================================================
+CURRENT STATE AT HANDOFF
+============================================================
+- main is clean and synchronized at commit 4610f85, the merge result of PR #13.
+- Current checkout is branch fix/prompt-improver-native-parity.
+- Prompt Improver parity is committed and pushed at d48cd35.
+- PR #14 is open: https://github.com/exploreofficialzz-star/enV/pull/14
+- PR #14 title: Add native prompt improver parity.
+- PR #14 currently has 3 successful checks and 3 pending checks at handoff. Keep its watcher active or refresh with:
+  gh pr checks 14 --repo exploreofficialzz-star/enV --watch
+- If PR #14 becomes fully green, merge it:
+  gh pr merge 14 --repo exploreofficialzz-star/enV --squash --delete-branch=false
+  git checkout main
+  git pull --ff-only origin main
+- If PR #14 fails, inspect the exact failed workflow using gh run list / gh run view. Do not guess. Fix and push to the same branch.
+
+============================================================
+MERGED WORK — DO NOT REDO
+============================================================
+PR #1 — Native UUID validation parity
+- Branch: native-developer-parity-uuid-b9d28f8
+- Merged. Matched native UUID validation with web behavior.
+
+PR #2 — Native Developer tool parity
+- Branch: native/developer-engine-family-parity
+- Merged. Added native Developer engine-family parity.
+
+PR #3 — Route MIME tools through local native engines
+- Branch: native/mime-local-first
+- Merged. Ensured MIME/file-oriented tools use local-first native execution.
+
+PR #4 — Fix native URL media request contract
+- Branch: fix/url-media-native-contract
+- Merged. Android/iOS now serialize URL-media server fields at the top level, matching the backend contract. Added Android/iOS regression coverage.
+
+PR #5 — Native datetime and barcode parity
+- Branch: fix/datetime-barcode-native-parity
+- Merged. Added local Unix Timestamp Converter routing and GTIN/EAN/UPC validation parity on Android/iOS, including routing regressions and web-matched form behavior. This PR also became the base for the deterministic AI parity work.
+
+PR #6 — Native Title Generator parity
+- Branch: fix/title-generator-native-parity
+- Merged. Added deterministic Title Generator support, defaults, output templates, reset behavior, and Android/iOS tests.
+
+PR #7 — Native Product Description parity
+- Branch: fix/product-description-native-parity
+- Merged. Added deterministic Product Description Generator support and tests. A known unrelated Production Check flake was isolated and rerun successfully.
+
+PR #8 — Native Idea Generator parity
+- Branch: fix/idea-generator-native-parity
+- Merged. Added deterministic Idea Generator support and tests.
+
+PR #9 — Native Resume Bullet parity
+- Branch: fix/resume-bullet-native-parity
+- Merged. Added deterministic Resume Bullet Generator support and tests.
+
+PR #10 — Native Rewrite Helper parity
+- Branch: fix/rewrite-helper-native-parity
+- Merged. Added deterministic Rewrite Helper support and tests. A known unrelated Production Check flake was isolated and rerun successfully.
+
+PR #11 — Native Email Draft parity
+- Branch: fix/email-draft-native-parity
+- Merged. Added deterministic Email Draft Generator support and tests. Initial Android CI failure was a missing assertTrue import; fixed in commit cd7b7f8, after which all six authoritative checks passed.
+
+PR #12 — Native Meta Description parity
+- Branch: fix/meta-description-native-parity
+- Merged. Added deterministic Meta Description Generator support and tests. Initial Production Check failed only on unrelated blank-form accessibility flakes in overtime-pay-calculator and mechanical-rpm-from-speed; isolated rerun passed.
+
+PR #13 — Native Social Hook parity
+- Branch: fix/social-hook-native-parity
+- Merged. Added deterministic Social Hook Generator support and tests. All six authoritative checks passed.
+
+============================================================
+PR #14 — CURRENT PATCH
+============================================================
+Prompt Improver is implemented on both Android and iOS.
+
+Verified live web defaults:
+- Route: https://en-v.vercel.app/tools/ai/prompt-improver
+- Existing prompt: Write a good social media post about my product.
+- Audience: creators and small businesses
+- Tone default: Natural
+
+Verified default output:
+Improved prompt:
+
+Rewrite the following request into a precise, natural and conversational instruction for an AI assistant serving creators and small businesses. Preserve the original intent, add useful context placeholders where information is missing, specify the desired output format, and avoid inventing facts.
+
+Original request:
+Write a good social media post about my product.
+
+Suggested output format:
+1. Goal
+2. Context
+3. Constraints
+4. Tone
+5. Deliverable
+6. Quality checks
+
+Files changed in PR #14:
+- apps/android/app/src/main/java/com/chastech/env/NativeAiEngine.kt
+- apps/android/app/src/main/java/com/chastech/env/NativeAiToolForm.kt
+- apps/android/app/src/test/java/com/chastech/env/NativeAiEngineTest.kt
+- apps/ios/enV/ToolViews.swift
+- apps/ios/enVTests/NativeTextEngineTests.swift
+
+Implementation names:
+- Android: isLocalImprover, localImprover, local.improver, prompt-improver form branch.
+- iOS: improverTools, isLocalImprover, localImprover, local.improver, Prompt Improver form branch.
+
+============================================================
+NEXT READY CANDIDATE
+============================================================
+Content Brief Generator is already live-audited and should be implemented immediately after PR #14 merges.
+
+Route:
+https://en-v.vercel.app/tools/ai/content-brief-generator
+
+Verified defaults:
+- Topic: AI tools for creators
+- Audience: creators and small businesses
+- Tone: Natural
+- Goal: Educate and give the reader a practical next step
+
+Verified output:
+Content brief
+Topic: AI tools for creators
+Audience: creators and small businesses
+Goal: Educate and give the reader a practical next step
+Tone: natural and conversational
+
+Core question: What does the reader need to know or do?
+Primary sections: problem → context → solution → examples → next step
+CTA: Give the reader one clear action to take.
+
+Suggested implementation pattern:
+- Add contentBriefTools = setOf("content-brief-generator") to Android NativeAiEngine.
+- Add isLocalContentBrief and localContentBrief(values).
+- Add task mapping local.contentBrief and include it in supports().
+- Add Android state for goal if not already correctly available, matching topic/audience/tone defaults.
+- Add local form branch, availability bypass, reset defaults, and execution branch.
+- Add matching iOS support set, isLocalContentBrief, localContentBrief(topic:audience:goal:tone:), task mapping, form state, defaults, reset, validation, and execution.
+- Add Android and iOS exact-output regression tests.
+- Run all guards, create fix/content-brief-native-parity, push, open the next PR, and watch authoritative CI.
+
+Likely following deterministic candidates visible from the Content Brief route’s related tools:
+1. Ad Copy Generator — /tools/ai/ad-copy-generator
+2. YouTube Description Helper — /tools/ai/youtube-description-helper
+3. Alt Text Helper — /tools/ai/alt-text-generator (verify whether this is deterministic/local before changing; it may use file/backend handling)
+4. Blog Outline Generator — /tools/ai/blog-outline-generator
+5. Call To Action Generator — /tools/ai/call-to-action-generator
+
+Other known deterministic candidates discovered during prior audits include Shorten Text Helper, YouTube Title Helper, and additional AI/creator/business tools. Always verify the live route and exact output before coding.
+
+============================================================
+SOURCE OF TRUTH AND IMPORTANT FILES
+============================================================
+Web engines and live behavior:
+- src/components/engines/ai-engine.tsx
+- src/components/engines/qr-engine.tsx
+- src/lib/engines/datetime.ts
+- src/data/catalog.ts
+- apps/shared/catalog.json
+
+Android native:
+- apps/android/app/src/main/java/com/chastech/env/NativeAiEngine.kt
+- apps/android/app/src/main/java/com/chastech/env/NativeAiToolForm.kt
+- apps/android/app/src/main/java/com/chastech/env/MainActivity.kt
+- apps/android/app/src/main/java/com/chastech/env/NativeBackendEngine.kt
+- apps/android/app/src/test/java/com/chastech/env/NativeAiEngineTest.kt
+- apps/android/app/src/test/java/com/chastech/env/NativeDeveloperToolTest.kt
+
+iOS native:
+- apps/ios/enV/ToolViews.swift
+- apps/ios/enVTests/NativeTextEngineTests.swift
+
+Contributor instructions:
+- Read and follow /home/ubuntu/enV/AGENTS.md before modifying code.
+
+External audit notes:
+- /home/ubuntu/external_ai_audit.md contains live verified contracts for Social Hook, Prompt Improver, Content Brief, and previous candidate notes. It is outside the repo and is not automatically pushed.
+
+============================================================
+MANDATORY VALIDATION COMMANDS
+============================================================
+Run from /home/ubuntu/enV:
+
+npm run check:production
+npm run check:native-coverage
+npm run check:native-executability
+npm run check:native-backend-dispatch
+npm run check:native-no-web
+
+git diff --check
+! rg -n '^\*\*\*$' apps/android apps/ios
+
+If Android tooling is available:
+cd apps/android
+./gradlew :app:testDebugUnitTest --tests com.chastech.env.NativeAiEngineTest
+cd ../..
+
+If xcodebuild is available, run the focused iOS XCTest target or the repository’s documented iOS command. If the local environment lacks Xcode, rely on authoritative Native iOS CI and report that local iOS execution was unavailable.
+
+============================================================
+BRANCH / PR / MERGE WORKFLOW
+============================================================
+1. Start from synchronized main after the previous PR merges.
+2. Audit the live web route using the stateful Manus browser.
+3. Read the web engine/source implementation where available.
+4. Implement only one bounded parity family per branch.
+5. Add both Android and iOS regression tests.
+6. Run all repository guards and inspect git diff --check.
+7. Create branch: fix/<tool>-native-parity.
+8. Commit with a clear message.
+9. Push with git push -u origin <branch>.
+10. Open a focused PR with gh pr create.
+11. Watch gh pr checks <number> --watch.
+12. If all authoritative checks pass, squash-merge with gh pr merge, sync main, and continue.
+13. If a check fails, inspect exact logs; do not hide or bypass failures.
+14. Known Production Check flakes have involved unrelated calculator/accessibility records. Rerun only the failed Production workflow after confirming the failure is unrelated to the current patch.
+
+============================================================
+REPOSITORY GUARDRAILS
+============================================================
+- Do not alter production URL, deployment, authentication, or unrelated calculators while implementing native parity.
+- Do not route native tools through the web runtime.
+- Native no-web guard must remain green.
+- Preserve MIME/media local-first behavior and URL-media top-level request contract.
+- Do not claim native support for a tool until both platform paths are real and tested.
+- Keep changes focused; never bundle unrelated cleanup.
+- Use the live web output as the behavioral contract, including punctuation, spacing, defaults, reset behavior, and required-field validation.
+- When a deterministic web tool explicitly says it does not send text to an LLM, implement it locally rather than calling the remote AI endpoint.
+
+============================================================
+STOPPING CRITERIA
+============================================================
+The backlog is complete only when every remaining active deterministic/native-parity family has been audited, implemented on both Android and iOS where appropriate, tested, guarded, pushed, CI-validated, and merged. If credits or execution time become constrained, stop only after pushing the current branch and updating this handoff file with the exact branch, commit, PR, checks, failures, and next command sequence.
+
+At this handoff point, the immediate continuation is:
+1. Finish/wait for PR #14.
+2. Merge PR #14 if all six checks pass.
+3. Implement Content Brief Generator as PR #15.
+4. Continue with the next live-audited deterministic candidate without waiting idly.
