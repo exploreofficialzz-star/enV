@@ -67,6 +67,10 @@ class NativeAiEngineTest {
         assertEquals("1. Most people overcomplicate AI tools for creators.\n\n2. Before you try AI tools for creators, know this.\n\n3. Here's what I wish I knew about AI tools for creators.\n\n4. If you're a creators and small businesses, save this.\n\n5. The simple way to approach AI tools for creators.", output)
     }
 
+    @Test fun youtubeDescriptionMatchesDeterministicWebTemplate() {
+        assertEquals("AI tools for creators\n\nIn this video, we break down AI tools for creators for creators and small businesses in a natural and conversational way.\n\nWhat you'll cover:\n• Problem\n• Solution\n• Practical examples\n• Call to action\n\nIf you found this useful, save it for later and share it with someone working on the same goal.", NativeAiEngine.localYoutubeDescription(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses", "tone" to "natural", "points" to "Problem\nSolution\nPractical examples\nCall to action")))
+    }
+
     @Test fun adCopyMatchesDeterministicWebTemplates() {
         assertEquals("1. Stop overcomplicating AI tools for creators. Get Save time and get started quickly with a simple approach.\n\n2. AI tools for creators for creators and small businesses: practical, clear, and built around Save time and get started quickly.\n\n3. Ready to make AI tools for creators easier? Start with Save time and get started quickly and take the next step today.", NativeAiEngine.localAdCopy(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses", "benefit" to "Save time and get started quickly")))
     }

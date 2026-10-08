@@ -17,6 +17,7 @@ object NativeAiEngine {
     private val improverTools = setOf("prompt-improver")
     private val contentBriefTools = setOf("content-brief-generator")
     private val adCopyTools = setOf("ad-copy-generator")
+    private val youtubeDescriptionTools = setOf("youtube-description-helper")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -26,7 +27,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || contentBriefTools.contains(tool.id) || adCopyTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || contentBriefTools.contains(tool.id) || adCopyTools.contains(tool.id) || youtubeDescriptionTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
@@ -42,6 +43,7 @@ object NativeAiEngine {
     fun isLocalImprover(toolId: String): Boolean = improverTools.contains(toolId)
     fun isLocalContentBrief(toolId: String): Boolean = contentBriefTools.contains(toolId)
     fun isLocalAdCopy(toolId: String): Boolean = adCopyTools.contains(toolId)
+    fun isLocalYoutubeDescription(toolId: String): Boolean = youtubeDescriptionTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -138,6 +140,13 @@ object NativeAiEngine {
         val benefit = values["benefit"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "a useful result"
         return listOf("Stop overcomplicating $topic. Get $benefit with a simple approach.", "$topic for $audience: practical, clear, and built around $benefit.", "Ready to make $topic easier? Start with $benefit and take the next step today.").mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
+    fun localYoutubeDescription(values: Map<String, Any?>): String {
+        val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val points = values["points"]?.toString()?.lines()?.flatMap { it.split(",") }?.map { it.trim() }?.filter { it.isNotEmpty() } ?: listOf("Key points and practical examples")
+        val tone = when (values["tone"]?.toString()) { "professional" -> "clear and professional"; "bold" -> "confident and direct"; "playful" -> "light and playful"; "friendly" -> "warm and friendly"; else -> "natural and conversational" }
+        return "$topic\n\nIn this video, we break down $topic for $audience in a $tone way.\n\nWhat you'll cover:\n${points.joinToString("\n") { "• $it" }}\n\nIf you found this useful, save it for later and share it with someone working on the same goal."
+    }
     fun localImprover(values: Map<String, Any?>): String {
         val task = values["task"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your request"
         val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
@@ -159,6 +168,7 @@ object NativeAiEngine {
         improverTools.contains(toolId) -> "local.improver"
         contentBriefTools.contains(toolId) -> "local.contentBrief"
         adCopyTools.contains(toolId) -> "local.adCopy"
+        youtubeDescriptionTools.contains(toolId) -> "local.youtubeDescription"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }
