@@ -5,6 +5,7 @@ import org.json.JSONObject
 
 object NativeAiEngine {
     private val captionTools = setOf("instagram-caption-generator", "tiktok-caption-generator", "x-caption-generator", "youtube-caption-generator", "linkedin-caption-generator", "facebook-caption-generator", "caption-generator")
+    private val promptTools = setOf("prompt-generator")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -14,9 +15,10 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
+    fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -34,8 +36,16 @@ object NativeAiEngine {
         return lines.take(count).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
 
+    fun localPrompt(values: Map<String, Any?>): String {
+        val task = values["task"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Complete the requested task"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val tone = when (values["tone"]?.toString()) { "professional" -> "clear and professional"; "bold" -> "confident and direct"; "playful" -> "light and playful"; "friendly" -> "warm and friendly"; else -> "natural and conversational" }
+        return "ROLE\nYou are a helpful specialist supporting $audience.\n\nTASK\n$task.\n\nSTYLE\nUse a $tone style.\n\nCONTEXT\nFocus on practical, accurate output. Avoid unnecessary filler and clearly state assumptions.\n\nOUTPUT\nReturn a useful, structured answer with headings or bullets where they improve readability.\n\nCHECK\nBefore answering, verify that the response directly addresses the task and is suitable for $audience."
+    }
+
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
+        promptTools.contains(toolId) -> "local.prompt"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }

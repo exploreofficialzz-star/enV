@@ -14,4 +14,9 @@ class NativeAiEngineTest {
             NativeAiEngine.localCaption(mapOf("topic" to "AI tools for creators", "audience" to "creators and small businesses", "count" to 5))
         )
     }
+
+    @Test fun promptGeneratorMatchesDeterministicWebTemplate() {
+        val output = NativeAiEngine.localPrompt(mapOf("task" to "Create a launch plan for a digital product", "audience" to "creators and small businesses", "tone" to "natural"))
+        assertEquals("ROLE\nYou are a helpful specialist supporting creators and small businesses.\n\nTASK\nCreate a launch plan for a digital product.\n\nSTYLE\nUse a natural and conversational style.\n\nCONTEXT\nFocus on practical, accurate output. Avoid unnecessary filler and clearly state assumptions.\n\nOUTPUT\nReturn a useful, structured answer with headings or bullets where they improve readability.\n\nCHECK\nBefore answering, verify that the response directly addresses the task and is suitable for creators and small businesses.", output)
+    }
 }

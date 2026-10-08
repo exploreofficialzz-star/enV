@@ -53,14 +53,16 @@ fun NativeAiToolForm(tool: ToolRecord) {
     }
 
     LaunchedEffect(tool.id) {
-        if (!NativeAiEngine.isLocalCaption(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
+        if (!NativeAiEngine.isLocalCaption(tool.id) && !NativeAiEngine.isLocalPrompt(tool.id)) available = runCatching { NativeAiClient.availability(context)[NativeAiEngine.taskFor(tool.id)] == true }.getOrDefault(false)
     }
 
     val task = NativeAiEngine.taskFor(tool.id) ?: return
     val localCaption = NativeAiEngine.isLocalCaption(tool.id)
+    val localPrompt = NativeAiEngine.isLocalPrompt(tool.id)
+    val localDeterministic = localCaption || localPrompt
     val needsConsent = tool.id == "json-validator" || tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
     val isFileTool = tool.id == "alt-text-generator" || tool.id == "video-audio-extractor"
-    val buttonEnabled = !working && (localCaption || available == true) && (!needsConsent || consent) && (!isFileTool || selectedFile != null) && when {
+    val buttonEnabled = !working && (localDeterministic || available == true) && (!needsConsent || consent) && (!isFileTool || selectedFile != null) && when {
         tool.id in setOf("regex-tester") -> pattern.isNotBlank()
         tool.id == "sql-formatter" -> sql.isNotBlank()
         tool.id == "json-validator" -> json.isNotBlank()
@@ -68,8 +70,13 @@ fun NativeAiToolForm(tool: ToolRecord) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(if (localCaption) "Runs locally with deterministic templates" else "AI assistance · native Kotlin → enV AI API", style = MaterialTheme.typography.labelLarge)
+        Text(if (localDeterministic) "Runs locally with deterministic templates" else "AI assistance · native Kotlin → enV AI API", style = MaterialTheme.typography.labelLarge)
         when {
+            tool.id == "prompt-generator" -> {
+                NativeAiField("Task", topic) { topic = it }
+                NativeAiField("Audience", audience) { audience = it }
+                NativeAiField("Tone", tone) { tone = it }
+            }
             tool.id in setOf("instagram-caption-generator","tiktok-caption-generator","x-caption-generator","youtube-caption-generator","linkedin-caption-generator","facebook-caption-generator","caption-generator","youtube-title-generator","tiktok-title-generator","instagram-title-generator","podcast-title-generator","title-generator") -> {
                 NativeAiField("Topic", topic) { topic = it }
                 if (localCaption) NativeAiField("Audience", audience) { audience = it }
@@ -93,12 +100,12 @@ fun NativeAiToolForm(tool: ToolRecord) {
                 Text("I understand this input is sent to an external AI service.", style = MaterialTheme.typography.bodySmall)
             }
         }
-        if (!localCaption && available == false) Text("AI is currently unavailable on this deployment. The local/native tool still works.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!localDeterministic && available == false) Text("AI is currently unavailable on this deployment. The local/native tool still works.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(enabled = buttonEnabled, onClick = {
                 error = ""; output = ""; working = true
-                if (localCaption) {
-                    output = NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull()))
+                if (localDeterministic) {
+                    output = if (localCaption) NativeAiEngine.localCaption(mapOf("topic" to topic, "audience" to audience, "count" to variants.toIntOrNull())) else NativeAiEngine.localPrompt(mapOf("task" to topic, "audience" to audience, "tone" to tone))
                     working = false
                     return@Button
                 }
@@ -112,7 +119,7 @@ fun NativeAiToolForm(tool: ToolRecord) {
                     }.fold({ output = it; working = false }, { error = it.message ?: "AI request failed."; working = false })
                 }
             }) { Text(if (working) "Working…" else "Generate") }
-            OutlinedButton(onClick = { topic=if (localCaption) "AI tools for creators" else ""; audience="creators and small businesses"; pattern="";sql="";json="";output="";error="";selectedFile=null }) { Text("Reset") }
+            OutlinedButton(onClick = { topic=when { localCaption -> "AI tools for creators"; localPrompt -> "Create a launch plan for a digital product"; else -> "" }; audience="creators and small businesses"; pattern="";sql="";json="";output="";error="";selectedFile=null }) { Text("Reset") }
         }
         if (output.isNotBlank()) Text(output, style = MaterialTheme.typography.bodyMedium)
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
