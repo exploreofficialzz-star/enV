@@ -321,7 +321,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Trending tools", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                SectionTitle("Trending tools", accent = true)
                 trending.forEach { tool -> WebHomeToolCard(tool, onTool) }
                 TextButton(onClick = onTools, modifier = Modifier.align(Alignment.End)) {
                     Text("See more tools", color = MaterialTheme.colorScheme.primary)
