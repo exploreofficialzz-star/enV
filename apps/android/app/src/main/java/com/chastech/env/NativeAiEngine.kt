@@ -7,6 +7,7 @@ object NativeAiEngine {
     private val captionTools = setOf("instagram-caption-generator", "tiktok-caption-generator", "x-caption-generator", "youtube-caption-generator", "linkedin-caption-generator", "facebook-caption-generator", "caption-generator")
     private val promptTools = setOf("prompt-generator")
     private val bioTools = setOf("bio-generator")
+    private val productTools = setOf("product-description-generator")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -16,12 +17,13 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
     fun isLocalBio(toolId: String): Boolean = bioTools.contains(toolId)
     fun isLocalTitle(toolId: String): Boolean = toolId == "title-generator"
+    fun isLocalProduct(toolId: String): Boolean = productTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -62,10 +64,19 @@ object NativeAiEngine {
         return lines.take(count).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
 
+    fun localProduct(values: Map<String, Any?>): String {
+        val product = values["product"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Your product"
+        val audience = values["audience"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your audience"
+        val tone = when (values["tone"]?.toString()) { "professional" -> "clear and professional"; "bold" -> "confident and direct"; "playful" -> "light and playful"; "friendly" -> "warm and friendly"; else -> "natural and conversational" }
+        val features = values["features"]?.toString()?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        return "$product\n\nA practical option for $audience who want a simple way to get started.\n\nKey benefits:\n${features.joinToString("\n") { "• $it" }}\n\nPositioning style: $tone.\n\nCTA: Get started and see what $product can help you create."
+    }
+
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
         promptTools.contains(toolId) -> "local.prompt"
         bioTools.contains(toolId) -> "local.bio"
+        productTools.contains(toolId) -> "local.product"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }
