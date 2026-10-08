@@ -10,6 +10,7 @@ object NativeAiEngine {
     private val productTools = setOf("product-description-generator")
     private val ideaTools = setOf("idea-generator")
     private val resumeTools = setOf("resume-bullet-generator")
+    private val rewriteTools = setOf("rewrite-helper")
     private val titleTools = setOf("youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator")
     private val exactTasks = mapOf(
         "regex-tester" to "developer.regex.explain",
@@ -19,7 +20,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)
@@ -28,6 +29,7 @@ object NativeAiEngine {
     fun isLocalProduct(toolId: String): Boolean = productTools.contains(toolId)
     fun isLocalIdea(toolId: String): Boolean = ideaTools.contains(toolId)
     fun isLocalResume(toolId: String): Boolean = resumeTools.contains(toolId)
+    fun isLocalRewrite(toolId: String): Boolean = rewriteTools.contains(toolId)
 
     fun localCaption(values: Map<String, Any?>): String {
         val topic = values["topic"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "your topic"
@@ -90,6 +92,12 @@ object NativeAiEngine {
         return lines.mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     }
 
+    fun localRewrite(values: Map<String, Any?>): String {
+        val text = values["text"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Enter text to rewrite."
+        val tone = when (values["tone"]?.toString()) { "professional" -> "clear and professional"; "bold" -> "confident and direct"; "playful" -> "light and playful"; "friendly" -> "warm and friendly"; else -> "natural and conversational" }
+        return "Rewritten in a $tone tone:\n\n$text\n\nEdit for clarity, natural flow, and consistent tone before publishing."
+    }
+
     fun taskFor(toolId: String): String? = when {
         captionTools.contains(toolId) -> "creator.caption.generate"
         promptTools.contains(toolId) -> "local.prompt"
@@ -97,6 +105,7 @@ object NativeAiEngine {
         productTools.contains(toolId) -> "local.product"
         ideaTools.contains(toolId) -> "local.idea"
         resumeTools.contains(toolId) -> "local.resume"
+        rewriteTools.contains(toolId) -> "local.rewrite"
         titleTools.contains(toolId) -> "creator.title.generate"
         else -> exactTasks[toolId]
     }

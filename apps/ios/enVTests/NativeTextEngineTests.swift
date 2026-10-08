@@ -91,6 +91,11 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertTrue(output.contains("Owned Managed social media content and improved engagement with a focus on increased engagement."))
     }
 
+    func testRewriteHelperMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localRewrite(text: "We are launching a new product that helps people create useful content faster.", tone: "natural")
+        XCTAssertEqual(output, "Rewritten in a natural and conversational tone:\n\nWe are launching a new product that helps people create useful content faster.\n\nEdit for clarity, natural flow, and consistent tone before publishing.")
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text

@@ -44,4 +44,9 @@ class NativeAiEngineTest {
         val output = NativeAiEngine.localResume(mapOf("duty" to "Managed social media content and improved engagement", "result" to "increased engagement"))
         assertEquals("1. Managed social media content and improved engagement, contributing to increased engagement.\n\n2. Led Managed social media content and improved engagement and delivered measurable progress toward increased engagement.\n\n3. Executed Managed social media content and improved engagement, helping the team achieve increased engagement.\n\n4. Owned Managed social media content and improved engagement with a focus on increased engagement.", output)
     }
+
+    @Test fun rewriteHelperMatchesDeterministicWebTemplate() {
+        val output = NativeAiEngine.localRewrite(mapOf("text" to "We are launching a new product that helps people create useful content faster.", "tone" to "natural"))
+        assertEquals("Rewritten in a natural and conversational tone:\n\nWe are launching a new product that helps people create useful content faster.\n\nEdit for clarity, natural flow, and consistent tone before publishing.", output)
+    }
 }
