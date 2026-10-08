@@ -96,6 +96,12 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertEqual(output, "Rewritten in a natural and conversational tone:\n\nWe are launching a new product that helps people create useful content faster.\n\nEdit for clarity, natural flow, and consistent tone before publishing.")
     }
 
+    func testEmailDraftMatchesDeterministicWebTemplate() {
+        let output = NativeAiEngine.localEmail(purpose: "Introduce a new digital product", points: "What it does\nWho it is for\nHow to get started")
+        XCTAssertTrue(output.hasPrefix("Subject: Introduce a new digital product\n\nHi,"))
+        XCTAssertTrue(output.contains("• What it does\n• Who it is for\n• How to get started"))
+    }
+
     func testJSONToolsAcceptObjectsArraysAndTopLevelScalarValues() throws {
         let formatter=tool("json-formatter")
         let object=try NativeUtilityEngine.run(formatter,input:"{\"name\":\"enV\",\"count\":3}").text
