@@ -74,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -246,7 +247,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
                     AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
                     AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
@@ -268,9 +269,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     }
 }
 
+private val webHomeToolIds = listOf(
+    "audio-to-text", "percentage-calculator", "json-formatter", "image-compressor",
+    "qr-generator", "password-generator", "video-to-mp4", "video-to-text",
+    "youtube-video-downloader", "youtube-audio-extractor", "word-counter", "video-to-mp3",
+)
+
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
-    val trending = remember(catalog) { catalog.tools.sortedByDescending { it.popularity }.take(6) }
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
+    val showDesktopHome = LocalConfiguration.current.screenWidthDp >= 600
+    val trending = remember(catalog, showDesktopHome) { webHomeToolIds.take(if (showDesktopHome) webHomeToolIds.size else 6).mapNotNull { id -> catalog.tools.find { it.id == id } } }
     val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(5) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -292,10 +300,10 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                 )
                 if (query.isNotBlank()) {
                     if (suggestions.isEmpty()) {
-                        Text("No matching tools. Try another name or keyword.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+                        Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            suggestions.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+                            suggestions.forEach { tool -> WebHomeSearchSuggestion(tool, onTool) }
                             TextButton(onClick = onSearch, modifier = Modifier.align(Alignment.End)) {
                                 Text("See more results", color = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(8.dp))
@@ -314,9 +322,56 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionTitle("Trending tools", accent = true)
-                trending.forEach { tool -> ToolCard(tool, tool.id in favorites, onTool, onToggleFavorite) }
+                trending.forEach { tool -> WebHomeToolCard(tool, onTool) }
+                TextButton(onClick = onTools, modifier = Modifier.align(Alignment.End)) {
+                    Text("See more tools", color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
+        item { WebHomeFooter() }
+    }
+}
+
+@Composable
+private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable { onTool(tool.id) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        Column(Modifier.padding(16.dp).fillMaxWidth()) {
+            Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
+            }
+            Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            else if (tool.clientSide) Text("IN-BROWSER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
+        }
+    }
+}
+
+@Composable
+private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable { onTool(tool.id) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun WebHomeFooter() {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        EnVLogo(Modifier.width(142.dp).height(48.dp))
+        Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Product", fontWeight = FontWeight.SemiBold)
+        Text("About   Tools   Pricing   Contact", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Legal", fontWeight = FontWeight.SemiBold)
+        Text("Privacy   Terms   Disclaimer   Responsible use", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("© 2026 chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("43 categories · 10000 live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 

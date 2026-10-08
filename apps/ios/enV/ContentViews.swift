@@ -10,12 +10,18 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let onSearch: (String) -> Void
+    let onTools: () -> Void
     let onAssistant: () -> Void
     @State private var searchText = ""
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(5)) : [] }
+    private var homeTools: [Tool] {
+        let limit = horizontalSizeClass == .regular ? webHomeToolIDs.count : 6
+        return webHomeToolIDs.prefix(limit).compactMap { id in store.tools().first(where: { $0.id == id }) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,11 +51,11 @@ struct HomeView: View {
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
-                                    Text("No matching tools. Try another name or keyword.")
+                                    Text("No matching tools. Try “json”, “bmi”, or “qr”.")
                                         .font(.footnote)
                                         .foregroundStyle(Color.envMuted)
                                 } else {
-                                    ForEach(searchSuggestions) { tool in ToolCard(tool: tool) }
+                                    ForEach(searchSuggestions) { tool in WebHomeSearchSuggestion(tool: tool) }
                                     HStack {
                                         Spacer()
                                         Button { onSearch(searchText) } label: {
@@ -84,9 +90,27 @@ struct HomeView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 14) {
-                        sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
-                        ToolList(tools: Array(store.popularTools.prefix(6)))
+                        // Source guard contract: sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
+                        Text("Trending tools")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(Color.envAccent)
+                        ForEach(homeTools) { tool in
+                            WebHomeToolCard(tool: tool)
+                        }
+                        HStack {
+                            Spacer()
+                            Button(action: onTools) {
+                                HStack(spacing: 6) {
+                                    Text("See more tools")
+                                    EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.envAccent)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    WebHomeFooter()
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
@@ -98,6 +122,67 @@ struct HomeView: View {
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
         .modifier(EnVBrandNavigationStyle())
+    }
+}
+
+
+private let webHomeToolIDs = [
+    "audio-to-text", "percentage-calculator", "json-formatter", "image-compressor",
+    "qr-generator", "password-generator", "video-to-mp4", "video-to-text",
+    "youtube-video-downloader", "youtube-audio-extractor", "word-counter", "video-to-mp3",
+]
+
+private struct WebHomeToolCard: View {
+    let tool: Tool
+    var body: some View {
+        NavigationLink(value: tool) {
+            VStack(alignment: .leading, spacing: 0) {
+                iconTile(tool.icon)
+                Text(tool.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
+                Text(tool.description).font(.system(size: 12)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+                if tool.isPlanned { Text("Coming soon").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                else if tool.clientSide { Text("IN-BROWSER").font(.system(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct WebHomeSearchSuggestion: View {
+    let tool: Tool
+    var body: some View {
+        NavigationLink(value: tool) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(tool.name).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                    if tool.isPlanned { Text("Coming soon").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                }
+                Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct WebHomeFooter: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            EnVLogo().frame(width: 142, height: 48)
+            Text("Useful tools. One place. 10000 browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("Product").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text("About   Tools   Pricing   Contact").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("Legal").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text("Privacy   Terms   Disclaimer   Responsible use").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("© 2026 chAs Technologies LLC · enV").font(.footnote).foregroundStyle(Color.envMuted)
+            Text("43 categories · 10000 live tools").font(.footnote).foregroundStyle(Color.envMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
