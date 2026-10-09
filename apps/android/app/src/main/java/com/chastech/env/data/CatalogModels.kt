@@ -1,5 +1,7 @@
 package com.chastech.env.data
 
+import java.text.Normalizer
+import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -25,6 +27,7 @@ data class ToolRecord(
     val related: List<String>,
     val engine: EngineInfo,
     val subcategory: String? = null,
+    val disclaimer: String? = null,
 )
 
 data class Catalog(
@@ -58,6 +61,7 @@ fun JSONObject.toToolRecord(): ToolRecord {
         id = stringOrEmpty("id"), name = stringOrEmpty("name"), slug = stringOrEmpty("slug"),
         description = NativeCopy.text(stringOrEmpty("description")), category = stringOrEmpty("category"),
         subcategory = optString("subcategory").takeIf { it.isNotBlank() },
+        disclaimer = optString("disclaimer").takeIf { it.isNotBlank() },
         keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
@@ -127,6 +131,35 @@ fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> 
     return tools.asSequence().filter { categoryId == null || it.category == categoryId }.filter { tool ->
         needle.isEmpty() || sequenceOf(tool.name, tool.description, tool.id, tool.slug).plus(tool.keywords.asSequence()).plus(tool.tags.asSequence()).any { it.lowercase().contains(needle) }
     }.sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name }).toList()
+}
+
+private fun relatedAlphabeticalKey(value: String): String =
+    Normalizer.normalize(value, Normalizer.Form.NFKD)
+        .replace(Regex("\\p{M}+"), "")
+        .lowercase(Locale.ROOT)
+        .replace(Regex("[^a-z0-9]+"), " ")
+        .trim()
+
+/** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
+fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
+    val byId = tools.associateBy { it.id }
+    val related = tool.related.mapNotNull(byId::get).filter { it.status != "planned" }
+    if (related.size >= limit) return related.take(limit)
+    val seen = (setOf(tool.id) + related.map { it.id })
+    val rest = tools.asSequence()
+        .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
+        .sortedWith(compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id }))
+        .toList()
+    return (related + rest).take(limit)
+}
+
+fun ToolRecord.nativeDisclaimerText(): String? = when (disclaimer) {
+    "health" -> "Estimates only — not medical advice."
+    "finance" -> "Estimates based on your inputs — not financial advice."
+    "earnings" -> "Editable assumptions. Not a prediction of actual payouts."
+    "mockup" -> "DEMO / MOCKUP / FICTIONAL — not authentic evidence."
+    "estimate" -> "Approximate result. Check assumptions before relying on it."
+    else -> null
 }
 
 fun Catalog.featuredOrPopular(limit: Int = 8): List<ToolRecord> = tools.asSequence()

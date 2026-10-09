@@ -42,7 +42,7 @@ extension Color {
     static let envAccentSoft = adaptive(light: 0xD8F3EE, dark: 0x14332F)
 }
 
-private enum NativeTab: Int {
+enum NativeTab: Int {
     case home, tools, search, saved, account, assistant
 }
 

@@ -3,9 +3,9 @@ import XCTest
 
 final class CatalogCoreTests: XCTestCase {
     private let catalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 2, planned: 1, categories: 1), categories: [ToolCategory(id: "text", name: "Text", description: "Text tools", blurb: "Text", icon: "Type")], tools: [
-        Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", subcategory: nil, keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
-        Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", subcategory: nil, keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
-        Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Planned tool", category: "text", subcategory: nil, keywords: ["future"], tags: [], icon: "Wand2", popularity: 100, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
+        Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", subcategory: nil, keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
+        Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", subcategory: nil, keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
+        Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Planned tool", category: "text", subcategory: nil, keywords: ["future"], tags: [], icon: "Wand2", popularity: 100, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
     ])
 
     override func setUp() {
@@ -32,6 +32,13 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
     }
 
+    func testRelatedToolsExcludePlannedAndFillFromCategoryAlphabetically() {
+        let current = Tool(id: "current", name: "Current", slug: "current", description: "", category: "text", subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: ["word-count", "future-tool"], engine: ToolEngine(type: "text", id: "current", op: nil))
+        let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current])
+
+        XCTAssertEqual(testCatalog.relatedTools(for: current).map(\.id), ["word-count", "case-converter"])
+    }
+
     func testToolEnginePreservesUnknownConfigurationValues() throws {
         let data = Data(#"{"type":"calculator","formula":"body-mass-index","precision":2,"options":["metric"]}"#.utf8)
         let engine = try JSONDecoder().decode(ToolEngine.self, from: data)
@@ -39,6 +46,11 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(engine.configuration["formula"], .string("body-mass-index"))
         XCTAssertEqual(engine.configuration["precision"], .number(2))
         XCTAssertEqual(engine.configuration["options"], .array([.string("metric")]))
+    }
+
+    func testNativeDisclaimerTextMatchesCanonicalWebCopy() {
+        let tool = Tool(id: "health", name: "Health", slug: "health", description: "", category: "fitness", subcategory: nil, keywords: [], tags: [], icon: "Heart", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: "health", related: [], engine: ToolEngine(type: "calculator", id: "health", op: nil))
+        XCTAssertEqual(tool.nativeDisclaimerText, "Estimates only — not medical advice.")
     }
 
     func testCategoryFilterAndPopularityOrdering() {

@@ -14,7 +14,7 @@ final class NativeTextEngineTests: XCTestCase {
 
 final class NativeDeveloperToolTests: XCTestCase {
     private func tool(_ op:String, category:String="developer", engineType:String?="developer", status:String="active") -> Tool {
-        Tool(id:op,name:op,slug:op,description:"",category:category,subcategory:nil,keywords:[],tags:[],icon:"Code2",popularity:0,featured:false,clientSide:true,requiresBackend:false,requiresAuth:false,status:status,related:[],engine:ToolEngine(type:engineType,id:op,op:op))
+        Tool(id:op,name:op,slug:op,description:"",category:category,subcategory:nil,keywords:[],tags:[],icon:"Code2",popularity:0,featured:false,clientSide:true,requiresBackend:false,requiresAuth:false,status:status,disclaimer:nil,related:[],engine:ToolEngine(type:engineType,id:op,op:op))
     }
 
     func testAllDeveloperOperationsPreferLocalExecutionOverCategoryBackend() {

@@ -10,6 +10,7 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
+    @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
     let onSearch: (String) -> Void
     let onTools: () -> Void
     let onInformation: (String) -> Void
@@ -124,8 +125,10 @@ struct HomeView: View {
             .modifier(Screen())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
+        .id(homeNavigationReset)
         .modifier(EnVBrandNavigationStyle())
     }
 }
@@ -268,6 +271,7 @@ private struct ToolCategoryGroup: Identifiable {
 struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
     @Binding var toolsQuery: String
     @State private var visibleByCategory: [String: Int] = [:]
 
@@ -375,7 +379,12 @@ struct ToolsView: View {
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
+        .id(toolsNavigationReset)
         .modifier(EnVBrandNavigationStyle())
+        .onChange(of: toolsNavigationReset) { _ in
+            toolsQuery = ""
+            visibleByCategory.removeAll()
+        }
     }
 }
 
@@ -514,6 +523,7 @@ struct SearchResultsView: View {
         .searchable(text: $text, prompt: "Search names, descriptions, keywords, tags")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
         .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         .onChange(of: text) { _ in visibleCount = 24 }
     }
@@ -536,6 +546,7 @@ struct SavedView: View {
             .modifier(Screen())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
         .modifier(EnVBrandNavigationStyle())

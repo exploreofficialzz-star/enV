@@ -5,7 +5,7 @@ final class NativeMimeEngineTests: XCTestCase {
     private let activeIDs: Set<String> = ["mime-lookup", "mime-type-lookup"]
 
     private func tool(_ id: String, category: String) -> Tool {
-        Tool(id: id, name: id, slug: id, description: "", category: category, subcategory: nil, keywords: [], tags: [], icon: "File", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "mime", id: "lookup", op: "lookup"))
+        Tool(id: id, name: id, slug: id, description: "", category: category, subcategory: nil, keywords: [], tags: [], icon: "File", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "mime", id: "lookup", op: "lookup"))
     }
 
     func testCanonicalActiveMimeIDsHaveTheSameLocalLookupOperation() {

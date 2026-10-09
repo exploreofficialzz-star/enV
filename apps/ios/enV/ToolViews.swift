@@ -78,54 +78,164 @@ struct ToolList: View {
 
 struct ToolDetailView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
+    @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
+    @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
     let tool: Tool
+
+    private var compact: Bool { horizontalSizeClass != .regular }
+    private var backend: Bool { NativeBackendEngine.supports(tool) }
+    private var local: Bool { NativeCoverage.isLocallyExecutable(tool) }
+    private var relatedTools: [Tool] { store.catalog.relatedTools(for: tool) }
+    private var categoryName: String { store.category(named: tool.category)?.name ?? tool.category }
+    private var relatedColumns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: compact ? 1 : 2) }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 14) {
-                    EnVIcon(name: tool.icon, size: 26, tint: .envAccent).frame(width: 56, height: 56).background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 10))
-                    VStack(alignment: .leading, spacing: 6) { Text(tool.name).font(.title2.bold()); Text(store.category(named: tool.category)?.name ?? tool.category).foregroundStyle(.secondary) }
-                    Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Button("Home") { homeNavigationReset += 1; selectedTab = NativeTab.home.rawValue }
+                    Text("/").foregroundStyle(Color.envSubtle)
+                    Button("Tools") { toolsNavigationReset += 1; selectedTab = NativeTab.tools.rawValue }
+                    Text("/").foregroundStyle(Color.envSubtle)
+                    NavigationLink(value: tool.category) { Text(categoryName) }
+                    Text("/").foregroundStyle(Color.envSubtle)
+                    Text(tool.name).foregroundStyle(Color.envInk).lineLimit(1)
                 }
-                let backend = NativeBackendEngine.supports(tool)
-                let local = NativeCoverage.isLocallyExecutable(tool)
-                if backend {
-                    NativeBackendToolView(tool: tool)
-                } else if local {
-                    NativeFamilyToolView(tool: tool)
-                } else {
-                    HStack(spacing: 8) { EnVIcon(name: tool.isPlanned ? "Clock3" : "Globe", size: 16, tint: .envMuted); Text(tool.isPlanned ? "Coming soon" : "Web only").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envMuted) }
-                    Text(tool.isPlanned ? "This tool is not yet implemented natively or through the enV backend." : "This tool remains available in the Web product but has no native implementation in this standalone iOS app.").foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(tool.description).font(.body)
-                    Divider()
-                    metadataRow("Status", tool.status.capitalized)
-                    metadataRow("Engine", tool.engine.type ?? "Unknown")
-                    metadataRow("Popularity", "\(tool.popularity)")
-                    metadataRow("Native execution", NativeCoverage.status(for: tool))
-                    metadataRow("Processing", tool.clientSide ? "Runs on this device" : "Uses backend services")
-                    if tool.requiresBackend { metadataRow("Backend", "Required") }
-                }
-                .padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
-                Button { store.toggleFavorite(tool) } label: {
-                    HStack(spacing: 8) {
-                        EnVIcon(name: "Heart", size: 16, tint: .white)
-                        Text(store.isFavorite(tool) ? "Remove from Saved" : "Save tool")
+                .font(.custom("Outfit-Regular", size: 12))
+                .foregroundStyle(Color.envMuted)
+                .buttonStyle(.plain)
+                .padding(.bottom, 24)
+
+                if compact {
+                    VStack(alignment: .leading, spacing: 16) {
+                        toolHeading
+                        saveButton
                     }
-                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                } else {
+                    HStack(alignment: .top, spacing: 16) {
+                        toolHeading.frame(maxWidth: .infinity, alignment: .leading)
+                        saveButton
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .accessibilityLabel(store.isFavorite(tool) ? "Remove \(tool.name) from saved" : "Save \(tool.name)")
+
+                if let notice = tool.nativeDisclaimerText {
+                    Text(notice)
+                        .font(.custom("Outfit-Regular", size: 14))
+                        .foregroundStyle(Color.envMuted)
+                        .padding(.top, 12)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    if backend {
+                        NativeBackendToolView(tool: tool)
+                    } else if local {
+                        NativeFamilyToolView(tool: tool)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
+                            Text(tool.isPlanned
+                                ? "This tool is not yet implemented natively."
+                                : "This tool is available in the Web product but has no native implementation in this standalone iOS app.")
+                                .font(.custom("Outfit-Regular", size: 14))
+                                .foregroundStyle(Color.envMuted)
+                        }
+                    }
+                }
+                .padding(compact ? 16 : 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
+                .padding(.top, 24)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("What this tool does")
+                        .font(.custom("Outfit-SemiBold", size: 18))
+                        .foregroundStyle(Color.envInk)
+                    Text("\(tool.description) Results can be copied or downloaded from this page.")
+                        .font(.custom("Outfit-Regular", size: 14))
+                        .foregroundStyle(Color.envMuted)
+                }
+                .padding(.top, 40)
+
+                if !relatedTools.isEmpty {
+                    Text("Related tools")
+                        .font(.custom("Outfit-SemiBold", size: 18))
+                        .foregroundStyle(Color.envInk)
+                        .padding(.top, 40)
+                        .padding(.bottom, 16)
+                    LazyVGrid(columns: relatedColumns, alignment: .leading, spacing: 8) {
+                        ForEach(relatedTools) { related in
+                            NavigationLink(value: related) { RelatedToolDetailCard(tool: related) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, compact ? 32 : 40)
+            .frame(maxWidth: 1024, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
+        .modifier(Screen())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func metadataRow(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).fontWeight(.medium) } }
+    private var toolHeading: some View {
+        HStack(alignment: .top, spacing: 12) {
+            EnVIcon(name: tool.icon, size: 20, tint: .envAccent)
+                .frame(width: 44, height: 44)
+                .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(tool.name)
+                        .font(.custom("Outfit-SemiBold", size: compact ? 24 : 30))
+                        .tracking(-0.35)
+                        .foregroundStyle(Color.envInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted) }
+                }
+                Text(tool.description)
+                    .font(.custom("Outfit-Regular", size: 14))
+                    .foregroundStyle(Color.envMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var saveButton: some View {
+        Button { store.toggleFavorite(tool) } label: {
+            HStack(spacing: 8) {
+                EnVIcon(name: "Heart", size: 16, tint: store.isFavorite(tool) ? .white : .envInk)
+                Text(store.isFavorite(tool) ? "Saved" : "Save")
+                    .font(.custom("Outfit-Medium", size: 14))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(store.isFavorite(tool) ? Color.envAccent : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(store.isFavorite(tool) ? Color.envAccent : Color.envBorder, lineWidth: 1))
+            .foregroundStyle(store.isFavorite(tool) ? Color.white : Color.envInk)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(store.isFavorite(tool) ? "Remove \(tool.name) from saved" : "Save \(tool.name)")
+    }
+}
+
+private struct RelatedToolDetailCard: View {
+    let tool: Tool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+            Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+    }
 }
 
 /// The native surface is deliberately keyed by the catalog's engine type and

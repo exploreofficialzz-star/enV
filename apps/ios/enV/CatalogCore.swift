@@ -93,12 +93,24 @@ struct Tool: Decodable, Identifiable, Hashable {
     let requiresBackend: Bool
     let requiresAuth: Bool
     let status: String
+    let disclaimer: String?
     let related: [String]
     let engine: ToolEngine
 
     var isPlanned: Bool { status.lowercased() == "planned" }
     var searchText: String {
         ([id, slug, name, description, category, subcategory ?? "", keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
+    }
+
+    var nativeDisclaimerText: String? {
+        switch disclaimer {
+        case "health": return "Estimates only — not medical advice."
+        case "finance": return "Estimates based on your inputs — not financial advice."
+        case "earnings": return "Editable assumptions. Not a prediction of actual payouts."
+        case "mockup": return "DEMO / MOCKUP / FICTIONAL — not authentic evidence."
+        case "estimate": return "Approximate result. Check assumptions before relying on it."
+        default: return nil
+        }
     }
 
     func nativeFacing() -> Tool {
@@ -118,6 +130,7 @@ struct Tool: Decodable, Identifiable, Hashable {
             requiresBackend: requiresBackend,
             requiresAuth: requiresAuth,
             status: status,
+            disclaimer: disclaimer,
             related: related,
             engine: engine
         )
@@ -198,6 +211,32 @@ extension Catalog {
             return left.score > right.score
         }
         return rankedTools.prefix(limit).map { $0.tool }
+    }
+}
+
+private func relatedAlphabeticalKey(_ value: String) -> String {
+    value.decomposedStringWithCompatibilityMapping
+        .replacingOccurrences(of: "\\p{M}+", with: "", options: .regularExpression)
+        .lowercased()
+        .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+extension Catalog {
+    /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
+    func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
+        let byID = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
+        let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
+        if related.count >= limit { return Array(related.prefix(limit)) }
+        let seen = Set([tool.id] + related.map(\.id))
+        let rest = tools
+            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned }
+            .sorted {
+                let left = relatedAlphabeticalKey($0.name)
+                let right = relatedAlphabeticalKey($1.name)
+                return left == right ? $0.id < $1.id : left < right
+            }
+        return Array((related + rest).prefix(limit))
     }
 }
 

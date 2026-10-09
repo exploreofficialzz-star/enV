@@ -24,6 +24,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -97,6 +99,8 @@ import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.webSearch
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
+import com.chastech.env.data.nativeDisclaimerText
+import com.chastech.env.data.relatedTools
 import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
@@ -258,7 +262,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (selected != null) {
-                ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
+                ToolDetail(
+                    catalog = catalog,
+                    tool = selected,
+                    isFavorite = selected.id in favoriteIds,
+                    onHome = { selectedId = null; category = null; query = ""; tab = AppTab.Home.name },
+                    onTools = { selectedId = null; category = null; query = ""; tab = AppTab.Tools.name },
+                    onCategory = { value -> selectedId = null; category = value; query = ""; tab = AppTab.Tools.name },
+                    onRelatedTool = { selectedId = it },
+                    onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
+                )
             } else {
                 when (currentTab) {
                     AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
@@ -671,35 +684,129 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEng
 private fun nativeBackendSupported(tool: ToolRecord): Boolean = NativeBackendEngine.supports(tool)
 
 @Composable
-private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit, onToggleFavorite: () -> Unit) {
+private fun ToolDetail(
+    catalog: Catalog,
+    tool: ToolRecord,
+    isFavorite: Boolean,
+    onHome: () -> Unit,
+    onTools: () -> Unit,
+    onCategory: (String) -> Unit,
+    onRelatedTool: (String) -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
     val supported = nativeSupported(tool)
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) { EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface) }
-            Text("Tool details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onToggleFavorite, modifier = Modifier.semantics { contentDescription = if (isFavorite) "Remove from saved" else "Save tool" }) {
-                EnVIcon("Heart", tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    val backend = nativeBackendSupported(tool)
+    val related = remember(catalog, tool) { catalog.relatedTools(tool) }
+    val categoryName = catalog.categories.firstOrNull { it.id == tool.category }?.name ?: tool.category
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val compact = maxWidth < 640.dp
+        Column(
+            Modifier.widthIn(max = 1024.dp).fillMaxWidth().align(Alignment.TopCenter)
+                .verticalScroll(rememberScrollState()).imePadding()
+                .padding(horizontal = if (compact) 16.dp else 24.dp, vertical = if (compact) 32.dp else 40.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                NativeBreadcrumbLink("Home", onHome)
+                Text("/", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                NativeBreadcrumbLink("Tools", onTools)
+                Text("/", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                NativeBreadcrumbLink(categoryName) { onCategory(tool.category) }
+                Text("/", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tool.name, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurface)
+            }
+            Spacer(Modifier.height(24.dp))
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    NativeToolHeader(tool, compact)
+                    NativeToolSaveButton(isFavorite, onToggleFavorite)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    NativeToolHeader(tool, compact, Modifier.weight(1f))
+                    NativeToolSaveButton(isFavorite, onToggleFavorite)
+                }
+            }
+            tool.nativeDisclaimerText()?.let { notice ->
+                Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            }
+            Spacer(Modifier.height(24.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
+                    when {
+                        backend -> NativeBackendToolForm(tool, true)
+                        supported -> NativeToolForm(tool)
+                        tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusPill("Coming soon")
+                            Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusPill("Web only")
+                            Text("This tool is not yet implemented natively. Open it in the Web product to use it.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(40.dp))
+            Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.SemiBold)
+            Text("${tool.description} Results can be copied or downloaded from this page.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            if (related.isNotEmpty()) {
+                Spacer(Modifier.height(40.dp))
+                Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.SemiBold)
+                Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    related.chunked(if (compact) 1 else 2).forEach { rowTools ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowTools.forEach { item ->
+                                Box(Modifier.weight(1f)) { RelatedToolCard(item) { onRelatedTool(item.id) } }
+                            }
+                            if (!compact && rowTools.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(56.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp)) {
-                Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
-            }
-            Column(Modifier.padding(start = 12.dp)) {
-                Text(tool.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(tool.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+    }
+}
+
+@Composable
+private fun NativeToolHeader(tool: ToolRecord, compact: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(Modifier.size(44.dp), color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(8.dp)) {
+            Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary) }
         }
-        val backend = nativeBackendSupported(tool)
-        if (tool.status == "planned" && !supported && !backend) StatusPill("Coming soon")
-        else if (tool.status != "planned" && !supported && !backend) StatusPill("Web only")
-        Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        DetailRow("Engine", "${tool.engine.type} · ${tool.engine.id}")
-        DetailRow("Native execution", when { supported -> "Available offline"; backend -> "Available online via enV backend"; tool.status == "planned" -> "Coming soon"; else -> "Web only — no native implementation" })
-        DetailRow("Processing", if (backend) "Uses enV backend services" else "Runs on this device")
-        when { backend -> NativeBackendToolForm(tool,true); supported -> NativeToolForm(tool); else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.primary) }
-        if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tool.name, style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (compact) 24.sp else 30.sp, lineHeight = if (compact) 30.sp else 36.sp), fontWeight = FontWeight.SemiBold)
+                if (tool.status == "planned") StatusPill("Coming soon")
+            }
+            Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun NativeBreadcrumbLink(label: String, onClick: () -> Unit) {
+    Text(label, modifier = Modifier.clickable(onClick = onClick), style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun NativeToolSaveButton(isFavorite: Boolean, onClick: () -> Unit) {
+    if (isFavorite) Button(onClick = onClick) { EnVIcon("Heart", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(6.dp)); Text("Saved") }
+    else OutlinedButton(onClick = onClick) { EnVIcon("Heart", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface); Spacer(Modifier.width(6.dp)); Text("Save") }
+}
+
+@Composable
+private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Medium)
+            Text(tool.description, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
