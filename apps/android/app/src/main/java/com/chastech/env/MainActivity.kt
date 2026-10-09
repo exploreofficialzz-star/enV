@@ -86,6 +86,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -212,6 +214,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var homeQuery by rememberSaveable { mutableStateOf("") }
+    var assistantDraft by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showExchange by rememberSaveable { mutableStateOf(false) }
@@ -222,6 +225,9 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
     val selected = detailStack.lastOrNull()?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
+    LaunchedEffect(tab, selected?.id, showInformation, showExchange) {
+        if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
+    }
     LaunchedEffect(selected?.id) { selected?.id?.let { favorites.recordRecent(it) } }
     if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
     else if (category != null) BackHandler { category = null }
@@ -280,8 +286,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 } else {
                     when (currentTab) {
                         AppTab.Home -> HomeScreen(catalog, favoriteIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
-                        AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) })
-                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) })
+                        AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) }, assistantDraft, { assistantDraft = it })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name })
                         AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
@@ -313,8 +319,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
             .take(12)
             .take(if (screenWidth >= 768) 12 else 6)
     }
-    val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery).take(8) }
+    val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
     var homeSearchFocused by remember { mutableStateOf(false) }
+    val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
         item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -329,20 +336,20 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
                 ) {
                     // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = { onSearch(homeQuery) }) { EnVIcon("Search") } }.
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        EnVLogo(Modifier.width(48.dp).height(32.dp), darkTheme = darkMode)
+                        EnVLogo(Modifier.width(56.dp).height(36.dp), darkTheme = darkMode)
                         Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                             if (homeQuery.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                             BasicTextField(
                                 value = homeQuery,
                                 onValueChange = onQuery,
                                 modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused }.semantics { contentDescription = "Search tools" },
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = if (screenWidth >= 640) 18.sp else 16.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { onSearch(homeQuery) }),
+                                keyboardActions = KeyboardActions(onSearch = { openHomeSearch() }),
                             )
                         }
-                        IconButton(onClick = { onSearch(homeQuery) }, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
+                        IconButton(onClick = { openHomeSearch() }, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
                     }
                 }
                 if (homeQuery.isNotBlank()) {
@@ -401,7 +408,7 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
             Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
-            else if (tool.clientSide) Text("IN-BROWSER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
         }
     }
@@ -441,12 +448,13 @@ private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: 
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit) {
+private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit) {
     if (category != null) {
         CategoryScreen(catalog, category, { onCategory(null) }, onTool)
         return
     }
     val visibleCounts = remember { mutableStateMapOf<String, Int>() }
+    LaunchedEffect(query) { visibleCounts.clear() }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val groupedTools = remember(catalog, query) {
@@ -462,7 +470,10 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp))
+                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp)) {
+                        val first = groupedTools.firstOrNull()?.second?.firstOrNull()
+                        if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
+                    }
                 }
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -567,13 +578,13 @@ private fun ToolGrid(tools: List<ToolRecord>, columns: Int, onTool: (String) -> 
 }
 
 @Composable
-private fun WebToolsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun WebToolsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
     Surface(modifier.height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) Text("Search tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true)
+                BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }))
             }
         }
     }
@@ -587,7 +598,7 @@ private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: M
         Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
         Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
-        else if (tool.clientSide) Text("IN-BROWSER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
     }
 }
@@ -617,7 +628,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
         item {
             Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-            SearchBox(query, onQuery, "Search tools")
+            SearchBox(catalog, query, onQuery, onTool)
         }
         if (query.trim().isEmpty()) {
             item { Text("Start typing to see matching tools.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -1382,8 +1393,34 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
 }
 
 @Composable
-private fun SearchBox(value: String, onValueChange: (String) -> Unit, placeholder: String) {
-    OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = placeholder }, placeholder = { Text(placeholder) }, leadingIcon = { EnVIcon("Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = "Search") }, singleLine = true, shape = RoundedCornerShape(12.dp))
+private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearch(value, limit = 8) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "Search tools"; isTraversalGroup = true }) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+            placeholder = { Text("Search tools") },
+            leadingIcon = { EnVIcon("Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = "Search") },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } }),
+        )
+        if (focused && value.isNotBlank()) {
+            Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (suggestions.isEmpty()) {
+                        Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite })
+                    } else {
+                        suggestions.forEach { WebHomeSearchSuggestion(it, onTool) }
+                    }
+                    TextButton(onClick = { focused = false }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
+                }
+            }
+        }
+    }
 }
 
 @Composable

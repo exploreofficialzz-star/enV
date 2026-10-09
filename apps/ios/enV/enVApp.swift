@@ -66,6 +66,7 @@ struct RootTabView: View {
     @AppStorage("env.themeMode") private var themeMode = "system"
     @State private var searchQuery = ""
     @State private var assistantMessages: [AssistantChatMessage] = []
+    @State private var assistantDraft = ""
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -76,9 +77,9 @@ struct RootTabView: View {
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
                 .tag(NativeTab.home.rawValue)
-            AssistantChatView(messages: $assistantMessages)
+            AssistantChatView(messages: $assistantMessages, draft: $assistantDraft)
                 .tag(NativeTab.assistant.rawValue)
-            ToolsView(toolsQuery: $searchQuery)
+            ToolsView(toolsQuery: $searchQuery, onSearchNoMatch: { selectedTab = NativeTab.search.rawValue })
                 .tag(NativeTab.tools.rawValue)
             SearchView(query: $searchQuery)
                 .tag(NativeTab.search.rawValue)

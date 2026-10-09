@@ -17,9 +17,14 @@ struct HomeView: View {
     let onInformation: (String) -> Void
     let onAssistant: () -> Void
     @State private var searchText = ""
+    @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var searchSuggestions: [Tool] { hasSearchText ? store.catalog.webSearch(searchText, limit: 8) : [] }
+    private var searchSuggestions: [Tool] { hasSearchText ? store.catalog.webSearch(searchText, limit: 8, includeRelatedReferences: true) : [] }
+    private func openHomeSearch() {
+        if let first = searchSuggestions.first { homePath.append(first) }
+        else { onSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
     private var homeTools: [Tool] {
         store.catalog.webSearch("", limit: Int.max)
             .filter { $0.status == "active" || $0.status == "beta" }
@@ -28,21 +33,21 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $homePath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 12) {
-                            EnVLogo().frame(width: 48, height: 32)
+                            EnVLogo().frame(width: 56, height: 36)
                             TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
-                                .font(.custom("Outfit-Regular", size: 16))
+                                .font(.custom("Outfit-Regular", size: horizontalSizeClass == .regular ? 18 : 16))
                                 .multilineTextAlignment(.center)
                                 .focused($isHomeSearchFocused)
                                 .accessibilityLabel("Search tools")
                                 .submitLabel(.search)
-                                .onSubmit { onSearch(searchText) }
-                            Button { onSearch(searchText) } label: {
+                                .onSubmit { openHomeSearch() }
+                            Button { openHomeSearch() } label: {
                                 EnVIcon(name: "Search", size: 24, tint: .envAccent)
                                     .frame(width: 42, height: 42)
                             }
@@ -147,6 +152,10 @@ struct HomeView: View {
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
         .id(homeNavigationReset)
+        .onDisappear {
+            searchText = ""
+            isHomeSearchFocused = false
+        }
         .modifier(EnVBrandNavigationStyle())
     }
 }
@@ -291,7 +300,10 @@ struct ToolsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
     @Binding var toolsQuery: String
+    let onSearchNoMatch: () -> Void
     @State private var visibleByCategory: [String: Int] = [:]
+    @State private var searchNavigationTool: Tool?
+    @State private var showSearchNavigation = false
 
     // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
     private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery) }
@@ -323,10 +335,19 @@ struct ToolsView: View {
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
                                     .accessibilityLabel("Search tools")
+                                    .submitLabel(.search)
+                                    .onSubmit {
+                                        guard !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = matchingTools.first else {
+                                            onSearchNoMatch()
+                                            return
+                                        }
+                                        searchNavigationTool = first
+                                        showSearchNavigation = true
+                                    }
                                     .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
                             .padding(.horizontal, 16)
-                            .frame(width: horizontalSizeClass == .regular ? 288 : 195, height: 44)
+                            .frame(width: horizontalSizeClass == .regular ? 288 : min(288, max(160, UIScreen.main.bounds.width * 0.52)), height: 44)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 22))
                             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
                             .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
@@ -336,7 +357,7 @@ struct ToolsView: View {
                             .foregroundStyle(Color.envMuted)
                     }
                     if categoryGroups.isEmpty {
-                        EmptyStateView(title: "No tools found", lucideIcon: "Search", message: "Try another name or keyword.")
+                        EmptyStateView(title: "No tools match your search", lucideIcon: "Search", message: "Try another name or keyword.")
                     } else {
                         ForEach(categoryGroups) { group in
                             let visibleCount = min(visibleByCategory[group.id] ?? 3, group.tools.count)
@@ -400,6 +421,9 @@ struct ToolsView: View {
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         }
         .id(toolsNavigationReset)
+        .navigationDestination(isPresented: $showSearchNavigation) {
+            if let searchNavigationTool { ToolDetailView(tool: searchNavigationTool) }
+        }
         .modifier(EnVBrandNavigationStyle())
         .onChange(of: toolsNavigationReset) { _ in
             toolsQuery = ""
@@ -492,8 +516,12 @@ struct SearchResultsView: View {
     @EnvironmentObject private var store: CatalogStore
     @Binding var text: String
     @State private var visibleCount = 24
+    @State private var searchNavigationTool: Tool?
+    @State private var showSearchNavigation = false
+    @FocusState private var isSearchFocused: Bool
 
     private var results: [Tool] { store.catalog.webSearch(text, limit: Int.max) }
+    private var suggestions: [Tool] { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(text, limit: 8) }
 
     var body: some View {
         ScrollView {
@@ -505,6 +533,58 @@ struct SearchResultsView: View {
                     Text("Find a tool by name, category, or keyword.")
                         .font(.custom("Outfit-Regular", size: 14))
                         .foregroundStyle(Color.envMuted)
+                }
+                HStack(spacing: 10) {
+                    EnVIcon(name: "Search", size: 20, tint: .envMuted)
+                    TextField("Search tools", text: $text)
+                        .font(.custom("Outfit-Regular", size: 16))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityLabel("Search tools")
+                        .focused($isSearchFocused)
+                        .submitLabel(.search)
+                        .onSubmit {
+                            if let first = suggestions.first {
+                                searchNavigationTool = first
+                                showSearchNavigation = true
+                            }
+                        }
+                    Button {
+                        if let first = suggestions.first {
+                            searchNavigationTool = first
+                            showSearchNavigation = true
+                        }
+                    } label: { EnVIcon(name: "ArrowRight", size: 20, tint: .envAccent) }
+                        .accessibilityLabel("Open first matching tool")
+                        .disabled(suggestions.isEmpty)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 56)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorderStrong, lineWidth: 1))
+                if isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if suggestions.isEmpty {
+                            Text("No matching tools. Try “json”, “bmi”, or “qr”.")
+                                .font(.custom("Outfit-Regular", size: 14))
+                                .foregroundStyle(Color.envMuted)
+                                .padding(12)
+                        } else {
+                            ForEach(suggestions) { tool in WebHomeSearchSuggestion(tool: tool) }
+                        }
+                        HStack {
+                            Spacer()
+                            Button("See more results") { isSearchFocused = false }
+                                .font(.custom("Outfit-SemiBold", size: 14))
+                                .foregroundStyle(Color.envAccent)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                    }
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Search suggestions")
                 }
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Start typing to see matching tools.")
@@ -551,9 +631,11 @@ struct SearchResultsView: View {
             .padding(16)
         }
         .modifier(Screen())
-        .searchable(text: $text, prompt: "Search tools")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showSearchNavigation) {
+            if let searchNavigationTool { ToolDetailView(tool: searchNavigationTool) }
+        }
         .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
         .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
         .onChange(of: text) { _ in visibleCount = 24 }

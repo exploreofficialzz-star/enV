@@ -1,5 +1,6 @@
 package com.chastech.env
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,15 +20,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,10 +43,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.ui.EnVIcon
@@ -126,17 +134,27 @@ internal fun AssistantScreen(
     messages: List<AssistantChatMessage>,
     onMessagesChange: (List<AssistantChatMessage>) -> Unit,
     onTool: (String) -> Unit,
+    draft: String,
+    onDraftChange: (String) -> Unit,
 ) {
     val context = LocalContext.current.applicationContext
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val maxPanelHeight = (LocalConfiguration.current.screenHeightDp * 0.68f).dp
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val toolsById = remember(catalog) { catalog.tools.associateBy { it.id } }
-    var draft by rememberSaveable { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf<PendingAssistantRequest?>(null) }
     var activeJob by remember { mutableStateOf<Job?>(null) }
     var activeRequestHandle by remember { mutableStateOf<NativeAiClient.RequestHandle?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            activeRequestHandle?.cancel()
+            activeJob?.cancel()
+        }
+    }
 
     LaunchedEffect(messages.size, sending) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(if (sending) messages.size else messages.lastIndex)
@@ -201,7 +219,7 @@ internal fun AssistantScreen(
         val history = boundedContext(conversation)
         val request = PendingAssistantRequest(history, conversation, assistantCandidates(catalog, history))
         onMessagesChange(conversation)
-        draft = ""
+        onDraftChange("")
         requestReply(request)
     }
 
@@ -222,15 +240,21 @@ internal fun AssistantScreen(
                 sending = false
                 errorMessage = null
                 retry = null
-                draft = ""
+                onDraftChange("")
                 onMessagesChange(emptyList())
-            }, enabled = messages.isNotEmpty() && !sending) { Text("New chat") }
+            }) { Text("New chat") }
         }
 
+        Surface(
+            modifier = Modifier.weight(1f).fillMaxWidth().heightIn(min = 320.dp, max = maxPanelHeight),
+            color = MaterialTheme.colorScheme.background,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (messages.isEmpty()) {
@@ -240,18 +264,29 @@ internal fun AssistantScreen(
             }
             itemsIndexed(messages) { _, message ->
                 val tools = if (message.isUser) emptyList() else message.recommendedToolIds.mapNotNull { id -> toolsById[id]?.takeIf { it.status != "planned" } }
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = if (message.isUser) Alignment.End else Alignment.Start, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = if (message.isUser) Alignment.End else Alignment.Start) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(0.92f),
+                        modifier = Modifier.fillMaxWidth(if (screenWidth >= 640) 0.9f else 0.96f),
                         colors = CardDefaults.cardColors(containerColor = if (message.isUser) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(16.dp),
                     ) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             Text(if (message.isUser) "You" else "enV", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
-                            Text(message.content, modifier = Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
+                            SelectionContainer {
+                                Text(message.content, modifier = Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
+                            }
+                            if (tools.isNotEmpty()) {
+                                Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    tools.chunked(if (screenWidth >= 640) 2 else 1).forEach { rowTools ->
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            rowTools.forEach { tool -> AssistantRecommendationCard(tool, { onTool(tool.id) }, Modifier.weight(1f)) }
+                                            repeat(if (screenWidth >= 640) 2 - rowTools.size else 0) { Spacer(Modifier.weight(1f)) }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                    tools.forEach { tool -> AssistantRecommendationCard(tool) { onTool(tool.id) } }
                 }
             }
             if (sending) item {
@@ -269,8 +304,10 @@ internal fun AssistantScreen(
             }
         }
 
+        }
+
         errorMessage?.let { message ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Card(modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
                     retry?.let { pending -> TextButton(onClick = { requestReply(pending) }, enabled = !sending) { Text("Retry") } }
@@ -281,9 +318,9 @@ internal fun AssistantScreen(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = draft,
-                onValueChange = { draft = it.take(ASSISTANT_MESSAGE_MAX) },
+            onValueChange = { onDraftChange(it.take(ASSISTANT_MESSAGE_MAX)) },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask about enV tools or the brand…") },
+                placeholder = { Text("Ask about enV tools or the enV brand…") },
                 minLines = 1,
                 maxLines = 4,
                 enabled = !sending,
@@ -298,9 +335,9 @@ internal fun AssistantScreen(
 }
 
 @Composable
-private fun AssistantRecommendationCard(tool: ToolRecord, onClick: () -> Unit) {
+private fun AssistantRecommendationCard(tool: ToolRecord, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(0.92f).clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp),
     ) {

@@ -139,3 +139,10 @@
 - API validation/response headers: `server/routes/api/backend/documents.post.ts`
 - Processor operation dispatch, field use, MIME/output decisions: `scripts/document/process.py`
 - Native forms/dispatch: `apps/android/app/src/main/java/com/chastech/env/NativeBackendToolForm.kt`, `apps/ios/enV/ToolViews.swift`
+
+## Allowlist remediation update (2026-10-09)
+
+- **Fixed:** `server/routes/api/backend/documents.post.ts` previously allowed only 53 operation IDs while the catalog advertised 82 `document-backend` operations. The API now allowlists the exact 82 catalog operations, so catalogued operations reach the processor instead of being rejected immediately as “Unsupported document operation.”
+- The processor remains authoritative for operation/file-format-specific support. An allowed operation can still return a clear processor error for an unsupported input format or a missing processing dependency; this change does not claim every operation succeeds for every accepted file type.
+- **Regression guard:** `scripts/check-native-backend-forms.mjs` now compares the route allowlist against the catalog operation set, checking exact coverage and duplicates.
+- **Validation status:** Run `npm run check:native-backend-forms` before merge/push; platform integration/runtime processing still requires CI/deployed-backend validation.

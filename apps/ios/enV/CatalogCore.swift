@@ -177,10 +177,11 @@ extension Catalog {
 
 
 extension Catalog {
-    func webSearch(_ query: String, limit: Int = Int.max) -> [Tool] {
+    func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let candidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
         if q.isEmpty {
-            return Array(tools.enumerated().sorted {
+            return Array(candidates.enumerated().sorted {
                 $0.element.popularity == $1.element.popularity ? $0.offset < $1.offset : $0.element.popularity > $1.element.popularity
             }.prefix(limit).map { $0.element })
         }
@@ -211,7 +212,7 @@ extension Catalog {
             }
             return hits == 0 ? 0 : hits * 40 + tool.popularity
         }
-        let scoredTools: [(offset: Int, tool: Tool, score: Int)] = tools.enumerated().map { entry in
+        let scoredTools: [(offset: Int, tool: Tool, score: Int)] = candidates.enumerated().map { entry in
             (offset: entry.offset, tool: entry.element, score: score(entry.element))
         }
         let matchingTools = scoredTools.filter { $0.score > 0 }

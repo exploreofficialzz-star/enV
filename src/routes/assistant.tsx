@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, SquarePen } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useAssistantState } from "@/components/assistant/assistant-state";
+import type { AssistantRequest, ChatMessage, ChatTurn, ToolCandidate } from "@/components/assistant/assistant-state";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { Button } from "@/components/ui/button";
@@ -12,12 +14,6 @@ import { searchTools } from "@/lib/search";
 import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/assistant")({ component: AssistantPage });
-
-type ChatRole = "user" | "assistant";
-type ChatMessage = { role: ChatRole; content: string };
-type ChatTurn = ChatMessage & { recommendedToolIds?: string[] };
-type ToolCandidate = Pick<ToolMeta, "id" | "name" | "description" | "category">;
-type AssistantRequest = { messages: ChatMessage[]; candidates: ToolCandidate[] };
 
 function requestContext(messages: ChatTurn[]): ChatMessage[] {
   const context: ChatMessage[] = [];
@@ -36,19 +32,14 @@ function candidatesFor(messages: ChatMessage[]): ToolCandidate[] {
 }
 
 function AssistantPage() {
-  const [messages, setMessages] = useState<ChatTurn[]>([]);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryRequest, setRetryRequest] = useState<AssistantRequest | null>(null);
-  const activeRequest = useRef<AbortController | null>(null);
+  const { messages, setMessages, draft, setDraft, busy, setBusy, error, setError, retryRequest, setRetryRequest, activeRequest } = useAssistantState();
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, busy]);
 
-  useEffect(() => () => activeRequest.current?.abort(), []);
+  useEffect(() => () => activeRequest.current?.abort(), [activeRequest]);
 
   async function requestReply(request: AssistantRequest) {
     activeRequest.current?.abort();

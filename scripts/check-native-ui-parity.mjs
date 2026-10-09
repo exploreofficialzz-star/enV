@@ -19,7 +19,8 @@ assert.match(android, /var homeQuery by rememberSaveable/);
 assert.match(android, /HomeScreen\(catalog, favoriteIds, homeQuery, \{ homeQuery = it \}, \{ submitted -> query = submitted/);
 const homeScreen = android.split("private fun HomeScreen(")[1]?.split("@Composable\nprivate fun WebHomeToolCard")[0] ?? "";
 assert.ok(homeScreen.length > 0, "Android HomeScreen source should be present");
-assert.doesNotMatch(homeScreen, /\bquery\b/, "Home draft/filter should not read the global Search query");
+assert.doesNotMatch(homeScreen, /\b(?:var|val)\s+query\s*:/, "Home draft/filter should not declare or consume global Search query state");
+assert.match(homeScreen, /homeQuery: String, onQuery:/);
 
 // Native discovery shells use the web's 1152px content maximum.
 assert.match(android, /widthIn\(max = 1152\.dp\)/);
@@ -42,11 +43,16 @@ assert.match(androidInfo, /pushStringAnnotation\(tag = "mailto"/);
 assert.match(androidInfo, /No email app is available/);
 assert.match(android, /Year\.now\(\)\.value/);
 assert.match(iosContent, /Calendar\.current\.component\(\.year, from: \.now\)/);
-assert.match(android, /SearchBox\(query, onQuery, "Search tools"\)/);
+assert.match(android, /SearchBox\(catalog, query, onQuery, onTool\)/);
 assert.match(android, /contentDescription = "Search tools"/);
 assert.match(iosContent, /Text\("Search tools"\)/);
-assert.match(iosContent, /\.searchable\(text: \$text, prompt: "Search tools"\)/);
+assert.match(iosContent, /TextField\("Search tools", text: \$text\)/);
 assert.match(iosContent, /\.accessibilityLabel\("Search tools"\)/);
+assert.match(android, /suggestions\.firstOrNull\(\)\?\.let \{ onTool\(it\.id\) \}/);
+assert.match(android, /if \(focused && value\.isNotBlank\(\)\) \{[\s\S]*?suggestions\.forEach/);
+assert.match(iosContent, /if isSearchFocused && !text\.trimmingCharacters[\s\S]*?ForEach\(suggestions\)/);
+assert.match(iosContent, /if let first = suggestions\.first[\s\S]*?showSearchNavigation = true/);
+assert.match(iosContent, /UIScreen\.main\.bounds\.width \* 0\.52/);
 assert.match(android, /Column\(horizontalAlignment = Alignment\.CenterHorizontally, verticalArrangement = Arrangement\.spacedBy\(if \(screenWidth >= 640\) 20\.dp else 16\.dp\), modifier = Modifier\.fillMaxWidth\(\)\.widthIn\(max = 768\.dp\)\)/);
 assert.match(android, /Modifier\.width\(if \(screenWidth >= 640\) 163\.dp else 142\.dp\)\.height\(if \(screenWidth >= 640\) 64\.dp else 56\.dp\)/);
 assert.match(android, /Modifier\.fillMaxWidth\(\)\.height\(if \(screenWidth >= 640\) 72\.dp else 64\.dp\)/);

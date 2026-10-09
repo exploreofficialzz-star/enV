@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "enV — Browser Toolkit";
@@ -23,7 +24,7 @@ export const Route = createRootRoute({
     <html lang="en" suppressHydrationWarning>
       <head><HeadContent /></head>
       <body>
-        <Outlet />
+        <AssistantStateProvider><Outlet /></AssistantStateProvider>
         <Scripts />
       </body>
     </html>

@@ -7,6 +7,7 @@ const android = read("apps/android/app/src/main/java/com/chastech/env/NativeBack
 const ios = read("apps/ios/enV/ToolViews.swift");
 const docWeb = read("src/components/engines/document-tools-engine.tsx");
 const catalog = JSON.parse(readFileSync("apps/shared/catalog.json", "utf8"));
+const documentsRoute = read("server/routes/api/backend/documents.post.ts");
 
 // Generic web custom-backend contract: one freeform input, no option fields, JSON {}.
 assert.match(web, /placeholder="Enter the input required by this tool/);
@@ -44,6 +45,12 @@ for (const tool of docs) {
   const op = tool.engine.op ?? tool.id;
   assert.ok(op.length > 0, `document operation missing for ${tool.id}`);
 }
+const operationList = documentsRoute.match(/const OPS = new Set\(\[([\s\S]*?)\]\);/);
+assert.ok(operationList, "document API must define an explicit operation allowlist");
+const apiOperations = [...operationList[1].matchAll(/"([a-z0-9-]+)"/g)].map((match) => match[1]);
+const catalogOperations = docs.map((tool) => tool.engine.op ?? tool.id);
+assert.equal(new Set(apiOperations).size, apiOperations.length, "document API allowlist must not contain duplicate operations");
+assert.deepEqual([...apiOperations].sort(), [...catalogOperations].sort(), "document API allowlist must exactly cover all catalog document-backend operations");
 assert.match(docWeb, /multiple=\{\/merger\|comparison\|splitter\/\.test\(op\)\}/);
 assert.match(android, /Regex\("merger\|comparison\|splitter"\)/);
 assert.match(ios, /merger\|comparison\|splitter/);

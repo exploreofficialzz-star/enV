@@ -4,14 +4,16 @@
 
 **Overall conclusion:** **Parity is partial; this audit does not establish full parity.** Several contracts are aligned (catalog ranking logic for the common pool, typography declarations in most surfaces, card geometry, navigation intent, validation, and core AI request shapes), but there are confirmed P1/P2/P3 gaps in responsive geometry, catalog scope, search interaction, native state/error handling, accessibility semantics, footer/information behavior, assistant cancellation, and structured AI results.
 
+**Remediation update (2026-10-09):** This source audit is historical; this update records the current working-tree implementation. Native Home search now opens the first ranked suggestion on Enter/search-button activation (or falls back to global Search); Android and iOS global Search expose ranked suggestions and first-result navigation, and iOS Tools search uses a 52vw narrow-screen width. Web Assistant state is now root-owned, matching native conversation retention; iOS draft state is also root-owned. Native Assistant Stop/New chat and retry behavior, Android message selection/live updates, and iOS VoiceOver update semantics are aligned in source. Assistant panel/bubble bounds and recommendation nesting now reflect the web contract on both platforms. The document API allowlist now covers all 82 catalog operations (not 53). **Native device builds, screenshots, accessibility runtime, and deployed document processing remain to be verified; full product parity is not claimed.**
+
 ## Executive summary
 
 | Screen / surface | Status | Main confirmed gaps |
 |---|---|---|
-| Home | Partial | Hero/search width and scale; native-filtered suggestion pool; search semantics and empty-state surface; vertical rhythm; footer layout/count/year; catalog loading states; draft persistence policy |
-| Search and browsing | Gap | Native-filtered tool universe; SearchBox interaction mismatch; category back affordance; global Search presentation/width; gutters; Tools labels; loading/error state; URL-vs-native state model |
+| Home | Partial | Native-filtered suggestion pool; footer layout/count; catalog loading states; residual responsive/spacing differences |
+| Search and browsing | Partial | Native-filtered tool universe; category/back/URL model; residual Search presentation/width/gutters and loading/error behavior |
 | Tool detail shell | Partial | Availability labels; recent-tool persistence; form radius/elevation/background; native error announcement semantics |
-| Assistant chat | Gap | Responsive panel/bubble geometry; iOS Outfit scale; cancellation/Stop; New-chat enablement; composer semantics; error/timeout taxonomy; live-region/selectability; retention; recommendation nesting |
+| Assistant chat | Partial | Error/timeout taxonomy; Dynamic Type/runtime accessibility; remaining cross-platform retention/error state nuances |
 | Contextual AI assist | Partial | Android wide-field layout; panel elevation/radius; Android typography guarantee; structured result hierarchy/copy; MIME fallback; error/timeout; availability cache refresh |
 | Account and information screens | Partial | Android legal mailto links; Android return-tab behavior; responsive footer; dynamic year; About emphasis; no-mail-handler fallback |
 
@@ -165,27 +167,31 @@ The following are **confirmed implementation differences in the inspected source
 - **Native:** iOS uses 16pt horizontal padding and an unconstrained scroll area; message/recommendation content is capped at 520pt rather than using the web panel/bubble geometry. Evidence: `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:151-180,193-235,275-283`.
 - **Web reference:** The audit identifies a web panel/bubble geometry contract (including a 48rem panel and max-height behavior) that has no shared native equivalent; exact web lines should be rechecked during implementation because the supplied audit did not repeat them in this gap entry.
 - **Recommended action:** Implement the web geometry contract natively where responsive parity is required, or document mobile-specific geometry and validate narrow, tablet, and wide screenshots.
+- **Current status:** Android and iOS source now cap the Assistant surface at 768dp/pt, bound the conversation panel to 68% of screen height with a 320dp minimum, size bubbles to 96% on narrow screens/90% at wide breakpoints, and nest recommendations in assistant response bubbles. Native build and screenshot validation remain pending.
 
 #### P1 — Typography / Outfit scale
 
 - **Native:** Android applies bundled Outfit through Material typography. iOS AssistantChat uses SwiftUI system styles (`.title2`, `.body`, `.caption`, `.footnote`) rather than the explicit Outfit custom fonts used elsewhere. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt:13-18,56-73`; `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:157,186-190,228,247,257-265`; comparison: `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:38-40`.
 - **Recommended action:** Use Outfit and explicit assistant scale/weights in iOS, then validate Dynamic Type against web/Android.
+- **Current status:** iOS heading and message content now use registered Outfit faces with responsive heading sizing; empty-state and recommendation-card labels still use some system text styles. Dynamic Type/accessibility runtime validation remains.
 
 #### P1 — Pending and cancellation states
 
 - **Native:** Android exposes Thinking/Stop but `AssistantScreen` calls `NativeAiClient.run` without passing a `RequestHandle`; the handle is the mechanism that disconnects `HttpURLConnection`. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt:155-187,248-253`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/NativeAiClient.kt:25-41,67-71`.
 - **Native:** iOS shows ProgressView and Thinking but no in-screen Stop; it cancels on disappear/new chat. Evidence: `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:227-231,285-289,349-384`.
 - **Recommended action:** Pass the Android request handle through execution and add an accessible iOS Stop control with non-error cancellation semantics matching web.
+- **Current status:** Android Stop cancels both the `RequestHandle` and coroutine; route disposal cancels active work. iOS exposes Stop and cancels its task on stop/disappear. New chat is available while sending and aborts/resets the current conversation.
 
-#### P2 — New-chat interaction semantics
+#### P2 — New-chat interaction semantics — resolved in source
 
-- **Native:** Android and iOS disable New chat when messages are empty or sending. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt:210-218`; `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:160-164`.
-- **Recommended action:** Either match native guards on web or allow busy/empty reset consistently and test cancellation/reset behavior.
+- **Web/native contract:** New chat remains available when empty and while a request is running; it cancels any active request and clears messages, draft, retry, and error state.
+- **Current status:** Android, iOS, and Web use this behavior in source. Device-level cancellation/race testing remains pending.
 
 #### P2 — Prompt/input semantics and composer presentation
 
 - **Native:** Android and iOS omit `enV` from the placeholder. Android uses 1–4 lines and a text `Send`; iOS uses a 1–4-line TextField and arrow/hourglass icon. Native specifies IME/onSubmit send but no web-equivalent Shift+Enter rule. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt:266-279`; `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:256-273`.
 - **Recommended action:** Align copy and send affordance semantics or define platform-specific rules; test Enter, Shift+Enter, IME send, trimming, 3,000-character truncation, and busy disablement.
+- **Current status:** Android and iOS composer prompts now match the web's enV-branded copy; the native button/icon affordances remain platform-specific. Shift+Enter and runtime IME behavior still need device checks.
 
 #### P1 — Error normalization and timeout behavior
 
@@ -197,17 +203,20 @@ The following are **confirmed implementation differences in the inspected source
 
 - **Web/native difference:** Web has explicit ARIA attributes; iOS enables `textSelection`; Android has no equivalent selectable modifier in the inspected assistant source. Neither native source adds a conversation log/live-region equivalent. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt:221-255`; `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:181-191`.
 - **Recommended action:** Add native announcements/collection semantics for new replies and copy/select support on Android; verify TalkBack/VoiceOver and icon-only labels.
+- **Current status:** Android message text is selectable and the conversation uses a polite live region; iOS text selection and VoiceOver update traits are present. TalkBack/VoiceOver behavior must still be exercised on devices.
 
 #### P2 — Conversation retention/persistence
 
 - **Native:** Android owns assistant messages at EnVApp level; iOS owns them at RootTabView level, preserving them while switching tabs during app lifetime. Neither cited owner uses durable storage. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:210-229,281`; `/home/ubuntu/enV/apps/ios/enV/enVApp.swift:62-80`.
 - **Web:** Web state is screen-component-level and no local/session storage is cited. Evidence: `/home/ubuntu/enV/src/routes/assistant.tsx:1-189`.
 - **Recommended action:** Define retention explicitly; lift web state to a shared store if tab-return retention is canonical, or reset native state on equivalent navigation.
+- **Current status:** The Web provider is above the route outlet; Android owns conversation/draft at app root and iOS owns both at tab root. State is retained in memory only, consistently; durable persistence is not added.
 
 #### P2 — Recommendation response structure
 
 - **Native:** Android/iOS render recommendation cards outside the assistant message bubble as separate full-width-ish cards. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt:232-246,286-300`; `/home/ubuntu/enV/apps/ios/enV/AssistantChat.swift:199-219`.
 - **Recommended action:** Align recommendation nesting/card grouping or document the native separate-card treatment and validate long descriptions/wide screens.
+- **Current status:** Android now nests recommended tools in the assistant response bubble and lays them out in a 1/2-column grid; iOS also nests the cards in the reply bubble. Native screenshots still need to confirm long descriptions and wide-screen behavior.
 
 ### 5. Contextual AI assist — partial parity
 

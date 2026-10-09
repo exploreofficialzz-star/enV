@@ -34,6 +34,7 @@ private struct AssistantRunRequest: Encodable {
 
 private struct AssistantServiceError: Decodable {
     let message: String
+    let retryable: Bool?
 }
 
 private struct AssistantReply: Decodable {
@@ -55,7 +56,6 @@ private enum AssistantClientError: LocalizedError {
     case missingServer
     case unavailable(String)
     case invalidReply
-
     var errorDescription: String? {
         switch self {
         case .missingServer: return "Assistant is unavailable in this build."
@@ -116,8 +116,8 @@ private enum NativeAssistantClient {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AssistantClientError.invalidReply }
         guard (200...299).contains(http.statusCode) else {
-            let message = (try? JSONDecoder().decode(AssistantRunEnvelope.self, from: data).error?.message)
-                ?? "The assistant is temporarily unavailable. Please try again."
+            let serviceError = try? JSONDecoder().decode(AssistantRunEnvelope.self, from: data).error
+            let message = serviceError?.message ?? "The assistant is temporarily unavailable. Please try again."
             throw AssistantClientError.unavailable(message)
         }
         return data
@@ -128,7 +128,7 @@ struct AssistantChatView: View {
     @EnvironmentObject private var store: CatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Binding var messages: [AssistantChatMessage]
-    @State private var draft = ""
+    @Binding var draft: String
     @State private var isSending = false
     @State private var errorMessage: String?
     @State private var retryRequest: PendingAssistantRequest?
@@ -161,7 +161,6 @@ struct AssistantChatView: View {
                     Button(action: startNewChat) {
                         Label("New chat", systemImage: "square.and.pencil").font(.footnote.weight(.medium))
                     }
-                    .disabled(messages.isEmpty || isSending)
                 }
 
                 ScrollViewReader { proxy in
@@ -180,46 +179,48 @@ struct AssistantChatView: View {
                                 .padding(.vertical, 32)
                             } else {
                                 ForEach(messages) { message in
-                                    VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-                                        HStack {
-                                            if message.isUser { Spacer(minLength: 28) }
+                                    HStack {
+                                        if message.isUser { Spacer(minLength: 28) }
+                                        VStack(alignment: .leading, spacing: 8) {
                                             VStack(alignment: .leading, spacing: 5) {
                                                 Text(message.isUser ? "You" : "enV")
-                                                .font(.custom("Outfit-SemiBold", size: 12)).foregroundStyle(Color.envMuted)
+                                                    .font(.custom("Outfit-SemiBold", size: 12)).foregroundStyle(Color.envMuted)
                                                 Text(message.content)
                                                     .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk)
                                                     .textSelection(.enabled)
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
-                                            .padding(12)
-                                            .frame(maxWidth: 520, alignment: .leading)
-                                            .background(message.isUser ? Color.envAccentSoft : Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-                                            if !message.isUser { Spacer(minLength: 28) }
-                                        }
-                                        if !message.isUser {
-                                            ForEach(message.recommendedToolIds, id: \.self) { toolId in
-                                                if let tool = store.catalog.tools.first(where: { $0.id == toolId && ($0.status == "active" || $0.status == "beta") }) {
-                                                    NavigationLink(value: tool) {
-                                                        HStack(spacing: 10) {
-                                                            EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
-                                                            VStack(alignment: .leading, spacing: 3) {
-                                                                Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                                                                Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                            if !message.isUser && !message.recommendedToolIds.isEmpty {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    ForEach(message.recommendedToolIds, id: \.self) { toolId in
+                                                        if let tool = store.catalog.tools.first(where: { $0.id == toolId && ($0.status == "active" || $0.status == "beta") }) {
+                                                            NavigationLink(value: tool) {
+                                                                HStack(spacing: 10) {
+                                                                    EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
+                                                                    VStack(alignment: .leading, spacing: 3) {
+                                                                        Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                                                        Text(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                                                    }
+                                                                    Spacer(minLength: 4)
+                                                                    Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                                                }
+                                                                .padding(12)
+                                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 14))
+                                                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
                                                             }
-                                                            Spacer(minLength: 4)
-                                                            Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                                            .buttonStyle(.plain)
                                                         }
-                                                        .padding(12)
-                                                        .frame(maxWidth: 520, alignment: .leading)
-                                                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
-                                                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
                                                     }
-                                                    .buttonStyle(.plain)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
                                                 }
+                                                .padding(.top, 6)
                                             }
                                         }
+                                        .padding(12)
+                                        .frame(maxWidth: UIScreen.main.bounds.width * (horizontalSizeClass == .regular ? 0.9 : 0.96), alignment: .leading)
+                                        .background(message.isUser ? Color.envAccentSoft : Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                                        if !message.isUser { Spacer(minLength: 28) }
                                     }
                                     .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
                                     .id(message.id)
@@ -248,6 +249,13 @@ struct AssistantChatView: View {
                     }
                 }
                 .frame(maxHeight: .infinity)
+                .frame(minHeight: 320, maxHeight: UIScreen.main.bounds.height * 0.68)
+                .padding(16)
+                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Assistant conversation")
+                .accessibilityAddTraits(.updatesFrequently)
 
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
@@ -258,6 +266,8 @@ struct AssistantChatView: View {
                     }
                     .padding(12)
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.updatesFrequently)
                 }
 
                 HStack(alignment: .bottom, spacing: 10) {
@@ -283,6 +293,8 @@ struct AssistantChatView: View {
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 8)
+            .frame(maxWidth: 768)
+            .frame(maxWidth: .infinity)
             .background(Color.envSurface.ignoresSafeArea())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

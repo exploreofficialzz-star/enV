@@ -14,11 +14,14 @@ const ios = resolve(root, "apps/ios/enV/ToolViews.swift");
 const iosAssistant = resolve(root, "apps/ios/enV/AssistantChat.swift");
 const iosHome = resolve(root, "apps/ios/enV/ContentViews.swift");
 const webAssistant = resolve(root, "src/routes/assistant.tsx");
+const webAssistantState = resolve(root, "src/components/assistant/assistant-state.tsx");
+const webRoot = resolve(root, "src/routes/__root.tsx");
+const iosRoot = resolve(root, "apps/ios/enV/enVApp.swift");
 const webHome = resolve(root, "src/routes/index.tsx");
 const backendAssistant = resolve(root, "src/lib/ai/server/tasks/assistant.ts");
 
 const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode = 1; };
-for (const path of [catalogPath, featurePath, android, androidClient, androidAssist, androidAssistant, androidActivity, ios, iosAssistant, iosHome, webAssistant, webHome, backendAssistant]) {
+for (const path of [catalogPath, featurePath, android, androidClient, androidAssist, androidAssistant, androidActivity, ios, iosAssistant, iosHome, iosRoot, webAssistant, webAssistantState, webRoot, webHome, backendAssistant]) {
   if (!existsSync(path)) fail(`Missing required file: ${path}`);
 }
 if (process.exitCode) process.exit(1);
@@ -45,8 +48,12 @@ const androidAssistSource = readFileSync(androidAssist, "utf8");
 const androidAssistantSource = readFileSync(androidAssistant, "utf8");
 const androidActivitySource = readFileSync(androidActivity, "utf8");
 const iosSource = readFileSync(ios, "utf8");
+const iosHomeSource = readFileSync(iosHome, "utf8");
 const iosAssistantSource = readFileSync(iosAssistant, "utf8");
 const webAssistantSource = readFileSync(webAssistant, "utf8");
+const webAssistantStateSource = readFileSync(webAssistantState, "utf8");
+const webRootSource = readFileSync(webRoot, "utf8");
+const iosRootSource = readFileSync(iosRoot, "utf8");
 for (const id of unique) {
   if (!androidSource.includes(`"${id}"`)) fail(`Android native AI mapping missing: ${id}`);
   if (!iosSource.includes(`"${id}"`)) fail(`iOS native AI mapping missing: ${id}`);
@@ -81,12 +88,20 @@ for (const [label, text] of screens) {
 }
 if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.includes("onTool(tool.id)")) fail("Android assistant is missing catalog-backed, tappable tool recommendations");
 if (!iosAssistantSource.includes("candidates:") || !iosAssistantSource.includes("NavigationLink(value: tool)")) fail("iOS assistant is missing catalog-backed, tappable tool recommendations");
+if (!(iosAssistantSource.indexOf("if !message.isUser && !message.recommendedToolIds.isEmpty") < iosAssistantSource.indexOf(".background(message.isUser ? Color.envAccentSoft : Color.envCard"))) fail("iOS assistant recommendations must be grouped inside the assistant reply bubble");
 if (!androidAssistantSource.includes("activeRequestHandle?.cancel()") || !androidAssistantSource.includes('NativeAiClient.run(context, "assistant.chat", input, requestHandle)')) fail("Android assistant Stop does not cancel the active network request");
 if (!iosAssistantSource.includes('Button("Stop", action: stopRequest)') || !iosAssistantSource.includes("private func stopRequest()") || !iosAssistantSource.includes("activeRequest?.cancel()")) fail("iOS assistant Stop does not cancel the active task");
+if (!androidAssistantSource.includes("DisposableEffect(Unit)") || !androidAssistantSource.includes("activeRequestHandle?.cancel()")) fail("Android assistant does not cancel in-flight work when its route is disposed");
+if (!androidAssistantSource.includes("SelectionContainer") || !androidAssistantSource.includes("liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite")) fail("Android assistant messages need copy/select support and a live region");
+if (!iosAssistantSource.includes("accessibilityAddTraits(.updatesFrequently)")) fail("iOS assistant conversation is missing a VoiceOver update announcement");
+if (!androidActivitySource.includes("assistantDraft") || !iosRootSource.includes("assistantDraft") || !iosRootSource.includes("AssistantChatView(messages: $assistantMessages, draft: $assistantDraft)")) fail("Native Assistant conversation/draft state is not owned above the tab screen");
+if (!webRootSource.includes("<AssistantStateProvider><Outlet /></AssistantStateProvider>") || !webAssistantStateSource.includes("useState<ChatTurn[]>") || !webAssistantSource.includes("useAssistantState()")) fail("Web Assistant conversation state must be root-owned across route changes");
+if (!androidAssistantSource.includes('retry?.let { pending -> TextButton(onClick = { requestReply(pending) }') || !iosAssistantSource.includes("if let retryRequest")) fail("Native Retry visibility must match the web chat's any-error retry action");
 if (!iosAssistantSource.includes('Outfit-SemiBold", size: horizontalSizeClass == .regular ? 30 : 24')) fail("iOS assistant heading is missing responsive Outfit typography");
 if (!iosAssistantSource.includes('Outfit-Regular", size: 14')) fail("iOS assistant message text is missing Outfit typography");
 if (!iosAssistantSource.includes("Ask about enV tools or the enV brand…")) fail("iOS assistant composer prompt does not match the web prompt");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
+if (!androidActivitySource.includes("suggestions.firstOrNull()?.let { onTool(it.id) }") || !iosHomeSource.includes("homePath.append(first)")) fail("Home search submission must open the first ranked suggestion before global-search fallback");
 if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ detailStack = listOf(it) }")) fail("Android recommendation navigation is not wired to the native tool detail view");
 if (!androidAssistSource.includes("field.kind in setOf(AssistKind.TEXTAREA, AssistKind.IMAGE, AssistKind.AUDIO)") || !androidAssistSource.includes("Box(if (columns == 2 && !fullWidth) Modifier.weight(1f) else Modifier.fillMaxWidth())")) fail("Android contextual AI textarea/image/audio fields must span both columns on wide layouts");
 for (const [task, resultKind] of [["developer.regex.explain", "regex"], ["developer.sql.explain", "sql"], ["developer.json.explain", "json"], ["image.alt.generate", "alt-text"]]) {
@@ -101,7 +116,6 @@ for (const heading of ["Breakdown", "Watch out for", "Suggested examples (AI gue
 }
 
 const androidHome = androidActivitySource;
-const iosHomeSource = readFileSync(resolve(root, "apps/ios/enV/ContentViews.swift"), "utf8");
 const webHomeSource = readFileSync(webHome, "utf8");
 if (!androidHome.includes('HomePreviewBar("AI assistant"') || !androidHome.includes("onClick = onAssistant")) fail("Android Home assistant preview is not actionable");
 if (!iosHomeSource.includes('HomePreviewBar(title: "AI assistant", action: onAssistant)')) fail("iOS Home assistant preview is not actionable");

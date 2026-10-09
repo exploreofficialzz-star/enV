@@ -111,9 +111,10 @@ private val webSearchSynonyms = mapOf(
     "encode" to listOf("encoding", "base64"), "decode" to listOf("decoding"),
 )
 
-fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE): List<ToolRecord> {
+fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedReferences: Boolean = false): List<ToolRecord> {
     val q = query.trim().lowercase()
-    if (q.isEmpty()) return tools.sortedByDescending { it.popularity }.take(limit)
+    val candidates = if (includeRelatedReferences) tools + relatedReferenceTools else tools
+    if (q.isEmpty()) return candidates.sortedByDescending { it.popularity }.take(limit)
     val tokens = q.split(Regex("[^a-z0-9%+]+" )).filter { it.length > 1 || it == "%" }
     val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
     fun score(tool: ToolRecord): Int {
@@ -130,7 +131,7 @@ fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE): List<ToolRecor
         }
         return if (hits == 0) 0 else hits * 40 + tool.popularity
     }
-    return tools.map { it to score(it) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(limit).map { it.first }
+    return candidates.map { it to score(it) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(limit).map { it.first }
 }
 
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {
