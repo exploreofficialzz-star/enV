@@ -5,12 +5,12 @@
     "total": 10000,
     "active": 10000,
     "planned": 0,
-    "offlineNative": 7612,
+    "offlineNative": 7633,
     "backendNative": 1619,
-    "webOnly": 769,
-    "missingActive": 769,
+    "webOnly": 748,
+    "missingActive": 748,
     "divergentActive": 0,
-    "fullyExecutable": 9231
+    "fullyExecutable": 9252
   },
   "tools": [
     {
@@ -71272,8 +71272,8 @@
       "status": "active",
       "category": "files",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-size-converter",
@@ -71299,8 +71299,8 @@
       "status": "active",
       "category": "files",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "json-to-xml",
@@ -86428,8 +86428,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-csv-to-tsv-converter",
@@ -86437,8 +86437,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-csv-to-txt-converter",
@@ -86446,8 +86446,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "data-storage-comparison",
@@ -86878,8 +86878,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-jpg-to-png-converter",
@@ -86887,8 +86887,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-jpg-to-webp-converter",
@@ -86896,8 +86896,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-json-to-csv-converter",
@@ -86905,8 +86905,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-json-to-xml-converter",
@@ -86914,8 +86914,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-json-to-yaml-converter",
@@ -86923,8 +86923,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "length-comparison",
@@ -86977,8 +86977,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "mass-comparison",
@@ -87139,8 +87139,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-png-to-svg-helper",
@@ -87148,8 +87148,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-png-to-webp-converter",
@@ -87157,8 +87157,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "power-comparison",
@@ -87454,8 +87454,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-txt-to-csv-converter",
@@ -87463,8 +87463,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "volume-comparison",
@@ -87517,8 +87517,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-webp-to-png-converter",
@@ -87526,8 +87526,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "weight-converter",
@@ -87544,8 +87544,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "file-yaml-to-json-converter",
@@ -87553,8 +87553,8 @@
       "status": "active",
       "category": "converters",
       "engine": "file-converter",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "discord-aspect-ratio-helper",

@@ -138,6 +138,7 @@ enum NativeCoverage {
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
         case "ai": return NativeAiEngine.supports(tool.id)
+        case "file-converter": return NativeFileConverterEngine.supports(tool)
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
@@ -168,6 +169,7 @@ struct NativeFamilyToolView: View {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "file-converter": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1345,4 +1347,39 @@ private struct NativeBusinessToolView: View {
             NativeOutputView(output: output, error: error)
         }
     }
+}
+
+
+private struct NativeBinaryDocument: FileDocument {
+    static var readableContentTypes:[UTType] { [.data] }
+    let data:Data
+    init(data:Data){self.data=data}
+    init(configuration:ReadConfiguration)throws{data=configuration.file.regularFileContents ?? Data()}
+    func fileWrapper(configuration:WriteConfiguration)throws->FileWrapper{FileWrapper(regularFileWithContents:data)}
+}
+
+private struct NativeFileConverterToolView: View {
+    let tool:Tool
+    @State private var file:NativeBackendFile?
+    @State private var output:String=""
+    @State private var outputData:Data?
+    @State private var outputExt="txt"
+    @State private var error=""
+    @State private var importing=false
+    @State private var exporting=false
+    var body: some View {
+        VStack(alignment:.leading,spacing:12) {
+            Text("Native Swift · local file conversion").font(.subheadline.weight(.semibold))
+            Button(file == nil ? "Choose file" : file!.name) { importing=true }.buttonStyle(.bordered)
+            HStack { Button("Convert") { run() }.buttonStyle(.borderedProminent).disabled(file == nil); Button("Reset") { file=nil;output="";outputData=nil;error="" }.buttonStyle(.bordered) }
+            if !output.isEmpty { TextEditor(text:.constant(output)).frame(minHeight:150).textSelection(.enabled) }
+            if outputData != nil { Button("Save \(outputExt.uppercased())") { exporting=true }.buttonStyle(.bordered) }
+            if !error.isEmpty { Text(error).foregroundStyle(.red).font(.footnote) }
+        }
+        .fileImporter(isPresented:$importing,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
+            if case .success(let urls)=result,let url=urls.first { let access=url.startAccessingSecurityScopedResource(); defer{if access{url.stopAccessingSecurityScopedResource()}}; if let data=try? Data(contentsOf:url){file=NativeBackendFile(name:url.lastPathComponent,mimeType:UTType(filenameExtension:url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",data:data)} }
+        }
+        .fileExporter(isPresented:$exporting,document:outputData.map(NativeBinaryDocument.init),contentType:.data,defaultFilename:"env-\(tool.id).\(outputExt)") { result in if case .failure(let e)=result{error=e.localizedDescription} }
+    }
+    private func run(){ guard let file else{return}; do { let r=try NativeFileConverterEngine.run(tool,file:file);output=r.text ?? "";outputData=r.data;outputExt=r.ext;error="" } catch { output="";outputData=nil;error=error.localizedDescription } }
 }
