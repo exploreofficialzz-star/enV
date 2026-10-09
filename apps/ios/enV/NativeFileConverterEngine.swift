@@ -28,7 +28,9 @@ enum NativeFileConverterEngine {
         case "csv-to-tsv": return Result(rowsToCsv(parseCsv(input),separator:"\t"),nil,"text/tab-separated-values","tsv")
         case "tsv-to-csv": return Result(rowsToCsv(parseCsv(input,separator:"\t")),nil,"text/csv","csv")
         case "xml-to-json": return Result(try xmlToJson(input),nil,"application/json","json")
-        case "json-to-xml": return Result("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+try objectToXml(JSONSerialization.jsonObject(with:Data(input.utf8))),nil,"application/xml","xml")
+        case "json-to-xml":
+            let value = try JSONSerialization.jsonObject(with: Data(input.utf8))
+            return Result("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + objectToXml(value), nil, "application/xml", "xml")
         case "yaml-to-json": return Result(try JSONSerialization.data(withJSONObject:simpleYaml(input),options:.prettyPrinted).utf8String,nil,"application/json","json")
         case "json-to-yaml": return Result(jsonToYaml(try JSONSerialization.jsonObject(with:Data(input.utf8)))+"\n",nil,"text/yaml","yaml")
         case "txt-to-csv": return Result(rowsToCsv(input.split(whereSeparator:\.isNewline).map{[String($0)]}),nil,"text/csv","csv")

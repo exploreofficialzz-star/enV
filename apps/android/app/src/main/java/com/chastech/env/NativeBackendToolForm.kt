@@ -68,7 +68,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                 style = MaterialTheme.typography.bodySmall,
             )
             OutlinedButton(onClick = {
-                if (allowsMultipleDocuments) multiplePicker.launch("*/*")
+                if (allowsMultipleDocuments) multiplePicker.launch(arrayOf("*/*"))
                 else singlePicker.launch(DOCUMENT_MIME_TYPES)
             }) {
                 Text(when {
@@ -97,7 +97,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
         } else {
             Text("Native Kotlin · enV backend API", style = MaterialTheme.typography.labelLarge)
             if (backend || tool.engine.type in setOf("image", "video", "audio", "pdf", "file-converter", "mockup", "post") || tool.category.equals("screenshots", true)) {
-                OutlinedButton(onClick = { multiplePicker.launch("*/*") }) {
+                OutlinedButton(onClick = { multiplePicker.launch(arrayOf("*/*")) }) {
                     Text(if (files.isEmpty()) "Choose file(s)" else "Selected ${files.size} file(s)")
                 }
             }

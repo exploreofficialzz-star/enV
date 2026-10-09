@@ -31,7 +31,7 @@ enum NativeBusinessEngine {
         case "agenda", "meeting-agenda": return ["1. Welcome & objectives","2. \(s(options,"meetingGoal","Weekly planning"))","3. Progress updates","4. Decisions & blockers","5. Owners and next steps","6. Recap & close"].joined(separator:"\n")
         case "minutes", "meeting-minutes": return "Meeting: \(s(options,"meetingGoal","Weekly planning"))\nAttendees: \(s(options,"attendees","Team"))\n\nDecisions:\n- \n\nAction items:\n- Owner — Task — Due date\n\nNext meeting:"
         case "email-signature": return "\(s(options,"name","Alex Morgan")) | \(s(options,"role","Founder"))\n\(s(options,"email","hello@example.com"))\n\(s(options,"company","Your Business"))\nPhone: __________________\nWebsite: __________________"
-        default: throw NativeSimpleError.message("Unsupported business operation: \(operation)")
+        default: throw NSError(domain: "enV.NativeBusinessEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported business operation: \(operation)"])
         }
     }
 }
