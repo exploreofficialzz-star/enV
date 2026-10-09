@@ -218,7 +218,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
-    val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
+    val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -90,15 +89,76 @@ private object NativeAiAssistFeatures {
     private val tone = AssistField("tone", "Tone", AssistKind.SELECT, options = tones, default = "friendly")
     private val language = AssistField("language", "Language", AssistKind.SELECT, options = languages, default = "en")
     private val features: List<AssistFeature> = buildList {
-        fun caption(id: String, where: String) = AssistFeature(id, "Write captions with AI", "Get caption ideas for $where. The generator above keeps working without AI.", "Generate captions", "creator.caption.generate", listOf(topic, tone, language, AssistField("variants", "How many options?", AssistKind.NUMBER, min = 1, max = 5, default = "3"), AssistField("includeHashtags", "Include hashtags", AssistKind.CHECKBOX, default = true)))
-        fun title(id: String, where: String) = AssistFeature(id, "Get title ideas with AI", "Get title ideas for $where. The generator above keeps working without AI.", "Suggest titles", "creator.title.generate", listOf(topic, tone, language, AssistField("variants", "How many options?", AssistKind.NUMBER, min = 1, max = 8, default = "5")))
-        add(caption("instagram-caption-generator", "Instagram")); add(caption("tiktok-caption-generator", "TikTok")); add(caption("x-caption-generator", "X")); add(caption("youtube-caption-generator", "YouTube")); add(caption("linkedin-caption-generator", "LinkedIn")); add(caption("facebook-caption-generator", "Facebook")); add(caption("caption-generator", "social posts"))
-        add(title("youtube-title-generator", "YouTube videos")); add(title("tiktok-title-generator", "TikTok videos")); add(title("instagram-title-generator", "Instagram posts")); add(title("podcast-title-generator", "podcast episodes")); add(title("title-generator", "videos, posts and articles"))
-        add(AssistFeature("regex-tester", "Explain this regex with AI", "Get a plain-language explanation and common pitfalls. The explanation is AI-written and may be wrong, so confirm it with the tester above.", "Explain pattern", "developer.regex.explain", listOf(AssistField("pattern", "Pattern", AssistKind.TEXT, true, 1000, placeholder = "^[\\w.+-]+@[\\w-]+\\.[\\w.]+$", monospace = true, preserveWhitespace = true), AssistField("flags", "Flags", AssistKind.TEXT, maxLength = 8, placeholder = "gi", monospace = true), AssistField("sampleText", "Sample text (optional)", AssistKind.TEXTAREA, maxLength = 2000, preserveWhitespace = true)))
-        add(AssistFeature("sql-formatter", "Explain this SQL with AI", "Get a clause-by-clause explanation and risk warnings. The statement is never executed.", "Explain SQL", "developer.sql.explain", listOf(AssistField("sql", "SQL statement", AssistKind.TEXTAREA, true, 6000, monospace = true), AssistField("dialect", "Dialect", AssistKind.SELECT, options = listOf("generic", "postgresql", "mysql", "sqlite", "sqlserver").map { AssistOption(it, it.replaceFirstChar(Char::uppercase)) }, default = "generic")))
-        add(AssistFeature("json-validator", "Describe this JSON with AI", "Get a summary of the structure and likely issues. Secret-looking values are masked before sending, but avoid pasting real personal data.", "Describe JSON", "developer.json.explain", listOf(AssistField("json", "JSON", AssistKind.TEXTAREA, true, 20000, monospace = true), AssistField("goal", "Focus", AssistKind.SELECT, options = listOf(AssistOption("describe", "Describe"), AssistOption("find-issues", "Find issues")), default = "describe")), true, "I understand this JSON is sent to an external AI service."))
-        add(AssistFeature("alt-text-generator", "Write alt text from an image with AI", "Upload an image and get alt text plus a longer description. Large images are shrunk in your browser first. Review the result before publishing.", "Write alt text", "image.alt.generate", listOf(AssistField("image", "Image", AssistKind.IMAGE, true, accept = "image/jpeg,image/png,image/webp", help = "JPEG, PNG or WebP."), AssistField("context", "Page context (optional)", AssistKind.TEXT, maxLength = 300, placeholder = "Where will this image appear?"), AssistField("style", "Style", AssistKind.SELECT, options = listOf(AssistOption("concise", "Concise"), AssistOption("descriptive", "Descriptive")), default = "concise"), language), true, "I understand this image is sent to an external AI service."))
-        add(AssistFeature("video-audio-extractor", "Transcribe audio with AI", "Upload a short audio clip (up to about 2.8 MB) to get a transcript with timestamps. Longer recordings are not supported yet. Extract and compress the audio first.", "Transcribe", "video.transcript.generate", listOf(AssistField("audio", "Audio file", AssistKind.AUDIO, true, accept = "audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac", help = "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB."), AssistField("language", "Language code (optional)", AssistKind.TEXT, maxLength = 3, placeholder = "auto-detect", help = "Two letters, for example en or fr.")), true, "I understand this recording is sent to an external AI service."))
+        fun caption(id: String, where: String) = AssistFeature(
+            id, "Write captions with AI", "Get caption ideas for $where. The generator above keeps working without AI.",
+            "Generate captions", "creator.caption.generate",
+            listOf(topic, tone, language,
+                AssistField("variants", "How many options?", AssistKind.NUMBER, min = 1, max = 5, default = "3"),
+                AssistField("includeHashtags", "Include hashtags", AssistKind.CHECKBOX, default = true)),
+        )
+        fun title(id: String, where: String) = AssistFeature(
+            id, "Get title ideas with AI", "Get title ideas for $where. The generator above keeps working without AI.",
+            "Suggest titles", "creator.title.generate",
+            listOf(topic, tone, language, AssistField("variants", "How many options?", AssistKind.NUMBER, min = 1, max = 8, default = "5")),
+        )
+        add(caption("instagram-caption-generator", "Instagram"))
+        add(caption("tiktok-caption-generator", "TikTok"))
+        add(caption("x-caption-generator", "X"))
+        add(caption("youtube-caption-generator", "YouTube"))
+        add(caption("linkedin-caption-generator", "LinkedIn"))
+        add(caption("facebook-caption-generator", "Facebook"))
+        add(caption("caption-generator", "social posts"))
+        add(title("youtube-title-generator", "YouTube videos"))
+        add(title("tiktok-title-generator", "TikTok videos"))
+        add(title("instagram-title-generator", "Instagram posts"))
+        add(title("podcast-title-generator", "podcast episodes"))
+        add(title("title-generator", "videos, posts and articles"))
+        add(AssistFeature(
+            "regex-tester", "Explain this regex with AI", "Get a plain-language explanation and common pitfalls. The explanation is AI-written and may be wrong, so confirm it with the tester above.",
+            "Explain pattern", "developer.regex.explain",
+            listOf(
+                AssistField("pattern", "Pattern", AssistKind.TEXT, required = true, maxLength = 1000, placeholder = "^[\\w.+-]+@[\\w-]+\\.[\\w.]+$", monospace = true, preserveWhitespace = true),
+                AssistField("flags", "Flags", AssistKind.TEXT, maxLength = 8, placeholder = "gi", monospace = true),
+                AssistField("sampleText", "Sample text (optional)", AssistKind.TEXTAREA, maxLength = 2000, preserveWhitespace = true),
+            ),
+        ))
+        add(AssistFeature(
+            "sql-formatter", "Explain this SQL with AI", "Get a clause-by-clause explanation and risk warnings. The statement is never executed.",
+            "Explain SQL", "developer.sql.explain",
+            listOf(
+                AssistField("sql", "SQL statement", AssistKind.TEXTAREA, required = true, maxLength = 6000, monospace = true),
+                AssistField("dialect", "Dialect", AssistKind.SELECT, options = listOf("generic", "postgresql", "mysql", "sqlite", "sqlserver").map { AssistOption(it, it.replaceFirstChar(Char::uppercase)) }, default = "generic"),
+            ),
+        ))
+        add(AssistFeature(
+            "json-validator", "Describe this JSON with AI", "Get a summary of the structure and likely issues. Secret-looking values are masked before sending, but avoid pasting real personal data.",
+            "Describe JSON", "developer.json.explain",
+            listOf(
+                AssistField("json", "JSON", AssistKind.TEXTAREA, required = true, maxLength = 20000, monospace = true),
+                AssistField("goal", "Focus", AssistKind.SELECT, options = listOf(AssistOption("describe", "Describe"), AssistOption("find-issues", "Find issues")), default = "describe"),
+            ),
+            true, "I understand this JSON is sent to an external AI service.",
+        ))
+        add(AssistFeature(
+            "alt-text-generator", "Write alt text from an image with AI", "Upload an image and get alt text plus a longer description. Large images are shrunk in your browser first. Review the result before publishing.",
+            "Write alt text", "image.alt.generate",
+            listOf(
+                AssistField("image", "Image", AssistKind.IMAGE, required = true, accept = "image/jpeg,image/png,image/webp", help = "JPEG, PNG or WebP."),
+                AssistField("context", "Page context (optional)", AssistKind.TEXT, maxLength = 300, placeholder = "Where will this image appear?"),
+                AssistField("style", "Style", AssistKind.SELECT, options = listOf(AssistOption("concise", "Concise"), AssistOption("descriptive", "Descriptive")), default = "concise"),
+                language,
+            ),
+            true, "I understand this image is sent to an external AI service.",
+        ))
+        add(AssistFeature(
+            "video-audio-extractor", "Transcribe audio with AI", "Upload a short audio clip (up to about 2.8 MB) to get a transcript with timestamps. Longer recordings are not supported yet. Extract and compress the audio first.",
+            "Transcribe", "video.transcript.generate",
+            listOf(
+                AssistField("audio", "Audio file", AssistKind.AUDIO, required = true, accept = "audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac", help = "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB."),
+                AssistField("language", "Language code (optional)", AssistKind.TEXT, maxLength = 3, placeholder = "auto-detect", help = "Two letters, for example en or fr."),
+            ),
+            true, "I understand this recording is sent to an external AI service.",
+        ))
     }
     fun feature(toolId: String): AssistFeature? = features.firstOrNull { it.toolId == toolId }
     fun ids(): Set<String> = features.mapTo(linkedSetOf()) { it.toolId }
@@ -263,7 +323,7 @@ fun NativeAiAssistPanel(tool: ToolRecord) {
                 }
             }
             // Keep the inline first-fix validation identical to the browser's feature schema.
-            if (validation != null && !blocked) Text(validation, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            validation?.let { issue -> Text(issue, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

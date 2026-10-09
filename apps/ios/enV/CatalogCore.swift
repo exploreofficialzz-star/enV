@@ -7,6 +7,7 @@ struct Catalog: Decodable {
     let counts: CatalogCounts
     let categories: [ToolCategory]
     let tools: [Tool]
+    let relatedReferenceTools: [Tool]?
 }
 
 struct CatalogCounts: Codable {
@@ -154,6 +155,9 @@ extension Catalog {
         let nativeTools = tools
             .filter { !NativeCopy.isWebRuntimeOnly($0.id) }
             .map { $0.nativeFacing() }
+        let relatedReferences = (relatedReferenceTools ?? []) + tools
+            .filter { NativeCopy.isWebRuntimeOnly($0.id) }
+            .map { $0.nativeFacing() }
         let planned = nativeTools.filter(\.isPlanned).count
         let active = nativeTools.filter { !$0.isPlanned }.count
         return Catalog(
@@ -161,7 +165,8 @@ extension Catalog {
             catalogVersion: catalogVersion,
             counts: CatalogCounts(total: nativeTools.count, active: active, planned: planned, categories: categories.count),
             categories: categories.map { $0.nativeFacing() },
-            tools: nativeTools
+            tools: nativeTools,
+            relatedReferenceTools: relatedReferences
         )
     }
 }
@@ -225,11 +230,12 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
 extension Catalog {
     /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
-        let byID = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
+        let candidates = tools + (relatedReferenceTools ?? [])
+        let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
         let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
         if related.count >= limit { return Array(related.prefix(limit)) }
         let seen = Set([tool.id] + related.map(\.id))
-        let rest = tools
+        let rest = candidates
             .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned }
             .sorted {
                 let left = relatedAlphabeticalKey($0.name)
@@ -271,7 +277,7 @@ final class CatalogStore: ObservableObject {
 
     init(catalog: Catalog? = nil, bundle: Bundle = .main) {
         self.bundle = bundle
-        self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [])
+        self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [], relatedReferenceTools: nil)
         self.loadState = catalog == nil ? .loading : .ready
         self.favoriteIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
         if catalog == nil { reloadCatalog() }

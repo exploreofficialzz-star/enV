@@ -36,6 +36,7 @@ data class Catalog(
     val counts: CatalogCounts,
     val categories: List<Category>,
     val tools: List<ToolRecord>,
+    val relatedReferenceTools: List<ToolRecord> = emptyList(),
 ){
     companion object {}
 }
@@ -75,10 +76,12 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
     val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
     val toolsJson = root.optJSONArray("tools") ?: JSONArray()
     val categories = buildList(categoriesJson.length()) { for (i in 0 until categoriesJson.length()) add(categoriesJson.getJSONObject(i).toCategory()) }
-    val tools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) {
+    val allTools = buildList(toolsJson.length()) { for (i in 0 until toolsJson.length()) {
         val tool = toolsJson.getJSONObject(i).toToolRecord()
-        if (!NativeCopy.isWebRuntimeOnly(tool.id)) add(tool)
+        add(tool)
     } }
+    val tools = allTools.filterNot { NativeCopy.isWebRuntimeOnly(it.id) }
+    val relatedReferenceTools = allTools.filter { NativeCopy.isWebRuntimeOnly(it.id) }
     val planned = tools.count { it.status.equals("planned", ignoreCase = true) }
     val active = tools.count { it.status.equals("active", ignoreCase = true) }
     return Catalog(
@@ -91,6 +94,7 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
         ),
         categories = categories,
         tools = tools,
+        relatedReferenceTools = relatedReferenceTools,
     )
 }
 
@@ -142,11 +146,12 @@ private fun relatedAlphabeticalKey(value: String): String =
 
 /** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
-    val byId = tools.associateBy { it.id }
+    val relatedCandidates = tools + relatedReferenceTools
+    val byId = relatedCandidates.associateBy { it.id }
     val related = tool.related.mapNotNull(byId::get).filter { it.status != "planned" }
     if (related.size >= limit) return related.take(limit)
     val seen = (setOf(tool.id) + related.map { it.id })
-    val rest = tools.asSequence()
+    val rest = relatedCandidates.asSequence()
         .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
         .sortedWith(compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id }))
         .toList()
