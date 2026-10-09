@@ -10,7 +10,6 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let onSearch: (String) -> Void
     let onTools: () -> Void
     let onAccount: () -> Void
@@ -18,13 +17,11 @@ struct HomeView: View {
     @State private var searchText = ""
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var searchSuggestions: [Tool] { hasSearchText ? Array(store.tools(matching: searchText).prefix(8)) : [] }
+    private var searchSuggestions: [Tool] { hasSearchText ? store.catalog.webSearch(searchText, limit: 8) : [] }
     private var homeTools: [Tool] {
-        let limit = horizontalSizeClass == .regular ? 12 : 6
-        return store.tools()
+        store.catalog.webSearch("", limit: Int.max)
             .filter { $0.status == "active" || $0.status == "beta" }
-            .sorted { $0.popularity > $1.popularity }
-            .prefix(limit)
+            .prefix(12)
             .map { $0 }
     }
 
@@ -100,8 +97,10 @@ struct HomeView: View {
                         Text("Trending tools")
                             .font(.custom("Outfit-SemiBold", size: 20))
                             .foregroundStyle(Color.envAccent)
-                        ForEach(homeTools) { tool in
-                            WebHomeToolCard(tool: tool)
+                        ResponsiveToolGrid(home: true) { visibleLimit in
+                            ForEach(homeTools.prefix(visibleLimit)) { tool in
+                                DiscoveryToolCard(tool: tool)
+                            }
                         }
                         HStack {
                             Spacer()
@@ -132,7 +131,47 @@ struct HomeView: View {
 }
 
 
-private struct WebHomeToolCard: View {
+private struct ResponsiveToolGrid<Content: View>: View {
+    let home: Bool
+    let content: (Int) -> Content
+    @State private var width: CGFloat = 0
+
+    init(home: Bool, @ViewBuilder content: @escaping (Int) -> Content) {
+        self.home = home
+        self.content = content
+    }
+
+    private var columnCount: Int {
+        // The discovery grids live inside a 16-point inset on each side; use the
+        // corresponding viewport width for parity with the web breakpoints.
+        let viewportWidth = width + 32
+        if home {
+            return viewportWidth < 640 ? 1 : (viewportWidth < 768 ? 2 : 3)
+        }
+        return viewportWidth < 640 ? 1 : (viewportWidth < 1024 ? 2 : 3)
+    }
+
+    private var visibleLimit: Int { home && columnCount < 3 ? 6 : Int.max }
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount), spacing: 12) {
+            content(visibleLimit)
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ResponsiveGridWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(ResponsiveGridWidthKey.self) { width = $0 }
+    }
+}
+
+private struct ResponsiveGridWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private struct DiscoveryToolCard: View {
     let tool: Tool
     var body: some View {
         NavigationLink(value: tool) {
@@ -145,13 +184,14 @@ private struct WebHomeToolCard: View {
                 HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
-            .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
-            .opacity(tool.isPlanned ? 0.7 : 1)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(16)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
+        .opacity(tool.isPlanned ? 0.7 : 1)
     }
 }
 
@@ -212,9 +252,6 @@ struct ToolsView: View {
     @Binding var toolsQuery: String
     @State private var visibleByCategory: [String: Int] = [:]
 
-    private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 12), count: horizontalSizeClass == .compact ? 1 : 3)
-    }
     // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
     private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery) }
     private var categoryGroups: [ToolCategoryGroup] {
@@ -263,23 +300,26 @@ struct ToolsView: View {
                         ForEach(categoryGroups) { group in
                             let visibleCount = min(visibleByCategory[group.id] ?? 3, group.tools.count)
                             VStack(alignment: .leading, spacing: 16) {
-                                HStack(spacing: 10) {
-                                    EnVIcon(name: group.category.icon, size: 20, tint: .primary)
-                                        .frame(width: 40, height: 40)
-                                        .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        // Source guard contract: .font(.headline.weight(.bold)); .foregroundStyle(Color.envAccent)
-                                        Text(group.category.name)
-                                            .font(.custom("Outfit-Bold", size: 18))
-                                            .foregroundStyle(Color.envAccent)
-                                        Text(group.category.blurb)
-                                            .font(.custom("Outfit-Regular", size: 12))
-                                            .foregroundStyle(Color.envMuted)
-                                            .lineLimit(2)
+                                NavigationLink(value: group.category.id) {
+                                    HStack(spacing: 10) {
+                                        EnVIcon(name: group.category.icon, size: 20, tint: .primary)
+                                            .frame(width: 40, height: 40)
+                                            .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            // Source guard contract: .font(.headline.weight(.bold)); .foregroundStyle(Color.envAccent)
+                                            Text(group.category.name)
+                                                .font(.custom("Outfit-Bold", size: 18))
+                                                .foregroundStyle(Color.envAccent)
+                                            Text(group.category.blurb)
+                                                .font(.custom("Outfit-Regular", size: 12))
+                                                .foregroundStyle(Color.envMuted)
+                                                .lineLimit(2)
+                                        }
                                     }
                                 }
-                                LazyVGrid(columns: columns, spacing: 12) {
-                                    ForEach(group.tools.prefix(visibleCount)) { tool in WebHomeToolCard(tool: tool) }
+                                .buttonStyle(.plain)
+                                ResponsiveToolGrid(home: false) { _ in
+                                    ForEach(group.tools.prefix(visibleCount)) { tool in DiscoveryToolCard(tool: tool) }
                                 }
                                 if visibleCount < group.tools.count {
                                     HStack {
@@ -330,14 +370,31 @@ struct CategoryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 if let category = store.category(named: categoryID) {
-                    Text(category.description)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.envMuted)
+                    HStack(spacing: 12) {
+                        EnVIcon(name: category.icon, size: 20, tint: .primary)
+                            .frame(width: 44, height: 44)
+                            .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(category.name)
+                                .font(.custom("Outfit-Bold", size: 22))
+                                .foregroundStyle(Color.envAccent)
+                            Text(category.description)
+                                .font(.custom("Outfit-Regular", size: 14))
+                                .foregroundStyle(Color.envMuted)
+                        }
+                    }
                 }
                 if categoryTools.isEmpty {
-                    EmptyStateView(title: "No tools in this category", lucideIcon: "Folder", message: "Check back as the enV toolkit grows.")
+                    Text("No tools in this category yet.")
+                        .font(.custom("Outfit-Regular", size: 14))
+                        .foregroundStyle(Color.envMuted)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
                 } else {
-                    ToolList(tools: Array(categoryTools.prefix(visibleCount)))
+                    ResponsiveToolGrid(home: false) { _ in
+                        ForEach(categoryTools.prefix(visibleCount)) { tool in DiscoveryToolCard(tool: tool) }
+                    }
                 }
                 if visibleCount < categoryTools.count {
                     HStack {
@@ -383,40 +440,63 @@ struct SearchView: View {
 struct SearchResultsView: View {
     @EnvironmentObject private var store: CatalogStore
     @Binding var text: String
-    @State private var category: String?
+    @State private var visibleCount = 24
 
-    private var results: [Tool] { store.tools(matching: text, category: category) }
+    private var results: [Tool] { store.catalog.webSearch(text, limit: Int.max) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Category", selection: $category) {
-                Text("All categories").tag(String?.none)
-                ForEach(store.categories) { Text($0.name).tag(Optional($0.id)) }
-            }
-            .pickerStyle(.menu)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if results.isEmpty {
-                EmptyStateView(title: "No tools found", lucideIcon: "Search", message: "Try another name, keyword, tag, or category.")
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("\(results.count) results")
-                            .font(.caption)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Start typing to see matching tools.")
+                        .font(.custom("Outfit-Regular", size: 14))
+                        .foregroundStyle(Color.envMuted)
+                        .padding(.top, 16)
+                } else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Results for “\(text)”")
+                            .font(.custom("Outfit-SemiBold", size: 20))
+                            .foregroundStyle(Color.envInk)
+                        Text("\(results.count) matching tools")
+                            .font(.custom("Outfit-Regular", size: 14))
                             .foregroundStyle(Color.envMuted)
-                            .padding(.horizontal, 16)
-                        ToolList(tools: results).padding(.horizontal, 16)
                     }
-                    .padding(.vertical, 8)
+                    if results.isEmpty {
+                        Text("No matching tools. Try a broader word such as “image”, “video”, or “calculator”.")
+                            .font(.custom("Outfit-Regular", size: 14))
+                            .foregroundStyle(Color.envMuted)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        ResponsiveToolGrid(home: false) { _ in
+                            ForEach(results.prefix(visibleCount)) { tool in DiscoveryToolCard(tool: tool) }
+                        }
+                        if visibleCount < results.count {
+                            Button {
+                                visibleCount = min(visibleCount + 24, results.count)
+                            } label: {
+                                Text("See more results")
+                                    .font(.custom("Outfit-SemiBold", size: 14))
+                                    .foregroundStyle(Color.envAccent)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
+            .padding(16)
         }
         .modifier(Screen())
         .searchable(text: $text, prompt: "Search names, descriptions, keywords, tags")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+        .onChange(of: text) { _ in visibleCount = 24 }
     }
 }
 

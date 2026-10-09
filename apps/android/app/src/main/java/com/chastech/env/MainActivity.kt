@@ -260,8 +260,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 when (currentTab) {
                     AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { tab = AppTab.Account.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
                     AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
-                    AppTab.Tools -> ToolsScreen(catalog, category, favoriteIds, query, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Search -> SearchScreen(catalog, query, category, favoriteIds, { query = it }, { category = it }, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
+                    AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { selectedId = it })
+                    AppTab.Search -> SearchScreen(catalog, query, { query = it }, { selectedId = it })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Account -> when {
                         showExchange -> ContactExchangeScreen { showExchange = false }
@@ -282,15 +282,15 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 
 @Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onAccount: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
-    val showDesktopHome = LocalConfiguration.current.screenWidthDp >= 600
-    val trending = remember(catalog, showDesktopHome) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
+    val trending = remember(catalog, screenWidth) {
         catalog.tools.filter { it.status == "active" || it.status == "beta" }
             .sortedByDescending { it.popularity }
             .take(12)
-            .take(if (showDesktopHome) 12 else 6)
+            .take(if (screenWidth >= 768) 12 else 6)
     }
-    // SearchBox source contract: catalog.search(query).take(5) was the previous native guard marker; the web source currently renders eight results.
-    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.search(query).take(8) }
+    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.webSearch(query).take(8) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
@@ -345,7 +345,12 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionTitle("Trending tools", accent = true)
-                trending.forEach { tool -> WebHomeToolCard(tool, onTool) }
+                trending.chunked(homeColumns).forEach { rowTools ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        rowTools.forEach { tool -> WebHomeToolCard(tool, onTool, Modifier.weight(1f)) }
+                        repeat(homeColumns - rowTools.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
                 TextButton(onClick = onTools, modifier = Modifier.align(Alignment.End)) {
                     Text("See more tools", color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
@@ -358,9 +363,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
 }
 
 @Composable
-private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit) {
+private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
-    Card(Modifier.fillMaxWidth().shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).clickable { onTool(tool.id) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = shape, elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+    Card(modifier.fillMaxWidth().shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).clickable { onTool(tool.id) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = shape, elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.padding(16.dp).fillMaxWidth()) {
             Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                 Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
@@ -404,10 +409,14 @@ private fun WebHomeFooter(catalog: Catalog, onAccount: () -> Unit) {
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
+private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit) {
+    if (category != null) {
+        CategoryScreen(catalog, category, { onCategory(null) }, onTool)
+        return
+    }
     val visibleCounts = remember { mutableStateMapOf<String, Int>() }
     val screenWidth = LocalConfiguration.current.screenWidthDp
-    val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 600 -> 2; else -> 1 }
+    val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val groupedTools = remember(catalog, query) {
         val byCategory = catalog.webSearch(query).groupBy { it.category }
         catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
@@ -421,7 +430,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 600) 288.dp else (screenWidth * 0.52f).dp))
+                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp))
                 }
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -438,7 +447,11 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
                 val tools = group.second
                 val visible = minOf(visibleCounts[groupCategory.id] ?: 3, tools.size)
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().clickable { onCategory(groupCategory.id) },
+                    ) {
                         Surface(Modifier.size(40.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
                             Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
                         }
@@ -458,6 +471,64 @@ private fun ToolsScreen(catalog: Catalog, category: String?, favorites: Set<Stri
                         WebSeeMoreToolsButton { visibleCounts[groupCategory.id] = minOf(visible + 6, tools.size) }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> Unit, onTool: (String) -> Unit) {
+    val category = catalog.categories.find { it.id == categoryId }
+    val tools = remember(catalog, categoryId) {
+        catalog.tools.filter { it.category == categoryId }
+            .sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name })
+    }
+    var visibleCount by rememberSaveable(categoryId) { mutableIntStateOf(6) }
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back to all tools" }) {
+                    EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                Surface(Modifier.size(44.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
+                    Box(contentAlignment = Alignment.Center) { EnVIcon(category?.icon ?: "Folder", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
+                }
+                Column(Modifier.padding(start = 4.dp)) {
+                    Text(category?.name ?: categoryId, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(category?.description ?: "Tools in this category.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (tools.isEmpty()) {
+            item {
+                Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
+                    Text("No tools in this category yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
+                }
+            }
+        } else {
+            item { ToolGrid(tools.take(visibleCount), columns, onTool) }
+            if (visibleCount < tools.size) {
+                item {
+                    WebSeeMoreToolsButton { visibleCount = minOf(visibleCount + 6, tools.size) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolGrid(tools: List<ToolRecord>, columns: Int, onTool: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        tools.chunked(columns).forEach { rowTools ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowTools.forEach { tool -> WebToolsCard(tool, onTool, Modifier.weight(1f)) }
+                repeat(columns - rowTools.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -500,14 +571,44 @@ private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun SearchScreen(catalog: Catalog, query: String, category: String?, favorites: Set<String>, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        Text("Search", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-        SearchBox(query, onQuery, "Search names, descriptions, tags")
-        CategoryGrid(catalog, category, onCategory, compact = true)
-        val results = catalog.search(query, category)
-        Text("${results.size} results", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-        ToolList(results, favorites, onTool, onToggleFavorite, Modifier.weight(1f), "Try a different search or category")
+private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, onTool: (String) -> Unit) {
+    var visibleCount by rememberSaveable { mutableIntStateOf(24) }
+    LaunchedEffect(query) { visibleCount = 24 }
+    val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query) }
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item {
+            Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            SearchBox(query, onQuery, "Search names, descriptions, tags")
+        }
+        if (query.trim().isEmpty()) {
+            item { Text("Start typing to see matching tools.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            item {
+                Text("Results for “$query”", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text("${results.size} matching tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            }
+            if (results.isEmpty()) {
+                item {
+                    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
+                        Text("No matching tools. Try a broader word such as “image”, “video”, or “calculator”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
+                    }
+                }
+            } else {
+                item { ToolGrid(results.take(visibleCount), columns, onTool) }
+                if (visibleCount < results.size) {
+                    item {
+                        OutlinedButton(onClick = { visibleCount = minOf(visibleCount + 24, results.size) }) { Text("See more results") }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -668,7 +769,6 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
             }
         }
         val backend = nativeBackendSupported(tool)
-        val supported = nativeSupported(tool)
         if (tool.status == "planned" && !supported && !backend) StatusPill("Coming soon")
         else if (tool.status != "planned" && !supported && !backend) StatusPill("Web only")
         Text(tool.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1183,7 +1283,7 @@ private fun ToolList(tools: List<ToolRecord>, favorites: Set<String>, onTool: (S
 
 @Composable
 private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+    Card(Modifier.fillMaxWidth().alpha(if (tool.status == "planned") 0.7f else 1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Row(Modifier.weight(1f).clickable { onTool(tool.id) }, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
@@ -1194,8 +1294,8 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                     Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (tool.status == "planned") {
                         StatusPill("Coming soon", Modifier.padding(top = 10.dp))
-                    } else if (tool.clientSide && !tool.requiresBackend) {
-                        StatusPill("On device", Modifier.padding(top = 10.dp))
+                    } else if (tool.clientSide) {
+                        StatusPill("IN-BROWSER", Modifier.padding(top = 10.dp))
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
                         EnVIcon("ArrowRight", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)

@@ -83,6 +83,7 @@ struct Tool: Decodable, Identifiable, Hashable {
     let slug: String
     let description: String
     let category: String
+    let subcategory: String?
     let keywords: [String]
     let tags: [String]
     let icon: String
@@ -97,7 +98,7 @@ struct Tool: Decodable, Identifiable, Hashable {
 
     var isPlanned: Bool { status.lowercased() == "planned" }
     var searchText: String {
-        ([id, slug, name, description, category, keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
+        ([id, slug, name, description, category, subcategory ?? "", keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
     }
 
     func nativeFacing() -> Tool {
@@ -107,6 +108,7 @@ struct Tool: Decodable, Identifiable, Hashable {
             slug: slug,
             description: NativeCopy.text(description),
             category: category,
+            subcategory: subcategory,
             keywords: keywords,
             tags: tags,
             icon: icon,
@@ -155,7 +157,11 @@ extension Catalog {
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if q.isEmpty { return Array(tools.sorted { $0.popularity > $1.popularity }.prefix(limit)) }
+        if q.isEmpty {
+            return Array(tools.enumerated().sorted {
+                $0.element.popularity == $1.element.popularity ? $0.offset < $1.offset : $0.element.popularity > $1.element.popularity
+            }.prefix(limit).map { $0.element })
+        }
         let synonyms: [String: [String]] = [
             "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
             "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "resize": ["scale", "dimensions", "size"],
@@ -165,14 +171,16 @@ extension Catalog {
             "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"], "pdf": ["document"],
             "encode": ["encoding", "base64"], "decode": ["decoding"],
         ]
-        let tokens = q.split { character in !(character.isLetter || character.isNumber || character == "%" || character == "+") }.map(String.init).filter { $0.count > 1 || $0 == "%" }
+        let tokens = q.unicodeScalars.split { scalar in
+            !((scalar.value >= 97 && scalar.value <= 122) || (scalar.value >= 48 && scalar.value <= 57) || scalar.value == 37 || scalar.value == 43)
+        }.map { String($0) }.filter { $0.count > 1 || $0 == "%" }
         let expanded = Set(tokens + tokens.flatMap { synonyms[$0] ?? [] })
         func score(_ tool: Tool) -> Int {
             let name = tool.name.lowercased()
             if name == q || tool.id == q { return 2000 + tool.popularity }
             if name.hasPrefix(q) { return 1400 + tool.popularity }
             if tool.id.contains(q) || name.contains(q) { return 1000 + tool.popularity }
-            let haystack = ([tool.name, tool.description, tool.category, tool.id, tool.slug] + tool.keywords + tool.tags).joined(separator: " ").lowercased()
+            let haystack = ([tool.name, tool.description, tool.category, tool.subcategory ?? "", tool.id] + tool.keywords + tool.tags).joined(separator: " ").lowercased()
             var hits = 0
             for token in expanded {
                 if name.contains(token) { hits += 8 }
@@ -181,7 +189,9 @@ extension Catalog {
             }
             return hits == 0 ? 0 : hits * 40 + tool.popularity
         }
-        return Array(tools.map { ($0, score($0)) }.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.prefix(limit).map { $0.0 })
+        return Array(tools.enumerated().map { ($0.offset, $0.element, score($0.element)) }.filter { $0.2 > 0 }.sorted {
+            $0.2 == $1.2 ? $0.0 < $1.0 : $0.2 > $1.2
+        }.prefix(limit).map { $0.1 })
     }
 }
 

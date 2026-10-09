@@ -3,9 +3,9 @@ import XCTest
 
 final class CatalogCoreTests: XCTestCase {
     private let catalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 2, planned: 1, categories: 1), categories: [ToolCategory(id: "text", name: "Text", description: "Text tools", blurb: "Text", icon: "Type")], tools: [
-        Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
-        Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
-        Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Planned tool", category: "text", keywords: ["future"], tags: [], icon: "Wand2", popularity: 100, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
+        Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", subcategory: nil, keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
+        Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", subcategory: nil, keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
+        Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Planned tool", category: "text", subcategory: nil, keywords: ["future"], tags: [], icon: "Wand2", popularity: 100, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
     ])
 
     override func setUp() {
@@ -24,6 +24,12 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(store.tools(matching: "uppercase").first?.id, "case-converter")
         XCTAssertEqual(store.tools(matching: "writing").first?.id, "word-count")
         XCTAssertEqual(store.tools(matching: "case-converter").first?.id, "case-converter")
+    }
+
+    func testWebSearchUsesExactAndSynonymRankedMatches() {
+        XCTAssertEqual(catalog.webSearch("case-converter").first?.id, "case-converter")
+        XCTAssertEqual(catalog.webSearch("words").first?.id, "word-count")
+        XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
     }
 
     func testToolEnginePreservesUnknownConfigurationValues() throws {

@@ -24,6 +24,7 @@ data class ToolRecord(
     val status: String,
     val related: List<String>,
     val engine: EngineInfo,
+    val subcategory: String? = null,
 )
 
 data class Catalog(
@@ -56,6 +57,7 @@ fun JSONObject.toToolRecord(): ToolRecord {
     return ToolRecord(
         id = stringOrEmpty("id"), name = stringOrEmpty("name"), slug = stringOrEmpty("slug"),
         description = NativeCopy.text(stringOrEmpty("description")), category = stringOrEmpty("category"),
+        subcategory = optString("subcategory").takeIf { it.isNotBlank() },
         keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
@@ -108,7 +110,7 @@ fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE): List<ToolRecor
         if (name == q || tool.id == q) return 2000 + tool.popularity
         if (name.startsWith(q)) return 1400 + tool.popularity
         if (tool.id.contains(q) || name.contains(q)) return 1000 + tool.popularity
-        val hay = listOf(tool.name, tool.description, tool.category, tool.id, tool.slug).plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase()
+        val hay = listOf(tool.name, tool.description, tool.category, tool.subcategory.orEmpty(), tool.id).plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase()
         var hits = 0
         expanded.forEach { token ->
             if (name.contains(token)) hits += 8
