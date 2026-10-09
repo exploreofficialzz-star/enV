@@ -81,6 +81,8 @@ for (const [label, text] of screens) {
 }
 if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.includes("onTool(tool.id)")) fail("Android assistant is missing catalog-backed, tappable tool recommendations");
 if (!iosAssistantSource.includes("candidates:") || !iosAssistantSource.includes("NavigationLink(value: tool)")) fail("iOS assistant is missing catalog-backed, tappable tool recommendations");
+if (!androidAssistantSource.includes("activeRequestHandle?.cancel()") || !androidAssistantSource.includes('NativeAiClient.run(context, "assistant.chat", input, requestHandle)')) fail("Android assistant Stop does not cancel the active network request");
+if (!iosAssistantSource.includes('Button("Stop", action: stopRequest)') || !iosAssistantSource.includes("private func stopRequest()") || !iosAssistantSource.includes("activeRequest?.cancel()")) fail("iOS assistant Stop does not cancel the active task");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ detailStack = listOf(it) }")) fail("Android recommendation navigation is not wired to the native tool detail view");
 

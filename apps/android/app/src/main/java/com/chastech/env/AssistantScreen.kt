@@ -136,6 +136,7 @@ internal fun AssistantScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf<PendingAssistantRequest?>(null) }
     var activeJob by remember { mutableStateOf<Job?>(null) }
+    var activeRequestHandle by remember { mutableStateOf<NativeAiClient.RequestHandle?>(null) }
 
     LaunchedEffect(messages.size, sending) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(if (sending) messages.size else messages.lastIndex)
@@ -153,7 +154,10 @@ internal fun AssistantScreen(
     }
 
     fun requestReply(request: PendingAssistantRequest) {
+        activeRequestHandle?.cancel()
         activeJob?.cancel()
+        val requestHandle = NativeAiClient.RequestHandle()
+        activeRequestHandle = requestHandle
         sending = true
         errorMessage = null
         retry = request
@@ -169,7 +173,7 @@ internal fun AssistantScreen(
                         }
                     })
                 }
-                val response = NativeAiClient.run(context, "assistant.chat", input)
+                val response = NativeAiClient.run(context, "assistant.chat", input, requestHandle)
                 val reply = response.optString("reply").trim()
                 if (reply.isBlank()) throw NativeAiClient.AiError("AI_PROVIDER_BAD_RESPONSE", "The assistant returned an empty reply.", true)
                 val candidateIds = request.candidates.mapTo(mutableSetOf()) { it.id }
@@ -181,8 +185,11 @@ internal fun AssistantScreen(
             } catch (failure: Exception) {
                 errorMessage = failure.message ?: "The assistant could not respond. Please try again."
             } finally {
-                sending = false
-                activeJob = null
+                if (activeRequestHandle === requestHandle) {
+                    activeRequestHandle = null
+                    sending = false
+                    activeJob = null
+                }
             }
         }
     }
@@ -208,6 +215,8 @@ internal fun AssistantScreen(
                 Text("AI assistant", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             }
             TextButton(onClick = {
+                activeRequestHandle?.cancel()
+                activeRequestHandle = null
                 activeJob?.cancel()
                 activeJob = null
                 sending = false
@@ -249,7 +258,13 @@ internal fun AssistantScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     Text("Thinking…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = { activeJob?.cancel() }) { Text("Stop") }
+                    TextButton(onClick = {
+                        activeRequestHandle?.cancel()
+                        activeRequestHandle = null
+                        activeJob?.cancel()
+                        activeJob = null
+                        sending = false
+                    }) { Text("Stop") }
                 }
             }
         }

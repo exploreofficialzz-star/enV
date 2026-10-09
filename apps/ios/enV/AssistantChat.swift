@@ -225,7 +225,13 @@ struct AssistantChatView: View {
                                 }
                             }
                             if isSending {
-                                HStack(spacing: 8) { ProgressView(); Text("Thinking…").font(.footnote).foregroundStyle(Color.envMuted) }
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text("Thinking…").font(.footnote).foregroundStyle(Color.envMuted)
+                                    Button("Stop", action: stopRequest)
+                                        .font(.footnote.weight(.semibold))
+                                        .accessibilityLabel("Stop assistant response")
+                                }
                                     .padding(12)
                                     .id("assistant-thinking")
                             }
@@ -381,5 +387,11 @@ struct AssistantChatView: View {
         isSending = false
         errorMessage = nil
         retryRequest = nil
+    }
+
+    private func stopRequest() {
+        activeRequest?.cancel()
+        activeRequest = nil
+        isSending = false
     }
 }

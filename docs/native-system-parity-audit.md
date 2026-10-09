@@ -400,3 +400,8 @@ The following straightforward, source-confirmed issues have been fixed in the cu
 - Android and iOS native footers now derive the copyright year from the runtime calendar rather than hard-coding 2026.
 
 These code changes still require native CI confirmation. Remaining screen audit items listed earlier remain open; these changes do not establish overall parity.
+
+
+### Follow-up: Assistant cancellation
+
+Android Assistant now passes its `NativeAiClient.RequestHandle` to the active network call and its Stop/New chat actions disconnect the HTTP request before cancelling coroutine UI state. iOS now exposes an accessible `Stop assistant response` action that cancels the active Swift task. The `check:native-ai` guard verifies both platform Stop-to-cancel bindings. These changes are in the next pending commit and require authoritative native CI confirmation; other Assistant gaps (geometry, iOS Outfit scale, error normalization, and message accessibility/retention) remain open.
