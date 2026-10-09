@@ -50,7 +50,25 @@ object NativeFileConverterEngine {
     private fun xmlToJson(text:String):String { val root=Regex("<([A-Za-z_][\\w.-]*)[^>]*>([\\s\\S]*)</\\1>").find(text.trim()) ?: error("Invalid XML."); return JSONObject().put(root.groupValues[1],root.groupValues[2].replace(Regex("<[^>]+>"),"").trim()).toString(2) }
     private fun objectToXml(o:JSONObject,tag:String="root"):String { val b=StringBuilder("<$tag>");o.keys().forEach{key->val v=o.get(key);val safe=key.replace(Regex("[^A-Za-z0-9_.-]"),"_");if(v is JSONObject)b.append(objectToXml(v,safe)) else b.append("<$safe>${xmlEsc(v.toString())}</$safe>")};return b.append("</$tag>").toString() }
     private fun xmlEsc(s:String)=s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;")
-    private fun simpleYaml(text:String):String { val o=JSONObject();text.lines().forEach{val l=it.replace(Regex("\\s+#.*"),"").trim();if(l.isNotEmpty()&&!l.startsWith("#")&&l.contains(":")){val p=l.split(":",limit=2);val v=p[1].trim();o.put(p[0].trim(),when{v=="true"->true;v=="false"->false;v=="null"->JSONObject.NULL;v.matches(Regex("-?\\d+(\\.\\d+)?"))->v.toDouble();else->v.trim('"','\'')}}};return o.toString() }
+    private fun simpleYaml(text: String): String {
+        val output = JSONObject()
+        text.lines().forEach { raw ->
+            val line = raw.replace(Regex("\\s+#.*"), "").trim()
+            if (line.isNotEmpty() && !line.startsWith("#") && line.contains(":")) {
+                val parts = line.split(":", limit = 2)
+                val rawValue = parts[1].trim()
+                val value: Any = when {
+                    rawValue == "true" -> true
+                    rawValue == "false" -> false
+                    rawValue == "null" -> JSONObject.NULL
+                    rawValue.matches(Regex("-?\\d+(\\.\\d+)?")) -> rawValue.toDouble()
+                    else -> rawValue.trim('"', '\'')
+                }
+                output.put(parts[0].trim(), value)
+            }
+        }
+        return output.toString()
+    }
     private fun jsonToYaml(o:JSONObject,indent:String=""):String { val b=StringBuilder();o.keys().forEach{key->val v=o.get(key);b.append(indent).append(key).append(": ");if(v is JSONObject)b.append("\n").append(jsonToYaml(v,indent+"  ")) else b.append(if(v is String)"\"$v\"" else v).append("\n")};return b.toString().trimEnd() }
     private fun markdownToHtml(text:String)=buildString{append("<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Converted document</title></head><body>\n");text.lines().forEach{l->when{l.startsWith("### ")->append("<h3>${htmlEsc(l.drop(4))}</h3>");l.startsWith("## ")->append("<h2>${htmlEsc(l.drop(3))}</h2>");l.startsWith("# ")->append("<h1>${htmlEsc(l.drop(2))}</h1>");l.startsWith("- ")->append("<li>${htmlEsc(l.drop(2))}</li>");l.isBlank()->append("\n");else->append("<p>${htmlEsc(l).replace(Regex("\\*\\*(.+?)\\*\\*"),"<strong>$1</strong>")}</p>\n")}};append("</body></html>\n")}
     private fun htmlToMarkdown(text:String)=text.replace(Regex("<script[\\s\\S]*?</script>",RegexOption.IGNORE_CASE),"").replace(Regex("<style[\\s\\S]*?</style>",RegexOption.IGNORE_CASE),"").replace(Regex("<h1[^>]*>(.*?)</h1>",RegexOption.IGNORE_CASE),"# $1\n\n").replace(Regex("<h2[^>]*>(.*?)</h2>",RegexOption.IGNORE_CASE),"## $1\n\n").replace(Regex("<h3[^>]*>(.*?)</h3>",RegexOption.IGNORE_CASE),"### $1\n\n").replace(Regex("<strong[^>]*>(.*?)</strong>",RegexOption.IGNORE_CASE),"**$1**").replace(Regex("<li[^>]*>(.*?)</li>",RegexOption.IGNORE_CASE),"- $1\n").replace(Regex("<p[^>]*>(.*?)</p>",RegexOption.IGNORE_CASE),"$1\n\n").replace(Regex("<[^>]+>"),"").replace(Regex("\n{3,}"),"\n\n").trim()

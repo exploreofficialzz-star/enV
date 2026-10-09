@@ -187,36 +187,124 @@ struct NativeFamilyToolView: View {
     }
 }
 
+private struct NativeBackendExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.data] }
+    static var writableContentTypes: [UTType] {
+        [.data] + ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "tsv", "json", "xml", "yaml", "html", "txt", "png", "jpg", "jpeg", "webp", "svg", "zip"].compactMap { UTType(filenameExtension: $0) }
+    }
+    let data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
 private struct NativeBackendToolView: View {
     let tool: Tool
     @State private var input = ""
     @State private var options = "{}"
+    @State private var pages = "1"
+    @State private var watermarkText = "enV"
     @State private var files: [NativeBackendFile] = []
     @State private var output = ""
+    @State private var outputData: Data?
+    @State private var outputFileName = "env-output"
+    @State private var outputMimeType = "application/octet-stream"
     @State private var error: String?
     @State private var working = false
     @State private var showImporter = false
+    @State private var showExporter = false
+
+    private var isDocument: Bool { tool.engine.type == "document-backend" }
+    private var operation: String { tool.engine.op ?? tool.id }
+    private var allowsMultipleDocuments: Bool { operation.range(of: "merger|comparison|splitter", options: .regularExpression) != nil }
+    private var needsPages: Bool { operation.contains("page-") || operation.hasSuffix("splitter") }
+    private var needsWatermark: Bool { operation.contains("watermark") }
+    private var documentTypes: [UTType] {
+        [UTType.pdf, UTType.png, UTType.jpeg, UTType(filenameExtension: "docx"), UTType(filenameExtension: "pptx"), UTType(filenameExtension: "xlsx"), UTType(filenameExtension: "xls")].compactMap { $0 }
+    }
+    private var outputContentType: UTType {
+        let ext = URL(fileURLWithPath: outputFileName).pathExtension
+        if !ext.isEmpty, let type = UTType(filenameExtension: ext) { return type }
+        if let type = UTType(mimeType: outputMimeType) { return type }
+        return .data
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Native Swift · enV backend API").font(.subheadline.weight(.semibold))
-            NativeInputField(title: "Input", text: $input)
-            NativeInputField(title: "Options JSON", text: $options)
-            HStack {
-                if !["custom","developer"].contains(tool.engine.type ?? "") { Button("Choose file") { showImporter = true }.buttonStyle(.bordered) }
-                Button("Run") { Task { await run() } }.buttonStyle(.borderedProminent).disabled(working)
-                if !files.isEmpty { Text("Selected \(files.count) file(s)").font(.caption).foregroundStyle(.secondary) }
+            if isDocument {
+                Text("Real document processing through the enV document backend. The selected file is processed for the requested operation and the resulting file is returned.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button(files.isEmpty ? (allowsMultipleDocuments ? "Choose files" : "Choose file") : "Selected \(files.count) file(s)") { showImporter = true }
+                    .buttonStyle(.bordered)
+                if needsPages { NativeInputField(title: "Pages / range", text: $pages) }
+                if needsWatermark { NativeInputField(title: "Watermark text", text: $watermarkText) }
+                HStack {
+                    Button(working ? "Processing…" : "Run \(operationLabel(operation))") { Task { await run() } }
+                        .buttonStyle(.borderedProminent).disabled(working)
+                    Button("Reset", action: reset).buttonStyle(.bordered).disabled(working)
+                }
+                if !output.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(output).font(.subheadline)
+                        if outputData != nil {
+                            Button("Save \(outputFileName)") { showExporter = true }.buttonStyle(.bordered)
+                        }
+                    }
+                } else if let error { NativeOutputView(output: "", error: error) }
+            } else {
+                Text("Native Swift · enV backend API").font(.subheadline.weight(.semibold))
+                NativeInputField(title: "Input", text: $input)
+                NativeInputField(title: "Options JSON", text: $options)
+                HStack {
+                    if !["custom","developer"].contains(tool.engine.type ?? "") { Button("Choose file") { showImporter = true }.buttonStyle(.bordered) }
+                    Button("Run") { Task { await run() } }.buttonStyle(.borderedProminent).disabled(working)
+                    if !files.isEmpty { Text("Selected \(files.count) file(s)").font(.caption).foregroundStyle(.secondary) }
+                }
+                if !output.isEmpty { NativeOutputView(output: output, error: error) }
+                else if let error { NativeOutputView(output: "", error: error) }
             }
-            if !output.isEmpty { NativeOutputView(output: output, error: error) }
-            else if let error { NativeOutputView(output: "", error: error) }
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { files = urls.compactMap { url in try? NativeBackendFile(name: url.lastPathComponent, mimeType: "application/octet-stream", data: Data(contentsOf: url)) } }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: isDocument ? documentTypes : [.data], allowsMultipleSelection: isDocument ? allowsMultipleDocuments : true) { result in
+            switch result {
+            case .success(let urls): files = nativeBackendFiles(from: urls)
+            case .failure(let caughtError): error = caughtError.localizedDescription
+            }
+        }
+        .fileExporter(isPresented: $showExporter, document: NativeBackendExportDocument(data: outputData ?? Data()), contentType: outputContentType, defaultFilename: outputFileName) { result in
+            if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
     }
+
+    private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
+    private func reset() { files = []; pages = "1"; watermarkText = "enV"; output = ""; outputData = nil; error = nil }
     private func run() async {
-        working = true; defer { working = false }
-        do { let r = try await NativeBackendEngine.execute(tool,input:input,options:options,files:files); if let text=r.text { output=text } else { output="Output ready: \(r.fileName ?? tool.id) · \(r.data?.count ?? 0) bytes" }; error=nil }
-        catch let caughtError { output=""; error=caughtError.localizedDescription }
+        if isDocument && files.isEmpty { error = "Choose the document or file required by this tool."; return }
+        working = true; defer { working = false }; output = ""; outputData = nil; error = nil
+        do {
+            let requestOptions: String
+            if isDocument {
+                let data = try JSONSerialization.data(withJSONObject: ["pages": pages, "text": watermarkText])
+                requestOptions = String(decoding: data, as: UTF8.self)
+            } else { requestOptions = options }
+            let result = try await NativeBackendEngine.execute(tool, input: input, options: requestOptions, files: files)
+            if isDocument {
+                outputData = result.data
+                outputFileName = result.fileName ?? "\(operation)-output"
+                outputMimeType = result.mimeType ?? "application/octet-stream"
+                output = "\(operationLabel(operation)) completed · \(String(format: "%.1f", Double(result.data?.count ?? 0) / 1024.0)) KB"
+            } else if let text = result.text { output = text }
+            else { output = "Output ready: \(result.fileName ?? tool.id) · \(result.data?.count ?? 0) bytes" }
+            error = nil
+        } catch let caughtError { output = ""; outputData = nil; error = caughtError.localizedDescription }
+    }
+}
+
+private func nativeBackendFiles(from urls: [URL]) -> [NativeBackendFile] {
+    urls.compactMap { url in
+        let hasAccess = url.startAccessingSecurityScopedResource()
+        defer { if hasAccess { url.stopAccessingSecurityScopedResource() } }
+        let mime = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType?.preferredMIMEType
+        return try? NativeBackendFile(name: url.lastPathComponent, mimeType: mime ?? "application/octet-stream", data: Data(contentsOf: url))
     }
 }
 
@@ -828,7 +916,10 @@ enum NativeBackendEngine {
         if tool.engine.type=="pdf" { return try await multipart("/api/backend/pdf",fields:["operation":tool.engine.op ?? "metadata","params":options,"outputName":"\(tool.id).pdf"],files:files) }
         if tool.engine.type=="custom" || tool.engine.type=="developer" { return try await json("/api/backend/tool",body:["toolId":tool.id,"category":tool.category,"input":input,"options":opt]) }
         if categoryBackend.contains(tool.category) { return try await json("/api/backend/tool",body:["toolId":tool.id,"category":tool.category,"input":input,"options":opt]) }
-        if tool.engine.type=="document-backend" { return try await multipart("/api/backend/documents",fields:["operation":tool.engine.op ?? tool.id,"params":options,"outputName":"\(tool.id)-output"],files:files) }
+        if tool.engine.type=="document-backend" {
+            let operation = tool.engine.op ?? tool.id
+            return try await multipart("/api/backend/documents",fields:["operation":operation,"params":options,"outputName":"\(operation)-output"],files:files,downloadResponse:true,documentResponse:true)
+        }
         return try await multipart("/api/backend/media",fields:["operation":tool.engine.op ?? tool.engine.id ?? tool.id,"params":options],files:files)
     }
     static func urlMediaRequestBody(input: String, options: [String: Any]) -> [String: Any] {
@@ -846,7 +937,7 @@ enum NativeBackendEngine {
         let (data, response) = try await URLSession.shared.data(for: request)
         return try parse(data, response)
     }
-    private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile]) async throws -> NativeBackendResult {
+    private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile],downloadResponse:Bool=false,documentResponse:Bool=false) async throws -> NativeBackendResult {
         guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
         let boundary = "enV-\(UUID().uuidString)"
         var body = Data()
@@ -865,9 +956,29 @@ enum NativeBackendEngine {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         let (data, response) = try await URLSession.shared.data(for: request)
-        return try parse(data, response)
+        return try parse(data, response, downloadResponse: downloadResponse, documentResponse: documentResponse)
     }
-    private static func parse(_ d:Data,_ res:URLResponse)throws->NativeBackendResult{guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")};if !(200...299).contains(h.statusCode){throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")};let m=h.mimeType ?? "application/octet-stream";return m.contains("json") ? NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:m,fileName:nil) : NativeBackendResult(text:nil,data:d,mimeType:m,fileName:nil)}
+    private static func parse(_ d:Data,_ res:URLResponse,downloadResponse:Bool=false,documentResponse:Bool=false)throws->NativeBackendResult{
+        guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")}
+        if !(200...299).contains(h.statusCode) {
+            if documentResponse {
+                let body=(try? JSONSerialization.jsonObject(with:d)) as? [String:Any]
+                throw NativeNativeError.message((body?["error"] as? String).flatMap{$0.isEmpty ? nil : $0} ?? "Document service returned HTTP \(h.statusCode).")
+            }
+            throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")
+        }
+        let mime=h.mimeType ?? "application/octet-stream"
+        let disposition=h.value(forHTTPHeaderField:"Content-Disposition")
+        let quote = Character(UnicodeScalar(34)!)
+        let filename: String?
+        if let disposition, let range = disposition.range(of:"filename=") {
+            let remainder = disposition[range.upperBound...]
+            let value: Substring = remainder.first == quote ? remainder.dropFirst() : remainder
+            filename = String(value.prefix(while: { $0 != quote }))
+        } else { filename = nil }
+        if !downloadResponse && mime.contains("json") { return NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:mime,fileName:nil) }
+        return NativeBackendResult(text:nil,data:d,mimeType:mime,fileName:filename)
+    }
 }
 
 enum NativeBarcodeEngine {
@@ -1381,5 +1492,5 @@ private struct NativeFileConverterToolView: View {
         }
         .fileExporter(isPresented:$exporting,document:outputData.map(NativeBinaryDocument.init),contentType:.data,defaultFilename:"env-\(tool.id).\(outputExt)") { result in if case .failure(let e)=result{error=e.localizedDescription} }
     }
-    private func run(){ guard let file else{return}; do { let r=try NativeFileConverterEngine.run(tool,file:file);output=r.text ?? "";outputData=r.data;outputExt=r.ext;error="" } catch { output="";outputData=nil;error=error.localizedDescription } }
+    private func run(){ guard let file else{return}; do { let r=try NativeFileConverterEngine.run(tool,file:file);output=r.text ?? "";outputData=r.data;outputExt=r.ext;error="" } catch let caughtError { output="";outputData=nil;error=caughtError.localizedDescription } }
 }
