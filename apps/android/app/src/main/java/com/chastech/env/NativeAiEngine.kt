@@ -178,7 +178,7 @@ object NativeAiEngine {
         val id = tool.id
         return when (taskFor(id)) {
             "creator.caption.generate" -> JSONObject().apply {
-                put("topic", values["topic"] ?: "")
+                put("topic", values["topic"]?.toString()?.trim() ?: "")
                 put("tone", values["tone"] ?: "friendly")
                 put("language", values["language"] ?: "en")
                 put("variants", (values["variants"] as? Number)?.toInt() ?: 3)
@@ -186,7 +186,7 @@ object NativeAiEngine {
                 put("platform", fixedPlatform(id))
             }
             "creator.title.generate" -> JSONObject().apply {
-                put("topic", values["topic"] ?: "")
+                put("topic", values["topic"]?.toString()?.trim() ?: "")
                 put("tone", values["tone"] ?: "friendly")
                 put("language", values["language"] ?: "en")
                 put("variants", (values["variants"] as? Number)?.toInt() ?: 5)
@@ -194,22 +194,22 @@ object NativeAiEngine {
             }
             "developer.regex.explain" -> JSONObject().apply {
                 put("pattern", values["pattern"] ?: "")
-                put("flags", values["flags"] ?: "")
-                put("sampleText", values["sampleText"] ?: "")
+                values["flags"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("flags", it) }
+                values["sampleText"]?.toString()?.takeIf { it.trim().isNotEmpty() }?.let { put("sampleText", it) }
             }
             "developer.sql.explain" -> JSONObject().apply {
-                put("sql", values["sql"] ?: "")
+                put("sql", values["sql"]?.toString()?.trim() ?: "")
                 put("dialect", values["dialect"] ?: "generic")
             }
             "developer.json.explain" -> JSONObject().apply {
-                put("json", values["json"] ?: "")
+                put("json", values["json"]?.toString()?.trim() ?: "")
                 put("goal", values["goal"] ?: "describe")
             }
             "image.alt.generate" -> JSONObject().apply {
                 val file = values["image"] as JSONObject
                 put("imageBase64", file.optString("base64"))
                 put("mimeType", file.optString("mimeType"))
-                put("context", values["context"] ?: "")
+                values["context"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("context", it) }
                 put("style", values["style"] ?: "concise")
                 put("language", values["language"] ?: "en")
             }
@@ -218,7 +218,7 @@ object NativeAiEngine {
                 put("audioBase64", file.optString("base64"))
                 put("mimeType", file.optString("mimeType"))
                 put("filename", file.optString("filename"))
-                if (!values["language"].toString().isBlank()) put("language", values["language"])
+                values["language"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("language", it) }
             }
             else -> error("Unsupported native AI tool: $id")
         }
@@ -244,6 +244,7 @@ object NativeAiEngine {
             appendLine(result.optString("summary"))
             result.optJSONArray("parts")?.let { array -> if (array.length() > 0) { appendLine(); appendLine("Parts"); for (i in 0 until array.length()) { val p=array.optJSONObject(i); appendLine("• ${p?.optString("token")}: ${p?.optString("meaning")}") } } }
             result.optJSONArray("pitfalls")?.let { array -> if (array.length() > 0) { appendLine(); appendLine("Pitfalls"); for (i in 0 until array.length()) appendLine("• ${array.optString(i)}") } }
+            result.optJSONArray("suggestedTests")?.let { array -> if (array.length() > 0) { appendLine(); appendLine("Suggested examples (AI guesses, not verified)"); for (i in 0 until array.length()) { val item = array.optJSONObject(i); appendLine("• ${item?.optString("input")?.ifEmpty { "(empty)" }} — ${if (item?.optBoolean("shouldMatch") == true) "should match" else "should not match"}") }; appendLine("Try these in the regex tester above before relying on them.") } }
         }.trim()
         "developer.sql.explain" -> buildString {
             appendLine(result.optString("summary")); result.optJSONArray("steps")?.let { array -> appendLine(); appendLine("Steps"); for (i in 0 until array.length()) { val p=array.optJSONObject(i); appendLine("• ${p?.optString("clause")}: ${p?.optString("explanation")}") } }

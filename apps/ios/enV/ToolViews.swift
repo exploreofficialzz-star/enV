@@ -149,6 +149,11 @@ struct ToolDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
                 .padding(.top, 24)
 
+                if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
+                    NativeAiAssistPanel(tool: tool, feature: assistFeature)
+                        .padding(.top, 16)
+                }
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("What this tool does")
                         .font(.custom("Outfit-SemiBold", size: 18))
@@ -1287,17 +1292,25 @@ enum NativeAiEngine {
 
     static func input(toolID: String, values: [String:Any], file: NativeBackendFile?) -> [String:Any] {
         switch task(for: toolID) {
-        case "creator.caption.generate": return ["topic": values["topic"] ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 3, "includeHashtags": values["includeHashtags"] ?? true, "platform": platform(for: toolID)]
-        case "creator.title.generate": return ["topic": values["topic"] ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 5, "platform": platform(for: toolID)]
-        case "developer.regex.explain": return ["pattern": values["pattern"] ?? "", "flags": values["flags"] ?? "", "sampleText": values["sampleText"] ?? ""]
-        case "developer.sql.explain": return ["sql": values["sql"] ?? "", "dialect": values["dialect"] ?? "generic"]
-        case "developer.json.explain": return ["json": values["json"] ?? "", "goal": values["goal"] ?? "describe"]
+        case "creator.caption.generate": return ["topic": (values["topic"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 3, "includeHashtags": values["includeHashtags"] ?? true, "platform": platform(for: toolID)]
+        case "creator.title.generate": return ["topic": (values["topic"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "", "tone": values["tone"] ?? "friendly", "language": values["language"] ?? "en", "variants": values["variants"] ?? 5, "platform": platform(for: toolID)]
+        case "developer.regex.explain":
+            var input: [String:Any] = ["pattern": values["pattern"] ?? ""]
+            if let flags = values["flags"] as? String, !flags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input["flags"] = flags.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if let sample = values["sampleText"] as? String, !sample.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input["sampleText"] = sample }
+            return input
+        case "developer.sql.explain": return ["sql": (values["sql"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "", "dialect": values["dialect"] ?? "generic"]
+        case "developer.json.explain": return ["json": (values["json"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "", "goal": values["goal"] ?? "describe"]
         case "image.alt.generate":
             guard let file else { return values }
-            return ["imageBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "context": values["context"] ?? "", "style": values["style"] ?? "concise", "language": values["language"] ?? "en"]
+            var input: [String:Any] = ["imageBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "style": values["style"] ?? "concise", "language": values["language"] ?? "en"]
+            if let context = values["context"] as? String, !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input["context"] = context.trimmingCharacters(in: .whitespacesAndNewlines) }
+            return input
         case "video.transcript.generate":
             guard let file else { return values }
-            return ["audioBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "filename": file.name, "language": values["language"] ?? ""]
+            var input: [String:Any] = ["audioBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "filename": file.name]
+            if let language = values["language"] as? String, !language.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input["language"] = language.trimmingCharacters(in: .whitespacesAndNewlines) }
+            return input
         default: return values
         }
     }
@@ -1316,11 +1329,21 @@ enum NativeAiEngine {
             var text = result["summary"] as? String ?? ""
             if let parts = result["parts"] as? [[String:Any]], !parts.isEmpty { text += "\n\nParts\n" + parts.map { "• \($0["token"] as? String ?? ""): \($0["meaning"] as? String ?? "")" }.joined(separator: "\n") }
             if let pitfalls = result["pitfalls"] as? [String], !pitfalls.isEmpty { text += "\n\nPitfalls\n" + pitfalls.map { "• \($0)" }.joined(separator: "\n") }
+            if let examples = result["suggestedTests"] as? [[String:Any]], !examples.isEmpty {
+                let lines = examples.map { item -> String in
+                    let rawInput = item["input"] as? String ?? ""
+                    let displayInput = rawInput.isEmpty ? "(empty)" : rawInput
+                    let verdict = (item["shouldMatch"] as? Bool) == true ? "should match" : "should not match"
+                    return "• \(displayInput): \(verdict)"
+                }
+                text += "\n\nSuggested examples (AI guesses, not verified)\n" + lines.joined(separator: "\n") + "\nTry these in the regex tester above before relying on them."
+            }
             return text
         case "developer.sql.explain":
             var text = result["summary"] as? String ?? ""
             if let steps = result["steps"] as? [[String:Any]], !steps.isEmpty { text += "\n\nSteps\n" + steps.map { "• \($0["clause"] as? String ?? ""): \($0["explanation"] as? String ?? "")" }.joined(separator: "\n") }
             if let warnings = result["warnings"] as? [String], !warnings.isEmpty { text += "\n\nWarnings\n" + warnings.map { "• \($0)" }.joined(separator: "\n") }
+            if let notes = result["performanceNotes"] as? [String], !notes.isEmpty { text += "\n\nPerformance notes\n" + notes.map { "• \($0)" }.joined(separator: "\n") }
             return text
         case "developer.json.explain":
             var text = result["summary"] as? String ?? ""
@@ -1358,38 +1381,50 @@ private enum NativeAiClient {
     }
 
     static func run(task: String, input: [String:Any]) async throws -> [String:Any] {
+        try await runWithMetadata(task: task, input: input).result
+    }
+
+    static func runWithMetadata(task: String, input: [String:Any]) async throws -> NativeAiResponse {
         let body = try JSONSerialization.data(withJSONObject: ["task":task, "input":input], options: [])
         let (data, response) = try await request(path: "/api/ai/run", method: "POST", body: body)
         guard let http = response as? HTTPURLResponse else { throw NativeNativeError.message("Invalid AI response.") }
         let object = (try? JSONSerialization.jsonObject(with: data)) as? [String:Any] ?? [:]
         if !(200...299).contains(http.statusCode) {
             let error = object["error"] as? [String:Any]
-            throw NativeNativeError.message(error?["message"] as? String ?? "AI request failed.")
+            let retry = error?["retryAfterSeconds"] as? Int
+            throw NativeAiRequestError(message: error?["message"] as? String ?? "AI request failed.", retryAfterSeconds: retry)
         }
-        guard let payload = object["data"] as? [String:Any], let result = payload["result"] as? [String:Any] else { throw NativeNativeError.message("The AI response was not usable.") }
-        return result
+        guard let payload = object["data"] as? [String:Any], let result = payload["result"] as? [String:Any] else { throw NativeAiRequestError(message: "The AI response was not usable.", retryAfterSeconds: nil) }
+        let meta = payload["meta"] as? [String:Any] ?? [:]
+        return NativeAiResponse(result: result, warnings: meta["warnings"] as? [String] ?? [], requestId: meta["requestId"] as? String ?? "", cached: meta["cached"] as? Bool ?? false)
     }
 
     static func prepareImage(_ file: NativeBackendFile) throws -> NativeBackendFile {
+        let ext = URL(fileURLWithPath: file.name).pathExtension.lowercased()
+        let mime = file.mimeType.lowercased().split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
+        let imageTypes = Set(["image/jpeg", "image/png", "image/webp"])
+        let extensionTypes = ["jpg":"image/jpeg", "jpeg":"image/jpeg", "png":"image/png", "webp":"image/webp"]
+        guard imageTypes.contains(mime) || mime.isEmpty && extensionTypes[ext] != nil else { throw NativeNativeError.message("Use a JPEG, PNG or WebP image.") }
         guard let original = UIImage(data: file.data) else { throw NativeNativeError.message("The selected file is not a supported image.") }
-        let qualities: [CGFloat] = [0.82, 0.68, 0.60, 0.55]
-        for maxSide in [1280.0, 1024.0, 768.0] {
+        let attempts: [(CGFloat, CGFloat)] = [(1280, 0.82), (1280, 0.68), (1024, 0.60), (768, 0.55)]
+        for (maxSide, quality) in attempts {
             let scale = min(1, maxSide / max(original.size.width, original.size.height))
             let size = CGSize(width: max(1, original.size.width * scale), height: max(1, original.size.height * scale))
             let renderer = UIGraphicsImageRenderer(size: size)
             let scaled = renderer.image { _ in original.draw(in: CGRect(origin: .zero, size: size)) }
-            for q in qualities {
-                if let data = scaled.jpegData(compressionQuality: q), data.count <= 2_400_000 { return NativeBackendFile(name: file.name, mimeType: "image/jpeg", data: data) }
-            }
+            if let data = scaled.jpegData(compressionQuality: quality), data.count <= 2_400_000 { return NativeBackendFile(name: file.name, mimeType: "image/jpeg", data: data) }
         }
         throw NativeNativeError.message("That image is too large for AI. Try a smaller image.")
     }
 
     static func prepareAudio(_ file: NativeBackendFile) throws -> NativeBackendFile {
-        guard file.data.count <= 2_800_000 else { throw NativeNativeError.message("That audio file is too large for AI. Keep it under 2.8 MB.") }
         let ext = URL(fileURLWithPath: file.name).pathExtension.lowercased()
-        let mime = ["mp3":"audio/mpeg","m4a":"audio/x-m4a","mp4":"audio/mp4","wav":"audio/wav","webm":"audio/webm","ogg":"audio/ogg","oga":"audio/ogg","flac":"audio/flac"][ext] ?? file.mimeType
-        guard mime.hasPrefix("audio/") else { throw NativeNativeError.message("Use an MP3, M4A, WAV, WebM, OGG or FLAC audio file.") }
+        let aliases = ["audio/mp3":"audio/mpeg","audio/mpeg3":"audio/mpeg","audio/wave":"audio/wav","audio/x-flac":"audio/flac","audio/m4a":"audio/x-m4a"]
+        let source = file.mimeType.lowercased().split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
+        let extensions = ["mp3":"audio/mpeg","m4a":"audio/x-m4a","mp4":"audio/mp4","wav":"audio/wav","webm":"audio/webm","ogg":"audio/ogg","oga":"audio/ogg","flac":"audio/flac"]
+        let accepted = Set(["audio/mpeg","audio/mp4","audio/x-m4a","audio/wav","audio/x-wav","audio/webm","audio/ogg","audio/flac"])
+        guard let mime = aliases[source] ?? (accepted.contains(source) ? source : nil) ?? extensions[ext] else { throw NativeNativeError.message("Use an MP3, M4A, WAV, WebM, OGG or FLAC audio file.") }
+        guard file.data.count <= 2_800_000 else { throw NativeNativeError.message("That file is \(String(format: "%.1f", Double(file.data.count) / 1_000_000)) MB. AI transcription currently accepts audio up to 2.8 MB. Trim or compress it first.") }
         return NativeBackendFile(name: file.name, mimeType: mime, data: file.data)
     }
 
@@ -1603,4 +1638,338 @@ private struct NativeFileConverterToolView: View {
         .fileExporter(isPresented:$exporting,document:outputData.map(NativeBinaryDocument.init),contentType:.data,defaultFilename:"env-\(tool.id).\(outputExt)") { result in if case .failure(let e)=result{error=e.localizedDescription} }
     }
     private func run(){ guard let file else{return}; do { let r=try NativeFileConverterEngine.run(tool,file:file);output=r.text ?? "";outputData=r.data;outputExt=r.ext;error="" } catch let caughtError { output="";outputData=nil;error=caughtError.localizedDescription } }
+}
+
+
+private enum NativeAiAssistFieldKind: Equatable {
+    case text, textarea, number, select, checkbox, image, audio
+}
+
+private struct NativeAiAssistOption: Identifiable {
+    let value: String
+    let label: String
+    var id: String { value }
+}
+
+private struct NativeAiAssistField: Identifiable {
+    let name: String
+    let label: String
+    let kind: NativeAiAssistFieldKind
+    var required = false
+    var maxLength: Int? = nil
+    var min: Int? = nil
+    var max: Int? = nil
+    var placeholder: String? = nil
+    var help: String? = nil
+    var monospace = false
+    var preserveWhitespace = false
+    var options: [NativeAiAssistOption] = []
+    var defaultValue: String? = nil
+    var defaultBool: Bool? = nil
+    var id: String { name }
+    var wide: Bool { kind == .textarea || kind == .image || kind == .audio }
+}
+
+private struct NativeAiAssistFeature {
+    let toolID: String
+    let taskID: String
+    let title: String
+    let description: String
+    let actionLabel: String
+    let resultKind: String
+    let fields: [NativeAiAssistField]
+    var requiresConsent = false
+    var consentLabel: String? = nil
+}
+
+private enum NativeAiAssistFeatureRegistry {
+    private static let tones = ["friendly", "professional", "playful", "bold", "inspirational", "witty"].map { NativeAiAssistOption(value: $0, label: $0.capitalized) }
+    private static let languages = [NativeAiAssistOption(value: "en", label: "English"), NativeAiAssistOption(value: "fr", label: "French"), NativeAiAssistOption(value: "es", label: "Spanish"), NativeAiAssistOption(value: "pt", label: "Portuguese")]
+    private static let topic = NativeAiAssistField(name: "topic", label: "What is it about?", kind: .textarea, required: true, maxLength: 600, placeholder: "Describe the post, video or product in a sentence or two.")
+    private static let tone = NativeAiAssistField(name: "tone", label: "Tone", kind: .select, options: tones, defaultValue: "friendly")
+    private static let language = NativeAiAssistField(name: "language", label: "Language", kind: .select, options: languages, defaultValue: "en")
+
+    private static func caption(_ id: String, _ placement: String) -> NativeAiAssistFeature {
+        NativeAiAssistFeature(toolID: id, taskID: "creator.caption.generate", title: "Write captions with AI", description: "Get caption ideas for \(placement). The generator above keeps working without AI.", actionLabel: "Generate captions", resultKind: "captions", fields: [topic, tone, language, NativeAiAssistField(name: "variants", label: "How many options?", kind: .number, min: 1, max: 5, defaultValue: "3"), NativeAiAssistField(name: "includeHashtags", label: "Include hashtags", kind: .checkbox, defaultBool: true)])
+    }
+
+    private static func title(_ id: String, _ placement: String) -> NativeAiAssistFeature {
+        NativeAiAssistFeature(toolID: id, taskID: "creator.title.generate", title: "Get title ideas with AI", description: "Get title ideas for \(placement). The generator above keeps working without AI.", actionLabel: "Suggest titles", resultKind: "titles", fields: [topic, tone, language, NativeAiAssistField(name: "variants", label: "How many options?", kind: .number, min: 1, max: 8, defaultValue: "5")])
+    }
+
+    private static let all: [NativeAiAssistFeature] = [
+        caption("instagram-caption-generator", "Instagram"), caption("tiktok-caption-generator", "TikTok"), caption("x-caption-generator", "X"), caption("youtube-caption-generator", "YouTube"), caption("linkedin-caption-generator", "LinkedIn"), caption("facebook-caption-generator", "Facebook"), caption("caption-generator", "social posts"),
+        title("youtube-title-generator", "YouTube videos"), title("tiktok-title-generator", "TikTok videos"), title("instagram-title-generator", "Instagram posts"), title("podcast-title-generator", "podcast episodes"), title("title-generator", "videos, posts and articles"),
+        NativeAiAssistFeature(toolID: "regex-tester", taskID: "developer.regex.explain", title: "Explain this regex with AI", description: "Get a plain-language explanation and common pitfalls. The explanation is AI-written and may be wrong, so confirm it with the tester above.", actionLabel: "Explain pattern", resultKind: "regex", fields: [NativeAiAssistField(name: "pattern", label: "Pattern", kind: .text, required: true, maxLength: 1000, placeholder: "^[\\w.+-]+@[\\w-]+\\.[\\w.]+$", monospace: true, preserveWhitespace: true), NativeAiAssistField(name: "flags", label: "Flags", kind: .text, maxLength: 8, placeholder: "gi", monospace: true), NativeAiAssistField(name: "sampleText", label: "Sample text (optional)", kind: .textarea, maxLength: 2000, preserveWhitespace: true)]),
+        NativeAiAssistFeature(toolID: "sql-formatter", taskID: "developer.sql.explain", title: "Explain this SQL with AI", description: "Get a clause-by-clause explanation and risk warnings. The statement is never executed.", actionLabel: "Explain SQL", resultKind: "sql", fields: [NativeAiAssistField(name: "sql", label: "SQL statement", kind: .textarea, required: true, maxLength: 6000, monospace: true), NativeAiAssistField(name: "dialect", label: "Dialect", kind: .select, options: ["generic", "postgresql", "mysql", "sqlite", "sqlserver"].map { NativeAiAssistOption(value: $0, label: $0.capitalized) }, defaultValue: "generic")]),
+        NativeAiAssistFeature(toolID: "json-validator", taskID: "developer.json.explain", title: "Describe this JSON with AI", description: "Get a summary of the structure and likely issues. Secret-looking values are masked before sending, but avoid pasting real personal data.", actionLabel: "Describe JSON", resultKind: "json", fields: [NativeAiAssistField(name: "json", label: "JSON", kind: .textarea, required: true, maxLength: 20_000, monospace: true), NativeAiAssistField(name: "goal", label: "Focus", kind: .select, options: [NativeAiAssistOption(value: "describe", label: "Describe"), NativeAiAssistOption(value: "find-issues", label: "Find issues")], defaultValue: "describe")], requiresConsent: true, consentLabel: "I understand this JSON is sent to an external AI service."),
+        NativeAiAssistFeature(toolID: "alt-text-generator", taskID: "image.alt.generate", title: "Write alt text from an image with AI", description: "Upload an image and get alt text plus a longer description. Large images are shrunk in your browser first. Review the result before publishing.", actionLabel: "Write alt text", resultKind: "alt-text", fields: [NativeAiAssistField(name: "image", label: "Image", kind: .image, required: true, help: "JPEG, PNG or WebP."), NativeAiAssistField(name: "context", label: "Page context (optional)", kind: .text, maxLength: 300, placeholder: "Where will this image appear?"), NativeAiAssistField(name: "style", label: "Style", kind: .select, options: [NativeAiAssistOption(value: "concise", label: "Concise"), NativeAiAssistOption(value: "descriptive", label: "Descriptive")], defaultValue: "concise"), language], requiresConsent: true, consentLabel: "I understand this image is sent to an external AI service."),
+        NativeAiAssistFeature(toolID: "video-audio-extractor", taskID: "video.transcript.generate", title: "Transcribe audio with AI", description: "Upload a short audio clip (up to about 2.8 MB) to get a transcript with timestamps. Longer recordings are not supported yet. Extract and compress the audio first.", actionLabel: "Transcribe", resultKind: "transcript", fields: [NativeAiAssistField(name: "audio", label: "Audio file", kind: .audio, required: true, help: "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB."), NativeAiAssistField(name: "language", label: "Language code (optional)", kind: .text, maxLength: 3, placeholder: "auto-detect", help: "Two letters, for example en or fr.")], requiresConsent: true, consentLabel: "I understand this recording is sent to an external AI service.")
+    ]
+
+    static func feature(toolID: String) -> NativeAiAssistFeature? { all.first { $0.toolID == toolID } }
+    static var toolIDs: Set<String> { Set(all.map(\.toolID)) }
+}
+
+private struct NativeAiRequestError: LocalizedError {
+    let message: String
+    let retryAfterSeconds: Int?
+    var errorDescription: String? { message }
+}
+
+private struct NativeAiResponse {
+    let result: [String:Any]
+    let warnings: [String]
+    let requestId: String
+    let cached: Bool
+}
+
+private struct NativeAiAssistPanel: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    let tool: Tool
+    let feature: NativeAiAssistFeature
+    @State private var available = false
+    @State private var values: [String:String]
+    @State private var includeHashtags: Bool
+    @State private var consent = false
+    @State private var selectedFile: NativeBackendFile?
+    @State private var preparing = false
+    @State private var importing = false
+    @State private var working = false
+    @State private var error = ""
+    @State private var notice = ""
+    @State private var result: [String:Any]?
+    @State private var resultWarnings: [String] = []
+    @State private var requestTask: Task<Void, Never>?
+    @State private var captionDrafts: [String] = []
+    @State private var exporting = false
+    @State private var exportData: Data?
+    @State private var exportFilename = "transcript.txt"
+
+    init(tool: Tool, feature: NativeAiAssistFeature) {
+        self.tool = tool
+        self.feature = feature
+        _values = State(initialValue: Dictionary(uniqueKeysWithValues: feature.fields.compactMap { field in field.defaultValue.map { (field.name, $0) } }))
+        _includeHashtags = State(initialValue: feature.fields.first(where: { $0.name == "includeHashtags" })?.defaultBool ?? true)
+    }
+
+    private var compact: Bool { horizontalSizeClass != .regular }
+    private var fileField: NativeAiAssistField? { feature.fields.first { $0.kind == .image || $0.kind == .audio } }
+    private var validationIssue: String? {
+        for field in feature.fields {
+            if field.kind == .image || field.kind == .audio {
+                if field.required && selectedFile == nil { return "Choose a file for \"\(field.label)\"." }
+                continue
+            }
+            if field.kind == .checkbox { continue }
+            let value = values[field.name] ?? ""
+            if field.required && value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "\(field.label) is required." }
+            if let maxLength = field.maxLength, value.count > maxLength { return "\(field.label) is too long (maximum \(maxLength) characters)." }
+            if field.kind == .number, !value.isEmpty {
+                guard let number = Double(value), (field.min == nil || number >= Double(field.min!)), (field.max == nil || number <= Double(field.max!)) else { return "\(field.label) must be between \(field.min ?? 0) and \(field.max ?? 99)." }
+            }
+        }
+        return nil
+    }
+
+    var body: some View {
+        Group {
+            if available { panel }
+            else { EmptyView() }
+        }
+        .task(id: feature.taskID) { available = (try? await NativeAiClient.availability()[feature.taskID]) == true }
+        .fileImporter(isPresented: $importing, allowedContentTypes: fileTypes, allowsMultipleSelection: false) { picked in
+            guard case .success(let urls) = picked, let url = urls.first else { return }
+            preparing = true
+            notice = ""
+            do {
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                let raw = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: try Data(contentsOf: url))
+                if fileField?.kind == .image { selectedFile = try NativeAiClient.prepareImage(raw) }
+                else { selectedFile = try NativeAiClient.prepareAudio(raw) }
+            } catch { selectedFile = nil; notice = error.localizedDescription }
+            preparing = false
+        }
+        .fileExporter(isPresented: $exporting, document: exportData.map(NativeBinaryDocument.init), contentType: .data, defaultFilename: exportFilename) { saved in
+            if case .failure(let failure) = saved { error = failure.localizedDescription }
+        }
+        .onDisappear { requestTask?.cancel() }
+    }
+
+    private var panel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("✦").font(.custom("Outfit-SemiBold", size: 16)).foregroundStyle(Color.envAccent)
+                Text(feature.title).font(.custom("Outfit-SemiBold", size: 18)).foregroundStyle(Color.envInk)
+                Text("AI").font(.custom("Outfit-Medium", size: 11)).tracking(0.7).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.vertical, 3).background(Color.envSurface2, in: Capsule())
+            }
+            Text(feature.description).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+            let columns = compact ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())]
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                ForEach(feature.fields.filter { $0.kind != .checkbox }) { field in
+                    fieldView(field).gridCellColumns(!compact && field.wide ? 2 : 1)
+                }
+            }
+            ForEach(feature.fields.filter { $0.kind == .checkbox }) { field in
+                Toggle(field.label, isOn: $includeHashtags).font(.custom("Outfit-Regular", size: 14)).tint(Color.envAccent)
+            }
+            if feature.requiresConsent {
+                Toggle(feature.consentLabel ?? "I understand my input is sent to an external AI service.", isOn: $consent)
+                    .font(.custom("Outfit-Regular", size: 14)).tint(Color.envAccent)
+            }
+            HStack(spacing: 8) {
+                if working {
+                    Button("Cancel") { requestTask?.cancel(); requestTask = nil; working = false }.buttonStyle(.bordered)
+                } else {
+                    Button {
+                        if let issue = validationIssue { notice = issue; return }
+                        run()
+                    } label: {
+                        HStack(spacing: 6) { Text("✦"); Text(result == nil ? feature.actionLabel : "Try again") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.envAccent)
+                    .disabled(validationIssue != nil || feature.requiresConsent && !consent || preparing)
+                }
+                if working || preparing {
+                    ProgressView().tint(Color.envAccent)
+                    Text(preparing ? "Preparing your file…" : "Working on it. This can take up to a minute.")
+                        .font(.custom("Outfit-Regular", size: 13)).foregroundStyle(Color.envMuted)
+                }
+            }
+            Text("AI-assisted. Nothing is sent until you press the button; then your input goes to an external AI service to produce the result. AI can be wrong, so review it before you use it. Use is limited per person and per day to keep it available for everyone.")
+                .font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted)
+            if !notice.isEmpty { Text(notice).font(.custom("Outfit-Regular", size: 13)).foregroundStyle(.red) }
+            if !error.isEmpty { Text(error).font(.custom("Outfit-Regular", size: 13)).foregroundStyle(.red) }
+            if let result { resultView(result) }
+        }
+        .padding(compact ? 16 : 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
+    }
+
+    private var fileTypes: [UTType] {
+        if fileField?.kind == .image { return [.jpeg, .png, UTType(filenameExtension: "webp") ?? .image] }
+        return [.audio] + ["mp3", "m4a", "wav", "webm", "ogg", "flac"].compactMap { UTType(filenameExtension: $0) }
+    }
+
+    @ViewBuilder private func fieldView(_ field: NativeAiAssistField) -> some View {
+        let binding = valueBinding(field)
+        VStack(alignment: .leading, spacing: 6) {
+            switch field.kind {
+            case .textarea:
+                Text("\(field.label)\(field.required ? " *" : "")").font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                ZStack(alignment: .topLeading) {
+                    if (values[field.name] ?? "").isEmpty, let placeholder = field.placeholder { Text(placeholder).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envSubtle).padding(.horizontal, 5).padding(.vertical, 8) }
+                    TextEditor(text: binding).font(field.monospace ? .system(size: 14, design: .monospaced) : .custom("Outfit-Regular", size: 14)).frame(minHeight: 104, maxHeight: 180).scrollContentBackground(.hidden)
+                }
+                .padding(6).background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+            case .text:
+                TextField(field.placeholder ?? "", text: binding).font(field.monospace ? .system(size: 14, design: .monospaced) : .custom("Outfit-Regular", size: 14)).textFieldStyle(.roundedBorder).accessibilityLabel("\(field.label)\(field.required ? " required" : "")")
+                    .overlay(alignment: .topLeading) { if (values[field.name] ?? "").isEmpty { Text("\(field.label)\(field.required ? " *" : "")").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.top, -8) } }
+                    .keyboardType(field.name == "language" ? .asciiCapable : .default)
+            case .number:
+                Text(field.label).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                TextField("", text: binding).textFieldStyle(.roundedBorder).keyboardType(.numberPad)
+            case .select:
+                Text(field.label).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                Picker(field.label, selection: binding) { ForEach(field.options) { option in Text(option.label).tag(option.value) } }
+                    .pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+            case .image, .audio:
+                Text(field.label + (field.required ? " *" : "")).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                Button(selectedFile?.name ?? "Choose \(field.kind == .image ? "image" : "audio")") { importing = true }.buttonStyle(.bordered)
+                if let selectedFile { Text("\(selectedFile.name) · \(String(format: "%.1f", Double(selectedFile.data.count) / 1_000_000)) MB ready to send").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+            case .checkbox: EmptyView()
+            }
+            if let help = field.help { Text(help).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+        }
+    }
+
+    private func valueBinding(_ field: NativeAiAssistField) -> Binding<String> {
+        Binding(get: { values[field.name] ?? "" }, set: { next in values[field.name] = field.maxLength.map { String(next.prefix($0)) } ?? next })
+    }
+
+    private func run() {
+        guard NativeAiEngine.task(for: tool.id) != nil else { return }
+        working = true; error = ""; notice = ""; result = nil; resultWarnings = []
+        requestTask = Task {
+            do {
+                var inputValues: [String:Any] = values.mapValues { $0 as Any }
+                inputValues["includeHashtags"] = includeHashtags
+                if let field = feature.fields.first(where: { $0.kind == .number }) { inputValues[field.name] = Int(values[field.name] ?? "") ?? (feature.taskID == "creator.title.generate" ? 5 : 3) }
+                let input = NativeAiEngine.input(toolID: tool.id, values: inputValues, file: selectedFile)
+                let response = try await NativeAiClient.runWithMetadata(task: feature.taskID, input: input)
+                await MainActor.run {
+                    result = response.result
+                    resultWarnings = response.warnings
+                    captionDrafts = (response.result["variants"] as? [[String:Any]] ?? []).map { $0["caption"] as? String ?? "" }
+                    working = false; requestTask = nil
+                }
+            } catch is CancellationError {
+                await MainActor.run { working = false; requestTask = nil }
+            } catch {
+                await MainActor.run {
+                    if let apiError = error as? NativeAiRequestError {
+                        self.error = apiError.message + (apiError.retryAfterSeconds.map { " Try again in about \($0) seconds." } ?? "")
+                    } else { self.error = error.localizedDescription }
+                    working = false; requestTask = nil
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func resultView(_ result: [String:Any]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if feature.resultKind == "captions" {
+                let variants = result["variants"] as? [[String:Any]] ?? []
+                ForEach(variants.indices, id: \.self) { index in
+                    let hashtags = (variants[index]["hashtags"] as? [String] ?? []).map { "#\($0)" }.joined(separator: " ")
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextEditor(text: Binding(get: { captionDrafts.indices.contains(index) ? captionDrafts[index] : (variants[index]["caption"] as? String ?? "") }, set: { value in if captionDrafts.indices.contains(index) { captionDrafts[index] = value } })).font(.custom("Outfit-Regular", size: 14)).frame(minHeight: 92).scrollContentBackground(.hidden).padding(4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                        if !hashtags.isEmpty { Text(hashtags).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+                        HStack { Text("\((captionDrafts.indices.contains(index) ? captionDrafts[index] : "").count) characters").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted); Spacer(); Button("Copy") { UIPasteboard.general.string = (captionDrafts.indices.contains(index) ? captionDrafts[index] : "") + (hashtags.isEmpty ? "" : "\n\n\(hashtags)") }.buttonStyle(.bordered) }
+                    }.padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                }
+            } else if feature.resultKind == "titles" {
+                ForEach(Array((result["titles"] as? [String] ?? []).enumerated()), id: \.offset) { pair in
+                    let title = pair.element
+                    HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { Text(title).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk); Text("\(title.count) characters").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
+                        .padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                }
+            } else {
+                let text = NativeAiEngine.format(task: feature.taskID, result: result)
+                TextEditor(text: .constant(text)).font(.custom("Outfit-Regular", size: 14)).frame(minHeight: feature.resultKind == "transcript" ? 160 : 120).textSelection(.enabled).padding(4).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+                HStack(spacing: 8) {
+                    Button("Copy") { UIPasteboard.general.string = text }.buttonStyle(.bordered)
+                    if feature.resultKind == "transcript" {
+                        Button("Download .txt") { beginExport(text, filename: "transcript.txt") }.buttonStyle(.bordered).disabled(text.isEmpty)
+                        if let segments = result["segments"] as? [[String:Any]], !segments.isEmpty {
+                            Button("Download .srt") { beginExport(subtitles(segments, webVtt: false), filename: "transcript.srt") }.buttonStyle(.bordered)
+                            Button("Download .vtt") { beginExport(subtitles(segments, webVtt: true), filename: "transcript.vtt") }.buttonStyle(.bordered)
+                        }
+                    }
+                }
+                if feature.resultKind == "transcript", let language = result["language"] as? String { Text("Detected language: \(language)").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+            }
+            if !resultWarnings.isEmpty { Text(resultWarnings.joined(separator: " ")).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+        }
+    }
+
+    private func beginExport(_ text: String, filename: String) { exportData = Data(text.utf8); exportFilename = filename; exporting = true }
+    private func subtitles(_ segments: [[String:Any]], webVtt: Bool) -> String {
+        let rows = segments.enumerated().compactMap { index, item -> String? in
+            guard let start = item["start"] as? Double, let end = item["end"] as? Double, let text = item["text"] as? String else { return nil }
+            let arrow = webVtt ? " --> " : " --> "
+            return "\(webVtt ? "" : "\(index + 1)\n")\(subtitleTime(start, webVtt: webVtt))\(arrow)\(subtitleTime(end, webVtt: webVtt))\n\(text)"
+        }
+        return (webVtt ? "WEBVTT\n\n" : "") + rows.joined(separator: "\n\n") + "\n"
+    }
+    private func subtitleTime(_ value: Double, webVtt: Bool) -> String {
+        let milliseconds = Int((max(0, value) * 1000).rounded())
+        let h = milliseconds / 3_600_000, m = (milliseconds % 3_600_000) / 60_000, s = (milliseconds % 60_000) / 1000, ms = milliseconds % 1000
+        return String(format: "%02d:%02d:%02d%@%03d", h, m, s, webVtt ? "." : ",", ms)
+    }
 }

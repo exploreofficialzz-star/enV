@@ -752,6 +752,10 @@ private fun ToolDetail(
                     }
                 }
             }
+            if (hasNativeAiAssist(tool.id)) {
+                Spacer(Modifier.height(16.dp))
+                NativeAiAssistPanel(tool)
+            }
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.SemiBold)
             Text("${tool.description} Results can be copied or downloaded from this page.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))

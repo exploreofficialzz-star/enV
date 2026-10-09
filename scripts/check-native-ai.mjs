@@ -7,6 +7,7 @@ const catalogPath = resolve(root, "apps/shared/catalog.json");
 const featurePath = resolve(root, "src/lib/ai/features.ts");
 const android = resolve(root, "apps/android/app/src/main/java/com/chastech/env/NativeAiEngine.kt");
 const androidClient = resolve(root, "apps/android/app/src/main/java/com/chastech/env/NativeAiClient.kt");
+const androidAssist = resolve(root, "apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt");
 const androidAssistant = resolve(root, "apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt");
 const androidActivity = resolve(root, "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
 const ios = resolve(root, "apps/ios/enV/ToolViews.swift");
@@ -17,7 +18,7 @@ const webHome = resolve(root, "src/routes/index.tsx");
 const backendAssistant = resolve(root, "src/lib/ai/server/tasks/assistant.ts");
 
 const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode = 1; };
-for (const path of [catalogPath, featurePath, android, androidClient, androidAssistant, androidActivity, ios, iosAssistant, iosHome, webAssistant, webHome, backendAssistant]) {
+for (const path of [catalogPath, featurePath, android, androidClient, androidAssist, androidAssistant, androidActivity, ios, iosAssistant, iosHome, webAssistant, webHome, backendAssistant]) {
   if (!existsSync(path)) fail(`Missing required file: ${path}`);
 }
 if (process.exitCode) process.exit(1);
@@ -40,6 +41,7 @@ for (const id of unique) {
 
 const androidSource = readFileSync(android, "utf8");
 const androidClientSource = readFileSync(androidClient, "utf8");
+const androidAssistSource = readFileSync(androidAssist, "utf8");
 const androidAssistantSource = readFileSync(androidAssistant, "utf8");
 const androidActivitySource = readFileSync(androidActivity, "utf8");
 const iosSource = readFileSync(ios, "utf8");
@@ -48,6 +50,18 @@ const webAssistantSource = readFileSync(webAssistant, "utf8");
 for (const id of unique) {
   if (!androidSource.includes(`"${id}"`)) fail(`Android native AI mapping missing: ${id}`);
   if (!iosSource.includes(`"${id}"`)) fail(`iOS native AI mapping missing: ${id}`);
+  if (!androidAssistSource.includes(`"${id}"`)) fail(`Android supplemental AI panel missing: ${id}`);
+}
+for (const [label, source] of [["Android", androidAssistSource], ["iOS", iosSource]]) {
+  for (const match of featureSource.matchAll(/name:\s*"([A-Za-z][A-Za-z0-9]*)"/g)) {
+    if (!source.includes(`"${match[1]}"`)) fail(`${label} supplemental AI panel is missing the web feature field ${match[1]}`);
+  }
+}
+if (!androidActivitySource.includes("NativeAiAssistPanel(tool)") || !iosSource.includes("NativeAiAssistPanel(tool: tool, feature: assistFeature)")) fail("Native tool-detail screens do not mount the supplemental AI-assist panel");
+for (const [label, source] of [["Android", androidAssistSource], ["iOS", iosSource]]) {
+  if (!source.includes("Nothing is sent until you press the button")) fail(`${label} supplemental AI panel is missing the web disclosure`);
+  if (!source.includes("Cancel")) fail(`${label} supplemental AI panel is missing task cancellation`);
+  if (!source.includes("requiresConsent")) fail(`${label} supplemental AI panel is missing feature-specific consent gating`);
 }
 for (const [label, text] of [["Android AI client", androidClientSource], ["iOS AI client", iosSource + iosAssistantSource]]) {
   if (!text.includes("/api/ai/run")) fail(`${label} does not call /api/ai/run`);
