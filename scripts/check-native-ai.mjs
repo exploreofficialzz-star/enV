@@ -83,6 +83,9 @@ if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.in
 if (!iosAssistantSource.includes("candidates:") || !iosAssistantSource.includes("NavigationLink(value: tool)")) fail("iOS assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidAssistantSource.includes("activeRequestHandle?.cancel()") || !androidAssistantSource.includes('NativeAiClient.run(context, "assistant.chat", input, requestHandle)')) fail("Android assistant Stop does not cancel the active network request");
 if (!iosAssistantSource.includes('Button("Stop", action: stopRequest)') || !iosAssistantSource.includes("private func stopRequest()") || !iosAssistantSource.includes("activeRequest?.cancel()")) fail("iOS assistant Stop does not cancel the active task");
+if (!iosAssistantSource.includes('Outfit-SemiBold", size: horizontalSizeClass == .regular ? 30 : 24')) fail("iOS assistant heading is missing responsive Outfit typography");
+if (!iosAssistantSource.includes('Outfit-Regular", size: 14')) fail("iOS assistant message text is missing Outfit typography");
+if (!iosAssistantSource.includes("Ask about enV tools or the enV brand…")) fail("iOS assistant composer prompt does not match the web prompt");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ detailStack = listOf(it) }")) fail("Android recommendation navigation is not wired to the native tool detail view");
 

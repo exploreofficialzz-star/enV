@@ -30,15 +30,16 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    VStack(alignment: .center, spacing: 16) {
-                        EnVLogo(homeHero: true).frame(width: 142, height: 56)
+                VStack(alignment: .leading, spacing: 40) {
+                    VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
+                        EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 12) {
                             EnVLogo().frame(width: 48, height: 32)
                             TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
                                 .font(.custom("Outfit-Regular", size: 16))
                                 .multilineTextAlignment(.center)
                                 .focused($isHomeSearchFocused)
+                                .accessibilityLabel("Search tools")
                                 .submitLabel(.search)
                                 .onSubmit { onSearch(searchText) }
                             Button { onSearch(searchText) } label: {
@@ -46,10 +47,10 @@ struct HomeView: View {
                                     .frame(width: 42, height: 42)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Search")
+                            .accessibilityLabel("Search all tools")
                         }
                         .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, minHeight: 64, maxHeight: 64, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 72 : 64, maxHeight: horizontalSizeClass == .regular ? 72 : 64, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
@@ -59,6 +60,18 @@ struct HomeView: View {
                                     Text("No matching tools. Try “json”, “bmi”, or “qr”.")
                                         .font(.custom("Outfit-Regular", size: 14))
                                         .foregroundStyle(Color.envMuted)
+                                    HStack {
+                                        Spacer()
+                                        Button { onSearch(searchText) } label: {
+                                            HStack(spacing: 6) {
+                                                Text("See more results")
+                                                EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
+                                            }
+                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .foregroundStyle(Color.envAccent)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 } else {
                                     ForEach(searchSuggestions) { tool in WebHomeSearchSuggestion(tool: tool) }
                                     HStack {
@@ -85,7 +98,7 @@ struct HomeView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
-                        .padding(.top, 4)
+                        .padding(.top, horizontalSizeClass == .regular ? 12 : 8)
                         Text("A focused toolkit for\neveryday work.")
                             .font(.custom("Outfit-SemiBold", size: horizontalSizeClass == .regular ? 36 : 24))
                             .tracking(-0.4)
@@ -93,8 +106,10 @@ struct HomeView: View {
                             .multilineTextAlignment(.leading)
                             .foregroundStyle(Color.envInk)
                     }
+                    .frame(maxWidth: 768)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 16) {
                         // Source guard contract: sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
                         Text("Trending tools")
                             .font(.custom("Outfit-SemiBold", size: 20))
@@ -303,11 +318,11 @@ struct ToolsView: View {
                             Spacer(minLength: 4)
                             HStack(spacing: 10) {
                                 EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                                TextField("Search", text: $toolsQuery)
+                                TextField("Search tools", text: $toolsQuery)
                                     .font(.custom("Outfit-Regular", size: 14))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
-                                    .accessibilityLabel("Search all tools")
+                                    .accessibilityLabel("Search tools")
                                     .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
                             .padding(.horizontal, 16)
@@ -483,6 +498,14 @@ struct SearchResultsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Search tools")
+                        .font(.custom("Outfit-SemiBold", size: 20))
+                        .foregroundStyle(Color.envInk)
+                    Text("Find a tool by name, category, or keyword.")
+                        .font(.custom("Outfit-Regular", size: 14))
+                        .foregroundStyle(Color.envMuted)
+                }
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Start typing to see matching tools.")
                         .font(.custom("Outfit-Regular", size: 14))
@@ -528,7 +551,7 @@ struct SearchResultsView: View {
             .padding(16)
         }
         .modifier(Screen())
-        .searchable(text: $text, prompt: "Search names, descriptions, keywords, tags")
+        .searchable(text: $text, prompt: "Search tools")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }

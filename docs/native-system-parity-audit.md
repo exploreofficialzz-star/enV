@@ -140,8 +140,9 @@ The following are **confirmed implementation differences in the inspected source
 #### P2 — Recent-tool persistence
 
 - **Web:** Mounting ToolShell records the current tool in a bounded recent list of up to 24 IDs. Evidence: `/home/ubuntu/enV/src/components/tools/tool-shell.tsx:24-32`; `/home/ubuntu/enV/src/lib/storage.ts:3-6,96-100`.
-- **Native:** Android and iOS detail screens do not record recents; settings show only a placeholder that recently used tools will appear here. Native stores inspected persist favorites/theme but have no recent-tool key or recorder. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:663`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:605`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt:6-27`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift:267-323`.
-- **Recommended action:** Persist a bounded recent ID list on native detail entry and surface it in History, or remove the web recent contract from the parity target.
+- **Native:** Android and iOS detail screens do not record recents; settings show the same placeholder text. Native stores inspected persist favorites/theme but have no recent-tool key or recorder. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:663`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:605`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt:6-27`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift:267-323`.
+- **Important scope note:** The web detail shell records up to 24 recent IDs, but `/history` still renders only “Recently used tools will appear here.” This is a storage-contract divergence, not a current visible History-list difference.
+- **Recommended action:** If recent state remains part of the native parity contract, persist a bounded 24-ID list on native detail entry; do not claim a visible History list until the web surface actually renders one.
 
 #### P2 — Form-surface geometry
 
@@ -391,7 +392,7 @@ The following boundaries are important. They prevent the confirmed source differ
 4. **Then execute the validation matrix above before declaring any screen fully equivalent.**
 
 
-## Implemented after the source audit (commit pending verification)
+## Implemented after the source audit (commit `242a1d8`, all authoritative CI passed)
 
 The following straightforward, source-confirmed issues have been fixed in the current working tree and guarded by `check:native-ui-parity`:
 
@@ -399,9 +400,17 @@ The following straightforward, source-confirmed issues have been fixed in the cu
 - Android legal/info paragraphs now render detected email addresses as underlined tappable `mailto:` links; when no mail handler resolves, a visible Toast directs the user to copy the address.
 - Android and iOS native footers now derive the copyright year from the runtime calendar rather than hard-coding 2026.
 
-These code changes still require native CI confirmation. Remaining screen audit items listed earlier remain open; these changes do not establish overall parity.
+The web/Android, iOS, and Production workflows passed for `242a1d8` (run IDs `37951883099`, `37951882958`, and `37951882864`). Remaining screen audit items listed earlier remain open; these changes do not establish overall parity.
 
 
 ### Follow-up: Assistant cancellation
 
-Android Assistant now passes its `NativeAiClient.RequestHandle` to the active network call and its Stop/New chat actions disconnect the HTTP request before cancelling coroutine UI state. iOS now exposes an accessible `Stop assistant response` action that cancels the active Swift task. The `check:native-ai` guard verifies both platform Stop-to-cancel bindings. These changes are in the next pending commit and require authoritative native CI confirmation; other Assistant gaps (geometry, iOS Outfit scale, error normalization, and message accessibility/retention) remain open.
+Android Assistant now passes its `NativeAiClient.RequestHandle` to the active network call and its Stop/New chat actions disconnect the HTTP request before cancelling coroutine UI state. iOS now exposes an accessible `Stop assistant response` action that cancels the active Swift task. The `check:native-ai` guard verifies both platform Stop-to-cancel bindings. Both platform stop changes were pushed in `1a0fd01`; Web/Android, iOS, and Production workflows passed (run IDs `37953311251`, `37953311229`, and `37953311441`).
+
+The next working-tree change aligns iOS Assistant heading, role labels, message body, pending/error/retry text, and composer typography with registered Outfit faces at explicit web-equivalent sizes, applies the canonical `Ask about enV tools or the enV brand…` placeholder, and responds to the regular horizontal size class for the larger heading. Static assertions were added. Geometry, Dynamic Type accessibility, error normalization, and message accessibility/retention remain open pending runtime/device checks.
+
+Another working-tree change aligns Android global Search and Tools search prompts/accessibility labels with `Search tools`, and adds the missing visible `Search tools` heading and web-equivalent description on the iOS Search results surface. Regression assertions were added. Suggestion dropdown/Enter behavior, result-pool scope, and responsive search geometry remain open.
+
+The current working tree also aligns Android and iOS Home's 768-point inner hero/search cap, the 142×56 / 163×64 hero logo breakpoint, 64 / 72 search height, and Home-to-Trending spacing/heading gaps with the web source. `check:native-ui-parity` covers the explicit source values. Screenshot/device validation is still needed, particularly iPad's coarse `regular` size-class mapping to the web 640-pixel breakpoint.
+
+Home Search on both native platforms now has an explicit `Search tools` field label and `Search all tools` action; Android no-match results use a surfaced card and both platforms preserve the web's `See more results` action even when the suggestions are empty. The native UI guard checks those branches. TalkBack/VoiceOver interaction and screenshot comparison remain runtime checks.

@@ -126,6 +126,7 @@ private enum NativeAssistantClient {
 
 struct AssistantChatView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Binding var messages: [AssistantChatMessage]
     @State private var draft = ""
     @State private var isSending = false
@@ -154,7 +155,7 @@ struct AssistantChatView: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
-                        Text("AI assistant").font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
+                            Text("AI assistant").font(.custom("Outfit-SemiBold", size: horizontalSizeClass == .regular ? 30 : 24)).foregroundStyle(Color.envInk)
                     }
                     Spacer()
                     Button(action: startNewChat) {
@@ -184,9 +185,9 @@ struct AssistantChatView: View {
                                             if message.isUser { Spacer(minLength: 28) }
                                             VStack(alignment: .leading, spacing: 5) {
                                                 Text(message.isUser ? "You" : "enV")
-                                                    .font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                                .font(.custom("Outfit-SemiBold", size: 12)).foregroundStyle(Color.envMuted)
                                                 Text(message.content)
-                                                    .font(.body).foregroundStyle(Color.envInk)
+                                                    .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk)
                                                     .textSelection(.enabled)
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
@@ -227,9 +228,9 @@ struct AssistantChatView: View {
                             if isSending {
                                 HStack(spacing: 8) {
                                     ProgressView()
-                                    Text("Thinking…").font(.footnote).foregroundStyle(Color.envMuted)
+                                    Text("Thinking…").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
                                     Button("Stop", action: stopRequest)
-                                        .font(.footnote.weight(.semibold))
+                                        .font(.custom("Outfit-SemiBold", size: 14))
                                         .accessibilityLabel("Stop assistant response")
                                 }
                                     .padding(12)
@@ -250,9 +251,9 @@ struct AssistantChatView: View {
 
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
-                        Text(errorMessage).font(.footnote).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(errorMessage).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
                         if let retryRequest {
-                            Button("Retry") { runRequest(retryRequest) }.font(.footnote.weight(.semibold))
+                            Button("Retry") { runRequest(retryRequest) }.font(.custom("Outfit-SemiBold", size: 14))
                         }
                     }
                     .padding(12)
@@ -260,12 +261,13 @@ struct AssistantChatView: View {
                 }
 
                 HStack(alignment: .bottom, spacing: 10) {
-                    TextField("Ask about enV tools or the brand…", text: Binding(
+                    TextField("Ask about enV tools or the enV brand…", text: Binding(
                         get: { draft },
                         set: { draft = String($0.prefix(messageLimit)) }
                     ), axis: .vertical)
                     .lineLimit(1...4)
                     .textFieldStyle(.roundedBorder)
+                    .font(.custom("Outfit-Regular", size: 16))
                     .submitLabel(.send)
                     .onSubmit(sendDraft)
                     .disabled(isSending)
