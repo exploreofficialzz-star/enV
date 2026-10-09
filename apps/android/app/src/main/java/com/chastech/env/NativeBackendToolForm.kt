@@ -60,6 +60,9 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mime)) { uri ->
         if (uri != null && bytes != null) context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
     }
+    val textSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(output.toByteArray(Charsets.UTF_8)) }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (isDocument) {
@@ -68,7 +71,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                 style = MaterialTheme.typography.bodySmall,
             )
             OutlinedButton(onClick = {
-                if (allowsMultipleDocuments) multiplePicker.launch(arrayOf("*/*"))
+                if (allowsMultipleDocuments) multiplePicker.launch(DOCUMENT_MIME_TYPES)
                 else singlePicker.launch(DOCUMENT_MIME_TYPES)
             }) {
                 Text(when {
@@ -105,10 +108,11 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                 value = input,
                 onValueChange = { input = it },
                 label = { Text(if (tool.id.contains("url")) "URL" else "Input") },
+                placeholder = { Text("Enter the input required by this tool…") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
+                minLines = if (tool.engine.type == "custom") 6 else 2,
             )
-            if (backend || tool.engine.type == "custom") {
+            if (backend && tool.engine.type != "custom") {
                 OutlinedTextField(
                     value = options,
                     onValueChange = { options = it },
@@ -133,7 +137,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                     error = ""
                     val requestOptions = if (isDocument) {
                         JSONObject().put("pages", pages).put("text", watermarkText).toString()
-                    } else options
+                    } else if (tool.engine.type == "custom") "{}" else options
                     scope.launch {
                         runCatching {
                             withContext(Dispatchers.IO) {
@@ -165,6 +169,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                         working && isDocument -> "Processing…"
                         working -> "Running…"
                         isDocument -> "Run ${nativeOperationLabel(operation)}"
+                        tool.engine.type == "custom" -> "Run tool"
                         else -> "Run"
                     },
                 )
@@ -191,6 +196,9 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                     context.getSystemService(ClipboardManager::class.java)
                         ?.setPrimaryClip(ClipData.newPlainText("enV output", output))
                 }) { Text("Copy") }
+                if (tool.engine.type == "custom") {
+                    OutlinedButton(onClick = { textSaver.launch("env-${tool.id}.txt") }) { Text("Download") }
+                }
             }
         }
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)

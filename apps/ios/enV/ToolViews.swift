@@ -328,6 +328,7 @@ private struct NativeBackendToolView: View {
     @State private var working = false
     @State private var showImporter = false
     @State private var showExporter = false
+    @State private var showTextExporter = false
 
     private var isDocument: Bool { tool.engine.type == "document-backend" }
     private var operation: String { tool.engine.op ?? tool.id }
@@ -368,12 +369,28 @@ private struct NativeBackendToolView: View {
                 } else if let error { NativeOutputView(output: "", error: error) }
             } else {
                 Text("Native Swift · enV backend API").font(.subheadline.weight(.semibold))
-                NativeInputField(title: "Input", text: $input)
-                NativeInputField(title: "Options JSON", text: $options)
+                if tool.engine.type == "custom" {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextEditor(text: $input).frame(minHeight: 150)
+                            .overlay(alignment: .topLeading) {
+                                if input.isEmpty { Text("Enter the input required by this tool…").foregroundStyle(.tertiary).padding(.top, 8).padding(.leading, 5).allowsHitTesting(false) }
+                            }
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
+                    }
+                } else {
+                    NativeInputField(title: "Input", text: $input)
+                    NativeInputField(title: "Options JSON", text: $options)
+                }
                 HStack {
                     if !["custom","developer"].contains(tool.engine.type ?? "") { Button("Choose file") { showImporter = true }.buttonStyle(.bordered) }
-                    Button("Run") { Task { await run() } }.buttonStyle(.borderedProminent).disabled(working)
+                    Button(working && tool.engine.type == "custom" ? "Running…" : tool.engine.type == "custom" ? "Run tool" : "Run") { Task { await run() } }.buttonStyle(.borderedProminent).disabled(working)
                     if !files.isEmpty { Text("Selected \(files.count) file(s)").font(.caption).foregroundStyle(.secondary) }
+                }
+                if tool.engine.type == "custom" && !output.isEmpty {
+                    HStack {
+                        Button("Copy") { UIPasteboard.general.string = output }.buttonStyle(.bordered)
+                        Button("Download") { showTextExporter = true }.buttonStyle(.bordered)
+                    }
                 }
                 if !output.isEmpty { NativeOutputView(output: output, error: error) }
                 else if let error { NativeOutputView(output: "", error: error) }
@@ -388,6 +405,9 @@ private struct NativeBackendToolView: View {
         .fileExporter(isPresented: $showExporter, document: NativeBackendExportDocument(data: outputData ?? Data()), contentType: outputContentType, defaultFilename: outputFileName) { result in
             if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
+        .fileExporter(isPresented: $showTextExporter, document: NativePlainTextDocument(text: output), contentType: .plainText, defaultFilename: "env-\(tool.id).txt") { result in
+            if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
+        }
     }
 
     private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
@@ -400,7 +420,7 @@ private struct NativeBackendToolView: View {
             if isDocument {
                 let data = try JSONSerialization.data(withJSONObject: ["pages": pages, "text": watermarkText])
                 requestOptions = String(decoding: data, as: UTF8.self)
-            } else { requestOptions = options }
+            } else { requestOptions = tool.engine.type == "custom" ? "{}" : options }
             let result = try await NativeBackendEngine.execute(tool, input: input, options: requestOptions, files: files)
             if isDocument {
                 outputData = result.data
