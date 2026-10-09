@@ -245,7 +245,7 @@ private struct WebHomeFooter: View {
                         .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
                 }
             }
-            Text("© 2026 chAs Technologies LLC · enV").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+            Text("© \(Calendar.current.component(.year, from: .now)) chAs Technologies LLC · enV").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
             Text("\(categoryCount) categories · \(activeCount) live tools").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

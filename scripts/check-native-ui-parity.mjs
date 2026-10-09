@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const android = readFileSync("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", "utf8");
 const iosContent = readFileSync("apps/ios/enV/ContentViews.swift", "utf8");
 const iosTools = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
+const androidInfo = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", "utf8");
 
 // Android detail links push onto a stack; system Back returns to the prior detail.
 assert.match(android, /var detailStack by rememberSaveable/);
@@ -30,5 +31,13 @@ assert.match(iosTools, /Outfit-Medium", size: 10/);
 assert.match(android, /screenWidth >= 640\) 36\.sp else 24\.sp/);
 assert.match(android, /contentPadding = PaddingValues\(horizontal = 16\.dp, vertical = 40\.dp\),\s*verticalArrangement = Arrangement\.spacedBy\(24\.dp\)/);
 assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Bold, color = MaterialTheme\.colorScheme\.primary/);
+
+// Information-page back and legal email actions remain actionable and return to the source tab.
+assert.match(android, /showInformation -> NativeInformationScreen\(informationPage\) \{ showInformation = false; tab = informationReturnTab \}/);
+assert.match(androidInfo, /private fun InformationParagraph\(text: String\)/);
+assert.match(androidInfo, /pushStringAnnotation\(tag = "mailto"/);
+assert.match(androidInfo, /No email app is available/);
+assert.match(android, /Year\.now\(\)\.value/);
+assert.match(iosContent, /Calendar\.current\.component\(\.year, from: \.now\)/);
 
 console.log("PASS: native navigation, search-state, width-cap, and typography parity guards");

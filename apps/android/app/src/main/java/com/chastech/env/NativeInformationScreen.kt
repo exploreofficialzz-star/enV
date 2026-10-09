@@ -2,6 +2,7 @@ package com.chastech.env
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -160,8 +165,9 @@ private fun EmailAction(address: String, context: android.content.Context, label
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         if (label != null) Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = {
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$address"))
-        if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
+            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$address"))
+            if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
+            else Toast.makeText(context, "No email app is available. Copy this address: $address", Toast.LENGTH_LONG).show()
         }) { Text(address, textDecoration = TextDecoration.Underline) }
     }
 }
@@ -310,7 +316,7 @@ private fun InformationCardSection(title: String, paragraphs: List<String>) {
 private fun InformationSection(title: String, paragraphs: List<String> = emptyList(), bullets: List<String> = emptyList(), afterBullets: List<String> = emptyList(), titleSize: TextUnit = 18.sp) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.titleMedium, fontSize = titleSize, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        paragraphs.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        paragraphs.forEach { InformationParagraph(it) }
         bullets.forEach { item ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 Surface(Modifier.padding(top = 9.dp).size(5.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape) {}
@@ -323,8 +329,37 @@ private fun InformationSection(title: String, paragraphs: List<String> = emptyLi
                 }
             }
         }
-        afterBullets.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        afterBullets.forEach { InformationParagraph(it) }
     }
+}
+
+@Composable
+private fun InformationParagraph(text: String) {
+    val context = LocalContext.current
+    val emails = Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
+    val color = MaterialTheme.colorScheme.primary
+    val annotated = buildAnnotatedString {
+        var cursor = 0
+        for (match in emails.findAll(text)) {
+            append(text.substring(cursor, match.range.first))
+            pushStringAnnotation(tag = "mailto", annotation = match.value)
+            withStyle(SpanStyle(color = color, textDecoration = TextDecoration.Underline)) { append(match.value) }
+            pop()
+            cursor = match.range.last + 1
+        }
+        append(text.substring(cursor))
+    }
+    ClickableText(
+        text = annotated,
+        style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+        onClick = { offset ->
+            annotated.getStringAnnotations("mailto", offset, offset).firstOrNull()?.let { annotation ->
+                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${annotation.item}"))
+                if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
+                else Toast.makeText(context, "No email app is available. Copy this address: ${annotation.item}", Toast.LENGTH_LONG).show()
+            }
+        },
+    )
 }
 
 @Composable

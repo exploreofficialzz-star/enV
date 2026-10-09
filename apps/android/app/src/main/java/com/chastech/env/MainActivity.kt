@@ -126,6 +126,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Year
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -284,7 +285,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
                             showExchange -> ContactExchangeScreen { showExchange = false }
-                            showInformation -> NativeInformationScreen(informationPage) { showInformation = false }
+                            showInformation -> NativeInformationScreen(informationPage) { showInformation = false; tab = informationReturnTab }
                             else -> AccountScreen(
                                 catalog = catalog,
                                 themeMode = themeMode,
@@ -428,7 +429,7 @@ private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: 
                 TextButton(onClick = { onInformation(route) }, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
             }
         }
-        Text("© 2026 chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("© ${Year.now().value} chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("${catalog.categories.size} categories · ${catalog.counts.active} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
