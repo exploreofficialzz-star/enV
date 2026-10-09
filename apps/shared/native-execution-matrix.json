@@ -5,12 +5,12 @@
     "total": 10000,
     "active": 10000,
     "planned": 0,
-    "offlineNative": 7597,
+    "offlineNative": 7612,
     "backendNative": 1619,
-    "webOnly": 784,
-    "missingActive": 784,
+    "webOnly": 769,
+    "missingActive": 769,
     "divergentActive": 0,
-    "fullyExecutable": 9216
+    "fullyExecutable": 9231
   },
   "tools": [
     {
@@ -514,8 +514,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "ai-meeting-agenda-generator",
@@ -532,8 +532,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "bio-generator",
@@ -541,8 +541,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "blog-outline-generator",
@@ -568,8 +568,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "content-brief-generator",
@@ -577,8 +577,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "email-generator",
@@ -586,8 +586,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "expand-helper",
@@ -622,8 +622,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "meeting-action-items",
@@ -640,8 +640,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "product-description-generator",
@@ -649,8 +649,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "product-title-generator",
@@ -667,8 +667,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "prompt-improver",
@@ -676,8 +676,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "pros-cons-generator",
@@ -694,8 +694,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "rewrite-helper",
@@ -703,8 +703,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "shorten-helper",
@@ -721,8 +721,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "tiktok-caption-helper",
@@ -739,8 +739,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "youtube-description-helper",

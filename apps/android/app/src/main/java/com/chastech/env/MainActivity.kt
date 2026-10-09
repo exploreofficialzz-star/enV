@@ -627,6 +627,7 @@ private fun InformationSection(title: String, paragraphs: List<String>) {
 
 private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
+    "ai" -> NativeAiEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
@@ -673,7 +674,6 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
         DetailRow("Native execution", when { supported -> "Available offline"; backend -> "Available online via enV backend"; tool.status == "planned" -> "Coming soon"; else -> "Web only — no native implementation" })
         DetailRow("Processing", if (backend) "Uses enV backend services" else "Runs on this device")
         when { backend -> NativeBackendToolForm(tool,true); supported -> NativeToolForm(tool); else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.primary) }
-        if (NativeAiEngine.supports(tool)) { NativeAiToolForm(tool) }
         if (tool.tags.isNotEmpty()) Text("Tags: ${tool.tags.joinToString()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -682,6 +682,7 @@ private fun ToolDetail(tool: ToolRecord, isFavorite: Boolean, onBack: () -> Unit
 private fun NativeToolForm(tool: ToolRecord) {
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
+        "ai" -> NativeAiToolForm(tool)
         "text" -> NativeTextToolForm(tool.id)
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)

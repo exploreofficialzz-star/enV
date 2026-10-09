@@ -137,6 +137,7 @@ enum NativeCoverage {
         if usesBackend(tool) || tool.isPlanned { return false }
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
+        case "ai": return NativeAiEngine.supports(tool.id)
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
@@ -166,6 +167,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "ai": if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -178,9 +180,6 @@ struct NativeFamilyToolView: View {
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "custom": if tool.category == "productivity" { NativeProductivityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
-            }
-            if NativeAiEngine.supports(tool.id) {
-                NativeAiToolView(tool: tool)
             }
         }
     }
