@@ -13,13 +13,13 @@ struct ToolCard: View {
                     VStack(alignment: .leading, spacing: 0) {
                         iconTile(tool.icon)
                         Text(tool.name)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.custom("Outfit-SemiBold", size: 14))
                             .tracking(-0.15)
                             .foregroundStyle(Color.envInk)
                             .lineLimit(1)
                             .padding(.top, 12)
                         Text(tool.description)
-                            .font(.system(size: 12))
+                            .font(.custom("Outfit-Regular", size: 12))
                             .foregroundStyle(Color.envMuted)
                             .lineLimit(2)
                             .lineSpacing(2)
@@ -27,7 +27,7 @@ struct ToolCard: View {
                         if NativeBackendEngine.supports(tool) {
                             StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
                         } else if NativeCoverage.isLocallyExecutable(tool) {
-                            Text("ON DEVICE").font(.system(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+                            Text("ON DEVICE").font(.custom("Outfit-Medium", size: 9)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
                         } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
                         } else {
                             StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
@@ -65,7 +65,7 @@ struct StatusPill: View {
     let text: String
     let color: Color
     var body: some View {
-        Text(text).font(.system(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
+        Text(text).font(.custom("Outfit-Medium", size: 10)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -357,7 +357,7 @@ private struct NativeBackendToolView: View {
                 HStack {
                     Button(working ? "Processing…" : "Run \(operationLabel(operation))") { Task { await run() } }
                         .buttonStyle(.borderedProminent).disabled(working)
-                    Button("Reset", action: reset).buttonStyle(.bordered).disabled(working)
+                    Button("Reset", action: reset).buttonStyle(.bordered)
                 }
                 if !output.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
@@ -396,6 +396,7 @@ private struct NativeBackendToolView: View {
                 else if let error { NativeOutputView(output: "", error: error) }
             }
         }
+        .font(.custom("Outfit-Regular", size: 14))
         .fileImporter(isPresented: $showImporter, allowedContentTypes: isDocument ? documentTypes : [.data], allowsMultipleSelection: isDocument ? allowsMultipleDocuments : true) { result in
             switch result {
             case .success(let urls): files = nativeBackendFiles(from: urls)
@@ -411,7 +412,7 @@ private struct NativeBackendToolView: View {
     }
 
     private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
-    private func reset() { files = []; pages = "1"; watermarkText = "enV"; output = ""; outputData = nil; error = nil }
+    private func reset() { files = []; output = ""; outputData = nil; error = nil }
     private func run() async {
         if isDocument && files.isEmpty { error = "Choose the document or file required by this tool."; return }
         working = true; defer { working = false }; output = ""; outputData = nil; error = nil

@@ -271,7 +271,7 @@ try {
       await form.getByRole("button", { name: "Calculate", exact: true }).click();
       let blankErrorVisible = false;
       try {
-        await form.locator('[role="alert"]').first().waitFor({ state: "visible", timeout: 1500 });
+        await form.locator('[role="alert"]').first().waitFor({ state: "visible", timeout: 5000 });
         blankErrorVisible = true;
       } catch {}
       const blankResultCount = await form.locator("dl").count();

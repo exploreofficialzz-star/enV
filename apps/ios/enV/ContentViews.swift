@@ -10,6 +10,7 @@ struct Screen: ViewModifier {
 
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
     let onSearch: (String) -> Void
     let onTools: () -> Void
@@ -86,7 +87,7 @@ struct HomeView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 4)
                         Text("A focused toolkit for\neveryday work.")
-                            .font(.custom("Outfit-SemiBold", size: 28))
+                            .font(.custom("Outfit-SemiBold", size: horizontalSizeClass == .regular ? 36 : 24))
                             .tracking(-0.4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
@@ -121,6 +122,8 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 24)
+                .frame(maxWidth: 1152)
+                .frame(maxWidth: .infinity)
             }
             .modifier(Screen())
             .navigationTitle("")
@@ -372,6 +375,8 @@ struct ToolsView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 40)
+                .frame(maxWidth: 1152)
+                .frame(maxWidth: .infinity)
             }
             .modifier(Screen())
             .navigationTitle("")
@@ -396,7 +401,7 @@ struct CategoryView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 24) {
                 if let category = store.category(named: categoryID) {
                     HStack(spacing: 12) {
                         EnVIcon(name: category.icon, size: 20, tint: .primary)
@@ -404,7 +409,7 @@ struct CategoryView: View {
                             .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 9))
                         VStack(alignment: .leading, spacing: 3) {
                             Text(category.name)
-                                .font(.custom("Outfit-Bold", size: 22))
+                                .font(.custom("Outfit-Bold", size: 30))
                                 .foregroundStyle(Color.envAccent)
                             Text(category.description)
                                 .font(.custom("Outfit-Regular", size: 14))
@@ -445,7 +450,10 @@ struct CategoryView: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 40)
+            .frame(maxWidth: 1152)
+            .frame(maxWidth: .infinity)
         }
         .modifier(Screen())
         .navigationTitle(store.category(named: categoryID)?.name ?? "Category")

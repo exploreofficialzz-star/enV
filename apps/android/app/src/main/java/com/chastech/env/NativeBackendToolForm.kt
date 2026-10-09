@@ -174,11 +174,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                     },
                 )
             }
-            OutlinedButton(onClick = {
-                input = ""
-                options = "{}"
-                pages = "1"
-                watermarkText = "enV"
+            if (isDocument) OutlinedButton(onClick = {
                 output = ""
                 error = ""
                 bytes = null

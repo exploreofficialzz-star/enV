@@ -53,5 +53,12 @@ assert.match(ios, /operation\.contains\("page-"\).*operation\.hasSuffix\("splitt
 assert.match(docWeb, /watermark/);
 assert.match(android, /operation\.contains\("watermark"\)/);
 assert.match(ios, /operation\.contains\("watermark"\)/);
+assert.match(docWeb, /onClick=\{\(\)=>\{setFiles\(\[\]\);setOut\(""\);setErr\(null\)\}\}/);
+assert.match(android, /if \(isDocument\) OutlinedButton\(onClick\s*=\s*\{\s*output = ""\s*error = ""\s*bytes = null\s*files = emptyList\(\)\s*\}\s*\)/s);
+assert.match(ios, /Button\("Reset", action: reset\)\.buttonStyle\(\.bordered\)(?!\.disabled\(working\))/);
+assert.match(ios, /private func reset\(\) \{ files = \[\]; output = ""; outputData = nil; error = nil \}/);
+assert.doesNotMatch(ios, /private func reset\(\) \{[^}]*pages\s*=/);
+assert.doesNotMatch(ios, /private func reset\(\) \{[^}]*watermarkText\s*=/);
+assert.match(android, /if \(isDocument\) OutlinedButton\(onClick\s*=/);
 
 console.log(`PASS: custom backend form contracts and document selectors match web behavior; ${docs.length} document operations audited.`);

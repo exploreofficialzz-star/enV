@@ -82,7 +82,7 @@ for (const [label, text] of screens) {
 if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.includes("onTool(tool.id)")) fail("Android assistant is missing catalog-backed, tappable tool recommendations");
 if (!iosAssistantSource.includes("candidates:") || !iosAssistantSource.includes("NavigationLink(value: tool)")) fail("iOS assistant is missing catalog-backed, tappable tool recommendations");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
-if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ selectedId = it }")) fail("Android recommendation navigation is not wired to the native tool detail view");
+if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ detailStack = listOf(it) }")) fail("Android recommendation navigation is not wired to the native tool detail view");
 
 const androidHome = androidActivitySource;
 const iosHomeSource = readFileSync(resolve(root, "apps/ios/enV/ContentViews.swift"), "utf8");

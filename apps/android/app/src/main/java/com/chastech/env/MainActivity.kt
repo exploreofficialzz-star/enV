@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -209,8 +210,9 @@ private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
+    var homeQuery by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showExchange by rememberSaveable { mutableStateOf(false) }
     var showInformation by rememberSaveable { mutableStateOf(false) }
     var informationPage by rememberSaveable { mutableStateOf("about") }
@@ -218,8 +220,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
-    val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
-    if (selected != null) BackHandler { selectedId = null }
+    val selected = detailStack.lastOrNull()?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
+    if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
     else if (showExchange) BackHandler { showExchange = false }
@@ -231,15 +233,15 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { tab = AppTab.Home.name; selectedId = null; category = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Home" }) {
+                    IconButton(onClick = { tab = AppTab.Home.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Home" }) {
                         EnVIcon("Home", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { tab = AppTab.Saved.name; selectedId = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
+                    IconButton(onClick = { tab = AppTab.Saved.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
                         EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = { tab = AppTab.Tools.name; selectedId = null; showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
+                    IconButton(onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
                         EnVIcon("LayoutGrid", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Box {
@@ -249,10 +251,10 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
-                            DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; selectedId = null; category = null; showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Pricing") }, onClick = { informationReturnTab = tab; informationPage = "pricing"; tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Pricing") }, onClick = { informationReturnTab = tab; informationPage = "pricing"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }
                 },
@@ -260,36 +262,38 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            if (selected != null) {
-                ToolDetail(
-                    catalog = catalog,
-                    tool = selected,
-                    isFavorite = selected.id in favoriteIds,
-                    onHome = { selectedId = null; category = null; query = ""; tab = AppTab.Home.name },
-                    onTools = { selectedId = null; category = null; query = ""; tab = AppTab.Tools.name },
-                    onCategory = { value -> selectedId = null; category = value; query = ""; tab = AppTab.Tools.name },
-                    onRelatedTool = { selectedId = it },
-                    onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
-                )
-            } else {
-                when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
-                    AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
-                    AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { selectedId = it })
-                    AppTab.Search -> SearchScreen(catalog, query, { query = it }, { selectedId = it })
-                    AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
-                    AppTab.Account -> when {
-                        showExchange -> ContactExchangeScreen { showExchange = false }
-                        showInformation -> NativeInformationScreen(informationPage) { showInformation = false }
-                        else -> AccountScreen(
-                            catalog = catalog,
-                            themeMode = themeMode,
-                            onUseSystemTheme = onUseSystemTheme,
-                            onOpenExchange = { showExchange = true },
-                            onOpenInformation = { informationReturnTab = tab; informationPage = "about"; showInformation = true },
-                            onOpenInformationPage = { page -> informationReturnTab = tab; informationPage = page; showInformation = true },
-                        )
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            Column(Modifier.align(Alignment.TopCenter).widthIn(max = 1152.dp).fillMaxHeight()) {
+                if (selected != null) {
+                    ToolDetail(
+                        catalog = catalog,
+                        tool = selected,
+                        isFavorite = selected.id in favoriteIds,
+                        onHome = { detailStack = emptyList(); category = null; query = ""; tab = AppTab.Home.name },
+                        onTools = { detailStack = emptyList(); category = null; query = ""; tab = AppTab.Tools.name },
+                        onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
+                        onRelatedTool = { detailStack = detailStack + it },
+                        onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
+                    )
+                } else {
+                    when (currentTab) {
+                        AppTab.Home -> HomeScreen(catalog, favoriteIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
+                        AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) })
+                        AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
+                        AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
+                        AppTab.Account -> when {
+                            showExchange -> ContactExchangeScreen { showExchange = false }
+                            showInformation -> NativeInformationScreen(informationPage) { showInformation = false }
+                            else -> AccountScreen(
+                                catalog = catalog,
+                                themeMode = themeMode,
+                                onUseSystemTheme = onUseSystemTheme,
+                                onOpenExchange = { showExchange = true },
+                                onOpenInformation = { informationReturnTab = tab; informationPage = "about"; showInformation = true },
+                                onOpenInformationPage = { page -> informationReturnTab = tab; informationPage = page; showInformation = true },
+                            )
+                        }
                     }
                 }
             }
@@ -298,7 +302,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val trending = remember(catalog, screenWidth) {
@@ -307,7 +311,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
             .take(12)
             .take(if (screenWidth >= 768) 12 else 6)
     }
-    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.webSearch(query).take(8) }
+    val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery).take(8) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
@@ -320,31 +324,31 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,
                 ) {
-                    // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = onSearch) { EnVIcon("Search") } }.
+                    // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = { onSearch(homeQuery) }) { EnVIcon("Search") } }.
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         EnVLogo(Modifier.width(48.dp).height(32.dp), darkTheme = darkMode)
                         Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-                            if (query.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                            if (homeQuery.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                             BasicTextField(
-                                value = query,
+                                value = homeQuery,
                                 onValueChange = onQuery,
                                 modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused },
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                                keyboardActions = KeyboardActions(onSearch = { onSearch(homeQuery) }),
                             )
                         }
-                        IconButton(onClick = onSearch, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
+                        IconButton(onClick = { onSearch(homeQuery) }, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
                     }
                 }
-                if (query.isNotBlank()) {
+                if (homeQuery.isNotBlank()) {
                     if (suggestions.isEmpty()) {
                         Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             suggestions.forEach { tool -> WebHomeSearchSuggestion(tool, onTool) }
-                            TextButton(onClick = onSearch, modifier = Modifier.align(Alignment.End)) {
+                            TextButton(onClick = { onSearch(homeQuery) }, modifier = Modifier.align(Alignment.End)) {
                                 Text("See more results", color = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(8.dp))
                                 EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -356,7 +360,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                     HomePreviewBar("AI assistant", Modifier.weight(1f), onClick = onAssistant)
                     HomePreviewBar("Total token = 100", Modifier.weight(1f))
                 }
-                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
+                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth())
             }
         }
         item {
@@ -508,8 +512,8 @@ private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> U
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         item {
@@ -521,7 +525,7 @@ private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> U
                     Box(contentAlignment = Alignment.Center) { EnVIcon(category?.icon ?: "Folder", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
                 }
                 Column(Modifier.padding(start = 4.dp)) {
-                    Text(category?.name ?: categoryId, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(category?.name ?: categoryId, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 30.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(category?.description ?: "Tools in this category.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
