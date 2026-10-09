@@ -46,8 +46,22 @@ private enum NativeTab: Int {
     case home, tools, search, saved, account, assistant
 }
 
+struct NativeInformationRoute: Identifiable {
+    let pageID: String
+    var id: String { pageID }
+}
+
+final class NativeInformationRouter: ObservableObject {
+    @Published var route: NativeInformationRoute?
+
+    func open(_ pageID: String) {
+        route = NativeInformationRoute(pageID: pageID)
+    }
+}
+
 struct RootTabView: View {
     @EnvironmentObject private var store: CatalogStore
+    @StateObject private var informationRouter = NativeInformationRouter()
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.themeMode") private var themeMode = "system"
     @State private var searchQuery = ""
@@ -58,7 +72,7 @@ struct RootTabView: View {
             HomeView(
                 onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue },
                 onTools: { selectedTab = NativeTab.tools.rawValue },
-                onAccount: { selectedTab = NativeTab.account.rawValue },
+                onInformation: { informationRouter.open($0) },
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
                 .tag(NativeTab.home.rawValue)
@@ -73,9 +87,13 @@ struct RootTabView: View {
             AccountView()
                 .tag(NativeTab.account.rawValue)
         }
+        .environmentObject(informationRouter)
         .toolbar(.hidden, for: .tabBar)
         .background(Color.envChrome.ignoresSafeArea())
         .preferredColorScheme(themeMode == "dark" ? .dark : themeMode == "light" ? .light : nil)
+        .fullScreenCover(item: $informationRouter.route) { route in
+            NativeInformationPageView(pageID: route.pageID)
+        }
         .overlay {
             if store.loadState == .loading {
                 NativeLaunchView()
@@ -87,6 +105,7 @@ struct RootTabView: View {
 }
 
 struct EnVBrandNavigationStyle: ViewModifier {
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
 
     func body(content: Content) -> some View {
@@ -114,7 +133,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
-                        Button("Pricing") { selectedTab = NativeTab.account.rawValue }
+                        Button("Pricing") { informationRouter.open("pricing") }
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in

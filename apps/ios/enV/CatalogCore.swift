@@ -189,9 +189,15 @@ extension Catalog {
             }
             return hits == 0 ? 0 : hits * 40 + tool.popularity
         }
-        return Array(tools.enumerated().map { ($0.offset, $0.element, score($0.element)) }.filter { $0.2 > 0 }.sorted {
-            $0.2 == $1.2 ? $0.0 < $1.0 : $0.2 > $1.2
-        }.prefix(limit).map { $0.1 })
+        let scoredTools: [(offset: Int, tool: Tool, score: Int)] = tools.enumerated().map { entry in
+            (offset: entry.offset, tool: entry.element, score: score(entry.element))
+        }
+        let matchingTools = scoredTools.filter { $0.score > 0 }
+        let rankedTools = matchingTools.sorted { left, right in
+            if left.score == right.score { return left.offset < right.offset }
+            return left.score > right.score
+        }
+        return rankedTools.prefix(limit).map { $0.tool }
     }
 }
 

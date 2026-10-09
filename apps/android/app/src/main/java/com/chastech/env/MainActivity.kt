@@ -209,13 +209,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var showExchange by rememberSaveable { mutableStateOf(false) }
     var showInformation by rememberSaveable { mutableStateOf(false) }
+    var informationPage by rememberSaveable { mutableStateOf("about") }
+    var informationReturnTab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
     val selected = selectedId?.let { id -> catalog.tools.find { it.id == id } }
     if (selected != null) BackHandler { selectedId = null }
     else if (category != null) BackHandler { category = null }
-    else if (showExchange || showInformation) BackHandler { showExchange = false; showInformation = false }
+    else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
+    else if (showExchange) BackHandler { showExchange = false }
     else if (tab == AppTab.Assistant.name) BackHandler { tab = AppTab.Home.name }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
     Scaffold(
@@ -245,7 +248,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; selectedId = null; category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Pricing") }, onClick = { tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Pricing") }, onClick = { informationReturnTab = tab; informationPage = "pricing"; tab = AppTab.Account.name; selectedId = null; showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }
                 },
@@ -258,20 +261,21 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 ToolDetail(tool = selected, isFavorite = selected.id in favoriteIds, onBack = { selectedId = null }, onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) })
             } else {
                 when (currentTab) {
-                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { tab = AppTab.Account.name }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
+                    AppTab.Home -> HomeScreen(catalog, favoriteIds, query, { query = it }, { category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { selectedId = it }, { favoriteIds = favorites.toggle(it) }, { selectedId = null; category = null; tab = AppTab.Assistant.name })
                     AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { selectedId = it })
                     AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { selectedId = it })
                     AppTab.Search -> SearchScreen(catalog, query, { query = it }, { selectedId = it })
                     AppTab.Saved -> SavedScreen(catalog, favoriteIds, { selectedId = it }, { favoriteIds = favorites.toggle(it) })
                     AppTab.Account -> when {
                         showExchange -> ContactExchangeScreen { showExchange = false }
-                        showInformation -> CompanyInformationScreen { showInformation = false }
+                        showInformation -> NativeInformationScreen(informationPage) { showInformation = false }
                         else -> AccountScreen(
                             catalog = catalog,
                             themeMode = themeMode,
                             onUseSystemTheme = onUseSystemTheme,
                             onOpenExchange = { showExchange = true },
-                            onOpenInformation = { showInformation = true },
+                            onOpenInformation = { informationReturnTab = tab; informationPage = "about"; showInformation = true },
+                            onOpenInformationPage = { page -> informationReturnTab = tab; informationPage = page; showInformation = true },
                         )
                     }
                 }
@@ -281,7 +285,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onAccount: () -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val trending = remember(catalog, screenWidth) {
@@ -358,7 +362,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, query: String, 
                 }
             }
         }
-        item { WebHomeFooter(catalog, onAccount) }
+        item { WebHomeFooter(catalog, onTools, onInformation) }
     }
 }
 
@@ -391,17 +395,21 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter(catalog: Catalog, onAccount: () -> Unit) {
+private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EnVLogo(Modifier.width(142.dp).height(48.dp))
         Text("Useful tools. One place. ${catalog.counts.active} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("Product", fontWeight = FontWeight.SemiBold)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            listOf("About", "Tools", "Pricing", "Contact").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
+            listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact").forEach { (label, route) ->
+                TextButton(onClick = { if (route == "tools") onTools() else onInformation(route) }, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+            }
         }
         Text("Legal", fontWeight = FontWeight.SemiBold)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            listOf("Privacy", "Terms", "Disclaimer", "Responsible use").forEach { label -> TextButton(onClick = onAccount, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) } }
+            listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use").forEach { (label, route) ->
+                TextButton(onClick = { onInformation(route) }, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+            }
         }
         Text("© 2026 chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("${catalog.categories.size} categories · ${catalog.counts.active} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -622,7 +630,7 @@ private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (Strin
 }
 
 @Composable
-private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit, onOpenInformation: () -> Unit) {
+private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit, onOpenInformation: () -> Unit, onOpenInformationPage: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -634,96 +642,11 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
+        SettingCard("Account", "No account is required for the browser toolkit.", "Info", onClick = { onOpenInformationPage("account") })
+        SettingCard("History", "Recently used tools will appear here.", "Info", onClick = { onOpenInformationPage("history") })
         SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
         SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
         SettingCard("About enV & chAs Technologies LLC", "Company details, policies, and pricing", "Info", onClick = onOpenInformation)
-    }
-}
-
-@Composable
-private fun CompanyInformationScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back to Account" }) {
-                EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
-            }
-            Text("About & policies", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        }
-        Surface(color = Color.White, shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-            ChasTechnologiesLogo(Modifier.fillMaxWidth().height(112.dp).padding(8.dp))
-        }
-        InformationSection("About enV", listOf(
-            "A focused toolkit for everyday work across Web, Android, and iOS. enV is developed and operated by chAs Technologies LLC, registered in Delaware, USA.",
-            "Some tools process information on your device; connected features use the service or provider described for that feature.",
-        ))
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Contact", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("enV product support", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:envtoolkit@gmail.com"))) }) {
-                    Text("envtoolkit@gmail.com")
-                }
-                Text("Company inquiries · chAs Technologies LLC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:chastechnologiesllc@gmail.com"))) }) {
-                    Text("chastechnologiesllc@gmail.com")
-                }
-            }
-        }
-        InformationSection("Privacy", listOf(
-            "chAs Technologies LLC, the company behind enV, is registered in Delaware, USA.",
-            "enV is for people aged 13 or older and is not intended for children under 13. If you are under the age of majority where you live, local parent or guardian permission requirements still apply.",
-            "Favorites, recent tools, theme preferences, and the Web contact card are stored locally on your device until you clear app or browser data. Ordinary toolkit use does not require an account.",
-            "Some document and media tools upload selected files to the enV service or a processor configured for that deployment. The document endpoint uses a temporary working directory and removes it when the request finishes.",
-            "When AI is enabled, the task input is sent through the enV server to the configured provider. Supported providers include Groq, OpenRouter, and Google Gemini; routing and brief result caching depend on deployment settings. Provider retention policies apply.",
-            "Optional sign-in may process account and session information. Nearby Contact Exchange sends only the fields enabled in the feature to participating nearby devices while Exchange is active. Saving a received contact requires your separate action and permission.",
-            "For privacy requests, email envtoolkit@gmail.com. Provider and infrastructure retention may vary; do not send sensitive information to a connected feature unless you are comfortable with its handling.",
-        ))
-        InformationSection("Terms of Use", listOf(
-            "You must be at least 13 years old to use enV. If you are under the age of majority where you live, use enV only with any parent or guardian permission required by local law.",
-            "These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict-of-law principles. Subject to non-waivable consumer rights and mandatory laws that apply where you live, disputes relating to these Terms will be brought in state or federal courts located in Delaware. Nothing here limits a right or remedy that cannot lawfully be waived.",
-            "Use enV lawfully and responsibly. You are responsible for your inputs, permissions, and decisions based on tool results. Do not submit material you do not have permission to use or violate another person’s rights.",
-            "Outputs may be incomplete, inaccurate, or non-unique. Verify important results before relying on them. Some features depend on third-party services and may change or become unavailable.",
-            "Prices are listed in USD. The token schedule is planned only: this app has no token balance, purchase checkout, or reward issuance. When payments are enabled, checkout is intended to convert USD prices to local currency in countries supported by the selected gateway; the final amount and currency will be shown before payment. Availability and conversion rates depend on the provider. Future token, payment, expiry, refund, and eligibility terms will be displayed before activation.",
-            "To the extent allowed by applicable law, enV is provided as available and without warranties that cannot be disclaimed. Nothing here limits a right or liability that cannot legally be limited.",
-        ))
-        InformationSection("Disclaimer", listOf(
-            "enV provides general-purpose tools, not legal, medical, mental-health, financial, investment, tax, engineering, or safety-critical advice.",
-            "Calculations, generated content, and extracted data may be wrong or incomplete. Check inputs, assumptions, units, and outputs. Do not rely on a result as the sole basis for a high-stakes decision; consult a qualified professional when appropriate.",
-            "AI output may be biased, incorrect, incomplete, or similar to other output. Third-party service availability and handling are outside enV’s control.",
-        ))
-        InformationSection("Responsible Use", listOf(
-            "Do not use enV for unlawful activity, fraud, harassment, impersonation, unauthorized access, malware, spam, infringement, or to violate another person’s privacy or rights.",
-            "Only submit content you are permitted to use. Review connected-feature notices before sending files or text to a server or AI provider. In Contact Exchange, enable only fields you intend to share with nearby participants.",
-            "Keep a person responsible for reviewing results, especially for legal, medical, financial, tax, and safety-critical matters. Report safety or privacy concerns to envtoolkit@gmail.com.",
-        ))
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Pricing", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Planned pricing — purchases are not available yet. The current app has no token balance, checkout, or referral-award system. Prices are listed in USD; when payments are enabled, checkout is intended to convert them to local currency in countries supported by the gateway and show the final amount and currency before payment.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                listOf("100 tokens" to "$0.30", "300 tokens" to "$0.50", "500 tokens" to "$0.80", "1,000 tokens" to "$1.20", "5,000 tokens" to "$5.00").forEach { (tokens, price) ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(tokens, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(price, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
-                Text("Planned first sign-up bonus: 100 tokens · planned referral reward: 50 tokens. Eligibility and program rules will be published before rewards are enabled.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun InformationSection(title: String, paragraphs: List<String>) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            paragraphs.forEach { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
     }
 }
 

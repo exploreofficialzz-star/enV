@@ -51,30 +51,32 @@ for (const name of new Set([...catalog.tools, ...catalog.categories].map((entry)
 
 const androidAssets = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt"), "utf8");
 const androidHome = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), "utf8");
+const androidInformation = readFileSync(path.join(root, "apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt"), "utf8");
 const androidToolCard = androidHome.slice(androidHome.indexOf("private fun ToolCard("));
 const androidBaseStyles = readFileSync(path.join(root, "apps/android/app/src/main/res/values/styles.xml"), "utf8");
 const androidApi27Styles = readFileSync(path.join(root, "apps/android/app/src/main/res/values-v27/styles.xml"), "utf8");
 const iosApp = readFileSync(path.join(root, "apps/ios/enV/enVApp.swift"), "utf8");
 const iosHome = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
+const iosInformation = iosHome.slice(iosHome.indexOf("struct NativeInformationPageView: View {"));
 const iosCards = readFileSync(path.join(root, "apps/ios/enV/ToolViews.swift"), "utf8");
 const xcodeProject = readFileSync(path.join(root, "apps/ios/enV.xcodeproj/project.pbxproj"), "utf8");
 assert.ok(androidAssets.includes('"native-icons/icons/'), "Android must read the shared icon assets");
 assert.ok(iosApp.includes('native-icons/icons/'), "iOS must read the shared icon assets");
 assert.ok(androidAssets.includes('"native-icons/chas-technologies-logo.jpg"') && androidAssets.includes("fun ChasTechnologiesLogo"), "Android must render the supplied company logo from shared native assets");
 assert.ok(iosApp.includes('native-icons/chas-technologies-logo.jpg') && iosApp.includes("struct ChasTechnologiesLogo"), "iOS must render the supplied company logo from shared native assets");
-assert.ok(androidHome.includes("CompanyInformationScreen") && androidHome.includes("onOpenInformation =") && androidHome.includes("envtoolkit@gmail.com") && androidHome.includes("chastechnologiesllc@gmail.com"), "Android Account must open native company and contact information");
-assert.ok(iosHome.includes("NavigationLink { CompanyInformationView() }") && iosHome.includes("ChasTechnologiesLogo()") && iosHome.includes("envtoolkit@gmail.com") && iosHome.includes("chastechnologiesllc@gmail.com"), "iOS Account must open native company and contact information");
-assert.ok(androidHome.includes("people aged 13 or older") && androidHome.includes("at least 13 years old") && androidHome.includes("Prices are listed in USD") && androidHome.includes("final amount and currency"), "Android information screen must preserve the confirmed age and currency terms");
-assert.ok(iosHome.includes("people aged 13 or older") && iosHome.includes("at least 13 years old") && iosHome.includes("Prices are listed in USD") && iosHome.includes("final amount and currency"), "iOS information screen must preserve the confirmed age and currency terms");
-assert.ok(androidHome.includes("registered in Delaware, USA") && androidHome.includes("governed by the laws of the State of Delaware, United States") && androidHome.includes("courts located in Delaware"), "Android information screen must identify Delaware registration and governing law");
-assert.ok(iosHome.includes("registered in Delaware, USA") && iosHome.includes("governed by the laws of the State of Delaware, United States") && iosHome.includes("courts located in Delaware"), "iOS information screen must identify Delaware registration and governing law");
-for (const section of ["About enV", "Privacy", "Terms of Use", "Disclaimer", "Responsible Use", "Pricing"]) {
-  assert.ok(androidHome.includes(`InformationSection(\"${section}\"`) || (section === "Pricing" && androidHome.includes('Text("Pricing"')), `Android information screen is missing ${section}`);
-  assert.ok(iosHome.includes(`title: \"${section}\"`) || (section === "Pricing" && iosHome.includes('Text("Pricing")')), `iOS information screen is missing ${section}`);
+assert.ok(androidHome.includes("NativeInformationScreen(informationPage)") && androidHome.includes("informationPage = page;") && androidHome.includes("onOpenInformationPage ="), "Android footer and Account must route to individual native information pages");
+assert.ok(androidInformation.includes("fun NativeInformationScreen") && androidInformation.includes("envtoolkit@gmail.com") && androidInformation.includes("chastechnologiesllc@gmail.com"), "Android native information destinations must include tappable contact actions");
+assert.ok(iosHome.includes('informationRouter.open("about")') && iosHome.includes('informationRouter.open("account")') && iosHome.includes('informationRouter.open("history")') && iosInformation.includes("struct NativeInformationPageView: View") && iosInformation.includes("envtoolkit@gmail.com") && iosInformation.includes("chastechnologiesllc@gmail.com"), "iOS footer and Account must route to individual native information pages with contact actions");
+assert.ok(androidInformation.includes("people aged 13 or older") && androidInformation.includes("at least 13 years old") && androidInformation.includes("Prices are listed in USD") && androidInformation.includes("final currency and total will be shown"), "Android information pages must preserve canonical age and currency terms");
+assert.ok(iosInformation.includes("people aged 13 or older") && iosInformation.includes("at least 13 years old") && iosInformation.includes("Prices are listed in USD") && iosInformation.includes("final currency and total will be shown"), "iOS information pages must preserve canonical age and currency terms");
+assert.ok(androidInformation.includes("registered in Delaware, USA") && androidInformation.includes("governed by the laws of the State of Delaware, United States") && androidInformation.includes("courts located in Delaware"), "Android information pages must preserve registration and governing-law text");
+assert.ok(iosInformation.includes("registered in Delaware, USA") && iosInformation.includes("governed by the laws of the State of Delaware, United States") && iosInformation.includes("courts located in Delaware"), "iOS information pages must preserve registration and governing-law text");
+for (const pageID of ["about", "pricing", "contact", "account", "history", "privacy", "terms", "disclaimer", "responsible-use"]) {
+  assert.ok(androidInformation.includes(`\"${pageID}\" ->`) && iosInformation.includes(`case \"${pageID}\"`), `Android and iOS must have a dedicated native destination for ${pageID}`);
 }
 for (const offer of ["$0.30", "$0.50", "$0.80", "$1.20", "$5.00"]) {
-  assert.ok(androidHome.includes(offer), `Android pricing is missing ${offer}`);
-  assert.ok(iosHome.includes(offer), `iOS pricing is missing ${offer}`);
+  assert.ok(androidInformation.includes(offer), `Android pricing is missing ${offer}`);
+  assert.ok(iosInformation.includes(offer), `iOS pricing is missing ${offer}`);
 }
 assert.ok(androidAssets.includes('"native-icons/logo-header-dark.png"'), "Android must use the contrast-safe dark logo");
 assert.ok(iosApp.includes('"native-icons/logo-header-dark.png"'), "iOS must use the contrast-safe dark logo");
