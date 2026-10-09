@@ -5,6 +5,9 @@ const android = readFileSync("apps/android/app/src/main/java/com/chastech/env/Ma
 const iosContent = readFileSync("apps/ios/enV/ContentViews.swift", "utf8");
 const iosTools = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
 const androidInfo = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", "utf8");
+const androidStore = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt", "utf8");
+const iosCatalog = readFileSync("apps/ios/enV/CatalogCore.swift", "utf8");
+const androidCatalog = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt", "utf8");
 
 // Android detail links push onto a stack; system Back returns to the prior detail.
 assert.match(android, /var detailStack by rememberSaveable/);
@@ -55,5 +58,18 @@ assert.match(android, /if \(suggestions\.isEmpty\(\)\) \{[\s\S]*?TextButton\(onC
 assert.match(iosContent, /\.accessibilityLabel\("Search tools"\)/);
 assert.match(iosContent, /\.accessibilityLabel\("Search all tools"\)/);
 assert.match(iosContent, /if searchSuggestions\.isEmpty \{[\s\S]*?Text\("See more results"\)/);
+assert.match(android, /LaunchedEffect\(selected\?\.id\) \{ selected\?\.id\?\.let \{ favorites\.recordRecent\(it\) \} \}/);
+assert.match(androidStore, /private val recentKey = "recent_tool_ids"/);
+assert.match(androidStore, /fun recordRecent\(toolId: String\): List<String>/);
+assert.match(androidStore, /\.filterNot \{ it == toolId \}.*\.take\(24\)/s);
+assert.match(iosTools, /\.onAppear \{ store\.recordRecent\(tool\.id\) \}/);
+assert.match(iosCatalog, /@Published private\(set\) var recentIDs: \[String\]/);
+assert.match(iosCatalog, /func recordRecent\(_ toolID: String\)/);
+assert.match(iosCatalog, /\.prefix\(24\)/);
+assert.match(androidCatalog, /val browserActiveToolCount: Int[\s\S]*?relatedReferenceTools\)\.count \{ it\.status == "active" \|\| it\.status == "beta" \}/);
+assert.match(iosCatalog, /var browserActiveToolCount: Int[\s\S]*?\(tools \+ \(relatedReferenceTools \?\? \[\]\)\)\.filter \{ \$0\.status == "active" \|\| \$0\.status == "beta" \}\.count/);
+assert.match(android, /\$\{catalog\.browserActiveToolCount\} browser tools/);
+assert.match(android, /\$\{catalog\.browserActiveToolCount\} live tools/);
+assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.browserActiveToolCount/);
 
 console.log("PASS: native navigation, search-state, width-cap, and typography parity guards");

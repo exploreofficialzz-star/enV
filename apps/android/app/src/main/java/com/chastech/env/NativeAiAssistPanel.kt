@@ -232,7 +232,7 @@ fun NativeAiAssistPanel(tool: ToolRecord) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(32.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -246,10 +246,27 @@ fun NativeAiAssistPanel(tool: ToolRecord) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val columns = if (maxWidth >= 640.dp) 2 else 1
                 val fields = feature.fields.filter { it.kind != AssistKind.CHECKBOX }
-                fields.chunked(columns).forEach { rowFields ->
+                val fieldRows = if (columns == 1) fields.map { listOf(it) } else {
+                    val rows = mutableListOf<List<AssistField>>()
+                    val regularRow = mutableListOf<AssistField>()
+                    fields.forEach { field ->
+                        val fullWidth = field.kind in setOf(AssistKind.TEXTAREA, AssistKind.IMAGE, AssistKind.AUDIO)
+                        if (fullWidth) {
+                            if (regularRow.isNotEmpty()) { rows += regularRow.toList(); regularRow.clear() }
+                            rows += listOf(field)
+                        } else {
+                            regularRow += field
+                            if (regularRow.size == columns) { rows += regularRow.toList(); regularRow.clear() }
+                        }
+                    }
+                    if (regularRow.isNotEmpty()) rows += regularRow.toList()
+                    rows
+                }
+                fieldRows.forEach { rowFields ->
+                    val fullWidth = rowFields.size == 1 && rowFields.first().kind in setOf(AssistKind.TEXTAREA, AssistKind.IMAGE, AssistKind.AUDIO)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                         rowFields.forEach { field ->
-                            Box(Modifier.weight(1f)) {
+                            Box(if (columns == 2 && !fullWidth) Modifier.weight(1f) else Modifier.fillMaxWidth()) {
                                 NativeAiAssistField(
                                     field = field,
                                     value = values[field.name] ?: "",
@@ -260,7 +277,7 @@ fun NativeAiAssistPanel(tool: ToolRecord) {
                                 )
                             }
                         }
-                        if (columns == 2 && rowFields.size == 1) Spacer(Modifier.weight(1f))
+                        if (columns == 2 && rowFields.size == 1 && !fullWidth) Spacer(Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -470,6 +487,39 @@ private fun NativeAiAssistResult(
                 }
                 result.optString("language").takeIf { it.isNotBlank() && it != "null" }?.let { Text("Detected language: $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
+            "developer.regex.explain" -> {
+                Text(result.optString("summary"), style = MaterialTheme.typography.bodyMedium)
+                val parts = result.optJSONArray("parts")
+                AssistResultSection("Breakdown", (0 until (parts?.length() ?: 0)).mapNotNull { index -> parts?.optJSONObject(index)?.let { "${it.optString("token")} — ${it.optString("meaning")}" } }, clipboard)
+                val pitfalls = result.optJSONArray("pitfalls")
+                AssistResultSection("Watch out for", (0 until (pitfalls?.length() ?: 0)).mapNotNull { pitfalls?.optString(it) }, clipboard)
+                val tests = result.optJSONArray("suggestedTests")
+                AssistResultSection("Suggested examples (AI guesses, not verified)", (0 until (tests?.length() ?: 0)).mapNotNull { index -> tests?.optJSONObject(index)?.let { "${it.optString("input").ifEmpty { "(empty)" }} — ${if (it.optBoolean("shouldMatch")) "should match" else "should not match"}" } }, clipboard)
+                if (tests != null && tests.length() > 0) Text("Try these in the regex tester above before relying on them.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            "developer.sql.explain" -> {
+                Text(result.optString("summary"), style = MaterialTheme.typography.bodyMedium)
+                val steps = result.optJSONArray("steps")
+                AssistResultSection("Step by step", (0 until (steps?.length() ?: 0)).mapNotNull { index -> steps?.optJSONObject(index)?.let { "${index + 1}. ${it.optString("clause")} — ${it.optString("explanation")}" } }, clipboard)
+                val warnings = result.optJSONArray("warnings")
+                AssistResultSection("Warnings", (0 until (warnings?.length() ?: 0)).mapNotNull { warnings?.optString(it) }, clipboard)
+                val notes = result.optJSONArray("performanceNotes")
+                AssistResultSection("Performance notes", (0 until (notes?.length() ?: 0)).mapNotNull { notes?.optString(it) }, clipboard)
+            }
+            "developer.json.explain" -> {
+                Text(result.optString("summary"), style = MaterialTheme.typography.bodyMedium)
+                val structure = result.optJSONArray("structure")
+                AssistResultSection("Structure", (0 until (structure?.length() ?: 0)).mapNotNull { index -> structure?.optJSONObject(index)?.let { "${it.optString("path")} · ${it.optString("type")}${it.optString("note").takeIf { note -> note.isNotEmpty() }?.let { note -> " — $note" }.orEmpty()}" } }, clipboard)
+                val issues = result.optJSONArray("issues")
+                AssistResultSection("Possible issues", (0 until (issues?.length() ?: 0)).mapNotNull { issues?.optString(it) }, clipboard)
+            }
+            "image.alt.generate" -> {
+                val alt = result.optString("altText")
+                AssistResultSection("Alt text", listOf(alt), clipboard)
+                Text("${alt.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                AssistResultSection("Longer description", listOf(result.optString("longDescription")), clipboard)
+                if (result.optBoolean("containsText")) AssistResultSection("Text found in the image", listOf(result.optString("textInImage")), clipboard)
+            }
             else -> {
                 val output = NativeAiEngine.formatResult(task, result).ifBlank { "No result was returned." }
                 Text(output, style = MaterialTheme.typography.bodyMedium)
@@ -477,6 +527,20 @@ private fun NativeAiAssistResult(
             }
         }
         if (warnings.isNotEmpty()) Text(warnings.joinToString(" "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun AssistResultSection(title: String, entries: List<String>, clipboard: androidx.compose.ui.platform.ClipboardManager) {
+    if (entries.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        entries.forEach { entry ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Text("• $entry", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(entry)) }) { Text("Copy") }
+            }
+        }
     }
 }
 

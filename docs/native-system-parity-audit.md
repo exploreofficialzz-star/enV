@@ -142,7 +142,8 @@ The following are **confirmed implementation differences in the inspected source
 - **Web:** Mounting ToolShell records the current tool in a bounded recent list of up to 24 IDs. Evidence: `/home/ubuntu/enV/src/components/tools/tool-shell.tsx:24-32`; `/home/ubuntu/enV/src/lib/storage.ts:3-6,96-100`.
 - **Native:** Android and iOS detail screens do not record recents; settings show the same placeholder text. Native stores inspected persist favorites/theme but have no recent-tool key or recorder. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:663`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:605`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt:6-27`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift:267-323`.
 - **Important scope note:** The web detail shell records up to 24 recent IDs, but `/history` still renders only “Recently used tools will appear here.” This is a storage-contract divergence, not a current visible History-list difference.
-- **Recommended action:** If recent state remains part of the native parity contract, persist a bounded 24-ID list on native detail entry; do not claim a visible History list until the web surface actually renders one.
+- **Status:** The pending follow-up persists a deduplicated, newest-first 24-ID list on Android/iOS detail entry. The History screen remains the identical placeholder because that is still the web behavior.
+- **Recommended action:** Verify persistence after app relaunch and keep History list rendering out of scope until the web `/history` route uses the recent state.
 
 #### P2 — Form-surface geometry
 
@@ -213,14 +214,18 @@ The following are **confirmed implementation differences in the inspected source
 #### P2 — Responsive field hierarchy / width
 
 - **Web:** At `sm` (640px), textarea/image/audio fields span both grid columns; ordinary fields use two columns. Evidence: `/home/ubuntu/enV/src/components/ai/ai-assist-panel.tsx:179-182`.
-- **Native:** Android uses only `fields.chunked(columns)` and never tests field kind, so every non-checkbox field becomes an equal two-column cell at >=640dp; topic/SQL/JSON textareas and image/audio controls do not span both columns. iOS implements the wide rule. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt:246-265`; `/home/ubuntu/enV/apps/ios/enV/ToolViews.swift:1691-1692,1829-1833`.
-- **Recommended action:** Give Android textarea/image/audio fields a two-column span.
+- **Native (initial audit):** Android used only `fields.chunked(columns)` and did not test field kind, so topic/SQL/JSON textareas and image/audio controls did not span both columns. iOS already implements the wide rule. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt:246-265`; `/home/ubuntu/enV/apps/ios/enV/ToolViews.swift:1691-1692,1829-1833`.
+- **Status:** The current working tree groups Android textarea/image/audio controls across both columns at >=640dp, flushes short rows around wide fields, and includes a `check:native-ai` regression assertion. Runtime/screenshot verification remains.
+- **Recommended action:** Verify TalkBack, layout at 640/768dp, and long localized/validation content on Android.
+
+For the structured result hierarchy finding below, the current working tree also adds labeled Breakdown/Warnings/Structure/Alt text sections, suggested-test caveats, metadata, and per-entry Copy controls for regex, SQL, JSON, and image alt-text outputs on Android and iOS. The `check:native-ai` guard now checks all result-kind routes and section labels. Native compile/XCTest/simulator verification remains pending before this batch is considered resolved.
 
 #### P2 — Panel geometry / elevation
 
 - **Web:** Panel uses `rounded-2xl` plus `shadow-[var(--shadow-border)]`; theme 2xl radius is 32px. Evidence: `/home/ubuntu/enV/src/components/ai/ai-assist-panel.tsx:168-170`; `/home/ubuntu/enV/src/styles.css:57-67`.
-- **Native:** Android uses 16dp card shape, explicit border, zero elevation; iOS uses 16pt rounded rectangle, border, and no shadow. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt:232-238`; `/home/ubuntu/enV/apps/ios/enV/ToolViews.swift:1868-1871`.
-- **Recommended action:** Align native outer radius/border/shadow with web or change the web token/class to make 16 the canonical contract.
+- **Native (initial audit):** Android and iOS used 16-point rounded rectangles with borders and no shadow. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt:232-238`; `/home/ubuntu/enV/apps/ios/enV/ToolViews.swift:1868-1871`.
+- **Status:** Pending working-tree changes align the native outer radius to 32dp/pt and guard it in `check:native-ai`; shadows remain lighter/different and need screenshot verification.
+- **Recommended action:** Verify native border/shadow perception at mobile and tablet widths.
 
 #### P2 — Typography / Outfit scale
 
@@ -358,10 +363,10 @@ These are **source-confirmed matches or materially aligned contracts**, not a cl
 
 The following boundaries are important. They prevent the confirmed source differences above from being overstated as runtime or visual claims.
 
-1. **Read-only source audit:** No application source was modified. No builds, unit/integration tests, browser visual runs, emulators, simulators, device runs, or screenshots were executed.
+1. **Audit snapshot versus follow-up work:** The original audit was read-only and had no builds, tests, or device/screenshot checks. Subsequent fixes and focused regression guards are recorded below. The three authoritative workflows passed on commit `d47df60`; a newer, separate working-tree batch (contextual AI, recents, canonical counts) still needs its own Android/iOS CI before its status is final.
 2. **Source semantics versus runtime behavior:** Accessibility conclusions are limited to explicit declarations present/absent in source. TalkBack, VoiceOver, browser accessibility-tree output, live-region timing, focus order, hit targets, and actual screen-reader announcements were not measured.
-3. **Rendered geometry:** Dimensions explicitly set in source are confirmed; default Compose/UIKit/SwiftUI control heights, font rasterization, Dynamic Type, native shadow rendering, and final wrapping remain runtime questions. The web Assistant geometry was identified as the reference contract, but the supplied assistant gap entry did not include all exact web line citations; recheck those lines before implementation.
-4. **Catalog data:** The shared catalog currently contains 10,000 entries marked active. The audit's current count example is therefore 10,000 web versus 9,992 native after the eight web-runtime-only filters. Beta/planned-specific count differences could not be observed in this data. The exact filtered ID set was not enumerated in the Search/browsing audit beyond the confirmed filtering contract.
+3. **Rendered geometry:** Dimensions explicitly set in source are confirmed; default Compose/UIKit/SwiftUI control heights, font rasterization, Dynamic Type, native shadow rendering, and final wrapping remain runtime questions. The d47 CI exercised native app builds/simulator launch, but no matched screenshots or TalkBack/VoiceOver sessions were captured; pending contextual-AI radius/layout changes still require their own device verification.
+4. **Catalog data:** At the original audit snapshot, the shared catalog contained 10,000 active entries while native footer counts omitted eight web-runtime-only reference records. The current working tree calculates the browser count from native-visible plus related-reference active/beta records; compile/CI and runtime count verification remain required. Beta/planned-specific differences were not present in the source catalog at audit time.
 5. **Failure paths:** Web currently uses static synchronous registry imports, so web loading/failure behavior is assessed from the current source, not from a simulated network-backed catalog. Native loading/failure states were source-confirmed but not executed.
 6. **Assistant runtime:** Cancellation timing, request-handle behavior, timeout behavior, server error envelopes, network failures, retry behavior, and state retention after screen destruction require runtime validation. Native system font rendering, Dynamic Type, and accessibility behavior were not tested.
 7. **Tool detail coverage:** The detail audit covered the shared ToolShell/ToolEngine/backend/result primitives, not every individual engine implementation. Child-engine-specific tabs, result controls, or file-picker differences may remain outside this report.

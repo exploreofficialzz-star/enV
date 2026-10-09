@@ -8,6 +8,10 @@ struct Catalog: Decodable {
     let categories: [ToolCategory]
     let tools: [Tool]
     let relatedReferenceTools: [Tool]?
+
+    var browserActiveToolCount: Int {
+        (tools + (relatedReferenceTools ?? [])).filter { $0.status == "active" || $0.status == "beta" }.count
+    }
 }
 
 struct CatalogCounts: Codable {
@@ -270,8 +274,10 @@ final class CatalogStore: ObservableObject {
     @Published var query = ""
     @Published var selectedCategory: String?
     @Published private(set) var favoriteIDs: Set<String>
+    @Published private(set) var recentIDs: [String]
 
     private let favoritesKey = "env.favoriteToolIDs"
+    private let recentKey = "env.recentToolIDs"
 
     private let bundle: Bundle
 
@@ -280,6 +286,7 @@ final class CatalogStore: ObservableObject {
         self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [], relatedReferenceTools: nil)
         self.loadState = catalog == nil ? .loading : .ready
         self.favoriteIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
+        self.recentIDs = Array(NSOrderedSet(array: UserDefaults.standard.stringArray(forKey: recentKey) ?? []).array.compactMap { $0 as? String }.prefix(24))
         if catalog == nil { reloadCatalog() }
     }
 
@@ -316,6 +323,14 @@ final class CatalogStore: ObservableObject {
         if favoriteIDs.contains(tool.id) { favoriteIDs.remove(tool.id) } else { favoriteIDs.insert(tool.id) }
         UserDefaults.standard.set(Array(favoriteIDs).sorted(), forKey: favoritesKey)
         objectWillChange.send()
+    }
+
+    func recordRecent(_ toolID: String) {
+        guard !toolID.isEmpty else { return }
+        let next = Array(([toolID] + recentIDs.filter { $0 != toolID }).prefix(24))
+        guard next != recentIDs else { return }
+        recentIDs = next
+        UserDefaults.standard.set(recentIDs, forKey: recentKey)
     }
 
     func isFavorite(_ tool: Tool) -> Bool { favoriteIDs.contains(tool.id) }

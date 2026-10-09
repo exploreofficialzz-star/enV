@@ -132,7 +132,7 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    WebHomeFooter(activeCount: store.catalog.counts.active, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
+                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)

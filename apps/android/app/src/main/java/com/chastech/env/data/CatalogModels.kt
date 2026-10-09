@@ -38,6 +38,9 @@ data class Catalog(
     val tools: List<ToolRecord>,
     val relatedReferenceTools: List<ToolRecord> = emptyList(),
 ){
+    val browserActiveToolCount: Int
+        get() = (tools + relatedReferenceTools).count { it.status == "active" || it.status == "beta" }
+
     companion object {}
 }
 

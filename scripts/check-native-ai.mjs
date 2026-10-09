@@ -88,6 +88,17 @@ if (!iosAssistantSource.includes('Outfit-Regular", size: 14')) fail("iOS assista
 if (!iosAssistantSource.includes("Ask about enV tools or the enV brand…")) fail("iOS assistant composer prompt does not match the web prompt");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("{ detailStack = listOf(it) }")) fail("Android recommendation navigation is not wired to the native tool detail view");
+if (!androidAssistSource.includes("field.kind in setOf(AssistKind.TEXTAREA, AssistKind.IMAGE, AssistKind.AUDIO)") || !androidAssistSource.includes("Box(if (columns == 2 && !fullWidth) Modifier.weight(1f) else Modifier.fillMaxWidth())")) fail("Android contextual AI textarea/image/audio fields must span both columns on wide layouts");
+for (const [task, resultKind] of [["developer.regex.explain", "regex"], ["developer.sql.explain", "sql"], ["developer.json.explain", "json"], ["image.alt.generate", "alt-text"]]) {
+  if (!androidAssistSource.includes(`"${task}" ->`)) fail(`Android contextual AI result is missing the structured ${task} view`);
+  if (!iosSource.includes(`feature.resultKind == "${resultKind}"`)) fail(`iOS contextual AI result is missing the structured ${task} view`);
+}
+if (!androidAssistSource.includes("private fun AssistResultSection(") || !iosSource.includes("private struct NativeAiStructuredSection")) fail("Structured AI results must expose reusable labeled sections and per-entry copy actions");
+if (!androidAssistSource.includes("shape = RoundedCornerShape(32.dp)") || !iosSource.includes("RoundedRectangle(cornerRadius: 32)")) fail("Android/iOS contextual AI panel outer radius must match the web 32px 2xl token");
+for (const heading of ["Breakdown", "Watch out for", "Suggested examples (AI guesses, not verified)", "Step by step", "Warnings", "Performance notes", "Structure", "Possible issues", "Alt text", "Longer description", "Text found in the image"]) {
+  if (!androidAssistSource.includes(heading)) fail(`Android structured AI output is missing ${heading}`);
+  if (!iosSource.includes(heading)) fail(`iOS structured AI output is missing ${heading}`);
+}
 
 const androidHome = androidActivitySource;
 const iosHomeSource = readFileSync(resolve(root, "apps/ios/enV/ContentViews.swift"), "utf8");

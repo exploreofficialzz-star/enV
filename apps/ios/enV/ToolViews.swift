@@ -186,6 +186,7 @@ struct ToolDetailView: View {
         .modifier(Screen())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { store.recordRecent(tool.id) }
     }
 
     private var toolHeading: some View {
@@ -1867,8 +1868,8 @@ private struct NativeAiAssistPanel: View {
         }
         .padding(compact ? 16 : 24)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 32))
+        .overlay(RoundedRectangle(cornerRadius: 32).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
     }
 
     private var fileTypes: [UTType] {
@@ -1960,6 +1961,27 @@ private struct NativeAiAssistPanel: View {
                     HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { Text(title).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk); Text("\(title.count) characters").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
                         .padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
                 }
+            } else if feature.resultKind == "regex" {
+                Text(result["summary"] as? String ?? "").font(.custom("Outfit-Regular", size: 14))
+                NativeAiStructuredSection(title: "Breakdown", entries: (result["parts"] as? [[String:Any]] ?? []).map { "\($0["token"] as? String ?? "") — \($0["meaning"] as? String ?? "")" })
+                NativeAiStructuredSection(title: "Watch out for", entries: result["pitfalls"] as? [String] ?? [])
+                NativeAiStructuredSection(title: "Suggested examples (AI guesses, not verified)", entries: (result["suggestedTests"] as? [[String:Any]] ?? []).map { item in "\((item["input"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "(empty)") — \((item["shouldMatch"] as? Bool ?? false) ? "should match" : "should not match")" })
+                if !(result["suggestedTests"] as? [[String:Any]] ?? []).isEmpty { Text("Try these in the regex tester above before relying on them.").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted) }
+            } else if feature.resultKind == "sql" {
+                Text(result["summary"] as? String ?? "").font(.custom("Outfit-Regular", size: 14))
+                NativeAiStructuredSection(title: "Step by step", entries: (result["steps"] as? [[String:Any]] ?? []).enumerated().map { "\($0.offset + 1). \($0.element["clause"] as? String ?? "") — \($0.element["explanation"] as? String ?? "")" })
+                NativeAiStructuredSection(title: "Warnings", entries: result["warnings"] as? [String] ?? [])
+                NativeAiStructuredSection(title: "Performance notes", entries: result["performanceNotes"] as? [String] ?? [])
+            } else if feature.resultKind == "json" {
+                Text(result["summary"] as? String ?? "").font(.custom("Outfit-Regular", size: 14))
+                NativeAiStructuredSection(title: "Structure", entries: (result["structure"] as? [[String:Any]] ?? []).map { item in "\(item["path"] as? String ?? "") · \(item["type"] as? String ?? "")\((item["note"] as? String).flatMap { $0.isEmpty ? nil : $0 }.map { " — \($0)" } ?? "")" })
+                NativeAiStructuredSection(title: "Possible issues", entries: result["issues"] as? [String] ?? [])
+            } else if feature.resultKind == "alt-text" {
+                let alt = result["altText"] as? String ?? ""
+                NativeAiStructuredSection(title: "Alt text", entries: [alt])
+                Text("\(alt.count) characters").font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted)
+                NativeAiStructuredSection(title: "Longer description", entries: [result["longDescription"] as? String ?? ""])
+                if result["containsText"] as? Bool == true { NativeAiStructuredSection(title: "Text found in the image", entries: [result["textInImage"] as? String ?? ""]) }
             } else {
                 let text = NativeAiEngine.format(task: feature.taskID, result: result)
                 TextEditor(text: .constant(text)).font(.custom("Outfit-Regular", size: 14)).frame(minHeight: feature.resultKind == "transcript" ? 160 : 120).textSelection(.enabled).padding(4).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
@@ -1992,5 +2014,30 @@ private struct NativeAiAssistPanel: View {
         let milliseconds = Int((max(0, value) * 1000).rounded())
         let h = milliseconds / 3_600_000, m = (milliseconds % 3_600_000) / 60_000, s = (milliseconds % 60_000) / 1000, ms = milliseconds % 1000
         return String(format: "%02d:%02d:%02d%@%03d", h, m, s, webVtt ? "." : ",", ms)
+    }
+}
+
+private struct NativeAiStructuredSection: View {
+    let title: String
+    let entries: [String]
+
+    var body: some View {
+        if !entries.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title).font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk)
+                ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("• \(entry)")
+                            .font(.custom("Outfit-Regular", size: 14))
+                            .foregroundStyle(Color.envMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                        Button("Copy") { UIPasteboard.general.string = entry }
+                            .buttonStyle(.bordered)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

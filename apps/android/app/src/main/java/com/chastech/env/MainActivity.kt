@@ -222,6 +222,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
     val selected = detailStack.lastOrNull()?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
+    LaunchedEffect(selected?.id) { selected?.id?.let { favorites.recordRecent(it) } }
     if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
@@ -421,7 +422,7 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EnVLogo(Modifier.width(142.dp).height(48.dp))
-        Text("Useful tools. One place. ${catalog.counts.active} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("Product", fontWeight = FontWeight.SemiBold)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact").forEach { (label, route) ->
@@ -435,7 +436,7 @@ private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: 
             }
         }
         Text("© ${Year.now().value} chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        Text("${catalog.categories.size} categories · ${catalog.counts.active} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
