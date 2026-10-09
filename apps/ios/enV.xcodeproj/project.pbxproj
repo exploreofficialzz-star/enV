@@ -18,6 +18,8 @@
 	        A10000000000000000000004 /* NativeMimeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* NativeMimeEngine.swift */; };
 	        A10000000000000000000005 /* NativeUrlMediaInfoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* NativeUrlMediaInfoEngine.swift */; };
         A40000000000000000000005 /* NativeUtilityEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000005 /* NativeUtilityEngine.swift */; };
+        A40000000000000000000007 /* NativeBusinessEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000007 /* NativeBusinessEngine.swift */; };
+        A40000000000000000000009 /* NativeFileConverterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000009 /* NativeFileConverterEngine.swift */; };
         A40000000000000000000006 /* NativeCalculatorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000006 /* NativeCalculatorEngine.swift */; };
 	        A10000000000000000000006 /* NativeCodecEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* NativeCodecEngineTests.swift */; };
 	        A10000000000000000000007 /* NativeColorEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* NativeColorEngineTests.swift */; };
@@ -26,6 +28,7 @@
 	        A1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift */; };
 		161616161616161616161616 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 888888888888888888888888 /* catalog.json */; };
 		76C612C7171249D4BA242035 /* native-icons in Resources */ = {isa = PBXBuildFile; fileRef = D9C644EB1332427BA2BD80E4 /* native-icons */; };
+		76C612C7171249D4BA242036 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = D9C644EB1332427BA2BD80E5 /* fonts */; };
 		A30000000000000000000001 /* NativeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000001 /* NativeCopy.swift */; };
 		A30000000000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000002 /* Assets.xcassets */; };
 	171717171717171717171717 /* CatalogCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */; };
@@ -61,6 +64,7 @@
 	        B1000000000000000000000A /* NativeUrlMediaInfoEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUrlMediaInfoEngineTests.swift; sourceTree = "<group>"; };
 		888888888888888888888888 /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = catalog.json; path = ../shared/catalog.json; sourceTree = "<group>"; };
 		D9C644EB1332427BA2BD80E4 /* native-icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = native-icons; path = ../shared/native-icons; sourceTree = "<group>"; };
+		D9C644EB1332427BA2BD80E5 /* fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fonts; path = ../shared/fonts; sourceTree = "<group>"; };
 	C30000000000000000000001 /* NativeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCopy.swift; sourceTree = "<group>"; };
 	C30000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
         B40000000000000000000001 /* NativeEngineData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEngineData.swift; sourceTree = "<group>"; };
@@ -69,7 +73,9 @@
         B40000000000000000000004 /* NativeMathExerciseEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMathExerciseEngine.swift; sourceTree = "<group>"; };
         B40000000000000000000005 /* NativeUtilityEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUtilityEngine.swift; sourceTree = "<group>"; };
         B40000000000000000000006 /* NativeCalculatorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCalculatorEngine.swift; sourceTree = "<group>"; };
-	999999999999999999999999 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        B40000000000000000000007 /* NativeBusinessEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBusinessEngine.swift; sourceTree = "<group>"; };
+        B40000000000000000000009 /* NativeFileConverterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeFileConverterEngine.swift; sourceTree = "<group>"; };
+        999999999999999999999999 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 	AAAAAAAAAAAAAAAAAAAAAAAA /* CatalogCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogCoreTests.swift; sourceTree = "<group>"; };
         E10000000000000000000003 /* NativeCalculatorData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCalculatorData.swift; sourceTree = "<group>"; };
         E1000000000000000000000E /* NativeNumberParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeNumberParser.swift; sourceTree = "<group>"; };
@@ -84,10 +90,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,); sourceTree = "<group>"; };
+        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,D9C644EB1332427BA2BD80E5,); sourceTree = "<group>"; };
         444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (AAAAAAAAAAAAAAAAAAAAAAAA,191919111111111111111111,B10000000000000000000006,B10000000000000000000007,B10000000000000000000008,B10000000000000000000009,B1000000000000000000000A,); path = enVTests; sourceTree = "<group>"; };
 	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,); name = Products; sourceTree = "<group>"; };
-        C50000000000000000000001 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,E10000000000000000000003,B40000000000000000000006,B10000000000000000000001,B10000000000000000000002,B40000000000000000000002,C30000000000000000000001,C30000000000000000000002,B10000000000000000000003,B40000000000000000000001,B40000000000000000000003,B40000000000000000000004,B10000000000000000000004,E1000000000000000000000E,181818111111111111111111,B10000000000000000000005,B40000000000000000000005,131313131313131313131313,141414141414141414141414,F10000000000000000000001,F10000000000000000000002,B60000000000000000000001); path = enV; sourceTree = "<group>"; };
+        C50000000000000000000001 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,E10000000000000000000003,B40000000000000000000006,B40000000000000000000007,B40000000000000000000009,B10000000000000000000001,B10000000000000000000002,B40000000000000000000002,C30000000000000000000001,C30000000000000000000002,B10000000000000000000003,B40000000000000000000001,B40000000000000000000003,B40000000000000000000004,B10000000000000000000004,E1000000000000000000000E,181818111111111111111111,B10000000000000000000005,B40000000000000000000005,131313131313131313131313,141414141414141414141414,F10000000000000000000001,F10000000000000000000002,B60000000000000000000001); path = enV; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -100,12 +106,12 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-	F00000000000000000000000 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (161616161616161616161616 /* catalog.json in Resources */,76C612C7171249D4BA242035 /* native-icons in Resources */,A30000000000000000000002 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+	F00000000000000000000000 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (161616161616161616161616 /* catalog.json in Resources */,76C612C7171249D4BA242035 /* native-icons in Resources */,76C612C7171249D4BA242036 /* fonts in Resources */,A30000000000000000000002 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
         EEEEEEEEEEEEEEEEEEEEEEEE /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (171717171717171717171717 /* CatalogCoreTests.swift in Sources */,191919222222222222222222 /* NativeTextEngineTests.swift in Sources */,A10000000000000000000006,A10000000000000000000007,A10000000000000000000008,A10000000000000000000009,A1000000000000000000000A,); runOnlyForDeploymentPostprocessing = 0; };
-        C50000000000000000000002 /* App Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,E20000000000000000000003,A40000000000000000000006,A10000000000000000000001,A10000000000000000000002,E20000000000000000000007,A30000000000000000000001,A10000000000000000000003,E2000000000000000000000A,E2000000000000000000000B,E2000000000000000000000C,A10000000000000000000004,E2000000000000000000000E,181818222222222222222222,A10000000000000000000005,A40000000000000000000005,153535353535353535353535,154545454545454545454545,F20000000000000000000001,F20000000000000000000002,A60000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+        C50000000000000000000002 /* App Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,E20000000000000000000003,A40000000000000000000006,A40000000000000000000007,A40000000000000000000009,A10000000000000000000001,A10000000000000000000002,E20000000000000000000007,A30000000000000000000001,A10000000000000000000003,E2000000000000000000000A,E2000000000000000000000B,E2000000000000000000000C,A10000000000000000000004,E2000000000000000000000E,181818222222222222222222,A10000000000000000000005,A40000000000000000000005,153535353535353535353535,154545454545454545454545,F20000000000000000000001,F20000000000000000000002,A60000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */

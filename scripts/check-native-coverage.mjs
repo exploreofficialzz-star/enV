@@ -6,7 +6,7 @@ const catalog = parseGeneratedCatalog(fs.readFileSync(new URL('../src/data/catal
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));
 const readIds = (platform) => {
-  const urls = [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url)];
+  const urls = [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url), new URL(`../apps/${platform}/backend-tool-coverage.txt`, import.meta.url)];
   const out = new Set();
   for (const url of urls) {
     if (!fs.existsSync(url)) continue;
@@ -31,8 +31,10 @@ validate('Android', android); validate('iOS', ios);
 const parityA = [...android].filter((id) => !ios.has(id));
 const parityI = [...ios].filter((id) => !android.has(id));
 if (parityA.length || parityI.length) throw new Error(`Android/iOS native coverage diverged. Android-only=${parityA.join(', ')} iOS-only=${parityI.join(', ')}`);
-const backendCategories = new Set(["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video","pdf","productivity"]);
-const backendExecutable = active.filter((tool) => backendCategories.has(tool.category) || tool.engine.type === "document-backend" || ["whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles","video-cropper"].includes(tool.id)).map(t=>t.id);
+const backendCategories = new Set(["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]);
+const backendTypes = new Set(["developer","image","audio","video","mockup","post","pdf","document-backend"]);
+const explicitBackendIds = new Set(["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader","whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"]);
+const backendExecutable = active.filter((tool) => backendCategories.has(tool.category) || backendTypes.has(tool.engine.type) || explicitBackendIds.has(tool.id)).map(t=>t.id);
 for (const id of backendExecutable) { android.add(id); ios.add(id); }
 const remaining = active.filter((tool) => !android.has(tool.id));
 const byFamily = new Map();

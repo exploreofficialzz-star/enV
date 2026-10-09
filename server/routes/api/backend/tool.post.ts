@@ -19,18 +19,6 @@ const CUSTOM_CATEGORIES = new Set([
 ]);
 
 function clean(v: unknown, fallback = "") { return String(v ?? fallback).trim(); }
-function esc(v: string) { return v.replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]!)); }
-function generic(id: string, input: string, o: Record<string, unknown>) {
-  const action = id.match(/(?:^|-)(calculator|planner|generator|template|helper|checker|guide|checklist|builder|preview|converter|scaler|quiz|page|mockup)$/)?.[1] ?? "generator";
-  const topic = id.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  const value = clean(input, clean(o.topic, topic));
-  if (action === "calculator") return `${topic}\n\nInput: ${value}\nValue A: ${Number(o.a ?? 10)}\nValue B: ${Number(o.b ?? 2)}\nResult: ${Number(o.a ?? 10) * Number(o.b ?? 2)}`;
-  if (action === "checklist" || action === "checker") return `${topic}\n\n☐ Define the objective\n☐ Collect the required inputs\n☐ Apply the stated constraints\n☐ Review the result\n☐ Save/export the completed output`;
-  if (action === "converter" || action === "scaler") return `${topic}\n\nValue: ${Number(o.value ?? o.a ?? 1)}\nMultiplier/rate: ${Number(o.rate ?? o.b ?? 1)}\nResult: ${Number(o.value ?? o.a ?? 1) * Number(o.rate ?? o.b ?? 1)}`;
-  if (action === "page" || action === "mockup" || id.includes("page-generator")) return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(topic)}</title></head><body><main><h1>${esc(value)}</h1><p>${esc(clean(o.body, "Created with enV."))}</p></main></body></html>`;
-  return `${topic}\n\n${value}\n\nGenerated from the tool's stated workflow. Review the inputs and export the result when satisfied.`;
-}
-
 function execute(id: string, category: string, input: string, o: Record<string, unknown>): string {
   if (category === "social") return buildSocialOutput(id, o as Record<string,string>);
   if (category === "gaming") { const p = parseGamingToolId(id); return buildGamingOutput(p.family, p.workflow, { name: clean(o.name,"My Game"), base:Number(o.base??10), modifier:Number(o.modifier??0), quantity:Number(o.quantity??1), sides:Number(o.sides??6), level:Number(o.level??1), players:Number(o.players??2), rounds:Number(o.rounds??1), notes:clean(o.notes), entries:clean(o.entries,input).split("\n").filter(Boolean) }); }
@@ -43,7 +31,7 @@ function execute(id: string, category: string, input: string, o: Record<string, 
   if (category === "communication") { const p=parseCommunicationToolId(id); return buildCommunication({kind:p.kind,action:p.action,audience:clean(o.audience,"Recipient"),subject:clean(o.subject,"Message"),purpose:clean(o.purpose,input),tone:clean(o.tone,"clear"),details:clean(o.details),date:clean(o.date),items:clean(o.items,"Agenda item 1\nAgenda item 2")}); }
   if (category === "accessibility") { const p=parseAccessibilityToolId(id); return `${p.kind} ${p.action}\n\nInput: ${clean(o.text,input)}\nForeground: ${clean(o.foreground,"#000000")}\nBackground: ${clean(o.background,"#ffffff")}\nSize: ${Number(o.size??16)}px\nLine height: ${Number(o.lineHeight??1.5)}\n\nReview against WCAG success criteria and the actual target UI before release.`; }
   if (category === "streaming") { const p=parseStreamingToolId(id); if(!p) throw new Error("Unsupported streaming tool."); const op=p.operation; if(op.includes("bitrate")) return calculateBitrate(clean(o.resolution,"1080p"),clean(o.fps,"30"),clean(o.quality,"standard"),p.platform); if(op.includes("aspect")) return calculateAspectRatio(clean(o.width,"1920"),clean(o.height,"1080")); if(op.includes("revenue")) return calculateRevenue(clean(o.viewers,"1000"),clean(o.hours,"2"),clean(o.rate,"3")); if(op.includes("schedule")) return buildScheduleText(p.platform,clean(o.date,""),clean(o.time,""),clean(o.duration,"60"),clean(o.topic,"Stream")); if(op.includes("overlay")) return buildOverlayText(p.platform,clean(o.items,"Welcome\nBe right back").split("\n")); if(op.includes("checklist")) return buildChecklistText(p.platform,clean(o.items,"Camera\nAudio\nInternet").split("\n"),[]); if(op.includes("title")) return buildTitles(clean(o.topic,"Stream"),clean(o.style,"clear")); if(op.includes("description")) return buildDescription(clean(o.topic,"Stream"),clean(o.cta,"Follow for more")); return `${p.platform} ${op}\n\n${clean(input,"Enter the stream details.")}`; }
-  return generic(id,input,o);
+  throw new Error(`No backend execution contract is implemented for ${category}/${id}.`);
 }
 
 export default defineHandler(async e => {

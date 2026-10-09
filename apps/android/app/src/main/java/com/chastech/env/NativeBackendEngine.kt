@@ -17,7 +17,9 @@ object NativeBackendEngine {
     data class Result(val text:String?=null,val bytes:ByteArray?=null,val mimeType:String?=null,val fileName:String?=null)
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
     private val explicit = setOf("youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader")
-    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators","developer","business","celebrations","events","food","travel","photography","ai","qr","random","mockups","screenshots","files","converters","image","audio","video")
+    // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
+    // The previous broad set made unsupported tools look executable and return fabricated output.
+    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators")
 
     fun supports(tool:ToolRecord):Boolean {
         if (tool.engine.type == "developer" && NativeUtilityEngine.supports(tool)) return false
@@ -47,7 +49,11 @@ object NativeBackendEngine {
             tool.engine.type=="custom" || tool.engine.type=="developer" -> postJson("/api/backend/tool",JSONObject().apply{put("toolId",tool.id);put("category",tool.category);put("input",input);put("options",options)})
             tool.category in categoryBackend -> postJson("/api/backend/tool",JSONObject().apply{put("toolId",tool.id);put("category",tool.category);put("input",input);put("options",options)})
             tool.engine.type=="pdf" -> { require(files.isNotEmpty()){ "Choose a PDF first." }; multipart("/api/backend/pdf",files,mapOf("operation" to (tool.engine.extras["op"] ?: tool.engine.id),"params" to options.toString(),"outputName" to "${tool.id}.pdf")) }
-            tool.engine.type=="document-backend" -> { require(files.isNotEmpty()){ "Choose a document first." }; multipart("/api/backend/documents",files,mapOf("operation" to (tool.engine.extras["op"] ?: tool.engine.id),"params" to options.toString(),"outputName" to "${tool.id}-output")) }
+            tool.engine.type=="document-backend" -> {
+                require(files.isNotEmpty()){ "Choose the document or file required by this tool." }
+                val operation = tool.engine.extras["op"] ?: tool.engine.id ?: tool.id
+                multipart("/api/backend/documents",files,mapOf("operation" to operation,"params" to options.toString(),"outputName" to "$operation-output"),downloadResponse=true,documentResponse=true)
+            }
             tool.engine.type=="video" -> { require(files.isNotEmpty()){ "Choose a video first." }; multipart("/api/backend/media",files,mapOf("operation" to (tool.engine.extras["op"]?:tool.id),"params" to options.toString())) }
             else -> error("This backend operation is not configured.")
         }
@@ -61,18 +67,18 @@ object NativeBackendEngine {
         return body
     }
     private fun postJson(path:String,body:JSONObject):Result=request(path,body.toString().toByteArray(StandardCharsets.UTF_8),"application/json")
-    private fun multipart(path:String,files:List<InputFile>,fields:Map<String,String>):Result {
+    private fun multipart(path:String,files:List<InputFile>,fields:Map<String,String>,downloadResponse:Boolean=false,documentResponse:Boolean=false):Result {
         val boundary="----enV-${UUID.randomUUID()}"; val out=ByteArrayOutputStream()
         fun w(s:String)=out.write(s.toByteArray(StandardCharsets.UTF_8))
         fields.forEach{(k,v)->w("--$boundary\r\nContent-Disposition: form-data; name=\"$k\"\r\n\r\n$v\r\n")}
         files.forEach{f->w("--$boundary\r\nContent-Disposition: form-data; name=\"files\"; filename=\"${f.name.replace("\"","_")}\"\r\nContent-Type: ${f.mimeType}\r\n\r\n");out.write(f.bytes);w("\r\n")};w("--$boundary--\r\n")
-        return request(path,out.toByteArray(),"multipart/form-data; boundary=$boundary")
+        return request(path,out.toByteArray(),"multipart/form-data; boundary=$boundary",downloadResponse,documentResponse)
     }
-    private fun request(path:String,body:ByteArray,type:String):Result {
+    private fun request(path:String,body:ByteArray,type:String,downloadResponse:Boolean=false,documentResponse:Boolean=false):Result {
         require(base.isNotBlank()) { "enV backend API is not configured for this build." }
         val c=(URL(base+path).openConnection() as HttpURLConnection).apply{requestMethod="POST";doOutput=true;connectTimeout=20000;readTimeout=180000;setRequestProperty("Content-Type",type);setRequestProperty("Accept","application/json,application/octet-stream,text/plain")}
         c.outputStream.use{it.write(body)}
-        val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299){val msg=runCatching{JSONObject(String(data)).optString("error")}.getOrNull();throw IllegalStateException(msg?.takeIf{it.isNotBlank()}?:"Backend request failed (${c.responseCode}).")}
-        val mime=c.contentType?:"application/octet-stream"; return if(mime.contains("json"))Result(text=String(data),mimeType=mime) else Result(bytes=data,mimeType=mime,fileName=c.getHeaderField("Content-Disposition")?.substringAfter("filename=\"")?.substringBefore('"'))
+        val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299){val msg=runCatching{JSONObject(String(data)).optString("error")}.getOrNull();throw IllegalStateException(msg?.takeIf{it.isNotBlank()}?:if(documentResponse)"Document service returned HTTP ${c.responseCode}." else "Backend request failed (${c.responseCode}).")}
+        val mime=c.contentType?:"application/octet-stream"; val fileName=c.getHeaderField("Content-Disposition")?.substringAfter("filename=\"")?.substringBefore('"'); return if(!downloadResponse&&mime.contains("json"))Result(text=String(data),mimeType=mime) else Result(bytes=data,mimeType=mime,fileName=fileName)
     }
 }

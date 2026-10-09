@@ -38,6 +38,7 @@ extension Color {
     static let envMuted = adaptive(light: 0x5C636C, dark: 0xA7ADB4)
     static let envSubtle = adaptive(light: 0x8A9098, dark: 0x7C848C)
     static let envBorder = adaptive(light: 0xE4E0D8, dark: 0x2A3036)
+    static let envBorderStrong = adaptive(light: 0xCFC9BD, dark: 0x3C444C)
     static let envAccentSoft = adaptive(light: 0xD8F3EE, dark: 0x14332F)
 }
 
@@ -57,6 +58,7 @@ struct RootTabView: View {
             HomeView(
                 onSearch: { query in searchQuery = query; selectedTab = NativeTab.search.rawValue },
                 onTools: { selectedTab = NativeTab.tools.rawValue },
+                onAccount: { selectedTab = NativeTab.account.rawValue },
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
                 .tag(NativeTab.home.rawValue)
@@ -112,6 +114,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
+                        Button("Pricing") { selectedTab = NativeTab.account.rawValue }
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in

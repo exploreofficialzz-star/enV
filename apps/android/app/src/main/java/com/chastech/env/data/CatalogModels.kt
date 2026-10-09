@@ -88,6 +88,38 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
     )
 }
 
+private val webSearchSynonyms = mapOf(
+    "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
+    "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),
+    "json" to listOf("javascript object"), "pwd" to listOf("password"), "pass" to listOf("password"), "bmi" to listOf("body mass", "weight"),
+    "percent" to listOf("percentage", "%"), "qr" to listOf("qrcode", "barcode"), "uuid" to listOf("guid"),
+    "hash" to listOf("checksum", "digest", "sha", "md5"), "color" to listOf("colour", "hex", "rgb"),
+    "mockup" to listOf("fake", "demo", "chat", "screenshot"), "invoice" to listOf("bill", "receipt"), "pdf" to listOf("document"),
+    "encode" to listOf("encoding", "base64"), "decode" to listOf("decoding"),
+)
+
+fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE): List<ToolRecord> {
+    val q = query.trim().lowercase()
+    if (q.isEmpty()) return tools.sortedByDescending { it.popularity }.take(limit)
+    val tokens = q.split(Regex("[^a-z0-9%+]+" )).filter { it.length > 1 || it == "%" }
+    val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
+    fun score(tool: ToolRecord): Int {
+        val name = tool.name.lowercase()
+        if (name == q || tool.id == q) return 2000 + tool.popularity
+        if (name.startsWith(q)) return 1400 + tool.popularity
+        if (tool.id.contains(q) || name.contains(q)) return 1000 + tool.popularity
+        val hay = listOf(tool.name, tool.description, tool.category, tool.id, tool.slug).plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase()
+        var hits = 0
+        expanded.forEach { token ->
+            if (name.contains(token)) hits += 8
+            else if (tool.keywords.any { it.lowercase().contains(token) }) hits += 5
+            else if (hay.contains(token)) hits += 2
+        }
+        return if (hits == 0) 0 else hits * 40 + tool.popularity
+    }
+    return tools.map { it to score(it) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(limit).map { it.first }
+}
+
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {
     val needle = query.trim().lowercase()
     return tools.asSequence().filter { categoryId == null || it.category == categoryId }.filter { tool ->
