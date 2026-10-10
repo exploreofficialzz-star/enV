@@ -1199,7 +1199,7 @@ private struct NativeImageToolView: View {
         .fileImporter(isPresented:$importing, allowedContentTypes:[.data], allowsMultipleSelection:false) { result in if case .success(let urls)=result, let url=urls.first { file = nativeBackendFiles(from:[url]).first; error=nil } }
         .fileExporter(isPresented:$exporting, document:outputData.map(NativeBinaryDocument.init), contentType:.jpeg, defaultFilename:"env-image.jpg") { result in if case .failure(let e)=result { error=e.localizedDescription } }
     }
-    private func run() { guard let file else { return }; do { let result=try NativeImageEngine.run(tool:tool,data:file.data,width:Int(width) ?? 0,height:Int(height),quality:CGFloat(Int(quality) ?? 88)/100,text:text,degrees:CGFloat(Double(degrees) ?? 90)); outputData=result.data; output="Processed locally · \(result.width) × \(result.height) · \(result.data.count/1024) KB"; error=nil } catch { output=""; outputData=nil; error=error.localizedDescription } }
+    private func run() { guard let file else { return }; do { let result=try NativeImageEngine.run(tool:tool,data:file.data,width:Int(width) ?? 0,height:Int(height),quality:CGFloat(Int(quality) ?? 88)/100,text:text,degrees:CGFloat(Double(degrees) ?? 90)); outputData=result.data; output="Processed locally · \(result.width) × \(result.height) · \(result.data.count/1024) KB"; error=nil } catch let caughtError { output=""; outputData=nil; error=caughtError.localizedDescription } }
 }
 
 enum NativeBarcodeEngine {
