@@ -18,9 +18,8 @@ object NativeBarcodeEngine {
         "ean13-barcode" to BarcodeFormat.EAN_13,
         "ean8-barcode" to BarcodeFormat.EAN_8,
         "upc-barcode" to BarcodeFormat.UPC_A,
-        "itf14-barcode" to BarcodeFormat.ITF_14,
+        "itf14-barcode" to BarcodeFormat.ITF,
         "codabar-barcode" to BarcodeFormat.CODABAR,
-        "msi-barcode" to BarcodeFormat.MSI,
     )
     fun supports(tool: ToolRecord): Boolean = tool.engine.type in setOf("barcode", "qr") && (tool.id in validatorIds || tool.id in qrIds || tool.id in barcodeFormats)
     fun generatesImage(toolId: String): Boolean = toolId in qrIds || toolId in barcodeFormats
