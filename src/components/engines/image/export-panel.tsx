@@ -110,7 +110,7 @@ export function ExportPanel({ source, render, deps, suffix, toolId, formats, def
       {result?.note ? <Notice tone="warn">{result.note}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {children}
-      <label className="block space-y-1.5"><span className="text-[14.3px] font-medium text-fg">File name</span>
+      <label className="block space-y-1.5"><span className="text-[15px] font-medium text-fg">File name</span>
         <input aria-label="File name" className="w-full rounded-md bg-surface px-3 py-2 text-sm shadow-[var(--shadow-border)] outline-none focus-visible:ring-2 focus-visible:ring-accent" placeholder={source ? outputName(source.name, suffix, info.ext) : "output"} value={name} onChange={(e) => setName(e.target.value)} /></label>
       <div className="flex flex-wrap gap-2">
         <Btn variant="default" onClick={download} disabled={!source || disabled || busy}>{busy ? "Preparing…" : "Download"}</Btn>

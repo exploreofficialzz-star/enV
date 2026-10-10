@@ -398,7 +398,7 @@ function AccessibleColorChecker() {
                 <p className={check.passes ? "text-xs font-medium text-success" : "text-xs font-medium text-danger"}>
                   {check.passes ? "PASS" : "FAIL"} · {item.threshold}:1
                 </p>
-                <p className="mt-1 text-[12.1px] text-muted">WCAG 2.2 · {item.criterion}</p>
+                <p className="mt-1 text-[12.7px] text-muted">WCAG 2.2 · {item.criterion}</p>
               </div>
             );
           })}

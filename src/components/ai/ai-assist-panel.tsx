@@ -172,7 +172,7 @@ function AiAssistForm({ feature }: { feature: AiFeature }) {
         <h2 id={headingId} className="text-lg font-semibold">
           {feature.title}
         </h2>
-        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[12.1px] font-medium uppercase tracking-wide text-muted">AI</span>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[12.7px] font-medium uppercase tracking-wide text-muted">AI</span>
       </div>
       <p className="mt-1 text-sm text-muted">{feature.description}</p>
 
