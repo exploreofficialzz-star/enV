@@ -1203,22 +1203,47 @@ private struct NativeImageToolView: View {
 }
 
 enum NativeBarcodeEngine {
-    private static let validatorIDs: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator"]
-    private static let generatedIDs: Set<String> = ["qr-generator", "text-qr-generator", "url-qr-generator", "code128-barcode"]
-    static func supports(_ tool: Tool) -> Bool { (validatorIDs.contains(tool.id) || generatedIDs.contains(tool.id)) && (tool.engine.type == "barcode" || tool.engine.type == "qr") }
-    static func generatesImage(_ toolID: String) -> Bool { generatedIDs.contains(toolID) }
+    private static let validatorIDs: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator", "isbn-check-digit"]
+    private static let qrIDs: Set<String> = ["qr-generator", "text-qr-generator", "url-qr-generator", "qr-code-high-error-correction", "qr-code-low-error-correction", "bitcoin-qr-generator", "calendar-qr-generator", "crypto-wallet-qr-generator", "discord-invite-qr-generator", "email-qr-generator", "ethereum-qr-generator", "event-qr-generator", "facebook-link-qr-generator", "google-play-qr-generator", "instagram-link-qr-generator", "linkedin-link-qr-generator", "location-qr-generator", "mecard-qr-generator", "phone-qr-generator", "qr-payload-encoder", "qr-code-styled", "sms-qr-generator", "telegram-link-qr-generator", "vcard-qr-generator", "whatsapp-qr-generator", "wifi-qr-generator", "x-link-qr-generator", "youtube-link-qr-generator", "app-store-qr-generator" ]
+    private static let linearIDs: Set<String> = ["code128-barcode", "ean13-barcode", "ean8-barcode", "upc-barcode", "isbn-barcode"]
+    static func supports(_ tool: Tool) -> Bool { (validatorIDs.contains(tool.id) || qrIDs.contains(tool.id) || linearIDs.contains(tool.id)) && (tool.engine.type == "barcode" || tool.engine.type == "qr") }
+    static func generatesImage(_ toolID: String) -> Bool { qrIDs.contains(toolID) || linearIDs.contains(toolID) }
     static func generate(toolID: String, input: String) throws -> UIImage {
         guard generatesImage(toolID), !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NativeNativeError.message("Enter a value to encode.") }
+        if ["ean13-barcode", "ean8-barcode", "upc-barcode", "isbn-barcode"].contains(toolID) { return try generateEAN(toolID: toolID, input: input) }
         let filterName = toolID == "code128-barcode" ? "CICode128BarcodeGenerator" : "CIQRCodeGenerator"
         guard let filter = CIFilter(name: filterName) else { throw NativeNativeError.message("This image generator is unavailable on this iOS version.") }
         filter.setValue(Data(input.utf8), forKey: "inputMessage")
-        if filterName == "CIQRCodeGenerator" { filter.setValue("M", forKey: "inputCorrectionLevel") }
+        if filterName == "CIQRCodeGenerator" { filter.setValue(toolID == "qr-code-high-error-correction" ? "H" : toolID == "qr-code-low-error-correction" ? "L" : "M", forKey: "inputCorrectionLevel") }
         guard let output = filter.outputImage else { throw NativeNativeError.message("The value could not be encoded.") }
         let scale: CGFloat = toolID == "code128-barcode" ? 3 : 12
         let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         guard let cg = CIContext().createCGImage(scaled, from: scaled.extent) else { throw NativeNativeError.message("Could not render the generated code.") }
         return UIImage(cgImage: cg)
     }
+    private static func generateEAN(toolID: String, input: String) throws -> UIImage {
+        var digits = input.filter(\.isNumber)
+        if toolID == "isbn-barcode" { digits = digits.replacingOccurrences(of: "ISBN", with: "", options: .caseInsensitive).filter(\.isNumber) }
+        let expectedLength = toolID == "ean8-barcode" ? 8 : toolID == "upc-barcode" ? 12 : 13
+        guard digits.count == expectedLength else { throw NativeNativeError.message("This barcode requires exactly \(expectedLength) digits.") }
+        let expected = checkDigit(String(digits.dropLast()), ean: toolID != "upc-barcode")
+        guard Int(String(digits.last!)) == expected else { throw NativeNativeError.message("The barcode check digit is invalid.") }
+        let patternDigits = toolID == "upc-barcode" ? "0" + digits : digits
+        let pattern = try eanPattern(patternDigits, kind: toolID == "ean8-barcode" ? "ean8" : "ean13")
+        return renderBars(pattern)
+    }
+    private static let lCodes = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"]
+    private static let gCodes = ["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"]
+    private static let rCodes = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"]
+    private static let parity = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"]
+    private static func eanPattern(_ digits: String, kind: String) throws -> String {
+        let d = Array(digits).compactMap { $0.wholeNumberValue }
+        var result = "101"
+        if kind == "ean8" { for n in d.prefix(4) { result += lCodes[n] }; result += "01010"; for n in d.suffix(4) { result += rCodes[n] } }
+        else { result += parity[d[0]].enumerated().map { $0.element == "L" ? lCodes[d[$0.offset + 1]] : gCodes[d[$0.offset + 1]] }.joined(); result += "01010"; for n in d.suffix(6) { result += rCodes[n] } }
+        return result + "101"
+    }
+    private static func renderBars(_ pattern: String) -> UIImage { let width: CGFloat = 3, height: CGFloat = 180; return UIGraphicsImageRenderer(size: CGSize(width: CGFloat(pattern.count) * width + 32, height: height)).image { c in c.cgContext.setFillColor(UIColor.black.cgColor); for (i, bit) in pattern.enumerated() where bit == "1" { c.cgContext.fill(CGRect(x: 16 + CGFloat(i) * width, y: 10, width: width, height: height - 20)) } } }
     static func run(toolID: String, input: String) throws -> String {
         guard validatorIDs.contains(toolID) else { throw NativeNativeError.message("Unknown barcode validation operation.") }
         let digits = input.filter(\.isNumber)
@@ -1228,12 +1253,18 @@ enum NativeBarcodeEngine {
             let supplied = Int(String(digits.last!))!
             return "\(expected == supplied ? "Valid" : "Invalid"): Expected check digit: \(expected). Supplied: \(supplied)."
         }
+        if toolID == "isbn-check-digit" {
+            guard digits.count == 13 else { throw NativeNativeError.message("ISBN-13 must contain 13 digits.") }
+            let expected = checkDigit(String(digits.dropLast()), ean: true)
+            let supplied = Int(String(digits.last!))!
+            return "\(expected == supplied ? "Valid" : "Invalid"): Expected check digit: \(expected). Supplied: \(supplied)."
+        }
         guard !digits.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
         let body = toolID == "upc-check-digit" ? String(digits.prefix(11)) : String(digits.prefix(12))
         guard !body.isEmpty else { throw NativeNativeError.message("Enter numeric digits.") }
         return "Calculated check digit: \(checkDigit(body)). Supplied check digit: \(digits.last!)."
     }
-    private static func checkDigit(_ value: String) -> Int { var sum = 0; for (index, scalar) in value.unicodeScalars.reversed().enumerated() { sum += Int(scalar.value - 48) * (index % 2 == 0 ? 3 : 1) }; return (10 - sum % 10) % 10 }
+    private static func checkDigit(_ value: String, ean: Bool = false) -> Int { var sum = 0; if ean { for (index, scalar) in value.unicodeScalars.enumerated() { sum += Int(scalar.value - 48) * (index % 2 == 0 ? 1 : 3) } } else { for (index, scalar) in value.unicodeScalars.reversed().enumerated() { sum += Int(scalar.value - 48) * (index % 2 == 0 ? 3 : 1) } }; return (10 - sum % 10) % 10 }
 }
 
 enum NativeNativeError:LocalizedError{case message(String);var errorDescription:String?{if case .message(let s)=self{return s};return nil}}

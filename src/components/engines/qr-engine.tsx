@@ -36,7 +36,7 @@ function esc(value: string) {
   return value.replace(/([\\;,:])/g, "\\$1");
 }
 
-function payloadFor(preset: string, v: Record<string, string>) {
+export function payloadFor(preset: string, v: Record<string, string>) {
   switch (preset) {
     case "wifi": return `WIFI:T:${v.security || "WPA"};S:${esc(v.ssid || "")};P:${esc(v.password || "")};H:${v.hidden === "true"};`;
     case "whatsapp": return `https://wa.me/${(v.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(v.text || "")}`;
@@ -65,7 +65,7 @@ function buildPayload(v: Record<string, string>) {
   return v.a || "";
 }
 
-function checkDigit(value: string) {
+export function checkDigit(value: string) {
   const digits = value.replace(/\D/g, "");
   if (!digits) return null;
   let sum = 0;
@@ -73,7 +73,7 @@ function checkDigit(value: string) {
   return (10 - (sum % 10)) % 10;
 }
 
-function validateGtin(value: string) {
+export function validateGtin(value: string) {
   const digits = value.replace(/\D/g, "");
   if (![8, 12, 13, 14].includes(digits.length)) return { valid: false, message: "GTIN must contain 8, 12, 13 or 14 digits." };
   const expected = checkDigit(digits.slice(0, -1));
@@ -173,7 +173,7 @@ export function BarcodeEngine({ format }: { format: string }) {
       }
       const JsBarcode = (await import("jsbarcode")).default;
       const doc = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      const fmt = ({ean13:"EAN13",ean8:"EAN8",upca:"UPC",code128:"CODE128",code39:"CODE39",itf14:"ITF14",msi:"MSI",pharmacode:"pharmacode",codabar:"codabar",isbn:"EAN13"} as Record<string,string>)[format] || "CODE128";
+      const fmt = ({ean13:"EAN13",ean8:"EAN8",upca:"UPC",code128:"CODE128",code39:"CODE39",itf14:"ITF14",msi:"MSI",pharmacode:"pharmacode",codabar:"codabar",isbn:"EAN13",["isbn-barcode"]:"EAN13",["barcode-label-generator"]:"CODE128",["barcode-svg-generator"]:"CODE128"} as Record<string,string>)[format] || "CODE128";
       const clean = value.replace(/[- ]/g, "");
       JsBarcode(doc, format === "isbn" ? clean.replace(/^ISBN(?:-13)?:?/i, "") : clean, { format: fmt, displayValue: true, font: "monospace", height: 80, margin: 8, width: 2 });
       const markup = new XMLSerializer().serializeToString(doc);

@@ -1,20 +1,20 @@
 {
   "schemaVersion": 1,
-  "policyVersion": "2026-10-10.2",
+  "policyVersion": "2026-10-10.3",
   "principle": "local-first; remote only when explicitly required or selected",
   "platforms": ["web", "android", "ios"],
   "modes": ["local", "remote-required", "unsupported"],
   "families": {
     "barcode": {
       "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "check-digit-validation-and-common-linear-barcode-generation"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "check-digit-validation-and-code128-generation"},
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "check-digit-validation; QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, ITF, and Codabar raster generation"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "check-digit-validation; QR, Code 128, EAN-13, EAN-8, UPC-A, and ISBN-13 raster generation"},
       "remoteFallback": false
     },
     "qr": {
       "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "text-url-QR-generation; scanning and specialized payload forms remain unsupported"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "text-url-QR-generation; scanning and specialized payload forms remain unsupported"},
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "local QR raster generation for catalog payload tools; scanning and exact SVG/data-URL/batch export remain unsupported"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "local QR raster generation for catalog payload tools; scanning and exact SVG/data-URL/batch export remain unsupported"},
       "remoteFallback": false
     },
     "image": {

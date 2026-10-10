@@ -19,11 +19,15 @@ class NativeBarcodeEngineTest {
         assertFalse(NativeBackendEngine.supports(tool("unix-timestamp-converter", type = "datetime", category = "developer")))
     }
 
-    @Test fun qrAndCode128AreAdvertisedAsLocalCapabilities() {
+    @Test fun qrAndBarcodeFormatsAreAdvertisedAsLocalCapabilities() {
         assertTrue(NativeBarcodeEngine.generatesImage("qr-generator"))
+        assertTrue(NativeBarcodeEngine.generatesImage("wifi-qr-generator"))
         assertTrue(NativeBarcodeEngine.generatesImage("code128-barcode"))
-        assertTrue(NativeBarcodeEngine.supports(tool("qr-generator", type = "qr")))
+        assertTrue(NativeBarcodeEngine.generatesImage("ean8-barcode"))
+        assertTrue(NativeBarcodeEngine.supports(tool("wifi-qr-generator", type = "qr")))
         assertTrue(NativeBarcodeEngine.supports(tool("code128-barcode")))
+        assertTrue(NativeBarcodeEngine.supports(tool("isbn-check-digit")))
+        assertTrue(NativeBarcodeEngine.run("isbn-check-digit", "9780143127741").startsWith("Valid"))
     }
 
     @Test fun supportedImageOperationsBypassGenericBackend() {
