@@ -126,7 +126,9 @@ const androidEnv = readFileSync(resolve(root, "apps/android/.env.example"), "utf
 const iosProject = readFileSync(resolve(root, "apps/ios/enV.xcodeproj/project.pbxproj"), "utf8");
 const iosEnv = readFileSync(resolve(root, "apps/ios/Config.xcconfig.example"), "utf8");
 if (!iosProject.includes("AssistantChat.swift in Sources") || !iosProject.includes("A60000000000000000000001 /* AssistantChat.swift in Sources */")) fail("iOS AssistantChat.swift is not registered in the Xcode app build phase");
-const backendBase = "https://env-q3mq.onrender.com";
+// Native clients call the application gateway. The Render host is the
+// server-side processor behind that gateway and cannot serve /api/ routes.
+const backendBase = "https://en-v.vercel.app";
 for (const [label, text] of [["Android build config", androidBuild], ["Android env example", androidEnv], ["iOS Xcode project", iosProject], ["iOS env example", iosEnv]]) {
   if (!text.includes(backendBase)) fail(`${label} does not use the configured native backend URL`);
 }
