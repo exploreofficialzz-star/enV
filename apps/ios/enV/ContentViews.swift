@@ -112,7 +112,6 @@ struct HomeView: View {
                         }
                         .frame(height: 40)
                         HomeMostUsedToolsTray(tools: mostUsedTools) { homePath.append($0) }
-                            .padding(.horizontal, 8)
                         Text("A focused toolkit for\neveryday work.")
                             .font(.envScaled(size: horizontalSizeClass == .regular ? 36 : 24, weight: .semibold))
                             .tracking(-0.4)
@@ -354,22 +353,22 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cellWidth = min(max(proxy.size.width * 0.14, 56), 88)
-            let iconSide = min(max(cellWidth * 0.64, 40), 56)
+            let cellWidth = min(max(proxy.size.width * 0.12, 52), 80)
+            let iconSide = min(max(cellWidth * 0.64, 36), 48)
             Group {
                 if tools.isEmpty {
                     Text("Open tools to build your personal shortcuts.")
-                        .font(.envScaled(size: 11, weight: .regular))
+                        .font(.envScaled(size: 10, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             ForEach(tools) { tool in
                                 Button { onSelect(tool) } label: {
-                                    VStack(spacing: 5) {
+                                    VStack(spacing: 4) {
                                         EnVIcon(name: tool.icon, size: iconSide * 0.5, tint: .envInk)
                                             .frame(width: iconSide, height: iconSide)
                                             .background(Color.envSurface2, in: Circle())
@@ -387,7 +386,7 @@ private struct HomeMostUsedToolsTray: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .frame(height: 136)
+                        .frame(height: 120)
                     }
                 }
             }
@@ -396,7 +395,7 @@ private struct HomeMostUsedToolsTray: View {
         .frame(maxWidth: 768)
         .frame(maxWidth: .infinity)
         .frame(height: 136)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 3, y: 1)
