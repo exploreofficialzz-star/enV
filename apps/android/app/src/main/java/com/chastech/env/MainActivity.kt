@@ -390,7 +390,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                         HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640)
                     }
                 }
-                MostUsedToolsTray(mostUsed, onTool, Modifier.fillMaxWidth())
+                MostUsedToolsTray(mostUsed, onTool, Modifier.padding(horizontal = 8.dp).fillMaxWidth())
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
@@ -417,17 +417,17 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 
 @Composable
 private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(24.dp)
     Surface(
-        modifier = modifier.height(152.dp),
+        modifier = modifier.height(136.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 1.dp,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val cellWidth = (maxWidth * 0.16f).coerceIn(64.dp, 100.dp)
-            val iconSize = (cellWidth * 0.64f).coerceIn(44.dp, 64.dp)
+            val cellWidth = (maxWidth * 0.14f).coerceIn(56.dp, 88.dp)
+            val iconSize = (cellWidth * 0.64f).coerceIn(40.dp, 56.dp)
             if (tools.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -441,7 +441,7 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                 LazyRow(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     items(tools, key = { it.id }) { tool ->
@@ -456,12 +456,12 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                             }
                             Text(
                                 tool.name,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
                             )
                         }
                     }
