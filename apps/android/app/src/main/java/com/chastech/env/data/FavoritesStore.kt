@@ -27,7 +27,7 @@ class FavoritesStore(context: Context) {
         (0 until array.length()).map { array.optString(it) }.filter { it.isNotBlank() && it != "null" }.distinct().take(24)
     }.getOrDefault(emptyList())
 
-    fun getMostUsed(limit: Int = 8): List<String> {
+    fun getMostUsed(limit: Int = 10): List<String> {
         val recent = getRecent()
         val counts = runCatching { JSONObject(preferences.getString(usageKey, "{}") ?: "{}") }.getOrElse { JSONObject() }
         val candidates = (recent + counts.keys().asSequence().toList()).distinct()

@@ -34,7 +34,7 @@ struct HomeView: View {
     private var mostUsedTools: [Tool] {
         let allTools = store.catalog.tools + (store.catalog.relatedReferenceTools ?? [])
         let byID = Dictionary(allTools.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return Array(store.mostUsedIDs.compactMap { byID[$0] }.prefix(5))
+        return Array(store.mostUsedIDs.compactMap { byID[$0] }.prefix(10))
     }
 
     var body: some View {
@@ -353,8 +353,8 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cellWidth = min(max(proxy.size.width * 0.12, 52), 80)
-            let iconSide = min(max(cellWidth * 0.64, 36), 48)
+            let cellWidth = proxy.size.width >= 720 ? 64 : min(max(proxy.size.width * 0.13, 52), 64)
+            let iconSide = proxy.size.width >= 720 ? 40 : min(max(cellWidth * 0.7, 36), 44)
             Group {
                 if tools.isEmpty {
                     Text("Open tools to build your personal shortcuts.")

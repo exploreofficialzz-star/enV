@@ -331,7 +331,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
     }
     val mostUsed = remember(catalog, mostUsedIds) {
         val byId = (catalog.tools + catalog.relatedReferenceTools).associateBy { it.id }
-        mostUsedIds.mapNotNull { byId[it] }.take(5)
+        mostUsedIds.mapNotNull { byId[it] }.take(10)
     }
     val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
     var homeSearchFocused by remember { mutableStateOf(false) }
@@ -426,8 +426,8 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
         shadowElevation = 1.dp,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val cellWidth = (maxWidth * 0.12f).coerceIn(52.dp, 80.dp)
-            val iconSize = (cellWidth * 0.64f).coerceIn(36.dp, 48.dp)
+            val cellWidth = if (maxWidth >= 720.dp) 64.dp else (maxWidth * 0.13f).coerceIn(52.dp, 64.dp)
+            val iconSize = if (maxWidth >= 720.dp) 40.dp else (cellWidth * 0.7f).coerceIn(36.dp, 44.dp)
             if (tools.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(

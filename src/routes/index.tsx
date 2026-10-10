@@ -21,7 +21,7 @@ function Home() {
   const usageCounts = usePrefs((state) => state.usageCounts);
   const prefsHydrated = usePrefs((state) => state.hydrated);
   const mostUsedTools = useMemo(
-    () => rankMostUsedToolIds(recent, usageCounts, 5).flatMap((id) => {
+    () => rankMostUsedToolIds(recent, usageCounts, 10).flatMap((id) => {
       const tool = getToolById(id);
       return tool ? [tool] : [];
     }),
@@ -60,7 +60,7 @@ function Home() {
           )}
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
-          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
+          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
           <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
         </div>
         {prefsHydrated && <MostUsedToolsTray tools={mostUsedTools} />}
@@ -91,12 +91,12 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
                 key={tool.id}
                 to={toolPath(tool)}
                 aria-label={`Open ${tool.name}`}
-                className="group flex w-[clamp(52px,12vw,80px)] shrink-0 snap-start flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
+                className="group flex w-[clamp(52px,13vw,64px)] md:w-16 shrink-0 snap-start flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
               >
-                <span className="flex size-[clamp(36px,10vw,48px)] items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft">
+                <span className="flex size-[clamp(36px,9vw,44px)] md:size-10 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft">
                   <Icon className="size-4 text-fg" aria-hidden="true" />
                 </span>
-                <span className="w-full truncate text-[11px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
+                <span className="w-full truncate text-[10px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
               </Link>
             );
           })}

@@ -71,7 +71,7 @@ function writeCounts(value: Record<string, number>): boolean {
 export function rankMostUsedToolIds(
   recent: string[],
   counts: Record<string, number>,
-  limit = 5,
+  limit = 10,
 ): string[] {
   const recentRank = new Map(recent.map((id, index) => [id, index]));
   return [...new Set([...Object.keys(counts), ...recent])]
