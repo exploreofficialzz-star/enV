@@ -417,7 +417,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 
 @Composable
 private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(28.dp)
     Surface(
         modifier = modifier.height(128.dp),
         shape = shape,
@@ -426,8 +426,9 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
         shadowElevation = 1.dp,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val cellWidth = if (maxWidth >= 720.dp) 60.dp else (maxWidth * 0.13f).coerceIn(52.dp, 64.dp)
-            val iconSize = if (maxWidth >= 720.dp) 44.dp else (cellWidth * 0.75f).coerceIn(40.dp, 48.dp)
+            val visibleCount = if (maxWidth >= 720.dp) 10 else 5
+            val cellWidth = (maxWidth - 24.dp - 12.dp * (visibleCount - 1).toFloat()) / visibleCount.toFloat()
+            val iconSize = (cellWidth * 0.78f).coerceIn(36.dp, 48.dp)
             if (tools.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(

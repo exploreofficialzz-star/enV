@@ -353,8 +353,9 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cellWidth = proxy.size.width >= 720 ? 60 : min(max(proxy.size.width * 0.13, 52), 64)
-            let iconSide = proxy.size.width >= 720 ? 44 : min(max(cellWidth * 0.75, 40), 48)
+            let cellWidth = let visibleCount = proxy.size.width >= 720 ? 10 : 5
+            let cellWidth = (proxy.size.width - 24 - 12 * CGFloat(visibleCount - 1)) / CGFloat(visibleCount)
+            let iconSide = min(max(cellWidth * 0.78, 36), 48)
             Group {
                 if tools.isEmpty {
                     Text("Open tools to build your personal shortcuts.")
@@ -395,9 +396,9 @@ private struct HomeMostUsedToolsTray: View {
         .frame(maxWidth: 768)
         .frame(maxWidth: .infinity)
         .frame(height: 128)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 3, y: 1)
     }
 }

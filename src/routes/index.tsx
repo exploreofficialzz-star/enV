@@ -82,26 +82,28 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   return (
     <section
       aria-label="Your most-used tools"
-      className="mx-auto mt-4 h-[128px] w-full max-w-3xl overflow-hidden rounded-[20px] border border-border bg-surface shadow-[var(--shadow-border)]"
+      className="mx-auto mt-4 h-[128px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
     >
       {tools.length ? (
-        <div className="flex h-full snap-x snap-mandatory items-center gap-3 overflow-x-auto px-3">
-          {tools.map((tool) => {
-            const Icon = toolIcon(tool.icon);
-            return (
-              <Link
-                key={tool.id}
-                to={toolPath(tool)}
-                aria-label={`Open ${tool.name}`}
-                className="group flex w-[clamp(52px,13vw,64px)] md:w-[60px] shrink-0 snap-start flex-col items-center justify-center gap-2 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
-              >
-                <span className="flex size-[clamp(40px,9vw,48px)] md:size-11 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft">
-                  <Icon className="size-5 text-fg" aria-hidden="true" />
-                </span>
-                <span className="w-full truncate text-[11px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
-              </Link>
-            );
-          })}
+        <div className="personal-tools-scroll snap-x snap-mandatory">
+          <div className="personal-tools-track">
+            {tools.map((tool) => {
+              const Icon = toolIcon(tool.icon);
+              return (
+                <Link
+                  key={tool.id}
+                  to={toolPath(tool)}
+                  aria-label={`Open ${tool.name}`}
+                  className="group flex min-w-0 snap-start flex-col items-center justify-center gap-2 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
+                >
+                  <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft md:size-11">
+                    <Icon className="size-5 text-fg" aria-hidden="true" />
+                  </span>
+                  <span className="w-full truncate text-[11px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="flex h-full items-center justify-center px-6 text-center text-xs text-muted">
