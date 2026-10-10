@@ -2,16 +2,16 @@
 
 **Audit scope:** source-level comparison of the web implementation with Android and iOS implementations across six screen families.
 
-**Overall conclusion:** **Parity is partial; this audit does not establish full parity.** Several contracts are aligned (catalog ranking logic for the common pool, typography declarations in most surfaces, card geometry, navigation intent, validation, and core AI request shapes), but there are confirmed P1/P2/P3 gaps in responsive geometry, catalog scope, search interaction, native state/error handling, accessibility semantics, footer/information behavior, assistant cancellation, and structured AI results.
+**Overall conclusion:** **Parity is partial; this audit does not establish full parity.** Several contracts are aligned (catalog ranking and discovery scope, typography declarations in most surfaces, card geometry, navigation intent, validation, and core AI request shapes), but confirmed P1/P2/P3 gaps remain in responsive geometry, residual search interaction, native state/error handling, accessibility semantics, footer/information behavior, and structured AI results.
 
-**Remediation update (2026-10-09):** This source audit is historical; this update records the current working-tree implementation. Native Home search now opens the first ranked suggestion on Enter/search-button activation (or falls back to global Search); Android and iOS global Search expose ranked suggestions and first-result navigation, and iOS Tools search uses a 52vw narrow-screen width. Web Assistant state is now root-owned, matching native conversation retention; iOS draft state is also root-owned. Native Assistant Stop/New chat and retry behavior, Android message selection/live updates, and iOS VoiceOver update semantics are aligned in source. Assistant panel/bubble bounds and recommendation nesting now reflect the web contract on both platforms. The document API allowlist now covers all 82 catalog operations (not 53). **Native device builds, screenshots, accessibility runtime, and deployed document processing remain to be verified; full product parity is not claimed.**
+**Remediation update (2026-10-09):** Native Home, Search, Tools, category, and Saved discovery include all catalog records; the eight browser-runtime tools remain non-executable references, are labeled **Web only**, and open their canonical `en-v.vercel.app` tool route in the system browser (no WebView). Home, global Search, and Tools now expose ranked suggestions and first-result navigation, with a see-more route. iOS Tools search uses a 52vw narrow-screen width. Web Assistant state is now root-owned, matching native conversation retention; iOS draft state is also root-owned. Native Assistant Stop/New chat and retry behavior, Android message selection/live updates, and iOS VoiceOver update semantics are aligned in source. Assistant panel/bubble bounds and recommendation nesting now reflect the web contract on both platforms. The document API allowlist covers all 82 catalog operations. Android, iOS, and Production CI passed for commit `aae1477`; the current follow-up changes are pending CI. **Pixel-level device screenshots, accessibility runtime, and deployed document processing remain to be verified; full product parity is not claimed.**
 
 ## Executive summary
 
 | Screen / surface | Status | Main confirmed gaps |
 |---|---|---|
-| Home | Partial | Native-filtered suggestion pool; footer layout/count; catalog loading states; residual responsive/spacing differences |
-| Search and browsing | Partial | Native-filtered tool universe; category/back/URL model; residual Search presentation/width/gutters and loading/error behavior |
+| Home | Partial | Search accessibility/empty states; footer layout/count; catalog loading states; residual responsive/spacing differences |
+| Search and browsing | Partial | Category/back/URL model; residual Search presentation/width/gutters and loading/error behavior |
 | Tool detail shell | Partial | Availability labels; recent-tool persistence; form radius/elevation/background; native error announcement semantics |
 | Assistant chat | Partial | Error/timeout taxonomy; Dynamic Type/runtime accessibility; remaining cross-platform retention/error state nuances |
 | Contextual AI assist | Partial | Android wide-field layout; panel elevation/radius; Android typography guarantee; structured result hierarchy/copy; MIME fallback; error/timeout; availability cache refresh |
@@ -31,12 +31,12 @@ The following are **confirmed implementation differences in the inspected source
 - **Native:** Android and iOS cap the parent at 1152px but put the search/headline at the full content width. Both retain a 142x56 hero and 64px search at all widths; title scales 24/36. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:265-266,306-343,363`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:33-55,89-94,122-127`.
 - **Recommended action:** Add a shared native Home inner max width of 768px, apply the equivalent `>=640` 163x64 hero and 72px search values, and cap the headline to the same inner width while retaining mobile values.
 
-#### P1 — Suggestion ranking/search pool
+#### P1 — Suggestion ranking/search pool (source remediation complete)
 
 - **Web:** Home suggestions call `searchTools(getAllTools(), q, 8)`, so web-runtime-only catalog entries participate. Evidence: `/home/ubuntu/enV/src/components/tools/search-box.tsx:48,128-163`; `/home/ubuntu/enV/src/lib/search.ts:56-87`; `/home/ubuntu/enV/src/lib/registry.ts:8-14`.
-- **Native:** Android `Catalog.fromJson` and iOS `Catalog.nativeFacing` remove the eight `NativeCopy.webRuntimeOnly` IDs before Home search. Native Home then calls `webSearch` on the filtered catalog. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/NativeCopy.kt:9-21`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt:74-98,111-131`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:314`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift:153-170,175-219`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:22`.
-- **Confirmed example:** For query `media`, web ranks `media-capability-checker` and `mediarecorder-support-checker` in its top eight; those cannot appear in native Home suggestions. The current empty-query top 12 happens to match because none of the eight filtered entries is in the popularity top 12; the confirmed divergence is for typed queries, not current Trending ordering.
-- **Recommended action:** Choose one contract: expose web-runtime entries as non-executable native reference results, or make web search use the native-eligible pool. If filtering is intentional, label/document platform-specific pools and test query parity.
+- **Native:** The executable `catalog.tools` collections still exclude the eight `NativeCopy.webRuntimeOnly` IDs, but Home, global Search, Tools index, category pages, and Saved now search/render the union with `relatedReferenceTools`. The records are labeled **Web only**, execution is explicitly gated off, and detail screens open the canonical route in the system browser. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift`; `/home/ubuntu/enV/apps/ios/enV/ToolViews.swift`.
+- **Historical confirmed example:** For query `media`, web ranks `media-capability-checker` and `mediarecorder-support-checker` in its top eight. The source divergence is now remediated by the non-executable reference pool; these tools are not represented as native execution paths.
+- **Resolution:** Preserve one full discovery universe while clearly distinguishing native-executable tools from Web-only references; native navigation opens the canonical web route externally and does not embed a WebView. Regression guards cover the pool, labels, browser route, and no-WebView invariant.
 
 #### P2 — Search accessibility semantics
 
@@ -83,17 +83,17 @@ The following are **confirmed implementation differences in the inspected source
 
 ### 2. Search and browsing — gap
 
-#### P1 — Tool universe / ranking result set
+#### P1 — Tool universe / ranking result set (source remediation complete)
 
 - **Web:** Search and Tools index use the complete registry; ranking includes category, subcategory, keywords, tags, and ID in the haystack. Evidence: `/home/ubuntu/enV/src/lib/registry.ts:1-10`; `/home/ubuntu/enV/src/lib/search.ts:42-87`.
 - **Native:** Android removes every `NativeCopy.isWebRuntimeOnly` tool from `catalog.tools` and keeps them only as related references; iOS `Catalog.nativeFacing` performs the same filtering. Search/Tools call `webSearch` on the filtered native catalog. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt:74-98`; `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:445-448,602`; `/home/ubuntu/enV/apps/ios/enV/CatalogCore.swift:153-170`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:281-287,481`.
 - **Recommended action:** Expose the same universe to native browsing/search or explicitly define web-runtime-only exclusion and shared platform counts/empty states.
 
-#### P1 — Search field interaction contract
+#### P1 — Search field interaction contract (source remediation complete; runtime visual check pending)
 
 - **Web:** Shared `SearchBox` computes up to eight ranked suggestions when focused/queried, renders suggestions plus `See more results`, and on Enter opens the first result when available, otherwise `/search?q=...`. It is used by the global Search and Tools index. Evidence: `/home/ubuntu/enV/src/components/tools/search-box.tsx:48-65,79-95,128-163`; `/home/ubuntu/enV/src/routes/search.tsx:24-29`; `/home/ubuntu/enV/src/routes/tools/index.tsx:35-42`.
-- **Native:** Android SearchScreen uses an `OutlinedTextField` with no suggestion/dropdown or Enter navigation contract; Android Tools uses a `BasicTextField` that only updates query. iOS Search uses system `.searchable` live results and iOS Tools uses a plain `TextField` with no suggestions. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt:562-572,599-635,1377-1380`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift:304-317,476-537`.
-- **Recommended action:** Either implement ranked suggestions and first-result Enter natively, or change web SearchBox behavior on these pages to match native live-result behavior.
+- **Native:** Android and iOS Home, global Search, and Tools index now render ranked suggestions and activate the first result on Enter/search action. Their dropdowns include a no-match state and See more results route; Web-only reference entries remain visibly labeled and non-executable. Evidence: `/home/ubuntu/enV/apps/android/app/src/main/java/com/chastech/env/MainActivity.kt`; `/home/ubuntu/enV/apps/ios/enV/ContentViews.swift`.
+- **Resolution:** Implemented in source and protected by `check-native-ui-parity`; pixel-level dropdown geometry and live accessibility behavior still need device/simulator review.
 
 #### P1 — Category navigation and back affordance
 

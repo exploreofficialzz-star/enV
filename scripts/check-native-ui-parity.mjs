@@ -78,4 +78,26 @@ assert.match(android, /\$\{catalog\.browserActiveToolCount\} browser tools/);
 assert.match(android, /\$\{catalog\.browserActiveToolCount\} live tools/);
 assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.browserActiveToolCount/);
 
-console.log("PASS: native navigation, search-state, width-cap, and typography parity guards");
+// All advertised catalog records remain discoverable; browser-runtime references are clearly labeled and never wrapped in a WebView.
+assert.match(android, /catalog\.webSearch\(query, includeRelatedReferences = true\)/);
+assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedReferences = true\)/);
+assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
+assert.match(androidCatalog, /\(tools \+ relatedReferenceTools\)\.asSequence\(\)/);
+assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.includes('Text("Web only"'), "Android discovery labels retained browser-only tools");
+assert.match(android, /authority\("en-v\.vercel\.app"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
+assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
+assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
+assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)\)\.filter \{ favoriteIDs\.contains/);
+assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
+assert.ok(iosTools.includes("https://en-v.vercel.app/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
+assert.match(iosContent, /NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
+assert.match(android, /private fun nativeSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
+assert.match(android, /private fun nativeBackendSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
+assert.match(iosTools, /private var backend: Bool \{ !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
+assert.match(iosTools, /private var local: Bool \{ !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
+assert.match(android, /private fun WebToolsSearchField\([\s\S]*?focused && query\.isNotBlank\(\)[\s\S]*?suggestions\.forEach[\s\S]*?See more results/);
+assert.match(iosContent, /\.focused\(\$isToolsSearchFocused\)/);
+assert.match(iosContent, /private var searchSuggestions: \[Tool\][\s\S]*?ForEach\(searchSuggestions\)[\s\S]*?See more results/);
+assert.doesNotMatch(`${android}\n${iosContent}\n${iosTools}`, /WebView|WKWebView/);
+
+console.log("PASS: native navigation, full-catalog discovery, search interaction, width-cap, and typography parity guards");

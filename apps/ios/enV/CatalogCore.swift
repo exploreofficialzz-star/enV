@@ -309,13 +309,13 @@ final class CatalogStore: ObservableObject {
     }
 
     var categories: [ToolCategory] { catalog.categories }
-    var favoriteTools: [Tool] { catalog.tools.filter { favoriteIDs.contains($0.id) }.sorted { $0.name < $1.name } }
-    var featuredTools: [Tool] { catalog.tools.filter(\.featured).sorted { $0.popularity > $1.popularity } }
-    var popularTools: [Tool] { catalog.tools.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
+    var favoriteTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter { favoriteIDs.contains($0.id) }.sorted { $0.name < $1.name } }
+    var featuredTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter(\.featured).sorted { $0.popularity > $1.popularity } }
+    var popularTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return catalog.tools.filter { tool in
+        return (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter { tool in
             (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
         }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
     }

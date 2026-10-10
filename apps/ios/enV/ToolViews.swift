@@ -24,9 +24,9 @@ struct ToolCard: View {
                             .lineLimit(2)
                             .lineSpacing(2)
                             .padding(.top, 4)
-                        if NativeBackendEngine.supports(tool) {
+                        if !NativeCopy.isWebRuntimeOnly(tool.id), NativeBackendEngine.supports(tool) {
                             StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
-                        } else if NativeCoverage.isLocallyExecutable(tool) {
+                        } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeCoverage.isLocallyExecutable(tool) {
                             Text("ON DEVICE").font(.custom("Outfit-Medium", size: 9)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
                         } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
                         } else {
@@ -85,8 +85,8 @@ struct ToolDetailView: View {
     let tool: Tool
 
     private var compact: Bool { horizontalSizeClass != .regular }
-    private var backend: Bool { NativeBackendEngine.supports(tool) }
-    private var local: Bool { NativeCoverage.isLocallyExecutable(tool) }
+    private var backend: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool) }
+    private var local: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeCoverage.isLocallyExecutable(tool) }
     private var relatedTools: [Tool] { store.catalog.relatedTools(for: tool) }
     private var categoryName: String { store.category(named: tool.category)?.name ?? tool.category }
     private var relatedColumns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: compact ? 1 : 2) }
@@ -137,9 +137,14 @@ struct ToolDetailView: View {
                             StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
                             Text(tool.isPlanned
                                 ? "This tool is not yet implemented natively."
-                                : "This tool is available in the Web product but has no native implementation in this standalone iOS app.")
+                                : "This tool is available in the Web product and is not executable natively.")
                                 .font(.custom("Outfit-Regular", size: 14))
                                 .foregroundStyle(Color.envMuted)
+                            if !tool.isPlanned, let webURL = URL(string: "https://en-v.vercel.app/tools/\(tool.category)/\(tool.slug)") {
+                                Link("Open in Web", destination: webURL)
+                                    .font(.custom("Outfit-SemiBold", size: 14))
+                                    .accessibilityHint("Opens this tool in your default web browser")
+                            }
                         }
                     }
                 }

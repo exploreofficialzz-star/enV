@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.FavoritesStore
+import com.chastech.env.data.NativeCopy
 import com.chastech.env.data.webSearch
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
@@ -408,6 +409,7 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
             Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
         }
@@ -420,6 +422,7 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -458,7 +461,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val groupedTools = remember(catalog, query) {
-        val byCategory = catalog.webSearch(query).groupBy { it.category }
+        val byCategory = catalog.webSearch(query, includeRelatedReferences = true).groupBy { it.category }
         catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
     }
     LazyColumn(
@@ -470,10 +473,18 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-                    WebToolsSearchField(query, onQuery, Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp)) {
-                        val first = groupedTools.firstOrNull()?.second?.firstOrNull()
-                        if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
-                    }
+                    WebToolsSearchField(
+                        catalog = catalog,
+                        query = query,
+                        onQuery = onQuery,
+                        modifier = Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp),
+                        onTool = onTool,
+                        onSubmit = {
+                            val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
+                            if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
+                        },
+                        onSeeMore = onSearch,
+                    )
                 }
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -523,7 +534,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
 private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> Unit, onTool: (String) -> Unit) {
     val category = catalog.categories.find { it.id == categoryId }
     val tools = remember(catalog, categoryId) {
-        catalog.tools.filter { it.category == categoryId }
+        (catalog.tools + catalog.relatedReferenceTools).filter { it.category == categoryId }
             .sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name })
     }
     var visibleCount by rememberSaveable(categoryId) { mutableIntStateOf(6) }
@@ -578,13 +589,34 @@ private fun ToolGrid(tools: List<ToolRecord>, columns: Int, onTool: (String) -> 
 }
 
 @Composable
-private fun WebToolsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier, onSearch: () -> Unit = {}) {
-    Surface(modifier.height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) Text("Search tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSearch() }))
+private fun WebToolsSearchField(
+    catalog: Catalog,
+    query: String,
+    onQuery: (String) -> Unit,
+    modifier: Modifier,
+    onTool: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onSeeMore: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.webSearch(query, limit = 8, includeRelatedReferences = true) }
+    Column(modifier) {
+        Surface(Modifier.fillMaxWidth().height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (query.isEmpty()) Text("Search tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = onSubmit))
+                }
+            }
+        }
+        if (focused && query.isNotBlank()) {
+            Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 2.dp) {
+                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (suggestions.isEmpty()) Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
+                    else suggestions.forEach { WebHomeSearchSuggestion(it, onTool) }
+                    TextButton(onClick = { focused = false; onSeeMore() }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
+                }
             }
         }
     }
@@ -598,6 +630,7 @@ private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: M
         Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
         Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
     }
@@ -617,7 +650,7 @@ private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
 private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, onTool: (String) -> Unit) {
     var visibleCount by rememberSaveable { mutableIntStateOf(24) }
     LaunchedEffect(query) { visibleCount = 24 }
-    val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query) }
+    val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query, includeRelatedReferences = true) }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     LazyColumn(
@@ -657,7 +690,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
 
 @Composable
 private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
-    val tools = catalog.tools.filter { it.id in favorites }.sortedBy { it.name }
+    val tools = (catalog.tools + catalog.relatedReferenceTools).filter { it.id in favorites }.sortedBy { it.name }
     Column(Modifier.fillMaxSize()) {
         Text("Saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(20.dp))
         ToolList(tools, favorites, onTool, onToggle, Modifier.weight(1f), "Save a tool to find it here across restarts.")
@@ -685,7 +718,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter" -> NativeFileConverterEngine.supports(tool)
@@ -703,7 +736,7 @@ private fun nativeSupported(tool: ToolRecord): Boolean = when { NativeBackendEng
     }
 }
 
-private fun nativeBackendSupported(tool: ToolRecord): Boolean = NativeBackendEngine.supports(tool)
+private fun nativeBackendSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool)
 
 @Composable
 private fun ToolDetail(
@@ -718,6 +751,7 @@ private fun ToolDetail(
 ) {
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
+    val context = LocalContext.current
     val related = remember(catalog, tool) { catalog.relatedTools(tool) }
     val categoryName = catalog.categories.firstOrNull { it.id == tool.category }?.name ?: tool.category
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -769,7 +803,12 @@ private fun ToolDetail(
                         }
                         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             StatusPill("Web only")
-                            Text("This tool is not yet implemented natively. Open it in the Web product to use it.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Button(onClick = {
+                                val url = Uri.Builder().scheme("https").authority("en-v.vercel.app")
+                                    .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
+                                context.startActivity(Intent(Intent.ACTION_VIEW, url))
+                            }) { Text("Open in Web") }
                         }
                     }
                 }
@@ -1350,6 +1389,8 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                     Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (tool.status == "planned") {
                         StatusPill("Coming soon", Modifier.padding(top = 10.dp))
+                    } else if (NativeCopy.isWebRuntimeOnly(tool.id)) {
+                        StatusPill("WEB ONLY", Modifier.padding(top = 10.dp))
                     } else if (tool.clientSide) {
                         StatusPill("IN-BROWSER", Modifier.padding(top = 10.dp))
                     }
@@ -1395,7 +1436,7 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
 @Composable
 private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearch(value, limit = 8) }
+    val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearch(value, limit = 8, includeRelatedReferences = true) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "Search tools"; isTraversalGroup = true }) {
         OutlinedTextField(
             value = value,

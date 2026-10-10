@@ -136,8 +136,8 @@ fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedR
 
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {
     val needle = query.trim().lowercase()
-    return tools.asSequence().filter { categoryId == null || it.category == categoryId }.filter { tool ->
-        needle.isEmpty() || sequenceOf(tool.name, tool.description, tool.id, tool.slug).plus(tool.keywords.asSequence()).plus(tool.tags.asSequence()).any { it.lowercase().contains(needle) }
+    return (tools + relatedReferenceTools).asSequence().filter { categoryId == null || it.category == categoryId }.filter { tool ->
+        needle.isEmpty() || sequenceOf(tool.name, tool.description, tool.id, tool.slug).plus(tool.keywords.asSequence()).plus(tool.tags).any { it.lowercase().contains(needle) }
     }.sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name }).toList()
 }
 
@@ -171,5 +171,5 @@ fun ToolRecord.nativeDisclaimerText(): String? = when (disclaimer) {
     else -> null
 }
 
-fun Catalog.featuredOrPopular(limit: Int = 8): List<ToolRecord> = tools.asSequence()
+fun Catalog.featuredOrPopular(limit: Int = 8): List<ToolRecord> = (tools + relatedReferenceTools).asSequence()
     .filter { it.featured || it.status == "active" }.sortedWith(compareByDescending<ToolRecord> { it.featured }.thenByDescending { it.popularity }.thenBy { it.name }).take(limit).toList()

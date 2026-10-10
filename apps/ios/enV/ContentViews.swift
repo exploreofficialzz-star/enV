@@ -26,7 +26,7 @@ struct HomeView: View {
         else { onSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
     private var homeTools: [Tool] {
-        store.catalog.webSearch("", limit: Int.max)
+        store.catalog.webSearch("", limit: Int.max, includeRelatedReferences: true)
             .filter { $0.status == "active" || $0.status == "beta" }
             .prefix(12)
             .map { $0 }
@@ -210,6 +210,7 @@ private struct DiscoveryToolCard: View {
                 Text(tool.name).font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk).padding(.top, 12)
                 Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
                 if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-Medium", size: 10)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("WEB ONLY").font(.custom("Outfit-Medium", size: 10)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
                 else if tool.clientSide { Text("IN-BROWSER").font(.custom("Outfit-Medium", size: 10)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
                 HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
             }
@@ -233,6 +234,7 @@ private struct WebHomeSearchSuggestion: View {
                 HStack(spacing: 8) {
                     Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
                     if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
+                    else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
                 }
                 Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
@@ -304,9 +306,12 @@ struct ToolsView: View {
     @State private var visibleByCategory: [String: Int] = [:]
     @State private var searchNavigationTool: Tool?
     @State private var showSearchNavigation = false
+    @FocusState private var isToolsSearchFocused: Bool
 
     // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
-    private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery) }
+    private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery, includeRelatedReferences: true) }
+    private var searchSuggestions: [Tool] { toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(toolsQuery, limit: 8, includeRelatedReferences: true) }
+    private var searchFieldWidth: CGFloat { horizontalSizeClass == .regular ? 288 : min(288, max(160, UIScreen.main.bounds.width * 0.52)) }
     private var categoryGroups: [ToolCategoryGroup] {
         let toolsByCategory = Dictionary(grouping: matchingTools, by: \.category)
         return store.categories.compactMap { category in
@@ -335,22 +340,73 @@ struct ToolsView: View {
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
                                     .accessibilityLabel("Search tools")
+                                    .focused($isToolsSearchFocused)
                                     .submitLabel(.search)
                                     .onSubmit {
                                         guard !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = matchingTools.first else {
+                                            isToolsSearchFocused = false
                                             onSearchNoMatch()
                                             return
                                         }
                                         searchNavigationTool = first
+                                        isToolsSearchFocused = false
                                         showSearchNavigation = true
                                     }
                                     .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
                             .padding(.horizontal, 16)
-                            .frame(width: horizontalSizeClass == .regular ? 288 : min(288, max(160, UIScreen.main.bounds.width * 0.52)), height: 44)
+                            .frame(width: searchFieldWidth, height: 44)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 22))
                             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
                             .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
+                        }
+                        if isToolsSearchFocused && !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            HStack {
+                                Spacer(minLength: 0)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if searchSuggestions.isEmpty {
+                                        Text("No matching tools. Try “json”, “bmi”, or “qr”.")
+                                            .font(.custom("Outfit-Regular", size: 14))
+                                            .foregroundStyle(Color.envMuted)
+                                            .padding(12)
+                                    } else {
+                                        ForEach(searchSuggestions) { tool in
+                                            Button {
+                                                searchNavigationTool = tool
+                                                isToolsSearchFocused = false
+                                                showSearchNavigation = true
+                                            } label: {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    HStack(spacing: 8) {
+                                                        Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
+                                                        if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
+                                                        else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
+                                                    }
+                                                    Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(1)
+                                                }
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    HStack {
+                                        Spacer()
+                                        Button("See more results") { isToolsSearchFocused = false; onSearchNoMatch() }
+                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .foregroundStyle(Color.envAccent)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.bottom, 8)
+                                }
+                                .frame(width: searchFieldWidth)
+                                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                                .shadow(color: Color.black.opacity(0.06), radius: 4, y: 2)
+                                .accessibilityElement(children: .contain)
+                                .accessibilityLabel("Search suggestions")
+                            }
                         }
                         Text("Find a tool by name or browse the categories below.")
                             .font(.custom("Outfit-Regular", size: 16))
@@ -520,8 +576,8 @@ struct SearchResultsView: View {
     @State private var showSearchNavigation = false
     @FocusState private var isSearchFocused: Bool
 
-    private var results: [Tool] { store.catalog.webSearch(text, limit: Int.max) }
-    private var suggestions: [Tool] { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(text, limit: 8) }
+    private var results: [Tool] { store.catalog.webSearch(text, limit: Int.max, includeRelatedReferences: true) }
+    private var suggestions: [Tool] { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(text, limit: 8, includeRelatedReferences: true) }
 
     var body: some View {
         ScrollView {
