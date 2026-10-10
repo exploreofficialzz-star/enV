@@ -12,7 +12,7 @@ The native apps must not embed the website or depend on a WebView for navigation
 
 ## Product parity target
 
-The canonical web catalog contains **10,000 entries** across **43 declared categories** (42 populated). The current generated state is **10,000 active** and **0 planned**. The native execution matrix reports **7,066 offline-native** and **2,934 backend-native** active operations, with **0 Web-only** active operations and **0 platform divergence**.
+The canonical web catalog contains **10,000 entries** across **43 declared categories** (42 populated). The current generated state is **10,000 active** and **0 planned**. The generated native execution matrix reports **7,633 offline-native**, **1,619 backend-native**, and **748 explicitly Web-only** active operations, with **0 platform divergence**. These are route classifications; a backend-native record is only considered complete when its concrete route and native form are covered by the execution-policy audit.
 
 ## Current status (2026-10-06)
 

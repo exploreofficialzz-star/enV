@@ -12,22 +12,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.engine.NativeFileConverterEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun NativeFileConverterToolForm(tool: ToolRecord) {
     val context=LocalContext.current
+    val scope=rememberCoroutineScope()
     var file by remember { mutableStateOf<NativeBackendEngine.InputFile?>(null) }
     var output by remember { mutableStateOf<NativeFileConverterEngine.Result?>(null) }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null) file=readConverterFile(context,uri) }
-    val saver=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if(uri!=null&&output?.bytes!=null) context.contentResolver.openOutputStream(uri)?.use { it.write(output!!.bytes) } }
+    var working by rememberSaveable(tool.id) { mutableStateOf(false) }
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null) scope.launch { working=true; file=withContext(Dispatchers.IO) { readConverterFile(context,uri) }; working=false } }
+    val saver=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if(uri!=null&&output?.bytes!=null) scope.launch(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(output!!.bytes) } } }
     val baseName=file?.name?.substringBeforeLast('.') ?: "output"
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("Native Kotlin · local file conversion",style=MaterialTheme.typography.labelLarge)
-        Button(onClick={picker.launch(arrayOf("*/*"))}) { Text(if(file==null) "Choose file" else file!!.name) }
+        Button(enabled=!working,onClick={picker.launch(arrayOf("*/*"))}) { Text(if(file==null) "Choose file" else file!!.name) }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Button(enabled=file!=null,onClick={ runCatching { NativeFileConverterEngine.run(tool,file!!.name,file!!.bytes) }.fold({output=it;error=""},{output=null;error=it.message?:"Conversion failed."}) }) { Text("Convert") }
-            OutlinedButton(onClick={file=null;output=null;error=""}) { Text("Reset") }
+            Button(enabled=file!=null&&!working,onClick={ val selected=file ?: return@Button; scope.launch { working=true; withContext(Dispatchers.Default) { runCatching { NativeFileConverterEngine.run(tool,selected.name,selected.bytes) }.fold({output=it;error=""},{output=null;error=it.message?:"Conversion failed."}) }; working=false } }) { Text(if(working) "Working…" else "Convert") }
+            OutlinedButton(enabled=!working,onClick={file=null;output=null;error=""}) { Text("Reset") }
         }
         output?.text?.let { Text(it,modifier=Modifier.fillMaxWidth().heightIn(max=280.dp),style=MaterialTheme.typography.bodySmall) }
         output?.bytes?.let { OutlinedButton(onClick={saver.launch("$baseName.${output!!.extension}")}) { Text("Save ${output!!.extension.uppercase()}") } }

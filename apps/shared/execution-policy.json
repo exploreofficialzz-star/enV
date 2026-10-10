@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "2026-10-10.1",
+  "principle": "local-first; remote only when explicitly required or selected",
+  "platforms": ["web", "android", "ios"],
+  "modes": ["local", "remote-required", "unsupported"],
+  "families": {
+    "barcode": {
+      "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "validated-check-digit-operations"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "validated-check-digit-operations"},
+      "remoteFallback": false
+    },
+    "qr": {
+      "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
+      "android": {"mode": "unsupported", "next": "CameraX + bundled ML Kit scanner and native encoder"},
+      "ios": {"mode": "unsupported", "next": "Vision/Core Image scanner and generator"},
+      "remoteFallback": true,
+      "consent": "required"
+    },
+    "image": {
+      "web": {"mode": "local", "implementation": "src/lib/image/"},
+      "android": {"mode": "unsupported", "next": "ImageDecoder/Bitmap processing module"},
+      "ios": {"mode": "unsupported", "next": "ImageIO/Core Image processing module"},
+      "remoteFallback": true,
+      "consent": "required"
+    },
+    "screenshots": {
+      "web": {"mode": "local", "implementation": "src/lib/screenshots/"},
+      "android": {"mode": "unsupported", "next": "Compose/Bitmap local composition module"},
+      "ios": {"mode": "unsupported", "next": "Core Graphics/UIGraphics local composition module"},
+      "remoteFallback": true,
+      "consent": "required"
+    },
+    "mockups": {
+      "web": {"mode": "local", "implementation": "src/lib/mockups/"},
+      "android": {"mode": "unsupported", "next": "Kotlin scene model and Canvas renderer"},
+      "ios": {"mode": "unsupported", "next": "Swift scene model and Core Graphics renderer"},
+      "remoteFallback": true,
+      "consent": "required"
+    },
+    "document-backend": {
+      "web": {"mode": "remote-required", "implementation": "server/routes/api/backend/documents.post.ts", "reason": "fidelity-sensitive document conversion currently uses server processors"},
+      "android": {"mode": "remote-required", "implementation": "NativeBackendEngine document route", "reason": "no native Office conversion engine yet"},
+      "ios": {"mode": "remote-required", "implementation": "NativeBackendEngine document route", "reason": "no native Office conversion engine yet"},
+      "remoteFallback": false,
+      "consent": "required"
+    },
+    "media": {
+      "web": {"mode": "local", "implementation": "src/lib/media/ and browser media engines", "scope": "operation and codec capability dependent"},
+      "android": {"mode": "unsupported", "next": "Media3 Transformer local operation registry"},
+      "ios": {"mode": "unsupported", "next": "AVFoundation/AVFAudio local operation registry"},
+      "remoteFallback": true,
+      "consent": "required"
+    },
+    "remote-url": {
+      "web": {"mode": "remote-required", "reason": "requires network access to the remote resource"},
+      "android": {"mode": "remote-required"},
+      "ios": {"mode": "remote-required"},
+      "remoteFallback": false,
+      "consent": "required"
+    }
+  },
+  "rules": [
+    "A catalog record is not executable merely because it has a form.",
+    "A native backend route must name a concrete server route or an explicit remote-required reason.",
+    "Local processing errors never trigger an implicit upload.",
+    "Every remote file operation must disclose the files leaving the device and require an explicit user action.",
+    "A new local claim requires a platform handler and a platform test fixture before it is published."
+  ]
+}
