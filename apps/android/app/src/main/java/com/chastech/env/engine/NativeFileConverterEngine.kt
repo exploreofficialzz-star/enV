@@ -40,7 +40,6 @@ object NativeFileConverterEngine {
     }
     private fun document(op:String,name:String,data:ByteArray):Result {
         if (op == "docx-text-extractor") return Result(docxText(data), extension="txt", mime="text/plain")
-        PDFBoxResourceLoader.init()
         PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
             if (op == "pdf-metadata-viewer" || op == "pdf-metadata-tool") return Result(JSONObject().put("pages",pdf.numberOfPages).put("title",pdf.documentInformation.title ?: "").put("author",pdf.documentInformation.author ?: "").toString(2), extension="json", mime="application/json")
             if (op == "pdf-text-extractor") { val text = com.tom_roush.pdfbox.text.PDFTextStripper().getText(pdf); return Result(text, extension="txt", mime="text/plain") }

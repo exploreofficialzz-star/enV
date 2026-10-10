@@ -5,7 +5,7 @@ import { downloadBlob } from "@/lib/utils";
 import { runLocalDocument } from "@/lib/documents/local-document";
 
 const LOCAL = new Set(["pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter", "pdf-rotator", "docx-text-extractor", "text-to-docx", "txt-to-docx", "markdown-to-docx"]);
-const ACCEPT = ".pdf,.docx,.txt,.md,.markdown";
+const ACCEPT = ".pdf,.docx,.pptx,.xlsx,.xls,.png,.jpg,.jpeg,.txt,.md,.markdown";
 const label = (id: string) => id.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
 export function DocumentToolsEngine({ op }: { op: string }) {

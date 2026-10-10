@@ -44,7 +44,7 @@ enum NativeFileConverterEngine {
     }
     private static func document(_ op:String,file:NativeBackendFile)throws->Result {
         if op == "docx-text-extractor" {
-            guard let attributed = try? NSAttributedString(data:file.data, options:[.documentType:NSAttributedString.DocumentType.officeOpenXML], documentAttributes:nil) else { throw NativeNativeError.message("This DOCX file could not be read locally.") }
+            guard let attributed = try? NSAttributedString(data:file.data, options:[.documentType:"org.openxmlformats.wordprocessingml.document"], documentAttributes:nil) else { throw NativeNativeError.message("This DOCX file could not be read locally.") }
             return Result(attributed.string + "\n", nil, "text/plain", "txt")
         }
         guard let pdf=PDFDocument(data:file.data) else { throw NativeNativeError.message("Selected file is not a readable PDF.") }

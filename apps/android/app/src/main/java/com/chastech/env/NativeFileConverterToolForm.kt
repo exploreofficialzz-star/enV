@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.engine.NativeFileConverterEngine
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,6 +25,7 @@ fun NativeFileConverterToolForm(tool: ToolRecord) {
     var output by remember { mutableStateOf<NativeFileConverterEngine.Result?>(null) }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
     var working by rememberSaveable(tool.id) { mutableStateOf(false) }
+    LaunchedEffect(Unit) { PDFBoxResourceLoader.init(context) }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if(uri!=null) scope.launch { working=true; file=withContext(Dispatchers.IO) { readConverterFile(context,uri) }; working=false } }
     val saver=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if(uri!=null&&output?.bytes!=null) scope.launch(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(output!!.bytes) } } }
     val baseName=file?.name?.substringBeforeLast('.') ?: "output"
