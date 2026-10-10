@@ -417,49 +417,53 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 
 @Composable
 private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(32.dp)
+    val shape = RoundedCornerShape(28.dp)
     Surface(
-        modifier = modifier.height(176.dp),
+        modifier = modifier.height(152.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 1.dp,
     ) {
-        if (tools.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    "Open tools to build your personal shortcuts.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-            }
-        } else {
-            LazyRow(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(tools, key = { it.id }) { tool ->
-                    Column(
-                        modifier = Modifier.width(120.dp).clickable { onTool(tool.id) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Surface(Modifier.size(72.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Box(contentAlignment = Alignment.Center) {
-                                EnVIcon(tool.icon, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurface)
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val cellWidth = (maxWidth * 0.16f).coerceIn(64.dp, 100.dp)
+            val iconSize = (cellWidth * 0.64f).coerceIn(44.dp, 64.dp)
+            if (tools.isEmpty()) {
+                Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        "Open tools to build your personal shortcuts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+            } else {
+                LazyRow(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items(tools, key = { it.id }) { tool ->
+                        Column(
+                            modifier = Modifier.width(cellWidth).clickable { onTool(tool.id) },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Surface(Modifier.size(iconSize), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    EnVIcon(tool.icon, Modifier.size(iconSize * 0.5f), tint = MaterialTheme.colorScheme.onSurface)
+                                }
                             }
+                            Text(
+                                tool.name,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            )
                         }
-                        Text(
-                            tool.name,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        )
                     }
                 }
             }

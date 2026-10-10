@@ -352,48 +352,52 @@ private struct HomeMostUsedToolsTray: View {
     let onSelect: (Tool) -> Void
 
     var body: some View {
-        Group {
-            if tools.isEmpty {
-                Text("Open tools to build your personal shortcuts.")
-                    .font(.envScaled(size: 14, weight: .regular))
-                    .foregroundStyle(Color.envMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity, minHeight: 176)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(tools) { tool in
-                            Button { onSelect(tool) } label: {
-                                VStack(spacing: 8) {
-                                    EnVIcon(name: tool.icon, size: 30, tint: .envInk)
-                                        .frame(width: 72, height: 72)
-                                        .background(Color.envSurface2, in: Circle())
-                                    Text(tool.name)
-                                        .font(.envScaled(size: 14, weight: .medium))
-                                        .foregroundStyle(Color.envMuted)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                        .frame(width: 120)
+        GeometryReader { proxy in
+            let cellWidth = min(max(proxy.size.width * 0.16, 64), 100)
+            let iconSide = min(max(cellWidth * 0.64, 44), 64)
+            Group {
+                if tools.isEmpty {
+                    Text("Open tools to build your personal shortcuts.")
+                        .font(.envScaled(size: 12, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(tools) { tool in
+                                Button { onSelect(tool) } label: {
+                                    VStack(spacing: 6) {
+                                        EnVIcon(name: tool.icon, size: iconSide * 0.5, tint: .envInk)
+                                            .frame(width: iconSide, height: iconSide)
+                                            .background(Color.envSurface2, in: Circle())
+                                        Text(tool.name)
+                                            .font(.envScaled(size: 12, weight: .medium))
+                                            .foregroundStyle(Color.envMuted)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                            .frame(width: cellWidth)
+                                    }
+                                    .frame(width: cellWidth)
                                 }
-                                .frame(width: 120)
-                                .frame(height: 136)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Open \(tool.name)")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Open \(tool.name)")
                         }
+                        .padding(.horizontal, 12)
+                        .frame(height: 152)
                     }
-                    .padding(.horizontal, 24)
-                    .frame(height: 176)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: 832)
         .frame(maxWidth: .infinity)
-        .frame(height: 176)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .frame(height: 152)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 3, y: 1)
     }
 }
