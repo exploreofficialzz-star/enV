@@ -155,7 +155,7 @@ struct AssistantChatView: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
-                            Text("AI assistant").font(.custom("Outfit-SemiBold", size: horizontalSizeClass == .regular ? 30 : 24)).foregroundStyle(Color.envInk)
+                            Text("AI assistant").font(.system(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
                     }
                     Spacer()
                     Button(action: startNewChat) {
@@ -184,9 +184,9 @@ struct AssistantChatView: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             VStack(alignment: .leading, spacing: 5) {
                                                 Text(message.isUser ? "You" : "enV")
-                                                    .font(.custom("Outfit-SemiBold", size: 12)).foregroundStyle(Color.envMuted)
+                                                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.envMuted)
                                                 Text(message.content)
-                                                    .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk)
+                                                    .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
                                                     .textSelection(.enabled)
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
@@ -229,9 +229,9 @@ struct AssistantChatView: View {
                             if isSending {
                                 HStack(spacing: 8) {
                                     ProgressView()
-                                    Text("Thinking…").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+                                    Text("Thinking…").font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                                     Button("Stop", action: stopRequest)
-                                        .font(.custom("Outfit-SemiBold", size: 14))
+                                        .font(.system(size: 14, weight: .semibold))
                                         .accessibilityLabel("Stop assistant response")
                                 }
                                     .padding(12)
@@ -259,9 +259,9 @@ struct AssistantChatView: View {
 
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
-                        Text(errorMessage).font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(errorMessage).font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
                         if let retryRequest {
-                            Button("Retry") { runRequest(retryRequest) }.font(.custom("Outfit-SemiBold", size: 14))
+                            Button("Retry") { runRequest(retryRequest) }.font(.system(size: 14, weight: .semibold))
                         }
                     }
                     .padding(12)
@@ -277,7 +277,7 @@ struct AssistantChatView: View {
                     ), axis: .vertical)
                     .lineLimit(1...4)
                     .textFieldStyle(.roundedBorder)
-                    .font(.custom("Outfit-Regular", size: 16))
+                    .font(.system(size: 16, weight: .regular))
                     .submitLabel(.send)
                     .onSubmit(sendDraft)
                     .disabled(isSending)

@@ -38,10 +38,10 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
-                        HStack(spacing: 12) {
+                        HStack(spacing: horizontalSizeClass == .regular ? 16 : 12) {
                             EnVLogo().frame(width: 56, height: 36)
                             TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
-                                .font(.custom("Outfit-Regular", size: horizontalSizeClass == .regular ? 18 : 16))
+                                .font(.system(size: horizontalSizeClass == .regular ? 18 : 16, weight: .regular))
                                 .multilineTextAlignment(.center)
                                 .focused($isHomeSearchFocused)
                                 .accessibilityLabel("Search tools")
@@ -49,12 +49,12 @@ struct HomeView: View {
                                 .onSubmit { openHomeSearch() }
                             Button { openHomeSearch() } label: {
                                 EnVIcon(name: "Search", size: 24, tint: .envAccent)
-                                    .frame(width: 42, height: 42)
+                                    .frame(width: 44, height: 44)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Search all tools")
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, horizontalSizeClass == .regular ? 20 : 16)
                         .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 72 : 64, maxHeight: horizontalSizeClass == .regular ? 72 : 64, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
@@ -63,7 +63,7 @@ struct HomeView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
                                     Text("No matching tools. Try “json”, “bmi”, or “qr”.")
-                                        .font(.custom("Outfit-Regular", size: 14))
+                                        .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(Color.envMuted)
                                     HStack {
                                         Spacer()
@@ -72,7 +72,7 @@ struct HomeView: View {
                                                 Text("See more results")
                                                 EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
                                             }
-                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(Color.envAccent)
                                         }
                                         .buttonStyle(.plain)
@@ -86,7 +86,7 @@ struct HomeView: View {
                                                 Text("See more results")
                                                 EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
                                             }
-                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(Color.envAccent)
                                         }
                                         .buttonStyle(.plain)
@@ -97,27 +97,31 @@ struct HomeView: View {
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
                         }
-                        HStack(spacing: 8) {
-                            HomePreviewBar(title: "AI assistant", action: onAssistant).frame(maxWidth: .infinity)
-                            HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)
+                        GeometryReader { proxy in
+                            HStack(spacing: horizontalSizeClass == .regular ? 12 : 8) {
+                                HomePreviewBar(title: "AI assistant", action: onAssistant).frame(maxWidth: .infinity)
+                                HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)
+                            }
+                            .frame(width: min(proxy.size.width * 0.84, 640), height: 40)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 20)
-                        .padding(.top, horizontalSizeClass == .regular ? 12 : 8)
+                        .frame(height: 40)
                         Text("A focused toolkit for\neveryday work.")
-                            .font(.custom("Outfit-SemiBold", size: horizontalSizeClass == .regular ? 36 : 24))
+                            .font(.system(size: horizontalSizeClass == .regular ? 36 : 24, weight: .semibold))
                             .tracking(-0.4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
                             .foregroundStyle(Color.envInk)
+                            .padding(.top, horizontalSizeClass == .regular ? 12 : 8)
                     }
                     .frame(maxWidth: 768)
                     .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, 16)
 
                     VStack(alignment: .leading, spacing: 16) {
                         // Source guard contract: sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
                         Text("Trending tools")
-                            .font(.custom("Outfit-SemiBold", size: 20))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
                         ResponsiveToolGrid(home: true) { visibleLimit in
                             ForEach(homeTools.prefix(visibleLimit)) { tool in
@@ -131,18 +135,18 @@ struct HomeView: View {
                                     Text("See more tools")
                                     EnVIcon(name: "ArrowRight", size: 15, tint: .envAccent)
                                 }
-                                .font(.custom("Outfit-SemiBold", size: 14))
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.envAccent)
                             }
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: 1152)
+                    .frame(maxWidth: .infinity)
                     WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
                 }
-                .padding(.horizontal, 16)
                 .padding(.top, 4)
-                .padding(.bottom, 24)
-                .frame(maxWidth: 1152)
                 .frame(maxWidth: .infinity)
             }
             .modifier(Screen())
@@ -207,11 +211,11 @@ private struct DiscoveryToolCard: View {
         NavigationLink(value: tool) {
             VStack(alignment: .leading, spacing: 0) {
                 iconTile(tool.icon)
-                Text(tool.name).font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk).padding(.top, 12)
-                Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
-                if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-Medium", size: 10)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("WEB ONLY").font(.custom("Outfit-Medium", size: 10)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                else if tool.clientSide { Text("IN-BROWSER").font(.custom("Outfit-Medium", size: 10)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                Text(tool.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
+                Text(tool.description).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+                if tool.isPlanned { Text("Coming soon").font(.system(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("WEB ONLY").font(.system(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
+                else if tool.clientSide { Text("IN-BROWSER").font(.system(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
                 HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -232,11 +236,11 @@ private struct WebHomeSearchSuggestion: View {
         NavigationLink(value: tool) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
-                    if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
-                    else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
+                    Text(tool.name).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                    if tool.isPlanned { Text("Coming soon").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                    else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                 }
-                Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(1)
+                Text(tool.description).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -246,47 +250,93 @@ private struct WebHomeSearchSuggestion: View {
 }
 
 private struct WebHomeFooter: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let activeCount: Int
     let categoryCount: Int
     let onInformation: (String) -> Void
     let onTools: () -> Void
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            EnVLogo().frame(width: 142, height: 48)
-            Text("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
-            Text("Product").font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk)
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(["About", "Tools", "Pricing", "Contact"], id: \.self) { label in
-                    Button(label) {
-                        if label == "Tools" { onTools() }
-                        else { onInformation(informationPageID(for: label)) }
-                    }
-                    .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
-                }
-            }
-            Text("Legal").font(.custom("Outfit-SemiBold", size: 14)).foregroundStyle(Color.envInk)
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(["Privacy", "Terms", "Disclaimer", "Responsible use"], id: \.self) { label in
-                    Button(label) { onInformation(informationPageID(for: label)) }
-                        .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted).buttonStyle(.plain).padding(.vertical, 5)
-                }
-            }
-            Text("© \(Calendar.current.component(.year, from: .now)) chAs Technologies LLC · enV").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
-            Text("\(categoryCount) categories · \(activeCount) live tools").font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+
+    private var wideLayout: Bool { horizontalSizeClass == .regular }
+    private var wideColumnUnit: CGFloat {
+        max(0, (min(UIScreen.main.bounds.width, 1152) - 48 - 80) / 4)
     }
 
-    private func informationPageID(for label: String) -> String {
-        switch label {
-        case "About": return "about"
-        case "Pricing": return "pricing"
-        case "Contact": return "contact"
-        case "Privacy": return "privacy"
-        case "Terms": return "terms"
-        case "Disclaimer": return "disclaimer"
-        case "Responsible use": return "responsible-use"
-        default: return "about"
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(Color.envBorder).frame(height: 1)
+            Group {
+                if wideLayout {
+                    HStack(alignment: .top, spacing: 40) {
+                        brandBlock.frame(width: wideColumnUnit * 2, alignment: .leading)
+                        linkGroup("Product", links: [("About", "about"), ("Tools", "tools"), ("Pricing", "pricing"), ("Contact", "contact")]).frame(width: wideColumnUnit, alignment: .leading)
+                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")]).frame(width: wideColumnUnit, alignment: .leading)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 40) {
+                        brandBlock
+                        linkGroup("Product", links: [("About", "about"), ("Tools", "tools"), ("Pricing", "pricing"), ("Contact", "contact")])
+                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")])
+                    }
+                }
+            }
+            .padding(.horizontal, wideLayout ? 24 : 16)
+            .padding(.vertical, 48)
+            .frame(maxWidth: 1152)
+            .frame(maxWidth: .infinity)
+
+            Rectangle().fill(Color.envBorder).frame(height: 1)
+            HStack(spacing: 12) {
+                Text("© \(Calendar.current.component(.year, from: .now)) chAs Technologies LLC · enV")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envSubtle)
+                Spacer(minLength: 12)
+                if wideLayout {
+                    Text("\(categoryCount) categories · \(activeCount) live tools")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.envSubtle)
+                        .lineSpacing(4)
+                }
+            }
+            .padding(.horizontal, wideLayout ? 24 : 16)
+            .padding(.vertical, 16)
+            .frame(maxWidth: 1152)
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface)
+    }
+
+    private var brandBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            EnVLogo().frame(width: 84, height: 56)
+            Text("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .lineSpacing(4)
+                .frame(maxWidth: 384, alignment: .leading)
+        }
+    }
+
+    private func linkGroup(_ title: String, links: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title.uppercased())
+                .font(.system(size: 12, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(Color.envSubtle)
+                .frame(height: 18, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(links, id: \.0) { label, route in
+                    Button(label) {
+                        if route == "tools" { onTools() }
+                        else { onInformation(route) }
+                    }
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 21, alignment: .leading)
+                }
+            }
         }
     }
 }
@@ -327,7 +377,7 @@ struct ToolsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 16) {
                             Text("All tools")
-                                .font(.custom("Outfit-SemiBold", size: 24))
+                                .font(.system(size: 24, weight: .semibold))
                                 .tracking(-0.4)
                                 .foregroundStyle(Color.envInk)
                                 .lineLimit(1)
@@ -336,7 +386,7 @@ struct ToolsView: View {
                             HStack(spacing: 10) {
                                 EnVIcon(name: "Search", size: 20, tint: .envMuted)
                                 TextField("Search tools", text: $toolsQuery)
-                                    .font(.custom("Outfit-Regular", size: 14))
+                                    .font(.system(size: 14, weight: .regular))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
                                     .accessibilityLabel("Search tools")
@@ -366,7 +416,7 @@ struct ToolsView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     if searchSuggestions.isEmpty {
                                         Text("No matching tools. Try “json”, “bmi”, or “qr”.")
-                                            .font(.custom("Outfit-Regular", size: 14))
+                                            .font(.system(size: 14, weight: .regular))
                                             .foregroundStyle(Color.envMuted)
                                             .padding(12)
                                     } else {
@@ -378,11 +428,11 @@ struct ToolsView: View {
                                             } label: {
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     HStack(spacing: 8) {
-                                                        Text(tool.name).font(.custom("Outfit-Medium", size: 14)).foregroundStyle(Color.envInk)
-                                                        if tool.isPlanned { Text("Coming soon").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
-                                                        else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.custom("Outfit-SemiBold", size: 9)).foregroundStyle(Color.envSubtle) }
+                                                        Text(tool.name).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                                                        if tool.isPlanned { Text("Coming soon").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                                                        else if NativeCopy.isWebRuntimeOnly(tool.id) { Text("Web only").font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                     }
-                                                    Text(tool.description).font(.custom("Outfit-Regular", size: 12)).foregroundStyle(Color.envMuted).lineLimit(1)
+                                                    Text(tool.description).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
                                                 }
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .padding(.horizontal, 12)
@@ -394,7 +444,7 @@ struct ToolsView: View {
                                     HStack {
                                         Spacer()
                                         Button("See more results") { isToolsSearchFocused = false; onSearchNoMatch() }
-                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(Color.envAccent)
                                     }
                                     .padding(.horizontal, 12)
@@ -409,7 +459,7 @@ struct ToolsView: View {
                             }
                         }
                         Text("Find a tool by name or browse the categories below.")
-                            .font(.custom("Outfit-Regular", size: 16))
+                            .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                     }
                     if categoryGroups.isEmpty {
@@ -426,10 +476,10 @@ struct ToolsView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             // Source guard contract: .font(.headline.weight(.bold)); .foregroundStyle(Color.envAccent)
                                             Text(group.category.name)
-                                                .font(.custom("Outfit-Bold", size: 18))
+                                                .font(.system(size: 18, weight: .bold))
                                                 .foregroundStyle(Color.envAccent)
                                             Text(group.category.blurb)
-                                                .font(.custom("Outfit-Regular", size: 12))
+                                                .font(.system(size: 12, weight: .regular))
                                                 .foregroundStyle(Color.envMuted)
                                                 .lineLimit(2)
                                         }
@@ -450,7 +500,7 @@ struct ToolsView: View {
                                                 Text("See more tools")
                                                 EnVIcon(name: "ChevronDown", size: 16, tint: .envAccent)
                                             }
-                                            .font(.custom("Outfit-SemiBold", size: 14))
+                                            .font(.system(size: 14, weight: .semibold))
                                             .foregroundStyle(Color.envAccent)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
@@ -504,17 +554,17 @@ struct CategoryView: View {
                             .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 9))
                         VStack(alignment: .leading, spacing: 3) {
                             Text(category.name)
-                                .font(.custom("Outfit-Bold", size: 30))
+                                .font(.system(size: 30, weight: .bold))
                                 .foregroundStyle(Color.envAccent)
                             Text(category.description)
-                                .font(.custom("Outfit-Regular", size: 14))
+                                .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(Color.envMuted)
                         }
                     }
                 }
                 if categoryTools.isEmpty {
                     Text("No tools in this category yet.")
-                        .font(.custom("Outfit-Regular", size: 14))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -584,16 +634,16 @@ struct SearchResultsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Search tools")
-                        .font(.custom("Outfit-SemiBold", size: 20))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                     Text("Find a tool by name, category, or keyword.")
-                        .font(.custom("Outfit-Regular", size: 14))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                 }
                 HStack(spacing: 10) {
                     EnVIcon(name: "Search", size: 20, tint: .envMuted)
                     TextField("Search tools", text: $text)
-                        .font(.custom("Outfit-Regular", size: 16))
+                        .font(.system(size: 16, weight: .regular))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .accessibilityLabel("Search tools")
@@ -622,7 +672,7 @@ struct SearchResultsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         if suggestions.isEmpty {
                             Text("No matching tools. Try “json”, “bmi”, or “qr”.")
-                                .font(.custom("Outfit-Regular", size: 14))
+                                .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(Color.envMuted)
                                 .padding(12)
                         } else {
@@ -631,7 +681,7 @@ struct SearchResultsView: View {
                         HStack {
                             Spacer()
                             Button("See more results") { isSearchFocused = false }
-                                .font(.custom("Outfit-SemiBold", size: 14))
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.envAccent)
                         }
                         .padding(.horizontal, 12)
@@ -644,21 +694,21 @@ struct SearchResultsView: View {
                 }
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Start typing to see matching tools.")
-                        .font(.custom("Outfit-Regular", size: 14))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(.top, 16)
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Results for “\(text)”")
-                            .font(.custom("Outfit-SemiBold", size: 20))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envInk)
                         Text("\(results.count) matching tools")
-                            .font(.custom("Outfit-Regular", size: 14))
+                            .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                     }
                     if results.isEmpty {
                         Text("No matching tools. Try a broader word such as “image”, “video”, or “calculator”.")
-                            .font(.custom("Outfit-Regular", size: 14))
+                            .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -672,7 +722,7 @@ struct SearchResultsView: View {
                                 visibleCount = min(visibleCount + 24, results.count)
                             } label: {
                                 Text("See more results")
-                                    .font(.custom("Outfit-SemiBold", size: 14))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color.envAccent)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
@@ -799,8 +849,11 @@ private func sectionHeader(_ title: String, subtitle: String, accent: Bool = fal
 }
 
 private struct HomePreviewBar: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let title: String
     var action: (() -> Void)? = nil
+
+    private var isWide: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
         Group {
@@ -816,17 +869,16 @@ private struct HomePreviewBar: View {
 
     private var content: some View {
         Text(title)
-            .font(.custom("Outfit-Medium", size: 10))
+            .font(.system(size: isWide ? 14 : 10, weight: .medium))
             .foregroundStyle(Color.envMuted)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity, alignment: .center)
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, isWide ? 16 : 8)
             .frame(height: 40)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorderStrong, lineWidth: 1))
-            .padding(.horizontal, 8)
     }
 }
 
@@ -890,7 +942,7 @@ struct NativeInformationPageView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(pageTitle)
-                        .font(.custom("Outfit-SemiBold", size: 30))
+                        .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                     pageContent
                 }
@@ -938,12 +990,12 @@ private struct NativeInfoSectionView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
-                    .font(.custom("Outfit-SemiBold", size: titleSize))
+                    .font(.system(size: titleSize, weight: .semibold))
                     .foregroundStyle(Color.envInk)
             }
             ForEach(Array(paragraphs.enumerated()), id: \.offset) { entry in
                 Text(LocalizedStringKey(entry.element))
-                    .font(.custom("Outfit-Regular", size: 16))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Color.envMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -951,14 +1003,14 @@ private struct NativeInfoSectionView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("•").foregroundStyle(Color.envMuted)
                     Text(LocalizedStringKey(bullet))
-                        .font(.custom("Outfit-Regular", size: 16))
+                        .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             ForEach(Array(afterBullets.enumerated()), id: \.offset) { entry in
                 Text(LocalizedStringKey(entry.element))
-                    .font(.custom("Outfit-Regular", size: 16))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Color.envMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -990,17 +1042,17 @@ private struct NativeAboutInformationPage: View {
                 "enV is developed and operated by **chAs Technologies LLC**, a company registered in Delaware, USA. Some tools process information on your device; features that need a server or an external provider make that clear in their use and are described in our Privacy page.",
             ], titleSize: 20)
             VStack(alignment: .leading, spacing: 10) {
-                Text("Company").font(.custom("Outfit-SemiBold", size: 16)).foregroundStyle(Color.envInk)
-                Text("chAs Technologies LLC").font(.custom("Outfit-Regular", size: 16)).foregroundStyle(Color.envMuted)
+                Text("Company").font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("chAs Technologies LLC").font(.system(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
                 HStack(spacing: 4) {
-                    Text("Product inquiries:").font(.custom("Outfit-Regular", size: 16)).foregroundStyle(Color.envMuted)
+                    Text("Product inquiries:").font(.system(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
                     Link("envtoolkit@gmail.com", destination: URL(string: "mailto:envtoolkit@gmail.com")!)
-                        .font(.custom("Outfit-Regular", size: 16))
+                        .font(.system(size: 16, weight: .regular))
                 }
                 HStack(spacing: 4) {
-                    Text("Company inquiries:").font(.custom("Outfit-Regular", size: 16)).foregroundStyle(Color.envMuted)
+                    Text("Company inquiries:").font(.system(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
                     Link("chastechnologiesllc@gmail.com", destination: URL(string: "mailto:chastechnologiesllc@gmail.com")!)
-                        .font(.custom("Outfit-Regular", size: 16))
+                        .font(.system(size: 16, weight: .regular))
                 }
             }
             .padding(16)
@@ -1026,11 +1078,11 @@ private struct NativePricingInformationPage: View {
                 "The token amounts and prices below are the schedule supplied by chAs Technologies LLC.",
             ])
             Text("Prices are listed in USD. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final currency and total will be shown before you confirm payment; availability and conversion rates depend on the provider.")
-                .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+                .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             VStack(alignment: .leading, spacing: 6) {
-                Text("Planned pricing — purchases are not available yet").font(.custom("Outfit-SemiBold", size: 16)).foregroundStyle(Color.envInk)
+                Text("Planned pricing — purchases are not available yet").font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 Text("The current enV codebase does not include a token balance, checkout, or referral-award system. You cannot buy, redeem, or receive these tokens in the app at this time. This page lists the proposed schedule and is not a live offer.")
-                    .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+                    .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1043,7 +1095,7 @@ private struct NativePricingInformationPage: View {
                     Spacer()
                     Text("Price (USD)")
                 }
-                .font(.custom("Outfit-SemiBold", size: 14))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.envInk)
                 .padding(.horizontal, 16).padding(.vertical, 12)
                 .background(Color.envSurface2)
@@ -1053,7 +1105,7 @@ private struct NativePricingInformationPage: View {
                         Spacer()
                         Text(package.price).fontWeight(.medium).foregroundStyle(Color.envInk)
                     }
-                    .font(.custom("Outfit-Regular", size: 14))
+                    .font(.system(size: 14, weight: .regular))
                     .padding(.horizontal, 16).padding(.vertical, 12)
                     .overlay(alignment: .top) { Rectangle().fill(Color.envBorder).frame(height: 1) }
                 }
@@ -1069,7 +1121,7 @@ private struct NativePricingInformationPage: View {
             .padding(16)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
             Text(LocalizedStringKey("Questions about enV pricing can be sent to [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com)."))
-                .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+                .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
         }
     }
 }
@@ -1095,16 +1147,16 @@ private struct NativeContactInformationPage: View {
                 }
             }
             Text("Please do not include passwords, payment-card details, or other highly sensitive information in ordinary email.")
-                .font(.custom("Outfit-Regular", size: 14)).foregroundStyle(Color.envMuted)
+                .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
         }
     }
 
     private func contactCard(title: String, description: String, address: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.custom("Outfit-SemiBold", size: 16)).foregroundStyle(Color.envInk)
-            Text(description).font(.custom("Outfit-Regular", size: 16)).foregroundStyle(Color.envMuted)
+            Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+            Text(description).font(.system(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
             Link(address, destination: URL(string: "mailto:\(address)")!)
-                .font(.custom("Outfit-SemiBold", size: 16))
+                .font(.system(size: 16, weight: .semibold))
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

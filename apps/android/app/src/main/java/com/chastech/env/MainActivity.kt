@@ -325,10 +325,10 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
     val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
-    LazyColumn(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
+    LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
         item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.fillMaxWidth().widthIn(max = 768.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
@@ -338,9 +338,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
                     shadowElevation = 1.dp,
                 ) {
                     // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = { onSearch(homeQuery) }) { EnVIcon("Search") } }.
-                    Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = if (screenWidth >= 640) 20.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         EnVLogo(Modifier.width(56.dp).height(36.dp), darkTheme = darkMode)
-                        Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.weight(1f).padding(horizontal = if (screenWidth >= 640) 16.dp else 12.dp), contentAlignment = Alignment.Center) {
                             if (homeQuery.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                             BasicTextField(
                                 value = homeQuery,
@@ -372,16 +372,19 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
                         }
                     }
                 }
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HomePreviewBar("AI assistant", Modifier.weight(1f), onClick = onAssistant)
-                    HomePreviewBar("Total token = 100", Modifier.weight(1f))
+                BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
+                    Row(Modifier.width(previewWidth), horizontalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 12.dp else 8.dp)) {
+                        HomePreviewBar("AI assistant", Modifier.weight(1f), isLarge = screenWidth >= 640, onClick = onAssistant)
+                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640)
+                    }
                 }
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionTitle("Trending tools", accent = true)
                 trending.chunked(homeColumns).forEach { rowTools ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -396,7 +399,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
                 }
             }
         }
-        item { WebHomeFooter(catalog, onTools, onInformation) }
+        item { WebHomeFooter(catalog, onTools, onInformation, screenWidth) }
     }
 }
 
@@ -431,24 +434,99 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        EnVLogo(Modifier.width(142.dp).height(48.dp))
-        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        Text("Product", fontWeight = FontWeight.SemiBold)
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact").forEach { (label, route) ->
-                TextButton(onClick = { if (route == "tools") onTools() else onInformation(route) }, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: (String) -> Unit, screenWidth: Int) {
+    val horizontalPadding = if (screenWidth >= 640) 24.dp else 16.dp
+    val footerSubtle = if (isSystemInDarkTheme()) Color(0xFF7C848C) else Color(0xFF8A9098)
+    val borderColor = MaterialTheme.colorScheme.outline
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            if (screenWidth >= 768) {
+                Row(
+                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(40.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    FooterBrandBlock(catalog, Modifier.weight(2f))
+                    FooterLinkGroup("Product", listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact"), onTools, onInformation, footerSubtle, Modifier.weight(1f))
+                    FooterLinkGroup("Legal", listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use"), onTools, onInformation, footerSubtle, Modifier.weight(1f))
+                }
+            } else {
+                Column(
+                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(40.dp),
+                ) {
+                    FooterBrandBlock(catalog)
+                    FooterLinkGroup("Product", listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact"), onTools, onInformation, footerSubtle)
+                    FooterLinkGroup("Legal", listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use"), onTools, onInformation, footerSubtle)
+                }
             }
         }
-        Text("Legal", fontWeight = FontWeight.SemiBold)
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use").forEach { (label, route) ->
-                TextButton(onClick = { onInformation(route) }, contentPadding = PaddingValues(0.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+        Row(
+            Modifier.widthIn(max = 1152.dp).fillMaxWidth().align(Alignment.CenterHorizontally).padding(horizontal = horizontalPadding, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "© ${Year.now().value} chAs Technologies LLC · enV",
+                color = footerSubtle,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+            )
+            if (screenWidth >= 640) {
+                Text(
+                    "${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools",
+                    color = footerSubtle,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                )
             }
         }
-        Text("© ${Year.now().value} chAs Technologies LLC · enV", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun FooterBrandBlock(catalog: Catalog, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        EnVLogo(Modifier.width(84.dp).height(56.dp))
+        Text(
+            "Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
+            modifier = Modifier.widthIn(max = 384.dp),
+        )
+    }
+}
+
+@Composable
+private fun FooterLinkGroup(
+    title: String,
+    links: List<Pair<String, String>>,
+    onTools: () -> Unit,
+    onInformation: (String) -> Unit,
+    footerSubtle: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(
+            title.uppercase(),
+            color = footerSubtle,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 18.sp, letterSpacing = 0.6.sp),
+            fontWeight = FontWeight.SemiBold,
+        )
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            links.forEach { (label, route) ->
+                Row(
+                    Modifier.fillMaxWidth().height(21.dp).clickable { if (route == "tools") onTools() else onInformation(route) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1474,15 +1552,23 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
 }
 
 @Composable
-private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, onClick: (() -> Unit)? = null) {
     Surface(
         modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI assistant" },
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Box(Modifier.fillMaxSize().padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, modifier = Modifier.fillMaxWidth())
+        Box(Modifier.fillMaxSize().padding(horizontal = if (isLarge) 16.dp else 8.dp), contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = if (isLarge) 14.sp else 10.sp),
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
