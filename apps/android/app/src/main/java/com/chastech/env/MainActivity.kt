@@ -419,15 +419,15 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = modifier.height(120.dp),
+        modifier = modifier.height(128.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 1.dp,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val cellWidth = if (maxWidth >= 720.dp) 64.dp else (maxWidth * 0.13f).coerceIn(52.dp, 64.dp)
-            val iconSize = if (maxWidth >= 720.dp) 40.dp else (cellWidth * 0.7f).coerceIn(36.dp, 44.dp)
+            val cellWidth = if (maxWidth >= 720.dp) 60.dp else (maxWidth * 0.13f).coerceIn(52.dp, 64.dp)
+            val iconSize = if (maxWidth >= 720.dp) 44.dp else (cellWidth * 0.75f).coerceIn(40.dp, 48.dp)
             if (tools.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -441,7 +441,7 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                 LazyRow(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     items(tools, key = { it.id }) { tool ->
@@ -461,7 +461,7 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                             )
                         }
                     }

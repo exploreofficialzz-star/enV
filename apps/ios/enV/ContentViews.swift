@@ -353,8 +353,8 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cellWidth = proxy.size.width >= 720 ? 64 : min(max(proxy.size.width * 0.13, 52), 64)
-            let iconSide = proxy.size.width >= 720 ? 40 : min(max(cellWidth * 0.7, 36), 44)
+            let cellWidth = proxy.size.width >= 720 ? 60 : min(max(proxy.size.width * 0.13, 52), 64)
+            let iconSide = proxy.size.width >= 720 ? 44 : min(max(cellWidth * 0.75, 40), 48)
             Group {
                 if tools.isEmpty {
                     Text("Open tools to build your personal shortcuts.")
@@ -365,15 +365,15 @@ private struct HomeMostUsedToolsTray: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 12) {
                             ForEach(tools) { tool in
                                 Button { onSelect(tool) } label: {
-                                    VStack(spacing: 4) {
+                                    VStack(spacing: 6) {
                                         EnVIcon(name: tool.icon, size: iconSide * 0.5, tint: .envInk)
                                             .frame(width: iconSide, height: iconSide)
                                             .background(Color.envSurface2, in: Circle())
                                         Text(tool.name)
-                                            .font(.envScaled(size: 12, weight: .medium))
+                                            .font(.envScaled(size: 10, weight: .medium))
                                             .foregroundStyle(Color.envMuted)
                                             .lineLimit(1)
                                             .truncationMode(.tail)
@@ -386,7 +386,7 @@ private struct HomeMostUsedToolsTray: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .frame(height: 120)
+                        .frame(height: 128)
                     }
                 }
             }
@@ -394,10 +394,10 @@ private struct HomeMostUsedToolsTray: View {
         }
         .frame(maxWidth: 768)
         .frame(maxWidth: .infinity)
-        .frame(height: 136)
+        .frame(height: 128)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 3, y: 1)
     }
 }

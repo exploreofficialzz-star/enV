@@ -1,11 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePrefs } from "@/lib/storage";
+
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export function useHydratePrefs() {
   const hydrate = usePrefs((s) => s.hydrate);
   const hydrated = usePrefs((s) => s.hydrated);
   const theme = usePrefs((s) => s.theme);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
 
