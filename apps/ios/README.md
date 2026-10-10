@@ -35,6 +35,6 @@ The native execution manifests are generated/audited from the same catalog as An
 This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a full iOS application build/test cannot be performed here. Standalone Swift engine source validation is used in this environment; the committed macOS CI workflow remains the authoritative iOS build/test path.
 
 
-## Native AI
+## Native API
 
-AI-assisted tools call the repository AI API directly from Kotlin/Swift at `/api/ai/status` and `/api/ai/run`. The native build defaults to `https://env-q3mq.onrender.com`; Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting to override it for another deployment. Provider keys remain server-only and must never be put in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client.
+Backend-powered tools and AI features call the enV application API at `https://en-v.vercel.app` (`/api/backend/*` and `/api/ai/*`). The Render `env-media-processor` host is a downstream processor, not the mobile API gateway; using it as `ENV_API_BASE_URL` returns processor-level errors instead of reaching application routes. Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting to override the application origin for another deployment. Provider keys remain server-only and must never be put in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client.

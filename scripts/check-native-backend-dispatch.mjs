@@ -4,7 +4,21 @@ const files = [
   "apps/android/app/src/main/java/com/chastech/env/NativeBackendEngine.kt",
   "apps/ios/enV/ToolViews.swift",
 ];
+const apiOrigin = "https://en-v.vercel.app";
+const configurationFiles = [
+  "apps/android/app/build.gradle.kts",
+  "apps/android/.env.example",
+  "apps/ios/enV.xcodeproj/project.pbxproj",
+  "apps/ios/Config.xcconfig.example",
+  "apps/android/README.md",
+  "apps/ios/README.md",
+];
 const errors = [];
+for (const file of configurationFiles) {
+  const source = readFileSync(file, "utf8");
+  if (!source.includes(apiOrigin)) errors.push(`${file}: missing canonical enV application API origin ${apiOrigin}`);
+  if (source.includes("https://env-q3mq.onrender.com")) errors.push(`${file}: points ENV_API_BASE_URL at the downstream Render processor instead of the application API`);
+}
 for (const file of files) {
   const source = readFileSync(file, "utf8");
   const image = source.indexOf('engine.type=="image"');
@@ -15,5 +29,9 @@ for (const file of files) {
   if (/engine\.type=="audio"[^\n]*else postJson\("\/api\/backend\/tool"/.test(source)) errors.push(`${file}: audio without a file can fall into generic backend tool`);
   if (/engine\.type=="video"[^\n]*else postJson\("\/api\/backend\/tool"/.test(source)) errors.push(`${file}: video without a file can fall into generic backend tool`);
 }
+const iosBackend = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
+if (!iosBackend.includes("static func endpointURL(_ path: String) -> URL?")) errors.push("iOS: missing explicit API endpoint URL builder");
+if (!iosBackend.includes("URLComponents(url: baseURL, resolvingAgainstBaseURL: false)")) errors.push("iOS: API endpoint builder must join route paths through URLComponents");
+if (iosBackend.includes("baseURL.appendingPathComponent(path)")) errors.push("iOS: ambiguous leading-slash route path construction remains");
 if (errors.length) { console.error(errors.join("\n")); process.exit(1); }
-console.log("Native backend dispatch audit PASS: image/audio/video handlers precede generic custom/category routing on Android and iOS.");
+console.log("Native backend audit PASS: mobile builds target the enV API gateway, and image/audio/video handlers precede generic routing on Android and iOS.");

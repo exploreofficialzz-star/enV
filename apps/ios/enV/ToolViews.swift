@@ -1031,6 +1031,13 @@ enum NativeBackendEngine {
         let raw = (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return raw.isEmpty ? nil : URL(string: raw.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     }
+    static func endpointURL(_ path: String) -> URL? {
+        guard let baseURL, var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return nil }
+        let prefix = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let route = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + ([prefix, route].filter { !$0.isEmpty }.joined(separator: "/"))
+        return components.url
+    }
     static let backendIDs:Set<String> = ["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader"]
     // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
     // Unsupported tools must not appear executable in the native app.
@@ -1070,8 +1077,8 @@ enum NativeBackendEngine {
         return body
     }
     private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult {
-        guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        guard let endpoint = endpointURL(path) else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 180
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1080,7 +1087,7 @@ enum NativeBackendEngine {
         return try parse(data, response)
     }
     private static func multipart(_ path:String,fields:[String:String],files:[NativeBackendFile],downloadResponse:Bool=false,documentResponse:Bool=false) async throws -> NativeBackendResult {
-        guard let baseURL else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
+        guard let endpoint = endpointURL(path) else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
         let boundary = "enV-\(UUID().uuidString)"
         var body = Data()
         for (name, value) in fields {
@@ -1092,7 +1099,7 @@ enum NativeBackendEngine {
             body.append("\r\n".data(using: .utf8)!)
         }
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 180
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
