@@ -1,22 +1,25 @@
 package com.chastech.env.engine
 
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.chastech.env.data.ToolRecord
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import java.io.ByteArrayOutputStream
+import java.io.ByteArrayInputStream
+import java.util.zip.ZipInputStream
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 
 object NativeFileConverterEngine {
     data class Result(val text: String? = null, val bytes: ByteArray? = null, val mime: String = "text/plain", val extension: String = "txt")
     private val imageOps = setOf("jpg-to-png","png-to-jpg","png-to-webp","webp-to-png","jpg-to-webp","webp-to-jpg","png-to-svg")
-    fun supports(tool: ToolRecord): Boolean = tool.engine.type == "file-converter" && op(tool) in setOf(
-        "csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown"
-    ) + imageOps
+    private val documentOps = setOf("pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor")
+    fun supports(tool: ToolRecord): Boolean = (tool.engine.type == "file-converter" && op(tool) in setOf("csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown") + imageOps) || (tool.engine.type == "document-backend" && op(tool) in documentOps)
     private fun op(t: ToolRecord) = t.engine.extras["op"] ?: t.engine.id ?: t.id
     fun run(tool: ToolRecord, fileName: String, bytes: ByteArray): Result {
         val operation = op(tool)
+        if (operation in documentOps) return document(operation, fileName, bytes)
         if (operation in imageOps) return image(operation, fileName, bytes)
         val input = bytes.toString(Charsets.UTF_8)
         return when (operation) {
@@ -35,42 +38,27 @@ object NativeFileConverterEngine {
             else -> error("Unsupported file conversion: $operation")
         }
     }
-    private fun image(op:String,name:String,data:ByteArray):Result {
-        if (op=="png-to-svg") { val b64=Base64.encodeToString(data,Base64.NO_WRAP); val image=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Selected file is not a supported PNG image."); return Result("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${image.width}\" height=\"${image.height}\" viewBox=\"0 0 ${image.width} ${image.height}\"><image href=\"data:image/png;base64,$b64\" width=\"100%\" height=\"100%\"/></svg>",extension="svg",mime="image/svg+xml") }
-        val bitmap=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Selected file is not a supported image.")
-        val (format,ext,mime)=when { op.endsWith("png") -> Triple(Bitmap.CompressFormat.PNG,"png","image/png"); op.endsWith("webp") -> Triple(Bitmap.CompressFormat.WEBP,"webp","image/webp"); else -> Triple(Bitmap.CompressFormat.JPEG,"jpg","image/jpeg") }
-        val out=ByteArrayOutputStream(); bitmap.compress(format,92,out); return Result(bytes=out.toByteArray(),extension=ext,mime=mime)
+    private fun document(op:String,name:String,data:ByteArray):Result {
+        if (op == "docx-text-extractor") return Result(docxText(data), extension="txt", mime="text/plain")
+        PDFBoxResourceLoader.init()
+        PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
+            if (op == "pdf-metadata-viewer" || op == "pdf-metadata-tool") return Result(JSONObject().put("pages",pdf.numberOfPages).put("title",pdf.documentInformation.title ?: "").put("author",pdf.documentInformation.author ?: "").toString(2), extension="json", mime="application/json")
+            if (op == "pdf-text-extractor") { val text = com.tom_roush.pdfbox.text.PDFTextStripper().getText(pdf); return Result(text, extension="txt", mime="text/plain") }
+            if (op == "pdf-rotator") { pdf.pages.forEach { it.rotation = (it.rotation + 90) % 360 }; val out=ByteArrayOutputStream(); pdf.save(out); return Result(bytes=out.toByteArray(),extension="pdf",mime="application/pdf") }
+            val out=PDDocument(); val pages=if(op=="pdf-page-extractor"||op=="pdf-splitter") listOf(0) else (0 until pdf.numberOfPages).toList(); pages.forEach { out.importPage(pdf.getPage(it)) }; val outBytes=ByteArrayOutputStream(); out.save(outBytes); out.close(); return Result(bytes=outBytes.toByteArray(),extension="pdf",mime="application/pdf")
+        }
     }
-    private fun parseCsv(text:String,delimiter:Char=','):List<List<String>> { val rows=mutableListOf<MutableList<String>>(); var row=mutableListOf<String>(); val cell=StringBuilder(); var quote=false; var i=0; while(i<text.length){val c=text[i]; if(c=='"'){if(quote&&i+1<text.length&&text[i+1]=='"'){cell.append('"');i++}else quote=!quote}else if(c==delimiter&&!quote){row.add(cell.toString());cell.clear()}else if((c=='\n'||c=='\r')&&!quote){if(c=='\r'&&i+1<text.length&&text[i+1]=='\n')i++;row.add(cell.toString());cell.clear();if(row.any{it.trim().isNotEmpty()})rows.add(row);row=mutableListOf()}else cell.append(c);i++};if(cell.isNotEmpty()||row.isNotEmpty()){row.add(cell.toString());if(row.any{it.trim().isNotEmpty()})rows.add(row)};return rows}
+    private fun docxText(data:ByteArray):String { val xml=ZipInputStream(ByteArrayInputStream(data)).use { z -> var e=z.nextEntry; var result=""; while(e!=null){if(e.name=="word/document.xml") result=z.readBytes().toString(Charsets.UTF_8); e=z.nextEntry}; result }; require(xml.isNotEmpty()){ "This DOCX file does not contain word/document.xml." }; return xml.replace(Regex("<w:tab\\s*/?>"),"\t").replace(Regex("<w:br\\s*/?>"),"\n").replace("</w:p>","\n").replace(Regex("<w:t[^>]*>(.*?)</w:t>")){it.groupValues[1]}.replace(Regex("<[^>]+>"),"").replace("&amp;","&").replace("&lt;","<").replace("&gt;",">").trim()+"\n" }
+    private fun image(op:String,name:String,data:ByteArray):Result { if(op=="png-to-svg"){val image=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported PNG"); val b64=Base64.encodeToString(data,Base64.NO_WRAP); return Result("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${image.width}\" height=\"${image.height}\"><image href=\"data:image/png;base64,$b64\" width=\"100%\" height=\"100%\"/></svg>",extension="svg",mime="image/svg+xml")}; val bitmap=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported image"); val format=when{op.endsWith("png")->android.graphics.Bitmap.CompressFormat.PNG;op.endsWith("webp")->android.graphics.Bitmap.CompressFormat.WEBP;else->android.graphics.Bitmap.CompressFormat.JPEG}; val out=ByteArrayOutputStream(); bitmap.compress(format,92,out); return Result(bytes=out.toByteArray(),extension=if(format==android.graphics.Bitmap.CompressFormat.PNG)"png" else if(format==android.graphics.Bitmap.CompressFormat.WEBP)"webp" else "jpg",mime=if(format==android.graphics.Bitmap.CompressFormat.PNG)"image/png" else "image/jpeg") }
+    private fun parseCsv(text:String,delimiter:Char=','):List<List<String>> { val rows=mutableListOf<MutableList<String>>(); var row=mutableListOf<String>(); val cell=StringBuilder(); var quote=false; var i=0; while(i<text.length){val c=text[i];if(c=='"'){if(quote&&i+1<text.length&&text[i+1]=='"'){cell.append('"');i++}else quote=!quote}else if(c==delimiter&&!quote){row.add(cell.toString());cell.clear()}else if((c=='\n'||c=='\r')&&!quote){if(c=='\r'&&i+1<text.length&&text[i+1]=='\n')i++;row.add(cell.toString());cell.clear();if(row.any{it.trim().isNotEmpty()})rows.add(row);row=mutableListOf()}else cell.append(c);i++};if(cell.isNotEmpty()||row.isNotEmpty()){row.add(cell.toString());if(row.any{it.trim().isNotEmpty()})rows.add(row)};return rows}
     private fun csvEscape(v:String)=if(v.any{it==','||it=='\n'||it=='\r'||it=='"'})"\"${v.replace("\"","\"\"")}\"" else v
     private fun rowsToCsv(rows:List<List<String>>,d:Char=',')=rows.joinToString("\r\n"){it.joinToString(d.toString(),transform=::csvEscape)}+"\r\n"
     private fun csvToJson(text:String):String { val rows=parseCsv(text);if(rows.isEmpty())return "[]";val heads=rows[0].mapIndexed{i,v->v.trim().ifEmpty{"column_${i+1}"}};return JSONArray().apply{rows.drop(1).forEach{r->put(JSONObject().apply{heads.forEachIndexed{i,h->put(h,r.getOrNull(i) ?: "")}})}}.toString(2) }
-    private fun jsonRows(text:String):List<List<String>> { val raw=text.trim(); val arr=if(raw.startsWith("["))JSONArray(raw) else JSONArray().put(JSONObject(raw)); val keys=linkedSetOf<String>();for(i in 0 until arr.length())arr.optJSONObject(i)?.keys()?.forEach(keys::add);return listOf(keys.toList())+(0 until arr.length()).map{i->val o=arr.optJSONObject(i);keys.map{k->o?.opt(k)?.let{if(it is JSONObject||it is JSONArray)it.toString() else it.toString()} ?: ""}}
-    }
-    private fun xmlToJson(text:String):String { val root=Regex("<([A-Za-z_][\\w.-]*)[^>]*>([\\s\\S]*)</\\1>").find(text.trim()) ?: error("Invalid XML."); return JSONObject().put(root.groupValues[1],root.groupValues[2].replace(Regex("<[^>]+>"),"").trim()).toString(2) }
-    private fun objectToXml(o:JSONObject,tag:String="root"):String { val b=StringBuilder("<$tag>");o.keys().forEach{key->val v=o.get(key);val safe=key.replace(Regex("[^A-Za-z0-9_.-]"),"_");if(v is JSONObject)b.append(objectToXml(v,safe)) else b.append("<$safe>${xmlEsc(v.toString())}</$safe>")};return b.append("</$tag>").toString() }
-    private fun xmlEsc(s:String)=s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;")
-    private fun simpleYaml(text: String): String {
-        val output = JSONObject()
-        text.lines().forEach { raw ->
-            val line = raw.replace(Regex("\\s+#.*"), "").trim()
-            if (line.isNotEmpty() && !line.startsWith("#") && line.contains(":")) {
-                val parts = line.split(":", limit = 2)
-                val rawValue = parts[1].trim()
-                val value: Any = when {
-                    rawValue == "true" -> true
-                    rawValue == "false" -> false
-                    rawValue == "null" -> JSONObject.NULL
-                    rawValue.matches(Regex("-?\\d+(\\.\\d+)?")) -> rawValue.toDouble()
-                    else -> rawValue.trim('"', '\'')
-                }
-                output.put(parts[0].trim(), value)
-            }
-        }
-        return output.toString()
-    }
-    private fun jsonToYaml(o:JSONObject,indent:String=""):String { val b=StringBuilder();o.keys().forEach{key->val v=o.get(key);b.append(indent).append(key).append(": ");if(v is JSONObject)b.append("\n").append(jsonToYaml(v,indent+"  ")) else b.append(if(v is String)"\"$v\"" else v).append("\n")};return b.toString().trimEnd() }
-    private fun markdownToHtml(text:String)=buildString{append("<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Converted document</title></head><body>\n");text.lines().forEach{l->when{l.startsWith("### ")->append("<h3>${htmlEsc(l.drop(4))}</h3>");l.startsWith("## ")->append("<h2>${htmlEsc(l.drop(3))}</h2>");l.startsWith("# ")->append("<h1>${htmlEsc(l.drop(2))}</h1>");l.startsWith("- ")->append("<li>${htmlEsc(l.drop(2))}</li>");l.isBlank()->append("\n");else->append("<p>${htmlEsc(l).replace(Regex("\\*\\*(.+?)\\*\\*"),"<strong>$1</strong>")}</p>\n")}};append("</body></html>\n")}
-    private fun htmlToMarkdown(text:String)=text.replace(Regex("<script[\\s\\S]*?</script>",RegexOption.IGNORE_CASE),"").replace(Regex("<style[\\s\\S]*?</style>",RegexOption.IGNORE_CASE),"").replace(Regex("<h1[^>]*>(.*?)</h1>",RegexOption.IGNORE_CASE),"# $1\n\n").replace(Regex("<h2[^>]*>(.*?)</h2>",RegexOption.IGNORE_CASE),"## $1\n\n").replace(Regex("<h3[^>]*>(.*?)</h3>",RegexOption.IGNORE_CASE),"### $1\n\n").replace(Regex("<strong[^>]*>(.*?)</strong>",RegexOption.IGNORE_CASE),"**$1**").replace(Regex("<li[^>]*>(.*?)</li>",RegexOption.IGNORE_CASE),"- $1\n").replace(Regex("<p[^>]*>(.*?)</p>",RegexOption.IGNORE_CASE),"$1\n\n").replace(Regex("<[^>]+>"),"").replace(Regex("\n{3,}"),"\n\n").trim()
-    private fun htmlEsc(s:String)=s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    private fun jsonRows(text:String):List<List<String>> { val raw=text.trim();val arr=if(raw.startsWith("["))JSONArray(raw) else JSONArray().put(JSONObject(raw));val keys=linkedSetOf<String>();for(i in 0 until arr.length())arr.optJSONObject(i)?.keys()?.forEach(keys::add);return listOf(keys.toList())+(0 until arr.length()).map{i->val o=arr.optJSONObject(i);keys.map{k->o?.opt(k)?.toString() ?: ""}} }
+    private fun xmlToJson(text:String)=JSONObject().put("document",text.replace(Regex("<[^>]+>"),"").trim()).toString(2)
+    private fun objectToXml(o:JSONObject,tag:String="root")=o.keys().asSequence().joinToString("",prefix="<$tag>",postfix="</$tag>"){k->"<$k>${o.get(k)}</$k>"}
+    private fun simpleYaml(text:String)=JSONObject().apply{text.lines().forEach{l->if(l.contains(":")){val p=l.split(":",limit=2);put(p[0].trim(),p[1].trim())}}}.toString()
+    private fun jsonToYaml(o:JSONObject)=o.keys().asSequence().joinToString("\n"){k->"$k: ${o.get(k)}"}
+    private fun markdownToHtml(t:String)="<!doctype html><html><body>"+t.lines().joinToString("\n"){if(it.startsWith("# "))"<h1>${it.drop(2)}</h1>" else "<p>$it</p>"}+"</body></html>"
+    private fun htmlToMarkdown(t:String)=t.replace(Regex("<h1[^>]*>(.*?)</h1>",RegexOption.IGNORE_CASE),"# $1\n\n").replace(Regex("<p[^>]*>(.*?)</p>",RegexOption.IGNORE_CASE),"$1\n\n").replace(Regex("<[^>]+>"),"").trim()
 }

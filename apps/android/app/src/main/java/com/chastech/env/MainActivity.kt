@@ -723,7 +723,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
-    "file-converter" -> NativeFileConverterEngine.supports(tool)
+    "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
@@ -883,7 +883,7 @@ private fun NativeToolForm(tool: ToolRecord) {
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "ai" -> NativeAiToolForm(tool)
-        "file-converter" -> NativeFileConverterToolForm(tool)
+        "file-converter", "document-backend" -> NativeFileConverterToolForm(tool)
         "text" -> NativeTextToolForm(tool.id)
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)

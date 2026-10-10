@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import ImageIO
 import UniformTypeIdentifiers
+import PDFKit
 
 enum NativeFileConverterEngine {
     struct Result {
@@ -18,9 +19,10 @@ enum NativeFileConverterEngine {
     }
     private static let imageOps:Set<String> = ["jpg-to-png","png-to-jpg","png-to-webp","webp-to-png","jpg-to-webp","webp-to-jpg","png-to-svg"]
     static func operation(_ tool:Tool)->String { tool.engine.configuration["op"].flatMap { if case .string(let v) = $0 { return v }; return nil } ?? tool.engine.op ?? tool.id }
-    static func supports(_ tool:Tool)->Bool { tool.engine.type == "file-converter" && (imageOps.contains(operation(tool)) || ["csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown"].contains(operation(tool))) }
+    private static let documentOps:Set<String> = ["pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor"]
+    static func supports(_ tool:Tool)->Bool { (tool.engine.type == "file-converter" && (imageOps.contains(operation(tool)) || ["csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown"].contains(operation(tool)))) || (tool.engine.type == "document-backend" && documentOps.contains(operation(tool))) }
     static func run(_ tool:Tool,file:NativeBackendFile)throws->Result {
-        let op=operation(tool); if imageOps.contains(op) { return try image(op,file.data) }
+        let op=operation(tool); if documentOps.contains(op) { return try document(op,file:file) }; if imageOps.contains(op) { return try image(op,file.data) }
         let input=String(decoding:file.data,as:UTF8.self)
         switch op {
         case "csv-to-json": return Result(try csvToJson(input),nil,"application/json","json")
@@ -39,6 +41,17 @@ enum NativeFileConverterEngine {
         case "html-to-markdown": return Result(htmlToMarkdown(input)+"\n",nil,"text/markdown","md")
         default: throw NativeNativeError.message("Unsupported file conversion: \(op)")
         }
+    }
+    private static func document(_ op:String,file:NativeBackendFile)throws->Result {
+        if op == "docx-text-extractor" {
+            guard let attributed = try? NSAttributedString(data:file.data, options:[.documentType:NSAttributedString.DocumentType.officeOpenXML], documentAttributes:nil) else { throw NativeNativeError.message("This DOCX file could not be read locally.") }
+            return Result(attributed.string + "\n", nil, "text/plain", "txt")
+        }
+        guard let pdf=PDFDocument(data:file.data) else { throw NativeNativeError.message("Selected file is not a readable PDF.") }
+        if op == "pdf-metadata-viewer" || op == "pdf-metadata-tool" { let info:[String:Any] = ["pages":pdf.pageCount,"title":pdf.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String ?? "","author":pdf.documentAttributes?[PDFDocumentAttribute.authorAttribute] as? String ?? ""]; let data=try JSONSerialization.data(withJSONObject:info,options:.prettyPrinted); return Result(String(decoding:data,as:UTF8.self),nil,"application/json","json") }
+        if op == "pdf-text-extractor" { return Result((0..<pdf.pageCount).compactMap{pdf.page(at:$0)?.string}.joined(separator:"\n\n")+"\n",nil,"text/plain","txt") }
+        if op == "pdf-rotator" { for i in 0..<pdf.pageCount { if let page = pdf.page(at: i) { page.rotation = (page.rotation + 90) % 360 } }; return Result(nil,pdf.dataRepresentation(),"application/pdf","pdf") }
+        let out=PDFDocument(); let indexes = op == "pdf-page-extractor" || op == "pdf-splitter" ? [0] : Array(0..<pdf.pageCount); for i in indexes { if let page=pdf.page(at:i) { out.insert(page,at:out.pageCount) } }; return Result(nil,out.dataRepresentation(),"application/pdf","pdf")
     }
     private static func image(_ op: String, _ data: Data) throws -> Result {
         if op == "png-to-svg" {

@@ -3,6 +3,7 @@ package com.chastech.env
 import android.os.Build
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.engine.NativeDateTimeEngine
+import com.chastech.env.engine.NativeFileConverterEngine
 import com.chastech.env.engine.NativeMimeEngine
 import com.chastech.env.engine.NativeUtilityEngine
 import org.json.JSONObject
@@ -27,6 +28,7 @@ object NativeBackendEngine {
         if (tool.engine.type == "mime" && NativeMimeEngine.operationForTool(tool.id) != null) return false
         if (tool.engine.type == "datetime" && NativeDateTimeEngine.operationForTool(tool.id) != null) return false
         if (NativeBarcodeEngine.supports(tool)) return false
+        if (NativeFileConverterEngine.supports(tool)) return false
         return tool.id in explicit || tool.category in categoryBackend || tool.engine.type in setOf("developer","image","audio","video","mockup","post","pdf","document-backend")
     }
 
