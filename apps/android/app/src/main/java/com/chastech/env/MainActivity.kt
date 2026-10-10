@@ -419,7 +419,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(28.dp)
     Surface(
-        modifier = modifier.height(128.dp),
+        modifier = modifier.height(112.dp),
         shape = shape,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

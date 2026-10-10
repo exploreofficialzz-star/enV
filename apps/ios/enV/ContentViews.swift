@@ -353,7 +353,7 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let cellWidth = let visibleCount = proxy.size.width >= 720 ? 10 : 5
+            let visibleCount = proxy.size.width >= 720 ? 10 : 5
             let cellWidth = (proxy.size.width - 24 - 12 * CGFloat(visibleCount - 1)) / CGFloat(visibleCount)
             let iconSide = min(max(cellWidth * 0.78, 36), 48)
             Group {
@@ -387,7 +387,7 @@ private struct HomeMostUsedToolsTray: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .frame(height: 128)
+                        .frame(height: 112)
                     }
                 }
             }
@@ -395,7 +395,7 @@ private struct HomeMostUsedToolsTray: View {
         }
         .frame(maxWidth: 768)
         .frame(maxWidth: .infinity)
-        .frame(height: 128)
+        .frame(height: 112)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.envBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
