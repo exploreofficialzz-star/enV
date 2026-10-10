@@ -1,4 +1,5 @@
 import type { MediaJobRequest, MediaRuntimeAdapter } from "./media-runtime";
+import { apiUrl } from "@/lib/api/base";
 
 export interface FfmpegExecutionRequest {
   input: Blob;
@@ -52,7 +53,7 @@ export function getServerMediaConfig(): ServerMediaConfig {
   const nodeEndpoint = typeof process !== "undefined" && typeof process.env?.VITE_MEDIA_PROCESSOR_URL === "string"
     ? String(process.env.VITE_MEDIA_PROCESSOR_URL).trim()
     : "";
-  const endpoint = viteEndpoint || nodeEndpoint || "/api/backend/media";
+  const endpoint = viteEndpoint || nodeEndpoint || apiUrl("/api/backend/media");
   return { endpoint, configured: true };
 }
 
@@ -76,7 +77,7 @@ export function createServerMediaAdapter(): MediaRuntimeAdapter {
       const fileNames = Array.isArray(request.params?.fileNames) ? request.params.fileNames.map(String) : [];
       const sourceFiles = input instanceof Blob ? [{ value: input, name: String(request.params?.fileName ?? "input") }] : inputs.map((value, index) => ({ value, name: fileNames[index] ?? `input-${index + 1}` }));
       const gatewayLimit = 4 * 1024 * 1024;
-      if (endpoint === "/api/backend/media" && sourceFiles.reduce((total, file) => total + file.value.size, 0) > gatewayLimit) {
+      if (endpoint === apiUrl("/api/backend/media") && sourceFiles.reduce((total, file) => total + file.value.size, 0) > gatewayLimit) {
         throw new Error("This deployment's same-origin media gateway accepts files up to 4 MB. Configure a direct MEDIA_PROCESSOR_URL for larger files.");
       }
       let response: Response;

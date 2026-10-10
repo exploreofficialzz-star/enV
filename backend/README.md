@@ -1,10 +1,10 @@
 # enV backend gateway
 
-This folder contains the server-side integration boundary for the existing Vercel deployment. The Nitro routes in `server/routes/api/backend` are deployed as Vercel Functions together with the website; no second deployment is required.
+This folder contains the server-side integration boundary for the existing Render API deployment. The Nitro routes in `server/routes/api/backend` are deployed as Vercel Functions together with the website; no second deployment is required.
 
 ## Routing contract
 
-Web, Android, and iOS call the enV application API gateway at `https://en-v.vercel.app` for `/api/backend/*` and `/api/ai/*`. The exact Render URL `https://env-q3mq.onrender.com` is the downstream processor host, not a client API base URL: it accepts `/media`, `/info`, `/download` (and optionally `/transcribe`) and requires the server-only `PROCESSOR_SHARED_SECRET`. The Vercel gateway adds that secret and keeps it out of browser and native builds.
+Web, Android, and iOS call the enV public Render API at `https://env-q3mq.onrender.com` for `/api/backend/*` and `/api/ai/*`. The exact Render URL `https://env-q3mq.onrender.com` is the downstream processor host, not a client API base URL: it accepts `/media`, `/info`, `/download` (and optionally `/transcribe`) and requires the server-only `PROCESSOR_SHARED_SECRET`. The Vercel gateway adds that secret and keeps it out of browser and native builds.
 
 ## Routes
 

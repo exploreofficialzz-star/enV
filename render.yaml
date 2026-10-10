@@ -12,6 +12,8 @@ services:
       - key: MEDIA_MAX_BYTES
         value: "104857600"
       - key: PROCESSOR_ALLOWED_ORIGIN
-        value: "*"
+        value: "https://en-v.vercel.app"
+      - key: APPLICATION_API_ORIGIN
+        value: "https://en-v.vercel.app"
       - key: TRANSCRIBE_ENABLED
         value: "false"

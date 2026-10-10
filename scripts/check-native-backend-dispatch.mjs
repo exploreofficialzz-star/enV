@@ -4,7 +4,7 @@ const files = [
   "apps/android/app/src/main/java/com/chastech/env/NativeBackendEngine.kt",
   "apps/ios/enV/ToolViews.swift",
 ];
-const apiOrigin = "https://en-v.vercel.app";
+const apiOrigin = "https://env-q3mq.onrender.com";
 const configurationFiles = [
   "apps/android/app/build.gradle.kts",
   "apps/android/.env.example",
@@ -17,7 +17,7 @@ const errors = [];
 for (const file of configurationFiles) {
   const source = readFileSync(file, "utf8");
   if (!source.includes(apiOrigin)) errors.push(`${file}: missing canonical enV application API origin ${apiOrigin}`);
-  if (source.includes("https://env-q3mq.onrender.com")) errors.push(`${file}: points ENV_API_BASE_URL at the downstream Render processor instead of the application API`);
+  if (source.includes("https://en-v.vercel.app")) errors.push(`${file}: still points ENV_API_BASE_URL at the Vercel website instead of the public Render API`);
 }
 for (const file of files) {
   const source = readFileSync(file, "utf8");

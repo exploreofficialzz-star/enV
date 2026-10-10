@@ -1,10 +1,11 @@
 /**
- * Browser client for the enV AI API. Talks only to same-origin /api/ai/* endpoints; it never sees a
+ * Browser client for the enV AI API. Talks to the public Render /api/ai/* endpoints; it never sees a
  * provider, a model or a key. All failures become AiClientError with a message that is safe to show.
  */
 import type { AiTaskId, AiTaskResultMap } from "../contracts.ts";
 import { AI_LIMITS, IMAGE_MIME_TYPES } from "../contracts.ts";
 import type { FileValue } from "../features.ts";
+import { apiUrl } from "../../api/base.ts";
 
 export interface AiRunMeta {
   requestId: string;
@@ -73,11 +74,11 @@ export async function runAiTask<T extends AiTaskId>(taskId: T, input: unknown, o
   try {
     let response: Response;
     try {
-      response = await doFetch("/api/ai/run", {
+      response = await doFetch(apiUrl("/api/ai/run"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ task: taskId, input }),
-        credentials: "same-origin",
+        credentials: "include",
         signal: deadline.signal,
       });
     } catch {
@@ -133,7 +134,7 @@ export function fetchAiAvailability(options: { fetchImpl?: FetchFn; now?: () => 
   const promise = (async () => {
     const deadline = withDeadline(undefined, STATUS_TIMEOUT_MS);
     try {
-      const response = await doFetch("/api/ai/status", { credentials: "same-origin", signal: deadline.signal });
+      const response = await doFetch(apiUrl("/api/ai/status"), { credentials: "include", signal: deadline.signal });
       const body = asRecord(await response.json());
       if (!response.ok || body.ok !== true) return {};
       const map: Record<string, boolean> = {};

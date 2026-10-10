@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { downloadBlob } from "@/lib/utils";
+import { apiUrl } from "@/lib/api/base";
 
 type Props = { mode: "audio" | "video"; format: "txt" | "srt" | "vtt" };
 
@@ -9,7 +10,7 @@ function endpoint() {
   const value = typeof import.meta !== "undefined" && typeof import.meta.env?.VITE_TRANSCRIBE_URL === "string"
     ? String(import.meta.env.VITE_TRANSCRIBE_URL).trim()
     : "";
-  return value.replace(/\/$/, "") || "/api/backend";
+  return value.replace(/\/$/, "") || apiUrl("/api/backend");
 }
 
 export function TranscriptionEngine({ mode, format }: Props) {
@@ -28,8 +29,8 @@ export function TranscriptionEngine({ mode, format }: Props) {
     if (!url) { setError("The enV transcription service is not configured. Set VITE_TRANSCRIBE_URL to a running transcription endpoint."); return; }
     setBusy(true);
     try {
-      if (url === "/api/backend" && file.size > 4 * 1024 * 1024) {
-        throw new Error("This deployment's same-origin transcription gateway accepts files up to 4 MB. Configure a direct VITE_TRANSCRIBE_URL for larger files.");
+      if (url === apiUrl("/api/backend") && file.size > 4 * 1024 * 1024) {
+        throw new Error("The Render API gateway accepts transcription files up to 4 MB. Use a smaller file or configure a larger Render upload limit.");
       }
       const form = new FormData();
       form.append("file", file, file.name);
@@ -37,7 +38,7 @@ export function TranscriptionEngine({ mode, format }: Props) {
       form.append("language", language.trim() || "auto");
       form.append("translate", String(translate));
       form.append("outputName", `${file.name.replace(/\.[^.]+$/, "")}.${format}`);
-      const response = await fetch(`${url === "/api/backend" ? `${url}/transcribe` : `${url}/transcribe`}`, { method: "POST", body: form });
+      const response = await fetch(`${url}/transcribe`, { method: "POST", body: form, credentials: "include" });
       if (!response.ok) {
         let message = `Transcription service returned HTTP ${response.status}.`;
         try { const body = await response.json() as { error?: string }; if (body.error) message = body.error; } catch { /* non-JSON error */ }

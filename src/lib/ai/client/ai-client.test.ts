@@ -1,3 +1,4 @@
+import { apiUrl } from "../../api/base.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AiClientError, bytesToBase64, fetchAiAvailability, fitWithin, normalizeAudioMime, resetAiAvailabilityCache, runAiTask } from "./ai-client.ts";
@@ -5,14 +6,14 @@ import { AiClientError, bytesToBase64, fetchAiAvailability, fitWithin, normalize
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const OK = { ok: true, data: { taskId: "creator.title.generate", result: { titles: ["A"] }, meta: { requestId: "req_1", cached: false, warnings: ["w"] } } };
 
-test("runAiTask posts only the task and input, same-origin, and returns result plus meta", async () => {
+test("runAiTask posts only the task and input, Render credentials, and returns result plus meta", async () => {
   let seen: { url: string; init: RequestInit } | null = null;
   const out = await runAiTask("creator.title.generate", { topic: "x" }, { fetchImpl: async (url, init) => { seen = { url, init: init! }; return json(OK); } });
   assert.deepEqual(out.result, { titles: ["A"] });
   assert.deepEqual(out.meta, { requestId: "req_1", cached: false, warnings: ["w"] });
-  assert.equal(seen!.url, "/api/ai/run");
+  assert.equal(seen!.url, apiUrl("/api/ai/run"));
   assert.equal(seen!.init.method, "POST");
-  assert.equal(seen!.init.credentials, "same-origin");
+  assert.equal(seen!.init.credentials, "include");
   assert.deepEqual(JSON.parse(seen!.init.body as string), { task: "creator.title.generate", input: { topic: "x" } });
 });
 
