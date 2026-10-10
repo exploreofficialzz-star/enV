@@ -22,6 +22,7 @@ object NativeBackendEngine {
     private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators")
 
     fun supports(tool:ToolRecord):Boolean {
+        if (NativeImageEngine.supports(tool)) return false
         if (tool.engine.type == "developer" && NativeUtilityEngine.supports(tool)) return false
         if (tool.engine.type == "mime" && NativeMimeEngine.operationForTool(tool.id) != null) return false
         if (tool.engine.type == "datetime" && NativeDateTimeEngine.operationForTool(tool.id) != null) return false

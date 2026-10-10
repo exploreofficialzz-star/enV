@@ -729,6 +729,7 @@ private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntim
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
     "datetime" -> NativeDateTimeEngine.operationForTool(tool.id) != null
     "barcode", "qr" -> NativeBarcodeEngine.supports(tool)
+    "image" -> NativeImageEngine.supports(tool)
     "mime" -> NativeMimeEngine.operationForTool(tool.id) != null
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
@@ -888,6 +889,7 @@ private fun NativeToolForm(tool: ToolRecord) {
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
         "barcode", "qr" -> NativeBarcodeToolForm(tool.id)
+        "image" -> NativeImageToolForm(tool)
         "mime" -> NativeMimeToolForm(tool.id)
         "converter" -> NativeConverterToolForm(tool)
         "calculator" -> when {

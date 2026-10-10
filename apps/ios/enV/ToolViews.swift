@@ -266,6 +266,7 @@ enum NativeCoverage {
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
         case "datetime": return NativeDateTimeEngine.operation(forToolID: tool.id) != nil
         case "barcode", "qr": return NativeBarcodeEngine.supports(tool)
+        case "image": return NativeImageEngine.supports(tool)
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
@@ -297,6 +298,7 @@ struct NativeFamilyToolView: View {
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "barcode", "qr": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "image": if NativeImageEngine.supports(tool) { NativeImageToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1044,6 +1046,7 @@ enum NativeBackendEngine {
     // Unsupported tools must not appear executable in the native app.
     static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
     static func supports(_ tool:Tool)->Bool {
+        if NativeImageEngine.supports(tool) { return false }
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
         if tool.engine.type=="datetime" && NativeDateTimeEngine.operation(forToolID: tool.id) != nil { return false }
@@ -1129,6 +1132,74 @@ enum NativeBackendEngine {
         if !downloadResponse && mime.contains("json") { return NativeBackendResult(text:String(data:d,encoding:.utf8),data:nil,mimeType:mime,fileName:nil) }
         return NativeBackendResult(text:nil,data:d,mimeType:mime,fileName:filename)
     }
+}
+
+enum NativeImageEngine {
+    private static let operations: Set<String> = ["resize", "compress", "grayscale", "invert", "blur", "sharpen", "crop", "watermark", "rotate", "flip"]
+    private static let aliases: [String:String] = ["image-resizer":"resize", "image-compressor":"compress", "image-grayscale":"grayscale", "image-invert":"invert", "image-blur":"blur", "image-sharpen":"sharpen", "image-cropper":"crop", "image-watermark":"watermark", "image-rotator":"rotate", "image-flipper":"flip"]
+    static func operation(for tool: Tool) -> String? { guard tool.engine.type == "image" else { return nil }; let op = tool.engine.op ?? tool.engine.id ?? tool.id; return aliases[tool.id] ?? (operations.contains(op) ? op : nil) }
+    static func supports(_ tool: Tool) -> Bool { operation(for: tool) != nil }
+    static func run(tool: Tool, data: Data, width: Int, height: Int?, quality: CGFloat, text: String, degrees: CGFloat) throws -> (data: Data, width: Int, height: Int, ext: String) {
+        guard let op = operation(for: tool), let source = UIImage(data: data), let cg = source.cgImage else { throw NativeNativeError.message("Choose a supported PNG, JPEG, or WebP image.") }
+        let size = CGSize(width: cg.width, height: cg.height)
+        var image = source
+        switch op {
+        case "resize":
+            guard width > 0 || (height ?? 0) > 0 else { throw NativeNativeError.message("Enter a target width or height.") }
+            let scale = width > 0 && (height ?? 0) > 0 ? min(CGFloat(width) / size.width, CGFloat(height!) / size.height) : width > 0 ? CGFloat(width) / size.width : CGFloat(height!) / size.height
+            image = render(source, size: CGSize(width: max(1, size.width * scale), height: max(1, size.height * scale)))
+        case "grayscale", "invert", "blur", "sharpen":
+            let names = ["grayscale":"CIColorControls", "invert":"CIColorInvert", "blur":"CIGaussianBlur", "sharpen":"CISharpenLuminance"]
+            guard let filter = CIFilter(name: names[op]!), let ci = CIImage(image: source) else { throw NativeNativeError.message("Could not process this image.") }
+            filter.setValue(ci, forKey: kCIInputImageKey); if op == "grayscale" { filter.setValue(0, forKey: kCIInputSaturationKey) }; if op == "blur" { filter.setValue(4.0, forKey: kCIInputRadiusKey) }; if op == "sharpen" { filter.setValue(0.7, forKey: kCIInputSharpnessKey) }
+            guard let filtered = filter.outputImage, let rendered = CIContext().createCGImage(filtered, from: filtered.extent) else { throw NativeNativeError.message("Could not render the filter output.") }; image = UIImage(cgImage: rendered)
+        case "crop":
+            let w = min(CGFloat(width > 0 ? width : Int(size.width)), size.width), h = min(CGFloat(height ?? Int(size.height)), size.height); image = render(source, crop: CGRect(x: (size.width-w)/2, y: (size.height-h)/2, width: w, height: h))
+        case "watermark": image = watermark(source, text: text)
+        case "rotate": image = render(source, angle: degrees * .pi / 180)
+        case "flip": image = render(source, flipHorizontal: true)
+        default: break
+        }
+        let out = (op == "compress" ? image.jpegData(compressionQuality: quality) : image.jpegData(compressionQuality: quality)) ?? image.pngData() ?? Data()
+        return (out, Int(image.size.width), Int(image.size.height), "jpg")
+    }
+    private static func render(_ image: UIImage, size: CGSize) -> UIImage { UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) } }
+    private static func render(_ image: UIImage, crop: CGRect) -> UIImage { guard let cg = image.cgImage?.cropping(to: crop) else { return image }; return UIImage(cgImage: cg, scale: image.scale, orientation: image.imageOrientation) }
+    private static func render(_ image: UIImage, angle: CGFloat) -> UIImage { let box = CGRect(origin: .zero, size: image.size).applying(CGAffineTransform(rotationAngle: angle)); return UIGraphicsImageRenderer(size: CGSize(width: abs(box.width), height: abs(box.height))).image { c in c.cgContext.translateBy(x: abs(box.width)/2, y: abs(box.height)/2); c.cgContext.rotate(by: angle); image.draw(in: CGRect(x: -image.size.width/2, y: -image.size.height/2, width: image.size.width, height: image.size.height)) } }
+    private static func render(_ image: UIImage, flipHorizontal: Bool) -> UIImage { UIGraphicsImageRenderer(size: image.size).image { c in c.cgContext.translateBy(x: image.size.width, y: 0); c.cgContext.scaleBy(x: -1, y: 1); image.draw(in: CGRect(origin: .zero, size: image.size)) } }
+    private static func watermark(_ image: UIImage, text: String) -> UIImage { UIGraphicsImageRenderer(size: image.size).image { _ in image.draw(at: .zero); let attrs: [NSAttributedString.Key:Any] = [.font:UIFont.boldSystemFont(ofSize:max(18,image.size.width/18)), .foregroundColor:UIColor.white, .shadow:NSShadow()]; (text.isEmpty ? "enV" : text).draw(at: CGPoint(x:24,y:image.size.height-max(48,image.size.height/10)), withAttributes: attrs) } }
+}
+
+private struct NativeImageToolView: View {
+    let tool: Tool
+    @State private var file: NativeBackendFile?
+    @State private var outputData: Data?
+    @State private var output = ""
+    @State private var error: String?
+    @State private var importing = false
+    @State private var exporting = false
+    @State private var width = "1200"
+    @State private var height = ""
+    @State private var quality = "88"
+    @State private var text = "enV"
+    @State private var degrees = "90"
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(file?.name ?? "Choose image") { importing = true }.buttonStyle(.bordered)
+            if let op = NativeImageEngine.operation(for: tool) {
+                if op == "resize" { NativeInputField(title:"Width", text:$width); NativeInputField(title:"Height (optional)", text:$height) }
+                if op == "compress" { NativeInputField(title:"JPEG quality (1–100)", text:$quality) }
+                if op == "watermark" { NativeInputField(title:"Watermark text", text:$text) }
+                if op == "rotate" { NativeInputField(title:"Degrees", text:$degrees) }
+            }
+            HStack { Button("Run locally") { run() }.buttonStyle(.borderedProminent).disabled(file == nil); Button("Reset") { file=nil; outputData=nil; output=""; error=nil }.buttonStyle(.bordered) }
+            NativeOutputView(output: output, error: error)
+            if outputData != nil { Button("Save output") { exporting = true }.buttonStyle(.bordered) }
+        }
+        .fileImporter(isPresented:$importing, allowedContentTypes:[.data], allowsMultipleSelection:false) { result in if case .success(let urls)=result, let url=urls.first { file = nativeBackendFiles(from:[url]).first; error=nil } }
+        .fileExporter(isPresented:$exporting, document:outputData.map(NativeBinaryDocument.init), contentType:.jpeg, defaultFilename:"env-image.jpg") { result in if case .failure(let e)=result { error=e.localizedDescription } }
+    }
+    private func run() { guard let file else { return }; do { let result=try NativeImageEngine.run(tool:tool,data:file.data,width:Int(width) ?? 0,height:Int(height),quality:CGFloat(Int(quality) ?? 88)/100,text:text,degrees:CGFloat(Double(degrees) ?? 90)); outputData=result.data; output="Processed locally · \(result.width) × \(result.height) · \(result.data.count/1024) KB"; error=nil } catch { output=""; outputData=nil; error=error.localizedDescription } }
 }
 
 enum NativeBarcodeEngine {

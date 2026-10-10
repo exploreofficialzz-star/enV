@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policyVersion": "2026-10-10.1",
+  "policyVersion": "2026-10-10.2",
   "principle": "local-first; remote only when explicitly required or selected",
   "platforms": ["web", "android", "ios"],
   "modes": ["local", "remote-required", "unsupported"],
@@ -19,10 +19,9 @@
     },
     "image": {
       "web": {"mode": "local", "implementation": "src/lib/image/"},
-      "android": {"mode": "unsupported", "next": "ImageDecoder/Bitmap processing module"},
-      "ios": {"mode": "unsupported", "next": "ImageIO/Core Image processing module"},
-      "remoteFallback": true,
-      "consent": "required"
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeImageEngine.kt", "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"},
+      "remoteFallback": false
     },
     "screenshots": {
       "web": {"mode": "local", "implementation": "src/lib/screenshots/"},

@@ -25,4 +25,12 @@ class NativeBarcodeEngineTest {
         assertTrue(NativeBarcodeEngine.supports(tool("qr-generator", type = "qr")))
         assertTrue(NativeBarcodeEngine.supports(tool("code128-barcode")))
     }
+
+    @Test fun supportedImageOperationsBypassGenericBackend() {
+        for (id in listOf("image-resizer", "image-compressor", "image-grayscale", "image-blur", "image-cropper", "image-watermark")) {
+            val image = tool(id, type = "image", category = "images")
+            assertTrue(NativeImageEngine.supports(image))
+            assertFalse(NativeBackendEngine.supports(image))
+        }
+    }
 }
