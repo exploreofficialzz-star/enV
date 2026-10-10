@@ -155,7 +155,7 @@ struct AssistantChatView: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
-                            Text("AI assistant").font(.system(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
+                            Text("AI assistant").font(.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
                     }
                     Spacer()
                     Button(action: startNewChat) {
@@ -169,7 +169,7 @@ struct AssistantChatView: View {
                             if messages.isEmpty {
                                 VStack(spacing: 10) {
                                     Image(systemName: "sparkles")
-                                        .font(.system(size: 24, weight: .semibold))
+                                        .font(.envScaled(size: 24, weight: .semibold))
                                         .foregroundStyle(Color.envAccent)
                                         .frame(width: 52, height: 52)
                                         .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 16))
@@ -184,9 +184,9 @@ struct AssistantChatView: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             VStack(alignment: .leading, spacing: 5) {
                                                 Text(message.isUser ? "You" : "enV")
-                                                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.envMuted)
+                                                    .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envMuted)
                                                 Text(message.content)
-                                                    .font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
+                                                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
                                                     .textSelection(.enabled)
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
@@ -229,9 +229,9 @@ struct AssistantChatView: View {
                             if isSending {
                                 HStack(spacing: 8) {
                                     ProgressView()
-                                    Text("Thinking…").font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    Text("Thinking…").font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                                     Button("Stop", action: stopRequest)
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.envScaled(size: 14, weight: .semibold))
                                         .accessibilityLabel("Stop assistant response")
                                 }
                                     .padding(12)
@@ -259,9 +259,9 @@ struct AssistantChatView: View {
 
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
-                        Text(errorMessage).font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(errorMessage).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
                         if let retryRequest {
-                            Button("Retry") { runRequest(retryRequest) }.font(.system(size: 14, weight: .semibold))
+                            Button("Retry") { runRequest(retryRequest) }.font(.envScaled(size: 14, weight: .semibold))
                         }
                     }
                     .padding(12)
@@ -277,13 +277,13 @@ struct AssistantChatView: View {
                     ), axis: .vertical)
                     .lineLimit(1...4)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.envScaled(size: 16, weight: .regular))
                     .submitLabel(.send)
                     .onSubmit(sendDraft)
                     .disabled(isSending)
                     Button(action: sendDraft) {
                         Image(systemName: isSending ? "hourglass" : "arrow.up.circle.fill")
-                            .font(.system(size: 28, weight: .semibold))
+                            .font(.envScaled(size: 28, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
                     }
                     .accessibilityLabel("Send message")

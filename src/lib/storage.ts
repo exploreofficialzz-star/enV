@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 const FAV_KEY = "env:favorites";
 const RECENT_KEY = "env:recent";
+const USAGE_KEY = "env:tool-use-counts";
 const THEME_KEY = "env:theme";
 const MAX_RECENT = 24;
 
@@ -40,9 +41,52 @@ function writeList(key: string, value: string[]): boolean {
   }
 }
 
+function readCounts(key: string): Record<string, number> {
+  try {
+    const raw = browserStorage()?.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] =>
+        typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0,
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeCounts(value: Record<string, number>): boolean {
+  try {
+    const storage = browserStorage();
+    if (!storage) return false;
+    storage.setItem(USAGE_KEY, JSON.stringify(value));
+    return storage.getItem(USAGE_KEY) === JSON.stringify(value);
+  } catch {
+    return false;
+  }
+}
+
+export function rankMostUsedToolIds(
+  recent: string[],
+  counts: Record<string, number>,
+  limit = 5,
+): string[] {
+  const recentRank = new Map(recent.map((id, index) => [id, index]));
+  return [...new Set([...Object.keys(counts), ...recent])]
+    .sort((a, b) =>
+      (counts[b] ?? 0) - (counts[a] ?? 0) ||
+      (recentRank.get(a) ?? Number.MAX_SAFE_INTEGER) - (recentRank.get(b) ?? Number.MAX_SAFE_INTEGER) ||
+      a.localeCompare(b),
+    )
+    .slice(0, Math.max(0, limit));
+}
+
 type PrefsState = {
   favorites: string[];
   recent: string[];
+  usageCounts: Record<string, number>;
   theme: "light" | "dark";
   hydrated: boolean;
   storageAvailable: boolean;
@@ -58,6 +102,7 @@ type PrefsState = {
 export const usePrefs = create<PrefsState>((set, get) => ({
   favorites: [],
   recent: [],
+  usageCounts: {},
   theme: "light",
   hydrated: false,
   storageAvailable: false,
@@ -76,6 +121,7 @@ export const usePrefs = create<PrefsState>((set, get) => ({
     set({
       favorites: readList(FAV_KEY),
       recent: readList(RECENT_KEY),
+      usageCounts: readCounts(USAGE_KEY),
       theme,
       hydrated: true,
       storageAvailable: Boolean(storage),
@@ -94,9 +140,12 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   },
   isFavorite: (id) => get().favorites.includes(id),
   recordRecent: (id) => {
+    if (!id) return;
     const next = [id, ...get().recent.filter((x) => x !== id)].slice(0, MAX_RECENT);
+    const usageCounts = { ...get().usageCounts, [id]: Math.min((get().usageCounts[id] ?? 0) + 1, 1_000_000) };
     writeList(RECENT_KEY, next);
-    set({ recent: next });
+    writeCounts(usageCounts);
+    set({ recent: next, usageCounts });
   },
   setTheme: (theme) => {
     document.documentElement.classList.toggle("dark", theme === "dark");

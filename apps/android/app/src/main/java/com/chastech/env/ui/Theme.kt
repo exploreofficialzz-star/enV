@@ -5,6 +5,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
 
 private val EnVLightColors = lightColorScheme(
@@ -39,11 +42,17 @@ private val EnVDarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFF97066),
 )
 
+private const val EnVFontScale = 1.1f
+
 @Composable
 fun EnVTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) EnVDarkColors else EnVLightColors,
-        typography = Typography(),
-        content = content,
-    )
+    val systemDensity = LocalDensity.current
+    val scaledDensity = Density(systemDensity.density, systemDensity.fontScale * EnVFontScale)
+    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) EnVDarkColors else EnVLightColors,
+            typography = Typography(),
+            content = content,
+        )
+    }
 }

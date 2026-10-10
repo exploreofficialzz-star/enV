@@ -276,9 +276,11 @@ final class CatalogStore: ObservableObject {
     @Published var selectedCategory: String?
     @Published private(set) var favoriteIDs: Set<String>
     @Published private(set) var recentIDs: [String]
+    @Published private(set) var usageCounts: [String: Int]
 
     private let favoritesKey = "env.favoriteToolIDs"
     private let recentKey = "env.recentToolIDs"
+    private let usageKey = "env.toolUseCounts"
 
     private let bundle: Bundle
 
@@ -288,6 +290,7 @@ final class CatalogStore: ObservableObject {
         self.loadState = catalog == nil ? .loading : .ready
         self.favoriteIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
         self.recentIDs = Array(NSOrderedSet(array: UserDefaults.standard.stringArray(forKey: recentKey) ?? []).array.compactMap { $0 as? String }.prefix(24))
+        self.usageCounts = UserDefaults.standard.dictionary(forKey: usageKey)?.compactMapValues { $0 as? Int } ?? [:]
         if catalog == nil { reloadCatalog() }
     }
 
@@ -309,6 +312,17 @@ final class CatalogStore: ObservableObject {
     }
 
     var categories: [ToolCategory] { catalog.categories }
+    var mostUsedIDs: [String] {
+        Set(recentIDs).union(usageCounts.keys).sorted { left, right in
+            let leftCount = usageCounts[left, default: 0]
+            let rightCount = usageCounts[right, default: 0]
+            if leftCount != rightCount { return leftCount > rightCount }
+            let leftRecent = recentIDs.firstIndex(of: left) ?? Int.max
+            let rightRecent = recentIDs.firstIndex(of: right) ?? Int.max
+            if leftRecent != rightRecent { return leftRecent < rightRecent }
+            return left < right
+        }
+    }
     var favoriteTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter { favoriteIDs.contains($0.id) }.sorted { $0.name < $1.name } }
     var featuredTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter(\.featured).sorted { $0.popularity > $1.popularity } }
     var popularTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
@@ -329,9 +343,10 @@ final class CatalogStore: ObservableObject {
     func recordRecent(_ toolID: String) {
         guard !toolID.isEmpty else { return }
         let next = Array(([toolID] + recentIDs.filter { $0 != toolID }).prefix(24))
-        guard next != recentIDs else { return }
         recentIDs = next
+        usageCounts[toolID] = min(usageCounts[toolID, default: 0] + 1, 1_000_000)
         UserDefaults.standard.set(recentIDs, forKey: recentKey)
+        UserDefaults.standard.set(usageCounts, forKey: usageKey)
     }
 
     func isFavorite(_ tool: Tool) -> Bool { favoriteIDs.contains(tool.id) }

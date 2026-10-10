@@ -14,13 +14,13 @@ struct ToolCard: View {
                     VStack(alignment: .leading, spacing: 0) {
                         iconTile(tool.icon)
                         Text(tool.name)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.envScaled(size: 14, weight: .semibold))
                             .tracking(-0.15)
                             .foregroundStyle(Color.envInk)
                             .lineLimit(1)
                             .padding(.top, 12)
                         Text(tool.description)
-                            .font(.system(size: 12, weight: .regular))
+                            .font(.envScaled(size: 12, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .lineLimit(2)
                             .lineSpacing(2)
@@ -28,7 +28,7 @@ struct ToolCard: View {
                         if !NativeCopy.isWebRuntimeOnly(tool.id), NativeBackendEngine.supports(tool) {
                             StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
                         } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeCoverage.isLocallyExecutable(tool) {
-                            Text("ON DEVICE").font(.system(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+                            Text("ON DEVICE").font(.envScaled(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
                         } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
                         } else {
                             StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
@@ -66,7 +66,7 @@ struct StatusPill: View {
     let text: String
     let color: Color
     var body: some View {
-        Text(text).font(.system(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
+        Text(text).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -104,7 +104,7 @@ struct ToolDetailView: View {
                     Text("/").foregroundStyle(Color.envSubtle)
                     Text(tool.name).foregroundStyle(Color.envInk).lineLimit(1)
                 }
-                .font(.system(size: 12, weight: .regular))
+                .font(.envScaled(size: 12, weight: .regular))
                 .foregroundStyle(Color.envMuted)
                 .buttonStyle(.plain)
                 .padding(.bottom, 24)
@@ -123,7 +123,7 @@ struct ToolDetailView: View {
 
                 if let notice = tool.nativeDisclaimerText {
                     Text(notice)
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(.top, 12)
                 }
@@ -139,11 +139,11 @@ struct ToolDetailView: View {
                             Text(tool.isPlanned
                                 ? "This tool is not yet implemented natively."
                                 : "This tool is available in the Web product and is not executable natively.")
-                                .font(.system(size: 14, weight: .regular))
+                                .font(.envScaled(size: 14, weight: .regular))
                                 .foregroundStyle(Color.envMuted)
                             if !tool.isPlanned, let webURL = URL(string: "https://en-v.vercel.app/tools/\(tool.category)/\(tool.slug)") {
                                 Link("Open in Web", destination: webURL)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.envScaled(size: 14, weight: .semibold))
                                     .accessibilityHint("Opens this tool in your default web browser")
                             }
                         }
@@ -162,17 +162,17 @@ struct ToolDetailView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("What this tool does")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                     Text("\(tool.description) Results can be copied or downloaded from this page.")
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                 }
                 .padding(.top, 40)
 
                 if !relatedTools.isEmpty {
                     Text("Related tools")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                         .padding(.top, 40)
                         .padding(.bottom, 16)
@@ -203,14 +203,14 @@ struct ToolDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(tool.name)
-                        .font(.system(size: compact ? 24 : 30, weight: .semibold))
+                        .font(.envScaled(size: compact ? 24 : 30, weight: .semibold))
                         .tracking(-0.35)
                         .foregroundStyle(Color.envInk)
                         .fixedSize(horizontal: false, vertical: true)
                     if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted) }
                 }
                 Text(tool.description)
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.envScaled(size: 14, weight: .regular))
                     .foregroundStyle(Color.envMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -222,7 +222,7 @@ struct ToolDetailView: View {
             HStack(spacing: 8) {
                 EnVIcon(name: "Heart", size: 16, tint: store.isFavorite(tool) ? .white : .envInk)
                 Text(store.isFavorite(tool) ? "Saved" : "Save")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.envScaled(size: 14, weight: .medium))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -239,8 +239,8 @@ private struct RelatedToolDetailCard: View {
     let tool: Tool
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(tool.name).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
-            Text(tool.description).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
+            Text(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+            Text(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
@@ -405,7 +405,7 @@ private struct NativeBackendToolView: View {
                 else if let error { NativeOutputView(output: "", error: error) }
             }
         }
-        .font(.system(size: 14, weight: .regular))
+        .font(.envScaled(size: 14, weight: .regular))
         .fileImporter(isPresented: $showImporter, allowedContentTypes: isDocument ? documentTypes : [.data], allowsMultipleSelection: isDocument ? allowsMultipleDocuments : true) { result in
             switch result {
             case .success(let urls): files = nativeBackendFiles(from: urls)
@@ -460,7 +460,7 @@ private struct NativeProductivityToolView: View {
     @State private var remaining = 1500
     @State private var phase = "focus"
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    var body: some View { VStack(spacing: 14) { Text(tool.id == "stopwatch" ? "Stopwatch" : tool.id == "pomodoro-timer" ? "Pomodoro · \(phase.capitalized)" : "Focus Timer").font(.headline); Text(format(tool.id == "stopwatch" ? elapsed : remaining)).font(.system(size: 56, weight: .medium, design: .monospaced)); HStack { Button(running ? "Pause" : "Start") { running.toggle() }.buttonStyle(.borderedProminent); Button("Reset") { running=false; elapsed=0; remaining=tool.id=="pomodoro-timer" ? 1500 : 3000; phase="focus" }.buttonStyle(.bordered) } }.onReceive(timer) { _ in guard running else { return }; if tool.id == "stopwatch" { elapsed += 1 } else if remaining <= 1 { phase = phase == "focus" ? "break" : "focus"; remaining = tool.id=="pomodoro-timer" ? (phase == "focus" ? 1500 : 300) : (phase == "focus" ? 3000 : 600) } else { remaining -= 1 } } }
+    var body: some View { VStack(spacing: 14) { Text(tool.id == "stopwatch" ? "Stopwatch" : tool.id == "pomodoro-timer" ? "Pomodoro · \(phase.capitalized)" : "Focus Timer").font(.headline); Text(format(tool.id == "stopwatch" ? elapsed : remaining)).font(.envScaled(size: 56, weight: .medium, design: .monospaced)); HStack { Button(running ? "Pause" : "Start") { running.toggle() }.buttonStyle(.borderedProminent); Button("Reset") { running=false; elapsed=0; remaining=tool.id=="pomodoro-timer" ? 1500 : 3000; phase="focus" }.buttonStyle(.bordered) } }.onReceive(timer) { _ in guard running else { return }; if tool.id == "stopwatch" { elapsed += 1 } else if remaining <= 1 { phase = phase == "focus" ? "break" : "focus"; remaining = tool.id=="pomodoro-timer" ? (phase == "focus" ? 1500 : 300) : (phase == "focus" ? 3000 : 600) } else { remaining -= 1 } } }
     private func format(_ s:Int)->String { String(format:"%02d:%02d",s/60,s%60) }
 }
 
@@ -1960,11 +1960,11 @@ private struct NativeAiAssistPanel: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text("✦").font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.envAccent)
-                Text(feature.title).font(.system(size: 18, weight: .semibold)).foregroundStyle(Color.envInk)
-                Text("AI").font(.system(size: 11, weight: .medium)).tracking(0.7).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.vertical, 3).background(Color.envSurface2, in: Capsule())
+                Text("✦").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envAccent)
+                Text(feature.title).font(.envScaled(size: 18, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("AI").font(.envScaled(size: 11, weight: .medium)).tracking(0.7).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.vertical, 3).background(Color.envSurface2, in: Capsule())
             }
-            Text(feature.description).font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+            Text(feature.description).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             let columns = compact ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())]
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 ForEach(feature.fields.filter { $0.kind != .checkbox }) { field in
@@ -1972,11 +1972,11 @@ private struct NativeAiAssistPanel: View {
                 }
             }
             ForEach(feature.fields.filter { $0.kind == .checkbox }) { field in
-                Toggle(field.label, isOn: $includeHashtags).font(.system(size: 14, weight: .regular)).tint(Color.envAccent)
+                Toggle(field.label, isOn: $includeHashtags).font(.envScaled(size: 14, weight: .regular)).tint(Color.envAccent)
             }
             if feature.requiresConsent {
                 Toggle(feature.consentLabel ?? "I understand my input is sent to an external AI service.", isOn: $consent)
-                    .font(.system(size: 14, weight: .regular)).tint(Color.envAccent)
+                    .font(.envScaled(size: 14, weight: .regular)).tint(Color.envAccent)
             }
             HStack(spacing: 8) {
                 if working {
@@ -1995,13 +1995,13 @@ private struct NativeAiAssistPanel: View {
                 if working || preparing {
                     ProgressView().tint(Color.envAccent)
                     Text(preparing ? "Preparing your file…" : "Working on it. This can take up to a minute.")
-                        .font(.system(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
+                        .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
                 }
             }
             Text("AI-assisted. Nothing is sent until you press the button; then your input goes to an external AI service to produce the result. AI can be wrong, so review it before you use it. Use is limited per person and per day to keep it available for everyone.")
-                .font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-            if !notice.isEmpty { Text(notice).font(.system(size: 13, weight: .regular)).foregroundStyle(.red) }
-            if !error.isEmpty { Text(error).font(.system(size: 13, weight: .regular)).foregroundStyle(.red) }
+                .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+            if !notice.isEmpty { Text(notice).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
+            if !error.isEmpty { Text(error).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
             if let result { resultView(result) }
         }
         .padding(compact ? 16 : 24)
@@ -2020,31 +2020,31 @@ private struct NativeAiAssistPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             switch field.kind {
             case .textarea:
-                Text("\(field.label)\(field.required ? " *" : "")").font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                Text("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 ZStack(alignment: .topLeading) {
-                    if (values[field.name] ?? "").isEmpty, let placeholder = field.placeholder { Text(placeholder).font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envSubtle).padding(.horizontal, 5).padding(.vertical, 8) }
-                    TextEditor(text: binding).font(field.monospace ? .system(size: 14, design: .monospaced) : .system(size: 14, weight: .regular)).frame(minHeight: 104, maxHeight: 180).scrollContentBackground(.hidden)
+                    if (values[field.name] ?? "").isEmpty, let placeholder = field.placeholder { Text(placeholder).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envSubtle).padding(.horizontal, 5).padding(.vertical, 8) }
+                    TextEditor(text: binding).font(field.monospace ? .envScaled(size: 14, design: .monospaced) : .envScaled(size: 14, weight: .regular)).frame(minHeight: 104, maxHeight: 180).scrollContentBackground(.hidden)
                 }
                 .padding(6).background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
             case .text:
-                TextField(field.placeholder ?? "", text: binding).font(field.monospace ? .system(size: 14, design: .monospaced) : .system(size: 14, weight: .regular)).textFieldStyle(.roundedBorder).accessibilityLabel("\(field.label)\(field.required ? " required" : "")")
-                    .overlay(alignment: .topLeading) { if (values[field.name] ?? "").isEmpty { Text("\(field.label)\(field.required ? " *" : "")").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.top, -8) } }
+                TextField(field.placeholder ?? "", text: binding).font(field.monospace ? .envScaled(size: 14, design: .monospaced) : .envScaled(size: 14, weight: .regular)).textFieldStyle(.roundedBorder).accessibilityLabel("\(field.label)\(field.required ? " required" : "")")
+                    .overlay(alignment: .topLeading) { if (values[field.name] ?? "").isEmpty { Text("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.top, -8) } }
                     .keyboardType(field.name == "language" ? .asciiCapable : .default)
             case .number:
-                Text(field.label).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                Text(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 TextField("", text: binding).textFieldStyle(.roundedBorder).keyboardType(.numberPad)
             case .select:
-                Text(field.label).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                Text(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 Picker(field.label, selection: binding) { ForEach(field.options) { option in Text(option.label).tag(option.value) } }
                     .pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 7)
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
             case .image, .audio:
-                Text(field.label + (field.required ? " *" : "")).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                Text(field.label + (field.required ? " *" : "")).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 Button(selectedFile?.name ?? "Choose \(field.kind == .image ? "image" : "audio")") { importing = true }.buttonStyle(.bordered)
-                if let selectedFile { Text("\(selectedFile.name) · \(String(format: "%.1f", Double(selectedFile.data.count) / 1_000_000)) MB ready to send").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if let selectedFile { Text("\(selectedFile.name) · \(String(format: "%.1f", Double(selectedFile.data.count) / 1_000_000)) MB ready to send").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             case .checkbox: EmptyView()
             }
-            if let help = field.help { Text(help).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+            if let help = field.help { Text(help).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
         }
     }
 
@@ -2088,41 +2088,41 @@ private struct NativeAiAssistPanel: View {
                 ForEach(variants.indices, id: \.self) { index in
                     let hashtags = (variants[index]["hashtags"] as? [String] ?? []).map { "#\($0)" }.joined(separator: " ")
                     VStack(alignment: .leading, spacing: 8) {
-                        TextEditor(text: Binding(get: { captionDrafts.indices.contains(index) ? captionDrafts[index] : (variants[index]["caption"] as? String ?? "") }, set: { value in if captionDrafts.indices.contains(index) { captionDrafts[index] = value } })).font(.system(size: 14, weight: .regular)).frame(minHeight: 92).scrollContentBackground(.hidden).padding(4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
-                        if !hashtags.isEmpty { Text(hashtags).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
-                        HStack { Text("\((captionDrafts.indices.contains(index) ? captionDrafts[index] : "").count) characters").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted); Spacer(); Button("Copy") { UIPasteboard.general.string = (captionDrafts.indices.contains(index) ? captionDrafts[index] : "") + (hashtags.isEmpty ? "" : "\n\n\(hashtags)") }.buttonStyle(.bordered) }
+                        TextEditor(text: Binding(get: { captionDrafts.indices.contains(index) ? captionDrafts[index] : (variants[index]["caption"] as? String ?? "") }, set: { value in if captionDrafts.indices.contains(index) { captionDrafts[index] = value } })).font(.envScaled(size: 14, weight: .regular)).frame(minHeight: 92).scrollContentBackground(.hidden).padding(4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                        if !hashtags.isEmpty { Text(hashtags).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                        HStack { Text("\((captionDrafts.indices.contains(index) ? captionDrafts[index] : "").count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted); Spacer(); Button("Copy") { UIPasteboard.general.string = (captionDrafts.indices.contains(index) ? captionDrafts[index] : "") + (hashtags.isEmpty ? "" : "\n\n\(hashtags)") }.buttonStyle(.bordered) }
                     }.padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
                 }
             } else if feature.resultKind == "titles" {
                 ForEach(Array((result["titles"] as? [String] ?? []).enumerated()), id: \.offset) { pair in
                     let title = pair.element
-                    HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { Text(title).font(.system(size: 14, weight: .regular)).foregroundStyle(Color.envInk); Text("\(title.count) characters").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
+                    HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { Text(title).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk); Text("\(title.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
                         .padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
                 }
             } else if feature.resultKind == "regex" {
-                Text(result["summary"] as? String ?? "").font(.system(size: 14, weight: .regular))
+                Text(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Breakdown", entries: (result["parts"] as? [[String:Any]] ?? []).map { "\($0["token"] as? String ?? "") — \($0["meaning"] as? String ?? "")" })
                 NativeAiStructuredSection(title: "Watch out for", entries: result["pitfalls"] as? [String] ?? [])
                 NativeAiStructuredSection(title: "Suggested examples (AI guesses, not verified)", entries: (result["suggestedTests"] as? [[String:Any]] ?? []).map { item in "\((item["input"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "(empty)") — \((item["shouldMatch"] as? Bool ?? false) ? "should match" : "should not match")" })
-                if !(result["suggestedTests"] as? [[String:Any]] ?? []).isEmpty { Text("Try these in the regex tester above before relying on them.").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if !(result["suggestedTests"] as? [[String:Any]] ?? []).isEmpty { Text("Try these in the regex tester above before relying on them.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             } else if feature.resultKind == "sql" {
-                Text(result["summary"] as? String ?? "").font(.system(size: 14, weight: .regular))
+                Text(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Step by step", entries: (result["steps"] as? [[String:Any]] ?? []).enumerated().map { "\($0.offset + 1). \($0.element["clause"] as? String ?? "") — \($0.element["explanation"] as? String ?? "")" })
                 NativeAiStructuredSection(title: "Warnings", entries: result["warnings"] as? [String] ?? [])
                 NativeAiStructuredSection(title: "Performance notes", entries: result["performanceNotes"] as? [String] ?? [])
             } else if feature.resultKind == "json" {
-                Text(result["summary"] as? String ?? "").font(.system(size: 14, weight: .regular))
+                Text(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Structure", entries: (result["structure"] as? [[String:Any]] ?? []).map { item in "\(item["path"] as? String ?? "") · \(item["type"] as? String ?? "")\((item["note"] as? String).flatMap { $0.isEmpty ? nil : $0 }.map { " — \($0)" } ?? "")" })
                 NativeAiStructuredSection(title: "Possible issues", entries: result["issues"] as? [String] ?? [])
             } else if feature.resultKind == "alt-text" {
                 let alt = result["altText"] as? String ?? ""
                 NativeAiStructuredSection(title: "Alt text", entries: [alt])
-                Text("\(alt.count) characters").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                Text("\(alt.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
                 NativeAiStructuredSection(title: "Longer description", entries: [result["longDescription"] as? String ?? ""])
                 if result["containsText"] as? Bool == true { NativeAiStructuredSection(title: "Text found in the image", entries: [result["textInImage"] as? String ?? ""]) }
             } else {
                 let text = NativeAiEngine.format(task: feature.taskID, result: result)
-                TextEditor(text: .constant(text)).font(.system(size: 14, weight: .regular)).frame(minHeight: feature.resultKind == "transcript" ? 160 : 120).textSelection(.enabled).padding(4).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+                TextEditor(text: .constant(text)).font(.envScaled(size: 14, weight: .regular)).frame(minHeight: feature.resultKind == "transcript" ? 160 : 120).textSelection(.enabled).padding(4).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
                 HStack(spacing: 8) {
                     Button("Copy") { UIPasteboard.general.string = text }.buttonStyle(.bordered)
                     if feature.resultKind == "transcript" {
@@ -2133,9 +2133,9 @@ private struct NativeAiAssistPanel: View {
                         }
                     }
                 }
-                if feature.resultKind == "transcript", let language = result["language"] as? String { Text("Detected language: \(language)").font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if feature.resultKind == "transcript", let language = result["language"] as? String { Text("Detected language: \(language)").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             }
-            if !resultWarnings.isEmpty { Text(resultWarnings.joined(separator: " ")).font(.system(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+            if !resultWarnings.isEmpty { Text(resultWarnings.joined(separator: " ")).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
         }
     }
 
@@ -2162,11 +2162,11 @@ private struct NativeAiStructuredSection: View {
     var body: some View {
         if !entries.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(title).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
                 ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                     HStack(alignment: .top, spacing: 8) {
                         Text("• \(entry)")
-                            .font(.system(size: 14, weight: .regular))
+                            .font(.envScaled(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)

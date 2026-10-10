@@ -1,12 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toolIcon } from "@/lib/icons";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
 import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getPopularTools } from "@/lib/registry";
+import { getPopularTools, getToolById, toolPath } from "@/lib/registry";
+import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
+import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -14,6 +17,15 @@ function Home() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const trending = getPopularTools(12);
+  const recent = usePrefs((state) => state.recent);
+  const usageCounts = usePrefs((state) => state.usageCounts);
+  const mostUsedTools = useMemo(
+    () => rankMostUsedToolIds(recent, usageCounts, 5).flatMap((id) => {
+      const tool = getToolById(id);
+      return tool ? [tool] : [];
+    }),
+    [recent, usageCounts],
+  );
 
   function openSearchResults(searchQuery: string) {
     void navigate({ to: "/search", search: { q: searchQuery.trim() } });
@@ -47,8 +59,8 @@ function Home() {
           )}
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
-          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[10px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
-          <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[10px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
+          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
+          <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
         </div>
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for
@@ -57,8 +69,43 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
+      <MostUsedToolsTray tools={mostUsedTools} />
       <ToolSection title="Trending tools" tools={trending} />
     </AppShell>
+  );
+}
+
+function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
+  return (
+    <section
+      aria-label="Your most-used tools"
+      className="mx-auto mt-4 h-[176px] w-[calc(100vw-24px)] max-w-[832px] overflow-hidden rounded-[32px] border border-border bg-surface shadow-[var(--shadow-border)]"
+    >
+      {tools.length ? (
+        <div className="flex h-full snap-x snap-mandatory items-center gap-4 overflow-x-auto px-6">
+          {tools.map((tool) => {
+            const Icon = toolIcon(tool.icon);
+            return (
+              <Link
+                key={tool.id}
+                to={toolPath(tool)}
+                aria-label={`Open ${tool.name}`}
+                className="group flex w-[120px] shrink-0 snap-start flex-col items-center justify-center gap-2 rounded-2xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
+              >
+                <span className="flex size-[72px] items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft">
+                  <Icon className="size-8 text-fg" aria-hidden="true" />
+                </span>
+                <span className="w-full truncate text-sm font-medium text-muted group-hover:text-fg">{tool.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted">
+          Open tools to build your personal shortcuts.
+        </div>
+      )}
+    </section>
   );
 }
 

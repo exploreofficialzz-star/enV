@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 
 const android = readFileSync("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", "utf8");
 const iosContent = readFileSync("apps/ios/enV/ContentViews.swift", "utf8");
+const iosApp = readFileSync("apps/ios/enV/enVApp.swift", "utf8");
 const iosTools = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
 const androidTheme = readFileSync("apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt", "utf8");
 const webStyles = readFileSync("src/styles.css", "utf8");
+const webHome = readFileSync("src/routes/index.tsx", "utf8");
+const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
 const androidInfo = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", "utf8");
 const androidStore = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt", "utf8");
@@ -19,7 +22,7 @@ assert.match(android, /onRelatedTool = \{ detailStack = detailStack \+ it \}/);
 
 // Home search drafts remain local until submit, rather than leaking into Tools/Search.
 assert.match(android, /var homeQuery by rememberSaveable/);
-assert.match(android, /HomeScreen\(catalog, favoriteIds, homeQuery, \{ homeQuery = it \}, \{ submitted -> query = submitted/);
+assert.match(android, /HomeScreen\(catalog, favoriteIds, mostUsedIds, homeQuery, \{ homeQuery = it \}, \{ submitted -> query = submitted/);
 const homeScreen = android.split("private fun HomeScreen(")[1]?.split("@Composable\nprivate fun WebHomeToolCard")[0] ?? "";
 assert.ok(homeScreen.length > 0, "Android HomeScreen source should be present");
 assert.doesNotMatch(homeScreen, /\b(?:var|val)\s+query\s*:/, "Home draft/filter should not declare or consume global Search query state");
@@ -32,12 +35,18 @@ assert.ok((iosContent.match(/frame\(maxWidth: 1152\)/g) ?? []).length >= 3, "iOS
 // Keep the web and each native app on their own platform system sans-serif.
 assert.match(webStyles, /--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif/);
 assert.match(androidTheme, /typography = Typography\(\)/);
+assert.match(androidTheme, /fontScale \* EnVFontScale/);
+assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
+assert.match(webStyles, /--text-base: 1\.1rem/);
+assert.match(webStyles, /font-size: 1\.1rem/);
+assert.match(iosApp, /size \* 1\.1/);
+assert.match(iosApp, /dynamicTypeSize\(dynamicTypeSize\.enVIncreased\)/);
 assert.match(iosContent, /horizontalSizeClass == \.regular \? 36 : 24/);
-assert.match(iosContent, /\.font\(\.system\(size: 30, weight: \.bold\)\)/);
+assert.match(iosContent, /\.font\(\.envScaled\(size: 30, weight: \.bold\)\)/);
 assert.match(iosContent, /LazyVStack\(alignment: \.leading, spacing: 24\)/);
-assert.match(iosTools, /\.font\(\.system\(size: 14, weight: \.semibold\)\)/);
-assert.match(iosTools, /\.font\(\.system\(size: 10, weight: \.medium\)\)/);
-assert.match(iosAssistant, /\.font\(\.system\(size: 14, weight: \.semibold\)\)/);
+assert.match(iosTools, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);
+assert.match(iosTools, /\.font\(\.envScaled\(size: 10, weight: \.medium\)\)/);
+assert.match(iosAssistant, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);
 assert.match(android, /screenWidth >= 640\) 36\.sp else 24\.sp/);
 assert.match(android, /contentPadding = PaddingValues\(horizontal = 16\.dp, vertical = 40\.dp\),\s*verticalArrangement = Arrangement\.spacedBy\(24\.dp\)/);
 assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Bold, color = MaterialTheme\.colorScheme\.primary/);
@@ -84,7 +93,7 @@ assert.match(android, /if \(suggestions\.isEmpty\(\)\) \{[\s\S]*?TextButton\(onC
 assert.match(iosContent, /\.accessibilityLabel\("Search tools"\)/);
 assert.match(iosContent, /\.accessibilityLabel\("Search all tools"\)/);
 assert.match(iosContent, /if searchSuggestions\.isEmpty \{[\s\S]*?Text\("See more results"\)/);
-assert.match(android, /LaunchedEffect\(selected\?\.id\) \{ selected\?\.id\?\.let \{ favorites\.recordRecent\(it\) \} \}/);
+assert.match(android, /LaunchedEffect\(selected\?\.id\)[\s\S]*?favorites\.recordRecent\(it\)[\s\S]*?mostUsedIds = favorites\.getMostUsed\(\)/);
 assert.match(androidStore, /private val recentKey = "recent_tool_ids"/);
 assert.match(androidStore, /fun recordRecent\(toolId: String\): List<String>/);
 assert.match(androidStore, /\.filterNot \{ it == toolId \}.*\.take\(24\)/s);
@@ -92,6 +101,18 @@ assert.match(iosTools, /\.onAppear \{ store\.recordRecent\(tool\.id\) \}/);
 assert.match(iosCatalog, /@Published private\(set\) var recentIDs: \[String\]/);
 assert.match(iosCatalog, /func recordRecent\(_ toolID: String\)/);
 assert.match(iosCatalog, /\.prefix\(24\)/);
+assert.match(androidStore, /private val usageKey = "tool_use_counts"/);
+assert.match(androidStore, /fun getMostUsed\(limit: Int = 8\)/);
+assert.match(android, /favorites\.getMostUsed\(\)/);
+assert.match(androidHome, /MostUsedToolsTray\(mostUsed, onTool/);
+assert.match(androidHome, /RoundedCornerShape\(32\.dp\)/);
+assert.match(iosCatalog, /env\.toolUseCounts/);
+assert.match(iosCatalog, /var mostUsedIDs: \[String\]/);
+assert.match(iosContent, /HomeMostUsedToolsTray\(tools: mostUsedTools\)/);
+assert.match(iosContent, /cornerRadius: 32/);
+assert.match(webStore, /env:tool-use-counts/);
+assert.match(webStore, /rankMostUsedToolIds/);
+assert.match(webHome, /Your most-used tools/);
 assert.match(androidCatalog, /val browserActiveToolCount: Int[\s\S]*?relatedReferenceTools\)\.count \{ it\.status == "active" \|\| it\.status == "beta" \}/);
 assert.match(iosCatalog, /var browserActiveToolCount: Int[\s\S]*?\(tools \+ \(relatedReferenceTools \?\? \[\]\)\)\.filter \{ \$0\.status == "active" \|\| \$0\.status == "beta" \}\.count/);
 assert.match(android, /\$\{catalog\.browserActiveToolCount\} browser tools/);
@@ -120,4 +141,4 @@ assert.match(iosContent, /\.focused\(\$isToolsSearchFocused\)/);
 assert.match(iosContent, /private var searchSuggestions: \[Tool\][\s\S]*?ForEach\(searchSuggestions\)[\s\S]*?See more results/);
 assert.doesNotMatch(`${android}\n${iosContent}\n${iosTools}`, /WebView|WKWebView/);
 
-console.log("PASS: native navigation, full-catalog discovery, search interaction, width-cap, and typography parity guards");
+console.log("PASS: native navigation, personal-use shortcuts, full-catalog discovery, width-cap, and typography parity guards");

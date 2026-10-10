@@ -44,6 +44,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -226,12 +227,18 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var informationReturnTab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var overflowExpanded by rememberSaveable { mutableStateOf(false) }
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
+    var mostUsedIds by remember { mutableStateOf(favorites.getMostUsed()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
     val selected = detailStack.lastOrNull()?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
     LaunchedEffect(tab, selected?.id, showInformation, showExchange) {
         if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
     }
-    LaunchedEffect(selected?.id) { selected?.id?.let { favorites.recordRecent(it) } }
+    LaunchedEffect(selected?.id) {
+        selected?.id?.let {
+            favorites.recordRecent(it)
+            mostUsedIds = favorites.getMostUsed()
+        }
+    }
     if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
@@ -288,7 +295,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     )
                 } else {
                     when (currentTab) {
-                        AppTab.Home -> HomeScreen(catalog, favoriteIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
+                        AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
                         AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) }, assistantDraft, { assistantDraft = it })
                         AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name })
                         AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
@@ -313,7 +320,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
+private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: List<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val trending = remember(catalog, screenWidth) {
@@ -321,6 +328,10 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
             .sortedByDescending { it.popularity }
             .take(12)
             .take(if (screenWidth >= 768) 12 else 6)
+    }
+    val mostUsed = remember(catalog, mostUsedIds) {
+        val byId = (catalog.tools + catalog.relatedReferenceTools).associateBy { it.id }
+        mostUsedIds.mapNotNull { byId[it] }.take(5)
     }
     val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
     var homeSearchFocused by remember { mutableStateOf(false) }
@@ -379,6 +390,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
                         HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640)
                     }
                 }
+                MostUsedToolsTray(mostUsed, onTool, Modifier.fillMaxWidth())
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
@@ -400,6 +412,58 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, homeQuery: Stri
             }
         }
         item { WebHomeFooter(catalog, onTools, onInformation, screenWidth) }
+    }
+}
+
+@Composable
+private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(32.dp)
+    Surface(
+        modifier = modifier.height(176.dp),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 1.dp,
+    ) {
+        if (tools.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    "Open tools to build your personal shortcuts.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+        } else {
+            LazyRow(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(tools, key = { it.id }) { tool ->
+                    Column(
+                        modifier = Modifier.width(120.dp).clickable { onTool(tool.id) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Surface(Modifier.size(72.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Box(contentAlignment = Alignment.Center) {
+                                EnVIcon(tool.icon, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                        Text(
+                            tool.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -72,7 +72,7 @@ export function CodeResult({
           Download
         </Button>
       </div>
-      <pre className="max-h-[28rem] overflow-auto rounded-lg bg-ink px-4 py-3 font-mono text-[13px] leading-6 text-bg whitespace-pre-wrap">
+      <pre className="max-h-[28rem] overflow-auto rounded-lg bg-ink px-4 py-3 font-mono text-[14.3px] leading-6 text-bg whitespace-pre-wrap">
         {code}
       </pre>
     </div>

@@ -1,6 +1,31 @@
 import SwiftUI
 import UIKit
 
+extension Font {
+    static func envScaled(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
+        .system(size: size * 1.1, weight: weight, design: design)
+    }
+}
+
+private extension DynamicTypeSize {
+    var enVIncreased: DynamicTypeSize {
+        switch self {
+        case .xSmall: return .small
+        case .small: return .medium
+        case .medium: return .large
+        case .large: return .xLarge
+        case .xLarge: return .xxLarge
+        case .xxLarge: return .xxxLarge
+        case .xxxLarge: return .accessibility1
+        case .accessibility1: return .accessibility2
+        case .accessibility2: return .accessibility3
+        case .accessibility3: return .accessibility4
+        case .accessibility4, .accessibility5: return .accessibility5
+        @unknown default: return self
+        }
+    }
+}
+
 @main
 struct enVApp: App {
     @StateObject private var store = CatalogStore()
@@ -61,6 +86,7 @@ final class NativeInformationRouter: ObservableObject {
 
 struct RootTabView: View {
     @EnvironmentObject private var store: CatalogStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var informationRouter = NativeInformationRouter()
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.themeMode") private var themeMode = "system"
@@ -95,6 +121,7 @@ struct RootTabView: View {
         .fullScreenCover(item: $informationRouter.route) { route in
             NativeInformationPageView(pageID: route.pageID)
         }
+        .dynamicTypeSize(dynamicTypeSize.enVIncreased)
         .overlay {
             if store.loadState == .loading {
                 NativeLaunchView()
@@ -185,7 +212,7 @@ struct EnVLogo: View {
             if let image = EnVNativeImages.logo(dark: colorScheme == .dark, homeHero: homeHero) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
-                Text("enV").font(.system(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
+                Text("enV").font(.envScaled(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
             }
         }
         .accessibilityHidden(true)

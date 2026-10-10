@@ -21,7 +21,7 @@ function Privacy() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Information stored on your device</h2>
-        <p>Depending on the platform and features you use, enV stores preferences such as theme, saved tools, and recently opened tools on your device. The Web version uses browser storage for these preferences. The Web Contact Exchange tool also stores the contact-card fields and selected sharing fields you enter in that browser. This information remains until you clear the relevant browser or app data.</p>
+        <p>Depending on the platform and features you use, enV stores preferences such as theme, saved tools, recently opened tools, and per-tool usage counts for personal shortcuts on your device. The Web version uses browser storage for these preferences. The Web Contact Exchange tool also stores the contact-card fields and selected sharing fields you enter in that browser. This information remains until you clear the relevant browser or app data.</p>
         <p>Native Contact Exchange does not upload a profile to an enV account. When you deliberately activate Exchange, the fields shown in that feature are sent to nearby participating devices. Saving a received contact to your address book requires your separate action and the platform’s Contacts permission.</p>
       </section>
 

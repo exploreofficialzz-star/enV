@@ -6,6 +6,21 @@
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 
+  /* A modest 10% app-wide text increase; layout spacing remains unchanged. */
+  --text-xs: 0.825rem;
+  --text-sm: 0.9625rem;
+  --text-base: 1.1rem;
+  --text-lg: 1.2375rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.65rem;
+  --text-3xl: 2.0625rem;
+  --text-4xl: 2.475rem;
+  --text-5xl: 3.3rem;
+  --text-6xl: 4.125rem;
+  --text-7xl: 4.95rem;
+  --text-8xl: 6.6rem;
+  --text-9xl: 8.8rem;
+
   --color-bg: #f7f6f3;
   --color-fg: #16181d;
   --color-muted: #5c636c;
@@ -76,6 +91,7 @@
 
   body {
     font-family: var(--font-sans);
+    font-size: 1.1rem;
     line-height: 1.5;
   }
 
