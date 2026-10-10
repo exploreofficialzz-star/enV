@@ -58,7 +58,7 @@ function Inspector({ item, initialGroup }: { item: Item; initialGroup: string })
         <Section key={g} title={g} badge={<span className="text-xs font-normal text-muted">{r.entries.filter((e) => e.group === g).length}</span>}>
           <dl className="divide-y divide-border text-sm">
             {r.entries.filter((e) => e.group === g).map((e, i) => (
-              <div key={`${e.label}-${i}`} className="flex flex-wrap items-center justify-between gap-2 py-2"><dt className="text-muted">{e.label}</dt><dd className="flex items-center gap-2"><span className="break-all font-medium tabular-nums text-fg">{e.value}</span><span className={`rounded-full px-2 py-0.5 text-[11.6px] font-medium ${SENS[e.sensitivity].cls}`}>{SENS[e.sensitivity].label}</span></dd></div>
+              <div key={`${e.label}-${i}`} className="flex flex-wrap items-center justify-between gap-2 py-2"><dt className="text-muted">{e.label}</dt><dd className="flex items-center gap-2"><span className="break-all font-medium tabular-nums text-fg">{e.value}</span><span className={`rounded-full px-2 py-0.5 text-[12.8px] font-medium ${SENS[e.sensitivity].cls}`}>{SENS[e.sensitivity].label}</span></dd></div>
             ))}
           </dl>
         </Section>

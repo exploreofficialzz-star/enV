@@ -3,7 +3,7 @@ import type { ToolMeta } from "@/types/tool";
 
 export function ComingSoonBadge() {
   return (
-    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[11.6px] font-semibold uppercase tracking-[0.12em] text-subtle shadow-[var(--shadow-border)]">
+    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-[12.8px] font-semibold uppercase tracking-[0.12em] text-subtle shadow-[var(--shadow-border)]">
       <Clock3 className="size-3" />
       Coming soon
     </span>

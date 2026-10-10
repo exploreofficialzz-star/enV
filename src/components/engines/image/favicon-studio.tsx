@@ -28,7 +28,7 @@ const png = async (c: HTMLCanvasElement) => { const b = await canvasToBlob(c, "i
 function Preview({ canvases }: { canvases: { size: number; c: HTMLCanvasElement }[] }) {
   return (
     <div className="flex flex-wrap items-end gap-4 rounded-lg bg-surface-2 p-3 shadow-[var(--shadow-border)]">
-      {canvases.filter((x) => x.size <= 64).map((x) => <figure key={x.size} className="space-y-1 text-center"><Thumb c={x.c} bg="#ffffff" /><Thumb c={x.c} bg="#1f2328" /><figcaption className="text-[12.7px] tabular-nums text-muted">{x.size}px</figcaption></figure>)}
+      {canvases.filter((x) => x.size <= 64).map((x) => <figure key={x.size} className="space-y-1 text-center"><Thumb c={x.c} bg="#ffffff" /><Thumb c={x.c} bg="#1f2328" /><figcaption className="text-[14px] tabular-nums text-muted">{x.size}px</figcaption></figure>)}
     </div>
   );
 }
@@ -82,8 +82,8 @@ function Workspace({ source, toolId, icoOnly }: { source: SourceImage; toolId: s
           <ColorField label="Icon background" value={v.iconBg} onChange={(iconBg) => st.set({ iconBg }, "ibg")} allowTransparent />
         </Section>
         <Section title={icoOnly ? "ICO sizes" : "Sizes"}>
-          <div className="space-y-1.5"><span className="text-[15px] font-medium text-fg">ICO file contains</span><Chips active="" items={ICO_ALL.map((n) => ({ id: String(n), label: `${v.icoSizes.includes(n) ? "✓ " : ""}${n}` }))} onPick={(id) => toggleSize("icoSizes", Number(id))} /></div>
-          {!icoOnly ? <div className="space-y-1.5"><span className="text-[15px] font-medium text-fg">PNG files</span><Chips active="" items={PNG_ALL.map((n) => ({ id: String(n), label: `${v.pngSizes.includes(n) ? "✓ " : ""}${n}${n === 180 ? " (Apple)" : n === 192 || n === 512 ? " (Android)" : ""}` }))} onPick={(id) => toggleSize("pngSizes", Number(id))} /></div> : null}
+          <div className="space-y-1.5"><span className="text-[16.5px] font-medium text-fg">ICO file contains</span><Chips active="" items={ICO_ALL.map((n) => ({ id: String(n), label: `${v.icoSizes.includes(n) ? "✓ " : ""}${n}` }))} onPick={(id) => toggleSize("icoSizes", Number(id))} /></div>
+          {!icoOnly ? <div className="space-y-1.5"><span className="text-[16.5px] font-medium text-fg">PNG files</span><Chips active="" items={PNG_ALL.map((n) => ({ id: String(n), label: `${v.pngSizes.includes(n) ? "✓ " : ""}${n}${n === 180 ? " (Apple)" : n === 192 || n === 512 ? " (Android)" : ""}` }))} onPick={(id) => toggleSize("pngSizes", Number(id))} /></div> : null}
           <Toggle label="Sizes up to 256 are stored as PNG inside the ICO" checked onChange={() => undefined} hint="Supported by every current browser and Windows Vista or later." />
         </Section>
         <div className="flex flex-wrap gap-2"><Btn variant="default" onClick={() => void downloadIco()} disabled={busy}>{busy ? "Working…" : "Download .ico"}</Btn>{!icoOnly ? <Btn onClick={() => void downloadZip()} disabled={busy}>Download full package (ZIP)</Btn> : null}</div>
