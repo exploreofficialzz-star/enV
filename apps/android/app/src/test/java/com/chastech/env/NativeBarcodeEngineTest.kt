@@ -18,4 +18,9 @@ class NativeBarcodeEngineTest {
         assertFalse(NativeBackendEngine.supports(tool("gtin-validator")))
         assertFalse(NativeBackendEngine.supports(tool("unix-timestamp-converter", type = "datetime", category = "developer")))
     }
+
+    @Test fun qrAndCode128GenerateBitmapsOffline() {
+        assertTrue(NativeBarcodeEngine.generate("qr-generator", "https://en-v.vercel.app").width > 0)
+        assertTrue(NativeBarcodeEngine.generate("code128-barcode", "ENV-12345").height > 0)
+    }
 }

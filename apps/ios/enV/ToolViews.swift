@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreImage
 import UniformTypeIdentifiers
 
 struct ToolCard: View {
@@ -264,7 +265,7 @@ enum NativeCoverage {
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
         case "color": return NativeColorEngine.operation(forToolID: tool.id) != nil
         case "datetime": return NativeDateTimeEngine.operation(forToolID: tool.id) != nil
-        case "barcode": return NativeBarcodeEngine.supports(tool)
+        case "barcode", "qr": return NativeBarcodeEngine.supports(tool)
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
@@ -295,7 +296,7 @@ struct NativeFamilyToolView: View {
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "barcode": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "barcode", "qr": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1131,10 +1132,24 @@ enum NativeBackendEngine {
 }
 
 enum NativeBarcodeEngine {
-    private static let ids: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator"]
-    static func supports(_ tool: Tool) -> Bool { ids.contains(tool.id) && tool.engine.type == "barcode" }
+    private static let validatorIDs: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator"]
+    private static let generatedIDs: Set<String> = ["qr-generator", "text-qr-generator", "url-qr-generator", "code128-barcode"]
+    static func supports(_ tool: Tool) -> Bool { (validatorIDs.contains(tool.id) || generatedIDs.contains(tool.id)) && (tool.engine.type == "barcode" || tool.engine.type == "qr") }
+    static func generatesImage(_ toolID: String) -> Bool { generatedIDs.contains(toolID) }
+    static func generate(toolID: String, input: String) throws -> UIImage {
+        guard generatesImage(toolID), !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NativeNativeError.message("Enter a value to encode.") }
+        let filterName = toolID == "code128-barcode" ? "CICode128BarcodeGenerator" : "CIQRCodeGenerator"
+        guard let filter = CIFilter(name: filterName) else { throw NativeNativeError.message("This image generator is unavailable on this iOS version.") }
+        filter.setValue(Data(input.utf8), forKey: "inputMessage")
+        if filterName == "CIQRCodeGenerator" { filter.setValue("M", forKey: "inputCorrectionLevel") }
+        guard let output = filter.outputImage else { throw NativeNativeError.message("The value could not be encoded.") }
+        let scale: CGFloat = toolID == "code128-barcode" ? 3 : 12
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let cg = CIContext().createCGImage(scaled, from: scaled.extent) else { throw NativeNativeError.message("Could not render the generated code.") }
+        return UIImage(cgImage: cg)
+    }
     static func run(toolID: String, input: String) throws -> String {
-        guard ids.contains(toolID) else { throw NativeNativeError.message("Unknown barcode operation.") }
+        guard validatorIDs.contains(toolID) else { throw NativeNativeError.message("Unknown barcode validation operation.") }
         let digits = input.filter(\.isNumber)
         if toolID == "gtin-validator" {
             guard [8, 12, 13, 14].contains(digits.count) else { throw NativeNativeError.message("GTIN must contain 8, 12, 13 or 14 digits.") }
@@ -1157,11 +1172,19 @@ private struct NativeBarcodeToolView: View {
     @State private var value = ""
     @State private var output = ""
     @State private var error: String?
+    @State private var image: UIImage?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             NativeInputField(title: "Value", text: $value)
-            NativeActionRow(output: output, run: { do { output = try NativeBarcodeEngine.run(toolID: tool.id, input: value); error = nil } catch let caughtError { output = ""; error = caughtError.localizedDescription } }, reset: { value = ""; output = ""; error = nil })
+            NativeActionRow(output: output, run: {
+                do {
+                    if NativeBarcodeEngine.generatesImage(tool.id) { image = try NativeBarcodeEngine.generate(toolID: tool.id, input: value); output = "Generated locally on this device." }
+                    else { output = try NativeBarcodeEngine.run(toolID: tool.id, input: value); image = nil }
+                    error = nil
+                } catch let caughtError { output = ""; image = nil; error = caughtError.localizedDescription }
+            }, reset: { value = ""; output = ""; image = nil; error = nil })
             NativeOutputView(output: output, error: error)
+            if let image { Image(uiImage: image).resizable().interpolation(.none).scaledToFit().frame(maxHeight: 280).background(Color.white).clipShape(RoundedRectangle(cornerRadius: 8)) }
         }
         .onAppear { if tool.id == "gtin-validator" && value.isEmpty { value = "ENV-12345" } }
     }

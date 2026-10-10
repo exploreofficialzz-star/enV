@@ -7,16 +7,15 @@
   "families": {
     "barcode": {
       "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "validated-check-digit-operations"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "validated-check-digit-operations"},
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "check-digit-validation-and-common-linear-barcode-generation"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "check-digit-validation-and-code128-generation"},
       "remoteFallback": false
     },
     "qr": {
       "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "unsupported", "next": "CameraX + bundled ML Kit scanner and native encoder"},
-      "ios": {"mode": "unsupported", "next": "Vision/Core Image scanner and generator"},
-      "remoteFallback": true,
-      "consent": "required"
+      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "text-url-QR-generation; scanning and specialized payload forms remain unsupported"},
+      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "text-url-QR-generation; scanning and specialized payload forms remain unsupported"},
+      "remoteFallback": false
     },
     "image": {
       "web": {"mode": "local", "implementation": "src/lib/image/"},

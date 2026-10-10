@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Image
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -83,6 +84,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -726,7 +728,7 @@ private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntim
     "codec" -> NativeCodecEngine.operationForTool(tool.id) != null
     "color" -> NativeColorEngine.operationForTool(tool.id) != null
     "datetime" -> NativeDateTimeEngine.operationForTool(tool.id) != null
-    "barcode" -> NativeBarcodeEngine.supports(tool)
+    "barcode", "qr" -> NativeBarcodeEngine.supports(tool)
     "mime" -> NativeMimeEngine.operationForTool(tool.id) != null
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
@@ -885,7 +887,7 @@ private fun NativeToolForm(tool: ToolRecord) {
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
-        "barcode" -> NativeBarcodeToolForm(tool.id)
+        "barcode", "qr" -> NativeBarcodeToolForm(tool.id)
         "mime" -> NativeMimeToolForm(tool.id)
         "converter" -> NativeConverterToolForm(tool)
         "calculator" -> when {
@@ -919,11 +921,16 @@ private fun NativeBarcodeToolForm(toolId: String) {
     var value by rememberSaveable(toolId) { mutableStateOf(if (toolId == "gtin-validator") "ENV-12345" else "") }
     var output by rememberSaveable(toolId) { mutableStateOf("") }
     var error by rememberSaveable(toolId) { mutableStateOf("") }
+    var image by remember(toolId) { mutableStateOf<android.graphics.Bitmap?>(null) }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         InputField(value, { value = it }, "Value", singleLine = true)
-        ActionRow(onRun = { runCatching { NativeBarcodeEngine.run(toolId, value) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to validate barcode" }) }, onReset = { value = if (toolId == "gtin-validator") "ENV-12345" else ""; output = ""; error = "" })
+        ActionRow(onRun = {
+            if (NativeBarcodeEngine.generatesImage(toolId)) runCatching { NativeBarcodeEngine.generate(toolId, value) }.fold({ image = it; output = "Generated locally on this device."; error = "" }, { image = null; output = ""; error = it.message ?: "Unable to generate barcode" })
+            else runCatching { NativeBarcodeEngine.run(toolId, value) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to validate barcode" })
+        }, onReset = { value = if (toolId == "gtin-validator") "ENV-12345" else ""; output = ""; error = ""; image = null })
         ResultBox(output, error, ::copy)
+        image?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "Generated barcode", modifier = Modifier.fillMaxWidth().height(240.dp)) }
     }
 }
 
