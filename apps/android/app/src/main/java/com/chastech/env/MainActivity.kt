@@ -250,7 +250,6 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     else if (showExchange) BackHandler { showExchange = false }
     else if (tab == AppTab.Assistant.name) BackHandler { tab = AppTab.Home.name }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
-    val screenWidth = LocalConfiguration.current.screenWidthDp
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -262,10 +261,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     }
                 },
                 actions = {
-                    if (screenWidth >= 640 || tab != AppTab.Tools.name || selected != null || category != null) {
-                        IconButton(onClick = { tab = AppTab.Saved.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
-                            EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                    IconButton(onClick = { tab = AppTab.Saved.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
+                        EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
                         EnVIcon("LayoutGrid", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -305,7 +302,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     when (currentTab) {
                         AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
                         AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) }, assistantDraft, { assistantDraft = it })
-                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name }, { tab = AppTab.Saved.name })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name })
                         AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
@@ -617,7 +614,7 @@ private fun FooterLinkGroup(
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit, onSaved: () -> Unit) {
+private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit) {
     if (category != null) {
         CategoryScreen(catalog, category, { onCategory(null) }, onTool)
         return
@@ -637,30 +634,21 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (screenWidth < 640) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
-                        IconButton(onClick = onSaved, modifier = Modifier.size(40.dp).semantics { contentDescription = "Saved tools" }) {
-                            EnVIcon("Heart", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
+                    WebToolsSearchField(
+                        catalog = catalog,
+                        query = query,
+                        onQuery = onQuery,
+                        modifier = Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp),
+                        onTool = onTool,
+                        onSubmit = {
+                            val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
+                            if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
+                        },
+                        onSeeMore = onSearch,
+                    )
                 }
-                WebToolsSearchField(
-                    catalog = catalog,
-                    query = query,
-                    onQuery = onQuery,
-                    modifier = if (screenWidth < 640) Modifier.fillMaxWidth() else Modifier.width(288.dp),
-                    onTool = onTool,
-                    onSubmit = {
-                        val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
-                        if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
-                    },
-                    onSeeMore = onSearch,
-                )
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -954,16 +942,13 @@ private fun ToolDetail(
                 Text(tool.name, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurface)
             }
             Spacer(Modifier.height(24.dp))
-            if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NativeToolHeader(tool, compact)
-                    NativeToolSaveButton(isFavorite, onToggleFavorite)
-                }
-            } else {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NativeToolHeader(tool, compact, Modifier.weight(1f))
-                    NativeToolSaveButton(isFavorite, onToggleFavorite)
-                }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 16.dp),
+            ) {
+                NativeToolHeader(tool, compact, Modifier.weight(1f))
+                NativeToolSaveButton(isFavorite, onToggleFavorite)
             }
             tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))

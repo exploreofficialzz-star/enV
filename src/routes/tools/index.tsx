@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronDown, Heart } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
@@ -35,12 +35,9 @@ function Tools() {
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 sm:flex sm:gap-4">
-          <h1 className="min-w-0 text-2xl font-semibold sm:shrink-0 sm:text-3xl">All tools</h1>
-          <Link to="/favorites" aria-label="Saved tools" title="Saved tools" className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:hidden">
-            <Heart className="size-6" strokeWidth={2.4} aria-hidden="true" />
-          </Link>
-          <div className="col-span-2 min-w-0 w-full sm:ml-auto sm:w-[52vw] sm:max-w-[18rem]">
+        <div className="flex items-center gap-4">
+          <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
+          <div className="ml-auto min-w-0 w-[52vw] shrink-0 max-w-[18rem]">
             <SearchBox value={query} onValueChange={(value) => { setVisibleByCategory({}); void navigate({ to: "/tools", search: { q: value }, replace: true }); }} />
           </div>
         </div>

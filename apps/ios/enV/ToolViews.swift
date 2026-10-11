@@ -111,16 +111,9 @@ struct ToolDetailView: View {
                 .buttonStyle(.plain)
                 .padding(.bottom, 24)
 
-                if compact {
-                    VStack(alignment: .leading, spacing: 16) {
-                        toolHeading
-                        saveButton
-                    }
-                } else {
-                    HStack(alignment: .top, spacing: 16) {
-                        toolHeading.frame(maxWidth: .infinity, alignment: .leading)
-                        saveButton
-                    }
+                HStack(alignment: .top, spacing: compact ? 8 : 16) {
+                    toolHeading.frame(maxWidth: .infinity, alignment: .leading)
+                    saveButton
                 }
 
                 if let notice = tool.nativeDisclaimerText {

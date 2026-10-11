@@ -71,9 +71,8 @@ test("browser chrome metadata follows the active light or dark theme", () => {
 
 test("All Tools groups results by category and progressively expands without global filters or counts", () => {
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
-  assert.match(tools, /grid grid-cols-\[minmax\(0,1fr\)_auto\].*sm:flex/s);
-  assert.match(tools, /to="\/favorites" aria-label="Saved tools"[\s\S]*?sm:hidden/);
-  assert.match(tools, /col-span-2 min-w-0 w-full sm:ml-auto sm:w-\[52vw\]/);
+  assert.match(tools, /flex items-center gap-4/);
+  assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
   assert.match(tools, /validateSearch: \(search: Record<string, unknown>\).*q:/s);
   assert.match(tools, /const \{ q \} = Route\.useSearch\(\)/);
@@ -86,6 +85,13 @@ test("All Tools groups results by category and progressively expands without glo
   assert.match(tools, /flex justify-end/);
   assert.match(tools, /text-accent/);
   assert.doesNotMatch(tools, /Tool availability filter|Coming Soon \(|PAGE_SIZE|Showing \d+–|Page \{safePage\}/);
+});
+
+test("tool detail Save action stays in the title row on compact screens", () => {
+  const shell = readFileSync(join(PROJECT_ROOT, "src/components/tools/tool-shell.tsx"), "utf8");
+  assert.match(shell, /<header className="mt-6 flex items-start justify-between gap-3">/);
+  assert.match(shell, /className="flex min-w-0 flex-1 gap-3"/);
+  assert.match(shell, /className="shrink-0"/);
 });
 
 test("tool and category cards use theme-aware icon strokes and directional click affordances", () => {

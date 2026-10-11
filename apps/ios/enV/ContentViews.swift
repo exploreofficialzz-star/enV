@@ -425,7 +425,6 @@ struct ToolsView: View {
     @EnvironmentObject private var store: CatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
-    @AppStorage("env.selectedTab") private var selectedTab = NativeTab.tools.rawValue
     @Binding var toolsQuery: String
     let onSearchNoMatch: () -> Void
     @State private var visibleByCategory: [String: Int] = [:]
@@ -436,43 +435,7 @@ struct ToolsView: View {
     // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
     private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery, includeRelatedReferences: true) }
     private var searchSuggestions: [Tool] { toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(toolsQuery, limit: 8, includeRelatedReferences: true) }
-    private var searchFieldWidth: CGFloat { horizontalSizeClass == .regular ? 288 : max(160, UIScreen.main.bounds.width - 32) }
-    private var toolsHeading: some View {
-        enVCharacterSpacedText("All tools")
-            .font(.envScaled(size: 24, weight: .semibold))
-            .tracking(-0.4)
-            .foregroundStyle(Color.envInk)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-    }
-    private var toolsSearchField: some View {
-        HStack(spacing: 10) {
-            EnVIcon(name: "Search", size: 20, tint: .envMuted)
-            TextField("Search tools", text: $toolsQuery)
-                .font(.envScaled(size: 14, weight: .regular))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .accessibilityLabel("Search tools")
-                .focused($isToolsSearchFocused)
-                .submitLabel(.search)
-                .onSubmit {
-                    guard !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = matchingTools.first else {
-                        isToolsSearchFocused = false
-                        onSearchNoMatch()
-                        return
-                    }
-                    searchNavigationTool = first
-                    isToolsSearchFocused = false
-                    showSearchNavigation = true
-                }
-                .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 44)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
-        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
-    }
+    private var searchFieldWidth: CGFloat { horizontalSizeClass == .regular ? 288 : min(288, max(160, UIScreen.main.bounds.width * 0.52)) }
     private var categoryGroups: [ToolCategoryGroup] {
         let toolsByCategory = Dictionary(grouping: matchingTools, by: \.category)
         return store.categories.compactMap { category in
@@ -486,24 +449,40 @@ struct ToolsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .leading, spacing: 8) {
-                        if horizontalSizeClass == .regular {
-                            HStack(spacing: 16) {
-                                toolsHeading
-                                Spacer(minLength: 4)
-                                toolsSearchField.frame(width: 288)
+                        HStack(spacing: 16) {
+                            enVCharacterSpacedText("All tools")
+                                .font(.envScaled(size: 24, weight: .semibold))
+                                .tracking(-0.4)
+                                .foregroundStyle(Color.envInk)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                            Spacer(minLength: 4)
+                            HStack(spacing: 10) {
+                                EnVIcon(name: "Search", size: 20, tint: .envMuted)
+                                TextField("Search tools", text: $toolsQuery)
+                                    .font(.envScaled(size: 14, weight: .regular))
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .accessibilityLabel("Search tools")
+                                    .focused($isToolsSearchFocused)
+                                    .submitLabel(.search)
+                                    .onSubmit {
+                                        guard !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = matchingTools.first else {
+                                            isToolsSearchFocused = false
+                                            onSearchNoMatch()
+                                            return
+                                        }
+                                        searchNavigationTool = first
+                                        isToolsSearchFocused = false
+                                        showSearchNavigation = true
+                                    }
+                                    .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
-                        } else {
-                            HStack(spacing: 16) {
-                                toolsHeading
-                                Spacer(minLength: 4)
-                                Button { selectedTab = NativeTab.saved.rawValue } label: {
-                                    EnVIcon(name: "Heart", size: 22, tint: .envMuted)
-                                        .frame(width: 40, height: 40)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Saved tools")
-                            }
-                            toolsSearchField.frame(maxWidth: .infinity)
+                            .padding(.horizontal, 16)
+                            .frame(width: searchFieldWidth, height: 44)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 22))
+                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         }
                         if isToolsSearchFocused && !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             HStack {

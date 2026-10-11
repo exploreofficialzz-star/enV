@@ -53,9 +53,9 @@ export function ToolShell({
         <span className="text-fg">{tool.name}</span>
       </nav>
 
-      <header className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-3">
-          <span className="inline-flex size-11 items-center justify-center rounded-lg bg-accent-soft text-accent">
+      <header className="mt-6 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
             <Icon className="size-5" />
           </span>
           <div>
@@ -66,6 +66,7 @@ export function ToolShell({
         <Button
           type="button"
           variant={saved ? "default" : "outline"}
+          className="shrink-0"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
