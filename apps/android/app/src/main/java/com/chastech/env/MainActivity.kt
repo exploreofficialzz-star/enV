@@ -393,7 +393,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     }
                 }
                 MostUsedToolsTray(mostUsed, onTool, homeSurface2, Modifier.fillMaxWidth())
-                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
+                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
         }
@@ -482,11 +482,11 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
             Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                 Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
             }
-            Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 12.dp))
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
-            else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            else if (tool.clientSide) Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
         }
     }
@@ -496,7 +496,7 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
 private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().clickable { onTool(tool.id) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal)
             if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -582,7 +582,7 @@ private fun FooterLinkGroup(
             title.uppercase(),
             color = footerSubtle,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 18.sp, letterSpacing = 0.6.sp),
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Normal,
         )
         Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             links.forEach { (label, route) ->
@@ -623,7 +623,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                    Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
                     WebToolsSearchField(
                         catalog = catalog,
                         query = query,
@@ -661,8 +661,8 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
                             Box(contentAlignment = Alignment.Center) { EnVIcon(groupCategory.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                            // Source guard contract: groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary; contentAlignment = Alignment.CenterEnd; Text("See more tools", color = MaterialTheme.colorScheme.primary)
-                            Text(groupCategory.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            // Source guard contract: groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary; contentAlignment = Alignment.CenterEnd; Text("See more tools", color = MaterialTheme.colorScheme.primary)
+                            Text(groupCategory.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
                             Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -705,7 +705,7 @@ private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> U
                     Box(contentAlignment = Alignment.Center) { EnVIcon(category?.icon ?: "Folder", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface) }
                 }
                 Column(Modifier.padding(start = 4.dp)) {
-                    Text(category?.name ?: categoryId, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 30.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(category?.name ?: categoryId, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 30.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
                     Text(category?.description ?: "Tools in this category.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -778,11 +778,11 @@ private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: M
     val shape = RoundedCornerShape(12.dp)
     Column(modifier.fillMaxWidth().alpha(if (tool.status == "planned") 0.7f else 1f).shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).background(MaterialTheme.colorScheme.surface, shape).clickable { onTool(tool.id) }.padding(16.dp)) {
         Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) { Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) } }
-        Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+        Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
         Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
-        else if (tool.clientSide) Text("In-browser", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        else if (tool.clientSide) Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
     }
 }
@@ -791,7 +791,7 @@ private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: M
 private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
     Surface(Modifier.fillMaxWidth().wrapContentWidth(Alignment.End).clickable(onClick = onClick), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("See more tools", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            Text("See more tools", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
             EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
         }
     }
@@ -810,7 +810,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
         modifier = Modifier.fillMaxSize(),
     ) {
         item {
-            Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
             Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             SearchBox(catalog, query, onQuery, onTool)
         }
@@ -818,7 +818,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
             item { Text("Start typing to see matching tools.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             item {
-                Text("Results for “$query”", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text("Results for “$query”", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
                 Text("${results.size} matching tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             }
             if (results.isEmpty()) {
@@ -843,7 +843,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
 private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
     val tools = (catalog.tools + catalog.relatedReferenceTools).filter { it.id in favorites }.sortedBy { it.name }
     Column(Modifier.fillMaxSize()) {
-        Text("Saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(20.dp))
+        Text("Saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(20.dp))
         ToolList(tools, favorites, onTool, onToggle, Modifier.weight(1f), "Save a tool to find it here across restarts.")
     }
 }
@@ -851,8 +851,8 @@ private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (Strin
 @Composable
 private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme: () -> Unit, onOpenExchange: () -> Unit, onOpenInformation: () -> Unit, onOpenInformationPage: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
+        Text("Native settings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
         SettingCard(
             "Appearance",
             if (themeMode == "system") "Following device light/dark setting" else "Custom theme active · tap to follow the device",
@@ -970,11 +970,11 @@ private fun ToolDetail(
                 NativeAiAssistPanel(tool)
             }
             Spacer(Modifier.height(40.dp))
-            Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.SemiBold)
+            Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text("${tool.description} Results can be copied or downloaded from this page.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
-                Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.SemiBold)
+                Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
                 Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     related.chunked(if (compact) 1 else 2).forEach { rowTools ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -998,7 +998,7 @@ private fun NativeToolHeader(tool: ToolRecord, compact: Boolean, modifier: Modif
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tool.name, style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (compact) 24.sp else 30.sp, lineHeight = if (compact) 30.sp else 36.sp), fontWeight = FontWeight.SemiBold)
+                Text(tool.name, style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (compact) 24.sp else 30.sp, lineHeight = if (compact) 30.sp else 36.sp), fontWeight = FontWeight.Normal)
                 if (tool.status == "planned") StatusPill("Coming soon")
             }
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1021,7 +1021,7 @@ private fun NativeToolSaveButton(isFavorite: Boolean, onClick: () -> Unit) {
 private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Medium)
+            Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Normal)
             Text(tool.description, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -1147,7 +1147,7 @@ private fun NativeExpansionCalculatorToolForm(toolId: String) {
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     val target = op.target
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("${op.row.cLabel} = ${op.row.aLabel} ${when(op.row.family) { "product" -> "×"; "ratio" -> "÷"; else -> "+" }} ${op.row.bLabel}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("${op.row.cLabel} = ${op.row.aLabel} ${when(op.row.family) { "product" -> "×"; "ratio" -> "÷"; else -> "+" }} ${op.row.bLabel}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
         if (target != 'a') InputField(aText, { aText = it }, op.row.aLabel, singleLine = true)
         if (target != 'b') InputField(bText, { bText = it }, op.row.bLabel, singleLine = true)
         if (target != 'c') InputField(cText, { cText = it }, op.row.cLabel, singleLine = true)
@@ -1171,7 +1171,7 @@ private fun NativeMathExerciseToolForm(toolId: String) {
     var error by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(op.formula, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(op.formula, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
         op.fields.forEach { field -> InputField(values[field.name].orEmpty(), { next -> values = values.toMutableMap().apply { put(field.name, next) } }, field.label, singleLine = true) }
         ActionRow(
             onRun = { runCatching { NativeMathExerciseEngine.run(op, values) }.fold({ rows -> output = rows.joinToString("\n") { row -> "${row.label}: ${row.value}${row.hint?.let { " $it" } ?: ""}" }; error = "" }, { output = ""; error = it.message ?: "Unable to run calculator" }) },
@@ -1217,7 +1217,7 @@ private fun NativeTextToolForm(toolId: String) {
         if (op == "reading-time-calculator") InputField(wpm, { wpm = it }, "Reading speed (words/min)", singleLine = true)
         if (op == "word-counter" || op == "character-counter") InputField(limit, { limit = it }, "Target limit", singleLine = true)
         if (counter) {
-            Text("${stats.words} words · ${stats.characters} characters · ${stats.sentences} sentences · ${stats.paragraphs} paragraphs", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Text("${stats.words} words · ${stats.characters} characters · ${stats.sentences} sentences · ${stats.paragraphs} paragraphs", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal)
             Text("${if (op == "word-counter") stats.words else if (op == "character-counter") stats.characters else if (op == "sentence-counter") stats.sentences else if (op == "paragraph-counter") stats.paragraphs else stats.readingMinutes} ${if (op == "reading-time-calculator") "min" else "matched"} · ${stats.readingMinutes} min reading time", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         ActionRow(
@@ -1401,7 +1401,7 @@ private fun NativeMimeToolForm(toolId: String) {
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         InputField(query, { query = it }, "Search extension, MIME, or format", placeholder = "pdf or image")
-        Text("Optional file inspection", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Optional file inspection", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Choose local file") }
             if (fileName.isNotBlank()) Text(fileName, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -1435,7 +1435,7 @@ private fun NativeUtilityToolForm(tool: ToolRecord) {
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Native ${tool.engine.type} engine · op ${op ?: tool.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Native ${tool.engine.type} engine · op ${op ?: tool.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
         Text("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine’s flexible option model.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InputField(input, { input = it }, "Input", minLines = if (tool.engine.type == "generator") 2 else 4, tall = tool.engine.type != "generator")
         InputField(options, { options = it }, "Options JSON", minLines = 4, tall = true, placeholder = "{\"count\": 5, \"text\": \"hello\"}")
@@ -1492,7 +1492,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
         }
         if (output.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
-                Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal)
                 Text(output, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                     OutlinedButton(onClick = { copy(output) }) { Text("Copy") }
@@ -1521,7 +1521,7 @@ private fun ResultBox(output: String, error: String, onCopy: (String) -> Unit) {
     if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text("Check your input: $error", color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp)) }
     if (output.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Text("Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Normal)
             Text(output, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Button(onClick = { onCopy(output) }) { Text("Copy output") } }
         }
@@ -1543,14 +1543,14 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                     Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                         Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
                     }
-                    Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
+                    Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                     Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (tool.status == "planned") {
                         StatusPill("Coming soon", Modifier.padding(top = 10.dp))
                     } else if (NativeCopy.isWebRuntimeOnly(tool.id)) {
                         StatusPill("WEB ONLY", Modifier.padding(top = 10.dp))
                     } else if (tool.clientSide) {
-                        StatusPill("IN-BROWSER", Modifier.padding(top = 10.dp))
+                        StatusPill("ON DEVICE", Modifier.padding(top = 10.dp))
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
                         EnVIcon("ArrowRight", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
@@ -1585,7 +1585,7 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
             Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                 Box(contentAlignment = Alignment.Center) { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
             }
-            Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(category.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -1634,7 +1634,7 @@ private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = if (isLarge) 14.sp else 10.sp),
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 maxLines = 1,
@@ -1646,19 +1646,19 @@ private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge
 
 @Composable private fun SectionTitle(text: String, subtitle: String? = null, accent: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 4.dp)) {
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 @Composable private fun StatusPill(text: String, modifier: Modifier = Modifier) { Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(5.dp)) { Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) } }
-@Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp)) } }
+@Composable private fun DetailRow(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Normal, modifier = Modifier.padding(start = 12.dp)) } }
 @Composable private fun SettingCard(title: String, detail: String, iconName: String, onClick: (() -> Unit)? = null) {
     val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().clickable(onClick = onClick)
     Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             EnVIcon(iconName, tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.padding(start = 14.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(title, fontWeight = FontWeight.Normal)
                 Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -1680,7 +1680,7 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Native business engine · ${tool.engine.extras["op"] ?: tool.engine.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Native business engine · ${tool.engine.extras["op"] ?: tool.engine.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
         InputField(a, { a = it }, "Revenue / amount", singleLine = true)
         InputField(b, { b = it }, "Cost / rate / second value", singleLine = true)
         InputField(c, { c = it }, "Variable cost / third value", singleLine = true)

@@ -13,6 +13,7 @@ const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const themeHook = readFileSync("src/hooks/use-theme.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
 const androidInfo = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", "utf8");
+const androidAssistant = readFileSync("apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt", "utf8");
 const androidStore = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt", "utf8");
 const iosCatalog = readFileSync("apps/ios/enV/CatalogCore.swift", "utf8");
 const androidCatalog = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt", "utf8");
@@ -37,7 +38,7 @@ assert.ok((iosContent.match(/frame\(maxWidth: 1152\)/g) ?? []).length >= 3, "iOS
 // Keep the web and each native app on their own platform system sans-serif.
 assert.match(webStyles, /--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif/);
 assert.match(webStyles, /letter-spacing: 0\.02em/);
-assert.match(androidTheme, /typography = Typography\(\)/);
+assert.match(androidTheme, /typography = EnVTypography/);
 assert.match(android, /import com\.chastech\.env\.ui\.CharacterSpacedText as Text/);
 assert.match(androidWordText, /private val subtleCharacterSpacing = 0\.02\.em/);
 assert.match(androidWordText, /letterSpacing = if \(letterSpacing == TextUnit\.Unspecified\) subtleCharacterSpacing else letterSpacing/);
@@ -46,6 +47,11 @@ assert.match(iosApp, /Text\(verbatim: source\)\.tracking\(0\.25\)/);
 assert.match(iosApp, /func enVLocalizedCharacterSpacedText\(_ key: LocalizedStringKey\)/);
 assert.match(androidTheme, /fontScale \* EnVFontScale/);
 assert.match(androidTheme, /EnVFontScale = 1\.11f/);
+assert.match(androidTheme, /titleSmall = system\.titleSmall\.copy\(fontWeight = FontWeight\.Normal\)/);
+assert.doesNotMatch(`${android}${androidInfo}${androidAssistant}`, /FontWeight\.(?:Bold|SemiBold|Medium)/, "Android screens must not add heavier font-weight overrides");
+assert.doesNotMatch(android, /(?:In-browser|IN-BROWSER)/, "Android must not describe on-device tools as browser-only");
+assert.match(android, /Text\("On device"/);
+assert.match(android, /StatusPill\("ON DEVICE"/);
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
 assert.match(webStyles, /--text-base: 1\.11rem/);
 assert.match(webStyles, /font-size: 1\.11rem/);
@@ -60,7 +66,7 @@ assert.match(iosTools, /\.font\(\.envScaled\(size: 10, weight: \.medium\)\)/);
 assert.match(iosAssistant, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);
 assert.match(android, /screenWidth >= 640\) 36\.sp else 24\.sp/);
 assert.match(android, /contentPadding = PaddingValues\(horizontal = 16\.dp, vertical = 40\.dp\),\s*verticalArrangement = Arrangement\.spacedBy\(24\.dp\)/);
-assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Bold, color = MaterialTheme\.colorScheme\.primary/);
+assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Normal, color = MaterialTheme\.colorScheme\.primary/);
 
 // Information-page back and legal email actions remain actionable and return to the source tab.
 assert.match(android, /showInformation -> NativeInformationScreen\(informationPage\) \{ showInformation = false; tab = informationReturnTab \}/);

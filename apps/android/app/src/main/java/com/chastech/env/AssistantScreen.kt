@@ -231,7 +231,7 @@ internal fun AssistantScreen(
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 EnVIcon("Sparkles", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("AI assistant", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text("AI assistant", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
             }
             TextButton(onClick = {
                 activeRequestHandle?.cancel()
@@ -272,7 +272,7 @@ internal fun AssistantScreen(
                         shape = RoundedCornerShape(16.dp),
                     ) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                            Text(if (message.isUser) "You" else "enV", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                            Text(if (message.isUser) "You" else "enV", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Normal)
                             SelectionContainer {
                                 Text(message.content, modifier = Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
                             }
@@ -345,7 +345,7 @@ private fun AssistantRecommendationCard(tool: ToolRecord, onClick: () -> Unit, m
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
             Column(Modifier.weight(1f)) {
-                Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
                 Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             EnVIcon("ArrowRight", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -71,7 +71,7 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
                     EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
                 }
-                Text(title, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), fontWeight = FontWeight.SemiBold)
+                Text(title, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), fontWeight = FontWeight.Normal)
             }
 
             when (pageId) {
@@ -115,7 +115,7 @@ private fun CompanyContactCard() {
     val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = informationSurface2()), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Company", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text("Company", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             Text("chAs Technologies LLC", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             EmailAction("envtoolkit@gmail.com", context, "Product inquiries:")
             EmailAction("chastechnologiesllc@gmail.com", context, "Company inquiries:")
@@ -154,7 +154,7 @@ private fun ContactCard(title: String, description: String, showProductSupport: 
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (showProductSupport) EmailAction("envtoolkit@gmail.com", context)
             if (showCompanyAddress) EmailAction("chastechnologiesllc@gmail.com", context)
@@ -184,20 +184,20 @@ private fun PricingInformation() {
         }
         Card(colors = CardDefaults.cardColors(containerColor = surface2), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Planned pricing — purchases are not available yet", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text("Planned pricing — purchases are not available yet", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
                 Text("The current enV codebase does not include a token balance, checkout, or referral-award system. You cannot buy, redeem, or receive these tokens in the app at this time. This page lists the proposed schedule and is not a live offer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().background(surface2).padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text("Tokens", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    Text("Price (USD)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.SemiBold)
+                    Text("Tokens", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Normal)
+                    Text("Price (USD)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.Normal)
                 }
                 listOf("100" to "$0.30", "300" to "$0.50", "500" to "$0.80", "1,000" to "$1.20", "5,000" to "$5.00").forEach { (tokens, price) ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("$tokens tokens", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(price, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(price, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
                     }
                     if (tokens != "5,000") Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
                 }
@@ -298,12 +298,12 @@ private fun ResponsibleUseInformation() {
 private fun InformationCardSection(title: String, paragraphs: List<String>) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.Transparent), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             paragraphs.forEachIndexed { index, paragraph ->
                 val labelEnd = paragraph.indexOf(':')
                 if (index < 2 && labelEnd > 0) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Text(paragraph.substring(0, labelEnd + 1), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(paragraph.substring(0, labelEnd + 1), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(paragraph.substring(labelEnd + 1), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
@@ -317,14 +317,14 @@ private fun InformationCardSection(title: String, paragraphs: List<String>) {
 @Composable
 private fun InformationSection(title: String, paragraphs: List<String> = emptyList(), bullets: List<String> = emptyList(), afterBullets: List<String> = emptyList(), titleSize: TextUnit = 18.sp) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.titleMedium, fontSize = titleSize, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.titleMedium, fontSize = titleSize, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
         paragraphs.forEach { InformationParagraph(it) }
         bullets.forEach { item ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 Surface(Modifier.padding(top = 9.dp).size(5.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape) {}
                 val labelEnd = item.indexOf(':')
                 if (labelEnd > 0) {
-                    Text(item.substring(0, labelEnd + 1), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(item.substring(0, labelEnd + 1), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(item.substring(labelEnd + 1), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Text(item, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)

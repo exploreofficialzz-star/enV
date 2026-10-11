@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 
 private val EnVLightColors = lightColorScheme(
     primary = Color(0xFF0D9F8A),
@@ -43,6 +44,25 @@ private val EnVDarkColors = darkColorScheme(
 )
 
 private const val EnVFontScale = 1.11f
+private val EnVTypography = Typography().let { system ->
+    system.copy(
+        displayLarge = system.displayLarge.copy(fontWeight = FontWeight.Normal),
+        displayMedium = system.displayMedium.copy(fontWeight = FontWeight.Normal),
+        displaySmall = system.displaySmall.copy(fontWeight = FontWeight.Normal),
+        headlineLarge = system.headlineLarge.copy(fontWeight = FontWeight.Normal),
+        headlineMedium = system.headlineMedium.copy(fontWeight = FontWeight.Normal),
+        headlineSmall = system.headlineSmall.copy(fontWeight = FontWeight.Normal),
+        titleLarge = system.titleLarge.copy(fontWeight = FontWeight.Normal),
+        titleMedium = system.titleMedium.copy(fontWeight = FontWeight.Normal),
+        titleSmall = system.titleSmall.copy(fontWeight = FontWeight.Normal),
+        bodyLarge = system.bodyLarge.copy(fontWeight = FontWeight.Normal),
+        bodyMedium = system.bodyMedium.copy(fontWeight = FontWeight.Normal),
+        bodySmall = system.bodySmall.copy(fontWeight = FontWeight.Normal),
+        labelLarge = system.labelLarge.copy(fontWeight = FontWeight.Normal),
+        labelMedium = system.labelMedium.copy(fontWeight = FontWeight.Normal),
+        labelSmall = system.labelSmall.copy(fontWeight = FontWeight.Normal),
+    )
+}
 
 @Composable
 fun EnVTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
@@ -51,7 +71,7 @@ fun EnVTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
         MaterialTheme(
             colorScheme = if (darkTheme) EnVDarkColors else EnVLightColors,
-            typography = Typography(),
+            typography = EnVTypography,
             content = content,
         )
     }
