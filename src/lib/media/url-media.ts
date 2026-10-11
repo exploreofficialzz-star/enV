@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { apiUrl } from "@/lib/api/base";
+import { mediaErrorMessage } from "@/lib/media/shared-media";
 export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
 
 export interface UrlMediaRequest {
@@ -30,8 +31,8 @@ export async function downloadUrlMedia(
     signal,
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(payload?.error || `URL media service returned HTTP ${response.status}.`);
+    const payload = await response.json().catch(() => null) as unknown;
+    throw new Error(mediaErrorMessage(payload, response.status));
   }
   const totalHeader = response.headers.get("content-length");
   const total = totalHeader ? Number(totalHeader) : undefined;
@@ -95,6 +96,6 @@ export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, 
     signal,
   });
   const payload = await response.json().catch(() => null) as UrlMediaInfo & { error?: string } | null;
-  if (!response.ok) throw new Error(payload?.error || `URL media service returned HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(mediaErrorMessage(payload, response.status));
   return payload as UrlMediaInfo;
 }

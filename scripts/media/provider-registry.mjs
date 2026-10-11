@@ -1,5 +1,5 @@
 export const PROVIDERS = {
-  youtube: ["youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com"],
+  youtube: ["youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com", "youtube-nocookie.com"],
   tiktok: ["tiktok.com", "m.tiktok.com", "vm.tiktok.com"],
   facebook: ["facebook.com", "m.facebook.com", "fb.watch"],
   instagram: ["instagram.com"],
@@ -10,7 +10,8 @@ const PROVIDER_BY_HOST = new Map(
 );
 
 export function detectProvider(url) {
-  return PROVIDER_BY_HOST.get(url.hostname.toLowerCase()) || "generic";
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+  return PROVIDER_BY_HOST.get(hostname) || "generic";
 }
 
 function audioAdapter(format) {

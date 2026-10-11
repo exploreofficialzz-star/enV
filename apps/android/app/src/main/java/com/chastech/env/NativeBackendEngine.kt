@@ -69,6 +69,15 @@ object NativeBackendEngine {
         body.put("url",input)
         return body
     }
+    internal fun backendErrorMessage(body:String,statusCode:Int,documentResponse:Boolean=false):String {
+        val payload=runCatching{JSONObject(body)}.getOrNull()
+        val message=sequenceOf(payload?.opt("error"),payload?.opt("message"))
+            .filterIsInstance<String>().map{it.trim()}.firstOrNull{it.isNotEmpty()}
+        if(message!=null)return message
+        val plain=body.trim()
+        if(payload==null&&plain.isNotEmpty()&&!plain.equals("true",true)&&!plain.equals("false",true)&&!plain.equals("null",true))return plain
+        return if(documentResponse)"Document service returned HTTP $statusCode." else "Backend request failed ($statusCode)."
+    }
     private fun postJson(path:String,body:JSONObject):Result=request(path,body.toString().toByteArray(StandardCharsets.UTF_8),"application/json")
     private fun multipart(path:String,files:List<InputFile>,fields:Map<String,String>,downloadResponse:Boolean=false,documentResponse:Boolean=false):Result {
         val boundary="----enV-${UUID.randomUUID()}"; val out=ByteArrayOutputStream()
@@ -81,7 +90,7 @@ object NativeBackendEngine {
         require(base.isNotBlank()) { "enV backend API is not configured for this build." }
         val c=(URL(base+path).openConnection() as HttpURLConnection).apply{requestMethod="POST";doOutput=true;connectTimeout=20000;readTimeout=180000;setRequestProperty("Content-Type",type);setRequestProperty("Accept","application/json,application/octet-stream,text/plain")}
         c.outputStream.use{it.write(body)}
-        val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299){val msg=runCatching{JSONObject(String(data)).optString("error")}.getOrNull();throw IllegalStateException(msg?.takeIf{it.isNotBlank()}?:if(documentResponse)"Document service returned HTTP ${c.responseCode}." else "Backend request failed (${c.responseCode}).")}
+        val data=(if(c.responseCode in 200..299)c.inputStream else c.errorStream).use{it.readBytes()}; if(c.responseCode !in 200..299)throw IllegalStateException(backendErrorMessage(String(data),c.responseCode,documentResponse))
         val mime=c.contentType?:"application/octet-stream"; val fileName=c.getHeaderField("Content-Disposition")?.substringAfter("filename=\"")?.substringBefore('"'); return if(!downloadResponse&&mime.contains("json"))Result(text=String(data),mimeType=mime) else Result(bytes=data,mimeType=mime,fileName=fileName)
     }
 }

@@ -31,4 +31,11 @@ class NativeBackendRequestTest {
         assertEquals("generic", body.getString("provider"))
         assertFalse(body.has("options"))
     }
+
+    @Test
+    fun booleanBackendErrorNeverBecomesTheLiteralTrue() {
+        assertEquals("Backend request failed (503).", NativeBackendEngine.backendErrorMessage("{\"error\":true}", 503))
+        assertEquals("Processor is starting.", NativeBackendEngine.backendErrorMessage("{\"error\":true,\"message\":\"Processor is starting.\"}", 503))
+        assertEquals("Video is unavailable.", NativeBackendEngine.backendErrorMessage("{\"error\":\"Video is unavailable.\"}", 404))
+    }
 }

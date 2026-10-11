@@ -90,6 +90,16 @@ export function isMediaProvider(value: unknown): value is MediaProvider {
     value === "instagram" || value === "facebook" || value === "x";
 }
 
+export function mediaErrorMessage(payload: unknown, status: number, service = "URL media service"): string {
+  if (payload && typeof payload === "object") {
+    const body = payload as { error?: unknown; message?: unknown };
+    for (const value of [body.error, body.message]) {
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  return `${service} returned HTTP ${status}.`;
+}
+
 export function normalizeMediaError(error: unknown): MediaErrorShape {
   if (error && typeof error === "object" && "code" in error && "message" in error) {
     const candidate = error as Partial<MediaErrorShape>;

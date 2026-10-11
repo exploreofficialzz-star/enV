@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { detectProvider } from "./media/provider-registry.mjs";
 
 const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
 const registry = await readFile(new URL("./media/provider-registry.mjs", import.meta.url), "utf8");
@@ -27,5 +28,16 @@ for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x"]) {
 }
 assert.match(registry, /export function createProviderAdapter/);
 assert.match(registry, /"generic"/);
+for (const url of [
+  "https://www.youtube.com/watch?v=example",
+  "https://youtube.com/watch?v=example",
+  "https://m.youtube.com/watch?v=example",
+  "https://music.youtube.com/watch?v=example",
+  "https://www.youtube-nocookie.com/embed/example",
+  "https://youtu.be/example",
+]) {
+  assert.equal(detectProvider(new URL(url)), "youtube", `${url} should be detected as YouTube`);
+}
+assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
 
 console.log("URL media shared-engine regression: 12/12 passed");

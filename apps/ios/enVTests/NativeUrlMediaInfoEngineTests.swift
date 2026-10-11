@@ -46,4 +46,11 @@ final class NativeUrlMediaInfoEngineTests: XCTestCase {
         XCTAssertEqual(body["provider"] as? String, "generic")
         XCTAssertNil(body["options"])
     }
+
+    func testBooleanBackendErrorUsesMessageOrHTTPFallbackInsteadOfTrue() {
+        let booleanError = Data(#"{"error":true}"#.utf8)
+        let messageError = Data(#"{"error":true,"message":"Processor is starting."}"#.utf8)
+        XCTAssertEqual(NativeBackendEngine.backendErrorMessage(booleanError, statusCode: 503), "Backend request failed (503).")
+        XCTAssertEqual(NativeBackendEngine.backendErrorMessage(messageError, statusCode: 503), "Processor is starting.")
+    }
 }

@@ -1100,6 +1100,20 @@ enum NativeBackendEngine {
         body["url"] = input
         return body
     }
+    static func backendErrorMessage(_ data: Data, statusCode: Int, documentResponse: Bool = false) -> String {
+        if let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            for key in ["error", "message"] {
+                if let message = payload[key] as? String {
+                    let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return trimmed }
+                }
+            }
+        } else if let raw = String(data: data, encoding: .utf8) {
+            let plain = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !plain.isEmpty && !["true", "false", "null"].contains(plain.lowercased()) { return plain }
+        }
+        return documentResponse ? "Document service returned HTTP \(statusCode)." : "Backend request failed (\(statusCode))."
+    }
     private static func json(_ path:String,body:[String:Any]) async throws -> NativeBackendResult {
         guard let endpoint = endpointURL(path) else { throw NativeNativeError.message("AI/backend API is not configured for this build.") }
         var request = URLRequest(url: endpoint)
@@ -1134,11 +1148,7 @@ enum NativeBackendEngine {
     private static func parse(_ d:Data,_ res:URLResponse,downloadResponse:Bool=false,documentResponse:Bool=false)throws->NativeBackendResult{
         guard let h=res as? HTTPURLResponse else{throw NativeNativeError.message("Invalid backend response.")}
         if !(200...299).contains(h.statusCode) {
-            if documentResponse {
-                let body=(try? JSONSerialization.jsonObject(with:d)) as? [String:Any]
-                throw NativeNativeError.message((body?["error"] as? String).flatMap{$0.isEmpty ? nil : $0} ?? "Document service returned HTTP \(h.statusCode).")
-            }
-            throw NativeNativeError.message(String(data:d,encoding:.utf8) ?? "Backend request failed.")
+            throw NativeNativeError.message(backendErrorMessage(d, statusCode: h.statusCode, documentResponse: documentResponse))
         }
         let mime=h.mimeType ?? "application/octet-stream"
         let disposition=h.value(forHTTPHeaderField:"Content-Disposition")
