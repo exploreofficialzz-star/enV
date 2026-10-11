@@ -114,23 +114,37 @@ object NativeAccessibilityEngine {
     }
 
     private fun preview(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String): String = when (kind) {
-        "alt-text" -> "SCREEN-READER ANNOUNCEMENT PREVIEW\n${Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE).findAll(input).map { tag -> Regex("\\balt\\s*=\\s*['\"]([^'\"]*)['\"]", RegexOption.IGNORE_CASE).find(tag.value)?.groupValues?.get(1)?.let { if (it.isBlank()) "Decorative image (not announced)" else "Image: $it" } ?: "Image (missing alternative)").joinToString("\n").ifBlank { "Paste image markup to preview announcements." } }\n\nIllustrative text only; actual announcements vary by screen reader and context."
+        "alt-text" -> screenReaderPreview(input)
         "aria" -> "ACCESSIBILITY TREE PREVIEW\n${analyze("aria-checker", input)}\n\nInspect the actual browser accessibility tree and test with a screen reader; static markup cannot resolve every computed name/state."
         "contrast", "accessible-color" -> contrastReport(kind, foreground, background)
         "color-blindness" -> colorVisionReport(foreground, background)
         "font-size" -> "TEXT PREVIEW · 200% RESIZE\nInput size: $fontSize\nCompare line wrapping, clipping, and overlap at 200% and 400% zoom."
         "line-height" -> "TEXT SPACING PREVIEW\nFont size: $fontSize · line-height: $lineHeight\nAlso test WCAG text-spacing overrides: 1.5× line height, 2× paragraph spacing, 0.12× letter spacing, and 0.16× word spacing."
         "text-readability" -> "BEFORE / REVIEW\n${readability(input)}\n\nThis preview reports estimates; it does not automatically rewrite the text."
-        else -> "INTERACTIVE PREVIEW\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
+        else -> "INTERACTIVE PREVIEW\n${analyze("${kind}-checker", input, foreground, background, fontSize, lineHeight)}"
     }
 
     private fun simulator(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String): String = when (kind) {
         "color-blindness" -> colorVisionReport(foreground, background)
         "contrast", "accessible-color" -> contrastReport(kind, foreground, background, true)
-        "keyboard-navigation", "focus-state", "aria", "form" -> "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through every control.\n2. Confirm focus is visible and order is logical.\n3. Activate with Enter/Space; close dismissible UI with Escape.\n4. Check names, roles, values, and errors with a screen reader.\n\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
+        "keyboard-navigation", "focus-state", "aria", "form" -> "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through every control.\n2. Confirm focus is visible and order is logical.\n3. Activate with Enter/Space; close dismissible UI with Escape.\n4. Check names, roles, values, and errors with a screen reader.\n\n${analyze("${kind}-checker", input, foreground, background, fontSize, lineHeight)}"
         "font-size", "line-height" -> "ZOOM SIMULATION CHECKLIST\nAt 200% text resize and 400% viewport zoom, inspect clipping, overlap, horizontal scrolling, and control reachability.\n\n${preview(kind, input, foreground, background, fontSize, lineHeight)}"
         "motion" -> "REDUCED-MOTION SIMULATION\nEnable the operating-system reduced-motion setting. Confirm non-essential transitions stop while feedback, loading state, and meaning remain available.\n\n${analyze("motion-checker", input)}"
-        else -> "SIMULATION GUIDE\nThis local static preview cannot reproduce an individual user's assistive technology. Test the supplied example with real devices and users.\n\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
+        else -> "SIMULATION GUIDE\nThis local static preview cannot reproduce an individual user's assistive technology. Test the supplied example with real devices and users.\n\n${analyze("${kind}-checker", input, foreground, background, fontSize, lineHeight)}"
+    }
+
+    private fun screenReaderPreview(input: String): String {
+        val announcements = Regex("""<img\b[^>]*>""", RegexOption.IGNORE_CASE).findAll(input).map { match ->
+            val tag = match.value
+            val alt = Regex("""\balt\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE).find(tag)?.groupValues?.get(1)
+            when {
+                alt == null -> "Image (missing alternative)"
+                alt.isBlank() -> "Decorative image (not announced)"
+                else -> "Image: $alt"
+            }
+        }.toList()
+        val body = announcements.joinToString("\n").ifBlank { "Paste image markup to preview announcements." }
+        return "SCREEN-READER ANNOUNCEMENT PREVIEW\n$body\n\nIllustrative text only; actual announcements vary by screen reader and context."
     }
 
     private fun parse(markup: String): List<Element> = tagPattern.findAll(markup.replace(Regex("<!--[\\s\\S]*?-->"), "")).map { match ->
