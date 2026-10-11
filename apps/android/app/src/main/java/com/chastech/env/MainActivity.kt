@@ -888,6 +888,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
+    "custom" -> NativeAccessibilityEngine.supports(tool.id, tool.category) || tool.category == "productivity"
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
@@ -900,7 +901,6 @@ private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntim
     "converter" -> NativeConverterEngine.operationForTool(tool) != null
     "calculator" -> NativeCalculatorEngine.operationForTool(tool.id) != null || NativeExpansionCalculatorEngine.operationForTool(tool.id) != null || NativeMathExerciseEngine.operationForTool(tool.id) != null
     "generator", "network", "seo", "developer", "cssgen" -> NativeUtilityEngine.supports(tool)
-    "custom" -> tool.category == "productivity"
     else -> false
     }
 }
@@ -1074,7 +1074,11 @@ private fun NativeToolForm(tool: ToolRecord) {
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
         "developer" -> NativeDeveloperToolForm(tool)
-    "custom" -> if (tool.category == "productivity") NativeProductivityToolForm(tool.id) else Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    "custom" -> when {
+        tool.category == "productivity" -> NativeProductivityToolForm(tool.id)
+        NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)
+        else -> Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
         else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -290,7 +290,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return tool.category == "productivity"
+        case "custom": return tool.category == "productivity" || NativeAccessibilityEngine.supports(tool)
         default: return false
         }
     }
@@ -323,7 +323,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if tool.category == "productivity" { NativeProductivityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if tool.category == "productivity" { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -1045,6 +1045,64 @@ struct NativeTextToolView: View {
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
 }
 
+struct NativeAccessibilityToolView: View {
+    let tool: Tool
+    @State private var input = ""
+    @State private var foreground = "#000000"
+    @State private var background = "#ffffff"
+    @State private var fontSize = "16px"
+    @State private var lineHeight = "1.5"
+    @State private var output = ""
+    private var kind: String { NativeAccessibilityEngine.kind(tool.id) }
+    private var colorTool: Bool { ["contrast", "accessible-color", "color-blindness"].contains(kind) }
+    private var sizeTool: Bool { ["font-size", "line-height"].contains(kind) }
+    private var textTool: Bool { kind == "text-readability" }
+    private var codeTool: Bool { !colorTool && !sizeTool && !textTool }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText("On-device accessibility review · no snippet is uploaded.")
+                .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
+            if colorTool {
+                NativeInputField(title: "Foreground color", text: $foreground)
+                NativeInputField(title: "Background color", text: $background)
+            }
+            if sizeTool {
+                NativeInputField(title: "Font size (CSS px/rem)", text: $fontSize)
+                if kind == "line-height" { NativeInputField(title: "Line height", text: $lineHeight) }
+            }
+            if codeTool || textTool {
+                enVCharacterSpacedText(textTool ? "English text" : "HTML / CSS snippet")
+                    .font(.envScaled(size: 13, weight: .semibold))
+                TextEditor(text: $input)
+                    .font(.system(size: 14, design: codeTool ? .monospaced : .default))
+                    .frame(minHeight: 160)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    .accessibilityLabel(textTool ? "English text for readability analysis" : "HTML or CSS snippet to analyze")
+            }
+            HStack(spacing: 8) {
+                Button { output = NativeAccessibilityEngine.analyze(toolID: tool.id, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) } label: {
+                    HStack(spacing: 6) { EnVIcon(name: "Play", size: 14, tint: .white); enVCharacterSpacedText("Analyze locally") }
+                }.buttonStyle(.borderedProminent)
+                Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; output = "" } label: {
+                    HStack(spacing: 6) { EnVIcon(name: "RotateCcw", size: 14, tint: .envMuted); enVCharacterSpacedText("Reset") }
+                }.buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = output } label: {
+                    HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy report") }
+                }.disabled(output.isEmpty)
+                if !output.isEmpty { ShareLink(item: output) { enVCharacterSpacedText("Export") } }
+            }
+            if !output.isEmpty {
+                TextEditor(text: .constant(output)).font(.system(size: 12, design: .monospaced)).frame(minHeight: 190)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35)))
+                    .accessibilityLabel("Accessibility analysis report")
+            }
+            enVCharacterSpacedText("Static snippet checks only. Manually test keyboard order, browser zoom, screen readers, and the complete page; results do not certify WCAG conformance.")
+                .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+        }
+    }
+}
+
 struct NativeBackendFile { let name:String; let mimeType:String; let data:Data }
 private struct NativeBackendResult { let text:String?; let data:Data?; let mimeType:String?; let fileName:String? }
 
@@ -1065,6 +1123,7 @@ enum NativeBackendEngine {
     // Unsupported tools must not appear executable in the native app.
     static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
     static func supports(_ tool:Tool)->Bool {
+        if NativeAccessibilityEngine.supports(tool) { return false }
         if NativeImageEngine.supports(tool) { return false }
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }

@@ -1907,14 +1907,30 @@ for (const tool of tools) {
   tool.requiresBackend = false;
   tool.requiresAuth = false;
   const action = tool.id.match(/-(checker|generator|simulator|helper|preview)$/)?.[1] || "checker";
-  const labels = {
-    checker: "Run a local accessibility-oriented check using the supplied values or markup.",
-    generator: "Generate an accessibility-oriented starting point, template, or recommendation locally.",
-    simulator: "Simulate or calculate an accessibility scenario locally for inspection and testing.",
-    helper: "Provide practical accessibility guidance from the supplied values or markup.",
-    preview: "Preview an accessibility result locally before implementation."
+  const kind = tool.id.replace(/-(checker|generator|simulator|helper|preview)$/, "");
+  const topics = {
+    "accessible-color": "alpha-aware foreground/background contrast against WCAG 2.2 text and UI thresholds, with color-adjustment suggestions",
+    "alt-text": "image alt attributes, decorative-image handling, likely filenames, and contextual text-alternative guidance",
+    aria: "ARIA role validity, accessible names, missing id references, duplicate ids, and focusable content hidden from assistive technology",
+    "color-blindness": "approximate protanopia, deuteranopia, and tritanopia color transformations; color alone must never convey meaning",
+    contrast: "relative-luminance contrast ratios for foreground/background pairs with WCAG AA and AAA thresholds",
+    "focus-state": "CSS :focus and :focus-visible indicators, including removed outlines and detectable replacement styles",
+    "font-size": "CSS px/rem conversion, text resizing, zoom, and reflow guidance; a single size is not a conformance threshold",
+    form: "programmatic control labels, error descriptions, invalid states, and discernible button names",
+    "keyboard-navigation": "positive tabindex, click-only custom controls, focus indicators, and keyboard-operability clues in supplied markup",
+    "line-height": "unitless or pixel line-height ratios plus user text-spacing and reflow guidance",
+    motion: "CSS animation/transition patterns, reduced-motion paths, and potentially distracting motion",
+    "text-readability": "English-language Flesch Reading Ease and approximate Flesch-Kincaid grade estimates, with heuristic limitations",
   };
-  tool.description = labels[action];
+  const topic = topics[kind] || "selected WCAG-oriented checks on supplied values or markup";
+  const descriptions = {
+    checker: `Check ${topic} locally and review rule-level findings with suggested fixes.`,
+    generator: `Generate a topic-specific starter or color/content recommendation for ${topic}.`,
+    helper: `Review ${topic} locally with clear explanations and practical next steps.`,
+    preview: `Preview how the local rules evaluate ${topic} on the supplied sample.`,
+    simulator: `Explore ${topic} against supplied values or markup; static previews do not simulate a full browser or assistive technology.`,
+  };
+  tool.description = descriptions[action];
 }
 
 // Auto-related: same category, nearest popularity

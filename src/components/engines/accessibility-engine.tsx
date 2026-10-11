@@ -22,6 +22,7 @@ import {
 } from "@/lib/engines/accessibility-color";
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
+import { auditAccessibilityMarkup, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
 const COLORS = ["#000000", "#ffffff", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e"];
 function downloadText(text: string, filename: string) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -91,68 +92,9 @@ function simulateColor(hex: string, type: "protanopia" | "deuteranopia" | "trita
   const m = matrices[type];
   return rgbHex([m[0][0] * r + m[0][1] * g + m[0][2] * b, m[1][0] * r + m[1][1] * g + m[1][2] * b, m[2][0] * r + m[2][1] * g + m[2][2] * b]);
 }
-const VALID_ARIA_ROLES = new Set([
-  "alert", "alertdialog", "application", "article", "banner", "blockquote", "button",
-  "caption", "cell", "checkbox", "code", "columnheader", "combobox", "complementary",
-  "contentinfo", "definition", "dialog", "directory", "document", "feed", "figure",
-  "form", "generic", "grid", "gridcell", "group", "heading", "img", "link", "list",
-  "listbox", "listitem", "log", "main", "marquee", "math", "menu", "menubar",
-  "menuitem", "menuitemcheckbox", "menuitemradio", "meter", "navigation", "none",
-  "note", "option", "presentation", "progressbar", "radio", "radiogroup", "region",
-  "row", "rowgroup", "rowheader", "scrollbar", "search", "searchbox", "separator",
-  "slider", "spinbutton", "status", "strong", "subscript", "superscript", "switch",
-  "tab", "table", "tabpanel", "term", "textbox", "timer", "toolbar", "tooltip", "tree",
-  "treegrid", "treeitem",
-]);
-
 function analyzeHtml(html: string, kind: Kind) {
   if (!html.trim()) return "Paste HTML/CSS in the field above to run the local check.";
-  if (typeof DOMParser === "undefined") return "This browser does not provide DOMParser, so this check cannot run here.";
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const issues: string[] = [];
-  if (kind === "alt-text") {
-    const images = [...doc.querySelectorAll("img")];
-    const missing = images.filter((img) => !img.hasAttribute("alt"));
-    const empty = images.filter((img) => img.getAttribute("alt") === "");
-    return `Images found: ${images.length}\nMissing alt attribute: ${missing.length}\nEmpty alt attribute: ${empty.length}\n\n${missing.length ? "Add alt text to informative images. Decorative images can use alt=\"\"." : "Every image has an alt attribute."}`;
-  }
-  if (kind === "aria") {
-    const elements = [...doc.querySelectorAll("[aria-label], [aria-labelledby], [role], [aria-describedby]")];
-    const invalidRoles = elements.filter((el) => {
-      const role = el.getAttribute("role")?.trim().split(/\s+/)[0].toLowerCase();
-      return Boolean(role) && !VALID_ARIA_ROLES.has(role!);
-    });
-    const labelledBy = new Set([...doc.querySelectorAll("[id]")].map((el) => el.id));
-    const interactive = [...doc.querySelectorAll("a[href], button, input, select, textarea, [role]")];
-    const unnamed = interactive.filter((el) => {
-      const label = el.getAttribute("aria-label")?.trim();
-      const labelled = el.getAttribute("aria-labelledby")?.trim().split(/\s+/).filter(Boolean) ?? [];
-      const native = el.textContent?.trim();
-      const placeholder = el.getAttribute("placeholder")?.trim();
-      return !label && !(labelled.length && labelled.every((id) => labelledBy.has(id))) && !native && !placeholder;
-    });
-    return `ARIA-bearing elements: ${elements.length}\nInvalid ARIA roles: ${invalidRoles.length}\nPotentially unnamed interactive controls: ${unnamed.length}\n\n${invalidRoles.length ? invalidRoles.map((x) => `Check role on <${x.tagName.toLowerCase()}>`).join("\n") : "No invalid ARIA roles detected."}${unnamed.length ? `\n\n${unnamed.map((x) => `<${x.tagName.toLowerCase()}> may need an accessible name`).join("\n")}` : "\n\nNo potentially unnamed interactive controls detected."}`;
-  }
-  if (kind === "form") {
-    const controls = [...doc.querySelectorAll("input, select, textarea")];
-    const missing = controls.filter((el) => {
-      const id = el.getAttribute("id");
-      return !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && !(id && [...doc.querySelectorAll("label")].some((label) => label.htmlFor === id)) && !el.closest("label");
-    });
-    return `Form controls: ${controls.length}\nControls without an explicit/associated label: ${missing.length}\nButtons: ${doc.querySelectorAll("button, input[type=submit], input[type=button]").length}\n\n${missing.length ? missing.map((x) => `<${x.tagName.toLowerCase()} name="${x.getAttribute("name") ?? ""}"> needs an accessible label`).join("\n") : "No unlabeled form controls detected by this local check."}`;
-  }
-  if (kind === "keyboard-navigation") {
-    const interactive = [...doc.querySelectorAll("a[href], button, input, select, textarea, [tabindex]")];
-    const positiveTab = interactive.filter((el) => Number(el.getAttribute("tabindex")) > 0);
-    const unnamed = interactive.filter((el) => !el.textContent?.trim() && !el.getAttribute("aria-label") && !el.getAttribute("title") && !el.getAttribute("aria-labelledby"));
-    return `Potential keyboard-interactive elements: ${interactive.length}\nPositive tabindex values: ${positiveTab.length}\nPotentially unnamed controls: ${unnamed.length}\n\n${positiveTab.length ? "Avoid positive tabindex values; prefer the document's natural order." : "No positive tabindex values detected."}`;
-  }
-  if (kind === "motion") {
-    const hasAnimation = /\banimation(?:-name)?\s*:|@keyframes|\btransition\s*:/i.test(html);
-    const reduced = /prefers-reduced-motion/i.test(html);
-    return `Motion declarations detected: ${hasAnimation ? "YES" : "NO"}\nReduced-motion media query detected: ${reduced ? "YES" : "NO"}\n\n${hasAnimation && !reduced ? "Add a prefers-reduced-motion path for non-essential motion." : "The supplied code includes a basic reduced-motion consideration or no motion declaration was found."}`;
-  }
-  return `Elements parsed: ${doc.body.querySelectorAll("*").length}\nHeadings: ${doc.querySelectorAll("h1,h2,h3,h4,h5,h6").length}\nLinks: ${doc.querySelectorAll("a").length}\nButtons: ${doc.querySelectorAll("button").length}\nImages: ${doc.querySelectorAll("img").length}\n\nNo severe issue was inferred; use the relevant specialized checker for detailed analysis.`;
+  return auditAccessibilityMarkup(`${kind}-checker`, html).report;
 }
 
 function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: string; text: string; size: string; lineHeight: string; html: string; role: string }) {
@@ -177,7 +119,8 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
   }
   if (kind === "line-height") {
     const lh = Number.parseFloat(lineHeight), px = parsePx(size);
-    const ratio = Number.isFinite(lh) && px ? lh / px : Number.parseFloat(lineHeight);
+    const ratio = /px$/i.test(lineHeight.trim()) ? (Number.isFinite(lh) && px ? lh / px : Number.NaN) : lh;
+    if (action === "generator") return `LINE HEIGHT STARTER\n\nbody {\n  font-size: 1rem;\n  line-height: 1.5;\n}\n\nUse a unitless line-height so it scales with the font. Test text-spacing overrides and 200% zoom.`;
     return `LINE HEIGHT ${action.toUpperCase()}\n\nFont size: ${size || "16px"}\nLine height: ${lineHeight || "1.5"}\nRatio: ${Number.isFinite(ratio) ? ratio.toFixed(2) : "invalid"}\n\n${Number.isFinite(ratio) && ratio >= 1.5 ? "At or above 1.5× font size; verify the final layout." : "For paragraphs, consider around 1.5× font size or greater."}`;
   }
   if (kind === "text-readability") {
@@ -186,18 +129,18 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
     if (!r) return "Paste text to calculate a Flesch Reading Ease estimate and approximate grade level.";
     return `TEXT READABILITY\n\nWords: ${r.words}\nSentences: ${r.sentences}\nSyllables: ${r.syllables}\nFlesch Reading Ease: ${r.ease.toFixed(1)}\nApprox. Flesch-Kincaid grade: ${r.grade.toFixed(1)}\n\nHigher Reading Ease generally indicates easier text. This is an English-language estimate and should not replace user testing.`;
   }
-  if (["alt-text", "aria", "form", "keyboard-navigation", "motion"].includes(kind)) {
+  if (["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind)) {
     if (action === "generator") {
       if (kind === "alt-text") return "ALT TEXT TEMPLATE\n\nDescribe the meaningful subject or function of the image, not its visual file details.\n\nExample structure:\n[Subject] + [important context/action] + [relevant outcome].";
       if (kind === "aria") return `ARIA STARTER\n\nRole: ${role || "button"}\nAccessible name: [Describe the control's purpose]\nState/value: [Only when applicable]\n\nPrefer native HTML semantics before adding ARIA.`;
       if (kind === "form") return "ACCESSIBLE FORM CHECKLIST\n\n• Associate every control with a visible label.\n• Provide useful error text.\n• Preserve keyboard access.\n• Group related controls with fieldset/legend when appropriate.\n• Do not rely on color alone for required/error state.";
       if (kind === "keyboard-navigation") return "KEYBOARD NAVIGATION CHECKLIST\n\n• All interactive controls reachable with Tab/Shift+Tab.\n• Logical focus order.\n• Visible focus indicator.\n• Enter/Space behavior matches the control.\n• Escape closes dismissible overlays where appropriate.\n• No keyboard trap.";
+      if (kind === "focus-state") return "VISIBLE FOCUS CSS STARTER\n\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nDo not remove focus without an equally visible replacement. Check contrast, clipping, and sticky-content obscuration.";
       return "REDUCED MOTION CHECKLIST\n\n• Respect prefers-reduced-motion.\n• Remove or reduce non-essential animation.\n• Avoid flashing content.\n• Preserve essential information when animation is disabled.";
     }
     if (action === "helper") return buildOutput(kind, "checker", values);
     return analyzeHtml(html, kind);
   }
-  if (kind === "focus-state") return `FOCUS STATE ${action.toUpperCase()}\n\nRecommended CSS:\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nDo not remove focus indicators without providing an equally visible replacement.`;
   return "Accessibility utility ready.";
 }
 
@@ -266,7 +209,7 @@ function AccessibleColorChecker() {
       seen.add(key);
       return true;
     }).slice(0, 4);
-  }, [bg, canvas, fg, suggestions, target]);
+  }, [bg, canvas, fg, suggestions]);
 
   const rendered = useMemo(() => {
     if (!fg || !bg || !canvas) return null;
@@ -510,8 +453,14 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
   const [fg, setFg] = useState("#000000"); const [bg, setBg] = useState("#ffffff");
   const [text, setText] = useState(""); const [size, setSize] = useState("16px"); const [lineHeight, setLineHeight] = useState("1.5");
   const [html, setHtml] = useState(""); const [role, setRole] = useState("button");
+  const [axeReport, setAxeReport] = useState(""); const [axeRunning, setAxeRunning] = useState(false);
   const output = useMemo(() => buildOutput(kind, action, { fg, bg, text, size, lineHeight, html, role }), [action, bg, fg, html, kind, lineHeight, role, size, text]);
-  const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "motion"].includes(kind) && action !== "generator";
+  const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && action !== "generator";
+  const runAxe = async () => {
+    setAxeRunning(true);
+    setAxeReport(await scanMarkupWithAxe(html));
+    setAxeRunning(false);
+  };
   const reset = () => {
     setFg("#000000");
     setBg("#ffffff");
@@ -520,6 +469,7 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
     setLineHeight("1.5");
     setHtml("");
     setRole("button");
+    setAxeReport("");
   };
   return <div className="space-y-5">
     <p className="text-sm text-muted">Local accessibility utility. Analysis runs in your browser; no accessibility claim is sent to an external service.</p>
@@ -535,5 +485,10 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
     <div className="flex flex-wrap gap-2"><CopyButton text={output} /><Button type="button" variant="outline" size="sm" onClick={() => downloadText(output, `env-${toolId}.txt`)}>Download</Button><Button type="button" variant="ghost" size="sm" onClick={reset}>Reset</Button></div>
     {(kind === "contrast" || kind === "accessible-color") && <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl p-6" style={{ background: bg, color: fg }}>Accessible color preview</div><div className="rounded-xl border p-4 text-sm">{contrastText(contrast(fg, bg))}</div></div>}
     <pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{output}</pre>
+    {needsHtml ? <section className="space-y-3 rounded-xl border border-border bg-surface-2 p-4" aria-labelledby="axe-scan-heading">
+      <div><h2 id="axe-scan-heading" className="text-sm font-semibold">Automated browser rules (axe-core)</h2><p className="mt-1 text-xs text-muted">Runs locally against an isolated copy of this snippet. It does not send the markup to a server.</p></div>
+      <Button type="button" variant="outline" size="sm" onClick={runAxe} disabled={axeRunning || !html.trim()}>{axeRunning ? "Scanning locally…" : "Run axe-core scan"}</Button>
+      {axeReport ? <pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{axeReport}</pre> : null}
+    </section> : null}
   </div>;
 }
