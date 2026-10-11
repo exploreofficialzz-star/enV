@@ -209,9 +209,14 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
     else source = source.replace(/<html\b[^>]*>/i, (opening) => `${opening}<head>${csp}<title>Accessibility snippet test</title></head>`);
   }
   const runner = `window.addEventListener('load',async()=>{try{const r=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']},resultTypes:['violations','incomplete','passes']});const pick=a=>a.map(x=>({id:x.id,impact:x.impact,help:x.help,helpUrl:x.helpUrl,tags:x.tags,nodes:x.nodes.map(n=>({target:n.target,html:n.html}))}));parent.postMessage({nonce:${JSON.stringify(nonce)},results:{violations:pick(r.violations),incomplete:pick(r.incomplete),passes:pick(r.passes)}},'*')}catch(e){parent.postMessage({nonce:${JSON.stringify(nonce)},error:String(e&&e.message||e)},'*')}})`;
+  // axe-core exposes readable source in development but a minified UMD source
+  // in production, where the equivalent guard uses short local variable names.
   const axeSource = axe.source.replace(
     /if\s*\(\s*typeof\s+window\.getComputedStyle\s*===\s*['"]function['"]\s*\)\s*\{\s*window\.axe\s*=\s*axe\s*;\s*\}/,
     "window.axe = axe;",
+  ).replace(
+    /typeof\s+([\w$]+)\.getComputedStyle\s*==\s*['"`]function['"`]\s*&&\s*\(\s*\1\.axe\s*=\s*([\w$]+)\s*\)/,
+    (_, globalName: string, axeName: string) => `${globalName}.axe=${axeName}`,
   );
   if (axeSource === axe.source) return "axe-core scan failed: bundled axe global bootstrap did not match the expected version.";
   const scannerScripts = `<script nonce="${nonce}">${axeSource.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
