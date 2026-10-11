@@ -14,6 +14,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY processor/server.mjs ./processor/server.mjs
+COPY processor/url-media-route.mjs ./processor/url-media-route.mjs
 COPY scripts/media-processor.mjs ./scripts/media-processor.mjs
 COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
 COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
@@ -23,6 +24,7 @@ COPY scripts/transcription-processor.mjs ./scripts/transcription-processor.mjs
 COPY scripts/faster-whisper-runner.py ./scripts/faster-whisper-runner.py
 
 RUN node --check processor/server.mjs \
+  && node --check processor/url-media-route.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
   && node --version \

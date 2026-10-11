@@ -1,6 +1,7 @@
 import http from "node:http";
 import { Readable } from "node:stream";
 import { spawn } from "node:child_process";
+import { urlMediaProcessorPath } from "./url-media-route.mjs";
 
 const HOST = process.env.PROCESSOR_HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || process.env.PROCESSOR_PORT || 10000);
@@ -40,6 +41,8 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`); const { pathname, search } = url;
   if (req.method === "OPTIONS") return json(req, res, 204, {});
   if (pathname === "/health" && req.method === "GET") { const servicesReady = [...services.values()].every(({ child }) => child.exitCode === null); return json(req, res, 200, { ok: servicesReady, service: "enV Render API", applicationApiOrigin: APPLICATION_API_ORIGIN, authentication: Boolean(SHARED_SECRET), ready: servicesReady, routes: ["/api/*", "/media", "/info", "/download", ...(services.has("transcription") ? ["/transcribe"] : [])], limits: { maxMediaBytes: Number(process.env.MEDIA_MAX_BYTES || 100 * 1024 * 1024) } }); }
+  const urlMediaPath = urlMediaProcessorPath(req.method || "GET", pathname);
+  if (urlMediaPath && services.has("url-media")) return proxyProcessor(req, res, services.get("url-media").port, urlMediaPath);
   if (pathname.startsWith("/api/")) return proxyApplication(req, res, pathname, search);
   if (!authorized(req)) return json(req, res, 401, { error: "Invalid processor credentials." });
   if (pathname === "/media" && services.has("media")) return proxyProcessor(req, res, services.get("media").port, "/media");

@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { detectProvider } from "./media/provider-registry.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
+import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 
 const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
 const registry = await readFile(new URL("./media/provider-registry.mjs", import.meta.url), "utf8");
 const dockerfile = await readFile(new URL("../processor/Dockerfile", import.meta.url), "utf8");
+const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
 
 assert.match(source, /assertPublicHostname/);
 assert.match(source, /handleDirectDownload/);
@@ -30,6 +32,14 @@ assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/me
 assert.match(dockerfile, /yt-dlp\[default\]/);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
+assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);
+assert.match(gateway, /urlMediaProcessorPath\(req\.method \|\| "GET", pathname\)/);
+assert.ok(gateway.indexOf("urlMediaProcessorPath(req.method || \"GET\", pathname)") < gateway.indexOf('if (pathname.startsWith("/api/"))'));
+
+assert.equal(urlMediaProcessorPath("POST", "/api/backend/url-media/info"), "/info");
+assert.equal(urlMediaProcessorPath("POST", "/api/backend/url-media/download"), "/download");
+assert.equal(urlMediaProcessorPath("GET", "/api/backend/url-media/download"), null);
+assert.equal(urlMediaProcessorPath("POST", "/api/backend/tool"), null);
 
 for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x"]) {
   assert.match(registry, new RegExp(provider));
