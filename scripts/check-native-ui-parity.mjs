@@ -37,12 +37,12 @@ assert.ok((iosContent.match(/frame\(maxWidth: 1152\)/g) ?? []).length >= 3, "iOS
 assert.match(webStyles, /--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif/);
 assert.match(androidTheme, /typography = Typography\(\)/);
 assert.match(androidTheme, /fontScale \* EnVFontScale/);
-assert.match(androidTheme, /EnVFontScale = 1\.17f/);
+assert.match(androidTheme, /EnVFontScale = 1\.11f/);
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
-assert.match(webStyles, /--text-base: 1\.17rem/);
-assert.match(webStyles, /font-size: 1\.17rem/);
+assert.match(webStyles, /--text-base: 1\.11rem/);
+assert.match(webStyles, /font-size: 1\.11rem/);
 assert.match(webStyles, /line-height: 1\.5/);
-assert.match(iosApp, /size \* 1\.17/);
+assert.match(iosApp, /size \* 1\.11/);
 assert.match(iosApp, /dynamicTypeSize\(dynamicTypeSize\.enVIncreased\)/);
 assert.match(iosContent, /horizontalSizeClass == \.regular \? 36 : 24/);
 assert.match(iosContent, /\.font\(\.envScaled\(size: 30, weight: \.bold\)\)/);

@@ -42,7 +42,7 @@ private val EnVDarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFF97066),
 )
 
-private const val EnVFontScale = 1.17f
+private const val EnVFontScale = 1.11f
 
 @Composable
 fun EnVTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {

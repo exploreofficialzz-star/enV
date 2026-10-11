@@ -133,8 +133,8 @@ export function CompareView({ before, after, busy, modes = ["slider", "side", "b
             <span className="absolute left-1/2 top-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-xs text-black shadow-md">↔</span>
           </div>
         ) : null}
-        {after && (effective === "slider" || effective === "side") ? (<><span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.9px] font-medium text-white">{beforeLabel}</span><span className="pointer-events-none absolute right-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.9px] font-medium text-white">{afterLabel}</span></>) : after ? <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.9px] font-medium text-white">{effective === "before" ? beforeLabel : afterLabel}</span> : null}
-        {busy ? <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[12.9px] text-white" role="status">Updating…</span> : null}
+        {after && (effective === "slider" || effective === "side") ? (<><span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.2px] font-medium text-white">{beforeLabel}</span><span className="pointer-events-none absolute right-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.2px] font-medium text-white">{afterLabel}</span></>) : after ? <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12.2px] font-medium text-white">{effective === "before" ? beforeLabel : afterLabel}</span> : null}
+        {busy ? <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[12.2px] text-white" role="status">Updating…</span> : null}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">{note ?? "Pinch, Ctrl/⌘+scroll or double-click to zoom; drag to pan."}</p>

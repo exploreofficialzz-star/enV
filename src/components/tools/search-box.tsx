@@ -143,7 +143,7 @@ export function SearchBox({
                     setOpen(false);
                   }}
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[10.5px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                  <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
                   <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
                 </button>
               </li>

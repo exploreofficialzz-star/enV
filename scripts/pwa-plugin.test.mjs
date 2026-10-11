@@ -221,7 +221,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /Total token = 100/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
-  assert.match(home, /text-center text-\[11\.7px\]/);
+  assert.match(home, /text-center text-\[11\.1px\]/);
   assert.match(home, /MostUsedToolsTray tools=\{mostUsedTools\}/);
   assert.match(home, /Your most-used tools/);
   assert.match(home, /personal-tools-scroll snap-x snap-mandatory/);

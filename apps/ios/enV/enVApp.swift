@@ -3,7 +3,7 @@ import UIKit
 
 extension Font {
     static func envScaled(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
-        .system(size: size * 1.17, weight: weight, design: design)
+        .system(size: size * 1.11, weight: weight, design: design)
     }
 }
 
