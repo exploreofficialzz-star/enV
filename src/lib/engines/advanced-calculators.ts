@@ -285,7 +285,14 @@ sci("science-dilution-calculator",[f("c1","Initial concentration"),f("v1","Initi
 sci("science-ph-calculator",[f("hydrogen","[H⁺] mol/L")],v=>[out("pH",-Math.log10(pos(v.hydrogen)),true)]);
 sci("science-half-life-calculator",[f("initial","Initial amount"),f("halfLife","Half-life"),f("time","Elapsed time")],v=>[out("Remaining",n(v.initial)*.5**(n(v.time)/pos(v.halfLife)),true)]);
 sci("science-heat-energy-calculator",[f("mass","Mass"),f("specificHeat","Specific heat"),f("deltaT","Temperature change")],v=>[out("Heat energy",n(v.mass)*n(v.specificHeat)*n(v.deltaT),true,"J")]);
-sci("science-gas-law-calculator",[f("p1","P₁"),f("v1","V₁"),f("t1","T₁"),f("p2","P₂"),f("v2","V₂"),f("t2","T₂")],v=>{
+sci("science-gas-law-calculator",[
+  f("p1","P₁",{hint:"Optional: leave blank to solve for this variable."}),
+  f("v1","V₁",{hint:"Optional: leave blank to solve for this variable."}),
+  f("t1","T₁",{hint:"Optional: leave blank to solve for this variable."}),
+  f("p2","P₂",{hint:"Optional: leave blank to solve for this variable."}),
+  f("v2","V₂",{hint:"Optional: leave blank to solve for this variable."}),
+  f("t2","T₂",{hint:"Optional: leave blank to solve for this variable."}),
+],v=>{
   const names=["p1","v1","t1","p2","v2","t2"] as const;
   type GasVariable=typeof names[number];
   const labels:Record<GasVariable,string>={p1:"P₁",v1:"V₁",t1:"T₁",p2:"P₂",v2:"V₂",t2:"T₂"};
