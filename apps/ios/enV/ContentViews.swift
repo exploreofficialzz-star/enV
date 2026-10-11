@@ -61,8 +61,8 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, horizontalSizeClass == .regular ? 20 : 16)
                         .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 72 : 64, maxHeight: horizontalSizeClass == .regular ? 72 : 64, alignment: .leading)
-                        .background(Color.envCard, in: Capsule())
-                        .overlay(Capsule().stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 28))
+                        .overlay(RoundedRectangle(cornerRadius: 28).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
@@ -939,8 +939,8 @@ private struct HomePreviewBar: View {
             .multilineTextAlignment(.center)
             .padding(.horizontal, isWide ? 16 : 8)
             .frame(height: 40)
-            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorderStrong, lineWidth: 1))
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.envBorderStrong, lineWidth: 1))
     }
 }
 

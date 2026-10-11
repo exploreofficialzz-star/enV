@@ -345,7 +345,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
-                    shape = RoundedCornerShape(percent = 50),
+                    shape = RoundedCornerShape(28.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,
@@ -1627,7 +1627,7 @@ private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge
     Surface(
         modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI assistant" },
         color = containerColor,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Box(Modifier.fillMaxSize().padding(horizontal = if (isLarge) 16.dp else 8.dp), contentAlignment = Alignment.Center) {
