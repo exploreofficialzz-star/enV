@@ -1,7 +1,6 @@
 package com.chastech.env
 
-import com.chastech.env.ui.WordSpacedText as Text
-import com.chastech.env.ui.withSubtleWordSpacing
+import com.chastech.env.ui.CharacterSpacedText as Text
 
 import android.content.Intent
 import android.net.Uri
@@ -46,6 +45,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.chastech.env.ui.ChasTechnologiesLogo
 import com.chastech.env.ui.EnVIcon
@@ -352,8 +352,8 @@ private fun InformationParagraph(text: String) {
         append(text.substring(cursor))
     }
     ClickableText(
-        text = annotated.withSubtleWordSpacing(),
-        style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+        text = annotated,
+        style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.02.em),
         onClick = { offset ->
             annotated.getStringAnnotations("mailto", offset, offset).firstOrNull()?.let { annotation ->
                 val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${annotation.item}"))

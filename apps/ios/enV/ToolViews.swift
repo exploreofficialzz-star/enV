@@ -13,13 +13,13 @@ struct ToolCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         iconTile(tool.icon)
-                        enVWordSpacedText(tool.name)
+                        enVCharacterSpacedText(tool.name)
                             .font(.envScaled(size: 14, weight: .semibold))
                             .tracking(-0.15)
                             .foregroundStyle(Color.envInk)
                             .lineLimit(1)
                             .padding(.top, 12)
-                        enVWordSpacedText(tool.description)
+                        enVCharacterSpacedText(tool.description)
                             .font(.envScaled(size: 12, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .lineLimit(2)
@@ -28,7 +28,7 @@ struct ToolCard: View {
                         if !NativeCopy.isWebRuntimeOnly(tool.id), NativeBackendEngine.supports(tool) {
                             StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
                         } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeCoverage.isLocallyExecutable(tool) {
-                            enVWordSpacedText("ON DEVICE").font(.envScaled(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+                            enVCharacterSpacedText("ON DEVICE").font(.envScaled(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
                         } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
                         } else {
                             StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
@@ -66,7 +66,7 @@ struct StatusPill: View {
     let text: String
     let color: Color
     var body: some View {
-        enVWordSpacedText(text).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
+        enVCharacterSpacedText(text).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(color).padding(.horizontal, 8).padding(.vertical, 4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -97,12 +97,12 @@ struct ToolDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Button("Home") { homeNavigationReset += 1; selectedTab = NativeTab.home.rawValue }
-                    enVWordSpacedText("/").foregroundStyle(Color.envSubtle)
+                    enVCharacterSpacedText("/").foregroundStyle(Color.envSubtle)
                     Button("Tools") { toolsNavigationReset += 1; selectedTab = NativeTab.tools.rawValue }
-                    enVWordSpacedText("/").foregroundStyle(Color.envSubtle)
-                    NavigationLink(value: tool.category) { enVWordSpacedText(categoryName) }
-                    enVWordSpacedText("/").foregroundStyle(Color.envSubtle)
-                    enVWordSpacedText(tool.name).foregroundStyle(Color.envInk).lineLimit(1)
+                    enVCharacterSpacedText("/").foregroundStyle(Color.envSubtle)
+                    NavigationLink(value: tool.category) { enVCharacterSpacedText(categoryName) }
+                    enVCharacterSpacedText("/").foregroundStyle(Color.envSubtle)
+                    enVCharacterSpacedText(tool.name).foregroundStyle(Color.envInk).lineLimit(1)
                 }
                 .font(.envScaled(size: 12, weight: .regular))
                 .foregroundStyle(Color.envMuted)
@@ -122,7 +122,7 @@ struct ToolDetailView: View {
                 }
 
                 if let notice = tool.nativeDisclaimerText {
-                    enVWordSpacedText(notice)
+                    enVCharacterSpacedText(notice)
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(.top, 12)
@@ -136,7 +136,7 @@ struct ToolDetailView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
-                            enVWordSpacedText(tool.isPlanned
+                            enVCharacterSpacedText(tool.isPlanned
                                 ? "This tool is not yet implemented natively."
                                 : "This tool is available in the Web product and is not executable natively.")
                                 .font(.envScaled(size: 14, weight: .regular))
@@ -161,17 +161,17 @@ struct ToolDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    enVWordSpacedText("What this tool does")
+                    enVCharacterSpacedText("What this tool does")
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
-                    enVWordSpacedText("\(tool.description) Results can be copied or downloaded from this page.")
+                    enVCharacterSpacedText("\(tool.description) Results can be copied or downloaded from this page.")
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                 }
                 .padding(.top, 40)
 
                 if !relatedTools.isEmpty {
-                    enVWordSpacedText("Related tools")
+                    enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                         .padding(.top, 40)
@@ -202,14 +202,14 @@ struct ToolDetailView: View {
                 .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    enVWordSpacedText(tool.name)
+                    enVCharacterSpacedText(tool.name)
                         .font(.envScaled(size: compact ? 24 : 30, weight: .semibold))
                         .tracking(-0.35)
                         .foregroundStyle(Color.envInk)
                         .fixedSize(horizontal: false, vertical: true)
                     if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted) }
                 }
-                enVWordSpacedText(tool.description)
+                enVCharacterSpacedText(tool.description)
                     .font(.envScaled(size: 14, weight: .regular))
                     .foregroundStyle(Color.envMuted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -221,7 +221,7 @@ struct ToolDetailView: View {
         Button { store.toggleFavorite(tool) } label: {
             HStack(spacing: 8) {
                 EnVIcon(name: "Heart", size: 16, tint: store.isFavorite(tool) ? .white : .envInk)
-                enVWordSpacedText(store.isFavorite(tool) ? "Saved" : "Save")
+                enVCharacterSpacedText(store.isFavorite(tool) ? "Saved" : "Save")
                     .font(.envScaled(size: 14, weight: .medium))
             }
             .padding(.horizontal, 14)
@@ -239,8 +239,8 @@ private struct RelatedToolDetailCard: View {
     let tool: Tool
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            enVWordSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
-            enVWordSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
+            enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+            enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
@@ -357,7 +357,7 @@ private struct NativeBackendToolView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if isDocument {
-                enVWordSpacedText("Real document processing through the enV document backend. The selected file is processed for the requested operation and the resulting file is returned.")
+                enVCharacterSpacedText("Real document processing through the enV document backend. The selected file is processed for the requested operation and the resulting file is returned.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button(files.isEmpty ? (allowsMultipleDocuments ? "Choose files" : "Choose file") : "Selected \(files.count) file(s)") { showImporter = true }
                     .buttonStyle(.bordered)
@@ -370,19 +370,19 @@ private struct NativeBackendToolView: View {
                 }
                 if !output.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        enVWordSpacedText(output).font(.subheadline)
+                        enVCharacterSpacedText(output).font(.subheadline)
                         if outputData != nil {
                             Button("Save \(outputFileName)") { showExporter = true }.buttonStyle(.bordered)
                         }
                     }
                 } else if let error { NativeOutputView(output: "", error: error) }
             } else {
-                enVWordSpacedText("Native Swift · enV backend API").font(.subheadline.weight(.semibold))
+                enVCharacterSpacedText("Native Swift · enV backend API").font(.subheadline.weight(.semibold))
                 if tool.engine.type == "custom" {
                     VStack(alignment: .leading, spacing: 6) {
                         TextEditor(text: $input).frame(minHeight: 150)
                             .overlay(alignment: .topLeading) {
-                                if input.isEmpty { enVWordSpacedText("Enter the input required by this tool…").foregroundStyle(.tertiary).padding(.top, 8).padding(.leading, 5).allowsHitTesting(false) }
+                                if input.isEmpty { enVCharacterSpacedText("Enter the input required by this tool…").foregroundStyle(.tertiary).padding(.top, 8).padding(.leading, 5).allowsHitTesting(false) }
                             }
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
                     }
@@ -393,7 +393,7 @@ private struct NativeBackendToolView: View {
                 HStack {
                     if !["custom","developer"].contains(tool.engine.type ?? "") { Button("Choose file") { showImporter = true }.buttonStyle(.bordered) }
                     Button(working && tool.engine.type == "custom" ? "Running…" : tool.engine.type == "custom" ? "Run tool" : "Run") { Task { await run() } }.buttonStyle(.borderedProminent).disabled(working)
-                    if !files.isEmpty { enVWordSpacedText("Selected \(files.count) file(s)").font(.caption).foregroundStyle(.secondary) }
+                    if !files.isEmpty { enVCharacterSpacedText("Selected \(files.count) file(s)").font(.caption).foregroundStyle(.secondary) }
                 }
                 if tool.engine.type == "custom" && !output.isEmpty {
                     HStack {
@@ -460,7 +460,7 @@ private struct NativeProductivityToolView: View {
     @State private var remaining = 1500
     @State private var phase = "focus"
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    var body: some View { VStack(spacing: 14) { enVWordSpacedText(tool.id == "stopwatch" ? "Stopwatch" : tool.id == "pomodoro-timer" ? "Pomodoro · \(phase.capitalized)" : "Focus Timer").font(.headline); enVWordSpacedText(format(tool.id == "stopwatch" ? elapsed : remaining)).font(.envScaled(size: 56, weight: .medium, design: .monospaced)); HStack { Button(running ? "Pause" : "Start") { running.toggle() }.buttonStyle(.borderedProminent); Button("Reset") { running=false; elapsed=0; remaining=tool.id=="pomodoro-timer" ? 1500 : 3000; phase="focus" }.buttonStyle(.bordered) } }.onReceive(timer) { _ in guard running else { return }; if tool.id == "stopwatch" { elapsed += 1 } else if remaining <= 1 { phase = phase == "focus" ? "break" : "focus"; remaining = tool.id=="pomodoro-timer" ? (phase == "focus" ? 1500 : 300) : (phase == "focus" ? 3000 : 600) } else { remaining -= 1 } } }
+    var body: some View { VStack(spacing: 14) { enVCharacterSpacedText(tool.id == "stopwatch" ? "Stopwatch" : tool.id == "pomodoro-timer" ? "Pomodoro · \(phase.capitalized)" : "Focus Timer").font(.headline); enVCharacterSpacedText(format(tool.id == "stopwatch" ? elapsed : remaining)).font(.envScaled(size: 56, weight: .medium, design: .monospaced)); HStack { Button(running ? "Pause" : "Start") { running.toggle() }.buttonStyle(.borderedProminent); Button("Reset") { running=false; elapsed=0; remaining=tool.id=="pomodoro-timer" ? 1500 : 3000; phase="focus" }.buttonStyle(.bordered) } }.onReceive(timer) { _ in guard running else { return }; if tool.id == "stopwatch" { elapsed += 1 } else if remaining <= 1 { phase = phase == "focus" ? "break" : "focus"; remaining = tool.id=="pomodoro-timer" ? (phase == "focus" ? 1500 : 300) : (phase == "focus" ? 3000 : 600) } else { remaining -= 1 } } }
     private func format(_ s:Int)->String { String(format:"%02d:%02d",s/60,s%60) }
 }
 
@@ -473,9 +473,9 @@ private struct NativeUtilityToolView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            enVWordSpacedText("Native \(tool.engine.type ?? "utility") engine · op \(tool.engine.op ?? tool.engine.id ?? tool.id)")
+            enVCharacterSpacedText("Native \(tool.engine.type ?? "utility") engine · op \(tool.engine.op ?? tool.engine.id ?? tool.id)")
                 .font(.subheadline.weight(.semibold))
-            enVWordSpacedText("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine's flexible option model.")
+            enVCharacterSpacedText("Uses the catalog engine.op contract. Input is optional; structured parameters are supplied as JSON to preserve the web engine's flexible option model.")
                 .font(.caption).foregroundStyle(.secondary)
             NativeInputField(title: "Input", text: $input)
             NativeInputField(title: "Options JSON", text: $optionsJSON)
@@ -507,12 +507,12 @@ private struct NativeDeveloperTextArea: View {
     var placeholder:String=""
     var body:some View {
         VStack(alignment:.leading,spacing:6) {
-            enVWordSpacedText(title).font(.footnote.weight(.medium))
+            enVCharacterSpacedText(title).font(.footnote.weight(.medium))
             TextEditor(text:$text).font(.system(.body,design:.monospaced)).scrollContentBackground(.hidden)
                 .frame(minHeight:170).padding(4)
                 .overlay(RoundedRectangle(cornerRadius:10).stroke(Color.envTeal.opacity(0.35)))
                 .overlay(alignment:.topLeading) {
-                    if text.isEmpty && !placeholder.isEmpty { enVWordSpacedText(placeholder).font(.system(.body,design:.monospaced)).foregroundStyle(.secondary).padding(.leading,10).padding(.top,12).allowsHitTesting(false) }
+                    if text.isEmpty && !placeholder.isEmpty { enVCharacterSpacedText(placeholder).font(.system(.body,design:.monospaced)).foregroundStyle(.secondary).padding(.leading,10).padding(.top,12).allowsHitTesting(false) }
                 }
         }
     }
@@ -581,9 +581,9 @@ private struct NativeConverterToolView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let op = NativeConverterEngine.operation(for: tool) {
-                enVWordSpacedText("System: \(op.systemID) · mode: \(op.mode)").font(.caption).foregroundStyle(.secondary)
+                enVCharacterSpacedText("System: \(op.systemID) · mode: \(op.mode)").font(.caption).foregroundStyle(.secondary)
                 NativeInputField(title: "Value", text: $value)
-                enVWordSpacedText("Unit IDs are the same IDs used by the web engine (examples: \(NativeConverterEngine.units(for: op).prefix(5).map(\.id).joined(separator: ", ")) …)").font(.caption).foregroundStyle(.secondary)
+                enVCharacterSpacedText("Unit IDs are the same IDs used by the web engine (examples: \(NativeConverterEngine.units(for: op).prefix(5).map(\.id).joined(separator: ", ")) …)").font(.caption).foregroundStyle(.secondary)
                 NativeInputField(title: "From unit", text: $from)
                 NativeInputField(title: "To unit", text: $to)
                 NativeActionRow(output: output, run: {
@@ -612,7 +612,7 @@ private struct NativeCalculatorToolView: View {
     var body: some View {
         if let op = NativeCalculatorEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                if let formula = op.formula, !formula.isEmpty { enVWordSpacedText("Formula: \(formula)").font(.subheadline.weight(.semibold)) }
+                if let formula = op.formula, !formula.isEmpty { enVCharacterSpacedText("Formula: \(formula)").font(.subheadline.weight(.semibold)) }
                 ForEach(op.fields, id: \.name) { field in
                     NativeInputField(title: field.suffix.map { "\(field.label) (\($0))" } ?? field.label, text: binding(for: field.name))
                 }
@@ -649,7 +649,7 @@ private struct NativeExpansionCalculatorToolView: View {
     var body: some View {
         if let op = NativeExpansionCalculatorEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                enVWordSpacedText("\(op.cLabel) = \(op.aLabel) \(op.family == "product" ? "×" : op.family == "ratio" ? "÷" : "+") \(op.bLabel)").font(.subheadline.weight(.semibold))
+                enVCharacterSpacedText("\(op.cLabel) = \(op.aLabel) \(op.family == "product" ? "×" : op.family == "ratio" ? "÷" : "+") \(op.bLabel)").font(.subheadline.weight(.semibold))
                 if op.target != "a" { NativeInputField(title: op.aLabel, text: binding(for: "a")) }
                 if op.target != "b" { NativeInputField(title: op.bLabel, text: binding(for: "b")) }
                 if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
@@ -686,7 +686,7 @@ private struct NativeMathExerciseToolView: View {
     var body: some View {
         if let op = NativeMathExerciseEngine.operation(for: tool.id) {
             VStack(alignment: .leading, spacing: 12) {
-                enVWordSpacedText(op.formula).font(.subheadline.weight(.semibold))
+                enVCharacterSpacedText(op.formula).font(.subheadline.weight(.semibold))
                 ForEach(op.fields, id: \.name) { field in NativeInputField(title: field.label, text: binding(for: field.name)) }
                 NativeActionRow(output: output, run: {
                     do {
@@ -723,7 +723,7 @@ private struct NativeActionRow: View {
             Button("Run", action: run).buttonStyle(.borderedProminent)
             Button("Reset", action: reset).buttonStyle(.bordered)
             Button { UIPasteboard.general.string = output } label: {
-                HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVWordSpacedText("Copy") }
+                HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
             }.buttonStyle(.bordered).disabled(output.isEmpty)
         }
     }
@@ -735,9 +735,9 @@ private struct NativeOutputView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let error { enVWordSpacedText(error).foregroundStyle(.red).font(.footnote) }
+            if let error { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
             if !output.isEmpty {
-                enVWordSpacedText("Result").font(.subheadline.weight(.semibold))
+                enVCharacterSpacedText("Result").font(.subheadline.weight(.semibold))
                 TextEditor(text: .constant(output))
                     .font(.system(.body, design: .monospaced))
                     .frame(minHeight: 130)
@@ -773,7 +773,7 @@ struct NativeCodecToolView: View {
                     TextField("To base", text: $toBase).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
                 }
             } else {
-                enVWordSpacedText("Input").font(.subheadline.weight(.semibold))
+                enVCharacterSpacedText("Input").font(.subheadline.weight(.semibold))
                 TextEditor(text: $input).frame(minHeight: 130).overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
             }
             NativeActionRow(output: output, run: run, reset: reset)
@@ -822,13 +822,13 @@ struct NativeColorToolView: View {
             NativeActionRow(output: output, run: run, reset: reset)
             NativeOutputView(output: output, error: error)
             if !palette.isEmpty {
-                enVWordSpacedText("Palette swatches · tap to apply").font(.subheadline).foregroundStyle(.secondary)
+                enVCharacterSpacedText("Palette swatches · tap to apply").font(.subheadline).foregroundStyle(.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 8) {
                     ForEach(palette, id: \.self) { swatch in
                         Button { input = swatch; run() } label: {
                             HStack(spacing: 8) {
                                 Circle().fill(color(for: swatch)).frame(width: 20, height: 20)
-                                enVWordSpacedText(swatch).font(.system(.footnote, design: .monospaced))
+                                enVCharacterSpacedText(swatch).font(.system(.footnote, design: .monospaced))
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(9)
@@ -845,8 +845,8 @@ struct NativeColorToolView: View {
     @ViewBuilder private func colorSwatchRow(_ value: String, label: String) -> some View {
         HStack(spacing: 8) {
             Circle().fill(color(for: value)).frame(width: 24, height: 24)
-            enVWordSpacedText(label).foregroundStyle(.secondary)
-            enVWordSpacedText(value).font(.system(.body, design: .monospaced))
+            enVCharacterSpacedText(label).foregroundStyle(.secondary)
+            enVCharacterSpacedText(value).font(.system(.body, design: .monospaced))
         }
     }
 
@@ -938,9 +938,9 @@ struct NativeMimeToolView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("Search extension, MIME, name, or group", text: $query).textFieldStyle(.roundedBorder)
-            enVWordSpacedText("Optional signature inspection").font(.subheadline.weight(.semibold))
+            enVCharacterSpacedText("Optional signature inspection").font(.subheadline.weight(.semibold))
             Button { showingFileImporter = true } label: {
-                HStack(spacing: 8) { EnVIcon(name: "FilePlus2", size: 16, tint: .envAccent); enVWordSpacedText(fileName.isEmpty ? "Choose a local file" : "Choose another file") }
+                HStack(spacing: 8) { EnVIcon(name: "FilePlus2", size: 16, tint: .envAccent); enVCharacterSpacedText(fileName.isEmpty ? "Choose a local file" : "Choose another file") }
             }.buttonStyle(.bordered)
             TextField("File name", text: $fileName).textFieldStyle(.roundedBorder)
             TextField("Declared MIME", text: $browserMime).textFieldStyle(.roundedBorder)
@@ -1000,18 +1000,18 @@ struct NativeTextToolView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if isDiff { enVWordSpacedText("Original text").font(.subheadline.weight(.semibold)); editor($input); enVWordSpacedText("New text").font(.subheadline.weight(.semibold)); editor($compare) }
-            else { enVWordSpacedText("Input").font(.subheadline.weight(.semibold)); editor($input) }
+            if isDiff { enVCharacterSpacedText("Original text").font(.subheadline.weight(.semibold)); editor($input); enVCharacterSpacedText("New text").font(.subheadline.weight(.semibold)); editor($compare) }
+            else { enVCharacterSpacedText("Input").font(.subheadline.weight(.semibold)); editor($input) }
             ForEach(optionNames, id: \.self) { name in TextField(label(name), text: Binding(get: { options[name, default: defaultValue(name)] }, set: { options[name] = $0 })).textFieldStyle(.roundedBorder) }
             if isCounter { let s = NativeTextEngine.statistics(input, wpm: options["wpm"] ?? "200"); LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], alignment: .leading) { stat("Words", s.words); stat("Characters", s.characters); stat("No spaces", s.charactersWithoutSpaces); stat("Sentences", s.sentences); stat("Paragraphs", s.paragraphs); stat("Reading", "\(s.readingMinutes) min") } }
-            if tool.id == "word-counter" || tool.id == "character-counter" { let s = NativeTextEngine.statistics(input); let metric = tool.id == "word-counter" ? s.words : s.characters; let limit = max(1, Int(options["limit"] ?? "1") ?? 1); enVWordSpacedText(metric <= limit ? "\(limit - metric) remaining" : "\(metric - limit) over").font(.subheadline).foregroundStyle(.secondary) }
+            if tool.id == "word-counter" || tool.id == "character-counter" { let s = NativeTextEngine.statistics(input); let metric = tool.id == "word-counter" ? s.words : s.characters; let limit = max(1, Int(options["limit"] ?? "1") ?? 1); enVCharacterSpacedText(metric <= limit ? "\(limit - metric) remaining" : "\(metric - limit) over").font(.subheadline).foregroundStyle(.secondary) }
             HStack {
-                Button(action: run) { HStack(spacing: 6) { EnVIcon(name: "Play", size: 14, tint: .white); enVWordSpacedText("Run") } }.buttonStyle(.borderedProminent)
-                Button(action: reset) { HStack(spacing: 6) { EnVIcon(name: "RotateCcw", size: 14, tint: .envMuted); enVWordSpacedText("Reset") } }.buttonStyle(.bordered)
-                Button { UIPasteboard.general.string = output } label: { HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVWordSpacedText("Copy output") } }.disabled(output.isEmpty)
+                Button(action: run) { HStack(spacing: 6) { EnVIcon(name: "Play", size: 14, tint: .white); enVCharacterSpacedText("Run") } }.buttonStyle(.borderedProminent)
+                Button(action: reset) { HStack(spacing: 6) { EnVIcon(name: "RotateCcw", size: 14, tint: .envMuted); enVCharacterSpacedText("Reset") } }.buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = output } label: { HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy output") } }.disabled(output.isEmpty)
             }
-            if let error { enVWordSpacedText(error).foregroundStyle(.red).font(.footnote) }
-            if let diffSummary { enVWordSpacedText(diffSummary).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envTeal) }
+            if let error { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
+            if let diffSummary { enVCharacterSpacedText(diffSummary).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envTeal) }
             if !output.isEmpty { TextEditor(text: .constant(output)).font(.system(.body, design: .monospaced)).frame(minHeight: 150).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35))) }
         }
         .onChange(of: input) { _ in if isCounter { run() } }
@@ -1019,7 +1019,7 @@ struct NativeTextToolView: View {
         .onAppear { for name in optionNames where options[name] == nil { options[name] = defaultValue(name) } }
     }
     private func editor(_ text: Binding<String>) -> some View { TextEditor(text: text).frame(minHeight: 150).overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25))) }
-    @ViewBuilder private func stat(_ name: String, _ value: some CustomStringConvertible) -> some View { VStack(alignment: .leading) { enVWordSpacedText(name).font(.caption).foregroundStyle(.secondary); enVWordSpacedText(value.description).font(.headline) }.padding(8).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8)) }
+    @ViewBuilder private func stat(_ name: String, _ value: some CustomStringConvertible) -> some View { VStack(alignment: .leading) { enVCharacterSpacedText(name).font(.caption).foregroundStyle(.secondary); enVCharacterSpacedText(value.description).font(.headline) }.padding(8).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8)) }
     private func label(_ name: String) -> String { ["find":"Find", "replace":"Replace", "flags":"Regex flags", "width":"Width", "style":"Style (bullets, numbered, comma)", "keyword":"Keyword (optional)", "wpm":"Reading speed (words/min)", "limit":"Target limit"][name] ?? name.capitalized }
     private func defaultValue(_ name: String) -> String { name == "flags" ? "g" : name == "width" ? "80" : name == "wpm" ? "200" : name == "limit" ? "280" : name == "style" ? "bullets" : "" }
     private func run() { do { let r = try NativeTextEngine.run(toolID: tool.id, input: input, compare: compare, options: options); output = r.output; diffSummary = isDiff ? "Added: \(r.added) · Removed: \(r.removed) · Unchanged: \(r.unchanged)" : nil; error = nil } catch let caughtError { output = ""; diffSummary = nil; error = caughtError.localizedDescription } }
@@ -1298,9 +1298,9 @@ private struct NativeUnavailableToolView: View {
     let backend: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            enVWordSpacedText(backend ? "Native Swift · enV backend API" : "Not implemented natively")
+            enVCharacterSpacedText(backend ? "Native Swift · enV backend API" : "Not implemented natively")
                 .font(.subheadline.weight(.semibold))
-            enVWordSpacedText(backend ? "This operation is executed by the configured enV backend." : "This catalog entry is not advertised as a native capability until a real implementation is connected.")
+            enVCharacterSpacedText(backend ? "This operation is executed by the configured enV backend." : "This catalog entry is not advertised as a native capability until a real implementation is connected.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -1656,8 +1656,8 @@ private struct NativeAiToolView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            enVWordSpacedText(localDeterministic ? "Runs locally with deterministic templates" : "AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
-            if !localDeterministic && available == false { enVWordSpacedText("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
+            enVCharacterSpacedText(localDeterministic ? "Runs locally with deterministic templates" : "AI assistance · native Swift → enV AI API").font(.subheadline.weight(.semibold))
+            if !localDeterministic && available == false { enVCharacterSpacedText("AI is currently unavailable on this deployment. The local/native tool still works.").font(.caption).foregroundStyle(.secondary) }
             if let task {
                 if localAdCopy { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Main benefit", text: $benefit) }
                 else if localContentBrief { NativeInputField(title: "Topic / subject", text: $topic); NativeInputField(title: "Audience", text: $audience); NativeInputField(title: "Tone", text: $tone); NativeInputField(title: "Goal", text: $goal) }
@@ -1682,8 +1682,8 @@ private struct NativeAiToolView: View {
                 if needsConsent { Toggle("I understand this input is sent to an external AI service.", isOn: $consent) }
                 HStack { Button(working ? "Working…" : "Generate") { run(task: task) }.buttonStyle(.borderedProminent).disabled(working || (!localDeterministic && available != true) || needsConsent && !consent || needsFile && file == nil || requiredMissing); Button("Reset") { output=""; error=""; existingPrompt=localImprover ? "Write a good social media post about my product." : existingPrompt; topic=localCaption || localTitle || localIdea || localHook || localContentBrief || localAdCopy ? "AI tools for creators" : localPrompt ? "Create a launch plan for a digital product" : localBio ? "AI music creator" : localProduct ? "AI Music Generator Class" : localResume ? "Managed social media content and improved engagement" : localRewrite ? "We are launching a new product that helps people create useful content faster." : ""; resultMetric=localResume ? "increased engagement" : ""; features=localProduct ? "Beginner friendly\nWorks from a smartphone\nUses accessible tools" : ""; benefit=localHook || localAdCopy ? "Save time and get started quickly" : ""; goal=localIdea || localContentBrief ? "Educate and give the reader a practical next step" : goal; audience="creators and small businesses";pattern="";sql="";json="";file=nil }.buttonStyle(.bordered) }
                 if !output.isEmpty { TextEditor(text: .constant(output)).frame(minHeight: 150).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3))) }
-                if !error.isEmpty { enVWordSpacedText(error).foregroundStyle(.red).font(.footnote) }
-                enVWordSpacedText("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
+                if !error.isEmpty { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
+                enVCharacterSpacedText("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.").font(.caption).foregroundStyle(.secondary)
                     .onAppear { if !localDeterministic { Task { available = (try? await NativeAiClient.availability()[task]) ?? false } } }
                     .fileImporter(isPresented: $picker, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }; if let data = try? Data(contentsOf: url) { file = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: data) } } }
             }
@@ -1748,7 +1748,7 @@ private struct NativeBusinessToolView: View {
     private var options: [String:String] { ["a":a,"b":b,"c":c,"d":d,"e":e,"seed":seed,"audience":audience] }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            enVWordSpacedText("Native business engine · \(tool.engine.op ?? tool.engine.id ?? tool.id)").font(.subheadline.weight(.semibold))
+            enVCharacterSpacedText("Native business engine · \(tool.engine.op ?? tool.engine.id ?? tool.id)").font(.subheadline.weight(.semibold))
             NativeInputField(title: "Revenue / amount", text: $a)
             NativeInputField(title: "Cost / rate / second value", text: $b)
             NativeInputField(title: "Variable cost / third value", text: $c)
@@ -1785,12 +1785,12 @@ private struct NativeFileConverterToolView: View {
     @State private var exporting=false
     var body: some View {
         VStack(alignment:.leading,spacing:12) {
-            enVWordSpacedText("Native Swift · local file conversion").font(.subheadline.weight(.semibold))
+            enVCharacterSpacedText("Native Swift · local file conversion").font(.subheadline.weight(.semibold))
             Button(file == nil ? "Choose file" : file!.name) { importing=true }.buttonStyle(.bordered)
             HStack { Button("Convert") { run() }.buttonStyle(.borderedProminent).disabled(file == nil); Button("Reset") { file=nil;output="";outputData=nil;error="" }.buttonStyle(.bordered) }
             if !output.isEmpty { TextEditor(text:.constant(output)).frame(minHeight:150).textSelection(.enabled) }
             if outputData != nil { Button("Save \(outputExt.uppercased())") { exporting=true }.buttonStyle(.bordered) }
-            if !error.isEmpty { enVWordSpacedText(error).foregroundStyle(.red).font(.footnote) }
+            if !error.isEmpty { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
         }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
             if case .success(let urls)=result,let url=urls.first { let access=url.startAccessingSecurityScopedResource(); defer{if access{url.stopAccessingSecurityScopedResource()}}; if let data=try? Data(contentsOf:url){file=NativeBackendFile(name:url.lastPathComponent,mimeType:UTType(filenameExtension:url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",data:data)} }
@@ -1960,11 +1960,11 @@ private struct NativeAiAssistPanel: View {
     private var panel: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                enVWordSpacedText("✦").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envAccent)
-                enVWordSpacedText(feature.title).font(.envScaled(size: 18, weight: .semibold)).foregroundStyle(Color.envInk)
-                enVWordSpacedText("AI").font(.envScaled(size: 11, weight: .medium)).tracking(0.7).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.vertical, 3).background(Color.envSurface2, in: Capsule())
+                enVCharacterSpacedText("✦").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envAccent)
+                enVCharacterSpacedText(feature.title).font(.envScaled(size: 18, weight: .semibold)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("AI").font(.envScaled(size: 11, weight: .medium)).tracking(0.7).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.vertical, 3).background(Color.envSurface2, in: Capsule())
             }
-            enVWordSpacedText(feature.description).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+            enVCharacterSpacedText(feature.description).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             let columns = compact ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())]
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 ForEach(feature.fields.filter { $0.kind != .checkbox }) { field in
@@ -1986,7 +1986,7 @@ private struct NativeAiAssistPanel: View {
                         if let issue = validationIssue { notice = issue; return }
                         run()
                     } label: {
-                        HStack(spacing: 6) { enVWordSpacedText("✦"); enVWordSpacedText(result == nil ? feature.actionLabel : "Try again") }
+                        HStack(spacing: 6) { enVCharacterSpacedText("✦"); enVCharacterSpacedText(result == nil ? feature.actionLabel : "Try again") }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.envAccent)
@@ -1994,14 +1994,14 @@ private struct NativeAiAssistPanel: View {
                 }
                 if working || preparing {
                     ProgressView().tint(Color.envAccent)
-                    enVWordSpacedText(preparing ? "Preparing your file…" : "Working on it. This can take up to a minute.")
+                    enVCharacterSpacedText(preparing ? "Preparing your file…" : "Working on it. This can take up to a minute.")
                         .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
                 }
             }
-            enVWordSpacedText("AI-assisted. Nothing is sent until you press the button; then your input goes to an external AI service to produce the result. AI can be wrong, so review it before you use it. Use is limited per person and per day to keep it available for everyone.")
+            enVCharacterSpacedText("AI-assisted. Nothing is sent until you press the button; then your input goes to an external AI service to produce the result. AI can be wrong, so review it before you use it. Use is limited per person and per day to keep it available for everyone.")
                 .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-            if !notice.isEmpty { enVWordSpacedText(notice).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
-            if !error.isEmpty { enVWordSpacedText(error).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
+            if !notice.isEmpty { enVCharacterSpacedText(notice).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
+            if !error.isEmpty { enVCharacterSpacedText(error).font(.envScaled(size: 13, weight: .regular)).foregroundStyle(.red) }
             if let result { resultView(result) }
         }
         .padding(compact ? 16 : 24)
@@ -2020,31 +2020,31 @@ private struct NativeAiAssistPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             switch field.kind {
             case .textarea:
-                enVWordSpacedText("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 ZStack(alignment: .topLeading) {
-                    if (values[field.name] ?? "").isEmpty, let placeholder = field.placeholder { enVWordSpacedText(placeholder).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envSubtle).padding(.horizontal, 5).padding(.vertical, 8) }
+                    if (values[field.name] ?? "").isEmpty, let placeholder = field.placeholder { enVCharacterSpacedText(placeholder).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envSubtle).padding(.horizontal, 5).padding(.vertical, 8) }
                     TextEditor(text: binding).font(field.monospace ? .envScaled(size: 14, design: .monospaced) : .envScaled(size: 14, weight: .regular)).frame(minHeight: 104, maxHeight: 180).scrollContentBackground(.hidden)
                 }
                 .padding(6).background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
             case .text:
                 TextField(field.placeholder ?? "", text: binding).font(field.monospace ? .envScaled(size: 14, design: .monospaced) : .envScaled(size: 14, weight: .regular)).textFieldStyle(.roundedBorder).accessibilityLabel("\(field.label)\(field.required ? " required" : "")")
-                    .overlay(alignment: .topLeading) { if (values[field.name] ?? "").isEmpty { enVWordSpacedText("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.top, -8) } }
+                    .overlay(alignment: .topLeading) { if (values[field.name] ?? "").isEmpty { enVCharacterSpacedText("\(field.label)\(field.required ? " *" : "")").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).padding(.horizontal, 8).padding(.top, -8) } }
                     .keyboardType(field.name == "language" ? .asciiCapable : .default)
             case .number:
-                enVWordSpacedText(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 TextField("", text: binding).textFieldStyle(.roundedBorder).keyboardType(.numberPad)
             case .select:
-                enVWordSpacedText(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
-                Picker(field.label, selection: binding) { ForEach(field.options) { option in enVWordSpacedText(option.label).tag(option.value) } }
+                enVCharacterSpacedText(field.label).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                Picker(field.label, selection: binding) { ForEach(field.options) { option in enVCharacterSpacedText(option.label).tag(option.value) } }
                     .pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 7)
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
             case .image, .audio:
-                enVWordSpacedText(field.label + (field.required ? " *" : "")).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText(field.label + (field.required ? " *" : "")).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
                 Button(selectedFile?.name ?? "Choose \(field.kind == .image ? "image" : "audio")") { importing = true }.buttonStyle(.bordered)
-                if let selectedFile { enVWordSpacedText("\(selectedFile.name) · \(String(format: "%.1f", Double(selectedFile.data.count) / 1_000_000)) MB ready to send").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if let selectedFile { enVCharacterSpacedText("\(selectedFile.name) · \(String(format: "%.1f", Double(selectedFile.data.count) / 1_000_000)) MB ready to send").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             case .checkbox: EmptyView()
             }
-            if let help = field.help { enVWordSpacedText(help).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+            if let help = field.help { enVCharacterSpacedText(help).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
         }
     }
 
@@ -2089,35 +2089,35 @@ private struct NativeAiAssistPanel: View {
                     let hashtags = (variants[index]["hashtags"] as? [String] ?? []).map { "#\($0)" }.joined(separator: " ")
                     VStack(alignment: .leading, spacing: 8) {
                         TextEditor(text: Binding(get: { captionDrafts.indices.contains(index) ? captionDrafts[index] : (variants[index]["caption"] as? String ?? "") }, set: { value in if captionDrafts.indices.contains(index) { captionDrafts[index] = value } })).font(.envScaled(size: 14, weight: .regular)).frame(minHeight: 92).scrollContentBackground(.hidden).padding(4).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
-                        if !hashtags.isEmpty { enVWordSpacedText(hashtags).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
-                        HStack { enVWordSpacedText("\((captionDrafts.indices.contains(index) ? captionDrafts[index] : "").count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted); Spacer(); Button("Copy") { UIPasteboard.general.string = (captionDrafts.indices.contains(index) ? captionDrafts[index] : "") + (hashtags.isEmpty ? "" : "\n\n\(hashtags)") }.buttonStyle(.bordered) }
+                        if !hashtags.isEmpty { enVCharacterSpacedText(hashtags).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                        HStack { enVCharacterSpacedText("\((captionDrafts.indices.contains(index) ? captionDrafts[index] : "").count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted); Spacer(); Button("Copy") { UIPasteboard.general.string = (captionDrafts.indices.contains(index) ? captionDrafts[index] : "") + (hashtags.isEmpty ? "" : "\n\n\(hashtags)") }.buttonStyle(.bordered) }
                     }.padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
                 }
             } else if feature.resultKind == "titles" {
                 ForEach(Array((result["titles"] as? [String] ?? []).enumerated()), id: \.offset) { pair in
                     let title = pair.element
-                    HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { enVWordSpacedText(title).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk); enVWordSpacedText("\(title.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
+                    HStack(spacing: 10) { VStack(alignment: .leading, spacing: 3) { enVCharacterSpacedText(title).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk); enVCharacterSpacedText("\(title.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }; Spacer(); Button("Copy") { UIPasteboard.general.string = title }.buttonStyle(.bordered) }
                         .padding(12).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
                 }
             } else if feature.resultKind == "regex" {
-                enVWordSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
+                enVCharacterSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Breakdown", entries: (result["parts"] as? [[String:Any]] ?? []).map { "\($0["token"] as? String ?? "") — \($0["meaning"] as? String ?? "")" })
                 NativeAiStructuredSection(title: "Watch out for", entries: result["pitfalls"] as? [String] ?? [])
                 NativeAiStructuredSection(title: "Suggested examples (AI guesses, not verified)", entries: (result["suggestedTests"] as? [[String:Any]] ?? []).map { item in "\((item["input"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "(empty)") — \((item["shouldMatch"] as? Bool ?? false) ? "should match" : "should not match")" })
-                if !(result["suggestedTests"] as? [[String:Any]] ?? []).isEmpty { enVWordSpacedText("Try these in the regex tester above before relying on them.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if !(result["suggestedTests"] as? [[String:Any]] ?? []).isEmpty { enVCharacterSpacedText("Try these in the regex tester above before relying on them.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             } else if feature.resultKind == "sql" {
-                enVWordSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
+                enVCharacterSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Step by step", entries: (result["steps"] as? [[String:Any]] ?? []).enumerated().map { "\($0.offset + 1). \($0.element["clause"] as? String ?? "") — \($0.element["explanation"] as? String ?? "")" })
                 NativeAiStructuredSection(title: "Warnings", entries: result["warnings"] as? [String] ?? [])
                 NativeAiStructuredSection(title: "Performance notes", entries: result["performanceNotes"] as? [String] ?? [])
             } else if feature.resultKind == "json" {
-                enVWordSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
+                enVCharacterSpacedText(result["summary"] as? String ?? "").font(.envScaled(size: 14, weight: .regular))
                 NativeAiStructuredSection(title: "Structure", entries: (result["structure"] as? [[String:Any]] ?? []).map { item in "\(item["path"] as? String ?? "") · \(item["type"] as? String ?? "")\((item["note"] as? String).flatMap { $0.isEmpty ? nil : $0 }.map { " — \($0)" } ?? "")" })
                 NativeAiStructuredSection(title: "Possible issues", entries: result["issues"] as? [String] ?? [])
             } else if feature.resultKind == "alt-text" {
                 let alt = result["altText"] as? String ?? ""
                 NativeAiStructuredSection(title: "Alt text", entries: [alt])
-                enVWordSpacedText("\(alt.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("\(alt.count) characters").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
                 NativeAiStructuredSection(title: "Longer description", entries: [result["longDescription"] as? String ?? ""])
                 if result["containsText"] as? Bool == true { NativeAiStructuredSection(title: "Text found in the image", entries: [result["textInImage"] as? String ?? ""]) }
             } else {
@@ -2133,9 +2133,9 @@ private struct NativeAiAssistPanel: View {
                         }
                     }
                 }
-                if feature.resultKind == "transcript", let language = result["language"] as? String { enVWordSpacedText("Detected language: \(language)").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+                if feature.resultKind == "transcript", let language = result["language"] as? String { enVCharacterSpacedText("Detected language: \(language)").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
             }
-            if !resultWarnings.isEmpty { enVWordSpacedText(resultWarnings.joined(separator: " ")).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
+            if !resultWarnings.isEmpty { enVCharacterSpacedText(resultWarnings.joined(separator: " ")).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted) }
         }
     }
 
@@ -2162,10 +2162,10 @@ private struct NativeAiStructuredSection: View {
     var body: some View {
         if !entries.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                enVWordSpacedText(title).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText(title).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
                 ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                     HStack(alignment: .top, spacing: 8) {
-                        enVWordSpacedText("• \(entry)")
+                        enVCharacterSpacedText("• \(entry)")
                             .font(.envScaled(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)

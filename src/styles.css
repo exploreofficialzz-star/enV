@@ -93,7 +93,7 @@
     font-family: var(--font-sans);
     font-size: 1.11rem;
     line-height: 1.5;
-    word-spacing: 0.02em;
+    letter-spacing: 0.02em;
   }
 
   h1,

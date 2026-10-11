@@ -5,11 +5,8 @@ import androidx.compose.material3.Text as MaterialText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -19,23 +16,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 
-private val subtleWordSpacing = 0.02.em
-
-fun AnnotatedString.withSubtleWordSpacing(): AnnotatedString = buildAnnotatedString {
-    append(this@withSubtleWordSpacing)
-    this@withSubtleWordSpacing.text.forEachIndexed { index, character ->
-        if (character == ' ') {
-            addStyle(
-                style = SpanStyle(letterSpacing = subtleWordSpacing),
-                start = index,
-                end = index + 1,
-            )
-        }
-    }
-}
+private val subtleCharacterSpacing = 0.02.em
 
 @Composable
-fun WordSpacedText(
+fun CharacterSpacedText(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
@@ -54,14 +38,14 @@ fun WordSpacedText(
     style: TextStyle = LocalTextStyle.current,
 ) {
     MaterialText(
-        text = AnnotatedString(text).withSubtleWordSpacing(),
+        text = text,
         modifier = modifier,
         color = color,
         fontSize = fontSize,
         fontStyle = fontStyle,
         fontWeight = fontWeight,
         fontFamily = fontFamily,
-        letterSpacing = letterSpacing,
+        letterSpacing = if (letterSpacing == TextUnit.Unspecified) subtleCharacterSpacing else letterSpacing,
         textDecoration = textDecoration,
         textAlign = textAlign,
         lineHeight = lineHeight,

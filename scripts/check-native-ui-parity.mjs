@@ -6,7 +6,7 @@ const iosContent = readFileSync("apps/ios/enV/ContentViews.swift", "utf8");
 const iosApp = readFileSync("apps/ios/enV/enVApp.swift", "utf8");
 const iosTools = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
 const androidTheme = readFileSync("apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt", "utf8");
-const androidWordText = readFileSync("apps/android/app/src/main/java/com/chastech/env/ui/WordSpacedText.kt", "utf8");
+const androidWordText = readFileSync("apps/android/app/src/main/java/com/chastech/env/ui/CharacterSpacedText.kt", "utf8");
 const webStyles = readFileSync("src/styles.css", "utf8");
 const webHome = readFileSync("src/routes/index.tsx", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
@@ -36,13 +36,14 @@ assert.ok((iosContent.match(/frame\(maxWidth: 1152\)/g) ?? []).length >= 3, "iOS
 
 // Keep the web and each native app on their own platform system sans-serif.
 assert.match(webStyles, /--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif/);
-assert.match(webStyles, /word-spacing: 0\.02em/);
+assert.match(webStyles, /letter-spacing: 0\.02em/);
 assert.match(androidTheme, /typography = Typography\(\)/);
-assert.match(android, /import com\.chastech\.env\.ui\.WordSpacedText as Text/);
-assert.match(androidWordText, /private val subtleWordSpacing = 0\.02\.em/);
-assert.match(androidWordText, /if \(character == ' '\)/);
-assert.match(iosApp, /func enVWordSpacedText\(_ source: String\)/);
-assert.match(iosApp, /addAttribute\(\.kern, value: 0\.25/);
+assert.match(android, /import com\.chastech\.env\.ui\.CharacterSpacedText as Text/);
+assert.match(androidWordText, /private val subtleCharacterSpacing = 0\.02\.em/);
+assert.match(androidWordText, /letterSpacing = if \(letterSpacing == TextUnit\.Unspecified\) subtleCharacterSpacing else letterSpacing/);
+assert.match(iosApp, /func enVCharacterSpacedText\(_ source: String\)/);
+assert.match(iosApp, /Text\(verbatim: source\)\.tracking\(0\.25\)/);
+assert.match(iosApp, /func enVLocalizedCharacterSpacedText\(_ key: LocalizedStringKey\)/);
 assert.match(androidTheme, /fontScale \* EnVFontScale/);
 assert.match(androidTheme, /EnVFontScale = 1\.11f/);
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
@@ -70,7 +71,7 @@ assert.match(android, /Year\.now\(\)\.value/);
 assert.match(iosContent, /Calendar\.current\.component\(\.year, from: \.now\)/);
 assert.match(android, /SearchBox\(catalog, query, onQuery, onTool\)/);
 assert.match(android, /contentDescription = "Search tools"/);
-assert.match(iosContent, /enVWordSpacedText\("Search tools"\)/);
+assert.match(iosContent, /enVCharacterSpacedText\("Search tools"\)/);
 assert.match(iosContent, /TextField\("Search tools", text: \$text\)/);
 assert.match(iosContent, /\.accessibilityLabel\("Search tools"\)/);
 assert.match(android, /suggestions\.firstOrNull\(\)\?\.let \{ onTool\(it\.id\) \}/);

@@ -155,7 +155,7 @@ struct AssistantChatView: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
-                            enVWordSpacedText("AI assistant").font(.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
+                            enVCharacterSpacedText("AI assistant").font(.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
                     }
                     Spacer()
                     Button(action: startNewChat) {
@@ -173,7 +173,7 @@ struct AssistantChatView: View {
                                         .foregroundStyle(Color.envAccent)
                                         .frame(width: 52, height: 52)
                                         .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 16))
-                                    enVWordSpacedText("What can I help with?").font(.title3.weight(.semibold)).foregroundStyle(Color.envMuted)
+                                    enVCharacterSpacedText("What can I help with?").font(.title3.weight(.semibold)).foregroundStyle(Color.envMuted)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 32)
@@ -183,9 +183,9 @@ struct AssistantChatView: View {
                                         if message.isUser { Spacer(minLength: 28) }
                                         VStack(alignment: .leading, spacing: 8) {
                                             VStack(alignment: .leading, spacing: 5) {
-                                                enVWordSpacedText(message.isUser ? "You" : "enV")
+                                                enVCharacterSpacedText(message.isUser ? "You" : "enV")
                                                     .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envMuted)
-                                                enVWordSpacedText(message.content)
+                                                enVCharacterSpacedText(message.content)
                                                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
                                                     .textSelection(.enabled)
                                                     .fixedSize(horizontal: false, vertical: true)
@@ -198,8 +198,8 @@ struct AssistantChatView: View {
                                                                 HStack(spacing: 10) {
                                                                     EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
                                                                     VStack(alignment: .leading, spacing: 3) {
-                                                                        enVWordSpacedText(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                                                                        enVWordSpacedText(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                                                        enVCharacterSpacedText(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                                                        enVCharacterSpacedText(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
                                                                     }
                                                                     Spacer(minLength: 4)
                                                                     Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
@@ -229,7 +229,7 @@ struct AssistantChatView: View {
                             if isSending {
                                 HStack(spacing: 8) {
                                     ProgressView()
-                                    enVWordSpacedText("Thinking…").font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    enVCharacterSpacedText("Thinking…").font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                                     Button("Stop", action: stopRequest)
                                         .font(.envScaled(size: 14, weight: .semibold))
                                         .accessibilityLabel("Stop assistant response")
@@ -259,7 +259,7 @@ struct AssistantChatView: View {
 
                 if let errorMessage {
                     HStack(alignment: .center, spacing: 8) {
-                        enVWordSpacedText(errorMessage).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
+                        enVCharacterSpacedText(errorMessage).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk).frame(maxWidth: .infinity, alignment: .leading)
                         if let retryRequest {
                             Button("Retry") { runRequest(retryRequest) }.font(.envScaled(size: 14, weight: .semibold))
                         }
