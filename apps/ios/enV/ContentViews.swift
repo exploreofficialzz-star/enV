@@ -64,7 +64,8 @@ struct HomeView: View {
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 28))
                         .overlay(RoundedRectangle(cornerRadius: 28).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
-                        if hasSearchText {
+                        .overlay(alignment: .top) {
+                            if isHomeSearchFocused && hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
                                 if searchSuggestions.isEmpty {
                                     enVCharacterSpacedText("No matching tools. Try “json”, “bmi”, or “qr”.")
@@ -99,9 +100,14 @@ struct HomeView: View {
                                 }
                             }
                             .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
                             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.12), radius: 8, y: 4)
+                            .offset(y: horizontalSizeClass == .regular ? 80 : 72)
+                            }
                         }
+                        .zIndex(isHomeSearchFocused && hasSearchText ? 1 : 0)
                         GeometryReader { proxy in
                             HStack(spacing: horizontalSizeClass == .regular ? 12 : 8) {
                                 HomePreviewBar(title: "AI assistant", action: onAssistant).frame(maxWidth: .infinity)
@@ -247,6 +253,12 @@ private struct WebHomeSearchSuggestion: View {
                     else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                 }
                 enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                HStack {
+                    Spacer()
+                    EnVIcon(name: "ArrowRight", size: 16, tint: .envInk)
+                        .accessibilityHidden(true)
+                }
+                .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -730,7 +742,8 @@ struct SearchResultsView: View {
                 .frame(height: 56)
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorderStrong, lineWidth: 1))
-                if isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                .overlay(alignment: .top) {
+                    if isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         if suggestions.isEmpty {
                             enVCharacterSpacedText("No matching tools. Try “json”, “bmi”, or “qr”.")
@@ -751,9 +764,14 @@ struct SearchResultsView: View {
                     }
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.12), radius: 8, y: 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .offset(y: 64)
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel("Search suggestions")
+                    }
                 }
+                .zIndex(isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1 : 0)
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     enVCharacterSpacedText("Start typing to see matching tools.")
                         .font(.envScaled(size: 14, weight: .regular))

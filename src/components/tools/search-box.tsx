@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
@@ -137,14 +137,17 @@ export function SearchBox({
               <li key={t.id}>
                 <button
                   type="button"
-                  className="flex w-full flex-col items-start px-4 py-2.5 text-left hover:bg-surface-2"
+                  className="flex w-full items-end gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
                   onClick={() => {
                     nav({ to: toolPath(t) });
                     setOpen(false);
                   }}
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
-                  <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                    <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
+                  </span>
+                  <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
                 </button>
               </li>
             ))

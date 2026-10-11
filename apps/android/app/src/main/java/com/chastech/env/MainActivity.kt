@@ -98,6 +98,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -340,9 +344,11 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
     val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
     LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
         item {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.fillMaxWidth().zIndex(if (homeSearchFocused && homeQuery.isNotBlank()) 1f else 0f), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val suggestionWidth = maxWidth
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
                     shape = RoundedCornerShape(28.dp),
@@ -368,8 +374,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                         IconButton(onClick = { openHomeSearch() }, modifier = Modifier.size(44.dp).semantics { contentDescription = "Search all tools" }) { EnVIcon("Search", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary) }
                     }
                 }
-                if (homeQuery.isNotBlank()) {
-                    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                if (homeSearchFocused && homeQuery.isNotBlank()) {
+                    Popup(alignment = Alignment.TopStart, offset = IntOffset(0, with(LocalDensity.current) { (if (screenWidth >= 640) 80.dp else 72.dp).roundToPx() }), onDismissRequest = { homeSearchFocused = false }) {
+                    Surface(Modifier.width(suggestionWidth), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 6.dp) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (suggestions.isEmpty()) {
                                 Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -384,6 +391,8 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                             }
                         }
                     }
+                    }
+                }
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
@@ -501,6 +510,9 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+            EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
@@ -800,6 +812,7 @@ private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
 @Composable
 private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, onTool: (String) -> Unit) {
     var visibleCount by rememberSaveable { mutableIntStateOf(24) }
+    var searchFocused by remember { mutableStateOf(false) }
     LaunchedEffect(query) { visibleCount = 24 }
     val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query, includeRelatedReferences = true) }
     val screenWidth = LocalConfiguration.current.screenWidthDp
@@ -810,9 +823,13 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
         modifier = Modifier.fillMaxSize(),
     ) {
         item {
-            Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
-            Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-            SearchBox(catalog, query, onQuery, onTool)
+            Box(Modifier.fillMaxWidth().zIndex(if (searchFocused && query.isNotBlank()) 1f else 0f)) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
+                    Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                    SearchBox(catalog, query, onQuery, onTool) { searchFocused = it }
+                }
+            }
         }
         if (query.trim().isEmpty()) {
             item { Text("Start typing to see matching tools.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -1603,14 +1620,16 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
 }
 
 @Composable
-private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit) {
+private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit, onFocusChange: (Boolean) -> Unit = {}) {
     var focused by remember { mutableStateOf(false) }
     val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearch(value, limit = 8, includeRelatedReferences = true) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "Search tools"; isTraversalGroup = true }) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val suggestionWidth = maxWidth
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) },
             placeholder = { Text("Search tools") },
             leadingIcon = { EnVIcon("Search", tint = MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = "Search") },
             singleLine = true,
@@ -1619,16 +1638,19 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
             keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } }),
         )
         if (focused && value.isNotBlank()) {
-            Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+            Popup(alignment = Alignment.TopStart, offset = IntOffset(0, with(LocalDensity.current) { 64.dp.roundToPx() }), onDismissRequest = { focused = false; onFocusChange(false) }) {
+            Surface(Modifier.width(suggestionWidth), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 6.dp) {
                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (suggestions.isEmpty()) {
                         Text("No matching tools. Try “json”, “bmi”, or “qr”.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite })
                     } else {
                         suggestions.forEach { WebHomeSearchSuggestion(it, onTool) }
                     }
-                    TextButton(onClick = { focused = false }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
+                    TextButton(onClick = { focused = false; onFocusChange(false) }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
                 }
             }
+            }
+        }
         }
     }
 }
