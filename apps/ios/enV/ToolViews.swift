@@ -278,7 +278,7 @@ enum NativeCoverage {
         if usesBackend(tool) || tool.isPlanned { return false }
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
-        case "ai": return NativeAiEngine.supports(tool.id)
+        case "ai": return NativeAiEngine.supports(tool.id) || NativeAiMicroEngine.supports(tool.id)
         case "file-converter", "document-backend": return NativeFileConverterEngine.supports(tool)
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
         case "codec": return NativeCodecEngine.operation(forToolID: tool.id) != nil
@@ -290,7 +290,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return tool.category == "productivity" || NativeAccessibilityEngine.supports(tool)
+        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool)
         default: return false
         }
     }
@@ -310,7 +310,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "ai": if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -323,7 +323,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if tool.category == "productivity" { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -472,15 +472,212 @@ private func nativeBackendFiles(from urls: [URL]) -> [NativeBackendFile] {
     }
 }
 
+enum NativeProductivityMode: String { case stopwatch, focus, pomodoro }
+enum NativeProductivityPhase: String { case focus, pause = "break" }
+
+struct NativeProductivityTimerState: Equatable {
+    var mode: NativeProductivityMode
+    var running = false
+    var hasStarted = false
+    /// Accumulated stopwatch time, or remaining time in the current countdown phase.
+    var valueMs: Int64
+    var anchorMs: Int64? = nil
+    var phase: NativeProductivityPhase = .focus
+    var round = 1
+    var focusMinutes = 50
+    var breakMinutes = 10
+    var lapsMs: [Int64] = []
+}
+
+enum NativeProductivityEngine {
+    static let supportedToolIDs: Set<String> = ["focus-timer", "pomodoro-timer", "stopwatch"]
+    static func supports(_ toolID: String) -> Bool { supportedToolIDs.contains(toolID) }
+    static func mode(for toolID: String) -> NativeProductivityMode? {
+        switch toolID {
+        case "stopwatch": return .stopwatch
+        case "pomodoro-timer": return .pomodoro
+        case "focus-timer": return .focus
+        default: return nil
+        }
+    }
+
+    static func create(mode: NativeProductivityMode, focusMinutes: Int = 50, breakMinutes: Int = 10) -> NativeProductivityTimerState {
+        let focus = min(240, max(1, focusMinutes))
+        let pause = min(240, max(1, breakMinutes))
+        return NativeProductivityTimerState(mode: mode, valueMs: mode == .stopwatch ? 0 : duration(mode, .focus, focus, pause), focusMinutes: focus, breakMinutes: pause)
+    }
+    static func create(toolID: String) -> NativeProductivityTimerState {
+        create(mode: mode(for: toolID) ?? .focus)
+    }
+    private static func duration(_ mode: NativeProductivityMode, _ phase: NativeProductivityPhase, _ focus: Int, _ pause: Int) -> Int64 {
+        let minutes: Int
+        if mode == .pomodoro { minutes = phase == .focus ? 25 : 5 }
+        else { minutes = phase == .focus ? focus : pause }
+        return Int64(minutes) * 60_000
+    }
+    private static func duration(_ state: NativeProductivityTimerState, _ phase: NativeProductivityPhase? = nil) -> Int64 {
+        duration(state.mode, phase ?? state.phase, state.focusMinutes, state.breakMinutes)
+    }
+
+    static func advance(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        guard state.running, let anchor = state.anchorMs else { return state }
+        let delta = max(0, nowMs - anchor)
+        if state.mode == .stopwatch {
+            var next = state
+            next.valueMs += delta
+            next.anchorMs = nowMs
+            return next
+        }
+        var next = state
+        next.valueMs -= delta
+        while next.valueMs <= 0 {
+            next.phase = next.phase == .focus ? .pause : .focus
+            if next.phase == .focus && next.mode == .pomodoro { next.round += 1 }
+            next.valueMs += duration(next, next.phase)
+        }
+        next.anchorMs = nowMs
+        return next
+    }
+    static func start(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        guard !state.running else { return advance(state, nowMs: nowMs) }
+        var next = state
+        next.running = true
+        next.hasStarted = true
+        next.anchorMs = nowMs
+        return next
+    }
+    static func pause(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        var next = advance(state, nowMs: nowMs)
+        guard next.running else { return next }
+        next.running = false
+        next.anchorMs = nil
+        return next
+    }
+    static func toggle(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        state.running ? pause(state, nowMs: nowMs) : start(state, nowMs: nowMs)
+    }
+    static func skip(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        guard state.mode != .stopwatch else { return state }
+        var next = advance(state, nowMs: nowMs)
+        next.phase = next.phase == .focus ? .pause : .focus
+        if next.phase == .focus && next.mode == .pomodoro { next.round += 1 }
+        next.hasStarted = true
+        next.valueMs = duration(next, next.phase)
+        next.anchorMs = next.running ? nowMs : nil
+        return next
+    }
+    static func reset(_ state: NativeProductivityTimerState) -> NativeProductivityTimerState {
+        var next = state
+        next.running = false
+        next.hasStarted = false
+        next.valueMs = state.mode == .stopwatch ? 0 : duration(state, .focus)
+        next.anchorMs = nil
+        next.phase = .focus
+        next.round = 1
+        next.lapsMs = []
+        return next
+    }
+    static func setFocusDurations(_ state: NativeProductivityTimerState, focusMinutes: Int, breakMinutes: Int) -> NativeProductivityTimerState {
+        guard state.mode == .focus else { return state }
+        let elapsed = max(0, duration(state) - state.valueMs)
+        var next = state
+        next.focusMinutes = min(240, max(1, focusMinutes))
+        next.breakMinutes = min(240, max(1, breakMinutes))
+        if !state.running { next.valueMs = max(0, duration(next) - elapsed) }
+        return next
+    }
+    static func lap(_ state: NativeProductivityTimerState, nowMs: Int64) -> NativeProductivityTimerState {
+        guard state.mode == .stopwatch, state.running else { return state }
+        var next = advance(state, nowMs: nowMs)
+        next.lapsMs.append(next.valueMs)
+        return next
+    }
+    static func displayedMs(_ state: NativeProductivityTimerState, nowMs: Int64) -> Int64 {
+        guard state.running, let anchor = state.anchorMs else { return state.valueMs }
+        let delta = max(0, nowMs - anchor)
+        return state.mode == .stopwatch ? state.valueMs + delta : max(0, state.valueMs - delta)
+    }
+    static func formatStopwatch(_ milliseconds: Int64) -> String {
+        let centiseconds = max(0, milliseconds) / 10
+        return String(format: "%02lld:%02lld.%02lld", centiseconds / 6_000, centiseconds / 100 % 60, centiseconds % 100)
+    }
+    static func formatCountdown(_ milliseconds: Int64) -> String {
+        let seconds = (max(0, milliseconds) + 999) / 1_000
+        return String(format: "%02lld:%02lld", seconds / 60, seconds % 60)
+    }
+}
+
 private struct NativeProductivityToolView: View {
     let tool: Tool
-    @State private var running = false
-    @State private var elapsed = 0
-    @State private var remaining = 1500
-    @State private var phase = "focus"
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    var body: some View { VStack(spacing: 14) { enVCharacterSpacedText(tool.id == "stopwatch" ? "Stopwatch" : tool.id == "pomodoro-timer" ? "Pomodoro · \(phase.capitalized)" : "Focus Timer").font(.headline); enVCharacterSpacedText(format(tool.id == "stopwatch" ? elapsed : remaining)).font(.envScaled(size: 56, weight: .medium, design: .monospaced)); HStack { Button(running ? "Pause" : "Start") { running.toggle() }.buttonStyle(.borderedProminent); Button("Reset") { running=false; elapsed=0; remaining=tool.id=="pomodoro-timer" ? 1500 : 3000; phase="focus" }.buttonStyle(.bordered) } }.onReceive(timer) { _ in guard running else { return }; if tool.id == "stopwatch" { elapsed += 1 } else if remaining <= 1 { phase = phase == "focus" ? "break" : "focus"; remaining = tool.id=="pomodoro-timer" ? (phase == "focus" ? 1500 : 300) : (phase == "focus" ? 3000 : 600) } else { remaining -= 1 } } }
-    private func format(_ s:Int)->String { String(format:"%02d:%02d",s/60,s%60) }
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var timerState: NativeProductivityTimerState
+    @State private var focusInput: String
+    @State private var breakInput: String
+    private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+    init(tool: Tool) {
+        self.tool = tool
+        let initial = NativeProductivityEngine.create(toolID: tool.id)
+        _timerState = State(initialValue: initial)
+        _focusInput = State(initialValue: String(initial.focusMinutes))
+        _breakInput = State(initialValue: String(initial.breakMinutes))
+    }
+
+    private var nowMs: Int64 { Int64(ProcessInfo.processInfo.systemUptime * 1_000) }
+    private var display: String {
+        let value = NativeProductivityEngine.displayedMs(timerState, nowMs: nowMs)
+        return timerState.mode == .stopwatch ? NativeProductivityEngine.formatStopwatch(value) : NativeProductivityEngine.formatCountdown(value)
+    }
+    private var cycleTitle: String {
+        if timerState.mode == .stopwatch { return "Stopwatch" }
+        if timerState.mode == .pomodoro { return "Round \(timerState.round) · \(timerState.phase.rawValue.capitalized)" }
+        return timerState.phase.rawValue.capitalized
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            if timerState.mode == .focus {
+                HStack(spacing: 10) {
+                    TextField("Focus minutes", text: $focusInput).keyboardType(.numberPad).textFieldStyle(.roundedBorder).accessibilityLabel("Focus minutes (1–240)")
+                    TextField("Break minutes", text: $breakInput).keyboardType(.numberPad).textFieldStyle(.roundedBorder).accessibilityLabel("Break minutes (1–240)")
+                }
+                .onChange(of: focusInput) { value in
+                    timerState = NativeProductivityEngine.setFocusDurations(timerState, focusMinutes: Int(value) ?? timerState.focusMinutes, breakMinutes: Int(breakInput) ?? timerState.breakMinutes)
+                }
+                .onChange(of: breakInput) { value in
+                    timerState = NativeProductivityEngine.setFocusDurations(timerState, focusMinutes: Int(focusInput) ?? timerState.focusMinutes, breakMinutes: Int(value) ?? timerState.breakMinutes)
+                }
+            }
+            enVCharacterSpacedText(cycleTitle).font(.headline)
+            enVCharacterSpacedText(display).font(.envScaled(size: 56, weight: .medium, design: .monospaced)).accessibilityLabel("Time remaining or elapsed: \(display)")
+            HStack {
+                Button(timerState.running ? "Pause" : timerState.hasStarted ? "Resume" : "Start") {
+                    timerState = NativeProductivityEngine.toggle(timerState, nowMs: nowMs)
+                }.buttonStyle(.borderedProminent)
+                if timerState.mode == .stopwatch {
+                    Button("Lap") { timerState = NativeProductivityEngine.lap(timerState, nowMs: nowMs) }
+                        .buttonStyle(.bordered).disabled(!timerState.running)
+                } else if timerState.mode == .pomodoro {
+                    Button("Skip") { timerState = NativeProductivityEngine.skip(timerState, nowMs: nowMs) }.buttonStyle(.bordered)
+                }
+                Button("Reset") { timerState = NativeProductivityEngine.reset(timerState) }.buttonStyle(.bordered)
+            }
+            if !timerState.lapsMs.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    enVCharacterSpacedText("Laps").font(.subheadline.weight(.semibold))
+                    ForEach(Array(timerState.lapsMs.enumerated()), id: \.offset) { index, value in
+                        HStack { enVCharacterSpacedText("Lap \(index + 1)"); Spacer(); enVCharacterSpacedText(NativeProductivityEngine.formatStopwatch(value)).monospacedDigit() }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            enVCharacterSpacedText(timerState.mode == .pomodoro ? "Standard 25-minute focus and 5-minute break cycle. No background alert is promised." : timerState.mode == .focus ? "Use whole-minute focus and break durations from 1 to 240 minutes. No background alert is promised." : "Uses a monotonic clock for elapsed time. Keep enV open to view live updates.")
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onReceive(timer) { _ in timerState = NativeProductivityEngine.advance(timerState, nowMs: nowMs) }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { timerState = NativeProductivityEngine.advance(timerState, nowMs: nowMs) }
+        }
+    }
 }
 
 private struct NativeUtilityToolView: View {
@@ -1293,22 +1490,14 @@ private struct NativeImageToolView: View {
 
 enum NativeBarcodeEngine {
     private static let validatorIDs: Set<String> = ["ean13-check-digit", "upc-check-digit", "gtin-validator", "isbn-check-digit"]
-    private static let qrIDs: Set<String> = ["qr-generator", "text-qr-generator", "url-qr-generator", "qr-code-high-error-correction", "qr-code-low-error-correction", "bitcoin-qr-generator", "calendar-qr-generator", "crypto-wallet-qr-generator", "discord-invite-qr-generator", "email-qr-generator", "ethereum-qr-generator", "event-qr-generator", "facebook-link-qr-generator", "google-play-qr-generator", "instagram-link-qr-generator", "linkedin-link-qr-generator", "location-qr-generator", "mecard-qr-generator", "phone-qr-generator", "qr-payload-encoder", "qr-code-styled", "sms-qr-generator", "telegram-link-qr-generator", "vcard-qr-generator", "whatsapp-qr-generator", "wifi-qr-generator", "x-link-qr-generator", "youtube-link-qr-generator", "app-store-qr-generator" ]
-    private static let linearIDs: Set<String> = ["code128-barcode", "ean13-barcode", "ean8-barcode", "upc-barcode", "isbn-barcode"]
+    private static let qrIDs: Set<String> = ["app-store-qr-generator", "bitcoin-qr-generator", "calendar-qr-generator", "crypto-wallet-qr-generator", "discord-invite-qr-generator", "email-qr-generator", "ethereum-qr-generator", "event-qr-generator", "facebook-link-qr-generator", "google-play-qr-generator", "instagram-link-qr-generator", "linkedin-link-qr-generator", "location-qr-generator", "mecard-qr-generator", "phone-qr-generator", "qr-batch-generator", "qr-capacity-helper", "qr-code-high-error-correction", "qr-code-low-error-correction", "qr-code-styled", "qr-data-url-generator", "qr-generator", "qr-payload-encoder", "qr-payload-inspector", "qr-size-calculator", "qr-svg-generator", "qr-version-helper", "sms-qr-generator", "telegram-link-qr-generator", "text-qr-generator", "url-qr-generator", "vcard-qr-generator", "whatsapp-qr-generator", "wifi-qr-generator", "x-link-qr-generator", "youtube-link-qr-generator"]
+    private static let helperIDs: Set<String> = ["qr-capacity-helper", "qr-payload-inspector", "qr-size-calculator", "qr-version-helper"]
+    private static let linearIDs: Set<String> = ["barcode-label-generator", "barcode-svg-generator", "codabar-barcode", "code128-barcode", "code39-barcode", "ean13-barcode", "ean8-barcode", "isbn-barcode", "itf14-barcode", "msi-barcode", "pharmacode-barcode", "upc-barcode"]
     static func supports(_ tool: Tool) -> Bool { (validatorIDs.contains(tool.id) || qrIDs.contains(tool.id) || linearIDs.contains(tool.id)) && (tool.engine.type == "barcode" || tool.engine.type == "qr") }
-    static func generatesImage(_ toolID: String) -> Bool { qrIDs.contains(toolID) || linearIDs.contains(toolID) }
+    static let supportedToolIDs = validatorIDs.union(qrIDs).union(linearIDs)
+    static func generatesImage(_ toolID: String) -> Bool { (qrIDs.contains(toolID) && !helperIDs.contains(toolID)) || linearIDs.contains(toolID) }
     static func generate(toolID: String, input: String) throws -> UIImage {
-        guard generatesImage(toolID), !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NativeNativeError.message("Enter a value to encode.") }
-        if ["ean13-barcode", "ean8-barcode", "upc-barcode", "isbn-barcode"].contains(toolID) { return try generateEAN(toolID: toolID, input: input) }
-        let filterName = toolID == "code128-barcode" ? "CICode128BarcodeGenerator" : "CIQRCodeGenerator"
-        guard let filter = CIFilter(name: filterName) else { throw NativeNativeError.message("This image generator is unavailable on this iOS version.") }
-        filter.setValue(Data(input.utf8), forKey: "inputMessage")
-        if filterName == "CIQRCodeGenerator" { filter.setValue(toolID == "qr-code-high-error-correction" ? "H" : toolID == "qr-code-low-error-correction" ? "L" : "M", forKey: "inputCorrectionLevel") }
-        guard let output = filter.outputImage else { throw NativeNativeError.message("The value could not be encoded.") }
-        let scale: CGFloat = toolID == "code128-barcode" ? 3 : 12
-        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        guard let cg = CIContext().createCGImage(scaled, from: scaled.extent) else { throw NativeNativeError.message("Could not render the generated code.") }
-        return UIImage(cgImage: cg)
+        try generateFull(toolID: toolID, input: input, size: 512, dark: "#16181d", light: "#ffffff")
     }
     private static func generateEAN(toolID: String, input: String) throws -> UIImage {
         var digits = input.filter(\.isNumber)
@@ -1360,24 +1549,56 @@ enum NativeNativeError:LocalizedError{case message(String);var errorDescription:
 
 private struct NativeBarcodeToolView: View {
     let tool: Tool
-    @State private var value = ""
+    @State private var values: [String:String]
     @State private var output = ""
     @State private var error: String?
-    @State private var image: UIImage?
+    @State private var images: [UIImage] = []
+    @State private var exportText: String?
+    @State private var exportData = Data()
+    @State private var exportName = "env-code"
+    @State private var exportingImage = false
+    @State private var exportingText = false
+
+    init(tool:Tool) { self.tool=tool; _values=State(initialValue:NativeBarcodeEngine.initialValues(for:tool.id)) }
+
+    private func binding(_ key:String)->Binding<String> { Binding(get:{values[key] ?? ""},set:{values[key]=$0}) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            NativeInputField(title: "Value", text: $value)
+            ForEach(NativeBarcodeEngine.fieldsFor(tool.id), id:\.key) { field in
+                if field.options.isEmpty {
+                    VStack(alignment:.leading,spacing:6) {
+                        Text(field.title).font(.footnote.weight(.medium))
+                        if field.multiline {
+                            TextEditor(text:binding(field.key)).frame(minHeight:90).scrollContentBackground(.hidden).overlay(RoundedRectangle(cornerRadius:8).stroke(Color.secondary.opacity(0.25)))
+                        } else {
+                            TextField(field.title,text:binding(field.key)).textFieldStyle(.roundedBorder)
+                        }
+                    }
+                } else {
+                    Picker(field.title,selection:binding(field.key)) { ForEach(field.options,id:\.self) { option in Text(option).tag(option) } }.pickerStyle(.menu)
+                }
+            }
             NativeActionRow(output: output, run: {
                 do {
-                    if NativeBarcodeEngine.generatesImage(tool.id) { image = try NativeBarcodeEngine.generate(toolID: tool.id, input: value); output = "Generated locally on this device." }
-                    else { output = try NativeBarcodeEngine.run(toolID: tool.id, input: value); image = nil }
+                    let result=try NativeBarcodeEngine.execute(toolID:tool.id,values:values)
+                    output=result.text; images=result.images; exportText=result.exportText; exportName=result.exportName ?? "env-code"
                     error = nil
-                } catch let caughtError { output = ""; image = nil; error = caughtError.localizedDescription }
-            }, reset: { value = ""; output = ""; image = nil; error = nil })
+                } catch let caughtError { output = ""; images=[]; exportText=nil; error = caughtError.localizedDescription }
+            }, reset: { values=NativeBarcodeEngine.initialValues(for:tool.id); output = ""; images=[]; exportText=nil; error = nil })
             NativeOutputView(output: output, error: error)
-            if let image { Image(uiImage: image).resizable().interpolation(.none).scaledToFit().frame(maxHeight: 280).background(Color.white).clipShape(RoundedRectangle(cornerRadius: 8)) }
+            ForEach(Array(images.enumerated()),id:\.offset) { index,image in
+                Image(uiImage:image).resizable().interpolation(.none).scaledToFit().frame(maxHeight:280).background(Color.white).clipShape(RoundedRectangle(cornerRadius:8))
+                Button("Save PNG \(index+1)") { if let data=image.pngData() { exportData=data; exportName="env-code-\(index+1)"; exportingImage=true } }.buttonStyle(.bordered)
+            }
+            if let exportText {
+                Text("Export data").font(.footnote.weight(.medium))
+                Text(String(exportText.prefix(512)) + (exportText.count > 512 ? "…" : "")).font(.system(.caption,design:.monospaced)).textSelection(.enabled).lineLimit(6)
+                HStack { Button("Copy export") { UIPasteboard.general.string=exportText }.buttonStyle(.bordered); Button("Save export") { exportingText=true }.buttonStyle(.bordered) }
+            }
         }
-        .onAppear { if tool.id == "gtin-validator" && value.isEmpty { value = "ENV-12345" } }
+        .fileExporter(isPresented:$exportingImage,document:NativeBinaryDocument(data:exportData),contentType:.data,defaultFilename:exportName) { _ in }
+        .fileExporter(isPresented:$exportingText,document:NativePlainTextDocument(text:exportText ?? ""),contentType:.plainText,defaultFilename:exportName) { _ in }
     }
 }
 
@@ -1413,7 +1634,7 @@ enum NativeAiEngine {
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
     static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
 
-    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || rewriteTools.contains(toolID) || emailTools.contains(toolID) || metaTools.contains(toolID) || hookTools.contains(toolID) || improverTools.contains(toolID) || contentBriefTools.contains(toolID) || adCopyTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil }
+    static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || rewriteTools.contains(toolID) || emailTools.contains(toolID) || metaTools.contains(toolID) || hookTools.contains(toolID) || improverTools.contains(toolID) || contentBriefTools.contains(toolID) || adCopyTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil || NativeAiMicroEngine.supports(toolID) }
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
     static func isLocalPrompt(_ toolID: String) -> Bool { promptTools.contains(toolID) }
     static func isLocalBio(_ toolID: String) -> Bool { bioTools.contains(toolID) }
@@ -1607,6 +1828,93 @@ enum NativeAiEngine {
         default: return ""
         }
     }
+}
+
+struct NativeAiMicroField: Identifiable {
+    let name: String
+    let label: String
+    let defaultValue: String
+    let multiline: Bool
+    var id: String { name }
+}
+
+enum NativeAiMicroEngine {
+    static let operations: [String: String] = [
+        "ai-meeting-agenda-generator": "agenda", "blog-outline-generator": "blog-outline",
+        "call-to-action-generator": "cta", "expand-helper": "expand", "faq-generator": "faq",
+        "feature-benefit-generator": "feature-benefit", "meeting-action-items": "actions",
+        "product-title-generator": "product-title", "pros-cons-generator": "pros-cons",
+        "shorten-helper": "shorten", "tiktok-caption-helper": "tt-caption",
+        "youtube-description-helper": "yt-desc", "youtube-title-helper": "yt-title"
+    ]
+
+    static func supports(_ toolID: String) -> Bool { operations[toolID] != nil }
+    static func operation(for toolID: String) -> String? { operations[toolID] }
+
+    static func fields(for toolID: String) -> [NativeAiMicroField] {
+        switch operation(for: toolID) {
+        case "blog-outline": return [topic(), audience(), field("goal", "Goal", "Educate and give the reader a practical next step")]
+        case "cta": return [topic()]
+        case "expand", "shorten": return [field("text", "Text", "We are launching a new product that helps people create useful content faster.", multiline: true)]
+        case "faq": return [topic(), audience(), field("points", "Key points", "What it is\nWho it is for\nHow it works\nPricing or access", multiline: true)]
+        case "feature-benefit": return [topic(), audience(), field("benefit", "Main benefit", "Save time and get started quickly")]
+        case "agenda": return [field("goal", "Meeting goal", "Plan the next launch"), field("topics", "Topics", "Progress\nBlockers\nDecisions\nNext steps", multiline: true)]
+        case "actions": return [field("notes", "Rough notes", "John — finish landing page by Friday\nAda — confirm pricing\nTeam — test checkout", multiline: true)]
+        case "product-title": return [topic(), field("benefit", "Main benefit", "Save time and get started quickly")]
+        case "pros-cons": return [topic(), field("option", "Option / decision", "Launch now vs wait for more features")]
+        case "tt-caption": return [topic(), audience(), field("count", "Options", "5")]
+        case "yt-desc": return [topic(), audience(), field("tone", "Tone", "natural"), field("points", "Key points", "Problem\nSolution\nPractical examples\nCall to action", multiline: true)]
+        case "yt-title": return [topic(), audience(), field("count", "Options", "8")]
+        default: return []
+        }
+    }
+
+    static func initialValues(_ toolID: String) -> [String: String] { Dictionary(uniqueKeysWithValues: fields(for: toolID).map { ($0.name, $0.defaultValue) }) }
+
+    static func generate(toolID: String, values: [String: String]) throws -> String {
+        guard let operation = operation(for: toolID) else { throw NSError(domain: "NativeAiMicroEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI micro-tool: \(toolID)"]) }
+        let topic = clean(values["topic"], "your topic")
+        let audience = clean(values["audience"], "your audience")
+        let style = tonePhrase(clean(values["tone"], "natural"))
+        let parsed = Double(values["count"] ?? "5") ?? 5
+        let count = parsed.isFinite ? Int(min(20, max(1, parsed))) : 5
+
+        switch operation {
+        case "title", "yt-title": return numbered(["\(topic): What \(audience) Should Know", "How to Get Better Results With \(topic)", "The Simple Guide to \(topic)", "I Tried \(topic) — Here’s What I Learned", "\(topic) Explained Without the Jargon", "5 Things \(audience) Should Know About \(topic)", "Before You Start With \(topic), Read This", "A Practical \(topic) Guide for \(audience)"], count: count)
+        case "tt-caption": return numbered(["\(topic) made simple. Save this for later.", "If you're into \(topic), this one is for you.", "A quick reminder for \(audience): you don't need to overcomplicate \(topic).", "Learning \(topic) one step at a time. What would you add?", "Here's the part about \(topic) people usually skip.", "Small steps, better results. That's the goal with \(topic).", "Trying to understand \(topic)? Start here."], count: count)
+        case "blog-outline": return "Title: \(topic)\nAudience: \(audience)\nGoal: \(clean(values["goal"], "Educate the reader"))\n\nOutline\n1. Introduction — the problem and why it matters\n2. What \(topic) means\n3. The key ideas \(audience) should understand\n4. Practical steps or examples\n5. Common mistakes to avoid\n6. Checklist / next steps\n7. Conclusion and CTA"
+        case "cta": return numbered(["Get started with \(topic)", "Try \(topic) today", "See how \(topic) can help", "Learn more about \(topic)", "Start creating with \(topic)"], count: 5)
+        case "expand": return "\(clean(values["text"], "Your notes").appending("."))\n\nKey context: explain why this matters, who it affects, and what should happen next. Add one practical example and finish with a clear next step."
+        case "faq": return splitList(clean(values["points"], "What it is\nHow it works")).map { "Q: \($0) about \(topic)?\nA: Explain \($0.lowercased()) in a concise, factual way for \(audience)." }.joined(separator: "\n\n")
+        case "feature-benefit": return splitList(clean(values["benefit"], "Saves time")).map { "Feature: \($0)\nBenefit: Helps \(audience) get a clearer result with less friction." }.joined(separator: "\n\n")
+        case "agenda":
+            let points = splitList(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps"))
+            return "Meeting goal: \(clean(values["goal"], "Make a clear decision"))\n\nAgenda\n\(points.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))\n\nClose with owners, deadlines, and unresolved questions."
+        case "actions":
+            let notes = clean(values["notes"], "Person — task — deadline").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            return "Action items\n\(notes.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))\n\nBefore sharing, confirm each owner and deadline."
+        case "product-title":
+            let benefit = clean(values["benefit"], "Simple and practical")
+            return numbered(["\(topic) — \(benefit)", "\(topic): \(clean(values["benefit"], "A better way to get started"))", "The \(topic) Starter Guide", "\(topic) Made Simple", "\(topic) Toolkit"], count: 5)
+        case "pros-cons": return "Decision worksheet: \(clean(values["option"], "your option"))\n\nPros\n• Potential upside: \(topic) may help achieve the stated goal.\n• Can be tested with a small, measurable experiment.\n• Creates information for the next decision.\n\nCons / risks\n• Requires time, money, or attention.\n• Results may differ from assumptions.\n• A larger commitment may reduce flexibility.\n\nQuestions to verify\n• What is the smallest useful test?\n• What metric decides whether to continue?\n• What would make you stop or change direction?"
+        case "shorten":
+            let text = clean(values["text"], "Your original text")
+            let words = text.split(whereSeparator: { $0.isWhitespace })
+            return words.count > 28 ? words.prefix(28).joined(separator: " ") + "…" : text
+        case "yt-desc":
+            let points = splitList(clean(values["points"], "Key points and practical examples"))
+            return "\(topic)\n\nIn this video, we break down \(topic) for \(audience) in a \(style) way.\n\nWhat you'll cover:\n\(points.map { "• \($0)" }.joined(separator: "\n"))\n\nIf you found this useful, save it for later and share it with someone working on the same goal."
+        default: throw NSError(domain: "NativeAiMicroEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI micro-tool operation: \(operation)"])
+        }
+    }
+
+    private static func field(_ name: String, _ label: String, _ value: String, multiline: Bool = false) -> NativeAiMicroField { NativeAiMicroField(name: name, label: label, defaultValue: value, multiline: multiline) }
+    private static func topic() -> NativeAiMicroField { field("topic", "Topic / subject", "AI tools for creators") }
+    private static func audience() -> NativeAiMicroField { field("audience", "Audience", "creators and small businesses") }
+    private static func clean(_ value: String?, _ fallback: String) -> String { let cleaned = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines); return cleaned.isEmpty ? fallback : cleaned }
+    private static func tonePhrase(_ tone: String) -> String { ["professional":"clear and professional", "bold":"confident and direct", "playful":"light and playful", "friendly":"warm and friendly"][tone] ?? "natural and conversational" }
+    private static func numbered(_ lines: [String], count: Int) -> String { lines.prefix(min(lines.count, max(1, count))).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n") }
+    private static func splitList(_ value: String) -> [String] { value.components(separatedBy: CharacterSet.newlines.union(CharacterSet(charactersIn: ","))).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
 }
 
 private enum NativeAiClient {
@@ -1821,6 +2129,75 @@ private struct NativeAiToolView: View {
     }
 }
 
+private struct NativeAiMicroToolView: View {
+    let tool: Tool
+    @State private var values: [String: String]
+    @State private var output = ""
+    @State private var error = ""
+
+    init(tool: Tool) {
+        self.tool = tool
+        _values = State(initialValue: NativeAiMicroEngine.initialValues(tool.id))
+    }
+
+    private var fields: [NativeAiMicroField] { NativeAiMicroEngine.fields(for: tool.id) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText("Runs locally with deterministic templates. This tool does not send your text to an AI service.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(fields) { field in
+                if field.name == "tone" {
+                    Picker(field.label, selection: binding(for: field)) {
+                        Text("Natural").tag("natural")
+                        Text("Professional").tag("professional")
+                        Text("Friendly").tag("friendly")
+                        Text("Bold").tag("bold")
+                        Text("Playful").tag("playful")
+                    }
+                    .pickerStyle(.menu)
+                } else if field.multiline {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(field.label).font(.caption).foregroundStyle(.secondary)
+                        TextEditor(text: binding(for: field))
+                            .frame(minHeight: 96)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))
+                    }
+                } else {
+                    TextField(field.label, text: binding(for: field))
+                        .textFieldStyle(.roundedBorder)
+                        .keyboardType(field.name == "count" ? .numberPad : .default)
+                }
+            }
+            HStack {
+                Button("Generate") {
+                    do { output = try NativeAiMicroEngine.generate(toolID: tool.id, values: values); error = "" }
+                    catch { output = ""; self.error = error.localizedDescription }
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Clear") { output = ""; error = "" }
+                    .buttonStyle(.bordered)
+                if !output.isEmpty {
+                    Button("Copy output") { UIPasteboard.general.string = output }
+                        .buttonStyle(.bordered)
+                }
+            }
+            if !output.isEmpty {
+                TextEditor(text: .constant(output))
+                    .frame(minHeight: 150)
+                    .textSelection(.enabled)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))
+            }
+            if !error.isEmpty { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func binding(for field: NativeAiMicroField) -> Binding<String> {
+        Binding(get: { values[field.name] ?? field.defaultValue }, set: { values[field.name] = $0 })
+    }
+}
 
 private struct NativeBusinessToolView: View {
     let tool: Tool
@@ -2266,4 +2643,228 @@ private struct NativeAiStructuredSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+}
+
+
+struct NativeBarcodeField {
+    let key: String
+    let title: String
+    var initial: String = ""
+    var multiline: Bool = false
+    var options: [String] = []
+}
+
+struct NativeBarcodeExecution {
+    let text: String
+    var images: [UIImage] = []
+    var exportText: String? = nil
+    var exportName: String? = nil
+}
+
+extension NativeBarcodeEngine {
+    private static var presetMap: [String:String] {
+        ["app-store-qr-generator":"url", "bitcoin-qr-generator":"bitcoin", "calendar-qr-generator":"calendar", "crypto-wallet-qr-generator":"crypto", "discord-invite-qr-generator":"url", "email-qr-generator":"email", "ethereum-qr-generator":"ethereum", "event-qr-generator":"event", "facebook-link-qr-generator":"url", "google-play-qr-generator":"url", "instagram-link-qr-generator":"url", "linkedin-link-qr-generator":"url", "location-qr-generator":"geo", "mecard-qr-generator":"mecard", "phone-qr-generator":"phone", "qr-batch-generator":"batch", "qr-capacity-helper":"capacity", "qr-code-high-error-correction":"high-error", "qr-code-low-error-correction":"low-error", "qr-code-styled":"styled", "qr-data-url-generator":"data-url", "qr-generator":"text", "qr-payload-encoder":"payload", "qr-payload-inspector":"inspect", "qr-size-calculator":"size", "qr-svg-generator":"svg", "qr-version-helper":"version", "sms-qr-generator":"sms", "telegram-link-qr-generator":"url", "text-qr-generator":"text", "url-qr-generator":"url", "vcard-qr-generator":"vcard", "whatsapp-qr-generator":"whatsapp", "wifi-qr-generator":"wifi", "x-link-qr-generator":"url", "youtube-link-qr-generator":"url"]
+    }
+
+    static func fieldsFor(_ toolID:String) -> [NativeBarcodeField] {
+        switch presetMap[toolID] ?? "" {
+        case "url": return [NativeBarcodeField(key:"url", title:"URL", initial:"https://example.com")]
+        case "wifi": return [NativeBarcodeField(key:"ssid", title:"Network name (SSID)"), NativeBarcodeField(key:"password", title:"Password"), NativeBarcodeField(key:"security", title:"Security", initial:"WPA", options:["WPA","WEP","nopass"]), NativeBarcodeField(key:"hidden", title:"Hidden network", initial:"false", options:["false","true"])]
+        case "whatsapp": return [NativeBarcodeField(key:"phone", title:"Phone with country code"), NativeBarcodeField(key:"text", title:"Message", multiline:true)]
+        case "email": return [NativeBarcodeField(key:"to", title:"Email address"), NativeBarcodeField(key:"subject", title:"Subject"), NativeBarcodeField(key:"body", title:"Message", multiline:true)]
+        case "phone": return [NativeBarcodeField(key:"phone", title:"Phone number")]
+        case "sms": return [NativeBarcodeField(key:"phone", title:"Phone number"), NativeBarcodeField(key:"body", title:"Message", multiline:true)]
+        case "vcard": return [NativeBarcodeField(key:"name", title:"Name"), NativeBarcodeField(key:"phone", title:"Phone"), NativeBarcodeField(key:"email", title:"Email"), NativeBarcodeField(key:"org", title:"Organization")]
+        case "mecard": return [NativeBarcodeField(key:"name", title:"Name"), NativeBarcodeField(key:"phone", title:"Phone"), NativeBarcodeField(key:"email", title:"Email")]
+        case "geo": return [NativeBarcodeField(key:"lat", title:"Latitude"), NativeBarcodeField(key:"lng", title:"Longitude")]
+        case "event", "calendar": return [NativeBarcodeField(key:"title", title:"Title"), NativeBarcodeField(key:"start", title:"Start (YYYYMMDDTHHMMSS)"), NativeBarcodeField(key:"end", title:"End (YYYYMMDDTHHMMSS)"), NativeBarcodeField(key:"location", title:"Location")]
+        case "bitcoin": return [NativeBarcodeField(key:"address", title:"Bitcoin address"), NativeBarcodeField(key:"amount", title:"Amount (optional BTC)"), NativeBarcodeField(key:"label", title:"Label")]
+        case "ethereum", "crypto": return [NativeBarcodeField(key:"address", title:"Wallet address")]
+        case "styled": return [NativeBarcodeField(key:"text", title:"Text or URL", multiline:true), NativeBarcodeField(key:"dark", title:"Dark color", initial:"#16181d"), NativeBarcodeField(key:"light", title:"Light color", initial:"#ffffff"), NativeBarcodeField(key:"size", title:"Size (px)", initial:"512"), NativeBarcodeField(key:"margin", title:"Margin", initial:"1")]
+        case "batch": return [NativeBarcodeField(key:"items", title:"One value per line (up to 50)", multiline:true)]
+        case "payload": return [NativeBarcodeField(key:"kind", title:"Payload type", initial:"wifi", options:["wifi","email","phone","sms","geo"]), NativeBarcodeField(key:"a", title:"Primary value"), NativeBarcodeField(key:"b", title:"Secondary value"), NativeBarcodeField(key:"c", title:"Third value")]
+        case "inspect": return [NativeBarcodeField(key:"payload", title:"QR payload", multiline:true)]
+        case "size": return [NativeBarcodeField(key:"modules", title:"QR modules", initial:"21"), NativeBarcodeField(key:"modulePx", title:"Module size (px)", initial:"4")]
+        case "version": return [NativeBarcodeField(key:"level", title:"Error correction", initial:"M", options:["L","M","Q","H"]), NativeBarcodeField(key:"text", title:"Payload", multiline:true)]
+        case "capacity": return [NativeBarcodeField(key:"version", title:"Version (1–40)", initial:"1"), NativeBarcodeField(key:"level", title:"Error correction", initial:"M", options:["L","M","Q","H"])]
+        case "text", "high-error", "low-error", "svg", "data-url": return [NativeBarcodeField(key:"text", title:"Text or URL", multiline:true)]
+        default:
+            let initial = ["ean13-barcode","isbn-barcode","ean13-check-digit","isbn-check-digit","gtin-validator"].contains(toolID) ? "9780143127741" : toolID == "ean8-barcode" ? "96385074" : ["upc-barcode","upc-check-digit"].contains(toolID) ? "036000291452" : toolID == "itf14-barcode" ? "10000000000007" : "12345"
+            return [NativeBarcodeField(key:"value", title:"Value", initial:initial)]
+        }
+    }
+
+    static func initialValues(for toolID:String) -> [String:String] { Dictionary(uniqueKeysWithValues:fieldsFor(toolID).map{($0.key,$0.initial)}) }
+    private static func v(_ values:[String:String],_ key:String)->String { values[key] ?? "" }
+    private static func escapeQR(_ text:String)->String { text.replacingOccurrences(of:"\\",with:"\\\\").replacingOccurrences(of:";",with:"\\;").replacingOccurrences(of:",",with:"\\,").replacingOccurrences(of:":",with:"\\:") }
+    private static func encodeQRComponent(_ text:String)->String { text.addingPercentEncoding(withAllowedCharacters:CharacterSet(charactersIn:"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!~*'()")) ?? text }
+
+    static func payloadFor(_ toolID:String,values:[String:String])->String {
+        switch presetMap[toolID] ?? "" {
+        case "wifi": return "WIFI:T:\(v(values,"security").isEmpty ? "WPA" : v(values,"security"));S:\(escapeQR(v(values,"ssid")));P:\(escapeQR(v(values,"password")));H:\(v(values,"hidden") == "true");"
+        case "whatsapp": return "https://wa.me/\(v(values,"phone").filter(\.isNumber))?text=\(encodeQRComponent(v(values,"text")))"
+        case "email": return "mailto:\(v(values,"to"))?subject=\(encodeQRComponent(v(values,"subject")))&body=\(encodeQRComponent(v(values,"body")))"
+        case "phone": return "tel:\(v(values,"phone"))"
+        case "sms": return "sms:\(v(values,"phone"))?body=\(encodeQRComponent(v(values,"body")))"
+        case "vcard": return "BEGIN:VCARD\nVERSION:3.0\nFN:\(v(values,"name"))\nORG:\(v(values,"org"))\nTEL:\(v(values,"phone"))\nEMAIL:\(v(values,"email"))\nEND:VCARD"
+        case "mecard": return "MECARD:N:\(escapeQR(v(values,"name")));TEL:\(escapeQR(v(values,"phone")));EMAIL:\(escapeQR(v(values,"email")));;"
+        case "geo": return "geo:\(v(values,"lat").isEmpty ? "0" : v(values,"lat")),\(v(values,"lng").isEmpty ? "0" : v(values,"lng"))"
+        case "event", "calendar": return "BEGIN:VEVENT\nSUMMARY:\(v(values,"title"))\nDTSTART:\(v(values,"start"))\nDTEND:\(v(values,"end"))\nLOCATION:\(v(values,"location"))\nEND:VEVENT"
+        case "bitcoin":
+            var query:[String]=[]; if !v(values,"amount").isEmpty { query.append("amount=\(encodeQRComponent(v(values,"amount")))") }; if !v(values,"label").isEmpty { query.append("label=\(encodeQRComponent(v(values,"label")))") }
+            return "bitcoin:\(v(values,"address"))\(query.isEmpty ? "" : "?"+query.joined(separator:"&"))"
+        case "ethereum": return "ethereum:\(v(values,"address"))"
+        case "crypto": return v(values,"address")
+        case "url": return v(values,"url")
+        case "payload":
+            switch v(values,"kind") {
+            case "wifi": return "WIFI:T:WPA;S:\(escapeQR(v(values,"a")));P:\(escapeQR(v(values,"b")));H:false;"
+            case "email": return "mailto:\(v(values,"a"))?subject=\(encodeQRComponent(v(values,"b")))&body=\(encodeQRComponent(v(values,"c")))"
+            case "phone": return "tel:\(v(values,"a"))"
+            case "sms": return "sms:\(v(values,"a"))?body=\(encodeQRComponent(v(values,"b")))"
+            case "geo": return "geo:\(v(values,"a").isEmpty ? "0" : v(values,"a")),\(v(values,"b").isEmpty ? "0" : v(values,"b"))"
+            default: return v(values,"a")
+            }
+        default: return v(values,"text")
+        }
+    }
+
+    static func execute(toolID:String,values:[String:String]) throws -> NativeBarcodeExecution {
+        if validatorIDs.contains(toolID) { return NativeBarcodeExecution(text:try run(toolID:toolID,input:v(values,"value"))) }
+        if let message=qrInputError(toolID:toolID,values:values) { throw NativeNativeError.message(message) }
+        switch presetMap[toolID] ?? "" {
+        case "size": let modules=Double(v(values,"modules")) ?? 21, px=Double(v(values,"modulePx")) ?? 4; return NativeBarcodeExecution(text:"\(Int(modules)) modules × \(px)px = \(modules*px)px before quiet-zone margin.")
+        case "version": let text=v(values,"text"), level=v(values,"level").isEmpty ? "M" : v(values,"level"); return NativeBarcodeExecution(text:"Estimated QR version: \(approximateVersion(text.count,level:level)) for \(level) error correction. Actual version depends on encoding mode and content.")
+        case "capacity": let version=Int(v(values,"version")) ?? 1, level=v(values,"level").isEmpty ? "M" : v(values,"level"), factor:[String:Double] = ["L":1,"M":0.8,"Q":0.65,"H":0.5]; return NativeBarcodeExecution(text:"Approximate alphanumeric capacity for version \(version) / \(level): about \(max(10,Int(Double(version*version*18)*(factor[level] ?? 0.8))) characters. This is a planning estimate, not the QR standard's exact byte table.")
+        case "inspect": let payload=v(values,"payload"); return NativeBarcodeExecution(text:"Detected payload type: \(payloadKind(payload)). Length: \(payload.count) characters.")
+        case "batch":
+            let items=v(values,"items").components(separatedBy:.newlines).map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}
+            let images=try items.map{try generateFull(toolID:"qr-generator",input:$0,size:320,dark:"#16181d",light:"#ffffff")}
+            return NativeBarcodeExecution(text:"Generated \(images.count) QR codes locally.",images:images)
+        default: break
+        }
+        let payload=presetMap[toolID] == nil ? v(values,"value") : payloadFor(toolID,values:values)
+        let image=try generateFull(toolID:toolID,input:payload,size:Int(v(values,"size")) ?? 512,dark:v(values,"dark").isEmpty ? "#16181d" : v(values,"dark"),light:v(values,"light").isEmpty ? "#ffffff" : v(values,"light"))
+        if toolID == "qr-data-url-generator" {
+            guard let data=image.pngData() else { throw NativeNativeError.message("Could not encode PNG data.") }
+            let uri="data:image/png;base64,\(data.base64EncodedString())"
+            return NativeBarcodeExecution(text:"Generated QR data URL (\(uri.count) characters).",images:[image],exportText:uri,exportName:"env-qr-data-url.txt")
+        }
+        if toolID == "qr-svg-generator" || toolID == "barcode-svg-generator" {
+            guard let data=image.pngData() else { throw NativeNativeError.message("Could not encode PNG data.") }
+            let svg="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 \(Int(image.size.width)) \(Int(image.size.height))\"><image width=\"100%\" height=\"100%\" href=\"data:image/png;base64,\(data.base64EncodedString())\"/></svg>"
+            return NativeBarcodeExecution(text:"Generated SVG locally · \(payload.count) payload characters.",images:[image],exportText:svg,exportName:"env-code.svg")
+        }
+        let labeled=toolID == "barcode-label-generator" ? addHumanLabel(image,payload) : image
+        return NativeBarcodeExecution(text:toolID == "barcode-label-generator" ? "Label: \(payload)\nGenerated locally on this device." : "Generated locally on this device.",images:[labeled])
+    }
+
+    private static func qrInputError(toolID:String,values:[String:String])->String? {
+        func req(_ key:String,_ label:String)->String? { v(values,key).trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ? "Enter \(label)." : nil }
+        func phone(_ key:String)->String? { req(key,"a phone number") ?? (v(values,key).filter(\.isNumber).count >= 3 ? nil : "Enter a valid phone number.") }
+        func email(_ key:String)->String? { req(key,"an email address") ?? (v(values,key).range(of:"^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",options:.regularExpression) != nil ? nil : "Enter a valid email address.") }
+        func coordinate(_ key:String,_ label:String,_ low:Double,_ high:Double)->String? { guard let n=Double(v(values,key)) else { return "Enter \(label)." }; return n >= low && n <= high ? nil : "\(label) must be between \(Int(low)) and \(Int(high))." }
+        guard let preset=presetMap[toolID] else { return req("value","a value to encode") }
+        switch preset {
+        case "size": return (Double(v(values,"modules")) ?? 21) > 0 && (Double(v(values,"modulePx")) ?? 4) > 0 ? nil : "Modules and module size must be positive numbers."
+        case "version": return req("text","a QR payload to estimate")
+        case "capacity": let n=Int(v(values,"version")) ?? 1; return (1...40).contains(n) && ["L","M","Q","H"].contains(v(values,"level").isEmpty ? "M" : v(values,"level")) ? nil : "Choose a QR version from 1 to 40 and a valid error-correction level."
+        case "inspect": return req("payload","a QR payload to inspect")
+        case "batch": let count=v(values,"items").components(separatedBy:.newlines).filter{!$0.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}.count; return count == 0 ? "Enter at least one value." : count > 50 ? "Batch generation is limited to 50 values at a time." : nil
+        case "text","high-error","low-error","styled","svg","data-url": return req("text","something to encode")
+        case "url": guard let parts=URLComponents(string:v(values,"url")), parts.scheme != nil, parts.host != nil else { return "Enter a complete URL including https://." }; return nil
+        case "wifi": return req("ssid","a network name") ?? (v(values,"security") != "nopass" ? req("password","a Wi-Fi password or choose No password") : nil)
+        case "whatsapp","phone","sms": return phone("phone")
+        case "email": return email("to")
+        case "vcard","mecard": return req("name","a contact name")
+        case "geo": return coordinate("lat","Latitude",-90,90) ?? coordinate("lng","Longitude",-180,180)
+        case "event","calendar": return req("title","an event title") ?? req("start","a start time") ?? req("end","an end time")
+        case "bitcoin": if req("address","a Bitcoin address") != nil { return "Enter a Bitcoin address." }; if let amount=Double(v(values,"amount")), amount < 0 { return "Amount must be a non-negative number." }; return nil
+        case "ethereum","crypto": return req("address","a wallet address")
+        case "payload": switch v(values,"kind") { case "wifi": return req("a","a network name"); case "email": return email("a"); case "phone","sms": return phone("a"); case "geo": return coordinate("a","Latitude",-90,90) ?? coordinate("b","Longitude",-180,180); default: return req("a","a payload value") }
+        default: return nil
+        }
+    }
+
+    private static func approximateVersion(_ length:Int,level:String)->Int { let factor:Double=level == "H" ? 0.7 : level == "Q" ? 0.78 : level == "M" ? 0.88 : 1; return min(40,max(1,Int(ceil(Double(length)/(factor*20))))) }
+    private static func payloadKind(_ p:String)->String { if p.hasPrefix("WIFI:"){return "Wi-Fi"}; if p.hasPrefix("BEGIN:VCARD"){return "vCard"}; if p.hasPrefix("BEGIN:VEVENT"){return "Calendar event"}; if p.hasPrefix("mailto:"){return "Email"}; if p.hasPrefix("tel:"){return "Phone"}; if p.hasPrefix("sms:"){return "SMS"}; if p.hasPrefix("geo:"){return "Location"}; if p.hasPrefix("bitcoin:"){return "Bitcoin payment"}; if p.lowercased().hasPrefix("http://") || p.lowercased().hasPrefix("https://"){return "URL"}; return "Plain text" }
+
+    private static func generateFull(toolID:String,input:String,size:Int,dark:String,light:String)throws->UIImage {
+        guard !input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw NativeNativeError.message("Enter something to encode.") }
+        if qrIDs.contains(toolID) {
+            let filter=CIFilter(name:"CIQRCodeGenerator")!; filter.setValue(Data(input.utf8),forKey:"inputMessage")
+            filter.setValue(toolID == "qr-code-high-error-correction" ? "H" : toolID == "qr-code-low-error-correction" ? "L" : "M",forKey:"inputCorrectionLevel")
+            guard var output=filter.outputImage else { throw NativeNativeError.message("The value could not be encoded.") }
+            if toolID == "qr-code-styled" {
+                let falseColor=CIFilter(name:"CIFalseColor")!; falseColor.setValue(output,forKey:"inputImage"); falseColor.setValue(CIColor(color:uiColor(dark,fallback:.black)),forKey:"inputColor0"); falseColor.setValue(CIColor(color:uiColor(light,fallback:.white)),forKey:"inputColor1"); output=falseColor.outputImage ?? output
+            }
+            let side=CGFloat(min(2048,max(128,size))); let scale=side/max(output.extent.width,output.extent.height)
+            guard let cg=CIContext().createCGImage(output.transformed(by:CGAffineTransform(scaleX:scale,y:scale)),from:output.transformed(by:CGAffineTransform(scaleX:scale,y:scale)).extent) else { throw NativeNativeError.message("Could not render the generated code.") }
+            return UIImage(cgImage:cg)
+        }
+        if ["ean13-barcode","ean8-barcode","upc-barcode","isbn-barcode"].contains(toolID) { return try generateEAN(toolID:toolID,input:input) }
+        if toolID == "code128-barcode" || toolID == "barcode-label-generator" || toolID == "barcode-svg-generator" {
+            guard let filter=CIFilter(name:"CICode128BarcodeGenerator") else { throw NativeNativeError.message("Code 128 is unavailable on this iOS version.") }
+            filter.setValue(Data(input.utf8),forKey:"inputMessage"); guard let output=filter.outputImage else { throw NativeNativeError.message("The value could not be encoded.") }
+            let transformed=output.transformed(by:CGAffineTransform(scaleX:3,y:3)); guard let cg=CIContext().createCGImage(transformed,from:transformed.extent) else { throw NativeNativeError.message("Could not render the barcode.") }; return UIImage(cgImage:cg)
+        }
+        let pattern=try linearPattern(toolID:toolID,input:input)
+        return renderFullBars(pattern)
+    }
+
+    private static func linearPattern(toolID:String,input:String)throws->String {
+        let clean=input.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:" ",with:"").replacingOccurrences(of:"-",with:"")
+        if toolID == "msi-barcode" {
+            guard !clean.isEmpty && clean.allSatisfy(\.isNumber) else { throw NativeNativeError.message("MSI accepts digits only.") }
+            return "110" + clean.map{String($0.wholeNumberValue!,radix:2).leftPadded(to:4,with:"0").map{$0 == "0" ? "100" : "110"}.joined()}.joined() + "1001"
+        }
+        if toolID == "pharmacode-barcode" {
+            guard var number=Int(clean), (3...131070).contains(number) else { throw NativeNativeError.message("Pharmacode must be an integer from 3 to 131070.") }
+            var result=""; while number != 0 { if number%2 == 0 { result="11100"+result; number=(number-2)/2 } else { result="100"+result; number=(number-1)/2 } }; return String(result.dropLast(2))
+        }
+        if toolID == "itf14-barcode" {
+            var digits=clean
+            guard digits.count == 13 || digits.count == 14, digits.allSatisfy(\.isNumber) else { throw NativeNativeError.message("ITF-14 requires 13 data digits or 14 digits with a check digit.") }
+            if digits.count == 13 { digits += String(checkDigit(String(digits),ean:false)) } else if Int(String(digits.last!)) != checkDigit(String(digits.dropLast())) { throw NativeNativeError.message("ITF-14 check digit is invalid.") }
+            let table=["NNWWN","WNNNW","NWNNW","WWNNN","NNWNW","WNWNN","NWWNN","NNNWW","WNNWN","NWNWN"]
+            let values=Array(digits).compactMap(\.wholeNumberValue); var result="1010"
+            for pair in stride(from:0,to:values.count,by:2) { let bars=Array(table[values[pair]]), spaces=Array(table[values[pair+1]]); for i in 0..<5 { result += bars[i] == "W" ? "111" : "1"; result += spaces[i] == "W" ? "000" : "0" } }
+            return result+"1101"
+        }
+        if toolID == "codabar-barcode" {
+            var text=clean.uppercased(); if text.first.map({"ABCD".contains($0)}) != true || text.last.map({"ABCD".contains($0)}) != true { text="A"+text+"A" }
+            let table:[Character:String]=["0":"101010011","1":"101011001","2":"101001011","3":"110010101","4":"101101001","5":"110101001","6":"100101011","7":"100101101","8":"100110101","9":"110100101","-":"101001101","$":"101100101",":":"1101011011","/":"1101101011",".":"1101101101","+":"1011011011","A":"1011001001","B":"1001001011","C":"1010010011","D":"1010011001"]
+            guard text.count >= 3, text.allSatisfy({table[$0] != nil}) else { throw NativeNativeError.message("Codabar accepts digits, - $ : . / + and A–D start/stop characters.") }
+            return text.enumerated().map{table[$0.element]! + ($0.offset == text.count-1 ? "" : "0")}.joined()
+        }
+        if toolID == "code39-barcode" {
+            let chars=Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%*"); let enc:[Int]=[20957,29783,23639,30485,20951,29813,23669,20855,29789,23645,29975,23831,30533,22295,30149,24005,21623,29981,23837,22301,30023,23879,30545,22343,30161,24017,21959,30065,23921,22385,29015,18263,29141,17879,29045,18293,17783,29021,18269,17477,17489,17681,20753,35770]
+            let text="*"+clean.uppercased()+"*"; guard text.allSatisfy({chars.contains($0)}) else { throw NativeNativeError.message("Code 39 accepts uppercase letters, digits, spaces and - . $ / + %.") }
+            return text.enumerated().map{index,char in let value=enc[chars.firstIndex(of:char)!]; let bits=String(value,radix:2).leftPadded(to:12,with:"0"); return bits+(index == text.count-1 ? "" : "0")}.joined()
+        }
+        throw NativeNativeError.message("This barcode format is not supported.")
+    }
+
+    private static func renderFullBars(_ pattern:String)->UIImage {
+        let unit:CGFloat=3, quiet:CGFloat=18, height:CGFloat=210
+        return UIGraphicsImageRenderer(size:CGSize(width:CGFloat(pattern.count)*unit+quiet*2,height:height)).image { context in
+            let rect=CGRect(origin:.zero,size:context.format.bounds.size); UIColor.white.setFill(); context.fill(rect); UIColor.black.setFill()
+            for (index,bit) in pattern.enumerated() where bit == "1" { context.fill(CGRect(x:quiet+CGFloat(index)*unit,y:10,width:unit,height:height-20)) }
+        }
+    }
+
+    private static func addHumanLabel(_ image:UIImage,_ label:String)->UIImage {
+        let size=CGSize(width:image.size.width,height:image.size.height+40)
+        return UIGraphicsImageRenderer(size:size).image { context in UIColor.white.setFill(); context.fill(CGRect(origin:.zero,size:size)); image.draw(in:CGRect(x:0,y:0,width:image.size.width,height:image.size.height)); let style=NSMutableParagraphStyle(); style.alignment = .center; (String(label.prefix(64)) as NSString).draw(in:CGRect(x:4,y:image.size.height+8,width:size.width-8,height:28),withAttributes:[.font:UIFont.monospacedSystemFont(ofSize:14,weight:.regular),.foregroundColor:UIColor.black,.paragraphStyle:style]) }
+    }
+
+    private static func uiColor(_ hex:String,fallback:UIColor)->UIColor {
+        var text=hex.trimmingCharacters(in:CharacterSet(charactersIn:"# ")); if text.count == 3 { text=String(text.map{[$0,$0]}.joined()) }
+        guard text.count == 6, let value=UInt32(text,radix:16) else { return fallback }
+        return UIColor(red:CGFloat((value>>16)&255)/255,green:CGFloat((value>>8)&255)/255,blue:CGFloat(value&255)/255,alpha:1)
+    }
+}
+
+private extension String {
+    func leftPadded(to length:Int,with character:Character)->String { String(repeating:String(character),count:max(0,length-count))+self }
 }

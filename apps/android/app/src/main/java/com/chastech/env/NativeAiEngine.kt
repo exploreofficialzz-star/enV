@@ -26,7 +26,7 @@ object NativeAiEngine {
         "video-audio-extractor" to "video.transcript.generate",
     )
 
-    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || contentBriefTools.contains(tool.id) || adCopyTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id)
+    fun supports(tool: ToolRecord): Boolean = captionTools.contains(tool.id) || promptTools.contains(tool.id) || bioTools.contains(tool.id) || productTools.contains(tool.id) || ideaTools.contains(tool.id) || resumeTools.contains(tool.id) || rewriteTools.contains(tool.id) || emailTools.contains(tool.id) || metaTools.contains(tool.id) || hookTools.contains(tool.id) || improverTools.contains(tool.id) || contentBriefTools.contains(tool.id) || adCopyTools.contains(tool.id) || titleTools.contains(tool.id) || exactTasks.containsKey(tool.id) || NativeAiMicroEngine.supports(tool.id)
 
     fun isLocalCaption(toolId: String): Boolean = captionTools.contains(toolId)
     fun isLocalPrompt(toolId: String): Boolean = promptTools.contains(toolId)

@@ -333,49 +333,23 @@ async function testNumberBaseCodec(page, result) {
   result.invalidDigitsRejected = true;
 }
 
-async function waitForAppHydration(page) {
-  const themeToggle = page.locator('button[aria-label="Switch to dark mode"], button[aria-label="Switch to light mode"]');
-  await themeToggle.waitFor({ state: "visible", timeout: 10000 });
-  const originalLabel = await themeToggle.getAttribute("aria-label");
-  assert(originalLabel === "Switch to dark mode" || originalLabel === "Switch to light mode", "Theme toggle did not render with an accessible state.");
-  const alternateLabel = originalLabel === "Switch to dark mode" ? "Switch to light mode" : "Switch to dark mode";
-  let hydrated = false;
-
-  for (let attempt = 0; attempt < 20; attempt++) {
-    if ((await themeToggle.getAttribute("aria-label")) === alternateLabel) {
-      hydrated = true;
-      break;
-    }
-    await themeToggle.click();
-    try {
-      await page.locator(`button[aria-label="${alternateLabel}"]`).waitFor({ state: "visible", timeout: 250 });
-      hydrated = true;
-      break;
-    } catch {
-      await page.waitForTimeout(50);
-    }
-  }
-  assert(hydrated, "React hydration did not activate the theme control within the retry window.");
-  await page.locator(`button[aria-label="${alternateLabel}"]`).click();
-  await page.locator(`button[aria-label="${originalLabel}"]`).waitFor({ state: "visible", timeout: 3000 });
+async function waitForAppHydration(page, toolId) {
+  await page.waitForFunction(
+    (id) => document.documentElement.dataset.envToolHydrated === id,
+    toolId,
+    { timeout: 10000 },
+  );
 }
 
-async function testSharedToolUi(page, width, result) {
+async function testSharedToolUi(page, tool, result) {
   assert(await page.getByRole("heading", { name: "How to use", exact: true }).count() === 0, "Tool page still shows a How to use section.");
   assert(await page.getByRole("heading", { name: "Frequently asked questions", exact: true }).count() === 0, "Tool page still shows a Frequently asked questions section.");
   assert(await page.getByRole("heading", { name: "What this tool does", exact: true }).count() === 1, "Tool description section is missing.");
-
-  const headerFavorites = page.locator('a[aria-label="Favorites"]');
-  assert(await headerFavorites.count() === 1, "Header Favorites control is missing.");
-  const mobileNav = page.getByRole("navigation", { name: "Mobile" });
-  const savedTab = mobileNav.getByRole("link", { name: "Saved", exact: true });
-  if (width < 768) {
-    assert(!(await headerFavorites.isVisible()), "Duplicate header Favorites control is visible on mobile.");
-    assert(await mobileNav.isVisible() && await savedTab.isVisible(), "Mobile Saved navigation tab is missing.");
-  } else {
-    assert(await headerFavorites.isVisible(), "Desktop header Favorites control should remain visible.");
-    assert(!(await mobileNav.isVisible()), "Mobile navigation should be hidden at desktop width.");
-  }
+  assert(await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).count() === 1, "Tool breadcrumb navigation is missing.");
+  const saveControl = page.locator("article header button[aria-label]");
+  assert(await saveControl.count() === 1 && await saveControl.isVisible(), "Tool save control is missing or not visible.");
+  const saveLabel = await saveControl.getAttribute("aria-label");
+  assert(saveLabel === `Save ${tool.name}` || saveLabel === `Remove ${tool.name} from saved tools`, `Tool save control has an unexpected accessible name: ${saveLabel ?? "none"}.`);
   result.sharedToolUiPassed = true;
 }
 
@@ -457,8 +431,8 @@ try {
       assert(response?.ok(), `Detail route returned HTTP ${response?.status() ?? 0}.`);
       const heading = (await page.locator("h1").first().textContent())?.trim() ?? "";
       assert(heading === tool.name, `Expected heading "${tool.name}", received "${heading}".`);
-      await waitForAppHydration(page);
-      await testSharedToolUi(page, viewportWidth, result);
+      await waitForAppHydration(page, tool.id);
+      await testSharedToolUi(page, tool, result);
       if (engine.type === "converter") await testConverter(page, tool, engine, unitModule, result);
       else if (engine.type === "file-converter") await testFileConverter(page, tool, engine, imageFixtures, result);
       else if (engine.type === "codec" && engine.op === "base-convert") await testNumberBaseCodec(page, result);

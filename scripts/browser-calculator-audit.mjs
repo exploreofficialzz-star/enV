@@ -260,6 +260,7 @@ try {
       if (!response?.ok()) throw new Error(`Detail route returned HTTP ${response?.status() ?? 0}.`);
       const heading = (await page.locator("h1").first().textContent())?.trim() ?? "";
       if (heading !== tool.name) throw new Error(`Expected detail heading "${tool.name}", received "${heading}".`);
+      await page.waitForFunction((toolId) => document.documentElement.dataset.envToolHydrated === toolId, tool.id, { timeout: 10000 });
       const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Calculate", exact: true }) }).first();
       await form.waitFor({ state: "visible", timeout: 10000 });
 

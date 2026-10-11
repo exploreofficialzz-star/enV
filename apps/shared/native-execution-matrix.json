@@ -5,12 +5,12 @@
     "total": 10000,
     "active": 10000,
     "planned": 0,
-    "offlineNative": 7633,
+    "offlineNative": 7701,
     "backendNative": 1619,
-    "webOnly": 748,
-    "missingActive": 748,
+    "webOnly": 680,
+    "missingActive": 680,
     "divergentActive": 0,
-    "fullyExecutable": 9252
+    "fullyExecutable": 9320
   },
   "tools": [
     {
@@ -523,8 +523,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "alt-text-generator",
@@ -550,8 +550,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "call-to-action-generator",
@@ -559,8 +559,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "caption-generator",
@@ -595,8 +595,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "faq-generator",
@@ -604,8 +604,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "feature-benefit-generator",
@@ -613,8 +613,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "idea-generator",
@@ -631,8 +631,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "meta-description-generator",
@@ -658,8 +658,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "prompt-generator",
@@ -685,8 +685,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "resume-bullet-generator",
@@ -712,8 +712,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "social-hook-generator",
@@ -730,8 +730,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "title-generator",
@@ -748,8 +748,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "youtube-title-helper",
@@ -757,8 +757,8 @@
       "status": "active",
       "category": "ai",
       "engine": "ai",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "apple-music-audio-file-size-calculator",
@@ -80245,8 +80245,8 @@
       "status": "active",
       "category": "productivity",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "pomodoro-timer",
@@ -80254,8 +80254,8 @@
       "status": "active",
       "category": "productivity",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sleep-calculator",
@@ -80272,8 +80272,8 @@
       "status": "active",
       "category": "productivity",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "app-store-qr-generator",
@@ -80281,8 +80281,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "barcode-label-generator",
@@ -80290,8 +80290,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "barcode-svg-generator",
@@ -80299,8 +80299,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-batch-generator",
@@ -80308,8 +80308,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "bitcoin-qr-generator",
@@ -80317,8 +80317,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "calendar-qr-generator",
@@ -80326,8 +80326,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "codabar-barcode",
@@ -80335,8 +80335,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "code128-barcode",
@@ -80344,8 +80344,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "code39-barcode",
@@ -80353,8 +80353,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "crypto-wallet-qr-generator",
@@ -80362,8 +80362,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "discord-invite-qr-generator",
@@ -80371,8 +80371,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "ean13-barcode",
@@ -80380,8 +80380,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "ean13-check-digit",
@@ -80389,8 +80389,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "ean8-barcode",
@@ -80398,8 +80398,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "email-qr-generator",
@@ -80407,8 +80407,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "ethereum-qr-generator",
@@ -80416,8 +80416,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "event-qr-generator",
@@ -80425,8 +80425,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "facebook-link-qr-generator",
@@ -80434,8 +80434,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "google-play-qr-generator",
@@ -80443,8 +80443,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "gtin-validator",
@@ -80452,8 +80452,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-code-high-error-correction",
@@ -80461,8 +80461,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "instagram-link-qr-generator",
@@ -80470,8 +80470,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "isbn-check-digit",
@@ -80479,8 +80479,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "isbn-barcode",
@@ -80488,8 +80488,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "itf14-barcode",
@@ -80497,8 +80497,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "linkedin-link-qr-generator",
@@ -80506,8 +80506,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "location-qr-generator",
@@ -80515,8 +80515,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-code-low-error-correction",
@@ -80524,8 +80524,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "mecard-qr-generator",
@@ -80533,8 +80533,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "msi-barcode",
@@ -80542,8 +80542,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "pharmacode-barcode",
@@ -80551,8 +80551,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "phone-qr-generator",
@@ -80560,8 +80560,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-capacity-helper",
@@ -80569,8 +80569,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-generator",
@@ -80578,8 +80578,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-data-url-generator",
@@ -80587,8 +80587,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-payload-encoder",
@@ -80596,8 +80596,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-payload-inspector",
@@ -80605,8 +80605,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-size-calculator",
@@ -80614,8 +80614,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-svg-generator",
@@ -80623,8 +80623,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-version-helper",
@@ -80632,8 +80632,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sms-qr-generator",
@@ -80641,8 +80641,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "qr-code-styled",
@@ -80650,8 +80650,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "telegram-link-qr-generator",
@@ -80659,8 +80659,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "text-qr-generator",
@@ -80668,8 +80668,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "upc-barcode",
@@ -80677,8 +80677,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "upc-check-digit",
@@ -80686,8 +80686,8 @@
       "status": "active",
       "category": "qr",
       "engine": "barcode",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "url-qr-generator",
@@ -80695,8 +80695,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "vcard-qr-generator",
@@ -80704,8 +80704,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "whatsapp-qr-generator",
@@ -80713,8 +80713,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "wifi-qr-generator",
@@ -80722,8 +80722,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "x-link-qr-generator",
@@ -80731,8 +80731,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "youtube-link-qr-generator",
@@ -80740,8 +80740,8 @@
       "status": "active",
       "category": "qr",
       "engine": "qr",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "baby-generator",

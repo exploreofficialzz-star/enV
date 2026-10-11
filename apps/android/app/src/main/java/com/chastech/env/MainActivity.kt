@@ -13,6 +13,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -81,6 +82,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -888,7 +890,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
-    "custom" -> NativeAccessibilityEngine.supports(tool.id, tool.category) || tool.category == "productivity"
+    "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category)
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
@@ -1075,7 +1077,7 @@ private fun NativeToolForm(tool: ToolRecord) {
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
         "developer" -> NativeDeveloperToolForm(tool)
     "custom" -> when {
-        tool.category == "productivity" -> NativeProductivityToolForm(tool.id)
+        NativeProductivityEngine.supports(tool.id) -> NativeProductivityToolForm(tool.id)
         NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)
         else -> Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -1084,33 +1086,153 @@ private fun NativeToolForm(tool: ToolRecord) {
 }
 
 
+private val nativeProductivityStateSaver = mapSaver<NativeProductivityEngine.State>(
+    save = { state -> mapOf(
+        "mode" to state.mode.name,
+        "running" to state.running,
+        "hasStarted" to state.hasStarted,
+        "valueMs" to state.valueMs,
+        "anchorMs" to (state.anchorMs ?: -1L),
+        "phase" to state.phase.name,
+        "round" to state.round,
+        "focusMinutes" to state.focusMinutes,
+        "breakMinutes" to state.breakMinutes,
+        "laps" to state.lapsMs.joinToString(","),
+    ) },
+    restore = { saved ->
+        NativeProductivityEngine.State(
+            mode = NativeProductivityEngine.Mode.valueOf(saved["mode"] as String),
+            running = saved["running"] as Boolean,
+            hasStarted = saved["hasStarted"] as Boolean,
+            valueMs = saved["valueMs"] as Long,
+            anchorMs = (saved["anchorMs"] as Long).takeIf { it >= 0L },
+            phase = NativeProductivityEngine.Phase.valueOf(saved["phase"] as String),
+            round = saved["round"] as Int,
+            focusMinutes = saved["focusMinutes"] as Int,
+            breakMinutes = saved["breakMinutes"] as Int,
+            lapsMs = (saved["laps"] as String).split(",").mapNotNull { it.toLongOrNull() },
+        )
+    },
+)
+
 @Composable
-private fun NativeProductivityToolForm(toolId:String) {
-    var running by rememberSaveable(toolId){ mutableStateOf(false) }
-    var elapsed by rememberSaveable(toolId){ mutableStateOf(0L) }
-    var phase by rememberSaveable(toolId){ mutableStateOf("focus") }
-    var remaining by rememberSaveable(toolId){ mutableStateOf(if(toolId=="pomodoro-timer")1500L else 3000L) }
-    LaunchedEffect(running, toolId, phase) { while(running) { kotlinx.coroutines.delay(1000); if(toolId=="stopwatch") elapsed++ else { if(remaining<=1){ phase=if(phase=="focus")"break" else "focus"; remaining=if(toolId=="pomodoro-timer") if(phase=="focus")1500 else 300 else if(phase=="focus")3000 else 600 } else remaining-- } } }
-    val display=if(toolId=="stopwatch") String.format("%02d:%02d",elapsed/60,elapsed%60) else String.format("%02d:%02d",remaining/60,remaining%60)
-    Column(verticalArrangement=Arrangement.spacedBy(12.dp)){ Text(if(toolId=="stopwatch")"Stopwatch" else if(toolId=="pomodoro-timer")"Pomodoro · ${phase.replaceFirstChar{it.uppercase()}}" else "Focus Timer",style=MaterialTheme.typography.titleMedium); Text(display,style=MaterialTheme.typography.displayLarge); Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Button({running=!running}){Text(if(running)"Pause" else "Start")}; OutlinedButton({running=false;elapsed=0;phase="focus";remaining=if(toolId=="pomodoro-timer")1500 else 3000}){Text("Reset")}} }
+private fun NativeProductivityToolForm(toolId: String) {
+    val mode = NativeProductivityEngine.modeFor(toolId)
+    if (mode == null) {
+        Text("This native productivity timer is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    var timerState by rememberSaveable(toolId, stateSaver = nativeProductivityStateSaver) {
+        mutableStateOf(NativeProductivityEngine.create(mode))
+    }
+    var focusInput by rememberSaveable(toolId) { mutableStateOf("50") }
+    var breakInput by rememberSaveable(toolId) { mutableStateOf("10") }
+    LaunchedEffect(timerState.running, mode) {
+        while (timerState.running) {
+            kotlinx.coroutines.delay(if (mode == NativeProductivityEngine.Mode.STOPWATCH) 50L else 250L)
+            timerState = NativeProductivityEngine.advance(timerState, SystemClock.elapsedRealtime())
+        }
+    }
+    val now = SystemClock.elapsedRealtime()
+    val displayMs = NativeProductivityEngine.displayedMs(timerState, now)
+    val display = if (mode == NativeProductivityEngine.Mode.STOPWATCH) NativeProductivityEngine.formatStopwatch(displayMs)
+        else NativeProductivityEngine.formatCountdown(displayMs)
+    val title = when (mode) {
+        NativeProductivityEngine.Mode.STOPWATCH -> "Stopwatch"
+        NativeProductivityEngine.Mode.POMODORO -> "Round ${timerState.round} · ${timerState.phase.name.lowercase().replaceFirstChar { it.uppercase() }}"
+        NativeProductivityEngine.Mode.FOCUS -> timerState.phase.name.lowercase().replaceFirstChar { it.uppercase() }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (mode == NativeProductivityEngine.Mode.FOCUS) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = focusInput,
+                    onValueChange = { value ->
+                        focusInput = value
+                        value.toIntOrNull()?.let {
+                            timerState = NativeProductivityEngine.setFocusDurations(timerState, it, breakInput.toIntOrNull() ?: timerState.breakMinutes)
+                        }
+                    },
+                    label = { Text("Focus minutes (1–240)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = breakInput,
+                    onValueChange = { value ->
+                        breakInput = value
+                        value.toIntOrNull()?.let {
+                            timerState = NativeProductivityEngine.setFocusDurations(timerState, focusInput.toIntOrNull() ?: timerState.focusMinutes, it)
+                        }
+                    },
+                    label = { Text("Break minutes (1–240)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text("Use whole minutes. Values are limited to 1–240 minutes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(display, style = MaterialTheme.typography.displayLarge, modifier = Modifier.semantics { contentDescription = "Time: $display" })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({ timerState = NativeProductivityEngine.toggle(timerState, SystemClock.elapsedRealtime()) }) {
+                Text(if (timerState.running) "Pause" else if (timerState.hasStarted) "Resume" else "Start")
+            }
+            if (mode == NativeProductivityEngine.Mode.STOPWATCH) {
+                OutlinedButton({ timerState = NativeProductivityEngine.lap(timerState, SystemClock.elapsedRealtime()) }, enabled = timerState.running) { Text("Lap") }
+            } else if (mode == NativeProductivityEngine.Mode.POMODORO) {
+                OutlinedButton({ timerState = NativeProductivityEngine.skip(timerState, SystemClock.elapsedRealtime()) }) { Text("Skip") }
+            }
+            OutlinedButton({ timerState = NativeProductivityEngine.reset(timerState) }) { Text("Reset") }
+        }
+        if (timerState.lapsMs.isNotEmpty()) {
+            Text("Laps", style = MaterialTheme.typography.titleSmall)
+            timerState.lapsMs.forEachIndexed { index, lap ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Lap ${index + 1}")
+                    Text(NativeProductivityEngine.formatStopwatch(lap), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+        Text(
+            when (mode) {
+                NativeProductivityEngine.Mode.STOPWATCH -> "Uses a monotonic clock for elapsed time. Keep enV open to view live updates."
+                NativeProductivityEngine.Mode.POMODORO -> "Standard 25-minute focus and 5-minute break cycle. No background alert is promised."
+                NativeProductivityEngine.Mode.FOCUS -> "Set focus and break lengths from 1 to 240 minutes. No background alert is promised."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
 private fun NativeBarcodeToolForm(toolId: String) {
     val context = LocalContext.current
-    var value by rememberSaveable(toolId) { mutableStateOf(if (toolId == "gtin-validator") "ENV-12345" else "") }
+    val fields = remember(toolId) { NativeBarcodeEngine.fieldsFor(toolId) }
+    var values by rememberSaveable(toolId) { mutableStateOf(NativeBarcodeEngine.initialValues(toolId)) }
     var output by rememberSaveable(toolId) { mutableStateOf("") }
     var error by rememberSaveable(toolId) { mutableStateOf("") }
-    var image by remember(toolId) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var images by remember(toolId) { mutableStateOf(emptyList<android.graphics.Bitmap>()) }
+    var exportText by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InputField(value, { value = it }, "Value", singleLine = true)
+        fields.forEach { field ->
+            val hint = if (field.options.isEmpty()) field.label else "${field.label} · ${field.options.joinToString(" / ")}"
+            InputField(values[field.key] ?: field.defaultValue, { values = values + (field.key to it) }, hint, minLines = if (field.multiline) 3 else 1, singleLine = !field.multiline)
+        }
         ActionRow(onRun = {
-            if (NativeBarcodeEngine.generatesImage(toolId)) runCatching { NativeBarcodeEngine.generate(toolId, value) }.fold({ image = it; output = "Generated locally on this device."; error = "" }, { image = null; output = ""; error = it.message ?: "Unable to generate barcode" })
-            else runCatching { NativeBarcodeEngine.run(toolId, value) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to validate barcode" })
-        }, onReset = { value = if (toolId == "gtin-validator") "ENV-12345" else ""; output = ""; error = ""; image = null })
+            runCatching { NativeBarcodeEngine.execute(toolId, values) }.fold({ result -> output = result.text; images = result.images; exportText = result.exportText.orEmpty(); error = "" }, { images = emptyList(); output = ""; exportText = ""; error = it.message ?: "Unable to run barcode operation" })
+        }, onReset = { values = NativeBarcodeEngine.initialValues(toolId); output = ""; error = ""; images = emptyList(); exportText = "" })
         ResultBox(output, error, ::copy)
-        image?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "Generated barcode", modifier = Modifier.fillMaxWidth().height(240.dp)) }
+        images.forEachIndexed { index, image -> Image(bitmap = image.asImageBitmap(), contentDescription = "Generated code ${index + 1}", modifier = Modifier.fillMaxWidth().height(240.dp)) }
+        if (exportText.isNotEmpty()) {
+            Text("Export data", style = MaterialTheme.typography.labelLarge)
+            Text(exportText.take(512) + if (exportText.length > 512) "…" else "", maxLines = 5, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { copy(exportText) }) { Text("Copy export data") }
+        }
     }
 }
 

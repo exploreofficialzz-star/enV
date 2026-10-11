@@ -65,6 +65,68 @@ function buildPayload(v: Record<string, string>) {
   return v.a || "";
 }
 
+/** Validate structured inputs before encoding so empty prefixes cannot masquerade as useful payloads. */
+export function qrInputError(preset: string, v: Record<string, string>): string | null {
+  const required = (key: string, label: string) => v[key]?.trim() ? null : `Enter ${label}.`;
+  const phone = (key: string, label: string) => required(key, label) ?? (/\d{3,}/.test(v[key].replace(/\D/g, "")) ? null : `Enter a valid ${label.toLowerCase()}.`);
+  const email = (key: string, label: string) => required(key, label) ?? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v[key].trim()) ? null : `Enter a valid ${label.toLowerCase()}.`);
+  const coordinate = (key: string, label: string, min: number, max: number) => {
+    if (!v[key]?.trim()) return `Enter ${label}.`;
+    const value = Number(v[key]);
+    return Number.isFinite(value) && value >= min && value <= max ? null : `${label} must be between ${min} and ${max}.`;
+  };
+  const firstError = (checks: (string | null)[]) => checks.find(Boolean) ?? null;
+
+  if (preset === "size") {
+    const modules = Number(v.modules || 21), modulePx = Number(v.modulePx || 4);
+    return Number.isInteger(modules) && modules > 0 && Number.isFinite(modulePx) && modulePx > 0 ? null : "Modules and module size must be positive numbers.";
+  }
+  if (preset === "version") return required("text", "a QR payload to estimate");
+  if (preset === "capacity") {
+    const version = Number(v.version || 1);
+    return Number.isInteger(version) && version >= 1 && version <= 40 && ["L", "M", "Q", "H"].includes(v.level || "M") ? null : "Choose a QR version from 1 to 40 and a valid error-correction level.";
+  }
+  if (preset === "inspect") return required("payload", "a QR payload to inspect");
+  if (preset === "batch") {
+    const items = (v.items || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    if (!items.length) return "Enter at least one value.";
+    return items.length > 50 ? "Batch generation is limited to 50 values at a time." : null;
+  }
+  if (["high-error", "low-error", "text", "styled", "svg", "data-url"].includes(preset)) return required("text", "something to encode");
+  if (preset === "url") {
+    if (!v.url?.trim()) return "Enter a URL.";
+    try { const url = new URL(v.url.trim()); return url.protocol && url.hostname ? null : "Enter a complete URL including its host."; }
+    catch { return "Enter a complete URL including https://."; }
+  }
+  if (preset === "wifi") return firstError([required("ssid", "a network name"), v.security !== "nopass" ? required("password", "a Wi-Fi password or choose No password") : null]);
+  if (preset === "whatsapp") return phone("phone", "phone number");
+  if (preset === "email") return email("to", "email address");
+  if (preset === "phone" || preset === "sms") return phone("phone", "phone number");
+  if (preset === "vcard" || preset === "mecard") return required("name", "a contact name");
+  if (preset === "geo") return firstError([coordinate("lat", "Latitude", -90, 90), coordinate("lng", "Longitude", -180, 180)]);
+  if (preset === "event" || preset === "calendar") return firstError([required("title", "an event title"), required("start", "a start time"), required("end", "an end time")]);
+  if (preset === "bitcoin") {
+    if (!v.address?.trim()) return "Enter a Bitcoin address.";
+    if (v.amount?.trim() && (!Number.isFinite(Number(v.amount)) || Number(v.amount) < 0)) return "Amount must be a non-negative number.";
+    return null;
+  }
+  if (preset === "ethereum" || preset === "crypto") return required("address", "a wallet address");
+  if (preset === "payload") {
+    switch (v.kind) {
+      case "wifi": return required("a", "a network name");
+      case "email": return email("a", "email address");
+      case "phone": case "sms": return phone("a", "phone number");
+      case "geo": return firstError([coordinate("a", "Latitude", -90, 90), coordinate("b", "Longitude", -180, 180)]);
+      default: return required("a", "a payload value");
+    }
+  }
+  return null;
+}
+
+export function initialBarcodeValue(format: string): string {
+  return ({ ean13: "9780143127741", isbn: "9780143127741", "ean13-check": "9780143127741", "isbn-check": "9780143127741", "gtin-validator": "9780143127741", upca: "036000291452", "upc-check": "036000291452", ean8: "96385074", itf14: "10000000000007", msi: "12345", pharmacode: "12345" } as Record<string, string>)[format] ?? "12345";
+}
+
 export function checkDigit(value: string) {
   const digits = value.replace(/\D/g, "");
   if (!digits) return null;
@@ -87,7 +149,7 @@ function approxVersion(length: number, level: string) {
 
 export function QrEngine({ preset }: { preset: string }) {
   const fieldPreset = ["high-error", "low-error"].includes(preset) ? "text" : preset;
-  const fields = ["size", "version", "capacity", "inspect"].includes(preset) ? [] : (COMMON_FIELDS[fieldPreset] ?? COMMON_FIELDS.text);
+  const fields = ["size", "version", "capacity"].includes(preset) ? [] : (COMMON_FIELDS[fieldPreset] ?? COMMON_FIELDS.text);
   const defaults = useMemo(() => Object.fromEntries(fields.map((f) => [f.name, String(f.defaultValue ?? "")])), [fields]);
   const [vals, setVals] = useState<Record<string, string>>(defaults);
   const [url, setUrl] = useState<string | null>(null);
@@ -99,6 +161,8 @@ export function QrEngine({ preset }: { preset: string }) {
   const run = async () => {
     try {
       setError(null); setInfo(null); setBatch([]); setUrl(null); setSvg("");
+      const inputError = qrInputError(preset, vals);
+      if (inputError) throw new Error(inputError);
       if (preset === "size") {
         const modules = Number(vals.modules || 21); const modulePx = Number(vals.modulePx || 4);
         setInfo(`${modules} modules × ${modulePx}px = ${modules * modulePx}px before quiet-zone margin.`); return;
@@ -119,8 +183,7 @@ export function QrEngine({ preset }: { preset: string }) {
       }
       const QR = await import("qrcode");
       if (preset === "batch") {
-        const items = (vals.items || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 50);
-        if (!items.length) throw new Error("Enter at least one value.");
+        const items = (vals.items || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
         const outputs = await Promise.all(items.map((x) => QR.toDataURL(x, { width: 320, margin: 1 })));
         setBatch(outputs); setInfo(`Generated ${outputs.length} QR codes locally.`); return;
       }
@@ -149,14 +212,14 @@ export function QrEngine({ preset }: { preset: string }) {
     <div className="flex gap-2"><Button type="button" onClick={run}>{["size","version","capacity","inspect"].includes(preset) ? "Calculate" : "Generate QR"}</Button><Button type="button" variant="outline" onClick={()=>{setVals(defaults);setUrl(null);setSvg("");setBatch([]);setInfo(null);setError(null);}}>Reset</Button></div>
     <ErrorBanner message={error} />
     {info ? <div className="rounded-lg border p-3 text-sm">{info}</div> : null}
-    {url ? <div className="space-y-3"><img src={url} alt="Generated QR code" className="size-56 rounded-lg bg-white p-2" /><div className="flex gap-2"><Button type="button" variant="outline" onClick={async()=>downloadBlob(await (await fetch(url)).blob(),"env-qr.png")}><Download className="size-4"/>Download PNG</Button></div></div> : null}
+    {url ? <div className="space-y-3"><img src={url} alt="Generated QR code" className="size-56 rounded-lg bg-white p-2" /><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={async()=>downloadBlob(await (await fetch(url)).blob(),"env-qr.png")}><Download className="size-4"/>Download PNG</Button>{preset === "data-url" ? <><Button type="button" variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(url)}catch{setError("Clipboard access is unavailable; use the text below instead.");}}}><Copy className="size-4"/>Copy data URL</Button><Button type="button" variant="outline" onClick={()=>downloadText(url,"env-qr-data-url.txt","text/plain")}><Download className="size-4"/>Download data URL</Button></> : null}</div>{preset === "data-url" ? <pre className="max-h-40 overflow-auto break-all rounded-md bg-surface p-3 text-xs" aria-label="Generated QR data URL">{url}</pre> : null}</div> : null}
     {svg ? <div className="space-y-3"><div className="max-w-md rounded-lg bg-white p-4" dangerouslySetInnerHTML={{__html:svg}}/><div className="flex gap-2"><Button type="button" variant="outline" onClick={()=>downloadText(svg,"env-qr.svg","image/svg+xml")}><Download className="size-4"/>Download SVG</Button><Button type="button" variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(svg)}catch{setError("Clipboard access is unavailable; use the download option instead.");}}}><Copy className="size-4"/>Copy SVG</Button></div></div> : null}
     {batch.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{batch.map((src,i)=><div key={src} className="space-y-2 rounded-lg border p-2"><img src={src} alt={`QR ${i+1}`} className="w-full bg-white"/><Button type="button" variant="outline" className="w-full" onClick={async()=>downloadBlob(await (await fetch(src)).blob(),`env-qr-${i+1}.png`)}><Download className="size-4"/>PNG</Button></div>)}</div> : null}
   </div>;
 }
 
 export function BarcodeEngine({ format }: { format: string }) {
-  const [value, setValue] = useState(format === "ean13" || format === "isbn" ? "9780143127741" : format === "upca" ? "036000291452" : format === "ean8" ? "96385074" : "ENV-12345");
+  const [value, setValue] = useState(() => initialBarcodeValue(format));
   const [error, setError] = useState<string | null>(null);
   const [svg, setSvg] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -183,7 +246,7 @@ export function BarcodeEngine({ format }: { format: string }) {
 
   return <div className="space-y-4">
     <label className="block space-y-1.5"><span className="text-sm font-medium">Value</span><input className="flex h-11 w-full rounded-md bg-surface px-3 text-sm shadow-[var(--shadow-border)]" value={value} onChange={(e)=>setValue(e.target.value)} /></label>
-    <div className="flex gap-2"><Button type="button" onClick={run}>{["gtin-validator","ean13-check","upc-check","isbn-check"].includes(format) ? "Validate / Calculate" : "Generate barcode"}</Button><Button type="button" variant="outline" onClick={()=>{setValue(format === "ean13" || format === "isbn" ? "9780143127741" : format === "upca" ? "036000291452" : format === "ean8" ? "96385074" : "ENV-12345");setError(null);setResult(null);setSvg("");}}>Reset</Button></div>
+    <div className="flex gap-2"><Button type="button" onClick={run}>{["gtin-validator","ean13-check","upc-check","isbn-check"].includes(format) ? "Validate / Calculate" : "Generate barcode"}</Button><Button type="button" variant="outline" onClick={()=>{setValue(initialBarcodeValue(format));setError(null);setResult(null);setSvg("");}}>Reset</Button></div>
     <ErrorBanner message={error}/>
     {result ? <div className="rounded-lg border p-3 text-sm">{result}</div> : null}
     {svg ? <div className="space-y-3"><div className="overflow-x-auto rounded-lg bg-white p-4" dangerouslySetInnerHTML={{__html:svg}}/><div className="flex gap-2"><Button type="button" variant="outline" onClick={()=>downloadText(svg,"env-barcode.svg","image/svg+xml")}><Download className="size-4"/>Download SVG</Button></div></div> : null}

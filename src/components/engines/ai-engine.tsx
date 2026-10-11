@@ -4,6 +4,7 @@ import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
 import { initialValues } from "@/components/engines/initial-values";
+import { generateAiMicroTool, isAiMicroOperation } from "@/lib/ai/micro-tools";
 
 const TONES = [
   { value: "natural", label: "Natural" },
@@ -22,8 +23,8 @@ function fieldsFor(op: string): UiField[] {
   const tone: UiField = { name: "tone", label: "Tone", type: "select", defaultValue: "natural", options: TONES };
   const topic: UiField = { name: "topic", label: "Topic / subject", type: "text", defaultValue: "AI tools for creators" };
   const audience: UiField = { name: "audience", label: "Audience", type: "text", defaultValue: "creators and small businesses" };
-  if (["title", "yt-title"].includes(op)) return [topic, audience, tone, { name: "count", label: "Options", type: "number", defaultValue: 8, min: 1, max: 20 }];
-  if (["caption", "tt-caption"].includes(op)) return [topic, audience, tone, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
+  if (["title", "yt-title"].includes(op)) return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 8, min: 1, max: 20 }];
+  if (["caption", "tt-caption"].includes(op)) return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
   if (op === "bio") return [{ name: "role", label: "Role / what you do", type: "text", defaultValue: "AI music creator" }, audience, tone, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
   if (op === "product-desc") return [{ name: "product", label: "Product name", type: "text", defaultValue: "AI Music Generator Class" }, { name: "features", label: "Features / benefits", type: "textarea", defaultValue: "Beginner friendly\nWorks from a smartphone\nUses accessible tools" }, audience, tone];
   if (op === "email") return [{ name: "purpose", label: "Email purpose", type: "text", defaultValue: "Introduce a new digital product" }, { name: "points", label: "Key points", type: "textarea", defaultValue: "What it does\nWho it is for\nHow to get started" }, tone];
@@ -32,13 +33,19 @@ function fieldsFor(op: string): UiField[] {
   if (op === "meta-desc") return [topic, { name: "page", label: "Page purpose", type: "textarea", defaultValue: "Explain the product, key benefits, and how visitors can get started." }, tone];
   if (op === "resume") return [{ name: "duty", label: "Duty / responsibility", type: "textarea", defaultValue: "Managed social media content and improved engagement" }, { name: "result", label: "Result or metric (optional)", type: "text", defaultValue: "increased engagement" }, tone];
   if (op === "yt-desc") return [topic, audience, tone, { name: "points", label: "Key points", type: "textarea", defaultValue: "Problem\nSolution\nPractical examples\nCall to action" }];
-  if (["blog-outline", "content-brief", "idea", "ideas"].includes(op)) return [topic, audience, tone, { name: "goal", label: "Goal", type: "text", defaultValue: "Educate and give the reader a practical next step" }];
-  if (["ad-copy", "cta", "hook", "product-title", "feature-benefit"].includes(op)) return [topic, audience, tone, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
+  if (op === "blog-outline") return [topic, audience, { name: "goal", label: "Goal", type: "text", defaultValue: "Educate and give the reader a practical next step" }];
+  if (["content-brief", "idea", "ideas"].includes(op)) return [topic, audience, tone, { name: "goal", label: "Goal", type: "text", defaultValue: "Educate and give the reader a practical next step" }];
+  if (op === "cta") return [topic];
+  if (op === "product-title") return [topic, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
+  if (op === "feature-benefit") return [topic, audience, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
+  if (["ad-copy", "hook"].includes(op)) return [topic, audience, tone, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
   if (op === "faq") return [topic, audience, { name: "points", label: "Key points", type: "textarea", defaultValue: "What it is\nWho it is for\nHow it works\nPricing or access" }];
   if (op === "agenda") return [{ name: "goal", label: "Meeting goal", type: "text", defaultValue: "Plan the next launch" }, { name: "topics", label: "Topics", type: "textarea", defaultValue: "Progress\nBlockers\nDecisions\nNext steps" }];
   if (op === "actions") return [{ name: "notes", label: "Rough notes", type: "textarea", defaultValue: "John — finish landing page by Friday\nAda — confirm pricing\nTeam — test checkout" }];
-  if (["rewrite", "shorten", "expand"].includes(op)) return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }, tone];
   if (op === "pros-cons") return [topic, { name: "option", label: "Option / decision", type: "text", defaultValue: "Launch now vs wait for more features" }];
+  if (["shorten", "expand"].includes(op)) return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }];
+  if (op === "yt-desc") return [topic, audience, tone, { name: "points", label: "Key points", type: "textarea", defaultValue: "Problem\nSolution\nPractical examples\nCall to action" }];
+  if (["rewrite", "shorten", "expand"].includes(op)) return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }, tone];
   return [topic, audience, tone];
 }
 
@@ -51,6 +58,7 @@ function numbered(lines: string[], count: number) {
 }
 
 function run(op: string, v: Record<string, string>) {
+  if (isAiMicroOperation(op)) return generateAiMicroTool(op, v);
   const topic = clean(v.topic, "your topic");
   const audience = clean(v.audience, "your audience");
   const tone = clean(v.tone, "natural");

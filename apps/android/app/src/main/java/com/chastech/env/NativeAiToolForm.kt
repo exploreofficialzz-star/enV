@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +18,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.chastech.env.data.ToolRecord
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +31,10 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun NativeAiToolForm(tool: ToolRecord) {
+    if (NativeAiMicroEngine.supports(tool.id)) {
+        NativeAiMicroToolForm(tool.id)
+        return
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var available by remember(tool.id) { mutableStateOf<Boolean?>(null) }
@@ -204,6 +213,54 @@ fun NativeAiToolForm(tool: ToolRecord) {
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.padding(1.dp))
         Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun NativeAiMicroToolForm(toolId: String) {
+    val fields = remember(toolId) { NativeAiMicroEngine.fields(toolId) }
+    val clipboard = LocalClipboardManager.current
+    var values by remember(toolId) { mutableStateOf(NativeAiMicroEngine.initialValues(toolId)) }
+    var output by remember(toolId) { mutableStateOf("") }
+    var error by remember(toolId) { mutableStateOf("") }
+    val toneChoices = listOf("natural" to "Natural", "professional" to "Professional", "friendly" to "Friendly", "bold" to "Bold", "playful" to "Playful")
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Text("Runs locally with deterministic templates. This tool does not send your text to an AI service.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        fields.forEach { field ->
+            if (field.name == "tone") {
+                var expanded by remember(toolId, field.name) { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { expanded = true }) { Text("${field.label}: ${values[field.name] ?: field.defaultValue}") }
+                    androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        toneChoices.forEach { (value, label) ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(label) }, onClick = { values = values + (field.name to value); expanded = false })
+                        }
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = values[field.name] ?: field.defaultValue,
+                    onValueChange = { values = values + (field.name to it) },
+                    label = { Text(field.label) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = if (field.multiline) 3 else 1,
+                    maxLines = if (field.multiline) 6 else 1,
+                    keyboardOptions = KeyboardOptions(keyboardType = if (field.name == "count") KeyboardType.Number else KeyboardType.Text),
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                runCatching { NativeAiMicroEngine.generate(toolId, values) }
+                    .onSuccess { output = it; error = "" }
+                    .onFailure { output = ""; error = it.message ?: "Could not generate text." }
+            }) { Text("Generate") }
+            OutlinedButton(onClick = { output = ""; error = "" }) { Text("Clear") }
+            if (output.isNotBlank()) OutlinedButton(onClick = { clipboard.setText(AnnotatedString(output)) }) { Text("Copy output") }
+        }
+        if (output.isNotBlank()) Text(output, style = MaterialTheme.typography.bodyMedium)
+        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     }
 }
 

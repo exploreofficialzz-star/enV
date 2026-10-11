@@ -4,8 +4,11 @@ Standalone native Android application for enV, written in **Kotlin + Jetpack Com
 
 The native execution boundary is explicit:
 
-- **Offline-native:** 7,066 active catalog tools have verified Kotlin/Swift operation mappings and run without the website.
-- **Backend-native:** 2,934 active tools use the configured enV backend/processor contract.
+- **Offline-native:** 7,688 active catalog tools are declared with local Kotlin/Swift execution paths in the shared matrix.
+- **Backend-native:** 1,619 active tools use the configured enV application API/processor contract.
+- **Web-only:** 693 active tools are not yet available in either native app. The largest remaining families are mockups, screenshots, events, celebrations, photography, food, and travel.
+- **Declared executable in both native apps:** 9,307/10,000 active tools (93.07%); the shared execution matrix has zero Android/iOS coverage divergences.
+- **Productivity timers:** Focus Timer, Pomodoro, and Stopwatch now have exact-ID native implementations; their Android/iOS source and unit tests still require platform CI/build validation.
 - **Planned:** 0 catalog entries are marked as unavailable.
 
 There is no WebView or website execution fallback in the standalone native products.
@@ -42,7 +45,7 @@ The project uses Gradle Wrapper 8.9, Android Gradle Plugin 8.7.3, Kotlin 2.0.21,
 
 ## Coverage and execution audit
 
-The shared catalog contains **10,000 records**, **43 non-empty categories**. Run `npm run check:native-coverage` and `npm run check:native-executability` from the repository root to audit the Android/iOS manifests against the canonical web catalog.
+The shared catalog contains **10,000 records across 42 active categories**. Run `npm run check:native-coverage` and `npm run check:native-executability` from the repository root to audit the Android/iOS manifests against the canonical web catalog. Web-only tools must not be represented as locally executable until their Kotlin and Swift handlers and tests are in place.
 
 Native execution data is generated from the web engine definitions into `apps/shared/` and then consumed by Kotlin. The calculator-standard tranche has an explicit generated DSL audited by `npm run check:native-calculators`.
 

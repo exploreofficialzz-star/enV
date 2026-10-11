@@ -1,4 +1,5 @@
 import type { ToolMeta } from "@/types/tool";
+import { useEffect } from "react";
 import { CalculatorEngine } from "@/components/engines/calculator-engine";
 import { ConverterEngine } from "@/components/engines/converter-engine";
 import { ColorEngine } from "@/components/engines/color-engine";
@@ -44,6 +45,14 @@ import { DocumentToolsEngine } from "@/components/engines/document-tools-engine"
 import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.envToolHydrated = tool.id;
+    return () => {
+      if (root.dataset.envToolHydrated === tool.id) delete root.dataset.envToolHydrated;
+    };
+  }, [tool.id]);
+
   // Mockups are backed by the shared mockup engine, including catalog entries that
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;

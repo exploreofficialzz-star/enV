@@ -4,7 +4,7 @@ import { ErrorBanner } from "@/components/tools/error-banner";
 import { CalculatorFields } from "@/components/engines/calculator-fields";
 import { CalculatorResults, NumberDisplayControls } from "@/components/engines/calculator-results";
 import { initialValues } from "@/components/engines/initial-values";
-import { CalcInputError } from "@/lib/calc/numeric";
+import { CalcInputError, isBlank } from "@/lib/calc/numeric";
 import { DEFAULT_DISPLAY, applyDisplaySettings, buildCalculationSummary, describeOutput, type DisplaySettings } from "@/lib/calc/display";
 import { calculators, type CalcOutput } from "@/lib/engines/formulas";
 import { Clock3, RotateCcw, Trash2, X } from "lucide-react";
@@ -51,6 +51,8 @@ function CalculatorForm({ formula }: { formula: string }) {
   const run = () => {
     if (!def) return;
     try {
+      const missing = fields.find((field) => field.type !== "select" && !/\boptional\b/i.test(`${field.label} ${field.hint ?? ""}`) && isBlank(values[field.name]));
+      if (missing) throw new CalcInputError(`Enter a value for ${missing.label}.`, missing.name);
       const outputs = def.compute(values);
       let steps: string[] = [];
       try {

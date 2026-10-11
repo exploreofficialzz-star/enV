@@ -4,8 +4,11 @@ Standalone native iOS application for enV, written in **Swift + SwiftUI**. The n
 
 The native execution boundary is explicit:
 
-- **Offline-native:** 7,066 active catalog tools have verified Kotlin/Swift operation mappings and run without the website.
-- **Backend-native:** 2,934 active tools use the configured enV backend/processor contract.
+- **Offline-native:** 7,688 active catalog tools are declared with local Kotlin/Swift execution paths in the shared matrix.
+- **Backend-native:** 1,619 active tools use the configured enV application API/processor contract.
+- **Web-only:** 693 active tools are not yet available in either native app. The largest remaining families are mockups, screenshots, events, celebrations, photography, food, and travel.
+- **Declared executable in both native apps:** 9,307/10,000 active tools (93.07%); the shared execution matrix has zero Android/iOS coverage divergences.
+- **Productivity timers:** Focus Timer, Pomodoro, and Stopwatch now have exact-ID native implementations; their Swift source and XCTest changes still require Xcode/iOS CI validation.
 - **Planned:** 0 catalog entries are marked as unavailable.
 
 There is no WebView or website execution fallback in the standalone native products.
@@ -32,9 +35,11 @@ The native execution manifests are generated/audited from the same catalog as An
 
 ## Linux limitation
 
-This Linux sandbox does not contain Xcode, `xcodebuild`, or the iOS SDK, so a full iOS application build/test cannot be performed here. Standalone Swift engine source validation is used in this environment; the committed macOS CI workflow remains the authoritative iOS build/test path.
+This Linux sandbox does not contain `swiftc`, Xcode, `xcodebuild`, or the iOS SDK, so neither standalone Swift compilation nor a full iOS application build/test can be performed here. The committed macOS CI workflow remains the authoritative iOS build/test path.
 
 
 ## Native API
 
 Backend-powered tools and AI features call the enV application API at `https://env-q3mq.onrender.com` (`/api/backend/*` and `/api/ai/*`). Render is the public API origin for every client; it proxies `/api/*` application routes and directly serves media processors. Android accepts `-PENV_API_BASE_URL=...` and iOS uses the `ENV_API_BASE_URL` build setting to override the application origin for another deployment. Provider keys remain server-only and must never be put in a mobile build. Anonymous AI session cookies are stored locally so the server can apply the same per-session protections as the web client.
+
+The shared catalog contains **10,000 records across 42 active categories**. Web-only tools must not be represented as locally executable until their Kotlin and Swift handlers and tests are in place.
