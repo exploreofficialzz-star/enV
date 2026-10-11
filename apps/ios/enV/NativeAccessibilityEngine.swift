@@ -17,7 +17,7 @@ public enum NativeAccessibilityEngine {
         let fix: String
     }
 
-    public static func supports(_ tool: Tool) -> Bool { tool.category == "accessibility" && tool.engine.type == "custom" }
+    static func supports(_ tool: Tool) -> Bool { tool.category == "accessibility" && tool.engine.type == "custom" }
     public static func kind(_ toolID: String) -> String { actions.first(where: { toolID.hasSuffix("-\($0)") }).map { String(toolID.dropLast($0.count + 1)) } ?? toolID }
 
     public static func analyze(toolID: String, input: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5") -> String {
@@ -128,8 +128,16 @@ public enum NativeAccessibilityEngine {
         return stride(from: 0, to: 6, by: 2).compactMap { start in Int(clean.dropFirst(start).prefix(2), radix: 16).map { Double($0) } }
     }
     private static func luminance(_ rgb: [Double]) -> Double {
-        let c = rgb.map { $0 / 255 }.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
-        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        let red = linearChannel(rgb[0])
+        let green = linearChannel(rgb[1])
+        let blue = linearChannel(rgb[2])
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    }
+
+    private static func linearChannel(_ value: Double) -> Double {
+        let channel = value / 255.0
+        if channel <= 0.04045 { return channel / 12.92 }
+        return pow((channel + 0.055) / 1.055, 2.4)
     }
 
     private static func colorVisionReport(_ foreground: String, _ background: String) -> String {

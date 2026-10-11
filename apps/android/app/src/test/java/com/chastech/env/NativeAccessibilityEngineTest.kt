@@ -15,7 +15,7 @@ class NativeAccessibilityEngineTest {
         val aria = NativeAccessibilityEngine.analyze("aria-checker", "<button role=\"pushbutton\" aria-labelledby=\"missing\"></button>")
         assertTrue(aria.contains("aria-valid-role"))
         assertTrue(aria.contains("aria-labelledby"))
-        val keyboard = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<div tabindex=\"3\" onclick=\"go()\"></div>")
+        val keyboard = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<div tabindex=\"3\"></div><div onclick=\"go()\"></div>")
         assertTrue(keyboard.contains("tabindex"))
         assertTrue(keyboard.contains("keyboard-operable"))
     }

@@ -37,11 +37,11 @@ test("flags positive tabindex, click-only custom elements, and motion without re
 test("reports outline removal without a replacement and makes no conformance claim", () => {
   const result = auditAccessibilityMarkup("focus-state-checker", 'button:focus { outline: none; }');
   assert.ok(result.findings.some((x) => x.rule === "focus-not-hidden"));
-  assert.match(result.report, /does not run axe-core/);
+  assert.match(result.report, /separate axe-core scan/);
 });
 
 test("handles empty input as a clean but explicitly limited static review", () => {
   const result = auditAccessibilityMarkup("aria-checker", "");
   assert.equal(result.inspected, 0);
-  assert.match(result.report, /does not run axe-core/);
+  assert.match(result.report, /separate axe-core scan/);
 });

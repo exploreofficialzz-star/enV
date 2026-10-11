@@ -17,6 +17,10 @@ export interface A11yAudit {
   report: string;
 }
 
+interface AxeReportNode { target: string[]; html: string }
+interface AxeReportRule { id: string; impact: string | null; help: string; helpUrl: string; tags: string[]; nodes: AxeReportNode[] }
+interface AxeReportResults { violations: AxeReportRule[]; incomplete: AxeReportRule[]; passes: AxeReportRule[] }
+
 interface MarkupElement {
   tag: string;
   attributes: Record<string, string>;
@@ -189,11 +193,14 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
   if (typeof document === "undefined") return "axe-core requires a browser document.";
   const frame = document.createElement("iframe");
   frame.title = "Temporary local accessibility test document";
-  frame.setAttribute("sandbox", "allow-same-origin");
+  // Scripts run only in this opaque-origin frame: user markup cannot access the
+  // app's origin, and the CSP below permits only the nonce-bearing scanner.
+  frame.setAttribute("sandbox", "allow-scripts");
   frame.setAttribute("aria-hidden", "true");
   frame.tabIndex = -1;
   frame.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:800px;border:0;visibility:hidden";
-  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:;">`;
+  const nonce = crypto.randomUUID();
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; script-src 'nonce-${nonce}';">`;
   let source = /^\s*<!doctype|^\s*<html\b/i.test(markup)
     ? markup
     : `<!doctype html><html lang="en"><head>${csp}<meta charset="utf-8"><title>Accessibility snippet test</title></head><body>${markup}</body></html>`;
@@ -201,23 +208,31 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
     if (/<head\b[^>]*>/i.test(source)) source = source.replace(/<head\b[^>]*>/i, (opening) => `${opening}${csp}`);
     else source = source.replace(/<html\b[^>]*>/i, (opening) => `${opening}<head>${csp}<title>Accessibility snippet test</title></head>`);
   }
-  const ready = new Promise<Document>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("Timed out preparing the local test document.")), 5000);
-    frame.addEventListener("load", () => {
-      window.clearTimeout(timeout);
-      if (frame.contentDocument) resolve(frame.contentDocument);
-      else reject(new Error("Could not read the isolated local test document."));
-    }, { once: true });
-  });
+  const runner = `window.addEventListener('load',async()=>{try{const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']},resultTypes:['violations','incomplete','passes']});const pick=a=>a.map(x=>({id:x.id,impact:x.impact,help:x.help,helpUrl:x.helpUrl,tags:x.tags,nodes:x.nodes.map(n=>({target:n.target,html:n.html}))}));parent.postMessage({nonce:${JSON.stringify(nonce)},results:{violations:pick(r.violations),incomplete:pick(r.incomplete),passes:pick(r.passes)}},'*')}catch(e){parent.postMessage({nonce:${JSON.stringify(nonce)},error:String(e&&e.message||e)},'*')}})`;
+  const scannerScripts = `<script nonce="${nonce}">${axe.source.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
+  if (/<\/body\s*>/i.test(source)) source = source.replace(/<\/body\s*>/i, `${scannerScripts}</body>`);
+  else if (/<\/html\s*>/i.test(source)) source = source.replace(/<\/html\s*>/i, `${scannerScripts}</html>`);
+  else source += scannerScripts;
+  let timeoutId = 0;
+  const onMessage = (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.data?.nonce !== nonce) return;
+    window.clearTimeout(timeoutId);
+    window.removeEventListener("message", onMessage);
+    resolveResults(event.data);
+  };
+  let resolveResults!: (value: { error?: string; results?: AxeReportResults }) => void;
+  let rejectResults!: (reason: Error) => void;
+  const resultsReady = new Promise<{ error?: string; results?: AxeReportResults }>((resolve, reject) => { resolveResults = resolve; rejectResults = reject; });
+  window.addEventListener("message", onMessage);
+  timeoutId = window.setTimeout(() => rejectResults(new Error("Timed out running axe-core in the isolated snippet.")), 15000);
   try {
     frame.srcdoc = source;
     document.body.appendChild(frame);
-    const testDocument = await ready;
-    const results = await axe.run(testDocument, {
-      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"] },
-      resultTypes: ["violations", "incomplete", "passes"],
-    });
-    const format = (group: typeof results.violations, heading: string) => {
+    const results = await resultsReady;
+    if (results?.error) return `axe-core scan failed: ${results.error}`;
+    if (!results?.results) return "axe-core scan could not read the isolated scan results.";
+    const scanResults = results.results;
+    const format = (group: AxeReportRule[], heading: string) => {
       if (!group.length) return `${heading}: 0`;
       const lines = group.map((rule) => {
         const targets = rule.nodes.slice(0, 5).map((node) => {
@@ -232,19 +247,21 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
     };
     return [
       `AXE-CORE ${axe.version} · local snippet scan`,
-      `Automated violations: ${results.violations.length}`,
-      `Manual review / incomplete rules: ${results.incomplete.length}`,
-      `Passed checks: ${results.passes.length}`,
+      `Automated violations: ${scanResults.violations.length}`,
+      `Manual review / incomplete rules: ${scanResults.incomplete.length}`,
+      `Passed checks: ${scanResults.passes.length}`,
       "",
-      format(results.violations, "Violations"),
+      format(scanResults.violations, "Violations"),
       "",
-      format(results.incomplete, "Needs human review"),
+      format(scanResults.incomplete, "Needs human review"),
       "",
       "Scope: This scans only the supplied isolated snippet and active rendered state. axe-core and other automated checks find a subset of accessibility problems; this output does not certify WCAG conformance. Manually test the full page, interaction states, keyboard, and assistive technology.",
     ].join("\n");
   } catch (error) {
     return `axe-core scan failed: ${error instanceof Error ? error.message : String(error)}`;
   } finally {
+    window.clearTimeout(timeoutId);
+    window.removeEventListener("message", onMessage);
     frame.remove();
   }
 }
