@@ -98,7 +98,7 @@ if (!androidActivitySource.includes("assistantDraft") || !iosRootSource.includes
 if (!webRootSource.includes("<AssistantStateProvider><Outlet /></AssistantStateProvider>") || !webAssistantStateSource.includes("useState<ChatTurn[]>") || !webAssistantSource.includes("useAssistantState()")) fail("Web Assistant conversation state must be root-owned across route changes");
 if (!androidAssistantSource.includes('retry?.let { pending -> TextButton(onClick = { requestReply(pending) }') || !iosAssistantSource.includes("if let retryRequest")) fail("Native Retry visibility must match the web chat's any-error retry action");
 if (!iosAssistantSource.includes('.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)')) fail("iOS assistant heading is missing responsive system typography");
-if (!iosAssistantSource.includes('.envScaled(size: 14, weight: .medium)')) fail("iOS assistant message text is missing system typography");
+if (!iosAssistantSource.includes('.envScaled(size: 14, weight: .regular)')) fail("iOS assistant message text is missing system typography");
 if (!iosAssistantSource.includes("Ask about enV tools or the enV brand…")) fail("iOS assistant composer prompt does not match the web prompt");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidActivitySource.includes("suggestions.firstOrNull()?.let { onTool(it.id) }") || !iosHomeSource.includes("homePath.append(first)")) fail("Home search submission must open the first ranked suggestion before global-search fallback");

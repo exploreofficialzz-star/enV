@@ -44,7 +44,7 @@ private val EnVDarkColors = darkColorScheme(
 )
 
 private val EnVTypography = Typography().let { base ->
-    val slightlyHeavier = FontWeight(450)
+    val slightlyHeavier = FontWeight(425)
     base.copy(
         displayLarge = base.displayLarge.copy(fontWeight = slightlyHeavier),
         displayMedium = base.displayMedium.copy(fontWeight = slightlyHeavier),

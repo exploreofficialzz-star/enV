@@ -14,7 +14,7 @@ struct ContactExchangeView: View {
         Form {
             Section {
                 Text("Both people must activate Exchange. Only the fields below are shared after the native nearby session is established.")
-                    .font(.footnote.weight(.medium)).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Your contact") {
                 TextField("Full name", text: $fullName)
@@ -36,7 +36,7 @@ struct ContactExchangeView: View {
                     ForEach(controller.received) { contact in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(contact.fullName.isEmpty ? "Unnamed contact" : contact.fullName).font(.headline)
-                            ForEach([contact.phone, contact.email, contact.company, contact.jobTitle, contact.website].filter { !$0.isEmpty }, id: \.self) { Text($0).font(.subheadline.weight(.medium)) }
+                            ForEach([contact.phone, contact.email, contact.company, contact.jobTitle, contact.website].filter { !$0.isEmpty }, id: \.self) { Text($0).font(.subheadline) }
                             Button("Save to Contacts") {
                                 controller.save(contact) { result in if case .failure(let error) = result { saveError = error.localizedDescription } }
                             }
