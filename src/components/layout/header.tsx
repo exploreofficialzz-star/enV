@@ -1,7 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Heart, Home, LayoutGrid, MoreVertical } from "lucide-react";
 
 export function Header() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const savedIsInToolsHeading = pathname === "/tools" || pathname === "/tools/";
   return (
     <header className="sticky top-0 z-30 bg-bg/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
@@ -19,7 +21,7 @@ export function Header() {
             to="/favorites"
             aria-label="Saved tools"
             title="Saved tools"
-            className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            className={`inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg ${savedIsInToolsHeading ? "max-sm:hidden" : ""}`}
           >
             <Heart className="size-6" strokeWidth={2.4} />
           </Link>

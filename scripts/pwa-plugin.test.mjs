@@ -71,8 +71,9 @@ test("browser chrome metadata follows the active light or dark theme", () => {
 
 test("All Tools groups results by category and progressively expands without global filters or counts", () => {
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
-  assert.match(tools, /flex items-center gap-4/);
-  assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
+  assert.match(tools, /grid grid-cols-\[minmax\(0,1fr\)_auto\].*sm:flex/s);
+  assert.match(tools, /to="\/favorites" aria-label="Saved tools"[\s\S]*?sm:hidden/);
+  assert.match(tools, /col-span-2 min-w-0 w-full sm:ml-auto sm:w-\[52vw\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
   assert.match(tools, /validateSearch: \(search: Record<string, unknown>\).*q:/s);
   assert.match(tools, /const \{ q \} = Route\.useSearch\(\)/);
@@ -209,7 +210,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /pt-1/);
   assert.match(home, /sm:pt-1/);
   assert.match(home, /className="mt-4 max-w-3xl sm:mt-5"/);
-  assert.match(home, /containerClassName="flex h-16 w-full items-center gap-4 rounded-\[28px\] border border-border-strong bg-surface px-4/);
+  assert.match(home, /containerClassName="flex h-16 w-full items-center gap-4 rounded-full border border-border-strong bg-surface px-4/);
   assert.match(home, /sm:h-\[72px\] sm:gap-4 sm:px-5/);
   assert.match(home, /inputClassName="[^\"]*text-left/);
   assert.doesNotMatch(home, /pl-\[76px\]/);

@@ -250,6 +250,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     else if (showExchange) BackHandler { showExchange = false }
     else if (tab == AppTab.Assistant.name) BackHandler { tab = AppTab.Home.name }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
+    val screenWidth = LocalConfiguration.current.screenWidthDp
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -261,8 +262,10 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     }
                 },
                 actions = {
-                    IconButton(onClick = { tab = AppTab.Saved.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
-                        EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (screenWidth >= 640 || tab != AppTab.Tools.name || selected != null || category != null) {
+                        IconButton(onClick = { tab = AppTab.Saved.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Saved tools" }) {
+                            EnVIcon("Heart", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     IconButton(onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); showExchange = false; showInformation = false }, modifier = Modifier.semantics { contentDescription = "Tools" }) {
                         EnVIcon("LayoutGrid", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -302,7 +305,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                     when (currentTab) {
                         AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
                         AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) }, assistantDraft, { assistantDraft = it })
-                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name }, { tab = AppTab.Saved.name })
                         AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
@@ -351,7 +354,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     val suggestionWidth = maxWidth
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,
@@ -614,7 +617,7 @@ private fun FooterLinkGroup(
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit) {
+private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit, onSaved: () -> Unit) {
     if (category != null) {
         CategoryScreen(catalog, category, { onCategory(null) }, onTool)
         return
@@ -634,21 +637,30 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
-                    WebToolsSearchField(
-                        catalog = catalog,
-                        query = query,
-                        onQuery = onQuery,
-                        modifier = Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp),
-                        onTool = onTool,
-                        onSubmit = {
-                            val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
-                            if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
-                        },
-                        onSeeMore = onSearch,
-                    )
+                if (screenWidth < 640) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
+                        IconButton(onClick = onSaved, modifier = Modifier.size(40.dp).semantics { contentDescription = "Saved tools" }) {
+                            EnVIcon("Heart", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
+                    }
                 }
+                WebToolsSearchField(
+                    catalog = catalog,
+                    query = query,
+                    onQuery = onQuery,
+                    modifier = if (screenWidth < 640) Modifier.fillMaxWidth() else Modifier.width(288.dp),
+                    onTool = onTool,
+                    onSubmit = {
+                        val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
+                        if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
+                    },
+                    onSeeMore = onSearch,
+                )
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

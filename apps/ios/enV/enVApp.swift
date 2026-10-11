@@ -142,6 +142,7 @@ struct RootTabView: View {
 
 struct EnVBrandNavigationStyle: ViewModifier {
     @EnvironmentObject private var informationRouter: NativeInformationRouter
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
 
     func body(content: Content) -> some View {
@@ -155,11 +156,13 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("Home")
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { selectedTab = NativeTab.saved.rawValue } label: {
-                        EnVIcon(name: "Heart", size: 24, tint: .envMuted).frame(width: 36, height: 40)
+                    if selectedTab != NativeTab.tools.rawValue || horizontalSizeClass == .regular {
+                        Button { selectedTab = NativeTab.saved.rawValue } label: {
+                            EnVIcon(name: "Heart", size: 24, tint: .envMuted).frame(width: 36, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Saved tools")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Saved tools")
                     Button { selectedTab = NativeTab.tools.rawValue } label: {
                         EnVIcon(name: "LayoutGrid", size: 24, tint: .envMuted).frame(width: 36, height: 40)
                     }
@@ -167,6 +170,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("Tools")
                     Menu {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
+                        Button("Saved tools") { selectedTab = NativeTab.saved.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
                         Button("Pricing") { informationRouter.open("pricing") }
