@@ -254,3 +254,70 @@ final class NativeAiMicroEngineTests: XCTestCase {
         XCTAssertThrowsError(try NativeAiMicroEngine.generate(toolID: "unknown-tool", values: [:]))
     }
 }
+
+
+final class NativeEventEngineTests: XCTestCase {
+    private let agendaIds = [
+        "birthday-agenda-generator", "concert-agenda-generator", "conference-agenda-generator", "dinner-agenda-generator",
+        "fundraiser-agenda-generator", "graduation-agenda-generator", "launch-agenda-generator", "party-agenda-generator",
+        "sports-event-agenda-generator", "webinar-agenda-generator", "wedding-agenda-generator", "workshop-agenda-generator"
+    ]
+    private let scheduleIds = [
+        "birthday-schedule-builder", "concert-schedule-builder", "conference-schedule-builder", "dinner-schedule-builder",
+        "fundraiser-schedule-builder", "graduation-schedule-builder", "launch-schedule-builder", "meeting-schedule-builder",
+        "party-schedule-builder", "sports-event-schedule-builder", "webinar-schedule-builder", "wedding-schedule-builder", "workshop-schedule-builder"
+    ]
+    private let pageThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"]
+    private var allIds: [String] { agendaIds + scheduleIds + pageThemes.map { "\($0)-rsvp-page" } + pageThemes.map { "\($0)-check-in-page" } }
+
+    private func tool(_ id: String) -> Tool {
+        Tool(id: id, name: id, slug: id, description: "", category: "events", subcategory: nil, keywords: [], tags: [], icon: "Calendar", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: id, op: id))
+    }
+
+    func testExactAllowlistCoversOnlyTheFiftyOneRoadmapTools() {
+        XCTAssertEqual(allIds.count, 51)
+        XCTAssertEqual(NativeEventEngine.supportedToolIDs, Set(allIds))
+        XCTAssertTrue(allIds.allSatisfy(NativeEventEngine.supports))
+        XCTAssertFalse(NativeEventEngine.supports("birthday-event-qr-generator"))
+        XCTAssertFalse(NativeEventEngine.supports("birthday-invitation-page"))
+        XCTAssertTrue(NativeEventEngine.fields(for: "unknown-event").isEmpty)
+        XCTAssertTrue(NativeCoverage.isLocallyExecutable(tool("wedding-rsvp-page")))
+        XCTAssertFalse(NativeCoverage.isLocallyExecutable(tool("birthday-event-qr-generator")))
+    }
+
+    func testAgendaAndScheduleFormattingMatchSharedContract() throws {
+        XCTAssertEqual(try NativeEventEngine.generate(toolID: "sports-event-agenda-generator", values: ["title":"Match day", "dateTime":"Sat 4pm local", "location":"North field", "items":"Doors\n\nKickoff\nWrap-up"]), "Sports Event agenda\n\nMatch day\nDate / time: Sat 4pm local\nLocation: North field\n\n1. Doors\n2. Kickoff\n3. Wrap-up")
+        XCTAssertEqual(try NativeEventEngine.generate(toolID: "meeting-schedule-builder", values: ["title":"Planning session", "dateTime":"2026-11-01 1:30 AM local", "items":"Introductions\nDecision"]), "Meeting schedule\n\nPlanning session\nDate / time: 2026-11-01 1:30 AM local\n\n1. Introductions\n2. Decision")
+        XCTAssertEqual(try NativeEventEngine.generate(toolID: "birthday-agenda-generator", values: ["items":" "]), "Birthday agenda\n\nEvent agenda\n\n1. Welcome\n2. Main activity\n3. Break\n4. Closing")
+    }
+
+    func testRsvpIsEscapedStaticHtmlAndDoesNotCollectResponses() throws {
+        let id = "wedding-rsvp-page"
+        let output = try NativeEventEngine.generate(toolID: id, values: ["title":"A & B <Wedding>", "body":"Dinner with \"friends\" & family", "dateTime":"June 4, 6 pm", "location":"Garden", "contact":"Rae <host@example.test>"])
+        XCTAssertTrue(output.hasPrefix("<!doctype html>"))
+        XCTAssertTrue(output.contains("<title>A &amp; B &lt;Wedding&gt;</title>"))
+        XCTAssertTrue(output.contains("Dinner with &quot;friends&quot; &amp; family"))
+        XCTAssertTrue(output.contains("Rae &lt;host@example.test&gt;"))
+        XCTAssertTrue(output.contains("does not collect or store RSVPs"))
+        XCTAssertEqual(NativeEventEngine.fileName(id), "env-wedding-rsvp-page.html")
+        XCTAssertEqual(NativeEventEngine.contentType(id), .html)
+    }
+
+    func testCheckInIsStaticAndDoesNotClaimLiveArrivalTracking() throws {
+        let id = "conference-check-in-page"
+        let output = try NativeEventEngine.generate(toolID: id, values: ["title":"Check in", "guest":"Alex & Jo", "location":"Hall A"])
+        XCTAssertTrue(output.hasPrefix("<!doctype html>"))
+        XCTAssertTrue(output.contains("Guest: Alex &amp; Jo"))
+        XCTAssertTrue(output.contains("Location:</strong> Hall A"))
+        XCTAssertTrue(output.contains("does not verify or record arrivals"))
+        XCTAssertEqual(NativeEventEngine.fileName(id), "env-conference-check-in-page.html")
+    }
+
+    func testOperationFieldsAndTextExportMetadata() {
+        XCTAssertEqual(NativeEventEngine.fields(for: "party-agenda-generator").last?.label, "Agenda items (one per line)")
+        XCTAssertEqual(NativeEventEngine.fields(for: "meeting-rsvp-page").last?.label, "Organizer / RSVP contact")
+        XCTAssertEqual(NativeEventEngine.fields(for: "meeting-check-in-page").last?.label, "Guest name")
+        XCTAssertEqual(NativeEventEngine.fileName("workshop-agenda-generator"), "env-workshop-agenda-generator.txt")
+        XCTAssertEqual(NativeEventEngine.contentType("workshop-schedule-builder"), .plainText)
+    }
+}

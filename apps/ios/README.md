@@ -4,11 +4,11 @@ Standalone native iOS application for enV, written in **Swift + SwiftUI**. The n
 
 The native execution boundary is explicit:
 
-- **Offline-native:** 7,688 active catalog tools are declared with local Kotlin/Swift execution paths in the shared matrix.
+- **Offline-native:** 7,752 active catalog tools are declared with local Kotlin/Swift execution paths in the shared matrix.
 - **Backend-native:** 1,619 active tools use the configured enV application API/processor contract.
-- **Web-only:** 693 active tools are not yet available in either native app. The largest remaining families are mockups, screenshots, events, celebrations, photography, food, and travel.
-- **Declared executable in both native apps:** 9,307/10,000 active tools (93.07%); the shared execution matrix has zero Android/iOS coverage divergences.
-- **Productivity timers:** Focus Timer, Pomodoro, and Stopwatch now have exact-ID native implementations; their Swift source and XCTest changes still require Xcode/iOS CI validation.
+- **Web-only:** 629 active tools are not yet available in either native app. The largest remaining families include mockups, screenshots, celebrations, photography, food, and travel.
+- **Declared executable in both native apps:** 9,371/10,000 active tools (93.71%); the shared execution matrix has zero Android/iOS coverage divergences.
+- **Native implementation tranches:** Focus Timer, Pomodoro, Stopwatch, 13 deterministic AI micro-tools, and 51 agenda/schedule/RSVP/check-in templates now have exact-ID implementations; Swift source and XCTest changes still require Xcode/iOS CI validation.
 - **Planned:** 0 catalog entries are marked as unavailable.
 
 There is no WebView or website execution fallback in the standalone native products.

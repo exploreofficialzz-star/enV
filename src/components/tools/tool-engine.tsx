@@ -43,6 +43,8 @@ import { TranscriptionEngine } from "@/components/engines/transcription-engine";
 import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
 import { DocumentToolsEngine } from "@/components/engines/document-tools-engine";
 import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
+import { EventTemplateEngine } from "@/components/engines/event-template-engine";
+import { isEventTemplateTool } from "@/lib/events/event-templates";
 
 export function ToolEngine({ tool }: { tool: ToolMeta }) {
   useEffect(() => {
@@ -58,6 +60,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
+  if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
   if (tool.requiresBackend && tool.engine.type === "custom") return <BackendToolEngine toolId={tool.id} category={tool.category} />;
 

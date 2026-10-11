@@ -5,12 +5,12 @@
     "total": 10000,
     "active": 10000,
     "planned": 0,
-    "offlineNative": 7701,
+    "offlineNative": 7752,
     "backendNative": 1619,
-    "webOnly": 680,
-    "missingActive": 680,
+    "webOnly": 629,
+    "missingActive": 629,
     "divergentActive": 0,
-    "fullyExecutable": 9320
+    "fullyExecutable": 9371
   },
   "tools": [
     {
@@ -70399,8 +70399,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-check-in-page",
@@ -70408,8 +70408,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-event-qr-generator",
@@ -70426,8 +70426,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-schedule-builder",
@@ -70435,8 +70435,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-ticket-mockup",
@@ -70453,8 +70453,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "concert-check-in-page",
@@ -70462,8 +70462,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "concert-countdown",
@@ -70498,8 +70498,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "concert-schedule-builder",
@@ -70507,8 +70507,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "concert-ticket-mockup",
@@ -70525,8 +70525,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "conference-check-in-page",
@@ -70534,8 +70534,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "conference-countdown",
@@ -70570,8 +70570,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "conference-schedule-builder",
@@ -70579,8 +70579,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "conference-ticket-mockup",
@@ -70597,8 +70597,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "dinner-check-in-page",
@@ -70606,8 +70606,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "dinner-countdown",
@@ -70642,8 +70642,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "dinner-schedule-builder",
@@ -70651,8 +70651,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "dinner-ticket-mockup",
@@ -70669,8 +70669,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "fundraiser-check-in-page",
@@ -70678,8 +70678,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "fundraiser-countdown",
@@ -70714,8 +70714,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "fundraiser-schedule-builder",
@@ -70723,8 +70723,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "fundraiser-ticket-mockup",
@@ -70741,8 +70741,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-check-in-page",
@@ -70750,8 +70750,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-event-qr-generator",
@@ -70768,8 +70768,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-schedule-builder",
@@ -70777,8 +70777,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-ticket-mockup",
@@ -70795,8 +70795,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "launch-check-in-page",
@@ -70804,8 +70804,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "launch-countdown",
@@ -70840,8 +70840,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "launch-schedule-builder",
@@ -70849,8 +70849,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "launch-ticket-mockup",
@@ -70867,8 +70867,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "meeting-countdown",
@@ -70903,8 +70903,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "meeting-schedule-builder",
@@ -70912,8 +70912,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "meeting-ticket-mockup",
@@ -70930,8 +70930,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-check-in-page",
@@ -70939,8 +70939,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-event-qr-generator",
@@ -70957,8 +70957,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-schedule-builder",
@@ -70966,8 +70966,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-ticket-mockup",
@@ -70984,8 +70984,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sports-event-check-in-page",
@@ -70993,8 +70993,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sports-event-countdown",
@@ -71029,8 +71029,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sports-event-schedule-builder",
@@ -71038,8 +71038,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "sports-event-ticket-mockup",
@@ -71056,8 +71056,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "webinar-check-in-page",
@@ -71065,8 +71065,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "webinar-countdown",
@@ -71101,8 +71101,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "webinar-schedule-builder",
@@ -71110,8 +71110,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "webinar-ticket-mockup",
@@ -71128,8 +71128,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "wedding-check-in-page",
@@ -71137,8 +71137,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "wedding-countdown",
@@ -71173,8 +71173,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "wedding-schedule-builder",
@@ -71182,8 +71182,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "wedding-ticket-mockup",
@@ -71200,8 +71200,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "workshop-check-in-page",
@@ -71209,8 +71209,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "workshop-countdown",
@@ -71245,8 +71245,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "workshop-schedule-builder",
@@ -71254,8 +71254,8 @@
       "status": "active",
       "category": "events",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "workshop-ticket-mockup",

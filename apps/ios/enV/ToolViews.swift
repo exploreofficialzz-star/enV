@@ -290,7 +290,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool)
+        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id)
         default: return false
         }
     }
@@ -323,7 +323,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -2195,6 +2195,165 @@ private struct NativeAiMicroToolView: View {
     }
 
     private func binding(for field: NativeAiMicroField) -> Binding<String> {
+        Binding(get: { values[field.name] ?? field.defaultValue }, set: { values[field.name] = $0 })
+    }
+}
+
+enum NativeEventEngine {
+    enum Operation: Equatable { case agenda, schedule, rsvp, checkIn }
+    struct Template { let operation: Operation; let theme: String }
+    struct Field: Identifiable { let name: String; let label: String; let defaultValue: String; var multiline = false; var id: String { name } }
+
+    private static let agendaThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "party", "sports-event", "webinar", "wedding", "workshop"]
+    private static let scheduleThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"]
+    private static let pageThemes = scheduleThemes
+    private static let templates: [String: Template] = {
+        var result: [String: Template] = [:]
+        for theme in agendaThemes { result["\(theme)-agenda-generator"] = Template(operation: .agenda, theme: Self.titleCase(theme)) }
+        for theme in scheduleThemes { result["\(theme)-schedule-builder"] = Template(operation: .schedule, theme: Self.titleCase(theme)) }
+        for theme in pageThemes {
+            result["\(theme)-rsvp-page"] = Template(operation: .rsvp, theme: Self.titleCase(theme))
+            result["\(theme)-check-in-page"] = Template(operation: .checkIn, theme: Self.titleCase(theme))
+        }
+        return result
+    }()
+    static let supportedToolIDs = Set(templates.keys)
+
+    static func supports(_ toolID: String) -> Bool { templates[toolID] != nil }
+    static func template(for toolID: String) -> Template? { templates[toolID] }
+
+    static func fields(for toolID: String) -> [Field] {
+        guard let template = template(for: toolID) else { return [] }
+        switch template.operation {
+        case .agenda, .schedule:
+            let label = template.operation == .agenda ? "agenda" : "schedule"
+            return [Field(name: "title", label: "Title", defaultValue: "Event \(label)"), Field(name: "dateTime", label: "Date / time (optional)", defaultValue: ""), Field(name: "location", label: "Location (optional)", defaultValue: ""), Field(name: "items", label: "Agenda items (one per line)", defaultValue: "Welcome\nMain activity\nBreak\nClosing", multiline: true)]
+        case .rsvp:
+            return [Field(name: "title", label: "Page title", defaultValue: "\(template.theme) event"), Field(name: "dateTime", label: "Date / time (optional)", defaultValue: ""), Field(name: "location", label: "Location (optional)", defaultValue: ""), Field(name: "body", label: "Event details", defaultValue: "You're invited to the \(template.theme.lowercased()) event.", multiline: true), Field(name: "contact", label: "Organizer / RSVP contact", defaultValue: "the event organizer")]
+        case .checkIn:
+            return [Field(name: "title", label: "Page title", defaultValue: "\(template.theme) check-in"), Field(name: "dateTime", label: "Date / time (optional)", defaultValue: ""), Field(name: "location", label: "Location (optional)", defaultValue: ""), Field(name: "body", label: "Event details", defaultValue: "Welcome to the \(template.theme.lowercased()) event.", multiline: true), Field(name: "guest", label: "Guest name", defaultValue: "Guest")]
+        }
+    }
+
+    static func initialValues(_ toolID: String) -> [String: String] { Dictionary(uniqueKeysWithValues: fields(for: toolID).map { ($0.name, $0.defaultValue) }) }
+    static func fileName(_ toolID: String) -> String {
+        let isHTML = template(for: toolID).map { $0.operation == .rsvp || $0.operation == .checkIn } ?? false
+        return "env-\(toolID).\(isHTML ? "html" : "txt")"
+    }
+    static func contentType(_ toolID: String) -> UTType {
+        let isHTML = template(for: toolID).map { $0.operation == .rsvp || $0.operation == .checkIn } ?? false
+        return isHTML ? .html : .plainText
+    }
+
+    static func generate(toolID: String, values: [String: String]) throws -> String {
+        guard let template = template(for: toolID) else { throw NSError(domain: "NativeEventEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported event template: \(toolID)"]) }
+        switch template.operation {
+        case .agenda, .schedule: return generateList(template, values: values)
+        case .rsvp: return generateRsvp(template, values: values)
+        case .checkIn: return generateCheckIn(template, values: values)
+        }
+    }
+
+    private static func generateList(_ template: Template, values: [String: String]) -> String {
+        let operation = template.operation == .agenda ? "agenda" : "schedule"
+        let title = clean(values["title"], template.operation == .agenda ? "Event agenda" : "Event schedule")
+        let rawItems = clean(values["items"], "Welcome\nMain activity\nBreak\nClosing")
+        let items = rawItems.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var details: [String] = []
+        if let date = values["dateTime"]?.trimmingCharacters(in: .whitespacesAndNewlines), !date.isEmpty { details.append("Date / time: \(date)") }
+        if let location = values["location"]?.trimmingCharacters(in: .whitespacesAndNewlines), !location.isEmpty { details.append("Location: \(location)") }
+        let header = "\(template.theme) \(operation)"
+        return "\(header)\n\n\(title)\(details.isEmpty ? "" : "\n\(details.joined(separator: "\n"))")\n\n\(items.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))"
+    }
+
+    private static func generateRsvp(_ template: Template, values: [String: String]) -> String {
+        let title = htmlEscape(clean(values["title"], "\(template.theme) event"))
+        let body = htmlEscape(clean(values["body"], "You're invited to the \(template.theme.lowercased()) event."))
+        let date = htmlParagraph("Date / time", values["dateTime"])
+        let location = htmlParagraph("Location", values["location"])
+        let contact = htmlEscape(clean(values["contact"], "the event organizer"))
+        let theme = htmlEscape(template.theme)
+        return "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>\(title)</title></head>\n<body><main><h1>\(title)</h1><p>\(body)</p>\(date)\(location)<section aria-labelledby=\"rsvp-heading\"><h2 id=\"rsvp-heading\">How to RSVP</h2><p>Contact \(contact) to respond. This static page does not collect or store RSVPs.</p></section><p>Event type: \(theme)</p></main></body>\n</html>"
+    }
+
+    private static func generateCheckIn(_ template: Template, values: [String: String]) -> String {
+        let title = htmlEscape(clean(values["title"], "\(template.theme) check-in"))
+        let body = htmlEscape(clean(values["body"], "Welcome to the \(template.theme.lowercased()) event."))
+        let date = htmlParagraph("Date / time", values["dateTime"])
+        let location = htmlParagraph("Location", values["location"])
+        let guest = htmlEscape(clean(values["guest"], "Guest"))
+        let theme = htmlEscape(template.theme)
+        return "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>\(title)</title></head>\n<body><main><h1>\(title)</h1><p>\(body)</p>\(date)\(location)<section aria-labelledby=\"checkin-heading\"><h2 id=\"checkin-heading\">Check-in information</h2><p>Guest: \(guest)</p><p>Please check in with event staff on arrival. This static page does not verify or record arrivals.</p></section><p>Event type: \(theme)</p></main></body>\n</html>"
+    }
+
+    private static func clean(_ value: String?, _ fallback: String) -> String { value?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? fallback }
+    private static func htmlParagraph(_ label: String, _ value: String?) -> String {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return "" }
+        return "<p><strong>\(label):</strong> \(htmlEscape(value))</p>"
+    }
+    private static func titleCase(_ slug: String) -> String { slug.split(separator: "-").map { $0.capitalized }.joined(separator: " ") }
+    private static func htmlEscape(_ value: String) -> String { value.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "'", with: "&#39;") }
+}
+
+private extension String { var nonEmpty: String? { isEmpty ? nil : self } }
+
+private struct NativeEventTextDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText, .html] }
+    var text: String
+    init(text: String) { self.text = text }
+    init(configuration: ReadConfiguration) throws { text = configuration.file.regularFileContents.map { String(decoding: $0, as: UTF8.self) } ?? "" }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: Data(text.utf8)) }
+}
+
+private struct NativeEventToolView: View {
+    let tool: Tool
+    @State private var values: [String: String]
+    @State private var output = ""
+    @State private var error = ""
+    @State private var exporting = false
+
+    init(tool: Tool) { self.tool = tool; _values = State(initialValue: NativeEventEngine.initialValues(tool.id)) }
+    private var fields: [NativeEventEngine.Field] { NativeEventEngine.fields(for: tool.id) }
+    private var isStaticPage: Bool { NativeEventEngine.template(for: tool.id).map { $0.operation == .rsvp || $0.operation == .checkIn } ?? false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText(isStaticPage ? "Static HTML template only. It does not publish a page, collect RSVP responses, or record live check-ins." : "Runs locally. Date and time are kept exactly as entered; no time-zone conversion or calendar service is used.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(fields) { field in
+                if field.multiline {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(field.label).font(.caption).foregroundStyle(.secondary)
+                        TextEditor(text: binding(for: field)).frame(minHeight: 96).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))
+                    }
+                } else {
+                    TextField(field.label, text: binding(for: field)).textFieldStyle(.roundedBorder)
+                }
+            }
+            HStack {
+                Button("Generate") {
+                    do { output = try NativeEventEngine.generate(toolID: tool.id, values: values); error = "" }
+                    catch { output = ""; self.error = error.localizedDescription }
+                }.buttonStyle(.borderedProminent)
+                Button("Reset") { values = NativeEventEngine.initialValues(tool.id); output = ""; error = "" }.buttonStyle(.bordered)
+                if !output.isEmpty {
+                    Button("Copy output") { UIPasteboard.general.string = output }.buttonStyle(.bordered)
+                    Button("Save output") { exporting = true }.buttonStyle(.bordered)
+                }
+            }
+            if !output.isEmpty {
+                TextEditor(text: .constant(output)).frame(minHeight: 160).textSelection(.enabled).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))
+            }
+            if !error.isEmpty { enVCharacterSpacedText(error).foregroundStyle(.red).font(.footnote) }
+        }
+        .padding(.vertical, 4)
+        .fileExporter(isPresented: $exporting, document: NativeEventTextDocument(text: output), contentType: NativeEventEngine.contentType(tool.id), defaultFilename: NativeEventEngine.fileName(tool.id), onCompletion: { result in
+            if case .failure(let failure) = result { error = failure.localizedDescription }
+        })
+    }
+
+    private func binding(for field: NativeEventEngine.Field) -> Binding<String> {
         Binding(get: { values[field.name] ?? field.defaultValue }, set: { values[field.name] = $0 })
     }
 }
