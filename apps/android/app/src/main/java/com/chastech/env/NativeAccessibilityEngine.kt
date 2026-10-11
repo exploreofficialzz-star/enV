@@ -20,7 +20,11 @@ object NativeAccessibilityEngine {
 
     fun analyze(toolId: String, markup: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5"): String {
         val kind = kind(toolId)
+        val action = actions.firstOrNull { toolId.endsWith("-$it") } ?: "checker"
         if (toolId.endsWith("-generator")) return generator(kind, foreground, background)
+        if (action == "helper") return "${helperGuide(kind)}\n\n${analyze(toolId.removeSuffix("-helper") + "-checker", markup, foreground, background, fontSize, lineHeight)}"
+        if (action == "preview") return preview(kind, markup, foreground, background, fontSize, lineHeight)
+        if (action == "simulator") return simulator(kind, markup, foreground, background, fontSize, lineHeight)
         if (kind == "contrast" || kind == "accessible-color") return contrastReport(kind, foreground, background, toolId.endsWith("-generator"))
         if (kind == "color-blindness") return colorVisionReport(foreground, background)
         if (kind == "font-size") {
@@ -94,6 +98,39 @@ object NativeAccessibilityEngine {
         val ordered = findings.sortedWith(compareBy<Finding> { severityOrder(it.severity) }.thenBy { it.rule })
         val details = if (ordered.isEmpty()) "No matching issues were detected in the supplied snippet. A clean snippet is not proof of conformance." else ordered.mapIndexed { i, f -> "${i + 1}. [${f.severity}] ${f.rule}: ${f.message}\n   Target: ${f.target}\n   Fix: ${f.fix}" }.joinToString("\n")
         return "${kind.uppercase(Locale.US)} LOCAL REVIEW\nElements inspected: ${elements.size}\nFindings: ${ordered.size} (critical: 0 · serious: ${ordered.count { it.severity == "SERIOUS" }} · moderate: ${ordered.count { it.severity == "MODERATE" }} · minor: ${ordered.count { it.severity == "MINOR" }})\n\n$details\n\nScope: Static snippet checks only. This does not inspect a live page or accessibility tree, test assistive technology, or certify WCAG conformance. Manually verify keyboard and screen-reader behavior."
+    }
+
+    private fun helperGuide(kind: String) = when (kind) {
+        "alt-text" -> "WRITING COACH · Describe the image's purpose in context. Keep essential meaning, omit decorative detail, and use alt=\"\" only for decorative images."
+        "aria" -> "ARIA MISTAKE FIXER · Prefer native HTML. Give each interactive control a name, keep referenced IDs unique, and expose accurate state; do not add redundant roles."
+        "form" -> "FORM FIXER · Pair every field with a visible label, associate errors with the field, explain how to correct them, and preserve keyboard focus."
+        "keyboard-navigation" -> "KEYBOARD FIXER · Use native controls, natural DOM order, visible focus, and no positive tabindex or keyboard traps."
+        "focus-state" -> "FOCUS FIXER · Keep a high-contrast, unclipped focus indicator for keyboard users; check sticky content and forced-colors modes."
+        "motion" -> "MOTION FIXER · Respect reduced-motion preferences, remove non-essential movement, and preserve essential status/feedback."
+        "contrast", "accessible-color" -> "GUIDED COLOR FIXER · Change one color at a time, retain the intended hue where possible, then verify the target in its real text/UI context."
+        "font-size", "line-height" -> "TYPE FIXER · Prefer scalable units; verify 200% text resize, 400% zoom/reflow, and user text-spacing overrides without clipping."
+        "text-readability" -> "READABILITY COACH · Break up long sentences, explain specialist terms, use descriptive headings, and test wording with intended readers."
+        else -> "ACCESSIBILITY FIXER · Apply one change at a time and verify with keyboard and assistive technology."
+    }
+
+    private fun preview(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String): String = when (kind) {
+        "alt-text" -> "SCREEN-READER ANNOUNCEMENT PREVIEW\n${Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE).findAll(input).map { tag -> Regex("\\balt\\s*=\\s*['\"]([^'\"]*)['\"]", RegexOption.IGNORE_CASE).find(tag.value)?.groupValues?.get(1)?.let { if (it.isBlank()) "Decorative image (not announced)" else "Image: $it" } ?: "Image (missing alternative)").joinToString("\n").ifBlank { "Paste image markup to preview announcements." } }\n\nIllustrative text only; actual announcements vary by screen reader and context."
+        "aria" -> "ACCESSIBILITY TREE PREVIEW\n${analyze("aria-checker", input)}\n\nInspect the actual browser accessibility tree and test with a screen reader; static markup cannot resolve every computed name/state."
+        "contrast", "accessible-color" -> contrastReport(kind, foreground, background)
+        "color-blindness" -> colorVisionReport(foreground, background)
+        "font-size" -> "TEXT PREVIEW · 200% RESIZE\nInput size: $fontSize\nCompare line wrapping, clipping, and overlap at 200% and 400% zoom."
+        "line-height" -> "TEXT SPACING PREVIEW\nFont size: $fontSize · line-height: $lineHeight\nAlso test WCAG text-spacing overrides: 1.5× line height, 2× paragraph spacing, 0.12× letter spacing, and 0.16× word spacing."
+        "text-readability" -> "BEFORE / REVIEW\n${readability(input)}\n\nThis preview reports estimates; it does not automatically rewrite the text."
+        else -> "INTERACTIVE PREVIEW\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
+    }
+
+    private fun simulator(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String): String = when (kind) {
+        "color-blindness" -> colorVisionReport(foreground, background)
+        "contrast", "accessible-color" -> contrastReport(kind, foreground, background, true)
+        "keyboard-navigation", "focus-state", "aria", "form" -> "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through every control.\n2. Confirm focus is visible and order is logical.\n3. Activate with Enter/Space; close dismissible UI with Escape.\n4. Check names, roles, values, and errors with a screen reader.\n\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
+        "font-size", "line-height" -> "ZOOM SIMULATION CHECKLIST\nAt 200% text resize and 400% viewport zoom, inspect clipping, overlap, horizontal scrolling, and control reachability.\n\n${preview(kind, input, foreground, background, fontSize, lineHeight)}"
+        "motion" -> "REDUCED-MOTION SIMULATION\nEnable the operating-system reduced-motion setting. Confirm non-essential transitions stop while feedback, loading state, and meaning remain available.\n\n${analyze("motion-checker", input)}"
+        else -> "SIMULATION GUIDE\nThis local static preview cannot reproduce an individual user's assistive technology. Test the supplied example with real devices and users.\n\n${analyze("$kind-checker", input, foreground, background, fontSize, lineHeight)}"
     }
 
     private fun parse(markup: String): List<Element> = tagPattern.findAll(markup.replace(Regex("<!--[\\s\\S]*?-->"), "")).map { match ->

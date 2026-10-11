@@ -24,6 +24,9 @@ public enum NativeAccessibilityEngine {
         let kind = kind(toolID)
         let action = actions.first(where: { toolID.hasSuffix("-\($0)") }) ?? "checker"
         if action == "generator" { return template(kind: kind, foreground: foreground, background: background) }
+        if action == "helper" { return "\(helperGuide(kind))\n\n\(analyze(toolID: String(toolID.dropLast("-helper".count)) + "-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))" }
+        if action == "preview" { return preview(kind: kind, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) }
+        if action == "simulator" { return simulator(kind: kind, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) }
         if ["contrast", "accessible-color"].contains(kind) { return contrast(kind, foreground, background, suggestions: toolID.hasSuffix("-generator")) }
         if kind == "color-blindness" { return colorVisionReport(foreground, background) }
         if kind == "font-size" {
@@ -89,6 +92,50 @@ public enum NativeAccessibilityEngine {
         return "\(kind.uppercased()) LOCAL REVIEW\nElements inspected: \(elements.count)\nFindings: \(findings.count) (critical: 0 · serious: \(findings.filter { $0.severity == "SERIOUS" }.count) · moderate: \(findings.filter { $0.severity == "MODERATE" }.count) · minor: \(findings.filter { $0.severity == "MINOR" }.count))\n\n\(details)\n\nScope: Static snippet checks only. This does not inspect a live page or accessibility tree, test assistive technology, or certify WCAG conformance. Manually verify keyboard and screen-reader behavior."
     }
 
+    private static func helperGuide(_ kind: String) -> String {
+        switch kind {
+        case "alt-text": return "WRITING COACH · Describe the image's purpose in context. Keep essential meaning, omit decorative detail, and use alt=\"\" only for decorative images."
+        case "aria": return "ARIA MISTAKE FIXER · Prefer native HTML. Give controls a name, keep referenced IDs unique, expose accurate state, and avoid redundant roles."
+        case "form": return "FORM FIXER · Pair each field with a visible label, associate errors with their field, explain corrections, and preserve keyboard focus."
+        case "keyboard-navigation": return "KEYBOARD FIXER · Use native controls, natural order, visible focus, and avoid positive tabindex and keyboard traps."
+        case "focus-state": return "FOCUS FIXER · Keep a high-contrast, unclipped keyboard focus indicator; check sticky content and forced-colors modes."
+        case "motion": return "MOTION FIXER · Respect reduced-motion preference, remove non-essential movement, and preserve essential feedback."
+        case "contrast", "accessible-color": return "GUIDED COLOR FIXER · Change one color at a time, retain intended hue where possible, then recheck the actual text/UI context."
+        case "font-size", "line-height": return "TYPE FIXER · Prefer scalable units; verify 200% text resize, 400% zoom/reflow, and text-spacing overrides without clipping."
+        case "text-readability": return "READABILITY COACH · Split long sentences, explain specialist terms, use descriptive headings, and test with intended readers."
+        default: return "ACCESSIBILITY FIXER · Apply one change at a time and verify with keyboard and assistive technology."
+        }
+    }
+
+    private static func preview(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String) -> String {
+        switch kind {
+        case "alt-text":
+            let announcements = matches(input, pattern: #"<img\b[^>]*>"#, options: [.caseInsensitive]).map { tag -> String in
+                if let alt = capture(tag, pattern: #"\balt\s*=\s*['\"]([^'\"]*)['\"]"#, group: 1, options: [.caseInsensitive]) { return alt.isEmpty ? "Decorative image (not announced)" : "Image: \(alt)" }
+                return "Image (missing alternative)"
+            }.joined(separator: "\n")
+            return "SCREEN-READER ANNOUNCEMENT PREVIEW\n\(announcements.isEmpty ? "Paste image markup to preview announcements." : announcements)\n\nIllustrative text only; actual announcements vary by screen reader and context."
+        case "aria": return "ACCESSIBILITY TREE PREVIEW\n\(analyze(toolID: "aria-checker", input: input))\n\nInspect the platform accessibility tree and test with a screen reader; static markup cannot resolve every computed name or state."
+        case "contrast", "accessible-color": return contrast(kind, foreground, background)
+        case "color-blindness": return colorVisionReport(foreground, background)
+        case "font-size": return "TEXT PREVIEW · 200% RESIZE\nInput size: \(fontSize)\nCompare wrapping, clipping, and overlap at 200% and 400% zoom."
+        case "line-height": return "TEXT SPACING PREVIEW\nFont size: \(fontSize) · line-height: \(lineHeight)\nAlso test WCAG text-spacing overrides: 1.5× line height, 2× paragraph spacing, 0.12× letter spacing, and 0.16× word spacing."
+        case "text-readability": return "BEFORE / REVIEW\n\(readability(input))\n\nEstimates only; this preview does not automatically rewrite the text."
+        default: return "INTERACTIVE PREVIEW\n\(analyze(toolID: "\(kind)-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
+        }
+    }
+
+    private static func simulator(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String) -> String {
+        switch kind {
+        case "color-blindness": return colorVisionReport(foreground, background)
+        case "contrast", "accessible-color": return contrast(kind, foreground, background, suggestions: true)
+        case "keyboard-navigation", "focus-state", "aria", "form": return "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through controls.\n2. Confirm visible focus and logical order.\n3. Activate with Enter/Space; dismiss with Escape where appropriate.\n4. Check names, roles, values, and errors with a screen reader.\n\n\(analyze(toolID: "\(kind)-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
+        case "font-size", "line-height": return "ZOOM SIMULATION CHECKLIST\nAt 200% text resize and 400% viewport zoom, inspect clipping, overlap, horizontal scrolling, and control reachability.\n\n\(preview(kind: kind, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
+        case "motion": return "REDUCED-MOTION SIMULATION\nEnable the operating-system reduced-motion setting. Confirm non-essential transitions stop while essential feedback and meaning remain.\n\n\(analyze(toolID: "motion-checker", input: input))"
+        default: return "SIMULATION GUIDE\nA static preview cannot reproduce an individual user's assistive technology. Test with real devices and users.\n\n\(analyze(toolID: "\(kind)-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
+        }
+    }
+
     private static func parse(_ input: String) -> [Element] {
         matches(input.replacingOccurrences(of: #"<!--[\s\S]*?-->"#, with: "", options: .regularExpression), pattern: #"<([a-zA-Z][\w:-]*)\b([^<>]*)>"#).compactMap { tag in
             let parts = matches(tag, pattern: #"^<([a-zA-Z][\w:-]*)\b([^<>]*)>"#).first
@@ -108,6 +155,13 @@ public enum NativeAccessibilityEngine {
     private static func matches(_ input: String, pattern: String, options: NSRegularExpression.Options = []) -> [String] {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return [] }
         return regex.matches(in: input, range: NSRange(input.startIndex..., in: input)).compactMap { Range($0.range, in: input).map { String(input[$0]) } }
+    }
+    private static func capture(_ input: String, pattern: String, group: Int, options: NSRegularExpression.Options = []) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options),
+              let match = regex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
+              group < match.numberOfRanges,
+              let range = Range(match.range(at: group), in: input) else { return nil }
+        return String(input[range])
     }
     private static func severityRank(_ value: String) -> Int { ["CRITICAL": 0, "SERIOUS": 1, "MODERATE": 2, "MINOR": 3][value] ?? 4 }
     private static func cssPixels(_ value: String) -> Double? { let clean = value.trimmingCharacters(in: .whitespacesAndNewlines); if clean.hasSuffix("rem") { return Double(clean.dropLast(3)).map { $0 * 16 } }; if clean.hasSuffix("px") { return Double(clean.dropLast(2)) }; return Double(clean) }

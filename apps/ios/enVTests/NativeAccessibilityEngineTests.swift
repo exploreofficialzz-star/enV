@@ -32,4 +32,18 @@ final class NativeAccessibilityEngineTests: XCTestCase {
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "line-height-generator", input: "").contains("line-height: 1.5"))
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "font-size-generator", input: "").contains("font-size: 1rem"))
     }
+
+    func testAccessibilityActionsHaveDistinctJobs() {
+        let markup = "<img src=\"hero.jpg\" alt=\"A person using a laptop\"><button>Save</button>"
+        let helper = NativeAccessibilityEngine.analyze(toolID: "alt-text-helper", input: markup)
+        let preview = NativeAccessibilityEngine.analyze(toolID: "alt-text-preview", input: markup)
+        let simulator = NativeAccessibilityEngine.analyze(toolID: "alt-text-simulator", input: markup)
+        XCTAssertTrue(helper.contains("WRITING COACH"))
+        XCTAssertTrue(preview.contains("SCREEN-READER ANNOUNCEMENT PREVIEW"))
+        XCTAssertTrue(preview.contains("Image: A person using a laptop"))
+        XCTAssertTrue(simulator.contains("SIMULATION GUIDE"))
+        XCTAssertNotEqual(helper, preview)
+        XCTAssertNotEqual(preview, simulator)
+        XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "aria-simulator", input: "<button aria-label=\"Save\">Save</button>").contains("KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH"))
+    }
 }

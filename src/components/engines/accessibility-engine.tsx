@@ -99,6 +99,45 @@ function analyzeHtml(html: string, kind: Kind) {
 
 function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: string; text: string; size: string; lineHeight: string; html: string; role: string }) {
   const { fg, bg, text, size, lineHeight, html, role } = values;
+  if (action === "helper") {
+    const guidance: Partial<Record<Kind, string>> = {
+      "alt-text": "WRITING COACH · Describe the image's purpose in context. Keep essential meaning, omit decorative details, and use alt=\"\" only for decorative images.",
+      aria: "ARIA MISTAKE FIXER · Prefer native HTML. Give controls a name, keep referenced IDs unique, expose accurate state, and avoid redundant roles.",
+      form: "FORM FIXER · Pair each field with a visible label, associate errors with their field, explain corrections, and preserve keyboard focus.",
+      "keyboard-navigation": "KEYBOARD FIXER · Use native controls, natural order, visible focus, and avoid positive tabindex and keyboard traps.",
+      "focus-state": "FOCUS FIXER · Keep a high-contrast, unclipped keyboard focus indicator; check sticky content and Windows High Contrast Mode.",
+      motion: "MOTION FIXER · Respect reduced-motion preferences, remove non-essential movement, and preserve essential feedback.",
+      contrast: "GUIDED COLOR FIXER · Change one color at a time, retain intended hue where possible, and recheck in the actual text/UI context.",
+      "accessible-color": "GUIDED COLOR FIXER · Change one color at a time, retain intended hue where possible, and recheck in the actual text/UI context.",
+      "font-size": "TYPE FIXER · Prefer scalable units; verify 200% text resize, 400% zoom/reflow, and text-spacing overrides without clipping.",
+      "line-height": "TYPE FIXER · Prefer scalable units; verify 200% text resize, 400% zoom/reflow, and text-spacing overrides without clipping.",
+      "text-readability": "READABILITY COACH · Split long sentences, explain specialist terms, use descriptive headings, and test with intended readers.",
+      "color-blindness": "COLOR-SAFETY HELPER · Never communicate status by color alone; pair colors with text, icons, or patterns and inspect the simulated alternatives.",
+    };
+    return `${guidance[kind] ?? "ACCESSIBILITY FIXER · Apply one change at a time and verify with keyboard and assistive technology."}\n\n${buildOutput(kind, "checker", values)}`;
+  }
+  if (action === "preview") {
+    if (kind === "alt-text") {
+      const announcements = [...html.matchAll(/<img\b[^>]*>/gi)].map(([tag]) => {
+        const alt = tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1];
+        return alt === undefined ? "Image (missing alternative)" : alt ? `Image: ${alt}` : "Decorative image (not announced)";
+      });
+      return `SCREEN-READER ANNOUNCEMENT PREVIEW\n${announcements.join("\n") || "Paste image markup to preview announcements."}\n\nIllustrative text only; real announcements vary by screen reader and context.`;
+    }
+    if (kind === "aria") return `ACCESSIBILITY TREE PREVIEW\n${analyzeHtml(html, kind)}\n\nInspect the actual browser accessibility tree and test with a screen reader; static markup cannot resolve every computed name or state.`;
+    if (kind === "font-size") return `TEXT PREVIEW · 200% RESIZE\nInput size: ${size}\nCompare wrapping, clipping, and overlap at 200% and 400% zoom.`;
+    if (kind === "line-height") return `TEXT SPACING PREVIEW\nFont size: ${size} · line-height: ${lineHeight}\nAlso test WCAG text-spacing overrides: 1.5× line height, 2× paragraph spacing, 0.12× letter spacing, and 0.16× word spacing.`;
+    if (kind === "text-readability") return `BEFORE / REVIEW\n${buildOutput(kind, "checker", values)}\n\nEstimates only; this preview does not automatically rewrite the text.`;
+    if (["contrast", "accessible-color", "color-blindness"].includes(kind)) return `SIDE-BY-SIDE PREVIEW\nOriginal: ${fg} on ${bg}\n\n${buildOutput(kind, "checker", values)}`;
+    return `INTERACTIVE PREVIEW\n${analyzeHtml(html, kind)}\n\nStatic preview only; verify with real keyboard and assistive technology.`;
+  }
+  if (action === "simulator") {
+    if (kind === "color-blindness") return `COLOR-VISION SIMULATION (approximate)\n${buildOutput(kind, "checker", values)}\n\nIllustrative only, not clinical or a substitute for user testing.`;
+    if (["keyboard-navigation", "focus-state", "aria", "form"].includes(kind)) return `KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through controls.\n2. Confirm visible focus and logical order.\n3. Activate with Enter/Space; dismiss with Escape where appropriate.\n4. Check names, roles, values, and errors with a screen reader.\n\n${buildOutput(kind, "checker", values)}`;
+    if (["font-size", "line-height"].includes(kind)) return `ZOOM SIMULATION CHECKLIST\nAt 200% text resize and 400% viewport zoom, inspect clipping, overlap, horizontal scrolling, and control reachability.\n\n${buildOutput(kind, "preview", values)}`;
+    if (kind === "motion") return `REDUCED-MOTION SIMULATION\nEnable the operating-system reduced-motion setting. Confirm non-essential movement stops while essential feedback and meaning remain.\n\n${analyzeHtml(html, kind)}`;
+    return `SIMULATION GUIDE\nStatic output cannot reproduce an individual user's assistive technology. Test with real devices and users.\n\n${buildOutput(kind, "checker", values)}`;
+  }
   if (kind === "contrast" || kind === "accessible-color") {
     const ratio = contrast(fg, bg);
     if (action === "generator") {
@@ -138,7 +177,6 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
       if (kind === "focus-state") return "VISIBLE FOCUS CSS STARTER\n\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nDo not remove focus without an equally visible replacement. Check contrast, clipping, and sticky-content obscuration.";
       return "REDUCED MOTION CHECKLIST\n\n• Respect prefers-reduced-motion.\n• Remove or reduce non-essential animation.\n• Avoid flashing content.\n• Preserve essential information when animation is disabled.";
     }
-    if (action === "helper") return buildOutput(kind, "checker", values);
     return analyzeHtml(html, kind);
   }
   return "Accessibility utility ready.";

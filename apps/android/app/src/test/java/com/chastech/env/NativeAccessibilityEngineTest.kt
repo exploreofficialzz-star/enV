@@ -37,4 +37,17 @@ class NativeAccessibilityEngineTest {
         assertTrue(NativeAccessibilityEngine.supports("aria-simulator", "accessibility"))
         assertFalse(NativeAccessibilityEngine.supports("aria-simulator", "developer"))
     }
+
+    @Test fun accessibilityActionsHaveDistinctJobs() {
+        val markup = "<img src=\"hero.jpg\" alt=\"A person using a laptop\"><button>Save</button>"
+        val helper = NativeAccessibilityEngine.analyze("alt-text-helper", markup)
+        val preview = NativeAccessibilityEngine.analyze("alt-text-preview", markup)
+        val simulator = NativeAccessibilityEngine.analyze("alt-text-simulator", markup)
+        assertTrue(helper.contains("WRITING COACH"))
+        assertTrue(preview.contains("SCREEN-READER ANNOUNCEMENT PREVIEW"))
+        assertTrue(preview.contains("Image: A person using a laptop"))
+        assertTrue(simulator.contains("SIMULATION GUIDE"))
+        assertFalse(helper == preview || preview == simulator || helper == simulator)
+        assertTrue(NativeAccessibilityEngine.analyze("aria-simulator", "<button aria-label=\"Save\">Save</button>").contains("KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH"))
+    }
 }
