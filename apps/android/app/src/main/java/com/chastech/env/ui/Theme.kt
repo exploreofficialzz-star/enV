@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 
 private val EnVLightColors = lightColorScheme(
     primary = Color(0xFF0D9F8A),
@@ -42,6 +43,22 @@ private val EnVDarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFF97066),
 )
 
+private val EnVTypography = Typography().let { base ->
+    val slightlyHeavier = FontWeight(450)
+    base.copy(
+        displayLarge = base.displayLarge.copy(fontWeight = slightlyHeavier),
+        displayMedium = base.displayMedium.copy(fontWeight = slightlyHeavier),
+        displaySmall = base.displaySmall.copy(fontWeight = slightlyHeavier),
+        headlineLarge = base.headlineLarge.copy(fontWeight = slightlyHeavier),
+        headlineMedium = base.headlineMedium.copy(fontWeight = slightlyHeavier),
+        headlineSmall = base.headlineSmall.copy(fontWeight = slightlyHeavier),
+        titleLarge = base.titleLarge.copy(fontWeight = slightlyHeavier),
+        bodyLarge = base.bodyLarge.copy(fontWeight = slightlyHeavier),
+        bodyMedium = base.bodyMedium.copy(fontWeight = slightlyHeavier),
+        bodySmall = base.bodySmall.copy(fontWeight = slightlyHeavier),
+    )
+}
+
 private const val EnVFontScale = 1.11f
 
 @Composable
@@ -51,7 +68,7 @@ fun EnVTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
         MaterialTheme(
             colorScheme = if (darkTheme) EnVDarkColors else EnVLightColors,
-            typography = Typography(),
+            typography = EnVTypography,
             content = content,
         )
     }
