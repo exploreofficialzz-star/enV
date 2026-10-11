@@ -43,11 +43,11 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
-                        HStack(spacing: horizontalSizeClass == .regular ? 16 : 12) {
+                        HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)
                             TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
                                 .font(.envScaled(size: horizontalSizeClass == .regular ? 18 : 16, weight: .regular))
-                                .multilineTextAlignment(.center)
+                                .multilineTextAlignment(.leading)
                                 .focused($isHomeSearchFocused)
                                 .accessibilityLabel("Search tools")
                                 .submitLabel(.search)

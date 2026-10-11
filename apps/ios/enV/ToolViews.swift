@@ -83,16 +83,18 @@ struct ToolDetailView: View {
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
     @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
+    @State private var visibleRelatedCount = 6
     let tool: Tool
 
     private var compact: Bool { horizontalSizeClass != .regular }
     private var backend: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool) }
     private var local: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeCoverage.isLocallyExecutable(tool) }
-    private var relatedTools: [Tool] { store.catalog.relatedTools(for: tool) }
+    private var relatedTools: [Tool] { store.catalog.relatedTools(for: tool, limit: Int.max) }
     private var categoryName: String { store.category(named: tool.category)?.name ?? tool.category }
     private var relatedColumns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: compact ? 1 : 2) }
 
     var body: some View {
+        let allRelatedTools = relatedTools
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
@@ -170,17 +172,35 @@ struct ToolDetailView: View {
                 }
                 .padding(.top, 40)
 
-                if !relatedTools.isEmpty {
+                if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.envInk)
+                        .foregroundStyle(Color.envAccent)
                         .padding(.top, 40)
                         .padding(.bottom, 16)
                     LazyVGrid(columns: relatedColumns, alignment: .leading, spacing: 8) {
-                        ForEach(relatedTools) { related in
+                        ForEach(allRelatedTools.prefix(visibleRelatedCount)) { related in
                             NavigationLink(value: related) { RelatedToolDetailCard(tool: related) }
                                 .buttonStyle(.plain)
                         }
+                    }
+                    if allRelatedTools.count > visibleRelatedCount {
+                        HStack {
+                            Spacer()
+                            Button {
+                                visibleRelatedCount = min(visibleRelatedCount + 6, allRelatedTools.count)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    enVCharacterSpacedText("See more")
+                                        .font(.envScaled(size: 14, weight: .medium))
+                                    EnVIcon(name: "ChevronDown", size: 16, tint: .envAccent)
+                                }
+                                .foregroundStyle(Color.envAccent)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("See more related tools")
+                        }
+                        .padding(.top, 8)
                     }
                 }
             }
@@ -241,6 +261,12 @@ private struct RelatedToolDetailCard: View {
         VStack(alignment: .leading, spacing: 2) {
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
             enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
+            HStack {
+                Spacer()
+                EnVIcon(name: "ArrowRight", size: 16, tint: .envInk)
+                    .accessibilityHidden(true)
+            }
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)

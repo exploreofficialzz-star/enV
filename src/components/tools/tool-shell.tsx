@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { Heart } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowRight, ChevronDown, Heart } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { toolIcon } from "@/lib/icons";
 import { getRelatedTools, toolPath } from "@/lib/registry";
@@ -19,7 +19,8 @@ export function ToolShell({
   children: React.ReactNode;
 }) {
   const Icon = toolIcon(tool.icon);
-  const related = getRelatedTools(tool);
+  const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
+  const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const note = disclaimerText(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
@@ -29,6 +30,7 @@ export function ToolShell({
 
   useEffect(() => {
     recordRecent(tool.id);
+    setVisibleRelatedCount(6);
   }, [tool.id, recordRecent]);
 
   const cat = CATEGORY_MAP[tool.category];
@@ -94,20 +96,34 @@ export function ToolShell({
 
       {related.length > 0 ? (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold">Related tools</h2>
+          <h2 className="text-lg font-semibold text-accent">Related tools</h2>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {related.map((r) => (
+            {related.slice(0, visibleRelatedCount).map((r) => (
               <li key={r.id}>
                 <Link
                   to={toolPath(r)}
-                  className="block rounded-lg bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)] hover:text-accent"
+                  className="group flex min-h-24 flex-col rounded-lg bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)] hover:text-accent"
                 >
                   <span className="font-medium">{r.name}</span>
                   <span className="mt-0.5 block text-xs text-muted">{r.description}</span>
+                  <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
                 </Link>
               </li>
             ))}
           </ul>
+          {related.length > visibleRelatedCount ? (
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-accent hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                onClick={() => setVisibleRelatedCount((count) => Math.min(count + 6, related.length))}
+                aria-label="See more related tools"
+              >
+                See more
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </article>

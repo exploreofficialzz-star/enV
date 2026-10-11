@@ -350,16 +350,16 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,
                 ) {
-                    // Search contract retained from the prior native field: placeholder = { if (!homeSearchFocused) Text("Search for a tool") }, textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center), leadingIcon = { EnVLogo }, trailingIcon = { IconButton(onClick = { onSearch(homeQuery) }) { EnVIcon("Search") } }.
+                    // Native search keeps the placeholder hidden on focus, left-aligns query text after the brand mark, and retains the trailing search action.
                     Row(Modifier.fillMaxSize().padding(horizontal = if (screenWidth >= 640) 20.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         EnVLogo(Modifier.width(56.dp).height(36.dp), darkTheme = darkMode)
-                        Box(Modifier.weight(1f).padding(horizontal = if (screenWidth >= 640) 16.dp else 12.dp), contentAlignment = Alignment.Center) {
-                            if (homeQuery.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
+                            if (homeQuery.isEmpty() && !homeSearchFocused) Text("Search for a tool", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Start, modifier = Modifier.fillMaxWidth())
                             BasicTextField(
                                 value = homeQuery,
                                 onValueChange = onQuery,
                                 modifier = Modifier.fillMaxWidth().onFocusChanged { homeSearchFocused = it.isFocused }.semantics { contentDescription = "Search tools" },
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = if (screenWidth >= 640) 18.sp else 16.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = if (screenWidth >= 640) 18.sp else 16.sp, textAlign = TextAlign.Start, color = MaterialTheme.colorScheme.onSurface),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { openHomeSearch() }),
@@ -904,7 +904,8 @@ private fun ToolDetail(
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
     val context = LocalContext.current
-    val related = remember(catalog, tool) { catalog.relatedTools(tool) }
+    val related = remember(catalog, tool) { catalog.relatedTools(tool, Int.MAX_VALUE) }
+    var visibleRelatedCount by remember(tool.id) { mutableIntStateOf(6) }
     val categoryName = catalog.categories.firstOrNull { it.id == tool.category }?.name ?: tool.category
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val compact = maxWidth < 640.dp
@@ -974,15 +975,22 @@ private fun ToolDetail(
             Text("${tool.description} Results can be copied or downloaded from this page.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
-                Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
+                Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
                 Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    related.chunked(if (compact) 1 else 2).forEach { rowTools ->
+                    related.take(visibleRelatedCount).chunked(if (compact) 1 else 2).forEach { rowTools ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowTools.forEach { item ->
                                 Box(Modifier.weight(1f)) { RelatedToolCard(item) { onRelatedTool(item.id) } }
                             }
                             if (!compact && rowTools.size == 1) Spacer(Modifier.weight(1f))
                         }
+                    }
+                }
+                if (related.size > visibleRelatedCount) {
+                    TextButton(onClick = { visibleRelatedCount = (visibleRelatedCount + 6).coerceAtMost(related.size) }, modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.End)) {
+                        Text("See more", color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(4.dp))
+                        EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -1023,6 +1031,9 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Normal)
             Text(tool.description, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+            }
         }
     }
 }
