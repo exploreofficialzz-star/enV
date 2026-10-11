@@ -210,7 +210,7 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
   }
   const runner = `window.addEventListener('load',async()=>{try{const r=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']},resultTypes:['violations','incomplete','passes']});const pick=a=>a.map(x=>({id:x.id,impact:x.impact,help:x.help,helpUrl:x.helpUrl,tags:x.tags,nodes:x.nodes.map(n=>({target:n.target,html:n.html}))}));parent.postMessage({nonce:${JSON.stringify(nonce)},results:{violations:pick(r.violations),incomplete:pick(r.incomplete),passes:pick(r.passes)}},'*')}catch(e){parent.postMessage({nonce:${JSON.stringify(nonce)},error:String(e&&e.message||e)},'*')}})`;
   const axeSource = axe.source.replace(
-    "if (typeof window.getComputedStyle === 'function') {\n    window.axe = axe;\n  }",
+    /if\s*\(\s*typeof\s+window\.getComputedStyle\s*===\s*['"]function['"]\s*\)\s*\{\s*window\.axe\s*=\s*axe\s*;\s*\}/,
     "window.axe = axe;",
   );
   if (axeSource === axe.source) return "axe-core scan failed: bundled axe global bootstrap did not match the expected version.";
