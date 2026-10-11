@@ -1,4 +1,4 @@
-import axe from "axe-core";
+import axeSource from "axe-core/axe.min.js?raw";
 
 export type A11ySeverity = "critical" | "serious" | "moderate" | "minor";
 export interface A11yFinding {
@@ -209,17 +209,13 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
     else source = source.replace(/<html\b[^>]*>/i, (opening) => `${opening}<head>${csp}<title>Accessibility snippet test</title></head>`);
   }
   const runner = `window.addEventListener('load',async()=>{try{const r=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']},resultTypes:['violations','incomplete','passes']});const pick=a=>a.map(x=>({id:x.id,impact:x.impact,help:x.help,helpUrl:x.helpUrl,tags:x.tags,nodes:x.nodes.map(n=>({target:n.target,html:n.html}))}));parent.postMessage({nonce:${JSON.stringify(nonce)},results:{violations:pick(r.violations),incomplete:pick(r.incomplete),passes:pick(r.passes)}},'*')}catch(e){parent.postMessage({nonce:${JSON.stringify(nonce)},error:String(e&&e.message||e)},'*')}})`;
-  // axe-core exposes readable source in development but a minified UMD source
-  // in production, where the equivalent guard uses short local variable names.
-  const axeSource = axe.source.replace(
-    /if\s*\(\s*typeof\s+window\.getComputedStyle\s*===\s*['"]function['"]\s*\)\s*\{\s*window\.axe\s*=\s*axe\s*;\s*\}/,
-    "window.axe = axe;",
-  ).replace(
-    /typeof\s+([\w$]+)\.getComputedStyle\s*==\s*['"`]function['"`]\s*&&\s*\(\s*\1\.axe\s*=\s*([\w$]+)\s*\)/,
-    (_, globalName: string, axeName: string) => `${globalName}.axe=${axeName}`,
-  );
-  if (axeSource === axe.source) return "axe-core scan failed: bundled axe global bootstrap did not match the expected version.";
-  const scannerScripts = `<script nonce="${nonce}">${axeSource.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
+  // Embed the package's standalone UMD file as raw text. Using axe.source
+  // stringifies a bundler-rewritten function in production, which can retain
+  // references to module-local variables and fail before axe initializes.
+  const bootstrapPattern = /["']function["']\s*==\s*typeof\s+window\.getComputedStyle\s*&&\s*\(\s*window\.axe\s*=\s*axe\s*\)/;
+  const standaloneAxeSource = axeSource.replace(bootstrapPattern, "(window.axe=axe)");
+  if (standaloneAxeSource === axeSource) return "axe-core scan failed: standalone axe bootstrap did not match the expected version.";
+  const scannerScripts = `<script nonce="${nonce}">${standaloneAxeSource.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
   if (/<\/body\s*>/i.test(source)) source = source.replace(/<\/body\s*>/i, `${scannerScripts}</body>`);
   else if (/<\/html\s*>/i.test(source)) source = source.replace(/<\/html\s*>/i, `${scannerScripts}</html>`);
   else source += scannerScripts;
@@ -256,7 +252,7 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
       return `${heading}: ${group.length}\n${lines.join("\n")}`;
     };
     return [
-      `AXE-CORE ${axe.version} · local snippet scan`,
+      "AXE-CORE · local snippet scan",
       `Automated violations: ${scanResults.violations.length}`,
       `Manual review / incomplete rules: ${scanResults.incomplete.length}`,
       `Passed checks: ${scanResults.passes.length}`,
