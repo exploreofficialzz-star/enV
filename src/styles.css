@@ -4,7 +4,6 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-weight-normal: 425;
   --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 
   /* A modest text-size increase (~11% over base); readable line-height and layout spacing remain unchanged. */
@@ -93,7 +92,6 @@
   body {
     font-family: var(--font-sans);
     font-size: 1.11rem;
-    font-weight: 425;
     line-height: 1.5;
   }
 

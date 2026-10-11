@@ -1,30 +1,9 @@
 import SwiftUI
 import UIKit
-import CoreText
 
 extension Font {
     static func envScaled(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
-        let scaledSize = size * 1.11
-        guard weight == .regular else {
-            return .system(size: scaledSize, weight: weight, design: design)
-        }
-
-        let systemFont = UIFont.systemFont(ofSize: scaledSize, weight: UIFont.Weight(0.05))
-        var descriptor = systemFont.fontDescriptor
-        let systemDesign: UIFontDescriptor.SystemDesign?
-        if design == .serif {
-            systemDesign = .serif
-        } else if design == .rounded {
-            systemDesign = .rounded
-        } else if design == .monospaced {
-            systemDesign = .monospaced
-        } else {
-            systemDesign = nil
-        }
-        if let systemDesign {
-            descriptor = descriptor.withDesign(systemDesign) ?? descriptor
-        }
-        return Font(UIFont(descriptor: descriptor, size: scaledSize) as CTFont)
+        .system(size: size * 1.11, weight: weight, design: design)
     }
 }
 
