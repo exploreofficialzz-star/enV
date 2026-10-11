@@ -61,8 +61,8 @@ function Home() {
           )}
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
-          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[12.8px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
-          <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[12.8px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
+          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[12.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
+          <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[12.1px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
         </div>
         <MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
@@ -99,7 +99,7 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
                   <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft md:size-11">
                     <Icon className="size-5 text-fg" aria-hidden="true" />
                   </span>
-                  <span className="w-full truncate text-[12.8px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
+                  <span className="w-full truncate text-[12.1px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
                 </Link>
               );
             })}

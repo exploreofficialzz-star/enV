@@ -6,20 +6,20 @@
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 
-  /* A clearer size increase (~27% over base); layout spacing remains unchanged. */
-  --text-xs: 0.952875rem;
-  --text-sm: 1.1116875rem;
-  --text-base: 1.2705rem;
-  --text-lg: 1.4293125rem;
-  --text-xl: 1.588125rem;
-  --text-2xl: 1.90575rem;
-  --text-3xl: 2.3821875rem;
-  --text-4xl: 2.858625rem;
-  --text-5xl: 3.8115rem;
-  --text-6xl: 4.764375rem;
-  --text-7xl: 5.71725rem;
-  --text-8xl: 7.623rem;
-  --text-9xl: 10.164rem;
+  /* A moderate text-size increase (~21% over base); layout spacing remains unchanged. */
+  --text-xs: 0.9075rem;
+  --text-sm: 1.05875rem;
+  --text-base: 1.21rem;
+  --text-lg: 1.36125rem;
+  --text-xl: 1.5125rem;
+  --text-2xl: 1.815rem;
+  --text-3xl: 2.26875rem;
+  --text-4xl: 2.7225rem;
+  --text-5xl: 3.63rem;
+  --text-6xl: 4.5375rem;
+  --text-7xl: 5.445rem;
+  --text-8xl: 7.26rem;
+  --text-9xl: 9.68rem;
 
   --color-bg: #f7f6f3;
   --color-fg: #16181d;
@@ -91,7 +91,7 @@
 
   body {
     font-family: var(--font-sans);
-    font-size: 1.2705rem;
+    font-size: 1.21rem;
     line-height: 1.5;
   }
 

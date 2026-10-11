@@ -34,7 +34,7 @@ export function ToolCard({
       {planned ? (
         <span className="mt-3"><ComingSoonBadge /></span>
       ) : tool.clientSide ? (
-        <span className="mt-3 text-[12.8px] font-medium uppercase tracking-wide text-subtle">
+        <span className="mt-3 text-[12.1px] font-medium uppercase tracking-wide text-subtle">
           In-browser
         </span>
       ) : null}

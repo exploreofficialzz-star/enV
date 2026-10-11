@@ -49,7 +49,7 @@ function Controls({ st, mark, onMark, markName }: { st: ReturnType<typeof useSet
         <Seg value={v.kind} onChange={(kind) => set({ kind })} options={[{ value: "text", label: "Text" }, { value: "image", label: "Image / logo" }]} />
         {v.kind === "text" ? (
           <>
-            <label className="block space-y-1.5"><span className="text-[16.5px] font-medium">Text</span><textarea aria-label="Watermark text" rows={2} className="w-full rounded-md bg-surface px-3 py-2 text-sm shadow-[var(--shadow-border)] outline-none focus-visible:ring-2 focus-visible:ring-accent" value={v.text} onChange={(e) => set({ text: e.target.value }, "text")} /></label>
+            <label className="block space-y-1.5"><span className="text-[15.7px] font-medium">Text</span><textarea aria-label="Watermark text" rows={2} className="w-full rounded-md bg-surface px-3 py-2 text-sm shadow-[var(--shadow-border)] outline-none focus-visible:ring-2 focus-visible:ring-accent" value={v.text} onChange={(e) => set({ text: e.target.value }, "text")} /></label>
             <Select label="Font" value={v.style.family} onChange={(family) => sty({ family })} options={FONTS.map((f) => ({ value: f.id, label: f.label }))} />
             <Slider label="Size" value={v.sizePct} onChange={(sizePct) => set({ sizePct }, "size")} min={1} max={40} step={0.5} unit="% of width" def={5} />
             <div className="grid grid-cols-2 gap-2"><Toggle label="Bold" checked={v.style.bold} onChange={(bold) => sty({ bold })} /><Toggle label="Italic" checked={v.style.italic} onChange={(italic) => sty({ italic })} /></div>
@@ -60,7 +60,7 @@ function Controls({ st, mark, onMark, markName }: { st: ReturnType<typeof useSet
           </>
         ) : (
           <>
-            <div className="space-y-1.5"><span className="text-[16.5px] font-medium">Watermark image</span><FileDropzone accept="image/*" label={mark ? `Using ${markName} — drop another to replace` : "Drop a logo or watermark image"} hint="A transparent PNG works best." onFiles={(f) => onMark(f[0])} /></div>
+            <div className="space-y-1.5"><span className="text-[15.7px] font-medium">Watermark image</span><FileDropzone accept="image/*" label={mark ? `Using ${markName} — drop another to replace` : "Drop a logo or watermark image"} hint="A transparent PNG works best." onFiles={(f) => onMark(f[0])} /></div>
             <Slider label="Size" value={v.imgPct} onChange={(imgPct) => set({ imgPct }, "img")} min={2} max={100} unit="% of width" def={20} />
             {!mark ? <Notice tone="warn">Add a watermark image to see it on the photo.</Notice> : null}
           </>
@@ -72,7 +72,7 @@ function Controls({ st, mark, onMark, markName }: { st: ReturnType<typeof useSet
         <Seg value={v.mode} onChange={(mode) => set({ mode })} options={[{ value: "single", label: "Single" }, { value: "tile", label: "Tiled" }]} />
         {v.mode === "single" ? (
           <>
-            <div className="space-y-1.5"><span className="text-[16.5px] font-medium">Snap to corner / edge</span><div className="grid w-28 grid-cols-3 gap-1">{ANCHORS.map((a: Anchor) => <button key={a} type="button" aria-label={`Place ${a}`} className="size-8 rounded-sm bg-surface-2 hover:bg-accent" onClick={() => { const f = anchorFractions(a); const m = v.margin / 100; set({ cx: f.posX === 0 ? m + 0.04 : f.posX === 1 ? 1 - m - 0.04 : 0.5, cy: f.posY === 0 ? m + 0.04 : f.posY === 1 ? 1 - m - 0.04 : 0.5 }); }} />)}</div></div>
+            <div className="space-y-1.5"><span className="text-[15.7px] font-medium">Snap to corner / edge</span><div className="grid w-28 grid-cols-3 gap-1">{ANCHORS.map((a: Anchor) => <button key={a} type="button" aria-label={`Place ${a}`} className="size-8 rounded-sm bg-surface-2 hover:bg-accent" onClick={() => { const f = anchorFractions(a); const m = v.margin / 100; set({ cx: f.posX === 0 ? m + 0.04 : f.posX === 1 ? 1 - m - 0.04 : 0.5, cy: f.posY === 0 ? m + 0.04 : f.posY === 1 ? 1 - m - 0.04 : 0.5 }); }} />)}</div></div>
             <Slider label="Margin for snapping" value={v.margin} onChange={(margin) => set({ margin }, "m")} min={0} max={20} unit="%" def={3} />
             <div className="grid grid-cols-2 gap-3"><Slider label="Horizontal" value={Math.round(v.cx * 100)} onChange={(x) => set({ cx: x / 100 }, "cx")} min={0} max={100} unit="%" def={88} /><Slider label="Vertical" value={Math.round(v.cy * 100)} onChange={(y) => set({ cy: y / 100 }, "cy")} min={0} max={100} unit="%" def={93} /></div>
             <p className="text-xs text-muted">You can also drag the watermark on the preview.</p>
@@ -123,7 +123,7 @@ function Single({ source, toolId }: { source: SourceImage; toolId: string }) {
       <div className="space-y-3"><Preview proxy={proxy} v={v} mark={m.mark} onMove={(cx, cy) => st.set({ cx, cy }, "drag")} /><div className="grid grid-cols-3 gap-2"><Stat label="Image" value={`${source.width} × ${source.height}`} /><Stat label="Mode" value={v.mode === "tile" ? "Tiled" : "Single"} /><Stat label="Opacity" value={`${v.opacity}%`} /></div><ErrorBanner message={m.error} /></div>
       <div className="space-y-4">
         <HistoryBar canUndo={st.canUndo} canRedo={st.canRedo} onUndo={st.undo} onRedo={st.redo} onReset={() => st.reset()} dirty={JSON.stringify(v) !== JSON.stringify(st.initial)} />
-        <div className="space-y-1.5"><span className="text-[16.5px] font-medium">Quick starts</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => st.set(PRESETS.find((p) => p.id === id)!.values)} /></div>
+        <div className="space-y-1.5"><span className="text-[15.7px] font-medium">Quick starts</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => st.set(PRESETS.find((p) => p.id === id)!.values)} /></div>
         <Controls st={st} mark={m.mark} onMark={(f) => void m.setMarkFile(f)} markName={m.markName} />
         <ExportPanel source={source} toolId={toolId} suffix="watermarked" deps={[v, m.mark]} render={() => renderWatermark(fullCanvas(source), v, m.mark)} />
       </div>
@@ -169,7 +169,7 @@ function Batch({ toolId }: { toolId: string }) {
       </div>
       <div className="space-y-4">
         <HistoryBar canUndo={st.canUndo} canRedo={st.canRedo} onUndo={st.undo} onRedo={st.redo} onReset={() => st.reset()} dirty={JSON.stringify(v) !== JSON.stringify(st.initial)} />
-        <div className="space-y-1.5"><span className="text-[16.5px] font-medium">Quick starts</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => st.set(PRESETS.find((p) => p.id === id)!.values)} /></div>
+        <div className="space-y-1.5"><span className="text-[15.7px] font-medium">Quick starts</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => st.set(PRESETS.find((p) => p.id === id)!.values)} /></div>
         <Controls st={st} mark={m.mark} onMark={(f) => void m.setMarkFile(f)} markName={m.markName} />
         <Section title="Output">
           <Select label="Format" value={fmt} onChange={setFmt} options={[{ value: "keep", label: "Keep each image's format" }, { value: "jpeg", label: "JPG" }, { value: "png", label: "PNG" }, { value: "webp", label: "WebP" }]} />
