@@ -13,7 +13,7 @@ final class NativeAccessibilityEngineTests: XCTestCase {
         let aria = NativeAccessibilityEngine.analyze(toolID: "aria-checker", input: "<button role=\"pushbutton\" aria-labelledby=\"missing\"></button>")
         XCTAssertTrue(aria.contains("aria-valid-role"))
         XCTAssertTrue(aria.contains("aria-labelledby"))
-        let keyboard = NativeAccessibilityEngine.analyze(toolID: "keyboard-navigation-checker", input: "<div tabindex=\"3\" onclick=\"go()\"></div>")
+        let keyboard = NativeAccessibilityEngine.analyze(toolID: "keyboard-navigation-checker", input: "<div tabindex=\"3\"></div><div onclick=\"go()\"></div>")
         XCTAssertTrue(keyboard.contains("tabindex"))
         XCTAssertTrue(keyboard.contains("keyboard-operable"))
     }
