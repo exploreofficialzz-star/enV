@@ -1,5 +1,7 @@
 package com.chastech.env
 
+import com.chastech.env.ui.WordSpacedText as Text
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context

@@ -5,6 +5,8 @@
 
 package com.chastech.env
 
+import com.chastech.env.ui.WordSpacedText as Text
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -66,7 +68,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults

@@ -1,5 +1,8 @@
 package com.chastech.env
 
+import com.chastech.env.ui.WordSpacedText as Text
+import com.chastech.env.ui.withSubtleWordSpacing
+
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -27,7 +30,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -350,7 +352,7 @@ private fun InformationParagraph(text: String) {
         append(text.substring(cursor))
     }
     ClickableText(
-        text = annotated,
+        text = annotated.withSubtleWordSpacing(),
         style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
         onClick = { offset ->
             annotated.getStringAnnotations("mailto", offset, offset).firstOrNull()?.let { annotation ->

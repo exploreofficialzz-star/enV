@@ -13,7 +13,7 @@ struct ContactExchangeView: View {
     var body: some View {
         Form {
             Section {
-                Text("Both people must activate Exchange. Only the fields below are shared after the native nearby session is established.")
+                enVWordSpacedText("Both people must activate Exchange. Only the fields below are shared after the native nearby session is established.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Your contact") {
@@ -28,15 +28,15 @@ struct ContactExchangeView: View {
                 Button(controller.active ? "Exchange active" : "Activate Exchange") {
                     if controller.active { controller.stop() } else { controller.start(fullName: fullName, phone: phone, email: email, company: company, jobTitle: jobTitle, website: website) }
                 }
-                if controller.active { Text("Connected participants: \(controller.connectedCount)").foregroundStyle(.secondary) }
-                if let error = controller.error { Text(error).foregroundStyle(.red) }
+                if controller.active { enVWordSpacedText("Connected participants: \(controller.connectedCount)").foregroundStyle(.secondary) }
+                if let error = controller.error { enVWordSpacedText(error).foregroundStyle(.red) }
             }
             if !controller.received.isEmpty {
                 Section("Received contacts") {
                     ForEach(controller.received) { contact in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(contact.fullName.isEmpty ? "Unnamed contact" : contact.fullName).font(.headline)
-                            ForEach([contact.phone, contact.email, contact.company, contact.jobTitle, contact.website].filter { !$0.isEmpty }, id: \.self) { Text($0).font(.subheadline) }
+                            enVWordSpacedText(contact.fullName.isEmpty ? "Unnamed contact" : contact.fullName).font(.headline)
+                            ForEach([contact.phone, contact.email, contact.company, contact.jobTitle, contact.website].filter { !$0.isEmpty }, id: \.self) { enVWordSpacedText($0).font(.subheadline) }
                             Button("Save to Contacts") {
                                 controller.save(contact) { result in if case .failure(let error) = result { saveError = error.localizedDescription } }
                             }
@@ -44,7 +44,7 @@ struct ContactExchangeView: View {
                     }
                 }
             }
-            if let saveError { Section { Text(saveError).foregroundStyle(.red) } }
+            if let saveError { Section { enVWordSpacedText(saveError).foregroundStyle(.red) } }
         }
         .navigationTitle("Instant Contact Exchange")
         .onDisappear { controller.stop() }

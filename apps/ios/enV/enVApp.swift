@@ -7,6 +7,15 @@ extension Font {
     }
 }
 
+func enVWordSpacedText(_ source: String) -> Text {
+    let attributed = NSMutableAttributedString(string: source)
+    let characters = source as NSString
+    for index in 0..<characters.length where characters.character(at: index) == 0x20 {
+        attributed.addAttribute(.kern, value: 0.25, range: NSRange(location: index, length: 1))
+    }
+    return Text(AttributedString(attributed))
+}
+
 private extension DynamicTypeSize {
     var enVIncreased: DynamicTypeSize {
         switch self {
@@ -212,7 +221,7 @@ struct EnVLogo: View {
             if let image = EnVNativeImages.logo(dark: colorScheme == .dark, homeHero: homeHero) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
-                Text("enV").font(.envScaled(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
+                enVWordSpacedText("enV").font(.envScaled(size: 24, weight: .bold)).foregroundStyle(Color.envAccent)
             }
         }
         .accessibilityHidden(true)
@@ -259,7 +268,7 @@ struct ChasTechnologiesLogo: View {
                 .scaledToFit()
                 .accessibilityLabel("chAs Technologies LLC")
         } else {
-            Text("chAs Technologies LLC")
+            enVWordSpacedText("chAs Technologies LLC")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(Color.envInk)
         }
@@ -270,7 +279,7 @@ private struct NativeLaunchView: View {
     var body: some View {
         VStack(spacing: 8) {
             EnVLogo().frame(width: 112, height: 75)
-            Text("Useful tools, ready when you are.").foregroundStyle(Color.envMuted)
+            enVWordSpacedText("Useful tools, ready when you are.").foregroundStyle(Color.envMuted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.envSurface.ignoresSafeArea())
@@ -283,7 +292,7 @@ private struct CatalogFailureView: View {
     var body: some View {
         VStack(spacing: 12) {
             EnVLogo().frame(width: 112, height: 75)
-            Text("The offline catalog couldn't be opened.").foregroundStyle(Color.envMuted)
+            enVWordSpacedText("The offline catalog couldn't be opened.").foregroundStyle(Color.envMuted)
             Button("Retry", action: retry).buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
