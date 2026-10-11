@@ -29,7 +29,7 @@ function safeName(value, fallback = "download.bin") {
 
 function runYtdlp(args, cwd, signal) {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
     const abort = () => child.kill("SIGTERM");
@@ -342,4 +342,3 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => console.log(`enV URL media processor listening on http://${HOST}:${PORT}`));
-

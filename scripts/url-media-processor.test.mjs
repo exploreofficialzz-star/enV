@@ -10,6 +10,7 @@ assert.match(source, /assertPublicHostname/);
 assert.match(source, /handleDirectDownload/);
 assert.match(source, /fetchPublic/);
 assert.match(source, /if \(provider === "generic"\)/);
+assert.match(source, /"--js-runtimes", "node"/);
 assert.match(source, /--no-playlist/);
 assert.match(source, /--max-filesize/);
 assert.match(source, /duration <=/);
@@ -22,6 +23,8 @@ assert.match(source, /from "\.\/media\/provider-registry\.mjs"/);
 assert.match(source, /from "\.\/media\/url-security\.mjs"/);
 assert.match(dockerfile, /COPY scripts\/media\/provider-registry\.mjs \.\/scripts\/media\/provider-registry\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
+assert.match(dockerfile, /yt-dlp\[default\]/);
+assert.match(dockerfile, /node --version/);
 
 for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x"]) {
   assert.match(registry, new RegExp(provider));
@@ -40,4 +43,4 @@ for (const url of [
 }
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
 
-console.log("URL media shared-engine regression: 12/12 passed");
+console.log("URL media shared-engine regressions passed");

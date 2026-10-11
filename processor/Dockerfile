@@ -8,7 +8,7 @@ ENV NODE_ENV=production \
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates \
-  && python3 -m pip install --break-system-packages --no-cache-dir yt-dlp \
+  && python3 -m pip install --break-system-packages --no-cache-dir "yt-dlp[default]" \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -24,6 +24,7 @@ COPY scripts/faster-whisper-runner.py ./scripts/faster-whisper-runner.py
 RUN node --check processor/server.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
+  && node --version \
   && ffmpeg -version >/dev/null \
   && yt-dlp --version
 
