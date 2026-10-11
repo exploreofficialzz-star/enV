@@ -209,7 +209,12 @@ export async function scanMarkupWithAxe(markup: string): Promise<string> {
     else source = source.replace(/<html\b[^>]*>/i, (opening) => `${opening}<head>${csp}<title>Accessibility snippet test</title></head>`);
   }
   const runner = `window.addEventListener('load',async()=>{try{const r=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice']},resultTypes:['violations','incomplete','passes']});const pick=a=>a.map(x=>({id:x.id,impact:x.impact,help:x.help,helpUrl:x.helpUrl,tags:x.tags,nodes:x.nodes.map(n=>({target:n.target,html:n.html}))}));parent.postMessage({nonce:${JSON.stringify(nonce)},results:{violations:pick(r.violations),incomplete:pick(r.incomplete),passes:pick(r.passes)}},'*')}catch(e){parent.postMessage({nonce:${JSON.stringify(nonce)},error:String(e&&e.message||e)},'*')}})`;
-  const scannerScripts = `<script nonce="${nonce}">${axe.source.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
+  const axeSource = axe.source.replace(
+    "if (typeof window.getComputedStyle === 'function') {\n    window.axe = axe;\n  }",
+    "window.axe = axe;",
+  );
+  if (axeSource === axe.source) return "axe-core scan failed: bundled axe global bootstrap did not match the expected version.";
+  const scannerScripts = `<script nonce="${nonce}">${axeSource.replace(/<\/script/gi, "<\\/script")}</script><script nonce="${nonce}">${runner}</script>`;
   if (/<\/body\s*>/i.test(source)) source = source.replace(/<\/body\s*>/i, `${scannerScripts}</body>`);
   else if (/<\/html\s*>/i.test(source)) source = source.replace(/<\/html\s*>/i, `${scannerScripts}</html>`);
   else source += scannerScripts;
