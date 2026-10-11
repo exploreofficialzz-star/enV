@@ -1105,12 +1105,12 @@ enum NativeBackendEngine {
             for key in ["error", "message"] {
                 if let message = payload[key] as? String {
                     let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty { return trimmed }
+                    if !trimmed.isEmpty && !trimmed.hasPrefix("<") { return String(trimmed.prefix(1200)) }
                 }
             }
         } else if let raw = String(data: data, encoding: .utf8) {
             let plain = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !plain.isEmpty && !["true", "false", "null"].contains(plain.lowercased()) { return plain }
+            if !plain.isEmpty && !plain.hasPrefix("<") && plain.count <= 1200 && !["true", "false", "null"].contains(plain.lowercased()) { return plain }
         }
         return documentResponse ? "Document service returned HTTP \(statusCode)." : "Backend request failed (\(statusCode))."
     }

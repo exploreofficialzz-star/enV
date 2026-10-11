@@ -91,10 +91,24 @@ export function isMediaProvider(value: unknown): value is MediaProvider {
 }
 
 export function mediaErrorMessage(payload: unknown, status: number, service = "URL media service"): string {
+  if (typeof payload === "string") {
+    const raw = payload.trim();
+    if (raw && !["true", "false", "null"].includes(raw.toLowerCase()) && !/^<!doctype html|^<html\b/i.test(raw)) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") payload = parsed;
+        else return `${service} returned HTTP ${status}.`;
+      } catch {
+        return raw.slice(0, 1200);
+      }
+    } else {
+      return `${service} returned HTTP ${status}.`;
+    }
+  }
   if (payload && typeof payload === "object") {
     const body = payload as { error?: unknown; message?: unknown };
     for (const value of [body.error, body.message]) {
-      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "string" && value.trim() && !/^<!doctype html|^<html\b/i.test(value.trim())) return value.trim().slice(0, 1200);
     }
   }
   return `${service} returned HTTP ${status}.`;

@@ -31,7 +31,9 @@ export async function downloadUrlMedia(
     signal,
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => null) as unknown;
+    const raw = await response.text().catch(() => "");
+    let payload: unknown = raw;
+    try { payload = JSON.parse(raw); } catch {}
     throw new Error(mediaErrorMessage(payload, response.status));
   }
   const totalHeader = response.headers.get("content-length");
@@ -95,7 +97,10 @@ export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, 
     body: JSON.stringify({ url, provider }),
     signal,
   });
-  const payload = await response.json().catch(() => null) as UrlMediaInfo & { error?: string } | null;
+  const raw = await response.text().catch(() => "");
+  let payload: unknown = raw;
+  try { payload = JSON.parse(raw); } catch {}
   if (!response.ok) throw new Error(mediaErrorMessage(payload, response.status));
+  if (!payload || typeof payload !== "object") throw new Error("URL media service returned an invalid metadata response.");
   return payload as UrlMediaInfo;
 }

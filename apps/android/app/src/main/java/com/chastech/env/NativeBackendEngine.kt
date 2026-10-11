@@ -72,10 +72,10 @@ object NativeBackendEngine {
     internal fun backendErrorMessage(body:String,statusCode:Int,documentResponse:Boolean=false):String {
         val payload=runCatching{JSONObject(body)}.getOrNull()
         val message=sequenceOf(payload?.opt("error"),payload?.opt("message"))
-            .filterIsInstance<String>().map{it.trim()}.firstOrNull{it.isNotEmpty()}
+            .filterIsInstance<String>().map{it.trim()}.firstOrNull{it.isNotEmpty()&&!it.startsWith("<")}
         if(message!=null)return message
         val plain=body.trim()
-        if(payload==null&&plain.isNotEmpty()&&!plain.equals("true",true)&&!plain.equals("false",true)&&!plain.equals("null",true))return plain
+        if(payload==null&&plain.isNotEmpty()&&!plain.startsWith("<")&&plain.length<=1200&&!plain.equals("true",true)&&!plain.equals("false",true)&&!plain.equals("null",true))return plain
         return if(documentResponse)"Document service returned HTTP $statusCode." else "Backend request failed ($statusCode)."
     }
     private fun postJson(path:String,body:JSONObject):Result=request(path,body.toString().toByteArray(StandardCharsets.UTF_8),"application/json")
