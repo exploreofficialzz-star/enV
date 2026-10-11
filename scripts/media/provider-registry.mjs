@@ -1,6 +1,8 @@
+import path from "node:path";
+
 export const PROVIDERS = {
   youtube: ["youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com", "youtube-nocookie.com"],
-  tiktok: ["tiktok.com", "m.tiktok.com", "vm.tiktok.com"],
+  tiktok: ["tiktok.com", "m.tiktok.com", "vm.tiktok.com", "vt.tiktok.com"],
   facebook: ["facebook.com", "m.facebook.com", "fb.watch"],
   instagram: ["instagram.com"],
   x: ["x.com", "twitter.com"],
@@ -38,4 +40,12 @@ export function createProviderAdapter(provider, format, audioOnly) {
 
 export function supportsProvider(provider) {
   return provider === "generic" || Object.prototype.hasOwnProperty.call(PROVIDERS, provider);
+}
+
+export function createProviderRequestArgs(provider, env = process.env) {
+  if (!provider || provider === "generic") return [];
+  const cookieFile = env[`URL_MEDIA_${provider.toUpperCase()}_COOKIES_FILE`]?.trim();
+  const args = cookieFile ? ["--cookies", path.resolve(cookieFile)] : [];
+  if (provider === "tiktok") args.push("--impersonate", "chrome");
+  return args;
 }

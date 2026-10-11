@@ -5,7 +5,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { PROVIDERS, detectProvider, createProviderAdapter } from "./media/provider-registry.mjs";
+import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 
@@ -29,9 +29,9 @@ function safeName(value, fallback = "download.bin") {
   return base || fallback;
 }
 
-function runYtdlp(args, cwd, signal) {
+function runYtdlp(args, cwd, signal, provider) {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
@@ -52,7 +52,16 @@ function runYtdlp(args, cwd, signal) {
       clearTimeout(timer); signal?.removeEventListener("abort", abort);
       if (signal?.aborted) return reject(new Error("Download cancelled."));
       if (stdoutExceeded) return reject(new Error("PROVIDER_ERROR: The media provider returned too much metadata."));
-      if (code !== 0) return reject(new Error(`Media downloader failed (code ${code}). ${stderr.trim().slice(-1200)}`));
+      if (code !== 0) {
+        const detail = stderr.trim().slice(-1200);
+        if (/sign in to confirm|login required|authentication required|please log in/i.test(detail)) {
+          return reject(new Error(`AUTH_REQUIRED: ${provider || "The provider"} requires sign-in or is challenging the processor's anonymous request. Use content accessible to the processor or configure a provider cookie file on the processor.`));
+        }
+        if (/unexpected response from webpage request|ip address is blocked|captcha|too many requests/i.test(detail)) {
+          return reject(new Error(`SOURCE_UNAVAILABLE: ${provider || "The provider"} is challenging or blocking the processor request. Confirm the post is publicly available in the service region, then retry later.`));
+        }
+        return reject(new Error(`Media downloader failed (code ${code}). ${detail}`));
+      }
       resolve({ stdout, stderr });
     });
   });
@@ -81,7 +90,9 @@ async function verifyDownloadedMedia(file, expectedMaxBytes, signal) {
   const stat = await fs.stat(file);
   if (!stat.isFile() || stat.size <= 0) throw new Error("OUTPUT_VERIFICATION_FAILED: The downloaded result is empty.");
   if (stat.size > expectedMaxBytes) throw new Error("FILE_TOO_LARGE: The downloaded result exceeds the configured limit.");
-  await runFfprobe(file, signal);
+  const probe = await runFfprobe(file, signal);
+  const duration = Number(probe?.format?.duration);
+  if (Number.isFinite(duration) && duration > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: The downloaded media exceeds the configured duration limit.");
   return stat;
 }
 
@@ -254,9 +265,9 @@ async function handleInfo(req, res) {
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-url-info-"));
   try {
     const args = ["--dump-single-json", "--skip-download", "--no-warnings", url.toString()];
-    const { stdout } = await runYtdlp(args, jobDir, controller.signal);
+    const { stdout } = await runYtdlp(args, jobDir, controller.signal, provider);
     const metadata = parseYtDlpJson(stdout);
-    if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("Media exceeds the configured duration limit.");
+    if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: Media exceeds the configured duration limit.");
 
     const rawFormats = Array.isArray(metadata.formats) ? metadata.formats : [];
     const formats = rawFormats.map((format) => ({
@@ -312,8 +323,8 @@ async function handleDownload(req, res) {
   try {
     const outputTemplate = path.join(jobDir, `${randomUUID()}-%(title).120s.%(ext)s`);
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
-    const args = ["--max-filesize", `${MAX_OUTPUT_BYTES}`, "--match-filter", `duration <= ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
-    await runYtdlp(args, jobDir, controller.signal);
+    const args = ["--max-filesize", `${MAX_OUTPUT_BYTES}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
+    await runYtdlp(args, jobDir, controller.signal, provider);
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
     for (const entry of entries) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { detectProvider } from "./media/provider-registry.mjs";
+import { detectProvider, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 
@@ -19,7 +19,9 @@ assert.match(source, /MAX_YTDLP_STDOUT_CHARS/);
 assert.doesNotMatch(source, /stdout = stdout\.slice\(-12000\)/);
 assert.match(source, /--no-playlist/);
 assert.match(source, /--max-filesize/);
-assert.match(source, /duration <=/);
+assert.match(source, /duration <=\?/);
+assert.match(source, /verifyDownloadedMedia/);
+assert.match(registry, /URL_MEDIA_\$\{provider\.toUpperCase\(\)\}_COOKIES_FILE/);
 assert.match(source, /errorPayload/);
 assert.match(source, /content-range/);
 assert.match(source, /FFPROBE_BIN/);
@@ -29,7 +31,7 @@ assert.match(source, /from "\.\/media\/provider-registry\.mjs"/);
 assert.match(source, /from "\.\/media\/url-security\.mjs"/);
 assert.match(dockerfile, /COPY scripts\/media\/provider-registry\.mjs \.\/scripts\/media\/provider-registry\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
-assert.match(dockerfile, /yt-dlp\[default\]/);
+assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
 assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);
@@ -56,6 +58,10 @@ for (const url of [
 ]) {
   assert.equal(detectProvider(new URL(url)), "youtube", `${url} should be detected as YouTube`);
 }
+assert.equal(detectProvider(new URL("https://vt.tiktok.com/ZSydNwHA1/")), "tiktok");
+assert.deepEqual(createProviderRequestArgs("generic", {}), []);
+assert.deepEqual(createProviderRequestArgs("tiktok", {}), ["--impersonate", "chrome"]);
+assert.deepEqual(createProviderRequestArgs("youtube", { URL_MEDIA_YOUTUBE_COOKIES_FILE: "/etc/secrets/youtube.txt" }), ["--cookies", "/etc/secrets/youtube.txt"]);
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
 assert.deepEqual(parseYtDlpJson('{"title":"clean"}'), { title: "clean" });
 assert.deepEqual(parseYtDlpJson('WARNING: extractor note\n{"title":"after warning"}\nfinished'), { title: "after warning" });

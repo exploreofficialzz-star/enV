@@ -26,6 +26,12 @@ The Vercel gateway sends `X-Processor-Key` to Render. The current gateway route 
 
 `TRANSCRIBE_URL` is intentionally not set in the first deployment. Whisper models are large and Render Free has only 512MB RAM. Transcription can be enabled later with a separately sized service and model configuration.
 
+## Provider access
+
+The processor installs `yt-dlp[default,curl-cffi]` and uses Chrome request impersonation for TikTok. Instagram, TikTok, or YouTube may still require a logged-in session or block requests from the processor's network. These provider restrictions cannot be fixed by changing the web, Android, or iOS client.
+
+If the service owner chooses to enable authenticated extraction, mount a provider-specific Netscape-format cookies file as a Render Secret File and set the matching server-only variable to its path: `URL_MEDIA_YOUTUBE_COOKIES_FILE`, `URL_MEDIA_INSTAGRAM_COOKIES_FILE`, or `URL_MEDIA_TIKTOK_COOKIES_FILE`. Do not put cookie contents in source control, `VITE_` variables, client requests, or chat. Cookies grant account access; use only an account you control and be aware the platform may revoke or restrict it. Leaving these variables unset keeps requests anonymous.
+
 ## Routes
 
 - `GET /health`
