@@ -209,7 +209,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /pt-1/);
   assert.match(home, /sm:pt-1/);
   assert.match(home, /className="mt-4 max-w-3xl sm:mt-5"/);
-  assert.match(home, /containerClassName="flex h-16 w-full items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4/);
+  assert.match(home, /containerClassName="flex h-16 w-full items-center gap-3 rounded-\[24px\] border border-border-strong bg-surface px-4/);
   assert.match(home, /sm:h-\[72px\] sm:gap-4 sm:px-5/);
   assert.match(home, /inputClassName="[^\"]*text-center/);
   assert.doesNotMatch(home, /pl-\[76px\]/);

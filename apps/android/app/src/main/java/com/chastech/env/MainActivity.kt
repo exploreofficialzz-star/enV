@@ -334,6 +334,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         val byId = (catalog.tools + catalog.relatedReferenceTools).associateBy { it.id }
         mostUsedIds.mapNotNull { byId[it] }.take(10)
     }
+    val homeSurface2 = if (darkMode) Color(0xFF1E2327) else Color(0xFFEFECE6)
     val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
     var homeSearchFocused by remember { mutableStateOf(false) }
     val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
@@ -344,7 +345,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,
@@ -387,11 +388,11 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
                     Row(Modifier.width(previewWidth), horizontalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 12.dp else 8.dp)) {
-                        HomePreviewBar("AI assistant", Modifier.weight(1f), isLarge = screenWidth >= 640, onClick = onAssistant)
-                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640)
+                        HomePreviewBar("AI assistant", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = onAssistant)
+                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2)
                     }
                 }
-                MostUsedToolsTray(mostUsed, onTool, Modifier.fillMaxWidth())
+                MostUsedToolsTray(mostUsed, onTool, homeSurface2, Modifier.fillMaxWidth())
                 Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
@@ -417,7 +418,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
 }
 
 @Composable
-private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit, iconBackgroundColor: Color, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(28.dp)
     Surface(
         modifier = modifier.height(112.dp),
@@ -427,9 +428,9 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
         shadowElevation = 1.dp,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val visibleCount = if (maxWidth >= 720.dp) 10 else 5
+            val visibleCount = if (maxWidth >= 768.dp) 10 else 5
             val cellWidth = (maxWidth - 24.dp - 12.dp * (visibleCount - 1).toFloat()) / visibleCount.toFloat()
-            val iconSize = (cellWidth * 0.78f).coerceIn(36.dp, 48.dp)
+            val iconSize = if (maxWidth >= 768.dp) 44.dp else 40.dp
             if (tools.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(
@@ -451,9 +452,9 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                             modifier = Modifier.width(cellWidth).clickable { onTool(tool.id) },
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Surface(Modifier.size(iconSize), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Surface(Modifier.size(iconSize), shape = CircleShape, color = iconBackgroundColor) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    EnVIcon(tool.icon, Modifier.size(iconSize * 0.5f), tint = MaterialTheme.colorScheme.onSurface)
+                                    EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                             Text(
@@ -1622,11 +1623,11 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
 }
 
 @Composable
-private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, onClick: (() -> Unit)? = null) {
+private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, containerColor: Color, onClick: (() -> Unit)? = null) {
     Surface(
         modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI assistant" },
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        color = containerColor,
+        shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Box(Modifier.fillMaxSize().padding(horizontal = if (isLarge) 16.dp else 8.dp), contentAlignment = Alignment.Center) {

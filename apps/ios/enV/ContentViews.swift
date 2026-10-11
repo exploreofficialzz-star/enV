@@ -61,8 +61,8 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, horizontalSizeClass == .regular ? 20 : 16)
                         .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 72 : 64, maxHeight: horizontalSizeClass == .regular ? 72 : 64, alignment: .leading)
-                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 24))
+                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(isHomeSearchFocused ? Color.envAccent : Color.envBorderStrong, lineWidth: 1))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         if hasSearchText {
                             VStack(alignment: .leading, spacing: 10) {
@@ -353,9 +353,9 @@ private struct HomeMostUsedToolsTray: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let visibleCount = proxy.size.width >= 720 ? 10 : 5
+            let visibleCount = proxy.size.width >= 768 ? 10 : 5
             let cellWidth = (proxy.size.width - 24 - 12 * CGFloat(visibleCount - 1)) / CGFloat(visibleCount)
-            let iconSide = min(max(cellWidth * 0.78, 36), 48)
+            let iconSide = proxy.size.width >= 768 ? 44.0 : 40.0
             Group {
                 if tools.isEmpty {
                     enVCharacterSpacedText("Open tools to build your personal shortcuts.")
@@ -370,7 +370,7 @@ private struct HomeMostUsedToolsTray: View {
                             ForEach(tools) { tool in
                                 Button { onSelect(tool) } label: {
                                     VStack(spacing: 6) {
-                                        EnVIcon(name: tool.icon, size: iconSide * 0.5, tint: .envInk)
+                                        EnVIcon(name: tool.icon, size: 20, tint: .envInk)
                                             .frame(width: iconSide, height: iconSide)
                                             .background(Color.envSurface2, in: Circle())
                                         enVCharacterSpacedText(tool.name)
@@ -939,8 +939,8 @@ private struct HomePreviewBar: View {
             .multilineTextAlignment(.center)
             .padding(.horizontal, isWide ? 16 : 8)
             .frame(height: 40)
-            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorderStrong, lineWidth: 1))
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorderStrong, lineWidth: 1))
     }
 }
 

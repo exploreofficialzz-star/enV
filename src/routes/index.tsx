@@ -47,7 +47,7 @@ function Home() {
           placeholder="Search for a tool"
           leading={<Logo size="search" className="shrink-0" />}
           className="mt-4 max-w-3xl sm:mt-5"
-          containerClassName="flex h-16 w-full items-center gap-3 rounded-2xl border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:h-[72px] sm:gap-4 sm:px-5"
+          containerClassName="flex h-16 w-full items-center gap-3 rounded-[24px] border border-border-strong bg-surface px-4 shadow-[var(--shadow-border)] transition focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/10 sm:h-[72px] sm:gap-4 sm:px-5"
           inputClassName="min-w-0 flex-1 bg-transparent text-center text-base text-fg outline-none placeholder:text-subtle sm:text-lg"
           trailing={(
             <button
@@ -61,8 +61,8 @@ function Home() {
           )}
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
-          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
-          <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
+          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-2xl border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
+          <div className="flex h-10 min-w-0 items-center justify-center rounded-2xl border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
         </div>
         <MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
