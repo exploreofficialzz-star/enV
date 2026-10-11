@@ -345,7 +345,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 Surface(
                     modifier = Modifier.fillMaxWidth().height(if (screenWidth >= 640) 72.dp else 64.dp).onFocusChanged { homeSearchFocused = it.isFocused },
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, if (homeSearchFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     shadowElevation = 1.dp,

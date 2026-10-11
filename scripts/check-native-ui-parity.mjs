@@ -96,9 +96,10 @@ const iosHome = iosContent.split("struct HomeView: View")[1]?.split("private str
 const iosMostUsed = iosContent.split("private struct HomeMostUsedToolsTray: View")[1]?.split("private struct")[0] ?? "";
 const iosPreview = iosContent.split("private struct HomePreviewBar: View")[1]?.split("func iconTile")[0] ?? "";
 const iosFooter = iosContent.split("private struct WebHomeFooter: View")[1]?.split("private struct ToolCategoryGroup")[0] ?? "";
-assert.match(androidHome, /shape = RoundedCornerShape\(24\.dp\)/, "Android hero search should use the stronger 24dp rounded treatment");
-assert.match(iosHome, /RoundedRectangle\(cornerRadius: 24\)/, "iOS hero search should use the same 24pt rounded treatment");
-assert.match(webHome, /rounded-\[24px\]/, "Web hero search should use the same 24px rounded treatment");
+assert.match(androidHome, /shape = RoundedCornerShape\(percent = 50\)/, "Android hero search should use a responsive capsule treatment");
+assert.match(iosHome, /\.background\(Color\.envCard, in: Capsule\(\)\)/, "iOS hero search should use a native capsule treatment");
+assert.match(iosHome, /\.overlay\(Capsule\(\)\.stroke\(/, "iOS focused and resting search borders should follow the capsule shape");
+assert.match(webHome, /rounded-full/, "Web hero search should use a pill-shaped rounded treatment");
 assert.match(android, /val previewWidth = minOf\(maxWidth \* 0\.84f, 640\.dp\)/);
 assert.match(androidPreview, /RoundedCornerShape\(16\.dp\)/);
 assert.match(androidPreview, /color = containerColor/);
