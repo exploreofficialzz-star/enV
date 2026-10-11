@@ -16,6 +16,8 @@ WORKDIR /app
 COPY processor/server.mjs ./processor/server.mjs
 COPY scripts/media-processor.mjs ./scripts/media-processor.mjs
 COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
+COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
+COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
 COPY scripts/transcription-processor.mjs ./scripts/transcription-processor.mjs
 COPY scripts/faster-whisper-runner.py ./scripts/faster-whisper-runner.py
 
