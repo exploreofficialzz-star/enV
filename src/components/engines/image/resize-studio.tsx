@@ -111,12 +111,12 @@ function Workspace({ source, toolId, upscale }: { source: SourceImage; toolId: s
               <div className="grid grid-cols-2 gap-3"><Num label="Width" value={v.w} onChange={(x) => setDim("w", x)} min={0.001} max={1e6} suffix={v.unit} /><Num label="Height" value={v.h} onChange={(x) => setDim("h", x)} min={0.001} max={1e6} suffix={v.unit} /></div>
               <Toggle label="Lock aspect ratio" checked={v.lock} onChange={(lock) => st.set({ lock })} hint={`Original ratio ${source.width}:${source.height}`} />
               {v.unit === "in" || v.unit === "cm" || v.unit === "mm" ? <Num label="DPI / PPI" value={v.dpi} onChange={(dpi) => st.set({ dpi }, "dpi")} min={1} max={4800} hint={source.meta.density ? `Read from the file: ${source.meta.density.x} DPI.` : "The file has no density; 96 is a screen default — print usually uses 300."} /> : null}
-              {!upscale ? <div className="space-y-1.5"><span className="text-[15.7px] font-medium text-fg">Common sizes</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => { const p = PRESETS.find((x) => x.id === id)!; st.set({ unit: "px", w: p.w, h: p.h, lock: false }); }} /></div> : null}
+              {!upscale ? <div className="space-y-1.5"><span className="text-[15.2px] font-medium text-fg">Common sizes</span><Chips items={PRESETS.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => { const p = PRESETS.find((x) => x.id === id)!; st.set({ unit: "px", w: p.w, h: p.h, lock: false }); }} /></div> : null}
             </>
           )}
           {v.mode === "fit" || v.mode === "fill" ? (
             <>
-              <div className="space-y-1.5"><span className="text-[15.7px] font-medium text-fg">Anchor</span><div className="grid w-28 grid-cols-3 gap-1">{ANCHORS.map((a) => <button key={a} type="button" aria-label={`Anchor ${a}`} aria-pressed={v.anchor === a} onClick={() => st.set({ anchor: a })} className={`size-8 rounded-sm ${v.anchor === a ? "bg-accent" : "bg-surface-2 hover:bg-border"}`} />)}</div></div>
+              <div className="space-y-1.5"><span className="text-[15.2px] font-medium text-fg">Anchor</span><div className="grid w-28 grid-cols-3 gap-1">{ANCHORS.map((a) => <button key={a} type="button" aria-label={`Anchor ${a}`} aria-pressed={v.anchor === a} onClick={() => st.set({ anchor: a })} className={`size-8 rounded-sm ${v.anchor === a ? "bg-accent" : "bg-surface-2 hover:bg-border"}`} />)}</div></div>
               {v.mode === "fill" ? <Slider label="Zoom" value={v.zoom} onChange={(zoom) => st.set({ zoom: clamp(zoom, 1, 8) }, "zoom")} min={1} max={8} step={0.05} def={1} unit="×" /> : <ColorField label="Empty space" value={v.bg} onChange={(bg) => st.set({ bg }, "bg")} allowTransparent />}
             </>
           ) : null}

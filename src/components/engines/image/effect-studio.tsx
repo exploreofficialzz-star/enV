@@ -72,7 +72,7 @@ function Workspace({ source, spec, toolId }: { source: SourceImage; spec: Effect
         <p className="text-sm text-muted">{spec.intro}</p>
         <HistoryBar canUndo={settings.canUndo} canRedo={settings.canRedo} onUndo={settings.undo} onRedo={settings.redo} onReset={() => settings.reset()} dirty={dirty} />
         {spec.presets?.length || spec.auto ? (
-          <div className="space-y-2"><span className="text-[15.7px] font-medium text-fg">Quick starts</span>
+          <div className="space-y-2"><span className="text-[15.2px] font-medium text-fg">Quick starts</span>
             <div className="flex flex-wrap gap-1.5">
               {spec.auto ? <button type="button" className="min-h-8 rounded-full bg-accent px-3 text-xs font-medium text-accent-fg" onClick={() => set(spec.auto!(proxy.canvas))}>{spec.autoLabel ?? "Auto"}</button> : null}
               <Chips items={(spec.presets ?? []).map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => { const p = spec.presets!.find((x) => x.id === id)!; set({ ...defaultsOf(spec), ...p.values }); }} />

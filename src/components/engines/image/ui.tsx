@@ -10,7 +10,7 @@ export function Row({ label, hint, children, right }: { label: string; hint?: st
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[15.7px] font-medium text-fg">{label}</span>
+        <span className="text-[15.2px] font-medium text-fg">{label}</span>
         {right}
       </div>
       {children}
@@ -56,7 +56,7 @@ export function Seg<T extends string | number>({ label, value, onChange, options
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1 rounded-md bg-surface-2 p-1">
       {options.map((o) => (
         <button key={String(o.value)} type="button" role="radio" aria-checked={o.value === value} title={o.title} onClick={() => onChange(o.value)}
-          className={cn("min-h-8 flex-1 whitespace-nowrap rounded-sm px-2.5 text-[15.7px] font-medium transition-colors", o.value === value ? "bg-surface text-fg shadow-[var(--shadow-border)]" : "text-muted hover:text-fg")}>{o.label}</button>
+          className={cn("min-h-8 flex-1 whitespace-nowrap rounded-sm px-2.5 text-[15.2px] font-medium transition-colors", o.value === value ? "bg-surface text-fg shadow-[var(--shadow-border)]" : "text-muted hover:text-fg")}>{o.label}</button>
       ))}
     </div>
   );
@@ -77,7 +77,7 @@ export function Toggle({ label, checked, onChange, hint }: { label: string; chec
   return (
     <label className="flex cursor-pointer items-start gap-3 py-1">
       <input type="checkbox" className="mt-0.5 size-4 accent-[var(--color-accent)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span><span className="text-[15.7px] font-medium text-fg">{label}</span>{hint ? <span className="block text-xs text-muted">{hint}</span> : null}</span>
+      <span><span className="text-[15.2px] font-medium text-fg">{label}</span>{hint ? <span className="block text-xs text-muted">{hint}</span> : null}</span>
     </label>
   );
 }
@@ -109,7 +109,7 @@ export function Section({ title, children, defaultOpen = true, badge }: { title:
 export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "ok" | "warn" | "danger" }) {
   return (
     <div className="rounded-md bg-surface-2 px-3 py-2">
-      <div className="text-[13.3px] uppercase tracking-wide text-muted">{label}</div>
+      <div className="text-[12.9px] uppercase tracking-wide text-muted">{label}</div>
       <div className={cn("text-sm font-semibold tabular-nums text-fg", tone === "ok" && "text-ok", tone === "warn" && "text-warn", tone === "danger" && "text-danger")}>{value}</div>
     </div>
   );
@@ -117,7 +117,7 @@ export function Stat({ label, value, tone }: { label: string; value: ReactNode; 
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "danger" | "ok"; children: ReactNode }) {
   const toneClass = { info: "bg-accent-soft text-fg", warn: "bg-warn/10 text-fg", danger: "bg-danger/10 text-danger", ok: "bg-ok/10 text-fg" }[tone];
-  return <p role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md px-3 py-2 text-[15.7px] leading-relaxed", toneClass)}>{children}</p>;
+  return <p role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md px-3 py-2 text-[15.2px] leading-relaxed", toneClass)}>{children}</p>;
 }
 
 export function Chips({ items, onPick, active }: { items: { id: string; label: string }[]; onPick: (id: string) => void; active?: string }) {

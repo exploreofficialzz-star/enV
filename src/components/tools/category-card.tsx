@@ -23,7 +23,7 @@ export function CategoryCard({
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-fg">{category.name}</span>
         <span className="mt-0.5 block text-xs text-muted">{category.blurb}</span>
-        <span className="mt-2 block text-[13.3px] font-medium uppercase tracking-wide text-subtle">
+        <span className="mt-2 block text-[12.9px] font-medium uppercase tracking-wide text-subtle">
           {count} tools
         </span>
       </span>

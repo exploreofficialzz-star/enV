@@ -68,13 +68,13 @@ export function MockupEngine({ variant }: { variant: string }) {
         <div className="overflow-hidden rounded-[28px] shadow-[var(--shadow-border)]" style={{ background: theme.bg }}>
           <div className="px-4 py-3 text-sm font-medium" style={{ background: theme.header, color: "#fff" }}>
             {vals.them || theme.name}
-            <span className="mt-0.5 block text-[12.1px] tracking-wide uppercase opacity-80">Demo mockup</span>
+            <span className="mt-0.5 block text-[11.7px] tracking-wide uppercase opacity-80">Demo mockup</span>
           </div>
           <div className="flex min-h-80 flex-col gap-2 p-3">
             {lines.map((l, i) => (
               <div key={i} className={l.me ? "self-end max-w-[80%]" : "self-start max-w-[80%]"}>
                 <p
-                  className="px-3 py-2 text-[15.7px] leading-5"
+                  className="px-3 py-2 text-[15.2px] leading-5"
                   style={{
                     background: l.me ? theme.bubbleMe : theme.bubbleThem,
                     color: l.me ? theme.meFg : theme.themFg,
@@ -119,7 +119,7 @@ export function PostEngine({ variant }: { variant: string }) {
         onChange={(n, v) => (n === "name" ? setName(v) : setBody(v))}
       />
       <article className="mx-auto max-w-md rounded-xl bg-surface p-4 shadow-[var(--shadow-border)]">
-        <p className="text-[12.1px] font-medium uppercase tracking-wide text-subtle">{meta.platform} mockup</p>
+        <p className="text-[11.7px] font-medium uppercase tracking-wide text-subtle">{meta.platform} mockup</p>
         <p className="mt-2 text-sm font-semibold">
           {name} <span className="font-normal text-muted">{meta.handle}</span>
         </p>

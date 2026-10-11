@@ -55,7 +55,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
       <div className="space-y-4">
         <p className="text-sm text-muted">{TITLES[op] ?? (parsed ? `${PLATFORMS[parsed.platform].name} image compressor` : "Shrink the file while checking the quality yourself.")}</p>
         <HistoryBar canUndo={st.canUndo} canRedo={st.canRedo} onUndo={st.undo} onRedo={st.redo} onReset={() => st.reset()} dirty={dirty} />
-        {!locked ? <div className="space-y-1.5"><span className="text-[15.7px] font-medium text-fg">Quick starts</span><Chips items={presets.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => presets.find((p) => p.id === id)!.apply()} /></div> : null}
+        {!locked ? <div className="space-y-1.5"><span className="text-[15.2px] font-medium text-fg">Quick starts</span><Chips items={presets.map((p) => ({ id: p.id, label: p.label }))} onPick={(id) => presets.find((p) => p.id === id)!.apply()} /></div> : null}
         <Section title="Dimensions">
           <Seg label="Resize" value={v.resize} onChange={(resize) => st.set({ resize })} options={[{ value: "original", label: "Keep" }, { value: "max", label: "Max side" }, { value: "percent", label: "Percent" }]} />
           {v.resize === "max" ? <><Chips items={[3840, 2560, 1920, 1280, 800].map((n) => ({ id: String(n), label: `${n}px` }))} onPick={(id) => st.set({ max: Number(id) })} active={String(v.max)} /><Num label="Longest side" value={v.max} onChange={(max) => st.set({ max }, "max")} min={16} max={30000} suffix="px" hint="Only shrinks — smaller images are never enlarged." /></> : null}
@@ -65,7 +65,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
           <Toggle label="Fit under a file size" checked={v.useTarget} onChange={(useTarget) => st.set({ useTarget })} hint="The best quality that stays under the limit is found by encoding several times." />
           {v.useTarget ? (
             <>
-              {caps.length ? <div className="space-y-1.5"><span className="text-[15.7px] font-medium text-fg">{PLATFORMS[parsed!.platform].name} limits</span><Chips items={caps.map((c, i) => ({ id: String(i), label: `${c.label.replace(" — limit", "").replace(" — recommended under", " (rec.)")} · ${formatBytes(c.bytes)}` }))} onPick={(id) => st.set({ targetText: String(Math.floor(caps[Number(id)].bytes / 1024)) })} /></div> : null}
+              {caps.length ? <div className="space-y-1.5"><span className="text-[15.2px] font-medium text-fg">{PLATFORMS[parsed!.platform].name} limits</span><Chips items={caps.map((c, i) => ({ id: String(i), label: `${c.label.replace(" — limit", "").replace(" — recommended under", " (rec.)")} · ${formatBytes(c.bytes)}` }))} onPick={(id) => st.set({ targetText: String(Math.floor(caps[Number(id)].bytes / 1024)) })} /></div> : null}
               <Num label="Target size (KB — or type 2 MB)" value={Number(v.targetText) || 0} onChange={(n) => st.set({ targetText: String(n) }, "target")} min={1} max={500000} suffix="KB" />
               <Toggle label="Allow reducing dimensions" checked={v.allowDownscale} onChange={(allowDownscale) => st.set({ allowDownscale })} hint="If even the lowest quality is too big, the image is scaled down just enough." />
               <Slider label="Never go below quality" value={v.minQuality} onChange={(minQuality) => st.set({ minQuality }, "minq")} min={5} max={90} unit="%" def={30} />
