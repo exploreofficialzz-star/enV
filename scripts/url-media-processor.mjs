@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { PROVIDERS, detectProvider, createProviderAdapter } from "./media/provider-registry.mjs";
 import { assertPublicHostname } from "./media/url-security.mjs";
+import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -16,6 +17,7 @@ const ALLOWED_ORIGIN = process.env.URL_MEDIA_ALLOWED_ORIGIN || "*";
 const MAX_OUTPUT_BYTES = Number(process.env.URL_MEDIA_MAX_OUTPUT_BYTES || 500 * 1024 * 1024);
 const MAX_DURATION_SECONDS = Number(process.env.URL_MEDIA_MAX_DURATION_SECONDS || 2 * 60 * 60);
 const DOWNLOAD_TIMEOUT_MS = Number(process.env.URL_MEDIA_TIMEOUT_MS || 10 * 60 * 1000);
+const MAX_YTDLP_STDOUT_CHARS = Number(process.env.URL_MEDIA_MAX_YTDLP_STDOUT_CHARS || 8 * 1024 * 1024);
 
 function json(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" });
@@ -31,15 +33,25 @@ function runYtdlp(args, cwd, signal) {
   return new Promise((resolve, reject) => {
     const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
+    let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
     const abort = () => child.kill("SIGTERM");
     signal?.addEventListener("abort", abort, { once: true });
-    child.stdout.on("data", (c) => { stdout += c.toString(); if (stdout.length > 12000) stdout = stdout.slice(-12000); });
+    child.stdout.on("data", (c) => {
+      const chunk = c.toString();
+      if (stdout.length + chunk.length > MAX_YTDLP_STDOUT_CHARS) {
+        stdoutExceeded = true;
+        child.kill("SIGTERM");
+        return;
+      }
+      stdout += chunk;
+    });
     child.stderr.on("data", (c) => { stderr += c.toString(); if (stderr.length > 12000) stderr = stderr.slice(-12000); });
     child.on("error", (error) => { clearTimeout(timer); signal?.removeEventListener("abort", abort); reject(error); });
     child.on("close", (code) => {
       clearTimeout(timer); signal?.removeEventListener("abort", abort);
       if (signal?.aborted) return reject(new Error("Download cancelled."));
+      if (stdoutExceeded) return reject(new Error("PROVIDER_ERROR: The media provider returned too much metadata."));
       if (code !== 0) return reject(new Error(`Media downloader failed (code ${code}). ${stderr.trim().slice(-1200)}`));
       resolve({ stdout, stderr });
     });
@@ -243,9 +255,7 @@ async function handleInfo(req, res) {
   try {
     const args = ["--dump-single-json", "--skip-download", "--no-warnings", url.toString()];
     const { stdout } = await runYtdlp(args, jobDir, controller.signal);
-    let metadata;
-    try { metadata = JSON.parse(stdout.trim().split(/\n(?=\{)/).pop() || stdout); }
-    catch { throw new Error("The media provider returned invalid metadata."); }
+    const metadata = parseYtDlpJson(stdout);
     if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("Media exceeds the configured duration limit.");
 
     const rawFormats = Array.isArray(metadata.formats) ? metadata.formats : [];
