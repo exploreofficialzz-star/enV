@@ -2894,7 +2894,12 @@ extension NativeBarcodeEngine {
         switch presetMap[toolID] ?? "" {
         case "size": let modules=Double(v(values,"modules")) ?? 21, px=Double(v(values,"modulePx")) ?? 4; return NativeBarcodeExecution(text:"\(Int(modules)) modules × \(px)px = \(modules*px)px before quiet-zone margin.")
         case "version": let text=v(values,"text"), level=v(values,"level").isEmpty ? "M" : v(values,"level"); return NativeBarcodeExecution(text:"Estimated QR version: \(approximateVersion(text.count,level:level)) for \(level) error correction. Actual version depends on encoding mode and content.")
-        case "capacity": let version=Int(v(values,"version")) ?? 1, level=v(values,"level").isEmpty ? "M" : v(values,"level"), factor:[String:Double] = ["L":1,"M":0.8,"Q":0.65,"H":0.5]; return NativeBarcodeExecution(text:"Approximate alphanumeric capacity for version \(version) / \(level): about \(max(10,Int(Double(version*version*18)*(factor[level] ?? 0.8))) characters. This is a planning estimate, not the QR standard's exact byte table.")
+        case "capacity":
+            let version=Int(v(values,"version")) ?? 1
+            let level=v(values,"level").isEmpty ? "M" : v(values,"level")
+            let factor:[String:Double] = ["L":1,"M":0.8,"Q":0.65,"H":0.5]
+            let estimate=max(10,Int(Double(version*version*18)*(factor[level] ?? 0.8)))
+            return NativeBarcodeExecution(text:"Approximate alphanumeric capacity for version \(version) / \(level): about \(estimate) characters. This is a planning estimate, not the QR standard's exact byte table.")
         case "inspect": let payload=v(values,"payload"); return NativeBarcodeExecution(text:"Detected payload type: \(payloadKind(payload)). Length: \(payload.count) characters.")
         case "batch":
             let items=v(values,"items").components(separatedBy:.newlines).map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}

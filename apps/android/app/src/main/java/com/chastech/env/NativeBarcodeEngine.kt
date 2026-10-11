@@ -18,7 +18,7 @@ import java.net.URI
 import java.net.URLEncoder
 import java.util.EnumMap
 
-internal data class NativeBarcodeField(
+data class NativeBarcodeField(
     val key: String,
     val label: String,
     val defaultValue: String = "",
@@ -26,7 +26,7 @@ internal data class NativeBarcodeField(
     val options: List<String> = emptyList(),
 )
 
-internal data class NativeBarcodeExecution(
+data class NativeBarcodeExecution(
     val text: String,
     val images: List<Bitmap> = emptyList(),
     val exportText: String? = null,
