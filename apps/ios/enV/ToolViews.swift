@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WebKit
 import CoreImage
 import UniformTypeIdentifiers
 
@@ -1249,6 +1250,7 @@ struct NativeTextToolView: View {
 
 struct NativeAccessibilityToolView: View {
     let tool: Tool
+    @State private var showAPCAWebView = false
     @State private var input = ""
     @State private var studioMode: String
     @State private var foreground = "#000000"
@@ -1285,7 +1287,7 @@ struct NativeAccessibilityToolView: View {
     private var textTool: Bool { studioKind == "text-readability" }
     private var altCoach: Bool { kind == "alt-text" && studioMode == "helper" }
     private var focusGenerator: Bool { kind == "focus-state" && studioMode == "generator" }
-    private var modes: [String] { colorTool ? ["checker", "generator", "helper", "preview", "simulator", "vision"] : ["checker", "generator", "helper", "preview", "simulator"] }
+    private var modes: [String] { colorTool ? ["checker", "generator", "helper", "preview", "simulator", "vision", "apca"] : ["checker", "generator", "helper", "preview", "simulator"] }
     private var engineToolID: String { studioMode == "vision" ? "color-blindness-preview" : "\(studioKind)-\(studioMode)" }
     private var codeTool: Bool { studioMode != "generator" && !colorTool && !sizeTool && !altCoach && !(kind == "form" && studioMode == "simulator") }
     private var studioTitle: String { ["contrast": "Color Contrast Studio", "alt-text": "Alt Text Studio", "focus-state": "Focus State Studio", "text-readability": "Text & Readability Studio", "aria": "ARIA Studio", "motion": "Motion & Reduced Motion Studio", "keyboard-navigation": "Keyboard Navigation Studio", "form": "Form Accessibility Studio"][studioKind] ?? tool.name }
@@ -1295,22 +1297,27 @@ struct NativeAccessibilityToolView: View {
             enVCharacterSpacedText(studioTitle).font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
             enVCharacterSpacedText(tool.description)
                 .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
-            enVCharacterSpacedText("Runs on this device · your text and markup are not uploaded.")
+            enVCharacterSpacedText(colorTool ? "Native contrast checks run on this device; APCA opens the web implementation." : "Runs on this device · your text and markup are not uploaded.")
                 .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(modes, id: \.self) { mode in
-                        let title = mode == "checker" ? "Check" : mode == "generator" ? "Generate" : mode == "helper" ? "Coach / fix" : mode == "preview" ? "Preview" : mode == "simulator" ? "Test" : "Color vision"
-                        Button { studioMode = mode; output = "" } label: {
-                            enVCharacterSpacedText("\(studioMode == mode ? "✓ " : "")\(title)")
-                                .font(.envScaled(size: 13, weight: studioMode == mode ? .semibold : .regular))
-                                .foregroundStyle(studioMode == mode ? Color.white : Color.accentColor)
+                        let title = mode == "checker" ? "Check" : mode == "generator" ? "Generate" : mode == "helper" ? "Coach / fix" : mode == "preview" ? "Preview" : mode == "simulator" ? "Test" : mode == "vision" ? "Color vision" : "APCA · Web"
+                        let selected = mode == "apca" ? showAPCAWebView : studioMode == mode
+                        Button {
+                            if mode == "apca" { showAPCAWebView = true }
+                            else { studioMode = mode; output = "" }
+                        } label: {
+                            enVCharacterSpacedText("\(selected ? "✓ " : "")\(title)")
+                                .font(.envScaled(size: 13, weight: selected ? .semibold : .regular))
+                                .foregroundStyle(selected ? Color.white : Color.accentColor)
                                 .padding(.horizontal, 14).frame(minHeight: 48)
-                                .background(studioMode == mode ? Color.accentColor : Color.clear, in: Capsule())
+                                .background(selected ? Color.accentColor : Color.clear, in: Capsule())
                                 .overlay(Capsule().stroke(Color.accentColor, lineWidth: 1))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(title)\(studioMode == mode ? ", selected" : "")")
+                        .accessibilityLabel(mode == "apca" ? "Open APCA in web view" : "\(title)\(studioMode == mode ? ", selected" : "")")
+                        .accessibilityHint(mode == "apca" ? "Requires an internet connection. The native color inputs are not copied to the web page." : "")
                     }
                 }
             }
@@ -1384,6 +1391,11 @@ struct NativeAccessibilityToolView: View {
             }
             enVCharacterSpacedText("Static snippet checks only. Manually test keyboard order, browser zoom, screen readers, and the complete page; results do not certify WCAG conformance.")
                 .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+        }
+        .sheet(isPresented: $showAPCAWebView) {
+            APCAWebViewSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
     private var colorPreview: some View {
@@ -1478,6 +1490,56 @@ struct NativeAccessibilityToolView: View {
         case "form": return "<form><input type=\"email\"><button>Submit</button></form>"
         case "motion": return "button { animation: pulse 1s infinite; }"
         default: return ""
+        }
+    }
+}
+
+private let apcaStudioWebURL = URL(string: "https://en-v.vercel.app/tools/accessibility/color-contrast-studio")!
+
+private struct APCAWebViewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                Text("APCA is web-hosted and requires a connection. Colors entered in the native fields are not transferred.")
+                    .font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                APCAWebView(url: apcaStudioWebURL)
+            }
+            .navigationTitle("APCA · Web view")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.accessibilityHint("Returns to the native Color Contrast Studio")
+                }
+            }
+        }
+    }
+}
+
+private struct APCAWebView: UIViewRepresentable {
+    let url: URL
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        webView.allowsBackForwardNavigationGestures = false
+        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard let target = navigationAction.request.url else { decisionHandler(.cancel); return }
+            if target.scheme == "https", target.host == "en-v.vercel.app" { decisionHandler(.allow); return }
+            if target.scheme == "https" { UIApplication.shared.open(target) }
+            decisionHandler(.cancel)
         }
     }
 }

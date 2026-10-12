@@ -19,6 +19,9 @@ const androidAssistant = readFileSync("apps/android/app/src/main/java/com/chaste
 const androidStore = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/FavoritesStore.kt", "utf8");
 const iosCatalog = readFileSync("apps/ios/enV/CatalogCore.swift", "utf8");
 const androidCatalog = readFileSync("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt", "utf8");
+const androidAccessibility = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeAccessibilityToolForm.kt", "utf8");
+const androidAccessibilityEngine = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeAccessibilityEngine.kt", "utf8");
+const iosAccessibilityEngine = readFileSync("apps/ios/enV/NativeAccessibilityEngine.swift", "utf8");
 
 // Android detail links push onto a stack; system Back returns to the prior detail.
 assert.match(android, /var detailStack by rememberSaveable/);
@@ -220,7 +223,7 @@ assert.match(android, /\$\{catalog\.browserActiveToolCount\} browser tools/);
 assert.match(android, /\$\{catalog\.browserActiveToolCount\} live tools/);
 assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.browserActiveToolCount/);
 
-// All advertised catalog records remain discoverable; browser-runtime references are clearly labeled and never wrapped in a WebView.
+// All advertised catalog records remain discoverable; general browser-runtime references stay labeled and do not receive a WebView execution fallback.
 assert.match(android, /catalog\.webSearch\(query, includeRelatedReferences = true\)/);
 assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedReferences = true\)/);
 assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
@@ -240,6 +243,15 @@ assert.match(iosTools, /private var local: Bool \{ !NativeCopy\.isWebRuntimeOnly
 assert.match(android, /private fun WebToolsSearchField\([\s\S]*?focused && query\.isNotBlank\(\)[\s\S]*?suggestions\.forEach[\s\S]*?See more results/);
 assert.match(iosContent, /\.focused\(\$isToolsSearchFocused\)/);
 assert.match(iosContent, /private var searchSuggestions: \[Tool\][\s\S]*?ForEach\(searchSuggestions\)[\s\S]*?See more results/);
-assert.doesNotMatch(`${android}\n${iosContent}\n${iosTools}`, /WebView|WKWebView/);
+// APCA is the sole WebView exception: it opens the web-content implementation from Color Contrast Studio only.
+assert.match(androidAccessibility, /if \(colorTool\) \{[\s\S]*?Open APCA in web view/);
+assert.match(androidAccessibility, /APCA_WEB_URL = "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"/);
+assert.match(androidAccessibility, /target\.scheme == "https" && target\.host == APCA_WEB_HOST/);
+assert.match(iosTools, /colorTool \? \[[^\]]*"apca"/);
+assert.match(iosTools, /apcaStudioWebURL = URL\(string: "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"\)!/);
+assert.match(iosTools, /private struct APCAWebView: UIViewRepresentable[\s\S]*?websiteDataStore = \.nonPersistent\(\)/);
+assert.match(iosTools, /target\.scheme == "https", target\.host == "en-v\.vercel\.app"/);
+assert.doesNotMatch(`${androidAccessibilityEngine}\n${iosAccessibilityEngine}`, /APCA-W3|APCAcontrast|APCAContrast/, "APCA scoring must not be implemented in a native engine");
+assert.doesNotMatch(`${android}\n${iosContent}`, /WebView|WKWebView/, "WebViews are restricted to the APCA Color Contrast Studio entry point");
 
 console.log("PASS: native navigation, personal-use shortcuts, full-catalog discovery, width-cap, and typography parity guards");

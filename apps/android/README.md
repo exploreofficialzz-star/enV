@@ -11,7 +11,7 @@ The native execution boundary is explicit:
 - **Native implementation tranches:** Focus Timer, Pomodoro, Stopwatch, 13 deterministic AI micro-tools, and 51 agenda/schedule/RSVP/check-in templates now have exact-ID implementations; Kotlin source and unit tests still require Android CI/build validation.
 - **Planned:** 0 catalog entries are marked as unavailable.
 
-There is no WebView or website execution fallback in the standalone native products.
+There is no general WebView or website execution fallback for the 629 Web-only catalog tools. The sole exception is the APCA entry point inside Color Contrast Studio: it opens the existing HTTPS web-content implementation in an isolated in-app WebView. APCA scoring remains out of the native engine; the native foreground/background fields are not copied into the web page, which requires an internet connection.
 
 No catalog record is currently marked Coming Soon. Android and iOS share the same execution-coverage audit, so an active tool cannot silently exist on only one native platform.
 

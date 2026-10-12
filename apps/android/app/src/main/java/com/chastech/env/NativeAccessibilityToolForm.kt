@@ -3,6 +3,10 @@ package com.chastech.env
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -32,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -44,9 +50,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chastech.env.data.ToolRecord
+
+private const val APCA_WEB_URL = "https://en-v.vercel.app/tools/accessibility/color-contrast-studio"
+private const val APCA_WEB_HOST = "en-v.vercel.app"
 
 @Composable
 fun NativeAccessibilityToolForm(tool: ToolRecord) {
@@ -66,6 +78,7 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
     var ariaPattern by rememberSaveable(tool.id) { mutableStateOf("button") }
     var ariaPatternExpanded by rememberSaveable(tool.id) { mutableStateOf(false) }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var apcaWebOpen by remember { mutableStateOf(false) }
     var previewSize by rememberSaveable(tool.id) { mutableStateOf(18f) }
     var previewLeading by rememberSaveable(tool.id) { mutableStateOf(1.5f) }
     var demoEmail by rememberSaveable(tool.id) { mutableStateOf("") }
@@ -92,13 +105,19 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("${tool.name} Studio", style = MaterialTheme.typography.headlineSmall)
         Text(tool.description, style = MaterialTheme.typography.bodyMedium)
-        Text("Runs on this device. Your text and markup are not uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (colorTool) "Native contrast checks run on this device; APCA opens the web implementation." else "Runs on this device. Your text and markup are not uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             modes.forEach { mode ->
                 val label = when (mode) { "checker" -> "Check"; "generator" -> "Generate"; "helper" -> "Coach / fix"; "preview" -> "Preview"; "simulator" -> "Test"; else -> "Color vision" }
                 if (studioMode == mode) Button(onClick = { studioMode = mode }, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
                 else OutlinedButton(onClick = { studioMode = mode }, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
             }
+        }
+        if (colorTool) {
+            OutlinedButton(onClick = { apcaWebOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Open APCA in web view")
+            }
+            Text("APCA runs in the web Color Contrast Studio. It requires a connection; colors entered in this native form are not copied over.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (colorTool) {
             OutlinedTextField(foreground, { foreground = it }, label = { Text("Foreground / first color (HEX)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, supportingText = { Text("Example: #2457C5") })
@@ -205,6 +224,48 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
             Text(output, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
         }
         Text("Static snippet checks cannot inspect the full live page or certify conformance. Verify keyboard use, zoom, and screen-reader behavior with real devices and users.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (apcaWebOpen) ApcaWebDialog(onDismiss = { apcaWebOpen = false })
+}
+
+@Composable
+private fun ApcaWebDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("APCA · Web view", style = MaterialTheme.typography.titleMedium)
+                    Text("Loads the existing web contrast panel. A connection is required; native color inputs are not transferred.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Close") }
+            }
+            AndroidView(
+                factory = { viewContext ->
+                    WebView(viewContext).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        settings.javaScriptCanOpenWindowsAutomatically = false
+                        settings.setSupportMultipleWindows(false)
+                        settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest): Boolean {
+                                val target = request.url
+                                if (target.scheme == "https" && target.host == APCA_WEB_HOST) return false
+                                if (target.scheme == "https") runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, target)) }
+                                return true
+                            }
+                        }
+                        loadUrl(APCA_WEB_URL)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                onRelease = { view -> view.stopLoading(); view.destroy() },
+            )
+        }
     }
 }
 
