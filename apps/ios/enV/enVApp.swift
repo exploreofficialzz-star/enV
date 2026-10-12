@@ -68,7 +68,7 @@ extension Color {
     static let envBg = envSurface
     static let envCard = adaptive(light: 0xFFFFFF, dark: 0x171B1E)
     static let envSurface2 = adaptive(light: 0xEFECE6, dark: 0x1E2327)
-    static let envMuted = adaptive(light: 0x5C636C, dark: 0xA7ADB4)
+    static let envMuted = adaptive(light: 0x4B5159, dark: 0xA7ADB4)
     static let envSubtle = adaptive(light: 0x5C636C, dark: 0xA7ADB4)
     static let envBorder = adaptive(light: 0xE4E0D8, dark: 0x2A3036)
     static let envBorderStrong = adaptive(light: 0xCFC9BD, dark: 0x3C444C)
