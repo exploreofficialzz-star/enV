@@ -570,7 +570,7 @@ public enum NativeAccessibilityEngine {
         UI / graphics AA (3:1): \(uiAA ? "PASS" : "FAIL")
         """
         if suggestions {
-            report += "\n\nSuggested foreground alternatives on this background (AA normal):\n"
+            report += "\n\nForeground alternatives suggested for this background (AA normal):\n"
             report += alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1. Adjust hue or lightness and recheck." : alternatives
             report += "\n\nApply one alternative at a time, then recheck in the real product surface."
         }

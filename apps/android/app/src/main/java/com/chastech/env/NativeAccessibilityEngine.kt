@@ -449,7 +449,7 @@ object NativeAccessibilityEngine {
         sb.append("Normal text AAA (7:1): ${if (aaaNormal) "PASS" else "FAIL"}\n")
         sb.append("UI / graphics AA (3:1): ${if (uiAA) "PASS" else "FAIL"}")
         if (suggestions) {
-            sb.append("\n\nSuggested foreground alternatives on this background (AA normal):\n")
+            sb.append("\n\nForeground alternatives suggested for this background (AA normal):\n")
             sb.append(alternatives)
             sb.append("\n\nApply one alternative at a time, then recheck in the real product surface.")
         }

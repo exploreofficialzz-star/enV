@@ -60,7 +60,7 @@ extension Color {
         })
     }
 
-    static let envAccent = adaptive(light: 0x0D9F8A, dark: 0x2EC4B6)
+    static let envAccent = adaptive(light: 0x006B60, dark: 0x2EC4B6)
     static let envTeal = envAccent
     static let envInk = adaptive(light: 0x16181D, dark: 0xEEF0F2)
     static let envChrome = adaptive(light: 0xFFFFFF, dark: 0x000000)
