@@ -119,7 +119,8 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.match(home, /leading=\{<Logo size="search"/);
   assert.match(brand, /search: "h-9 w-14"/);
   assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
-  assert.match(searchBox, /searchTools\(getAllTools\(\), q, 8\)/);
+  assert.match(searchBox, /const searchable = getSearchableTools\(\)/);
+  assert.match(searchBox, /searchTools\(searchable, q, 8\)/);
   assert.match(searchBox, /placeholder=\{hidePlaceholderOnFocus && focused \? "" : placeholder\}/);
   assert.match(searchBox, /setFocused\(true\);\s*setOpen\(true\);/);
   assert.match(searchBox, /See more results/);

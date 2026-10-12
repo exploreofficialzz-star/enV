@@ -1423,8 +1423,8 @@ struct NativeAccessibilityToolView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("Keyboard focus playground").font(.headline)
             Text("Use a hardware keyboard, VoiceOver, or switch control to navigate these native controls.").font(.caption).foregroundStyle(.secondary)
-            Toggle("Dark surface", isOn: $focusDark).onChange(of: focusDark) { _, value in if value { focusForced = false } }
-            Toggle("Forced-colors visual mock", isOn: $focusForced).onChange(of: focusForced) { _, value in if value { focusDark = false } }
+            Toggle("Dark surface", isOn: $focusDark).onChange(of: focusDark) { value in if value { focusForced = false } }
+            Toggle("Forced-colors visual mock", isOn: $focusForced).onChange(of: focusForced) { value in if value { focusDark = false } }
             Toggle("Show focus-ring preview", isOn: $showFocusRing).accessibilityHint("Visual sample only; navigate with the keyboard to test actual focus behavior.")
             VStack(alignment: .leading, spacing: 10) {
                 Button("Keyboard target") {}.buttonStyle(.borderedProminent).overlay(RoundedRectangle(cornerRadius: 8).stroke(showFocusRing ? ring : .clear, lineWidth: 4))

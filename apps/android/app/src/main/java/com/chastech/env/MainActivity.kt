@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.accessibilityDiscoveryTools
+import com.chastech.env.data.accessibilityStudioForId
 import com.chastech.env.data.displayTool
 import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.NativeCopy
