@@ -12,12 +12,24 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.launch()
     }
 
+    private func toolbarAction(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
     func testHomeSearchAndPrimaryActionsHaveAccessibleNames() throws {
         XCTAssertTrue(app.textFields["Search tools"].waitForExistence(timeout: 10), "The home search field should expose its Search tools label.")
-        XCTAssertTrue(app.buttons["Home"].exists, "The home navigation action should be named.")
-        XCTAssertTrue(app.buttons["Saved tools"].exists, "The saved-tools action should be named.")
-        XCTAssertTrue(app.buttons["Tools"].exists, "The tools navigation action should be named.")
-        XCTAssertTrue(app.buttons["More options"].exists, "The overflow menu should be named.")
+        let home = toolbarAction("home-navigation-action")
+        let saved = toolbarAction("saved-tools-navigation-action")
+        let tools = toolbarAction("tools-navigation-action")
+        let more = toolbarAction("more-options-navigation-action")
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "The home navigation action should be present in the accessibility tree.")
+        XCTAssertTrue(saved.exists, "The saved-tools action should be present in the accessibility tree.")
+        XCTAssertTrue(tools.exists, "The tools action should be present in the accessibility tree.")
+        XCTAssertTrue(more.exists, "The overflow menu should be present in the accessibility tree.")
+        XCTAssertEqual(home.label, "Home")
+        XCTAssertEqual(saved.label, "Saved tools")
+        XCTAssertEqual(tools.label, "Tools")
+        XCTAssertEqual(more.label, "More options")
 
         if #available(iOS 17.0, *) {
             try app.performAccessibilityAudit()
@@ -25,7 +37,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     func testMoreOptionsMenuIsAuditedInItsOpenState() throws {
-        let moreOptions = app.buttons["More options"]
+        let moreOptions = toolbarAction("more-options-navigation-action")
         XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
         moreOptions.tap()
 
@@ -39,7 +51,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     func testSearchDestinationIsAuditedAfterMenuNavigation() throws {
-        let moreOptions = app.buttons["More options"]
+        let moreOptions = toolbarAction("more-options-navigation-action")
         XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
         moreOptions.tap()
 

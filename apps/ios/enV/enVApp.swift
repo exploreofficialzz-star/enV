@@ -153,6 +153,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Home")
+                    .accessibilityIdentifier("home-navigation-action")
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { selectedTab = NativeTab.saved.rawValue } label: {
@@ -160,11 +161,13 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Saved tools")
+                    .accessibilityIdentifier("saved-tools-navigation-action")
                     Button { selectedTab = NativeTab.tools.rawValue } label: {
                         EnVIcon(name: "LayoutGrid", size: 24, tint: .envMuted).frame(width: 36, height: 40)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Tools")
+                    .accessibilityIdentifier("tools-navigation-action")
                     Menu {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
@@ -180,6 +183,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("More options")
+                    .accessibilityIdentifier("more-options-navigation-action")
                 }
             }
             .toolbarBackground(Color.envChrome, for: .navigationBar)

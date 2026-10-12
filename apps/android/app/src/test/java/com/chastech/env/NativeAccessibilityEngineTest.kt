@@ -154,7 +154,6 @@ class NativeAccessibilityEngineTest {
         assertTrue(helper.contains("READABILITY COACH"))
         assertTrue(helper.contains("Flesch Reading Ease"))
     }
-}
 
 
     @Test fun ariaStudioDetectsMissingNamesButAcceptsCommonNamedControls() {
@@ -190,3 +189,4 @@ class NativeAccessibilityEngineTest {
         assertTrue(first.contains("Related WCAG criteria (review hints, not a failure verdict)"))
         assertTrue(first.substringAfter("Finding ID:").substringBefore("\n") == second.substringAfter("Finding ID:").substringBefore("\n"))
     }
+}
