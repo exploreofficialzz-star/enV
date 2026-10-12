@@ -165,13 +165,13 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .modifier(EnVBrandNavigationStyle())
         }
         .id(homeNavigationReset)
         .onDisappear {
             searchText = ""
             isHomeSearchFocused = false
         }
-        .modifier(EnVBrandNavigationStyle())
     }
 }
 
@@ -598,12 +598,12 @@ struct ToolsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .modifier(EnVBrandNavigationStyle())
         }
         .id(toolsNavigationReset)
         .navigationDestination(isPresented: $showSearchNavigation) {
             if let searchNavigationTool { ToolDetailView(tool: searchNavigationTool) }
         }
-        .modifier(EnVBrandNavigationStyle())
         .onChange(of: toolsNavigationReset) { _ in
             toolsQuery = ""
             visibleByCategory.removeAll()
@@ -686,8 +686,8 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             SearchResultsView(text: $query)
+                .modifier(EnVBrandNavigationStyle())
         }
-        .modifier(EnVBrandNavigationStyle())
     }
 }
 
@@ -846,8 +846,8 @@ struct SavedView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .modifier(EnVBrandNavigationStyle())
         }
-        .modifier(EnVBrandNavigationStyle())
     }
 }
 
@@ -911,8 +911,8 @@ struct AccountView: View {
             .modifier(Screen())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .modifier(EnVBrandNavigationStyle())
         }
-        .modifier(EnVBrandNavigationStyle())
     }
 }
 

@@ -300,8 +300,8 @@ struct AssistantChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .modifier(EnVBrandNavigationStyle())
         }
-        .modifier(EnVBrandNavigationStyle())
         .onDisappear {
             activeRequest?.cancel()
             activeRequest = nil

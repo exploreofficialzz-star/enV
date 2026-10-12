@@ -552,12 +552,33 @@ public enum NativeAccessibilityEngine {
     private static func contrast(_ kind: String, _ fg: String, _ bg: String, suggestions: Bool = false) -> String {
         guard let a = rgb(fg), let b = rgb(bg) else { return "Enter valid #RRGGBB foreground and background colors." }
         let la = luminance(a), lb = luminance(b), ratio = (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
-        let alternatives = suggestions ? ["#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8"].compactMap { color -> String? in
+        let aaNormal = ratio >= 4.5, aaLarge = ratio >= 3.0, aaaNormal = ratio >= 7.0, uiAA = ratio >= 3.0
+        let alternatives = suggestions ? ["#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8", "#111827", "#f8fafc"].compactMap { color -> String? in
             guard let candidate = rgb(color) else { return nil }
             let l = luminance(candidate), candidateRatio = (max(l, lb) + 0.05) / (min(l, lb) + 0.05)
-            return candidateRatio >= 4.5 ? "\(color) — \(String(format: "%.2f:1", candidateRatio))" : nil
-        }.prefix(5).joined(separator: "\n") : ""
-        return "\(kind.uppercased()) CONTRAST REVIEW\nForeground: \(fg)\nBackground: \(bg)\nWCAG 2.2 ratio: \(String(format: "%.2f:1", ratio))\nWCAG AA normal text (4.5:1): \(ratio >= 4.5 ? "PASS" : "FAIL")\nWCAG AA large text (3:1): \(ratio >= 3 ? "PASS" : "FAIL")\nWCAG AAA normal text (7:1): \(ratio >= 7 ? "PASS" : "FAIL")\(suggestions ? "\n\nForeground alternatives on this background (WCAG AA normal text):\n\(alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1." : alternatives)" : "")\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
+            return candidateRatio >= 4.5 ? "\(color) — \(String(format: "%.2f:1", candidateRatio)) · AA normal" : nil
+        }.prefix(6).joined(separator: "\n") : ""
+        var report = """
+        \(kind.uppercased()) CONTRAST REVIEW · on-device
+        Foreground: \(fg)
+        Background: \(bg)
+        WCAG 2.2 ratio: \(String(format: "%.2f:1", ratio))
+
+        Normal text AA (4.5:1): \(aaNormal ? "PASS" : "FAIL")
+        Large text AA (3:1): \(aaLarge ? "PASS" : "FAIL")
+        Normal text AAA (7:1): \(aaaNormal ? "PASS" : "FAIL")
+        UI / graphics AA (3:1): \(uiAA ? "PASS" : "FAIL")
+        """
+        if suggestions {
+            report += "\n\nSuggested foreground alternatives on this background (AA normal):\n"
+            report += alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1. Adjust hue or lightness and recheck." : alternatives
+            report += "\n\nApply one alternative at a time, then recheck in the real product surface."
+        }
+        if !aaNormal {
+            report += "\n\nONE-CLICK PATH: switch to Coach / fix mode or try a suggested alternative above. Recheck large text and UI components separately."
+        }
+        report += "\n\nScope: a two-color pair cannot prove full-page WCAG conformance or WCAG 1.4.1 Use of Color. Processing stays on this device."
+        return report
     }
 
     public static func passingForegroundColors(background: String, minimumRatio: Double = 4.5) -> [String] {
@@ -648,7 +669,37 @@ public enum NativeAccessibilityEngine {
             let offset = matches(focusOffset, pattern: #"^(?:[1-9]|10)(?:\.\d+)?px$"#).first ?? "3px"
             let ring = matches(foreground, pattern: #"^#[0-9a-fA-F]{6}$"#).first ?? "currentColor"
             let darkRing = matches(background, pattern: #"^#[0-9a-fA-F]{6}$"#).first ?? "#ffd54f"
-            return "FOCUS-VISIBLE CSS STARTER\n:focus-visible {\n  outline: \(width) solid \(ring);\n  outline-offset: \(offset);\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: \(darkRing); }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep the indicator visible and unclipped; verify contrast against adjacent surfaces."
+            return """
+            FOCUS-VISIBLE CSS · production-ready (on-device)
+            /* Prefer :focus-visible so mouse users are not forced to see the ring */
+            :focus-visible {
+              outline: \(width) solid \(ring);
+              outline-offset: \(offset);
+            }
+            :focus:not(:focus-visible) {
+              outline: none;
+            }
+            @media (prefers-color-scheme: dark) {
+              :focus-visible { outline-color: \(darkRing); }
+            }
+            @media (forced-colors: active) {
+              :focus-visible {
+                outline: 3px solid Highlight;
+                outline-offset: 3px;
+              }
+            }
+            .button-large:focus-visible,
+            [data-size="lg"]:focus-visible {
+              outline-width: \(width);
+            }
+
+            Verification checklist
+            1. Tab through every interactive control
+            2. Confirm the ring is not clipped by overflow:hidden
+            3. Check ring contrast against adjacent surfaces
+            4. Test forced-colors / Windows High Contrast
+            5. Confirm mouse click does not leave a persistent ring
+            """
         case "keyboard-navigation": return "KEYBOARD REVIEW\n\nTab / Shift+Tab: logical order\nEnter / Space: expected activation\nEscape: closes dismissible overlays\nNo keyboard trap; visible focus remains present."
         case "motion": return "REDUCED MOTION CSS\n@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after {\n    scroll-behavior: auto !important;\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n  }\n}\n\nUse only when appropriate to the component; preserve essential feedback."
         case "color-blindness": return colorVisionReport(foreground, background)

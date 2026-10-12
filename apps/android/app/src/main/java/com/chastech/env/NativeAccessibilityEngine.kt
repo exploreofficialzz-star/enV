@@ -433,13 +433,31 @@ object NativeAccessibilityEngine {
         val b = rgb(bg) ?: return "Enter a valid #RRGGBB background color."
         val la = luminance(a); val lb = luminance(b)
         val ratio = (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
-        val alternatives = if (suggestions) listOf("#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8").mapNotNull { color ->
+        val aaNormal = ratio >= 4.5; val aaLarge = ratio >= 3.0; val aaaNormal = ratio >= 7.0; val uiAA = ratio >= 3.0
+        val alternatives = if (suggestions) listOf("#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8", "#111827", "#f8fafc").mapNotNull { color ->
             val candidate = rgb(color) ?: return@mapNotNull null
             val candidateLum = luminance(candidate)
             val candidateRatio = (max(candidateLum, lb) + 0.05) / (min(candidateLum, lb) + 0.05)
-            if (candidateRatio >= 4.5) "$color — ${String.format(Locale.US, "%.2f:1", candidateRatio)}" else null
-        }.distinct().take(5).joinToString("\n").ifBlank { "No candidate in the built-in palette reached 4.5:1; adjust foreground or background." } else ""
-        return "$kind CONTRAST REVIEW\nForeground: $fg\nBackground: $bg\nWCAG 2.2 ratio: ${String.format(Locale.US, "%.2f:1", ratio)}\nWCAG AA normal text (4.5:1): ${if (ratio >= 4.5) "PASS" else "FAIL"}\nWCAG AA large text (3:1): ${if (ratio >= 3) "PASS" else "FAIL"}\nWCAG AAA normal text (7:1): ${if (ratio >= 7) "PASS" else "FAIL"}${if (suggestions) "\n\nForeground alternatives on this background (WCAG AA normal text):\n$alternatives" else ""}\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
+            if (candidateRatio >= 4.5) "$color — ${String.format(Locale.US, "%.2f:1", candidateRatio)} · AA normal" else null
+        }.distinct().take(6).joinToString("\n").ifBlank { "No candidate in the built-in palette reached 4.5:1; adjust hue or lightness and recheck." } else ""
+        val sb = StringBuilder()
+        sb.append("$kind CONTRAST REVIEW · on-device\n")
+        sb.append("Foreground: $fg\nBackground: $bg\n")
+        sb.append("WCAG 2.2 ratio: ${String.format(Locale.US, "%.2f:1", ratio)}\n\n")
+        sb.append("Normal text AA (4.5:1): ${if (aaNormal) "PASS" else "FAIL"}\n")
+        sb.append("Large text AA (3:1): ${if (aaLarge) "PASS" else "FAIL"}\n")
+        sb.append("Normal text AAA (7:1): ${if (aaaNormal) "PASS" else "FAIL"}\n")
+        sb.append("UI / graphics AA (3:1): ${if (uiAA) "PASS" else "FAIL"}")
+        if (suggestions) {
+            sb.append("\n\nSuggested foreground alternatives on this background (AA normal):\n")
+            sb.append(alternatives)
+            sb.append("\n\nApply one alternative at a time, then recheck in the real product surface.")
+        }
+        if (!aaNormal) {
+            sb.append("\n\nONE-CLICK PATH: try a suggested alternative above, then recheck large text and UI components separately.")
+        }
+        sb.append("\n\nScope: a two-color pair cannot prove full-page WCAG conformance or WCAG 1.4.1 Use of Color. Processing stays on this device.")
+        return sb.toString()
     }
 
     fun passingForegroundColors(background: String, minimumRatio: Double = 4.5): List<String> {
@@ -547,7 +565,37 @@ object NativeAccessibilityEngine {
             val offset = focusOffset.trim().takeIf { it.matches(Regex("(?:[1-9]|10)(?:\\.\\d+)?px")) } ?: "3px"
             val ring = foreground.trim().takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "currentColor"
             val darkRing = background.trim().takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "#ffd54f"
-            "FOCUS-VISIBLE CSS STARTER\n:focus-visible {\n  outline: $width solid $ring;\n  outline-offset: $offset;\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: $darkRing; }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep the indicator visible and unclipped; verify contrast against adjacent surfaces."
+            """
+            FOCUS-VISIBLE CSS · production-ready (on-device)
+            /* Prefer :focus-visible so mouse users are not forced to see the ring */
+            :focus-visible {
+              outline: $width solid $ring;
+              outline-offset: $offset;
+            }
+            :focus:not(:focus-visible) {
+              outline: none;
+            }
+            @media (prefers-color-scheme: dark) {
+              :focus-visible { outline-color: $darkRing; }
+            }
+            @media (forced-colors: active) {
+              :focus-visible {
+                outline: 3px solid Highlight;
+                outline-offset: 3px;
+              }
+            }
+            .button-large:focus-visible,
+            [data-size="lg"]:focus-visible {
+              outline-width: $width;
+            }
+
+            Verification checklist
+            1. Tab through every interactive control
+            2. Confirm the ring is not clipped by overflow:hidden
+            3. Check ring contrast against adjacent surfaces
+            4. Test forced-colors / Windows High Contrast
+            5. Confirm mouse click does not leave a persistent ring
+            """.trimIndent()
         }
         "keyboard-navigation" -> "KEYBOARD REVIEW\n\nTab / Shift+Tab: logical order\nEnter / Space: expected activation\nEscape: closes dismissible overlays\nNo keyboard trap; visible focus remains present."
         "motion" -> "REDUCED MOTION CSS\n@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after {\n    scroll-behavior: auto !important;\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n  }\n}\n\nPreserve essential feedback when reducing motion."

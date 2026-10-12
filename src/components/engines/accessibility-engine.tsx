@@ -27,13 +27,105 @@ import { accessibilityKindFromToolId, accessibilityStudioForKind } from "@/lib/a
 import { apcaContrast } from "@/lib/engines/accessibility-apca";
 
 function StudioModeTabs<T extends string>({ modes, value, onChange, label }: { modes: Array<{ id: T; label: string }>; value: T; onChange: (value: T) => void; label: string }) {
-  return <div role="group" aria-label={label} className="flex gap-2 overflow-x-auto pb-1">{modes.map((mode) => <button key={mode.id} type="button" aria-pressed={value === mode.id} onClick={() => onChange(mode.id)} className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${value === mode.id ? "border-accent bg-accent text-white" : "border-border bg-surface hover:bg-surface-2"}`}>{mode.label}</button>)}</div>;
+  return (
+    <div className="space-y-1">
+      <div
+        role="group"
+        aria-label={label}
+        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+      >
+        {modes.map((mode) => (
+          <button
+            key={mode.id}
+            type="button"
+            aria-pressed={value === mode.id}
+            onClick={() => onChange(mode.id)}
+            className={`min-h-11 min-w-[5.5rem] shrink-0 snap-start rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              value === mode.id
+                ? "border-accent bg-accent text-white shadow-sm"
+                : "border-border bg-surface hover:bg-surface-2"
+            }`}
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted sm:hidden">Swipe modes sideways if needed · active mode is highlighted</p>
+    </div>
+  );
 }
 
 function ColorTokenExport({ foreground, background }: { foreground: string; background: string }) {
-  const css = `:root {\n  --color-text-primary: ${foreground};\n  --color-surface-primary: ${background};\n}`;
-  const tailwind = `// tailwind.config.js\nmodule.exports = {\n  theme: { extend: { colors: {\n    accessibleText: '${foreground}',\n    accessibleSurface: '${background}',\n  } } }\n};`;
-  return <section className="space-y-4" aria-labelledby="color-export-title"><div><h2 id="color-export-title" className="text-base font-semibold">Copy-ready color tokens</h2><p className="text-sm text-muted">Re-check every real text size, state, and surface after applying these tokens.</p></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">CSS custom properties</h3><CopyButton text={css} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{css}</pre></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">Tailwind extension</h3><CopyButton text={tailwind} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{tailwind}</pre></div></section>;
+  const css = `/* enV Color Contrast Studio · local export
+   Re-check every real text size, state, and surface after applying. */
+:root {
+  --color-text-primary: ${foreground};
+  --color-surface-primary: ${background};
+  --color-text-on-surface: ${foreground};
+  --color-surface: ${background};
+}
+
+/* Example usage
+.text-primary { color: var(--color-text-primary); }
+.bg-surface { background-color: var(--color-surface-primary); }
+*/`;
+  const tailwind = `// tailwind.config.js · tokens from enV Color Contrast Studio
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        accessible: {
+          text: '${foreground}',
+          surface: '${background}',
+        },
+      },
+    },
+  },
+};`;
+  const json = JSON.stringify(
+    {
+      source: "enV Color Contrast Studio",
+      localOnly: true,
+      tokens: {
+        textPrimary: foreground,
+        surfacePrimary: background,
+      },
+      note: "Re-verify contrast in product context before shipping.",
+    },
+    null,
+    2,
+  );
+  return (
+    <section className="space-y-4" aria-labelledby="color-export-title">
+      <div>
+        <h2 id="color-export-title" className="text-base font-semibold">Copy-ready color tokens</h2>
+        <p className="text-sm text-muted">
+          Design-system friendly exports. Nothing was uploaded. Re-check every real text size, state, and surface after applying.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium">CSS custom properties</h3>
+          <CopyButton text={css} />
+        </div>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{css}</pre>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium">Tailwind extension</h3>
+          <CopyButton text={tailwind} />
+        </div>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{tailwind}</pre>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium">JSON tokens</h3>
+          <CopyButton text={json} />
+        </div>
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{json}</pre>
+      </div>
+    </section>
+  );
 }
 const COLORS = ["#000000", "#111827", "#1f2937", "#374151", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e", "#ffffff", "#f8fafc", "#e5e7eb", "#dbeafe", "#fef3c7"];
 function downloadText(text: string, filename: string, mimeType = "text/plain;charset=utf-8") {
@@ -227,7 +319,49 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
       }
       if (kind === "form") return "ACCESSIBLE FORM CHECKLIST\n\n• Associate every control with a visible label.\n• Provide useful error text.\n• Preserve keyboard access.\n• Group related controls with fieldset/legend when appropriate.\n• Do not rely on color alone for required/error state.";
       if (kind === "keyboard-navigation") return "KEYBOARD NAVIGATION CHECKLIST\n\n• All interactive controls reachable with Tab/Shift+Tab.\n• Logical focus order.\n• Visible focus indicator.\n• Enter/Space behavior matches the control.\n• Escape closes dismissible overlays where appropriate.\n• No keyboard trap.";
-      if (kind === "focus-state") return `FOCUS-VISIBLE CSS · copy-ready\n:focus-visible {\n  outline: ${Math.min(8, Math.max(2, Number(focusWidth) || 3))}px solid ${fg};\n  outline-offset: ${Math.min(10, Math.max(1, Number(focusOffset) || 3))}px;\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: ${bg}; }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep focus visible and unclipped. Confirm the ring contrasts with adjacent colors and remains visible in your product.`;
+      if (kind === "focus-state") {
+        const w = Math.min(8, Math.max(2, Number(focusWidth) || 3));
+        const o = Math.min(10, Math.max(1, Number(focusOffset) || 3));
+        return `FOCUS-VISIBLE CSS · production-ready (local generator)
+/* Prefer :focus-visible so mouse users are not forced to see the ring */
+:focus-visible {
+  outline: ${w}px solid ${fg};
+  outline-offset: ${o}px;
+}
+
+/* Fallback for older browsers that only support :focus */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: ${bg};
+  }
+}
+
+/* Windows High Contrast / forced-colors */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+  }
+}
+
+/* Optional: thicker ring for large hit targets */
+.button-large:focus-visible,
+[data-size="lg"]:focus-visible {
+  outline-width: ${Math.min(8, w + 1)}px;
+}
+
+/* Verification checklist (do this in your product)
+1. Tab through every interactive control
+2. Confirm the ring is not clipped by overflow:hidden parents
+3. Check contrast of the ring against adjacent surfaces
+4. Test forced-colors / Windows High Contrast Mode
+5. Confirm mouse click does not leave a persistent ring (focus-visible)
+*/`;
+      }
       return "REDUCED MOTION CHECKLIST\n\n• Respect prefers-reduced-motion.\n• Remove or reduce non-essential animation.\n• Avoid flashing content.\n• Preserve essential information when animation is disabled.";
     }
     return analyzeHtml(html, kind);
@@ -354,7 +488,7 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
       <div className="accessibility-studio space-y-5">
         <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} label="Color Contrast Studio workflow" />
         <p className="text-sm text-muted">
-          Runs entirely on this device; nothing is uploaded. Enter HEX, RGB/RGBA, or HSL/HSLA colors. Alpha is composited before the ratio is calculated.
+          Runs entirely on this device — nothing is uploaded, no account, no extension. Enter HEX, RGB/RGBA, or HSL/HSLA. Alpha is composited before the ratio is calculated. Free features (APCA, full color-vision simulation, one-click fixes) that many tools lock behind paid plans.
         </p>
         <ColorInput label="Foreground" value={fgInput} onChange={setFgInput} parsed={fg} />
         <ColorInput label="Background" value={bgInput} onChange={setBgInput} parsed={bg} />
@@ -418,16 +552,24 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
               </span>
             </div>
           </div>
-          <div className="flex flex-col justify-center gap-2 bg-surface p-6">
-            <p className="text-sm text-muted">Selected evaluation · {evaluation?.criterion}</p>
-            <p className="text-4xl font-semibold tabular-nums">{evaluation?.ratio.toFixed(2)}:1</p>
-            <p className={evaluation?.passes ? "text-sm font-medium text-success" : "text-sm font-medium text-danger"}>
-              {evaluation?.passes ? "PASS" : "FAIL"} · requires {evaluation?.threshold.toFixed(1)}:1
-            </p>
+          <div className="flex flex-col justify-center gap-3 bg-surface p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">WCAG 2.2 · {evaluation?.criterion}</p>
+                <p className="text-3xl font-semibold tabular-nums sm:text-4xl">{evaluation?.ratio.toFixed(2)}:1</p>
+                <p className={evaluation?.passes ? "text-sm font-medium text-success" : "text-sm font-medium text-danger"}>
+                  {evaluation?.passes ? "PASS" : "FAIL"} · needs {evaluation?.threshold.toFixed(1)}:1
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">APCA-W3 0.1.9</p>
+                <p className="text-3xl font-semibold tabular-nums sm:text-4xl">{apcaScore === null ? "—" : `${apcaScore.toFixed(1)}`}</p>
+                <p className="text-sm text-muted">{apcaScore === null ? "Unavailable" : `Lc · ${apcaScore < 0 ? "light on dark" : "dark on light"}`}</p>
+              </div>
+            </div>
             <p className="text-xs text-muted">
-              Rendered foreground {formatColorSummary(rendered.foreground).hex} · rendered background {formatColorSummary(rendered.background).hex}
+              Rendered {formatColorSummary(rendered.foreground).hex} on {formatColorSummary(rendered.background).hex}. APCA is developmental perceptual guidance, not a WCAG pass/fail rule.
             </p>
-            <div className="mt-2 border-t border-border pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted">Supplementary APCA-W3 0.1.9</p><p className="text-xl font-semibold tabular-nums">{apcaScore === null ? "Unavailable" : `${apcaScore.toFixed(1)} Lc`}</p><p className="text-xs text-muted">Developmental perceptual guidance; not a WCAG 2.2 pass/fail criterion.</p></div>
           </div>
         </div>
       ) : null}
@@ -455,10 +597,10 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
         </div>
       </section>
 
-      {studioMode === "fix" ? <section aria-labelledby="corrections">
-        <h2 id="corrections" className="text-base font-semibold">Suggested corrections</h2>
+      {(studioMode === "fix" || (studioMode === "check" && evaluation && !evaluation.passes && corrections.length > 0)) ? <section aria-labelledby="corrections">
+        <h2 id="corrections" className="text-base font-semibold">{studioMode === "check" ? "One-click fixes for the selected target" : "Suggested corrections"}</h2>
         <p className="mt-1 text-sm text-muted">
-          The engine first searches HSL lightness while preserving hue/saturation, then checks whether increasing opacity can reach the selected threshold.
+          The engine first searches HSL lightness while preserving hue/saturation, then checks whether increasing opacity can reach the selected threshold. Apply a suggestion to update the live preview instantly — nothing leaves this device.
         </p>
         {corrections.length === 0 ? (
           <div className="mt-3 rounded-xl border border-border bg-surface-2 p-4 text-sm">
@@ -479,7 +621,7 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
                   Before {item.beforeRatio.toFixed(2)}:1 → After <strong>{item.afterRatio.toFixed(2)}:1</strong>
                 </p>
                 <p className="mt-1 text-xs text-muted">{item.summary.rgb} · {item.summary.hsl} · alpha {item.summary.alpha}</p>
-                <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => {
+                <Button type="button" variant="outline" className="mt-3 min-h-11 w-full sm:w-auto" onClick={() => {
                   if (item.label.startsWith("Foreground")) setFgInput(item.summary.hex);
                   else setBgInput(item.summary.hex);
                   setStudioMode("check");
@@ -501,7 +643,7 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
       </section>
 
       {studioMode === "preview" ? <ColorContexts foreground={fgInput} background={bgInput} /> : null}
-      {studioMode === "vision" ? <ColorVisionContexts foreground={fgInput} background={bgInput} /> : null}
+      {(studioMode === "vision" || studioMode === "check") ? <ColorVisionContexts foreground={fgInput} background={bgInput} compact={studioMode === "check"} /> : null}
       {studioMode === "export" ? <ColorTokenExport foreground={fgInput} background={bgInput} /> : null}
       <ResultPanel
         items={[
@@ -573,28 +715,106 @@ function ColorContexts({ foreground, background }: { foreground: string; backgro
   return <section id="color-preview" className="space-y-3" aria-labelledby="color-context-heading"><div><h2 id="color-context-heading" className="text-base font-semibold">Multi-surface preview</h2><p className="text-sm text-muted">Visual context is illustrative. Check actual text size, states, and the surfaces you ship.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{surfaces.map(([label, preview]) => <div key={label} className="space-y-2 rounded-xl border border-border p-3"><p className="text-xs font-medium text-muted">{label}</p>{preview}</div>)}</div></section>;
 }
 
-function ColorVisionContexts({ foreground, background }: { foreground: string; background: string }) {
+function ColorVisionContexts({ foreground, background, compact = false }: { foreground: string; background: string; compact?: boolean }) {
   const modes = [
     ["Original", foreground, background],
-    ["Protanopia approximation", simulateColor(foreground, "protanopia"), simulateColor(background, "protanopia")],
-    ["Deuteranopia approximation", simulateColor(foreground, "deuteranopia"), simulateColor(background, "deuteranopia")],
-    ["Tritanopia approximation", simulateColor(foreground, "tritanopia"), simulateColor(background, "tritanopia")],
-    ["Achromatopsia · grayscale approximation", simulateColor(foreground, "achromatopsia"), simulateColor(background, "achromatopsia")],
+    ["Protanopia", simulateColor(foreground, "protanopia"), simulateColor(background, "protanopia")],
+    ["Deuteranopia", simulateColor(foreground, "deuteranopia"), simulateColor(background, "deuteranopia")],
+    ["Tritanopia", simulateColor(foreground, "tritanopia"), simulateColor(background, "tritanopia")],
+    ["Achromatopsia", simulateColor(foreground, "achromatopsia"), simulateColor(background, "achromatopsia")],
   ] as const;
-  return <section className="space-y-3" aria-labelledby="vision-preview-heading"><div><h2 id="vision-preview-heading" className="text-base font-semibold">Side-by-side color-vision preview</h2><p className="text-sm text-muted">Matrix approximations are illustrative, not clinical. Never communicate meaning by color alone.</p></div><div className="grid gap-3 sm:grid-cols-2">{modes.map(([name, fg, bg]) => <div key={name} className="rounded-xl border border-border p-3"><p className="mb-2 text-xs font-medium text-muted">{name}</p><div className="flex min-h-20 items-center justify-center gap-3 rounded-lg p-3" style={{ backgroundColor: bg, color: fg }}><span className="rounded border border-current px-3 py-2">Alert</span><span className="rounded-full border border-current px-3 py-2">Ready</span></div><p className="mt-2 font-mono text-xs">{fg} / {bg}</p></div>)}</div></section>;
+  if (compact) {
+    return (
+      <section className="space-y-2" aria-labelledby="vision-preview-heading-compact">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="vision-preview-heading-compact" className="text-base font-semibold">Color-vision quick check</h2>
+            <p className="text-sm text-muted">Illustrative approximations · never rely on color alone</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {modes.map(([name, fg, bg]) => (
+            <div key={name} className="rounded-lg border border-border p-2">
+              <p className="mb-1 truncate text-[11px] font-medium text-muted">{name}</p>
+              <div className="flex min-h-12 items-center justify-center rounded-md px-2 py-1 text-xs font-medium" style={{ backgroundColor: bg ?? "#ccc", color: fg ?? "#000" }}>
+                Aa
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-3" aria-labelledby="vision-preview-heading">
+      <div>
+        <h2 id="vision-preview-heading" className="text-base font-semibold">Side-by-side color-vision preview</h2>
+        <p className="text-sm text-muted">Matrix approximations are illustrative, not clinical. Never communicate meaning by color alone. Full simulation is free here — many tools lock this behind paid plans.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {modes.map(([name, fg, bg]) => (
+          <div key={name} className="rounded-xl border border-border p-3">
+            <p className="mb-2 text-xs font-medium text-muted">{name}</p>
+            <div className="flex min-h-20 items-center justify-center gap-3 rounded-lg p-3" style={{ backgroundColor: bg ?? "#ccc", color: fg ?? "#000" }}>
+              <span className="rounded border border-current px-3 py-2">Alert</span>
+              <span className="rounded-full border border-current px-3 py-2">Ready</span>
+            </div>
+            <p className="mt-2 font-mono text-xs">{fg} / {bg}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function FocusPlayground({ focusColor = "#005fcc", darkColor = "#ffd54f" }: { focusColor?: string; darkColor?: string }) {
+function FocusPlayground({ focusColor = "#005fcc", darkColor = "#ffd54f", ringWidth = 3, ringOffset = 3 }: { focusColor?: string; darkColor?: string; ringWidth?: number; ringOffset?: number }) {
   const [dark, setDark] = useState(false);
   const [forced, setForced] = useState(false);
   const background = forced ? "#000000" : dark ? "#111827" : undefined;
   const foreground = forced ? "#ffffff" : dark ? "#ffffff" : undefined;
-  return <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading" style={{ "--preview-focus-color": forced ? "Highlight" : dark ? darkColor : focusColor, background, color: foreground } as CSSProperties}>
-    <div><h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2><p className="text-sm text-muted">Use Tab and Shift+Tab to move through the actual controls. Focus styling is shown on keyboard focus, not mouse clicks.</p></div>
-    <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" aria-pressed={dark} onClick={() => { setDark((value) => !value); setForced(false); }}>Preview {dark ? "light" : "dark"} surface</Button><Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal py-2 text-left sm:h-11 sm:whitespace-nowrap" aria-pressed={forced} onClick={() => { setForced((value) => !value); setDark(false); }}>Toggle forced-colors approximation</Button></div>
-    <div className="flex flex-wrap items-center gap-3 rounded-lg p-4" style={{ background: forced ? "#000000" : dark ? "#111827" : "#f8fafc", color: forced || dark ? "#ffffff" : "#111827" }}><span aria-hidden="true" className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-white">Sample button</span><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 min-w-0 max-w-full flex-1 flex-wrap items-center gap-2">Email <input className="min-h-11 min-w-0 w-full flex-1 rounded border bg-white px-3 text-black placeholder:text-gray-500" type="email" placeholder="name@example.com" /></label></div>
-    <p className="text-xs text-muted">Forced-colors mode is a visual mock, not the operating system's forced-colors environment. Verify with real OS/browser settings.</p>
-  </section>;
+  const activeRing = forced ? "Highlight" : dark ? darkColor : focusColor;
+  const focusStyle = {
+    "--preview-focus-color": activeRing,
+    "--preview-focus-width": `${Math.min(8, Math.max(2, ringWidth))}px`,
+    "--preview-focus-offset": `${Math.min(10, Math.max(1, ringOffset))}px`,
+    background,
+    color: foreground,
+  } as CSSProperties;
+  return (
+    <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading" style={focusStyle}>
+      <div>
+        <h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2>
+        <p className="text-sm text-muted">Use Tab and Shift+Tab. Focus rings appear on keyboard focus only. Toggle dark / forced-colors to stress-test the ring.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" className="min-h-11" aria-pressed={dark} onClick={() => { setDark((v) => !v); setForced(false); }}>
+          Preview {dark ? "light" : "dark"} surface
+        </Button>
+        <Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal py-2 text-left sm:h-11 sm:whitespace-nowrap" aria-pressed={forced} onClick={() => { setForced((v) => !v); setDark(false); }}>
+          Toggle forced-colors approximation
+        </Button>
+      </div>
+      <style>{`
+        .accessibility-focus-playground .focus-demo:focus-visible {
+          outline: var(--preview-focus-width, 3px) solid var(--preview-focus-color, #005fcc);
+          outline-offset: var(--preview-focus-offset, 3px);
+        }
+        .accessibility-focus-playground .focus-demo:focus:not(:focus-visible) { outline: none; }
+      `}</style>
+      <div className="flex flex-wrap items-center gap-3 rounded-lg p-4" style={{ background: forced ? "#000000" : dark ? "#111827" : "#f8fafc", color: forced || dark ? "#ffffff" : "#111827" }}>
+        <button type="button" className="focus-demo inline-flex min-h-11 items-center rounded-lg bg-accent px-4 font-medium text-white">Sample button</button>
+        <a className="focus-demo min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a>
+        <label className="flex min-h-11 min-w-0 max-w-full flex-1 flex-wrap items-center gap-2">
+          Email
+          <input className="focus-demo min-h-11 min-w-0 w-full flex-1 rounded border bg-white px-3 text-black placeholder:text-gray-500" type="email" placeholder="name@example.com" />
+        </label>
+      </div>
+      <p className="text-xs text-muted">
+        Ring: {Math.min(8, Math.max(2, ringWidth))}px · offset {Math.min(10, Math.max(1, ringOffset))}px · color {activeRing}.
+        Forced-colors is a visual mock — verify with real OS/browser settings before shipping.
+      </p>
+    </section>
+  );
 }
 
 
@@ -697,7 +917,14 @@ function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { 
     {kind === "aria" && action === "preview" ? <AccessibilityTreePreview html={html} /> : null}
     {kind === "form" && action === "simulator" ? <AccessibleFormPlayground /> : null}
     {kind === "text-readability" && ["preview", "simulator"].includes(action) && <section className="space-y-3 rounded-xl border border-border p-4"><div className="flex items-center justify-between"><Label htmlFor="accessibility-size-slider">Preview size</Label><output htmlFor="accessibility-size-slider">{previewSize}px</output></div><input id="accessibility-size-slider" className="min-h-11 w-full accent-accent" type="range" min="12" max="48" step="1" value={previewSize} onChange={(e) => setPreviewSize(Number(e.target.value))} aria-label="Preview text size" /><div className="flex items-center justify-between"><Label htmlFor="accessibility-leading-slider">Line height</Label><output htmlFor="accessibility-leading-slider">{previewLeading.toFixed(2)}</output><input id="accessibility-leading-slider" className="min-h-11 w-40 accent-accent" type="range" min="1" max="2.5" step="0.05" value={previewLeading} onChange={(e) => setPreviewLeading(Number(e.target.value))} aria-label="Preview line height" /></div><p className="rounded-lg bg-surface-2 p-4" style={{ fontSize: `${previewSize}px`, lineHeight: previewLeading }}>{text || "Accessible design gives people more than one way to understand and use content, across different screens and preferences."}</p></section>}
-    {(["focus-state", "keyboard-navigation"].includes(kind) && ["preview", "simulator"].includes(action)) ? <FocusPlayground focusColor={fg} darkColor={bg} /> : null}
+    {(["focus-state", "keyboard-navigation"].includes(kind) && ["preview", "simulator", "generator", "checker"].includes(action)) ? (
+      <FocusPlayground
+        focusColor={fg || "#005fcc"}
+        darkColor={bg || "#ffd54f"}
+        ringWidth={Number(focusWidth) || 3}
+        ringOffset={Number(focusOffset) || 3}
+      />
+    ) : null}
     {kind === "motion" && ["preview", "simulator"].includes(action) ? <section className="space-y-3 rounded-xl border border-border p-4"><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={reducedMotion} onChange={(e) => setReducedMotion(e.target.checked)} className="size-5 accent-accent" />Reduce non-essential motion</label><div className={`motion-preview-box rounded-lg bg-accent-soft p-5 text-center font-medium text-accent ${reducedMotion ? "motion-preview-reduced" : "motion-preview-active"}`}>Motion sample · {reducedMotion ? "reduced" : "full"}</div><p className="text-xs text-muted">This is a local demo only. Also test your operating system's reduced-motion preference.</p></section> : null}
     <pre aria-live="polite" aria-atomic="true" className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-sm leading-6 text-bg">{output}</pre>
     {needsHtml ? <section className="space-y-3 rounded-xl border border-border bg-surface-2 p-4" aria-labelledby="axe-scan-heading">
