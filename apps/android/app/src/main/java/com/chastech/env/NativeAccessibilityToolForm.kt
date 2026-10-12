@@ -65,9 +65,9 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val kind = NativeAccessibilityEngine.kind(tool.id)
     val studioKind = when (kind) { "accessible-color", "color-blindness" -> "contrast"; "font-size", "line-height" -> "text-readability"; else -> kind }
-    val modes = if (studioKind == "contrast") listOf("checker", "generator", "helper", "preview", "simulator", "vision") else listOf("checker", "generator", "helper", "preview", "simulator")
-    var studioMode by rememberSaveable(tool.id) { mutableStateOf(if (kind == "color-blindness") "vision" else tool.id.substringAfterLast('-', "checker").takeIf { it in modes } ?: "checker") }
-    val engineToolId = if (studioMode == "vision") "color-blindness-preview" else "$studioKind-$studioMode"
+    val modes = listOf("checker", "generator", "helper", "preview", "simulator")
+    var studioMode by rememberSaveable(tool.id, "accessibility-studio-modes-v2") { mutableStateOf(if (kind == "color-blindness") "simulator" else tool.id.substringAfterLast('-', "checker").takeIf { it in modes } ?: "checker") }
+    val engineToolId = if (studioKind == "contrast" && studioMode == "simulator") "color-blindness-simulator" else "$studioKind-$studioMode"
     var markup by rememberSaveable(tool.id) { mutableStateOf("") }
     var foreground by rememberSaveable(tool.id) { mutableStateOf("#000000") }
     var background by rememberSaveable(tool.id) { mutableStateOf("#ffffff") }
@@ -108,14 +108,14 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
         Text(if (colorTool) "Native contrast checks run on this device; APCA opens the web implementation." else "Runs on this device. Your text and markup are not uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             modes.forEach { mode ->
-                val label = when (mode) { "checker" -> "Check"; "generator" -> "Generate"; "helper" -> "Coach / fix"; "preview" -> "Preview"; "simulator" -> "Test"; else -> "Color vision" }
+                val label = when (mode) { "checker" -> "Check"; "generator" -> "Generate"; "helper" -> "Coach / fix"; "preview" -> "Preview"; else -> "Test" }
                 if (studioMode == mode) Button(onClick = { studioMode = mode }, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
                 else OutlinedButton(onClick = { studioMode = mode }, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
             }
         }
         if (colorTool) {
             OutlinedButton(onClick = { apcaWebOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Text("Open APCA in web view")
+                Text("APCA · Web only")
             }
             Text("APCA runs in the web Color Contrast Studio. It requires a connection; colors entered in this native form are not copied over.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -175,7 +175,7 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
                 }
             }
         }
-        if (colorTool && studioMode == "vision") {
+        if (colorTool && studioMode == "simulator") {
             Text("Approximation only—not a clinical simulator. Never convey meaning through color alone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             NativeAccessibilityEngine.colorVisionPreviewPairs(foreground, background).forEach { row ->
                 Surface(color = previewColor(row.background, MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -209,7 +209,7 @@ fun NativeAccessibilityToolForm(tool: ToolRecord) {
         Button(
             onClick = { output = NativeAccessibilityEngine.analyze(engineToolId, if (kind == "aria" && studioMode == "generator") ariaPattern else markup, foreground, background, fontSize, lineHeight, focusWidth, focusOffset) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text(if (studioMode == "generator") "Generate locally" else if (studioMode == "preview" || studioMode == "simulator" || studioMode == "vision") "Run local preview / test" else if (studioMode == "helper") "Get local coaching" else "Run local review") }
+        ) { Text(if (studioMode == "generator") "Generate locally" else if (studioMode == "preview" || studioMode == "simulator") "Run local preview / test" else if (studioMode == "helper") "Get local coaching" else "Run local review") }
         OutlinedButton(
             onClick = { markup = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; focusWidth = "3px"; focusOffset = "3px"; ariaPattern = "button"; previewSize = 18f; previewLeading = 1.5f; demoEmail = ""; demoSubmitted = false; demoValid = false; output = "" },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

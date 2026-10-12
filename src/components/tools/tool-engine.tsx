@@ -63,6 +63,9 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
   if (tool.requiresBackend && tool.engine.type === "custom") return <BackendToolEngine toolId={tool.id} category={tool.category} />;
+  // Accessibility Studios must override legacy per-tool engine metadata (for example,
+  // contrast-checker was historically a generic color tool).
+  if (tool.category === "accessibility") return <AccessibilityEngine toolId={tool.id} />;
 
   switch (tool.engine.type) {
     case "calculator":
@@ -130,7 +133,6 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
       if (tool.category === "communication") return <CommunicationEngine toolId={tool.id} />;
       if (tool.category === "streaming") return <StreamingEngine toolId={tool.id} />;
       if (tool.category === "marketing") return <MarketingEngine toolId={tool.id} />;
-      if (tool.category === "accessibility") return <AccessibilityEngine toolId={tool.id} />;
       if (tool.category === "webdesign") return <WebDesignEngine toolId={tool.id} />;
       if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;
       if (tool.category === "career") return <CareerEngine toolId={tool.id} />;

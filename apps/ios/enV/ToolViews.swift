@@ -1277,7 +1277,7 @@ struct NativeAccessibilityToolView: View {
         self.tool = tool
         let rawKind = NativeAccessibilityEngine.kind(tool.id)
         let suffix = tool.id.components(separatedBy: "-").last ?? "checker"
-        let initial = rawKind == "color-blindness" ? "vision" : (["checker", "generator", "helper", "preview", "simulator"].contains(suffix) ? suffix : "checker")
+        let initial = rawKind == "color-blindness" ? "simulator" : (["checker", "generator", "helper", "preview", "simulator"].contains(suffix) ? suffix : "checker")
         _studioMode = State(initialValue: initial)
     }
     private var kind: String { NativeAccessibilityEngine.kind(tool.id) }
@@ -1287,8 +1287,8 @@ struct NativeAccessibilityToolView: View {
     private var textTool: Bool { studioKind == "text-readability" }
     private var altCoach: Bool { kind == "alt-text" && studioMode == "helper" }
     private var focusGenerator: Bool { kind == "focus-state" && studioMode == "generator" }
-    private var modes: [String] { colorTool ? ["checker", "generator", "helper", "preview", "simulator", "vision", "apca"] : ["checker", "generator", "helper", "preview", "simulator"] }
-    private var engineToolID: String { studioMode == "vision" ? "color-blindness-preview" : "\(studioKind)-\(studioMode)" }
+    private var modes: [String] { ["checker", "generator", "helper", "preview", "simulator"] }
+    private var engineToolID: String { colorTool && studioMode == "simulator" ? "color-blindness-simulator" : "\(studioKind)-\(studioMode)" }
     private var codeTool: Bool { studioMode != "generator" && !colorTool && !sizeTool && !altCoach && !(kind == "form" && studioMode == "simulator") }
     private var studioTitle: String { ["contrast": "Color Contrast Studio", "alt-text": "Alt Text Studio", "focus-state": "Focus State Studio", "text-readability": "Text & Readability Studio", "aria": "ARIA Studio", "motion": "Motion & Reduced Motion Studio", "keyboard-navigation": "Keyboard Navigation Studio", "form": "Form Accessibility Studio"][studioKind] ?? tool.name }
 
@@ -1302,11 +1302,10 @@ struct NativeAccessibilityToolView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(modes, id: \.self) { mode in
-                        let title = mode == "checker" ? "Check" : mode == "generator" ? "Generate" : mode == "helper" ? "Coach / fix" : mode == "preview" ? "Preview" : mode == "simulator" ? "Test" : mode == "vision" ? "Color vision" : "APCA · Web"
-                        let selected = mode == "apca" ? showAPCAWebView : studioMode == mode
+                        let title = mode == "checker" ? "Check" : mode == "generator" ? "Generate" : mode == "helper" ? "Coach / fix" : mode == "preview" ? "Preview" : "Test"
+                        let selected = studioMode == mode
                         Button {
-                            if mode == "apca" { showAPCAWebView = true }
-                            else { studioMode = mode; output = "" }
+                            studioMode = mode; output = ""
                         } label: {
                             enVCharacterSpacedText("\(selected ? "✓ " : "")\(title)")
                                 .font(.envScaled(size: 13, weight: selected ? .semibold : .regular))
@@ -1316,10 +1315,20 @@ struct NativeAccessibilityToolView: View {
                                 .overlay(Capsule().stroke(Color.accentColor, lineWidth: 1))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(mode == "apca" ? "Open APCA in web view" : "\(title)\(studioMode == mode ? ", selected" : "")")
-                        .accessibilityHint(mode == "apca" ? "Requires an internet connection. The native color inputs are not copied to the web page." : "")
+                        .accessibilityLabel("\(title)\(studioMode == mode ? ", selected" : "")")
                     }
                 }
+            }
+            if colorTool {
+                Button { showAPCAWebView = true } label: {
+                    Label("APCA · Web only", systemImage: "safari")
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Open APCA in web view")
+                .accessibilityHint("Requires an internet connection. Native color values are not transferred to the web page.")
+                enVCharacterSpacedText("APCA runs only in the web Color Contrast Studio; native checks remain on-device.")
+                    .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             if colorTool {
                 NativeInputField(title: "Foreground color", text: $foreground)
@@ -1366,14 +1375,14 @@ struct NativeAccessibilityToolView: View {
             }
             if codeTool && !altCoach { Button("Load sample") { input = sampleInput }.buttonStyle(.bordered).frame(maxWidth: .infinity, alignment: .leading) }
             if colorTool && studioMode == "preview" { colorPreview }
-            if colorTool && studioMode == "vision" { colorVisionPreview }
+            if colorTool && studioMode == "simulator" { colorVisionPreview }
             if sizeTool && ["preview", "simulator"].contains(studioMode) { typeScalePreview }
             if kind == "focus-state" && ["preview", "simulator"].contains(studioMode) { focusPreview }
             if kind == "keyboard-navigation" && ["preview", "simulator"].contains(studioMode) { focusPreview }
             if kind == "motion" && ["preview", "simulator"].contains(studioMode) { motionPreview }
             if kind == "form" && studioMode == "simulator" { formPreview }
             Button { output = NativeAccessibilityEngine.analyze(toolID: engineToolID, input: kind == "aria" && studioMode == "generator" ? ariaPattern : input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight, focusWidth: focusWidth, focusOffset: focusOffset) } label: {
-                Label(studioMode == "generator" ? "Generate locally" : studioMode == "helper" ? "Get local coaching" : ["preview", "simulator", "vision"].contains(studioMode) ? "Run local preview / test" : "Run local review", systemImage: "play.fill")
+                Label(studioMode == "generator" ? "Generate locally" : studioMode == "helper" ? "Get local coaching" : ["preview", "simulator"].contains(studioMode) ? "Run local preview / test" : "Run local review", systemImage: "play.fill")
                     .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             }.buttonStyle(.borderedProminent)
             Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; focusWidth = "3px"; focusOffset = "3px"; ariaPattern = "button"; previewSize = 18; previewLineHeight = 1.5; demoEmail = ""; demoSubmitted = false; demoValid = false; output = "" } label: {

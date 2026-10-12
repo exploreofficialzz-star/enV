@@ -244,10 +244,20 @@ assert.match(android, /private fun WebToolsSearchField\([\s\S]*?focused && query
 assert.match(iosContent, /\.focused\(\$isToolsSearchFocused\)/);
 assert.match(iosContent, /private var searchSuggestions: \[Tool\][\s\S]*?ForEach\(searchSuggestions\)[\s\S]*?See more results/);
 // APCA is the sole WebView exception: it opens the web-content implementation from Color Contrast Studio only.
-assert.match(androidAccessibility, /if \(colorTool\) \{[\s\S]*?Open APCA in web view/);
+assert.match(androidAccessibility, /val modes = listOf\("checker", "generator", "helper", "preview", "simulator"\)/);
+assert.match(androidAccessibility, /if \(colorTool && studioMode == "simulator"\) \{[\s\S]*?colorVisionPreviewPairs/);
+assert.match(androidAccessibility, /if \(studioKind == "contrast" && studioMode == "simulator"\) "color-blindness-simulator"/);
+assert.match(androidAccessibility, /Text\("APCA · Web only"\)/);
+assert.match(androidAccessibility, /mutableStateOf\(if \(kind == "color-blindness"\) "simulator"/);
 assert.match(androidAccessibility, /APCA_WEB_URL = "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"/);
 assert.match(androidAccessibility, /target\.scheme == "https" && target\.host == APCA_WEB_HOST/);
-assert.match(iosTools, /colorTool \? \[[^\]]*"apca"/);
+assert.match(iosTools, /private var modes: \[String\] \{ \["checker", "generator", "helper", "preview", "simulator"\] \}/);
+assert.match(iosTools, /if colorTool && studioMode == "simulator" \{ colorVisionPreview \}/);
+assert.match(iosTools, /colorTool && studioMode == "simulator" \? "color-blindness-simulator"/);
+assert.match(iosTools, /rawKind == "color-blindness" \? "simulator"/);
+assert.match(iosTools, /if colorTool \{\s*Button \{ showAPCAWebView = true \}[\s\S]*?APCA · Web only/);
+assert.doesNotMatch(androidAccessibility, /studioMode == "vision"|"vision"\s*,\s*"apca"/);
+assert.doesNotMatch(iosTools, /studioMode == "vision"|"vision"\s*,\s*"apca"/);
 assert.match(iosTools, /apcaStudioWebURL = URL\(string: "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"\)!/);
 assert.match(iosTools, /private struct APCAWebView: UIViewRepresentable[\s\S]*?websiteDataStore = \.nonPersistent\(\)/);
 assert.match(iosTools, /target\.scheme == "https", target\.host == "en-v\.vercel\.app"/);

@@ -21,7 +21,7 @@ import {
   resolveRenderedPair,
 } from "@/lib/engines/accessibility-color";
 
-import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
+import { type Action, type ColorStudioMode, type Kind, colorStudioModeFromToolId, parseToolId } from "./accessibility-engine-utils";
 import { auditAccessibilityMarkup, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
 import { accessibilityKindFromToolId, accessibilityStudioForKind } from "@/lib/accessibility-studios";
 import { apcaContrast } from "@/lib/engines/accessibility-apca";
@@ -263,7 +263,6 @@ function correctionCard(
   return { label, beforeRatio, afterRatio, summary };
 }
 
-type ColorStudioMode = "check" | "fix" | "preview" | "vision" | "export";
 function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: ColorStudioMode }) {
   const [fgInput, setFgInput] = useState("#000000");
   const [bgInput, setBgInput] = useState("#ffffff");
@@ -271,8 +270,8 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
   const [studioMode, setStudioMode] = useState<ColorStudioMode>(initialMode);
   const modes: Array<{ id: ColorStudioMode; label: string }> = [
-    { id: "check", label: "Check contrast" }, { id: "fix", label: "Fix colors" },
-    { id: "preview", label: "Preview surfaces" }, { id: "vision", label: "Color vision" }, { id: "export", label: "Export tokens" },
+    { id: "check", label: "Check" }, { id: "export", label: "Generate" },
+    { id: "fix", label: "Coach / fix" }, { id: "preview", label: "Preview" }, { id: "vision", label: "Test" },
   ];
 
   const fg = useMemo(() => parseCssColor(fgInput), [fgInput]);
@@ -352,10 +351,10 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
 
   if (!allValid) {
     return (
-      <div className="space-y-5">
-        <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} />
+      <div className="accessibility-studio space-y-5">
+        <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} label="Color Contrast Studio workflow" />
         <p className="text-sm text-muted">
-          Deterministic local WCAG-oriented contrast calculation. Enter HEX, RGB/RGBA, or HSL/HSLA colors. Alpha is composited before the ratio is calculated.
+          Runs entirely on this device; nothing is uploaded. Enter HEX, RGB/RGBA, or HSL/HSLA colors. Alpha is composited before the ratio is calculated.
         </p>
         <ColorInput label="Foreground" value={fgInput} onChange={setFgInput} parsed={fg} />
         <ColorInput label="Background" value={bgInput} onChange={setBgInput} parsed={bg} />
@@ -368,14 +367,14 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
   }
 
   return (
-    <div className="space-y-6">
+    <div className="accessibility-studio space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Color Contrast Studio</p>
         <h2 className="mt-1 text-xl font-semibold">Check, improve, and preview a color system</h2>
       </div>
-      <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} />
+      <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} label="Color Contrast Studio workflow" />
       <p className="text-sm text-muted">
-        Deterministic local calculation based on WCAG 2.2 contrast rules. This evaluates the supplied color pair; it does not prove complete WCAG conformance.
+        Runs entirely on this device; nothing is uploaded. Deterministic calculations evaluate this supplied color pair, not complete WCAG conformance.
       </p>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -410,13 +409,13 @@ function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: Color
             <div className="max-w-md rounded-xl bg-white/10 p-4" style={{ color: rendered.foreground }}>
               <p className="text-2xl font-semibold">Accessible color preview</p>
               <p className="mt-1 text-sm">The rendered pair used for the deterministic contrast calculation.</p>
-              <button
-                type="button"
-                className="mt-4 rounded-md border px-3 py-2 text-sm font-medium"
+              <span
+                aria-hidden="true"
+                className="mt-4 inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm font-medium"
                 style={{ borderColor: rendered.foreground, color: rendered.foreground }}
               >
                 Sample action
-              </button>
+              </span>
             </div>
           </div>
           <div className="flex flex-col justify-center gap-2 bg-surface p-6">
@@ -592,8 +591,8 @@ function FocusPlayground({ focusColor = "#005fcc", darkColor = "#ffd54f" }: { fo
   const foreground = forced ? "#ffffff" : dark ? "#ffffff" : undefined;
   return <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading" style={{ "--preview-focus-color": forced ? "Highlight" : dark ? darkColor : focusColor, background, color: foreground } as CSSProperties}>
     <div><h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2><p className="text-sm text-muted">Use Tab and Shift+Tab to move through the actual controls. Focus styling is shown on keyboard focus, not mouse clicks.</p></div>
-    <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" aria-pressed={dark} onClick={() => { setDark((value) => !value); setForced(false); }}>Preview {dark ? "light" : "dark"} surface</Button><Button type="button" variant="outline" className="min-h-11" aria-pressed={forced} onClick={() => { setForced((value) => !value); setDark(false); }}>Toggle forced-colors approximation</Button></div>
-    <div className="flex flex-wrap items-center gap-3 rounded-lg p-4" style={{ background: forced ? "#000000" : dark ? "#111827" : "#f8fafc", color: forced || dark ? "#ffffff" : "#111827" }}><button type="button" className="min-h-11 rounded-lg bg-accent px-4 text-white">Sample button</button><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 items-center gap-2">Email <input className="min-h-11 rounded border px-3 text-black" type="email" placeholder="name@example.com" /></label></div>
+    <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" aria-pressed={dark} onClick={() => { setDark((value) => !value); setForced(false); }}>Preview {dark ? "light" : "dark"} surface</Button><Button type="button" variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal py-2 text-left sm:h-11 sm:whitespace-nowrap" aria-pressed={forced} onClick={() => { setForced((value) => !value); setDark(false); }}>Toggle forced-colors approximation</Button></div>
+    <div className="flex flex-wrap items-center gap-3 rounded-lg p-4" style={{ background: forced ? "#000000" : dark ? "#111827" : "#f8fafc", color: forced || dark ? "#ffffff" : "#111827" }}><span aria-hidden="true" className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-white">Sample button</span><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 min-w-0 max-w-full flex-1 flex-wrap items-center gap-2">Email <input className="min-h-11 min-w-0 w-full flex-1 rounded border bg-white px-3 text-black placeholder:text-gray-500" type="email" placeholder="name@example.com" /></label></div>
     <p className="text-xs text-muted">Forced-colors mode is a visual mock, not the operating system's forced-colors environment. Verify with real OS/browser settings.</p>
   </section>;
 }
@@ -626,12 +625,10 @@ function AccessibleFormPlayground() {
 
 export function AccessibilityEngine({ toolId }: { toolId: string }) {
   const parsed = parseToolId(toolId);
-  const rawKind = parsed.kind as string;
   const kind = accessibilityKindFromToolId(toolId) as Kind;
   const studio = accessibilityStudioForKind(kind);
   if (studio?.id === "contrast-checker") {
-    const initialMode: ColorStudioMode = rawKind === "color-blindness" ? "vision" : parsed.action === "helper" ? "fix" : parsed.action === "preview" ? "preview" : parsed.action === "generator" ? "export" : "check";
-    return <AccessibleColorChecker key={toolId} initialMode={initialMode} />;
+    return <AccessibleColorChecker key={toolId} initialMode={colorStudioModeFromToolId(toolId)} />;
   }
   return <AccessibilityStudioForm key={toolId} toolId={toolId} kind={kind} initialAction={parsed.action} studioName={studio?.name ?? `${titleCase(kind)} Studio`} />;
 }
@@ -668,8 +665,8 @@ function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { 
     setFocusWidth("3"); setFocusOffset("3"); setPreviewSize(18); setPreviewLeading(1.5); setReducedMotion(false);
     setAxeReport("");
   };
-  return <div className="space-y-5">
-    <header><p className="text-xs font-semibold uppercase tracking-wide text-accent">Accessibility Studio</p><h2 className="mt-1 text-xl font-semibold">{studioName}</h2><p className="mt-1 text-sm text-muted">Choose a workflow below. Processing stays in this browser; results are guidance, not certification.</p></header>
+  return <div className="accessibility-studio space-y-5">
+    <header><p className="text-xs font-semibold uppercase tracking-wide text-accent">Accessibility Studio</p><h2 className="mt-1 text-xl font-semibold">{studioName}</h2><p className="mt-1 text-sm text-muted">Choose a workflow below. Runs entirely on your device; nothing is uploaded. Results are guidance, not certification.</p></header>
     <StudioModeTabs modes={actionModes} value={action} onChange={setAction} label={`${studioName} workflow`} />
     <div className="grid gap-4 sm:grid-cols-2">
       {kind === "focus-state" && action === "generator" && <>
