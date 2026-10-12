@@ -98,6 +98,7 @@ export function ToolShell({
       {related.length > 0 ? (
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-accent">Related tools</h2>
+          {tool.category === "accessibility" ? <p className="mt-2 max-w-3xl text-sm text-muted">These tools have different jobs: checkers flag snippet issues, generators create starting output, helpers guide fixes, previews show examples, and simulators walk through user scenarios.</p> : null}
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {related.slice(0, visibleRelatedCount).map((r) => (
               <li key={r.id}>

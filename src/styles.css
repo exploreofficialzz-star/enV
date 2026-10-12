@@ -167,3 +167,27 @@
     }
   }
 }
+
+
+/* Local interaction demos used by accessibility preview tools. */
+.accessibility-focus-playground :focus-visible {
+  outline: 3px solid #005fcc;
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+@media (prefers-color-scheme: dark) {
+  .accessibility-focus-playground :focus-visible { outline-color: #ffd54f; }
+}
+@media (forced-colors: active) {
+  .accessibility-focus-playground :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
+}
+@keyframes accessibility-demo-pulse {
+  0%, 100% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+}
+.motion-preview-active { animation: accessibility-demo-pulse 1.4s ease-in-out infinite; }
+.motion-preview-reduced { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .motion-preview-active { animation: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

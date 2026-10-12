@@ -20,10 +20,13 @@ public enum NativeAccessibilityEngine {
     static func supports(_ tool: Tool) -> Bool { tool.category == "accessibility" && tool.engine.type == "custom" }
     public static func kind(_ toolID: String) -> String { actions.first(where: { toolID.hasSuffix("-\($0)") }).map { String(toolID.dropLast($0.count + 1)) } ?? toolID }
 
-    public static func analyze(toolID: String, input: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5") -> String {
+    public static func analyze(toolID: String, input: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5", focusWidth: String = "3px", focusOffset: String = "3px") -> String {
         let kind = kind(toolID)
         let action = actions.first(where: { toolID.hasSuffix("-\($0)") }) ?? "checker"
-        if action == "generator" { return template(kind: kind, foreground: foreground, background: background) }
+        if action == "generator" { return template(kind: kind, foreground: foreground, background: background, focusWidth: focusWidth, focusOffset: focusOffset, pattern: input) }
+        if action == "helper" && kind == "alt-text" { return altTextCoach(input) }
+        if action == "helper" && ["contrast", "accessible-color"].contains(kind) { return "\(helperGuide(kind))\n\n\(contrast(kind, foreground, background, suggestions: true))" }
+        if action == "helper" && kind == "text-readability" && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "READABILITY COACH · Heuristic draft for review\n\nOriginal:\n\(input)\n\nSimpler wording draft:\n\(plainLanguageDraft(input))\n\nReview each substitution for meaning and tone with intended readers.\n\n\(readability(input))" }
         if action == "helper" { return "\(helperGuide(kind))\n\n\(analyze(toolID: String(toolID.dropLast("-helper".count)) + "-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))" }
         if action == "preview" { return preview(kind: kind, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) }
         if action == "simulator" { return simulator(kind: kind, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) }
@@ -127,6 +130,7 @@ public enum NativeAccessibilityEngine {
 
     private static func simulator(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String) -> String {
         switch kind {
+        case "alt-text": return bulkAltText(input)
         case "color-blindness": return colorVisionReport(foreground, background)
         case "contrast", "accessible-color": return contrast(kind, foreground, background, suggestions: true)
         case "keyboard-navigation", "focus-state", "aria", "form": return "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through controls.\n2. Confirm visible focus and logical order.\n3. Activate with Enter/Space; dismiss with Escape where appropriate.\n4. Check names, roles, values, and errors with a screen reader.\n\n\(analyze(toolID: "\(kind)-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
@@ -134,6 +138,27 @@ public enum NativeAccessibilityEngine {
         case "motion": return "REDUCED-MOTION SIMULATION\nEnable the operating-system reduced-motion setting. Confirm non-essential transitions stop while essential feedback and meaning remain.\n\n\(analyze(toolID: "motion-checker", input: input))"
         default: return "SIMULATION GUIDE\nA static preview cannot reproduce an individual user's assistive technology. Test with real devices and users.\n\n\(analyze(toolID: "\(kind)-checker", input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight))"
         }
+    }
+
+    private static func altTextCoach(_ input: String) -> String {
+        let description = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty else { return "ALT-TEXT WRITING COACH\nDescribe the image and its purpose in the surrounding content. Drafts stay on this device.\n\nUse the shortest accurate wording; use alt=\"\" only when decorative." }
+        let phrase = description.trimmingCharacters(in: CharacterSet(charactersIn: ".!? \n\t"))
+        let options = ["\(phrase).", "\(phrase); it helps the reader understand the page content.", "\(phrase). The image adds relevant context for this section."]
+        let labels = ["Short", "Medium", "Detailed"]
+        let drafts = zip(labels, options).map { "\($0.0) (\($0.1.count) characters)\n\($0.1)" }.joined(separator: "\n\n")
+        return "ALT-TEXT WRITING COACH · Drafts, not automatic truth\n\n\(drafts)\n\nChoose the shortest version that conveys the image's purpose. Verify it against the actual image and nearby content."
+    }
+
+    private static func bulkAltText(_ input: String) -> String {
+        let images = parse(input).filter { $0.tag == "img" || ($0.tag == "input" && $0.attributes["type"]?.lowercased() == "image") }
+        guard !images.isEmpty else { return "BULK ALT-TEXT TRIAGE\nPaste multiple <img> tags to scan. This static check cannot inspect image pixels or judge meaning." }
+        let rows = images.enumerated().map { index, element -> String in
+            guard let alt = element.attributes["alt"] else { return "\(index + 1). SERIOUS · Missing alt\n   \(element.target)\n   Fix: add concise contextual alt, or alt=\"\" if decorative." }
+            if alt.range(of: #"(?i)\.(png|jpe?g|gif|webp|svg)$"#, options: .regularExpression) != nil { return "\(index + 1). MODERATE · Filename used as alt\n   \(element.target)\n   Fix: describe purpose, not the file name." }
+            return "\(index + 1). \(alt.isEmpty ? "REVIEW · Empty alt (decorative)" : "REVIEW · Alt present")\n   \(element.target)"
+        }.joined(separator: "\n\n")
+        return "BULK ALT-TEXT TRIAGE · Local scan\nImages found: \(images.count)\n\n\(rows)\n\nReview every proposed fix in context; valid alternative text depends on the image and nearby content."
     }
 
     private static func parse(_ input: String) -> [Element] {
@@ -212,6 +237,13 @@ public enum NativeAccessibilityEngine {
         return "#" + transformed.map { String(format: "%02X", $0) }.joined()
     }
 
+    private static func plainLanguageDraft(_ text: String) -> String {
+        let changes = [("at this point in time", "now"), ("in order to", "to"), ("in the event that", "if"), ("is able to", "can"), ("make a decision", "decide"), ("approximately", "about"), ("utilize", "use"), ("assistance", "help"), ("commence", "start"), ("demonstrate", "show"), ("purchase", "buy"), ("prior to", "before"), ("subsequently", "then"), ("determine", "decide"), ("requirement", "need"), ("sufficient", "enough"), ("numerous", "many"), ("obtain", "get"), ("regarding", "about"), ("additional", "more")]
+        var result = text
+        for (wordy, simple) in changes { result = result.replacingOccurrences(of: #"\b\#(NSRegularExpression.escapedPattern(for: wordy))\b"#, with: simple, options: [.regularExpression, .caseInsensitive]) }
+        return result
+    }
+
     private static func readability(_ text: String) -> String {
         let words = matches(text, pattern: #"[A-Za-z]+(?:['-][A-Za-z]+)*"#)
         guard !words.isEmpty else { return "Paste English text to calculate readability estimates." }
@@ -225,18 +257,33 @@ public enum NativeAccessibilityEngine {
         let ease = 206.835 - 1.015 * wps - 84.6 * spw, grade = 0.39 * wps + 11.8 * spw - 15.59
         return "TEXT READABILITY (English estimate)\nWords: \(words.count)\nSentences: \(sentences)\nSyllables: \(syllables)\nFlesch Reading Ease: \(String(format: "%.1f", ease))\nApproximate Flesch-Kincaid grade: \(String(format: "%.1f", grade))\n\nThese formulas are language-specific and do not replace testing with readers."
     }
-    private static func template(kind: String, foreground: String, background: String) -> String {
+    private static func template(kind: String, foreground: String, background: String, focusWidth: String, focusOffset: String, pattern: String) -> String {
         switch kind {
-        case "aria": return "ARIA STARTER\n\nPrefer native HTML semantics before ARIA. Example:\n<button type=\"button\">Save changes</button>\n\nAdd ARIA only when native semantics cannot express the required name, role, or state."
+        case "aria":
+            let snippet: String
+            switch pattern.lowercased() {
+            case "dialog": snippet = "<button type=\"button\" aria-haspopup=\"dialog\" aria-controls=\"settings\">Settings</button>\n<dialog id=\"settings\" aria-labelledby=\"settings-title\">\n  <h2 id=\"settings-title\">Settings</h2>\n  <button type=\"button\">Close</button>\n</dialog>"
+            case "disclosure": snippet = "<button type=\"button\" aria-expanded=\"false\" aria-controls=\"details\">More details</button>\n<div id=\"details\" hidden>Additional details</div>"
+            case "tabs": snippet = "<div role=\"tablist\" aria-label=\"Account sections\">\n  <button role=\"tab\" id=\"profile-tab\" aria-selected=\"true\" aria-controls=\"profile-panel\" tabindex=\"0\">Profile</button>\n</div>\n<section role=\"tabpanel\" id=\"profile-panel\" aria-labelledby=\"profile-tab\">Profile settings</section>"
+            case "checkbox": snippet = "<label><input type=\"checkbox\" name=\"updates\"> Email me updates</label>"
+            case "link": snippet = "<a href=\"/account/settings\">Account settings</a>"
+            default: snippet = "<button type=\"button\">Save changes</button>"
+            }
+            return "ARIA PATTERN STARTER · \(pattern.isEmpty ? "button" : pattern)\n\n\(snippet)\n\nPrefer native semantics. Custom widgets also need full keyboard behavior and accurate state updates; test the completed component."
         case "alt-text": return "ALT TEXT GUIDE\n\nDescribe an informative image's purpose in context. Use alt=\"\" only when it is decorative. Do not repeat nearby text or use filenames."
         case "form": return "ACCESSIBLE FORM STARTER\n\n<label for=\"email\">Email address</label>\n<input id=\"email\" name=\"email\" autocomplete=\"email\">\n\nAssociate errors with aria-describedby; do not communicate error state by color alone."
-        case "focus-state": return "VISIBLE FOCUS CSS\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nCheck contrast and ensure the focused control is not obscured."
+        case "focus-state":
+            let width = matches(focusWidth, pattern: #"^[2-8](?:\.\d+)?px$"#).first ?? "3px"
+            let offset = matches(focusOffset, pattern: #"^(?:[1-9]|10)(?:\.\d+)?px$"#).first ?? "3px"
+            let ring = matches(foreground, pattern: #"^#[0-9a-fA-F]{6}$"#).first ?? "currentColor"
+            let darkRing = matches(background, pattern: #"^#[0-9a-fA-F]{6}$"#).first ?? "#ffd54f"
+            return "FOCUS-VISIBLE CSS STARTER\n:focus-visible {\n  outline: \(width) solid \(ring);\n  outline-offset: \(offset);\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: \(darkRing); }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep the indicator visible and unclipped; verify contrast against adjacent surfaces."
         case "keyboard-navigation": return "KEYBOARD REVIEW\n\nTab / Shift+Tab: logical order\nEnter / Space: expected activation\nEscape: closes dismissible overlays\nNo keyboard trap; visible focus remains present."
         case "motion": return "REDUCED MOTION CSS\n@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after {\n    scroll-behavior: auto !important;\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n  }\n}\n\nUse only when appropriate to the component; preserve essential feedback."
         case "color-blindness": return colorVisionReport(foreground, background)
-        case "font-size": return "FONT SIZE CSS STARTER\n\nbody {\n  font-size: 1rem; /* 16 CSS px starting point */\n  line-height: 1.5;\n}\n\nVerify resizing and reflow; these are starting values, not WCAG conformance thresholds."
-        case "line-height": return "LINE HEIGHT CSS STARTER\n\nbody {\n  font-size: 1rem;\n  line-height: 1.5;\n}\n\nPrefer a unitless ratio that scales with the font. Verify user text-spacing overrides."
-        case "text-readability": return "READABILITY WRITING CHECKLIST\n\nUse clear headings, short sentences, concrete words, and one idea per paragraph. The English readability estimate is advisory; validate with readers."
+        case "font-size": return "FLUID TYPE SCALE CSS STARTER\n\n:root {\n  --type-body: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);\n  --type-lead: clamp(1.125rem, 1rem + 0.6vw, 1.375rem);\n  --type-heading: clamp(1.75rem, 1.35rem + 1.8vw, 2.5rem);\n}\n\nTest 200% text resizing, 400% zoom, and narrow screens. These are starting values, not conformance thresholds."
+        case "line-height": return "LINE-HEIGHT SCALE CSS STARTER\n\n:root {\n  --leading-tight: 1.2;\n  --leading-heading: 1.3;\n  --leading-body: 1.5;\n  --leading-relaxed: 1.75;\n}\nbody { line-height: var(--leading-body); }\n\nVerify user text-spacing overrides and ensure content is not clipped."
+        case "text-readability": return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "READABILITY STARTER\nPaste English text to create a reviewable plain-language draft. The local substitutions are limited and do not certify a reading level.\n\nUse clear headings, short sentences, concrete words, and one idea per paragraph." : "PLAIN-LANGUAGE DRAFT · Heuristic, not an automatic rewrite\n\nOriginal:\n\(pattern)\n\nSuggested wording:\n\(plainLanguageDraft(pattern))\n\nReview carefully: substitutions can change nuance or technical meaning. Test with intended readers."
         case "contrast", "accessible-color": return contrast(kind, foreground, background, suggestions: true)
         default: return "ACCESSIBILITY CHECKLIST\n\nUse semantic HTML, provide meaningful names, preserve keyboard operation and visible focus, support zoom and user text spacing, and test with assistive technology."
         }

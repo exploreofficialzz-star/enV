@@ -18,10 +18,13 @@ object NativeAccessibilityEngine {
     fun supports(toolId: String, category: String): Boolean = category == "accessibility" && toolId.isNotBlank()
     fun kind(toolId: String): String = actions.firstOrNull { toolId.endsWith("-$it") }?.let { toolId.removeSuffix("-$it") } ?: toolId
 
-    fun analyze(toolId: String, markup: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5"): String {
+    fun analyze(toolId: String, markup: String, foreground: String = "#000000", background: String = "#ffffff", fontSize: String = "16px", lineHeight: String = "1.5", focusWidth: String = "3px", focusOffset: String = "3px"): String {
         val kind = kind(toolId)
         val action = actions.firstOrNull { toolId.endsWith("-$it") } ?: "checker"
-        if (toolId.endsWith("-generator")) return generator(kind, foreground, background)
+        if (toolId.endsWith("-generator")) return generator(kind, foreground, background, focusWidth, focusOffset, markup)
+        if (action == "helper" && kind == "alt-text") return altTextCoach(markup)
+        if (action == "helper" && kind in setOf("contrast", "accessible-color")) return "${helperGuide(kind)}\n\n${contrastReport(kind, foreground, background, true)}"
+        if (action == "helper" && kind == "text-readability" && markup.isNotBlank()) return "READABILITY COACH · Heuristic draft for review\n\nOriginal:\n$markup\n\nSimpler wording draft:\n${plainLanguageDraft(markup)}\n\nReview each substitution for meaning and tone with intended readers.\n\n${analyze(kind + "-checker", markup)}"
         if (action == "helper") return "${helperGuide(kind)}\n\n${analyze(toolId.removeSuffix("-helper") + "-checker", markup, foreground, background, fontSize, lineHeight)}"
         if (action == "preview") return preview(kind, markup, foreground, background, fontSize, lineHeight)
         if (action == "simulator") return simulator(kind, markup, foreground, background, fontSize, lineHeight)
@@ -125,6 +128,7 @@ object NativeAccessibilityEngine {
     }
 
     private fun simulator(kind: String, input: String, foreground: String, background: String, fontSize: String, lineHeight: String): String = when (kind) {
+        "alt-text" -> bulkAltText(input)
         "color-blindness" -> colorVisionReport(foreground, background)
         "contrast", "accessible-color" -> contrastReport(kind, foreground, background, true)
         "keyboard-navigation", "focus-state", "aria", "form" -> "KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through every control.\n2. Confirm focus is visible and order is logical.\n3. Activate with Enter/Space; close dismissible UI with Escape.\n4. Check names, roles, values, and errors with a screen reader.\n\n${analyze("${kind}-checker", input, foreground, background, fontSize, lineHeight)}"
@@ -203,17 +207,63 @@ object NativeAccessibilityEngine {
         return "#" + transformed.joinToString("") { "%02X".format(Locale.US, it) }
     }
 
-    private fun generator(kind: String, foreground: String, background: String): String = when (kind) {
-        "aria" -> "ARIA STARTER\n\nPrefer native HTML semantics first. Example:\n<button type=\"button\">Save changes</button>\n\nAdd ARIA only when the name, role, or state cannot be expressed with native HTML."
+    private fun altTextCoach(input: String): String {
+        val description = input.trim()
+        if (description.isEmpty()) return "ALT-TEXT WRITING COACH\nDescribe the image and its purpose in the surrounding content. Drafts stay on this device.\n\nUse the shortest accurate wording; use alt=\"\" only when decorative."
+        val phrase = description.trimEnd('.', '!', '?', ' ')
+        val options = listOf("$phrase.", "$phrase; it helps the reader understand the page content.", "$phrase. The image adds relevant context for this section.")
+        return "ALT-TEXT WRITING COACH · Drafts, not automatic truth\n\n${options.mapIndexed { i, value -> "${listOf("Short", "Medium", "Detailed")[i]} (${value.length} characters)\n$value" }.joinToString("\n\n")}\n\nChoose the shortest accurate option. Verify against the actual image and nearby content."
+    }
+
+    private fun bulkAltText(input: String): String {
+        val images = parse(input).filter { it.tag == "img" || (it.tag == "input" && it.attrs["type"]?.equals("image", true) == true) }
+        if (images.isEmpty()) return "BULK ALT-TEXT TRIAGE\nPaste multiple <img> tags to scan. This static check cannot inspect image pixels or judge meaning."
+        val rows = images.mapIndexed { index, element ->
+            val alt = element.attrs["alt"]
+            when {
+                alt == null -> "${index + 1}. SERIOUS · Missing alt\n   ${element.source}\n   Fix: add concise contextual alt, or alt=\"\" if decorative."
+                alt.matches(Regex("(?i).*\\.(png|jpe?g|gif|webp|svg)$")) -> "${index + 1}. MODERATE · Filename used as alt\n   ${element.source}\n   Fix: describe purpose, not the file name."
+                alt.isBlank() -> "${index + 1}. REVIEW · Empty alt (decorative)\n   ${element.source}"
+                else -> "${index + 1}. REVIEW · Alt present\n   ${element.source}"
+            }
+        }
+        return "BULK ALT-TEXT TRIAGE · Local scan\nImages found: ${images.size}\n\n${rows.joinToString("\n\n")}\n\nReview every fix in context. Valid alt text depends on the image and nearby content."
+    }
+
+    private fun plainLanguageDraft(input: String): String {
+        val changes = listOf("at this point in time" to "now", "in order to" to "to", "in the event that" to "if", "is able to" to "can", "make a decision" to "decide", "approximately" to "about", "utilize" to "use", "assistance" to "help", "commence" to "start", "demonstrate" to "show", "purchase" to "buy", "prior to" to "before", "subsequently" to "then", "determine" to "decide", "requirement" to "need", "sufficient" to "enough", "numerous" to "many", "obtain" to "get", "regarding" to "about", "additional" to "more")
+        var result = input
+        changes.forEach { (wordy, simple) -> result = result.replace(Regex("\\b${Regex.escape(wordy)}\\b", RegexOption.IGNORE_CASE), simple) }
+        return result
+    }
+
+    private fun generator(kind: String, foreground: String, background: String, focusWidth: String, focusOffset: String, pattern: String): String = when (kind) {
+        "aria" -> {
+            val snippet = when (pattern.trim().lowercase()) {
+                "dialog" -> "<button type=\"button\" aria-haspopup=\"dialog\" aria-controls=\"settings\">Settings</button>\n<dialog id=\"settings\" aria-labelledby=\"settings-title\">\n  <h2 id=\"settings-title\">Settings</h2>\n  <button type=\"button\">Close</button>\n</dialog>"
+                "disclosure" -> "<button type=\"button\" aria-expanded=\"false\" aria-controls=\"details\">More details</button>\n<div id=\"details\" hidden>Additional details</div>"
+                "tabs" -> "<div role=\"tablist\" aria-label=\"Account sections\">\n  <button role=\"tab\" id=\"profile-tab\" aria-selected=\"true\" aria-controls=\"profile-panel\" tabindex=\"0\">Profile</button>\n</div>\n<section role=\"tabpanel\" id=\"profile-panel\" aria-labelledby=\"profile-tab\">Profile settings</section>"
+                "checkbox" -> "<label><input type=\"checkbox\" name=\"updates\"> Email me updates</label>"
+                "link" -> "<a href=\"/account/settings\">Account settings</a>"
+                else -> "<button type=\"button\">Save changes</button>"
+            }
+            "ARIA PATTERN STARTER · ${pattern.ifBlank { "button" }}\n\n$snippet\n\nPrefer native semantics. Custom widgets also need full keyboard behavior and accurate state updates; test the completed component."
+        }
         "alt-text" -> "ALT TEXT GUIDE\n\nDescribe an informative image's purpose in context. Use alt=\"\" only when decorative. Avoid filenames and nearby-text repetition."
         "form" -> "ACCESSIBLE FORM STARTER\n\n<label for=\"email\">Email address</label>\n<input id=\"email\" name=\"email\" autocomplete=\"email\">\n\nAssociate error text with aria-describedby; never rely on color alone."
-        "focus-state" -> "VISIBLE FOCUS CSS\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nCheck contrast and ensure the focused control is not obscured."
+        "focus-state" -> {
+            val width = focusWidth.trim().takeIf { it.matches(Regex("[2-8](?:\\.\\d+)?px")) } ?: "3px"
+            val offset = focusOffset.trim().takeIf { it.matches(Regex("(?:[1-9]|10)(?:\\.\\d+)?px")) } ?: "3px"
+            val ring = foreground.trim().takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "currentColor"
+            val darkRing = background.trim().takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) } ?: "#ffd54f"
+            "FOCUS-VISIBLE CSS STARTER\n:focus-visible {\n  outline: $width solid $ring;\n  outline-offset: $offset;\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: $darkRing; }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep the indicator visible and unclipped; verify contrast against adjacent surfaces."
+        }
         "keyboard-navigation" -> "KEYBOARD REVIEW\n\nTab / Shift+Tab: logical order\nEnter / Space: expected activation\nEscape: closes dismissible overlays\nNo keyboard trap; visible focus remains present."
         "motion" -> "REDUCED MOTION CSS\n@media (prefers-reduced-motion: reduce) {\n  *, *::before, *::after {\n    scroll-behavior: auto !important;\n    animation-duration: 0.01ms !important;\n    animation-iteration-count: 1 !important;\n    transition-duration: 0.01ms !important;\n  }\n}\n\nPreserve essential feedback when reducing motion."
         "color-blindness" -> colorVisionReport(foreground, background)
-        "font-size" -> "FONT SIZE CSS STARTER\n\nbody {\n  font-size: 1rem;\n  line-height: 1.5;\n}\n\nVerify resizing and reflow; these are starting values, not conformance thresholds."
-        "line-height" -> "LINE HEIGHT CSS STARTER\n\nbody {\n  font-size: 1rem;\n  line-height: 1.5;\n}\n\nPrefer a unitless ratio; verify text-spacing overrides."
-        "text-readability" -> "READABILITY WRITING CHECKLIST\n\nUse clear headings, short sentences, concrete words, and one idea per paragraph. This English readability estimate is advisory; validate with readers."
+        "font-size" -> "FLUID TYPE SCALE CSS STARTER\n\n:root {\n  --type-body: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);\n  --type-lead: clamp(1.125rem, 1rem + 0.6vw, 1.375rem);\n  --type-heading: clamp(1.75rem, 1.35rem + 1.8vw, 2.5rem);\n}\n\nTest 200% text resizing, 400% zoom, and narrow screens. These are starting values, not conformance thresholds."
+        "line-height" -> "LINE-HEIGHT SCALE CSS STARTER\n\n:root {\n  --leading-tight: 1.2;\n  --leading-heading: 1.3;\n  --leading-body: 1.5;\n  --leading-relaxed: 1.75;\n}\nbody { line-height: var(--leading-body); }\n\nVerify user text-spacing overrides and ensure content is not clipped."
+        "text-readability" -> if (pattern.isBlank()) "READABILITY STARTER\nPaste English text to create a reviewable plain-language draft. The local substitutions are limited and do not certify a reading level.\n\nUse clear headings, short sentences, concrete words, and one idea per paragraph." else "PLAIN-LANGUAGE DRAFT · Heuristic, not an automatic rewrite\n\nOriginal:\n$pattern\n\nSuggested wording:\n${plainLanguageDraft(pattern)}\n\nReview carefully: substitutions can change nuance or technical meaning. Test with intended readers."
         "contrast", "accessible-color" -> contrastReport(kind, foreground, background, true)
         else -> "ACCESSIBILITY CHECKLIST\n\nUse semantic HTML, meaningful names, keyboard operation, visible focus, zoom and text-spacing support, and assistive-technology testing."
     }

@@ -171,6 +171,11 @@ struct ToolDetailView: View {
                         .foregroundStyle(Color.envAccent)
                         .padding(.top, 40)
                         .padding(.bottom, 16)
+                    if tool.category == "accessibility" {
+                        enVCharacterSpacedText("Each tool has a distinct job: checkers flag snippet issues, generators create starting output, helpers guide fixes, previews show examples, and simulators walk through user scenarios.")
+                            .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                            .padding(.bottom, 10)
+                    }
                     LazyVGrid(columns: relatedColumns, alignment: .leading, spacing: 8) {
                         ForEach(allRelatedTools.prefix(visibleRelatedCount)) { related in
                             NavigationLink(value: related) { RelatedToolDetailCard(tool: related) }
@@ -1249,53 +1254,85 @@ struct NativeAccessibilityToolView: View {
     @State private var background = "#ffffff"
     @State private var fontSize = "16px"
     @State private var lineHeight = "1.5"
+    @State private var focusWidth = "3px"
+    @State private var focusOffset = "3px"
+    @State private var ariaPattern = "button"
     @State private var output = ""
     private var kind: String { NativeAccessibilityEngine.kind(tool.id) }
     private var colorTool: Bool { ["contrast", "accessible-color", "color-blindness"].contains(kind) }
     private var sizeTool: Bool { ["font-size", "line-height"].contains(kind) }
     private var textTool: Bool { kind == "text-readability" }
-    private var codeTool: Bool { !colorTool && !sizeTool && !textTool }
+    private var altCoach: Bool { tool.id == "alt-text-helper" }
+    private var focusGenerator: Bool { tool.id == "focus-state-generator" }
+    private var codeTool: Bool { !tool.id.hasSuffix("-generator") && !colorTool && !sizeTool && !textTool && !altCoach }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            enVCharacterSpacedText("On-device accessibility review · no snippet is uploaded.")
+            enVCharacterSpacedText(tool.description)
+                .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
+            enVCharacterSpacedText("Runs on this device · your text and markup are not uploaded.")
                 .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
             if colorTool {
                 NativeInputField(title: "Foreground color", text: $foreground)
                 NativeInputField(title: "Background color", text: $background)
             }
+            if focusGenerator {
+                NativeInputField(title: "Focus ring color (HEX)", text: $foreground)
+                NativeInputField(title: "Dark-mode ring color (HEX)", text: $background)
+                NativeInputField(title: "Ring width (CSS px)", text: $focusWidth)
+                NativeInputField(title: "Ring offset (CSS px)", text: $focusOffset)
+            }
+            if tool.id == "aria-generator" {
+                Picker("Pattern", selection: $ariaPattern) {
+                    Text("Button").tag("button"); Text("Dialog").tag("dialog"); Text("Disclosure").tag("disclosure")
+                    Text("Tabs").tag("tabs"); Text("Checkbox").tag("checkbox"); Text("Link").tag("link")
+                }.pickerStyle(.menu).accessibilityLabel("ARIA pattern to generate")
+            }
             if sizeTool {
                 NativeInputField(title: "Font size (CSS px/rem)", text: $fontSize)
                 if kind == "line-height" { NativeInputField(title: "Line height", text: $lineHeight) }
             }
-            if codeTool || textTool {
-                enVCharacterSpacedText(textTool ? "English text" : "HTML / CSS snippet")
+            if codeTool || textTool || altCoach {
+                enVCharacterSpacedText(altCoach ? "Image description" : textTool ? "English text" : "HTML / CSS snippet")
                     .font(.envScaled(size: 13, weight: .semibold))
                 TextEditor(text: $input)
-                    .font(.system(size: 14, design: codeTool ? .monospaced : .default))
+                    .font(.system(size: 16, design: codeTool && !altCoach ? .monospaced : .default))
                     .frame(minHeight: 160)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                    .accessibilityLabel(textTool ? "English text for readability analysis" : "HTML or CSS snippet to analyze")
+                    .accessibilityLabel(altCoach ? "Describe the image and its purpose" : textTool ? "English text for readability analysis" : "HTML or CSS snippet to analyze")
+                    .accessibilityHint(altCoach ? "Drafts three alternatives on this device; verify them against the actual image." : "Paste only the relevant snippet for a focused review.")
             }
-            HStack(spacing: 8) {
-                Button { output = NativeAccessibilityEngine.analyze(toolID: tool.id, input: input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight) } label: {
-                    HStack(spacing: 6) { EnVIcon(name: "Play", size: 14, tint: .white); enVCharacterSpacedText("Analyze locally") }
-                }.buttonStyle(.borderedProminent)
-                Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; output = "" } label: {
-                    HStack(spacing: 6) { EnVIcon(name: "RotateCcw", size: 14, tint: .envMuted); enVCharacterSpacedText("Reset") }
-                }.buttonStyle(.bordered)
-                Button { UIPasteboard.general.string = output } label: {
-                    HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy report") }
-                }.disabled(output.isEmpty)
-                if !output.isEmpty { ShareLink(item: output) { enVCharacterSpacedText("Export") } }
-            }
+            if codeTool && !altCoach { Button("Load sample") { input = sampleInput }.buttonStyle(.bordered).frame(maxWidth: .infinity, alignment: .leading) }
+            Button { output = NativeAccessibilityEngine.analyze(toolID: tool.id, input: tool.id == "aria-generator" ? ariaPattern : input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight, focusWidth: focusWidth, focusOffset: focusOffset) } label: {
+                Label(tool.id.hasSuffix("-generator") ? "Generate locally" : "Run local review", systemImage: "play.fill")
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            }.buttonStyle(.borderedProminent)
+            Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; focusWidth = "3px"; focusOffset = "3px"; ariaPattern = "button"; output = "" } label: {
+                Label("Reset fields", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            }.buttonStyle(.bordered)
             if !output.isEmpty {
-                TextEditor(text: .constant(output)).font(.system(size: 12, design: .monospaced)).frame(minHeight: 190)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35)))
-                    .accessibilityLabel("Accessibility analysis report")
+                enVCharacterSpacedText("Result").font(.envScaled(size: 17, weight: .semibold))
+                Button { UIPasteboard.general.string = output } label: {
+                    Label("Copy report", systemImage: "doc.on.doc").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                }.buttonStyle(.bordered).accessibilityHint("Copies the full local result to the clipboard")
+                ShareLink(item: output) { Label("Share or save report", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading) }
+                    .buttonStyle(.bordered)
+                Text(output).font(.system(size: 14, design: .monospaced)).textSelection(.enabled)
+                    .accessibilityLabel("Accessibility analysis result")
             }
             enVCharacterSpacedText("Static snippet checks only. Manually test keyboard order, browser zoom, screen readers, and the complete page; results do not certify WCAG conformance.")
                 .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+        }
+    }
+    private var sampleInput: String {
+        switch kind {
+        case "alt-text": return "<img src=\"logo.svg\" alt=\"\">\n<img src=\"event.jpg\">"
+        case "aria": return "<button aria-label=\"\" aria-expanded=\"false\">Open</button>"
+        case "focus-state": return "button:focus { outline: none; }"
+        case "keyboard-navigation": return "<div tabindex=\"4\" onclick=\"openMenu()\">Menu</div>"
+        case "form": return "<form><input type=\"email\"><button>Submit</button></form>"
+        case "motion": return "button { animation: pulse 1s infinite; }"
+        default: return ""
         }
     }
 }

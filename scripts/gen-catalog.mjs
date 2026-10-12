@@ -1924,11 +1924,11 @@ for (const tool of tools) {
   };
   const topic = topics[kind] || "selected WCAG-oriented checks on supplied values or markup";
   const descriptions = {
-    checker: `Check ${topic} locally and review rule-level findings with suggested fixes.`,
-    generator: `Generate a topic-specific starter or color/content recommendation for ${topic}.`,
-    helper: `Review ${topic} locally with clear explanations and practical next steps.`,
-    preview: `Preview how the local rules evaluate ${topic} on the supplied sample.`,
-    simulator: `Explore ${topic} against supplied values or markup; static previews do not simulate a full browser or assistive technology.`,
+    checker: `Focused local checker for ${topic}; shows severity, context, and actionable fixes. A clean snippet is not proof of conformance.`,
+    generator: `Create copy-ready accessible starting output for ${topic}; review it in your product and test with assistive technology before shipping.`,
+    helper: `Guided fixer for ${topic}; understand common mistakes, apply a suggested correction, and verify the result locally.`,
+    preview: `Interactive preview for ${topic}; inspect the supplied example in context instead of reading a generic checklist.`,
+    simulator: `Step through an educational simulation for ${topic}; this approximation is not a replacement for real user testing.`,
   };
   tool.description = descriptions[action];
 }
@@ -1940,12 +1940,25 @@ for (const t of tools) {
   byCat.get(t.category).push(t);
 }
 for (const t of tools) {
-  const peers = byCat
+  let peers = byCat
     .get(t.category)
     .filter((x) => x.id !== t.id && x.status !== "planned")
     .sort((a, b) => Math.abs(a.popularity - t.popularity) - Math.abs(b.popularity - t.popularity))
     .slice(0, 6)
     .map((x) => x.id);
+  if (t.category === "accessibility") {
+    const family = t.id.replace(/-(checker|generator|simulator|helper|preview)$/, "");
+    const siblings = byCat.get(t.category)
+      .filter((x) => x.id !== t.id && x.status !== "planned" && x.id.startsWith(`${family}-`))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((x) => x.id);
+    const relatedFamilies = ["accessible-color", "contrast", "color-blindness"].includes(family)
+      ? byCat.get(t.category)
+          .filter((x) => x.id !== t.id && ["accessible-color", "contrast", "color-blindness"].some((prefix) => x.id.startsWith(`${prefix}-`)))
+          .map((x) => x.id)
+      : [];
+    peers = [...new Set([...siblings, ...relatedFamilies, ...peers])].slice(0, 6);
+  }
   t.related = peers;
 }
 

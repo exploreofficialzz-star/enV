@@ -33,21 +33,45 @@ class NativeAccessibilityEngineTest {
         assertTrue(NativeAccessibilityEngine.analyze("color-blindness-simulator", "", "#ff0000", "#00ff00").contains("#"))
         assertTrue(NativeAccessibilityEngine.analyze("accessible-color-generator", "", "#777777", "#ffffff").contains("Foreground alternatives"))
         assertTrue(NativeAccessibilityEngine.analyze("line-height-checker", "", fontSize = "16px", lineHeight = "24px").contains("Ratio: 1.50"))
-        assertTrue(NativeAccessibilityEngine.analyze("font-size-generator", "").contains("font-size: 1rem"))
+        assertTrue(NativeAccessibilityEngine.analyze("font-size-generator", "").contains("--type-body: clamp"))
         assertTrue(NativeAccessibilityEngine.supports("aria-simulator", "accessibility"))
         assertFalse(NativeAccessibilityEngine.supports("aria-simulator", "developer"))
     }
 
     @Test fun accessibilityActionsHaveDistinctJobs() {
-        val markup = "<img src=\"hero.jpg\" alt=\"A person using a laptop\"><button>Save</button>"
-        val helper = NativeAccessibilityEngine.analyze("alt-text-helper", markup)
+        val markup = "<img src=\"hero.jpg\" alt=\"A person using a laptop\"><img src=\"logo.png\">"
+        val helper = NativeAccessibilityEngine.analyze("alt-text-helper", "Volunteer registers visitors at an event")
         val preview = NativeAccessibilityEngine.analyze("alt-text-preview", markup)
         val simulator = NativeAccessibilityEngine.analyze("alt-text-simulator", markup)
         assertTrue(helper.contains("WRITING COACH"))
         assertTrue(preview.contains("SCREEN-READER ANNOUNCEMENT PREVIEW"))
         assertTrue(preview.contains("Image: A person using a laptop"))
-        assertTrue(simulator.contains("SIMULATION GUIDE"))
+        assertTrue(simulator.contains("BULK ALT-TEXT TRIAGE"))
+        assertTrue(simulator.contains("SERIOUS · Missing alt"))
         assertFalse(helper == preview || preview == simulator || helper == simulator)
         assertTrue(NativeAccessibilityEngine.analyze("aria-simulator", "<button aria-label=\"Save\">Save</button>").contains("KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH"))
+    }
+
+    @Test fun focusGeneratorUsesUserOptionsAndModernModes() {
+        val css = NativeAccessibilityEngine.analyze("focus-state-generator", "", "#005fcc", "#ffd54f", focusWidth = "4px", focusOffset = "5px")
+        assertTrue(css.contains("outline: 4px solid #005fcc"))
+        assertTrue(css.contains("outline-offset: 5px"))
+        assertTrue(css.contains("forced-colors: active"))
+        assertTrue(css.contains("prefers-color-scheme: dark"))
+    }
+
+    @Test fun ariaGeneratorProducesSelectedPattern() {
+        assertTrue(NativeAccessibilityEngine.analyze("aria-generator", "disclosure").contains("aria-expanded=\"false\""))
+        assertTrue(NativeAccessibilityEngine.analyze("aria-generator", "tabs").contains("role=\"tablist\""))
+    }
+
+    @Test fun readabilityActionsProduceQualifiedSimplificationDrafts() {
+        val source = "We will utilize this assistance in order to make a decision."
+        val generated = NativeAccessibilityEngine.analyze("text-readability-generator", source)
+        val helper = NativeAccessibilityEngine.analyze("text-readability-helper", source)
+        assertTrue(generated.contains("Suggested wording:"))
+        assertTrue(generated.contains("use this help to decide"))
+        assertTrue(helper.contains("READABILITY COACH"))
+        assertTrue(helper.contains("Flesch Reading Ease"))
     }
 }

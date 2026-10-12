@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import {
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
 import { auditAccessibilityMarkup, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
-const COLORS = ["#000000", "#ffffff", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e"];
+const COLORS = ["#000000", "#111827", "#1f2937", "#374151", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e", "#ffffff", "#f8fafc", "#e5e7eb", "#dbeafe", "#fef3c7"];
 function downloadText(text: string, filename: string) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -75,6 +75,18 @@ function readability(text: string) {
   const grade = 0.39 * wordsPerSentence + 11.8 * syllablesPerWord - 15.59;
   return { words: words.length, sentences, syllables: syllableCount, ease, grade };
 }
+function plainLanguageDraft(text: string) {
+  const changes: Array<[RegExp, string]> = [
+    [/\bat this point in time\b/gi, "now"], [/\bin order to\b/gi, "to"], [/\bin the event that\b/gi, "if"], [/\bis able to\b/gi, "can"],
+    [/\bmake a decision\b/gi, "decide"], [/\bapproximately\b/gi, "about"], [/\butilize\b/gi, "use"], [/\bassistance\b/gi, "help"],
+    [/\bcommence\b/gi, "start"], [/\bdemonstrate\b/gi, "show"], [/\bpurchase\b/gi, "buy"], [/\bprior to\b/gi, "before"],
+    [/\bsubsequently\b/gi, "then"], [/\bdetermine\b/gi, "decide"], [/\brequirement\b/gi, "need"], [/\bsufficient\b/gi, "enough"],
+    [/\bnumerous\b/gi, "many"], [/\bobtain\b/gi, "get"], [/\bregarding\b/gi, "about"], [/\badditional\b/gi, "more"],
+  ];
+  let draft = text;
+  for (const [pattern, replacement] of changes) draft = draft.replace(pattern, (match) => /^[A-Z]/.test(match) ? replacement[0].toUpperCase() + replacement.slice(1) : replacement);
+  return draft;
+}
 function titleCase(value: string) { return value.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function parsePx(value: string) {
   const n = Number.parseFloat(value); if (!Number.isFinite(n)) return null;
@@ -97,8 +109,8 @@ function analyzeHtml(html: string, kind: Kind) {
   return auditAccessibilityMarkup(`${kind}-checker`, html).report;
 }
 
-function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: string; text: string; size: string; lineHeight: string; html: string; role: string }) {
-  const { fg, bg, text, size, lineHeight, html, role } = values;
+function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: string; text: string; size: string; lineHeight: string; html: string; role: string; focusWidth?: string; focusOffset?: string }) {
+  const { fg, bg, text, size, lineHeight, html, role, focusWidth = "3", focusOffset = "3" } = values;
   if (action === "helper") {
     const guidance: Partial<Record<Kind, string>> = {
       "alt-text": "WRITING COACH · Describe the image's purpose in context. Keep essential meaning, omit decorative details, and use alt=\"\" only for decorative images.",
@@ -114,7 +126,16 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
       "text-readability": "READABILITY COACH · Split long sentences, explain specialist terms, use descriptive headings, and test with intended readers.",
       "color-blindness": "COLOR-SAFETY HELPER · Never communicate status by color alone; pair colors with text, icons, or patterns and inspect the simulated alternatives.",
     };
-    return `${guidance[kind] ?? "ACCESSIBILITY FIXER · Apply one change at a time and verify with keyboard and assistive technology."}\n\n${buildOutput(kind, "checker", values)}`;
+    if (kind === "alt-text") {
+      const description = text.trim();
+      if (!description) return "WRITING COACH\nDescribe the image and its purpose in the surrounding content. The description stays in this browser.\n\nExample: ‘A volunteer uses a laptop to register visitors at a community event.’";
+      const phrase = description.replace(/[.!?]+$/g, "").trim();
+      const options = [`${phrase}.`, `${phrase}; it helps the reader understand the page content.`, `${phrase}. The image is included to show relevant context for this section.`];
+      return `ALT-TEXT WRITING COACH · Drafts, not automatic truth\n\n${options.map((value, i) => `${["Short", "Medium", "Detailed"][i]} (${value.length} characters)\n${value}`).join("\n\n")}\n\nChoose the shortest version that conveys the image's purpose. If nearby text already says this, use alt=\"\" only when the image is decorative. Verify against the actual image.`;
+    }
+    if (kind === "text-readability" && text.trim()) return `READABILITY COACH · Heuristic draft for review\n\nOriginal:\n${text}\n\nSimpler wording draft:\n${plainLanguageDraft(text)}\n\nThis local word-substitution pass cannot verify meaning or tone. Review every change with intended readers.\n\n${buildOutput(kind, "checker", values)}`;
+    const example = kind === "aria" ? `\n\nWRONG\n<div role="button" onclick="save()">Save</div>\nRIGHT\n<button type="button">Save</button>\n\nUse native semantics first; ARIA cannot add keyboard behavior by itself.` : "";
+    return `${guidance[kind] ?? "ACCESSIBILITY FIXER · Apply one change at a time and verify with keyboard and assistive technology."}${example}\n\n${buildOutput(kind, "checker", values)}`;
   }
   if (action === "preview") {
     if (kind === "alt-text") {
@@ -132,6 +153,15 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
     return `INTERACTIVE PREVIEW\n${analyzeHtml(html, kind)}\n\nStatic preview only; verify with real keyboard and assistive technology.`;
   }
   if (action === "simulator") {
+    if (kind === "alt-text") {
+      const tags = [...html.matchAll(/<img\b[^>]*>/gi)].map(([tag], i) => {
+        const alt = tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1];
+        if (alt === undefined) return `${i + 1}. SERIOUS · Missing alt\n   ${tag}\n   Fix: add concise contextual alt text, or alt="" if decorative.`;
+        if (/\.(png|jpe?g|gif|webp|svg)$/i.test(alt)) return `${i + 1}. MODERATE · Filename used as alt\n   ${tag}\n   Fix: describe purpose, not the file name.`;
+        return `${i + 1}. ${alt ? "REVIEW · Alt present" : "CHECK · Empty alt (decorative)"}\n   ${tag}`;
+      });
+      return `BULK ALT-TEXT TRIAGE · Local HTML scan\nImages found: ${tags.length}\n\n${tags.join("\n\n") || "Paste 1–50 image tags to scan. This checker evaluates markup patterns, not image pixels or meaning."}\n\nReview every proposed fix in context; valid alt text depends on the image and nearby content.`;
+    }
     if (kind === "color-blindness") return `COLOR-VISION SIMULATION (approximate)\n${buildOutput(kind, "checker", values)}\n\nIllustrative only, not clinical or a substitute for user testing.`;
     if (["keyboard-navigation", "focus-state", "aria", "form"].includes(kind)) return `KEYBOARD + ASSISTIVE-TECHNOLOGY WALKTHROUGH\n1. Tab forward and Shift+Tab backward through controls.\n2. Confirm visible focus and logical order.\n3. Activate with Enter/Space; dismiss with Escape where appropriate.\n4. Check names, roles, values, and errors with a screen reader.\n\n${buildOutput(kind, "checker", values)}`;
     if (["font-size", "line-height"].includes(kind)) return `ZOOM SIMULATION CHECKLIST\nAt 200% text resize and 400% viewport zoom, inspect clipping, overlap, horizontal scrolling, and control reachability.\n\n${buildOutput(kind, "preview", values)}`;
@@ -142,8 +172,8 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
     const ratio = contrast(fg, bg);
     if (action === "generator") {
       const base = hexRgb(bg);
-      const candidates = COLORS.map((c) => ({ c, ratio: contrast(c, bg) ?? 0 })).filter((x) => x.ratio >= 4.5).sort((a, b) => b.ratio - a.ratio).slice(0, 5);
-      return `ACCESSIBLE COLOR SUGGESTIONS\nBackground: ${bg}\n${base ? candidates.map((x) => `${x.c} — ${x.ratio.toFixed(2)}:1`).join("\n") : "Enter a valid #RRGGBB background."}`;
+      const candidates = COLORS.map((c) => ({ c, ratio: contrast(c, bg) ?? 0 })).filter((x) => x.ratio >= 4.5).sort((a, b) => b.ratio - a.ratio);
+      return `ACCESSIBLE PALETTE · WCAG 2.2 AA text pairs\nBase/background: ${bg}\n${base ? candidates.length ? candidates.map((x, i) => `Pair ${i + 1}: ${x.c} on ${bg} · ${x.ratio.toFixed(2)}:1 · ${x.ratio >= 7 ? "AA + AAA normal text" : "AA normal text"}`).join("\n") : "No passing pair in this starter palette. Try a darker or lighter base." : "Enter a valid #RRGGBB base color."}\n\nOnly passing values are listed. This starter palette is not an APCA evaluation; check actual type size, context, and use of color before shipping.`;
     }
     return `${titleCase(kind)} ${action.toUpperCase()}\n\nForeground: ${fg}\nBackground: ${bg}\n\n${contrastText(ratio)}\n\nTip: check the actual text size and UI context before shipping.`;
   }
@@ -153,28 +183,38 @@ function buildOutput(kind: Kind, action: Action, values: { fg: string; bg: strin
   }
   if (kind === "font-size") {
     const px = parsePx(size);
-    if (action === "generator") return `FONT SIZE GUIDE\n\nRecommended starting sizes:\nBody: 16px (1rem)\nSmall supporting text: 14px (0.875rem)\nLarge body: 18px (1.125rem)\nHeading: 32px+ depending on hierarchy\n\nUse relative units where appropriate and test browser zoom.`;
+    if (action === "generator") return `FLUID TYPE SCALE · CSS\n:root {\n  --type-body: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);\n  --type-lead: clamp(1.125rem, 1rem + 0.6vw, 1.375rem);\n  --type-heading: clamp(1.75rem, 1.35rem + 1.8vw, 2.5rem);\n}\n\nStart with body 1rem and scale headings proportionally. Test 200% text resize, 400% zoom, and narrow screens; no font size alone guarantees conformance.`;
     return `FONT SIZE CHECK\n\nInput: ${size || "(empty)"}\nEquivalent: ${px === null ? "invalid / unsupported unit" : `${px.toFixed(2)}px`}\n\n${px !== null && px >= 16 ? "The size is at least 16px; verify readability at zoom and on the target device." : "Consider increasing small body text and test at 200% zoom."}`;
   }
   if (kind === "line-height") {
     const lh = Number.parseFloat(lineHeight), px = parsePx(size);
     const ratio = /px$/i.test(lineHeight.trim()) ? (Number.isFinite(lh) && px ? lh / px : Number.NaN) : lh;
-    if (action === "generator") return `LINE HEIGHT STARTER\n\nbody {\n  font-size: 1rem;\n  line-height: 1.5;\n}\n\nUse a unitless line-height so it scales with the font. Test text-spacing overrides and 200% zoom.`;
+    if (action === "generator") return `LINE-HEIGHT SCALE · CSS\n:root {\n  --leading-tight: 1.2;\n  --leading-heading: 1.3;\n  --leading-body: 1.5;\n  --leading-relaxed: 1.75;\n}\n\nbody { line-height: var(--leading-body); }\n\nThese are starting values. Verify user text-spacing overrides and no content is clipped.`;
     return `LINE HEIGHT ${action.toUpperCase()}\n\nFont size: ${size || "16px"}\nLine height: ${lineHeight || "1.5"}\nRatio: ${Number.isFinite(ratio) ? ratio.toFixed(2) : "invalid"}\n\n${Number.isFinite(ratio) && ratio >= 1.5 ? "At or above 1.5× font size; verify the final layout." : "For paragraphs, consider around 1.5× font size or greater."}`;
   }
   if (kind === "text-readability") {
     const r = readability(text);
-    if (action === "generator") return `READABLE TEXT CHECKLIST\n\n• Prefer short sentences and concrete words.\n• Use headings and lists to expose structure.\n• Keep one main idea per paragraph.\n• Avoid unexplained abbreviations.\n• Test with real users and assistive technology.`;
+    if (action === "generator") return text.trim() ? `PLAIN-LANGUAGE DRAFT · Heuristic, not an automatic rewrite\n\nOriginal:\n${text}\n\nSuggested wording:\n${plainLanguageDraft(text)}\n\nReview carefully: automated substitutions can change nuance or technical meaning. Test with intended readers.` : `READABILITY STARTER\n\nPaste English text above to create a reviewable plain-language draft. The local helper only simplifies a small set of common wordy phrases; it does not certify a reading level.\n\nPrefer short sentences, concrete words, descriptive headings, and one main idea per paragraph. Test with intended readers.`;
     if (!r) return "Paste text to calculate a Flesch Reading Ease estimate and approximate grade level.";
     return `TEXT READABILITY\n\nWords: ${r.words}\nSentences: ${r.sentences}\nSyllables: ${r.syllables}\nFlesch Reading Ease: ${r.ease.toFixed(1)}\nApprox. Flesch-Kincaid grade: ${r.grade.toFixed(1)}\n\nHigher Reading Ease generally indicates easier text. This is an English-language estimate and should not replace user testing.`;
   }
   if (["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind)) {
     if (action === "generator") {
       if (kind === "alt-text") return "ALT TEXT TEMPLATE\n\nDescribe the meaningful subject or function of the image, not its visual file details.\n\nExample structure:\n[Subject] + [important context/action] + [relevant outcome].";
-      if (kind === "aria") return `ARIA STARTER\n\nRole: ${role || "button"}\nAccessible name: [Describe the control's purpose]\nState/value: [Only when applicable]\n\nPrefer native HTML semantics before adding ARIA.`;
+      if (kind === "aria") {
+        const patterns: Record<string, string> = {
+          button: `<button type="button">Save changes</button>`,
+          dialog: `<button type="button" aria-haspopup="dialog" aria-controls="settings-dialog">Settings</button>\n<dialog id="settings-dialog" aria-labelledby="settings-title">\n  <h2 id="settings-title">Settings</h2>\n  <button type="button" aria-label="Close settings">Close</button>\n</dialog>`,
+          tablist: `<div role="tablist" aria-label="Account sections">\n  <button role="tab" id="profile-tab" aria-selected="true" aria-controls="profile-panel" tabindex="0">Profile</button>\n</div>\n<section role="tabpanel" id="profile-panel" aria-labelledby="profile-tab">Profile settings</section>`,
+          disclosure: `<button type="button" aria-expanded="false" aria-controls="details-panel">More details</button>\n<div id="details-panel" hidden>Additional details</div>`,
+          checkbox: `<label><input type="checkbox" name="updates"> Email me updates</label>`,
+          link: `<a href="/account/settings">Account settings</a>`,
+        };
+        return `ARIA PATTERN SNIPPET · ${role}\n\n${patterns[role] ?? patterns.button}\n\nPrefer native HTML. For custom interactive patterns, implement and test required keyboard behavior and state changes; this snippet is a starter, not a complete component.`;
+      }
       if (kind === "form") return "ACCESSIBLE FORM CHECKLIST\n\n• Associate every control with a visible label.\n• Provide useful error text.\n• Preserve keyboard access.\n• Group related controls with fieldset/legend when appropriate.\n• Do not rely on color alone for required/error state.";
       if (kind === "keyboard-navigation") return "KEYBOARD NAVIGATION CHECKLIST\n\n• All interactive controls reachable with Tab/Shift+Tab.\n• Logical focus order.\n• Visible focus indicator.\n• Enter/Space behavior matches the control.\n• Escape closes dismissible overlays where appropriate.\n• No keyboard trap.";
-      if (kind === "focus-state") return "VISIBLE FOCUS CSS STARTER\n\n:focus-visible {\n  outline: 3px solid currentColor;\n  outline-offset: 3px;\n}\n\nDo not remove focus without an equally visible replacement. Check contrast, clipping, and sticky-content obscuration.";
+      if (kind === "focus-state") return `FOCUS-VISIBLE CSS · copy-ready\n:focus-visible {\n  outline: ${Math.min(8, Math.max(2, Number(focusWidth) || 3))}px solid ${fg};\n  outline-offset: ${Math.min(10, Math.max(1, Number(focusOffset) || 3))}px;\n}\n\n@media (prefers-color-scheme: dark) {\n  :focus-visible { outline-color: ${bg}; }\n}\n\n@media (forced-colors: active) {\n  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }\n}\n\nKeep focus visible and unclipped. Confirm the ring contrasts with adjacent colors and remains visible in your product.`;
       return "REDUCED MOTION CHECKLIST\n\n• Respect prefers-reduced-motion.\n• Remove or reduce non-essential animation.\n• Avoid flashing content.\n• Preserve essential information when animation is disabled.";
     }
     return analyzeHtml(html, kind);
@@ -484,6 +524,72 @@ function ColorInput({
   );
 }
 
+function ColorContexts({ foreground, background }: { foreground: string; background: string }) {
+  const surfaces = [
+    ["Button", <button type="button" className="min-h-11 rounded-lg px-4 font-medium" style={{ backgroundColor: foreground, color: background }}>Continue</button>],
+    ["Link", <a href="#color-preview" className="min-h-11 inline-flex items-center underline underline-offset-4" style={{ color: foreground }}>Read more</a>],
+    ["Card", <article className="rounded-lg border p-3" style={{ backgroundColor: background, color: foreground }}><strong>Card heading</strong><p className="mt-1 text-sm">Supporting content preview.</p></article>],
+    ["Input", <input aria-label="Example text field" className="min-h-11 w-full rounded-md border px-3" style={{ backgroundColor: background, color: foreground }} defaultValue="Example text" />],
+    ["Dark surface", <div className="rounded-lg p-3" style={{ backgroundColor: "#111827", color: foreground }}>Dark mode sample</div>],
+    ["Light surface", <div className="rounded-lg border p-3" style={{ backgroundColor: "#ffffff", color: foreground }}>Light mode sample</div>],
+  ] as const;
+  return <section id="color-preview" className="space-y-3" aria-labelledby="color-context-heading"><div><h2 id="color-context-heading" className="text-base font-semibold">Multi-surface preview</h2><p className="text-sm text-muted">Visual context is illustrative. Check actual text size, states, and the surfaces you ship.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{surfaces.map(([label, preview]) => <div key={label} className="space-y-2 rounded-xl border border-border p-3"><p className="text-xs font-medium text-muted">{label}</p>{preview}</div>)}</div></section>;
+}
+
+function ColorVisionContexts({ foreground, background }: { foreground: string; background: string }) {
+  const modes = [
+    ["Original", foreground, background],
+    ["Protanopia approximation", simulateColor(foreground, "protanopia"), simulateColor(background, "protanopia")],
+    ["Deuteranopia approximation", simulateColor(foreground, "deuteranopia"), simulateColor(background, "deuteranopia")],
+    ["Tritanopia approximation", simulateColor(foreground, "tritanopia"), simulateColor(background, "tritanopia")],
+  ] as const;
+  return <section className="space-y-3" aria-labelledby="vision-preview-heading"><div><h2 id="vision-preview-heading" className="text-base font-semibold">Side-by-side color-vision preview</h2><p className="text-sm text-muted">Matrix approximations are illustrative, not clinical. Never communicate meaning by color alone.</p></div><div className="grid gap-3 sm:grid-cols-2">{modes.map(([name, fg, bg]) => <div key={name} className="rounded-xl border border-border p-3"><p className="mb-2 text-xs font-medium text-muted">{name}</p><div className="flex min-h-20 items-center justify-center gap-3 rounded-lg p-3" style={{ backgroundColor: bg, color: fg }}><span className="rounded border border-current px-3 py-2">Alert</span><span className="rounded-full border border-current px-3 py-2">Ready</span></div><p className="mt-2 font-mono text-xs">{fg} / {bg}</p></div>)}</div></section>;
+}
+
+function FocusPlayground() {
+  return <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading"><div><h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2><p className="text-sm text-muted">Press Tab and Shift+Tab to move through these sample controls and inspect the focus ring.</p></div><div className="flex flex-wrap items-center gap-3"><button type="button" className="min-h-11 rounded-lg bg-accent px-4 text-white">Sample button</button><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 items-center gap-2">Email <input className="min-h-11 rounded border px-3" type="email" placeholder="name@example.com" /></label></div></section>;
+}
+
+
+function AccessibilityTreePreview({ html }: { html: string }) {
+  const [nodes, setNodes] = useState<Array<{ tag: string; role: string; name: string; state: string }>>([]);
+  useEffect(() => {
+    if (!html.trim()) { setNodes([]); return; }
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const controls = [...parsed.querySelectorAll("button,a[href],input,select,textarea,[role],[tabindex]")].slice(0, 40);
+    setNodes(controls.map((node) => {
+      const tag = node.tagName.toLowerCase(); const type = node.getAttribute("type")?.toLowerCase();
+      const role = node.getAttribute("role") || (tag === "a" ? "link" : tag === "button" || ["button", "submit", "reset"].includes(type ?? "") ? "button" : tag === "input" && type === "checkbox" ? "checkbox" : tag === "input" && type === "radio" ? "radio" : tag === "select" ? "combobox" : ["input", "textarea"].includes(tag) ? "textbox" : tag);
+      const ids = (node.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean);
+      const referenced = ids.map((id) => parsed.getElementById(id)?.textContent?.trim()).filter(Boolean).join(" ");
+      const name = node.getAttribute("aria-label") || referenced || node.textContent?.trim() || node.getAttribute("alt") || node.getAttribute("title") || node.getAttribute("placeholder") || "Unnamed control";
+      const state = ["aria-expanded", "aria-selected", "aria-checked", "aria-pressed", "aria-invalid", "disabled"].filter((key) => node.hasAttribute(key)).map((key) => `${key.replace("aria-", "")}: ${node.getAttribute(key) ?? "true"}`).join(" · ") || "no explicit state";
+      return { tag, role, name: name.slice(0, 120), state };
+    }));
+  }, [html]);
+  return <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="aria-tree-heading"><div><h2 id="aria-tree-heading" className="text-base font-semibold">Approximate accessibility tree</h2><p className="text-sm text-muted">DOM-based preview of likely controls, names, and authored states—not the browser's computed tree or a replacement for assistive-technology testing.</p></div>{nodes.length ? <ul className="space-y-2">{nodes.map((node, index) => <li key={`${node.tag}-${index}`} className="rounded-lg bg-surface-2 p-3"><div className="flex flex-wrap gap-2"><code className="text-xs">{node.role}</code><span className="text-sm font-medium">{node.name}</span></div><p className="mt-1 text-xs text-muted">&lt;{node.tag}&gt; · {node.state}</p></li>)}</ul> : <p className="text-sm text-muted">Paste HTML with a button, link, form field, or explicit role to inspect a sample tree.</p>}</section>;
+}
+
+function AccessibleFormPlayground() {
+  const [email, setEmail] = useState(""); const [submitted, setSubmitted] = useState(false);
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()); const showError = submitted && !valid;
+  return <form className="space-y-3 rounded-xl border border-border p-4" onSubmit={(event) => { event.preventDefault(); setSubmitted(true); }} aria-labelledby="form-playground-title" noValidate><h2 id="form-playground-title" className="text-base font-semibold">Accessible form walkthrough</h2><p className="text-sm text-muted">Try an empty or malformed email, then correct it. The error is associated with the field.</p><label htmlFor="form-playground-email" className="block text-sm font-medium">Email address</label><input id="form-playground-email" name="email" autoComplete="email" inputMode="email" className="min-h-11 w-full rounded-md border border-border bg-surface px-3" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={showError} aria-describedby={showError ? "form-playground-error" : "form-playground-hint"} /><p id={showError ? "form-playground-error" : "form-playground-hint"} className={`text-sm ${showError ? "text-danger" : "text-muted"}`} role={showError ? "alert" : undefined}>{showError ? "Enter an email address in the format name@example.com." : "We will use this address to send your receipt."}</p><button type="submit" className="min-h-11 rounded-md bg-accent px-4 font-medium text-white">Continue</button>{submitted && valid ? <p role="status" className="text-sm font-medium">Email looks valid. This local demo did not send anything.</p> : null}</form>;
+}
+
+function GuidedColorFixer({ foreground, background, onApply }: { foreground: string; background: string; onApply: (side: "foreground" | "background", value: string) => void }) {
+  const fg = useMemo(() => parseCssColor(foreground), [foreground]);
+  const bg = useMemo(() => parseCssColor(background), [background]);
+  const canvas = useMemo(() => parseCssColor("#ffffff"), []);
+  const suggestions = useMemo(() => fg && bg && canvas ? suggestContrastCorrections(fg, bg, "normal-aa", canvas) : null, [bg, canvas, fg]);
+  const [adjustBackground, setAdjustBackground] = useState(false);
+  const [amount, setAmount] = useState(100);
+  const source = adjustBackground ? bg : fg; const suggestion = adjustBackground ? suggestions?.background : suggestions?.foreground;
+  const preview = source && suggestion ? { r: source.r + (suggestion.r - source.r) * amount / 100, g: source.g + (suggestion.g - source.g) * amount / 100, b: source.b + (suggestion.b - source.b) * amount / 100, a: 1 } : null;
+  const previewHex = preview ? toHex(preview).slice(0, 7) : adjustBackground ? background : foreground;
+  const ratio = adjustBackground ? contrast(foreground, previewHex) : contrast(previewHex, background);
+  const canAdjust = Boolean(source && suggestion && preview);
+  return <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="guided-color-fix-title"><div><h2 id="guided-color-fix-title" className="text-base font-semibold">Guided WCAG AA color adjustment</h2><p className="text-sm text-muted">Explore the nearest passing lightness while preserving hue. This uses WCAG relative luminance, not APCA.</p></div><fieldset className="flex flex-wrap gap-4 text-sm"><legend className="sr-only">Color to adjust</legend><label className="flex min-h-11 items-center gap-2"><input type="radio" name="guided-color-side" checked={!adjustBackground} onChange={() => setAdjustBackground(false)} />Foreground</label><label className="flex min-h-11 items-center gap-2"><input type="radio" name="guided-color-side" checked={adjustBackground} onChange={() => setAdjustBackground(true)} />Background</label></fieldset>{canAdjust ? <><label className="flex items-center justify-between gap-3 text-sm" htmlFor="color-adjustment"><span>Adjustment</span><output>{amount}% · {ratio?.toFixed(2)}:1 {ratio !== null && ratio >= 4.5 ? "Pass" : "Below 4.5:1"}</output></label><input id="color-adjustment" type="range" min="0" max="100" step="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="min-h-11 w-full accent-accent" aria-label={`Adjust ${adjustBackground ? "background" : "foreground"} lightness toward a WCAG AA passing color`} /><div className="flex min-h-16 items-center justify-between gap-3 rounded-lg p-4" style={{ color: adjustBackground ? foreground : previewHex, backgroundColor: adjustBackground ? previewHex : background }}><strong>Live text preview</strong><span className="font-mono text-xs">{adjustBackground ? foreground : previewHex} on {adjustBackground ? previewHex : background}</span></div><Button type="button" className="min-h-11" onClick={() => onApply(adjustBackground ? "background" : "foreground", previewHex)}>Apply suggested {adjustBackground ? "background" : "foreground"}</Button></> : <p className="text-sm text-muted">Enter valid colors. The pair may already pass, or no passing change is available along the selected color's lightness path.</p>}</section>;
+}
 
 export function AccessibilityEngine({ toolId }: { toolId: string }) {
   const { kind, action } = parseToolId(toolId);
@@ -491,9 +597,13 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
   const [fg, setFg] = useState("#000000"); const [bg, setBg] = useState("#ffffff");
   const [text, setText] = useState(""); const [size, setSize] = useState("16px"); const [lineHeight, setLineHeight] = useState("1.5");
   const [html, setHtml] = useState(""); const [role, setRole] = useState("button");
+  const [focusWidth, setFocusWidth] = useState("3"); const [focusOffset, setFocusOffset] = useState("3");
+  const [previewSize, setPreviewSize] = useState(18); const [previewLeading, setPreviewLeading] = useState(1.5);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [axeReport, setAxeReport] = useState(""); const [axeRunning, setAxeRunning] = useState(false);
-  const output = useMemo(() => buildOutput(kind, action, { fg, bg, text, size, lineHeight, html, role }), [action, bg, fg, html, kind, lineHeight, role, size, text]);
-  const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && action !== "generator";
+  const output = useMemo(() => buildOutput(kind, action, { fg, bg: kind === "accessible-color" && action === "generator" ? fg : bg, text, size, lineHeight, html, role, focusWidth, focusOffset }), [action, bg, fg, focusOffset, focusWidth, html, kind, lineHeight, role, size, text]);
+  const sampleHtml = kind === "alt-text" ? '<img src="logo.svg" alt="">\n<img src="event.jpg">' : kind === "aria" ? '<button aria-label="" aria-expanded="false">Open</button>' : kind === "focus-state" ? "button:focus { outline: none; }" : kind === "keyboard-navigation" ? '<div tabindex="4" onclick="openMenu()">Menu</div>' : kind === "form" ? '<form><input type="email"><button>Submit</button></form>' : kind === "motion" ? "button { animation: pulse 1s infinite; }" : "";
+  const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && action !== "generator" && !(kind === "alt-text" && action === "helper");
   const runAxe = async () => {
     setAxeRunning(true);
     setAxeReport(await scanMarkupWithAxe(html));
@@ -507,22 +617,41 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
     setLineHeight("1.5");
     setHtml("");
     setRole("button");
+    setFocusWidth("3"); setFocusOffset("3"); setPreviewSize(18); setPreviewLeading(1.5); setReducedMotion(false);
     setAxeReport("");
   };
   return <div className="space-y-5">
-    <p className="text-sm text-muted">Local accessibility utility. Analysis runs in your browser; no accessibility claim is sent to an external service.</p>
+    <p className="text-sm text-muted">Runs on this device; your text and markup stay in your browser. Use results as guidance, not an accessibility certification.</p>
     <div className="grid gap-4 sm:grid-cols-2">
-      {(kind === "contrast" || kind === "accessible-color" || kind === "color-blindness") && <><label className="flex flex-col gap-1.5"><Label>Foreground / base color</Label><Input value={fg} onChange={(e) => setFg(e.target.value)} placeholder="#000000" /></label><label className="flex flex-col gap-1.5"><Label>Background</Label><Input value={bg} onChange={(e) => setBg(e.target.value)} placeholder="#ffffff" /></label></>}
-      {kind === "font-size" && <label className="flex flex-col gap-1.5"><Label>Font size</Label><Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="16px or 1rem" /></label>}
+      {(kind === "contrast" || kind === "accessible-color" || kind === "color-blindness") && <>
+        <ColorInput label={action === "generator" ? "Base color" : "Foreground / first color"} value={fg} onChange={setFg} parsed={parseCssColor(fg)} />
+        {action !== "generator" || kind !== "accessible-color" ? <ColorInput label="Background / second color" value={bg} onChange={setBg} parsed={parseCssColor(bg)} /> : null}
+      </>}
+      {kind === "focus-state" && action === "generator" && <>
+        <ColorInput label="Focus ring color" value={fg} onChange={setFg} parsed={parseCssColor(fg)} />
+        <ColorInput label="Dark-mode ring color" value={bg} onChange={setBg} parsed={parseCssColor(bg)} />
+        <label className="flex flex-col gap-1.5"><Label>Ring width (px)</Label><Input type="number" min="2" max="8" value={focusWidth} onChange={(e) => setFocusWidth(e.target.value)} /></label>
+        <label className="flex flex-col gap-1.5"><Label>Ring offset (px)</Label><Input type="number" min="1" max="10" value={focusOffset} onChange={(e) => setFocusOffset(e.target.value)} /></label>
+      </>}
+      {kind === "font-size" && action !== "generator" && <label className="flex flex-col gap-1.5"><Label>Font size</Label><Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="16px or 1rem" /></label>}
       {kind === "line-height" && <><label className="flex flex-col gap-1.5"><Label>Font size</Label><Input value={size} onChange={(e) => setSize(e.target.value)} /></label><label className="flex flex-col gap-1.5"><Label>Line height</Label><Input value={lineHeight} onChange={(e) => setLineHeight(e.target.value)} placeholder="1.5" /></label></>}
-      {kind === "text-readability" && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>Text</Label><Textarea className="min-h-40" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste English text to analyze…" /></label>}
-      {kind === "aria" && <label className="flex flex-col gap-1.5"><Label>Role</Label><Input value={role} onChange={(e) => setRole(e.target.value)} /></label>}
-      {needsHtml && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>HTML / CSS to inspect</Label><Textarea className="min-h-48 font-mono text-xs" value={html} onChange={(e) => setHtml(e.target.value)} placeholder="Paste the relevant HTML or CSS…" /></label>}
+      {(kind === "text-readability" || kind === "alt-text" && action === "helper") && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>{kind === "alt-text" ? "Describe the image and its purpose" : "Text (English estimate)"}</Label><Textarea className="min-h-32 text-base" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === "alt-text" ? "What is in the image? Why is it included here?" : "Paste English text to analyze…"} /></label>}
+      {kind === "aria" && action === "generator" && <label className="flex flex-col gap-1.5"><Label>Pattern to generate</Label><select className="min-h-11 rounded-md border border-border bg-surface px-3 text-base" value={role} onChange={(e) => setRole(e.target.value)}><option value="button">Button</option><option value="dialog">Dialog</option><option value="disclosure">Disclosure</option><option value="tablist">Tabs</option><option value="checkbox">Checkbox</option><option value="link">Link</option></select></label>}
+      {needsHtml && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>{kind === "alt-text" && action === "simulator" ? "Paste multiple image tags (up to 50)" : "HTML / CSS to inspect"}</Label><Textarea className="min-h-40 font-mono text-sm" value={html} onChange={(e) => setHtml(e.target.value)} placeholder={kind === "alt-text" && action === "simulator" ? '<img src="banner.jpg">\n<img src="avatar.png" alt="Profile photo">' : "Paste the relevant HTML or CSS…"} /></label>}
+      {needsHtml && sampleHtml ? <Button type="button" variant="outline" className="min-h-11 sm:col-span-2" onClick={() => setHtml(sampleHtml)}>Load example snippet</Button> : null}
     </div>
-    <ResultPanel items={[{ label: "Tool", value: `${titleCase(kind)} ${action}` }, { label: "Mode", value: "Local / deterministic", primary: true }]} />
-    <div className="flex flex-wrap gap-2"><CopyButton text={output} /><Button type="button" variant="outline" size="sm" onClick={() => downloadText(output, `env-${toolId}.txt`)}>Download</Button><Button type="button" variant="ghost" size="sm" onClick={reset}>Reset</Button></div>
-    {(kind === "contrast" || kind === "accessible-color") && <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl p-6" style={{ background: bg, color: fg }}>Accessible color preview</div><div className="rounded-xl border p-4 text-sm">{contrastText(contrast(fg, bg))}</div></div>}
-    <pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{output}</pre>
+    {kind === "color-blindness" && action === "generator" ? <p className="text-sm text-muted">Create safer combinations by avoiding red/green-only distinctions. Add labels, icons, or patterns to communicate state.</p> : null}
+    <ResultPanel items={[{ label: "Tool", value: `${titleCase(kind)} ${action}` }, { label: "Processing", value: "On device · no upload", primary: true }]} />
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><div className="flex flex-wrap gap-2"><CopyButton text={output} /><Button className="min-h-11" type="button" variant="outline" size="sm" onClick={() => downloadText(output, `env-${toolId}.txt`)}>Download</Button><Button className="min-h-11" type="button" variant="ghost" size="sm" onClick={reset}>Reset</Button></div></div>
+    {(kind === "contrast" || kind === "accessible-color") && action === "preview" && <ColorContexts foreground={fg} background={bg} />}
+    {(kind === "contrast" || kind === "accessible-color") && action === "helper" ? <GuidedColorFixer foreground={fg} background={bg} onApply={(side, value) => side === "foreground" ? setFg(value) : setBg(value)} /> : null}
+    {kind === "color-blindness" && action === "preview" && <ColorVisionContexts foreground={fg} background={bg} />}
+    {kind === "aria" && action === "preview" ? <AccessibilityTreePreview html={html} /> : null}
+    {kind === "form" && action === "simulator" ? <AccessibleFormPlayground /> : null}
+    {(kind === "font-size" || kind === "line-height") && ["preview", "simulator"].includes(action) && <section className="space-y-3 rounded-xl border border-border p-4"><div className="flex items-center justify-between"><Label htmlFor="accessibility-size-slider">Preview size</Label><output htmlFor="accessibility-size-slider">{previewSize}px</output></div><input id="accessibility-size-slider" className="min-h-11 w-full accent-accent" type="range" min="12" max="48" step="1" value={previewSize} onChange={(e) => setPreviewSize(Number(e.target.value))} aria-label="Preview text size" />{kind === "line-height" ? <div className="flex items-center justify-between"><Label htmlFor="accessibility-leading-slider">Line height</Label><output htmlFor="accessibility-leading-slider">{previewLeading.toFixed(2)}</output><input id="accessibility-leading-slider" className="min-h-11 w-40 accent-accent" type="range" min="1" max="2.5" step="0.05" value={previewLeading} onChange={(e) => setPreviewLeading(Number(e.target.value))} aria-label="Preview line height" /></div> : null}<p className="rounded-lg bg-surface-2 p-4" style={{ fontSize: `${previewSize}px`, lineHeight: kind === "line-height" ? previewLeading : 1.5 }}>Accessible design gives people more than one way to understand and use content, across different screens and preferences.</p></section>}
+    {(["focus-state", "keyboard-navigation"].includes(kind) && ["preview", "simulator"].includes(action)) ? <FocusPlayground /> : null}
+    {kind === "motion" && ["preview", "simulator"].includes(action) ? <section className="space-y-3 rounded-xl border border-border p-4"><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={reducedMotion} onChange={(e) => setReducedMotion(e.target.checked)} className="size-5 accent-accent" />Reduce non-essential motion</label><div className={`motion-preview-box rounded-lg bg-accent-soft p-5 text-center font-medium text-accent ${reducedMotion ? "motion-preview-reduced" : "motion-preview-active"}`}>Motion sample · {reducedMotion ? "reduced" : "full"}</div><p className="text-xs text-muted">This is a local demo only. Also test your operating system's reduced-motion preference.</p></section> : null}
+    <pre aria-live="polite" aria-atomic="true" className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-sm leading-6 text-bg">{output}</pre>
     {needsHtml ? <section className="space-y-3 rounded-xl border border-border bg-surface-2 p-4" aria-labelledby="axe-scan-heading">
       <div><h2 id="axe-scan-heading" className="text-sm font-semibold">Automated browser rules (axe-core)</h2><p className="mt-1 text-xs text-muted">Runs locally against an isolated copy of this snippet. It does not send the markup to a server.</p></div>
       <Button type="button" variant="outline" size="sm" onClick={runAxe} disabled={axeRunning || !html.trim()}>{axeRunning ? "Scanning locally…" : "Run axe-core scan"}</Button>
