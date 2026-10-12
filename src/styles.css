@@ -171,7 +171,7 @@
 
 /* Local interaction demos used by accessibility preview tools. */
 .accessibility-focus-playground :focus-visible {
-  outline: 3px solid #005fcc;
+  outline: 3px solid var(--preview-focus-color, #005fcc);
   outline-offset: 3px;
   border-radius: 0.25rem;
 }

@@ -108,6 +108,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
+import com.chastech.env.data.accessibilityDiscoveryTools
+import com.chastech.env.data.displayTool
 import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.NativeCopy
 import com.chastech.env.data.webSearch
@@ -236,7 +238,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var favoriteIds by remember { mutableStateOf(favorites.getFavorites()) }
     var mostUsedIds by remember { mutableStateOf(favorites.getMostUsed()) }
     var assistantMessages by remember { mutableStateOf(emptyList<AssistantChatMessage>()) }
-    val selected = detailStack.lastOrNull()?.let { id -> catalog.tools.find { it.id == id } ?: catalog.relatedReferenceTools.find { it.id == id } }
+    val selected = detailStack.lastOrNull()?.let(catalog::displayTool)
     LaunchedEffect(tab, selected?.id, showInformation, showExchange) {
         if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
     }
@@ -331,14 +333,13 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val trending = remember(catalog, screenWidth) {
-        catalog.tools.filter { it.status == "active" || it.status == "beta" }
+        catalog.accessibilityDiscoveryTools().filter { it.status == "active" || it.status == "beta" }
             .sortedByDescending { it.popularity }
             .take(12)
             .take(if (screenWidth >= 768) 12 else 6)
     }
     val mostUsed = remember(catalog, mostUsedIds) {
-        val byId = (catalog.tools + catalog.relatedReferenceTools).associateBy { it.id }
-        mostUsedIds.mapNotNull { byId[it] }.take(10)
+        mostUsedIds.mapNotNull { catalog.displayTool(it) }.distinctBy { it.id }.take(10)
     }
     val homeSurface2 = if (darkMode) Color(0xFF1E2327) else Color(0xFFEFECE6)
     val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
@@ -699,7 +700,8 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
 private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> Unit, onTool: (String) -> Unit) {
     val category = catalog.categories.find { it.id == categoryId }
     val tools = remember(catalog, categoryId) {
-        (catalog.tools + catalog.relatedReferenceTools).filter { it.category == categoryId }
+        val source = if (categoryId == "accessibility") catalog.accessibilityDiscoveryTools() else catalog.tools + catalog.relatedReferenceTools
+        source.filter { it.category == categoryId }
             .sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name })
     }
     var visibleCount by rememberSaveable(categoryId) { mutableIntStateOf(6) }
@@ -860,7 +862,8 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
 
 @Composable
 private fun SavedScreen(catalog: Catalog, favorites: Set<String>, onTool: (String) -> Unit, onToggle: (String) -> Unit) {
-    val tools = (catalog.tools + catalog.relatedReferenceTools).filter { it.id in favorites }.sortedBy { it.name }
+    val tools = (catalog.tools + catalog.relatedReferenceTools).filter { it.id in favorites }
+        .map { catalog.accessibilityStudioForId(it.id) ?: it }.distinctBy { it.id }.sortedBy { it.name }
     Column(Modifier.fillMaxSize()) {
         Text("Saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(20.dp))
         ToolList(tools, favorites, onTool, onToggle, Modifier.weight(1f), "Save a tool to find it here across restarts.")

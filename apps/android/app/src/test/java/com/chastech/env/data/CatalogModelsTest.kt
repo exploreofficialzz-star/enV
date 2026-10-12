@@ -5,6 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogModelsTest {
+    @Test fun accessibilitySearchUsesEightStudiosAndKeepsLegacyAliases() {
+        val ids = listOf("contrast-checker", "alt-text-checker", "focus-state-checker", "text-readability-checker", "aria-checker", "motion-checker", "keyboard-navigation-checker", "form-checker")
+        val sources = ids.map { id -> ToolRecord(id, id, id, "", "accessibility", emptyList(), emptyList(), "Accessibility", 10, false, true, false, false, "active", emptyList(), EngineInfo("custom", id)) }
+        val catalog = Catalog(1, "test", CatalogCounts(8, 8, 0, 1), emptyList(), sources)
+        val studios = catalog.search("", "accessibility")
+        assertEquals(8, studios.size)
+        assertEquals(8, studios.map { it.id }.distinct().size)
+        assertEquals("focus-state-checker", catalog.search("focus ring", "accessibility").first().id)
+        assertEquals("focus-state-checker", catalog.accessibilityStudioForId("focus-state-generator")?.id)
+        assertEquals(7, catalog.relatedTools(studios.first { it.id == "aria-checker" }, 20).count { it.category == "accessibility" })
+    }
+
     @Test fun parsesKnownFieldsAndIgnoresUnknownKeys() {
         val catalog = Catalog.fromJson("""
             {"schemaVersion":1,"catalogVersion":"test","counts":{"total":1,"active":1,"planned":0,"categories":1},

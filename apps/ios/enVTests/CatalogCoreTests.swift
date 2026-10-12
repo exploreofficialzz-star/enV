@@ -32,6 +32,20 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
     }
 
+    func testAccessibilityDiscoveryUsesEightStudiosAndPreservesLegacyIDs() {
+        let ids = ["contrast-checker", "alt-text-checker", "focus-state-checker", "text-readability-checker", "aria-checker", "motion-checker", "keyboard-navigation-checker", "form-checker"]
+        let sources = ids.map { id in
+            Tool(id: id, name: id, slug: id, description: "", category: "accessibility", subcategory: nil, keywords: [], tags: [], icon: "Accessibility", popularity: 10, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: id, op: nil))
+        }
+        let sut = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: sources, relatedReferenceTools: nil)
+        let studios = sut.webSearch("", includeRelatedReferences: true).filter { $0.category == "accessibility" }
+        XCTAssertEqual(studios.count, 8)
+        XCTAssertEqual(Set(studios.map(\.id)).count, 8)
+        XCTAssertEqual(sut.webSearch("focus ring", includeRelatedReferences: true).first?.id, "focus-state-checker")
+        XCTAssertEqual(sut.accessibilityStudio(for: "focus-state-generator")?.id, "focus-state-checker")
+        XCTAssertEqual(sut.relatedTools(for: studios.first(where: { $0.id == "aria-checker" })!, limit: 20).filter { $0.category == "accessibility" }.count, 7)
+    }
+
     func testRelatedToolsExcludePlannedAndFillFromCategoryAlphabetically() {
         let current = Tool(id: "current", name: "Current", slug: "current", description: "", category: "text", subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: ["word-count", "future-tool"], engine: ToolEngine(type: "text", id: "current", op: nil))
         let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current], relatedReferenceTools: nil)

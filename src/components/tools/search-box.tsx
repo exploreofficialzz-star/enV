@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { getAllTools, toolPath } from "@/lib/registry";
+import { getAllTools, getSearchableTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,8 @@ export function SearchBox({
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => (q.trim() ? searchTools(getAllTools(), q, 8) : []), [q]);
+  const searchable = getSearchableTools();
+  const results = useMemo(() => (q.trim() ? searchTools(searchable, q, 8) : []), [q, searchable]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,6 +1,11 @@
 import Foundation
 
 public enum NativeAccessibilityEngine {
+    public struct ColorVisionPreview: Equatable {
+        public let label: String
+        public let foreground: String
+        public let background: String
+    }
     private static let actions = ["checker", "generator", "helper", "preview", "simulator"]
     private static let validRoles = Set("alert alertdialog application article banner blockquote button caption cell checkbox code columnheader combobox complementary contentinfo definition dialog directory document feed figure form generic grid gridcell group heading img link list listbox listitem log main marquee math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search searchbox separator slider spinbutton status strong subscript superscript switch tab tabpanel table term textbox timer toolbar tooltip tree treegrid treeitem".split(separator: " ").map(String.init))
 
@@ -199,8 +204,18 @@ public enum NativeAccessibilityEngine {
             let l = luminance(candidate), candidateRatio = (max(l, lb) + 0.05) / (min(l, lb) + 0.05)
             return candidateRatio >= 4.5 ? "\(color) — \(String(format: "%.2f:1", candidateRatio))" : nil
         }.prefix(5).joined(separator: "\n") : ""
-        return "\(kind.uppercased()) CONTRAST REVIEW\nForeground: \(fg)\nBackground: \(bg)\nRatio: \(String(format: "%.2f:1", ratio))\nWCAG AA normal text (4.5:1): \(ratio >= 4.5 ? "PASS" : "FAIL")\nWCAG AA large text (3:1): \(ratio >= 3 ? "PASS" : "FAIL")\nWCAG AAA normal text (7:1): \(ratio >= 7 ? "PASS" : "FAIL")\(suggestions ? "\n\nForeground alternatives on this background (AA normal text):\n\(alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1." : alternatives)" : "")\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
+        return "\(kind.uppercased()) CONTRAST REVIEW\nForeground: \(fg)\nBackground: \(bg)\nWCAG 2.2 ratio: \(String(format: "%.2f:1", ratio))\nWCAG AA normal text (4.5:1): \(ratio >= 4.5 ? "PASS" : "FAIL")\nWCAG AA large text (3:1): \(ratio >= 3 ? "PASS" : "FAIL")\nWCAG AAA normal text (7:1): \(ratio >= 7 ? "PASS" : "FAIL")\(suggestions ? "\n\nForeground alternatives on this background (WCAG AA normal text):\n\(alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1." : alternatives)" : "")\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
     }
+
+    public static func passingForegroundColors(background: String, minimumRatio: Double = 4.5) -> [String] {
+        guard let base = rgb(background) else { return [] }
+        let baseLuminance = luminance(base)
+        return ["#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8"].filter { color in
+            guard let candidate = rgb(color) else { return false }
+            return (max(luminance(candidate), baseLuminance) + 0.05) / (min(luminance(candidate), baseLuminance) + 0.05) >= minimumRatio
+        }.prefix(5).map { $0 }
+    }
+
     private static func rgb(_ value: String) -> [Double]? {
         let clean = value.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         guard clean.range(of: #"^[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil else { return nil }
@@ -219,15 +234,18 @@ public enum NativeAccessibilityEngine {
         return pow((channel + 0.055) / 1.055, 2.4)
     }
 
-    private static func colorVisionReport(_ foreground: String, _ background: String) -> String {
+    public static func colorVisionPreviewPairs(_ foreground: String, _ background: String) -> [ColorVisionPreview] {
         let cases: [(String, [[Double]])] = [
             ("Protanopia approximation", [[0.567, 0.433, 0], [0.558, 0.442, 0], [0, 0.242, 0.758]]),
             ("Deuteranopia approximation", [[0.625, 0.375, 0], [0.7, 0.3, 0], [0, 0.3, 0.7]]),
-            ("Tritanopia approximation", [[0.95, 0.05, 0], [0, 0.433, 0.567], [0, 0.475, 0.525]])
+            ("Tritanopia approximation", [[0.95, 0.05, 0], [0, 0.433, 0.567], [0, 0.475, 0.525]]),
+            ("Achromatopsia · grayscale approximation", [[0.2126, 0.7152, 0.0722], [0.2126, 0.7152, 0.0722], [0.2126, 0.7152, 0.0722]])
         ]
-        let details = cases.map { name, matrix in
-            "\(name)\nForeground: \(transformColor(foreground, matrix)) · Background: \(transformColor(background, matrix))"
-        }.joined(separator: "\n\n")
+        return cases.map { name, matrix in ColorVisionPreview(label: name, foreground: transformColor(foreground, matrix), background: transformColor(background, matrix)) }
+    }
+
+    private static func colorVisionReport(_ foreground: String, _ background: String) -> String {
+        let details = colorVisionPreviewPairs(foreground, background).map { "\($0.label)\nForeground: \($0.foreground) · Background: \($0.background)" }.joined(separator: "\n\n")
         return "COLOR-VISION PREVIEW (approximate)\nOriginal foreground: \(foreground) · background: \(background)\n\n\(details)\n\nThis matrix preview is illustrative only, not a clinical simulation or substitute for testing with users. Never rely on color alone to communicate meaning."
     }
 

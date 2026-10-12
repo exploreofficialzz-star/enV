@@ -5,7 +5,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Local, deterministic WCAG-oriented checks for Android. Static snippets are not conformance certification. */
+/** Local, deterministic WCAG-oriented accessibility checks for Android. Static snippets are not conformance certification. */
 object NativeAccessibilityEngine {
     private val actions = listOf("checker", "generator", "helper", "preview", "simulator")
     private val roles = setOf("alert", "alertdialog", "application", "article", "banner", "button", "checkbox", "combobox", "complementary", "contentinfo", "dialog", "form", "grid", "heading", "img", "link", "list", "listbox", "main", "menu", "navigation", "option", "progressbar", "radio", "region", "search", "slider", "status", "switch", "tab", "tabpanel", "textbox", "toolbar", "tree", "treeitem")
@@ -14,6 +14,7 @@ object NativeAccessibilityEngine {
 
     data class Element(val tag: String, val attrs: Map<String, String>, val source: String)
     data class Finding(val severity: String, val rule: String, val message: String, val target: String, val fix: String)
+    data class ColorVisionPreview(val label: String, val foreground: String, val background: String)
 
     fun supports(toolId: String, category: String): Boolean = category == "accessibility" && toolId.isNotBlank()
     fun kind(toolId: String): String = actions.firstOrNull { toolId.endsWith("-$it") }?.let { toolId.removeSuffix("-$it") } ?: toolId
@@ -173,8 +174,17 @@ object NativeAccessibilityEngine {
             val candidateRatio = (max(candidateLum, lb) + 0.05) / (min(candidateLum, lb) + 0.05)
             if (candidateRatio >= 4.5) "$color — ${String.format(Locale.US, "%.2f:1", candidateRatio)}" else null
         }.distinct().take(5).joinToString("\n").ifBlank { "No candidate in the built-in palette reached 4.5:1; adjust foreground or background." } else ""
-        return "$kind CONTRAST REVIEW\nForeground: $fg\nBackground: $bg\nRatio: ${String.format(Locale.US, "%.2f:1", ratio)}\nWCAG AA normal text (4.5:1): ${if (ratio >= 4.5) "PASS" else "FAIL"}\nWCAG AA large text (3:1): ${if (ratio >= 3) "PASS" else "FAIL"}\nWCAG AAA normal text (7:1): ${if (ratio >= 7) "PASS" else "FAIL"}${if (suggestions) "\n\nForeground alternatives on this background (AA normal text):\n$alternatives" else ""}\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
+        return "$kind CONTRAST REVIEW\nForeground: $fg\nBackground: $bg\nWCAG 2.2 ratio: ${String.format(Locale.US, "%.2f:1", ratio)}\nWCAG AA normal text (4.5:1): ${if (ratio >= 4.5) "PASS" else "FAIL"}\nWCAG AA large text (3:1): ${if (ratio >= 3) "PASS" else "FAIL"}\nWCAG AAA normal text (7:1): ${if (ratio >= 7) "PASS" else "FAIL"}${if (suggestions) "\n\nForeground alternatives on this background (WCAG AA normal text):\n$alternatives" else ""}\n\nA color pair alone cannot establish full-page WCAG conformance or check use of color."
     }
+
+    fun passingForegroundColors(background: String, minimumRatio: Double = 4.5): List<String> {
+        val base = rgb(background) ?: return emptyList()
+        val baseLuminance = luminance(base)
+        return listOf("#000000", "#ffffff", "#1f2937", "#334155", "#0f766e", "#7f1d1d", "#1d4ed8")
+            .filter { candidate -> rgb(candidate)?.let { (max(luminance(it), baseLuminance) + 0.05) / (min(luminance(it), baseLuminance) + 0.05) >= minimumRatio } == true }
+            .distinct().take(5)
+    }
+
     private fun rgb(value: String): IntArray? {
         val clean = value.trim().removePrefix("#")
         if (!clean.matches(Regex("[0-9a-fA-F]{6}"))) return null
@@ -185,6 +195,22 @@ object NativeAccessibilityEngine {
         return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     }
     private fun Double.pow(exp: Double): Double = Math.pow(this, exp)
+
+    fun colorVisionPreviewPairs(foreground: String, background: String): List<ColorVisionPreview> {
+        val matrices = listOf(
+            "Protanopia approximation" to arrayOf(doubleArrayOf(.567,.433,0.0), doubleArrayOf(.558,.442,0.0), doubleArrayOf(0.0,.242,.758)),
+            "Deuteranopia approximation" to arrayOf(doubleArrayOf(.625,.375,0.0), doubleArrayOf(.7,.3,0.0), doubleArrayOf(0.0,.3,.7)),
+            "Tritanopia approximation" to arrayOf(doubleArrayOf(.95,.05,0.0), doubleArrayOf(0.0,.433,.567), doubleArrayOf(0.0,.475,.525)),
+        )
+        val rows = matrices.map { (name, matrix) -> ColorVisionPreview(name, transformColor(foreground, matrix), transformColor(background, matrix)) }.toMutableList()
+        fun gray(color: String): String {
+            val channels = rgb(color) ?: return "invalid color"
+            val value = (0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]).roundToInt().coerceIn(0, 255)
+            return "#%02X%02X%02X".format(Locale.US, value, value, value)
+        }
+        rows += ColorVisionPreview("Achromatopsia · grayscale approximation", gray(foreground), gray(background))
+        return rows
+    }
 
     private fun colorVisionReport(foreground: String, background: String): String {
         val matrices = listOf(

@@ -99,8 +99,10 @@ for (const tool of webTools) {
   }
 }
 assert.equal(mismatches, 0, `Related-tool parity mismatch on ${mismatches} details: ${JSON.stringify(examples)}`);
-assert.match(read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), /catalog\.tools\.find\s*\{[^}]*\}\s*\?:\s*catalog\.relatedReferenceTools\.find/,
-  "Android related-only tools must be resolvable by native detail navigation.");
+assert.match(read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), /detailStack\.lastOrNull\(\)\?\.let\(catalog::displayTool\)/,
+  "Android detail navigation must use the shared Studio-aware tool resolver.");
+assert.match(read("apps/android/app/src/main/java/com/chastech/env/data/AccessibilityStudios.kt"), /fun Catalog\.displayTool\(toolId: String\)[\s\S]*?relatedReferenceTools\.firstOrNull/,
+  "Android detail resolution must preserve access to related-only legacy tools.");
 assert.match(read("apps/ios/enV/CatalogCore.swift"), /tools\s*\+\s*\(relatedReferenceTools\s*\?\?\s*\[\]\)/,
   "iOS related selection must include related-only tools.");
 

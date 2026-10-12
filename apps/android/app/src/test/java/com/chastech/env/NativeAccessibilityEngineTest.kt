@@ -1,10 +1,19 @@
 package com.chastech.env
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeAccessibilityEngineTest {
+    @Test fun colorVisionStudioProvidesFourLabeledApproximationPairs() {
+        val pairs = NativeAccessibilityEngine.colorVisionPreviewPairs("#cc3322", "#ffffff")
+        assertEquals(4, pairs.size)
+        assertTrue(pairs.any { it.label.contains("Protanopia") })
+        assertTrue(pairs.any { it.label.contains("Achromatopsia") })
+        assertTrue(pairs.all { it.foreground.startsWith("#") && it.background.startsWith("#") })
+    }
+
     @Test fun detectsMissingImageAlternativeAndFilenameAlt() {
         val report = NativeAccessibilityEngine.analyze("alt-text-checker", "<img src=\"hero.jpg\"><img src=\"logo.png\" alt=\"logo.png\">")
         assertTrue(report.contains("image-alt"))

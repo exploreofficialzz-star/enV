@@ -74,4 +74,16 @@ test("invalid values are rejected", () => {
   assert.equal(parseCssColor("#12"), null);
   assert.equal(parseCssColor("rgb(255, 255)"), null);
   assert.equal(parseCssColor("hsl(120 50 50)"), null);
+  assert.equal(parseCssColor("rgb(12oops, 0, 0)"), null);
+  assert.equal(parseCssColor("rgba(0, 0, 0, 0.5oops)"), null);
+  assert.equal(parseCssColor("hsl(120degish 50% 50%)"), null);
+});
+
+test("opacity corrections never reduce opacity below the supplied alpha", () => {
+  const fg = { r: 0, g: 0, b: 0, a: 0.1 };
+  const bg = parseCssColor("#ffffff")!;
+  const suggestion = suggestContrastCorrections(fg, bg, "normal-aa").foregroundOpacity;
+  assert.ok(suggestion);
+  assert.ok(suggestion.a >= fg.a);
+  assert.ok(contrastRatio(suggestion, bg) >= 4.5);
 });

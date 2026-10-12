@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
-import { getAllTools } from "@/lib/registry";
+import { getSearchableTools } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 
 export const Route = createFileRoute("/search")({
@@ -18,7 +18,8 @@ function Search() {
   const { q } = useSearch({ from: "/search" });
   const navigate = useNavigate({ from: "/search" });
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const results = useMemo(() => searchTools(getAllTools(), q, getAllTools().length), [q]);
+  const searchable = getSearchableTools();
+  const results = useMemo(() => searchTools(searchable, q, searchable.length), [q, searchable]);
   const visible = results.slice(0, visibleCount);
 
   return (

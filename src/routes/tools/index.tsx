@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
-import { getAllTools } from "@/lib/registry";
+import { getSearchableTools } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 
@@ -18,7 +18,7 @@ const INITIAL_TOOLS_PER_CATEGORY = 3;
 const MORE_TOOLS_PER_CLICK = 6;
 
 function Tools() {
-  const all = getAllTools();
+  const all = getSearchableTools();
   const navigate = useNavigate();
   const { q } = Route.useSearch();
   const query = q;

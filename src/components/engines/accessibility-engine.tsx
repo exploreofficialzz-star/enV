@@ -23,6 +23,18 @@ import {
 
 import { type Action, type Kind, parseToolId } from "./accessibility-engine-utils";
 import { auditAccessibilityMarkup, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
+import { accessibilityKindFromToolId, accessibilityStudioForKind } from "@/lib/accessibility-studios";
+import { apcaContrast } from "@/lib/engines/accessibility-apca";
+
+function StudioModeTabs<T extends string>({ modes, value, onChange, label }: { modes: Array<{ id: T; label: string }>; value: T; onChange: (value: T) => void; label: string }) {
+  return <div role="group" aria-label={label} className="flex gap-2 overflow-x-auto pb-1">{modes.map((mode) => <button key={mode.id} type="button" aria-pressed={value === mode.id} onClick={() => onChange(mode.id)} className={`min-h-11 shrink-0 rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${value === mode.id ? "border-accent bg-accent text-white" : "border-border bg-surface hover:bg-surface-2"}`}>{mode.label}</button>)}</div>;
+}
+
+function ColorTokenExport({ foreground, background }: { foreground: string; background: string }) {
+  const css = `:root {\n  --color-text-primary: ${foreground};\n  --color-surface-primary: ${background};\n}`;
+  const tailwind = `// tailwind.config.js\nmodule.exports = {\n  theme: { extend: { colors: {\n    accessibleText: '${foreground}',\n    accessibleSurface: '${background}',\n  } } }\n};`;
+  return <section className="space-y-4" aria-labelledby="color-export-title"><div><h2 id="color-export-title" className="text-base font-semibold">Copy-ready color tokens</h2><p className="text-sm text-muted">Re-check every real text size, state, and surface after applying these tokens.</p></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">CSS custom properties</h3><CopyButton text={css} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{css}</pre></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">Tailwind extension</h3><CopyButton text={tailwind} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{tailwind}</pre></div></section>;
+}
 const COLORS = ["#000000", "#111827", "#1f2937", "#374151", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e", "#ffffff", "#f8fafc", "#e5e7eb", "#dbeafe", "#fef3c7"];
 function downloadText(text: string, filename: string) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -93,9 +105,10 @@ function parsePx(value: string) {
   if (/rem$/i.test(value)) return n * 16;
   return /px$/i.test(value) || /^\d+(?:\.\d+)?$/.test(value.trim()) ? n : null;
 }
-function simulateColor(hex: string, type: "protanopia" | "deuteranopia" | "tritanopia") {
+function simulateColor(hex: string, type: "protanopia" | "deuteranopia" | "tritanopia" | "achromatopsia") {
   const rgb = hexRgb(hex); if (!rgb) return null;
   const [r, g, b] = rgb;
+  if (type === "achromatopsia") return rgbHex([0.2126 * r + 0.7152 * g + 0.0722 * b, 0.2126 * r + 0.7152 * g + 0.0722 * b, 0.2126 * r + 0.7152 * g + 0.0722 * b]);
   const matrices = {
     protanopia: [[0.567, 0.433, 0], [0.558, 0.442, 0], [0, 0.242, 0.758]],
     deuteranopia: [[0.625, 0.375, 0], [0.7, 0.3, 0], [0, 0.3, 0.7]],
@@ -250,11 +263,17 @@ function correctionCard(
   return { label, beforeRatio, afterRatio, summary };
 }
 
-function AccessibleColorChecker() {
+type ColorStudioMode = "check" | "fix" | "preview" | "vision" | "export";
+function AccessibleColorChecker({ initialMode = "check" }: { initialMode?: ColorStudioMode }) {
   const [fgInput, setFgInput] = useState("#000000");
   const [bgInput, setBgInput] = useState("#ffffff");
   const [canvasInput, setCanvasInput] = useState("#ffffff");
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
+  const [studioMode, setStudioMode] = useState<ColorStudioMode>(initialMode);
+  const modes: Array<{ id: ColorStudioMode; label: string }> = [
+    { id: "check", label: "Check contrast" }, { id: "fix", label: "Fix colors" },
+    { id: "preview", label: "Preview surfaces" }, { id: "vision", label: "Color vision" }, { id: "export", label: "Export tokens" },
+  ];
 
   const fg = useMemo(() => parseCssColor(fgInput), [fgInput]);
   const bg = useMemo(() => parseCssColor(bgInput), [bgInput]);
@@ -293,6 +312,7 @@ function AccessibleColorChecker() {
     if (!fg || !bg || !canvas) return null;
     return resolveRenderedPair(fg, bg, canvas);
   }, [bg, canvas, fg]);
+  const apcaScore = useMemo(() => fg && bg && canvas ? apcaContrast(fg, bg, canvas) : null, [fg, bg, canvas]);
 
   const report = useMemo(() => {
     if (!fg || !bg || !canvas || !evaluation || !rendered) {
@@ -317,6 +337,8 @@ function AccessibleColorChecker() {
       `Selected ratio: ${evaluation.ratio.toFixed(2)}:1`,
       `Selected result: ${evaluation.passes ? "PASS" : "FAIL"}`,
       `WCAG 2.2 criterion: ${evaluation.criterion}`,
+      `Supplementary APCA-W3 0.1.9 score: ${apcaScore === null ? "unavailable" : `${apcaScore.toFixed(1)} Lc${apcaScore < 0 ? " (light text on dark background)" : " (dark text on light background)"}`}`,
+      "APCA is developmental guidance, not a WCAG 2.2 conformance criterion or pass/fail result.",
       "",
       "WCAG evaluations:",
       checks,
@@ -326,11 +348,12 @@ function AccessibleColorChecker() {
       "",
       "Scope note: a two-color contrast calculation cannot determine WCAG 1.4.1 Use of Color or establish full-page WCAG conformance.",
     ].join("\n");
-  }, [bgInput, canvasInput, corrections, evaluation, fgInput, fg, bg, canvas, rendered, target, targets]);
+  }, [bgInput, canvasInput, corrections, evaluation, fgInput, fg, bg, canvas, rendered, target, targets, apcaScore]);
 
   if (!allValid) {
     return (
       <div className="space-y-5">
+        <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} />
         <p className="text-sm text-muted">
           Deterministic local WCAG-oriented contrast calculation. Enter HEX, RGB/RGBA, or HSL/HSLA colors. Alpha is composited before the ratio is calculated.
         </p>
@@ -346,6 +369,11 @@ function AccessibleColorChecker() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Color Contrast Studio</p>
+        <h2 className="mt-1 text-xl font-semibold">Check, improve, and preview a color system</h2>
+      </div>
+      <StudioModeTabs modes={modes} value={studioMode} onChange={setStudioMode} />
       <p className="text-sm text-muted">
         Deterministic local calculation based on WCAG 2.2 contrast rules. This evaluates the supplied color pair; it does not prove complete WCAG conformance.
       </p>
@@ -400,10 +428,12 @@ function AccessibleColorChecker() {
             <p className="text-xs text-muted">
               Rendered foreground {formatColorSummary(rendered.foreground).hex} · rendered background {formatColorSummary(rendered.background).hex}
             </p>
+            <div className="mt-2 border-t border-border pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted">Supplementary APCA-W3 0.1.9</p><p className="text-xl font-semibold tabular-nums">{apcaScore === null ? "Unavailable" : `${apcaScore.toFixed(1)} Lc`}</p><p className="text-xs text-muted">Developmental perceptual guidance; not a WCAG 2.2 pass/fail criterion.</p></div>
           </div>
         </div>
       ) : null}
 
+      <p className="text-xs text-muted">APCA-W3 is licensed here for web-content accessibility review only; it is not used in the iOS or Android apps. This developmental score is not a WCAG 2.2 criterion. Read the <a className="underline underline-offset-2" href="/licenses/APCA-W3-LICENSE.md" target="_blank" rel="noreferrer">complete license included with this app</a> and the <a className="underline underline-offset-2" href="https://github.com/Myndex/apca-w3/blob/master/LICENSE.md" target="_blank" rel="noreferrer">upstream terms</a>. No APCA logo is used.</p>
       <section aria-labelledby="wcag-evaluations">
         <div className="flex items-center justify-between gap-3">
           <h2 id="wcag-evaluations" className="text-base font-semibold">WCAG 2.2 evaluations</h2>
@@ -426,7 +456,7 @@ function AccessibleColorChecker() {
         </div>
       </section>
 
-      <section aria-labelledby="corrections">
+      {studioMode === "fix" ? <section aria-labelledby="corrections">
         <h2 id="corrections" className="text-base font-semibold">Suggested corrections</h2>
         <p className="mt-1 text-sm text-muted">
           The engine first searches HSL lightness while preserving hue/saturation, then checks whether increasing opacity can reach the selected threshold.
@@ -450,11 +480,16 @@ function AccessibleColorChecker() {
                   Before {item.beforeRatio.toFixed(2)}:1 → After <strong>{item.afterRatio.toFixed(2)}:1</strong>
                 </p>
                 <p className="mt-1 text-xs text-muted">{item.summary.rgb} · {item.summary.hsl} · alpha {item.summary.alpha}</p>
+                <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={() => {
+                  if (item.label.startsWith("Foreground")) setFgInput(item.summary.hex);
+                  else setBgInput(item.summary.hex);
+                  setStudioMode("check");
+                }}>Apply this {item.label.startsWith("Foreground") ? "foreground" : "background"}</Button>
               </div>
             ))}
           </div>
         )}
-      </section>
+      </section> : null}
 
       <section aria-labelledby="scope-notes" className="rounded-xl bg-surface-2 p-4">
         <h2 id="scope-notes" className="text-base font-semibold">What this check can and cannot establish</h2>
@@ -466,6 +501,9 @@ function AccessibleColorChecker() {
         </ul>
       </section>
 
+      {studioMode === "preview" ? <ColorContexts foreground={fgInput} background={bgInput} /> : null}
+      {studioMode === "vision" ? <ColorVisionContexts foreground={fgInput} background={bgInput} /> : null}
+      {studioMode === "export" ? <ColorTokenExport foreground={fgInput} background={bgInput} /> : null}
       <ResultPanel
         items={[
           { label: "Selected target", value: targetLabel(target) },
@@ -542,12 +580,22 @@ function ColorVisionContexts({ foreground, background }: { foreground: string; b
     ["Protanopia approximation", simulateColor(foreground, "protanopia"), simulateColor(background, "protanopia")],
     ["Deuteranopia approximation", simulateColor(foreground, "deuteranopia"), simulateColor(background, "deuteranopia")],
     ["Tritanopia approximation", simulateColor(foreground, "tritanopia"), simulateColor(background, "tritanopia")],
+    ["Achromatopsia · grayscale approximation", simulateColor(foreground, "achromatopsia"), simulateColor(background, "achromatopsia")],
   ] as const;
   return <section className="space-y-3" aria-labelledby="vision-preview-heading"><div><h2 id="vision-preview-heading" className="text-base font-semibold">Side-by-side color-vision preview</h2><p className="text-sm text-muted">Matrix approximations are illustrative, not clinical. Never communicate meaning by color alone.</p></div><div className="grid gap-3 sm:grid-cols-2">{modes.map(([name, fg, bg]) => <div key={name} className="rounded-xl border border-border p-3"><p className="mb-2 text-xs font-medium text-muted">{name}</p><div className="flex min-h-20 items-center justify-center gap-3 rounded-lg p-3" style={{ backgroundColor: bg, color: fg }}><span className="rounded border border-current px-3 py-2">Alert</span><span className="rounded-full border border-current px-3 py-2">Ready</span></div><p className="mt-2 font-mono text-xs">{fg} / {bg}</p></div>)}</div></section>;
 }
 
-function FocusPlayground() {
-  return <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading"><div><h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2><p className="text-sm text-muted">Press Tab and Shift+Tab to move through these sample controls and inspect the focus ring.</p></div><div className="flex flex-wrap items-center gap-3"><button type="button" className="min-h-11 rounded-lg bg-accent px-4 text-white">Sample button</button><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 items-center gap-2">Email <input className="min-h-11 rounded border px-3" type="email" placeholder="name@example.com" /></label></div></section>;
+function FocusPlayground({ focusColor = "#005fcc", darkColor = "#ffd54f" }: { focusColor?: string; darkColor?: string }) {
+  const [dark, setDark] = useState(false);
+  const [forced, setForced] = useState(false);
+  const background = forced ? "#000000" : dark ? "#111827" : undefined;
+  const foreground = forced ? "#ffffff" : dark ? "#ffffff" : undefined;
+  return <section className="accessibility-focus-playground space-y-3 rounded-xl border border-border p-4" aria-labelledby="focus-playground-heading" style={{ "--preview-focus-color": forced ? "Highlight" : dark ? darkColor : focusColor, background, color: foreground } as CSSProperties}>
+    <div><h2 id="focus-playground-heading" className="text-base font-semibold">Keyboard focus playground</h2><p className="text-sm text-muted">Use Tab and Shift+Tab to move through the actual controls. Focus styling is shown on keyboard focus, not mouse clicks.</p></div>
+    <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" aria-pressed={dark} onClick={() => { setDark((value) => !value); setForced(false); }}>Preview {dark ? "light" : "dark"} surface</Button><Button type="button" variant="outline" className="min-h-11" aria-pressed={forced} onClick={() => { setForced((value) => !value); setDark(false); }}>Toggle forced-colors approximation</Button></div>
+    <div className="flex flex-wrap items-center gap-3 rounded-lg p-4" style={{ background: forced ? "#000000" : dark ? "#111827" : "#f8fafc", color: forced || dark ? "#ffffff" : "#111827" }}><button type="button" className="min-h-11 rounded-lg bg-accent px-4 text-white">Sample button</button><a className="min-h-11 inline-flex items-center underline" href="#focus-playground-heading">Sample link</a><label className="flex min-h-11 items-center gap-2">Email <input className="min-h-11 rounded border px-3 text-black" type="email" placeholder="name@example.com" /></label></div>
+    <p className="text-xs text-muted">Forced-colors mode is a visual mock, not the operating system's forced-colors environment. Verify with real OS/browser settings.</p>
+  </section>;
 }
 
 
@@ -576,24 +624,20 @@ function AccessibleFormPlayground() {
   return <form className="space-y-3 rounded-xl border border-border p-4" onSubmit={(event) => { event.preventDefault(); setSubmitted(true); }} aria-labelledby="form-playground-title" noValidate><h2 id="form-playground-title" className="text-base font-semibold">Accessible form walkthrough</h2><p className="text-sm text-muted">Try an empty or malformed email, then correct it. The error is associated with the field.</p><label htmlFor="form-playground-email" className="block text-sm font-medium">Email address</label><input id="form-playground-email" name="email" autoComplete="email" inputMode="email" className="min-h-11 w-full rounded-md border border-border bg-surface px-3" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={showError} aria-describedby={showError ? "form-playground-error" : "form-playground-hint"} /><p id={showError ? "form-playground-error" : "form-playground-hint"} className={`text-sm ${showError ? "text-danger" : "text-muted"}`} role={showError ? "alert" : undefined}>{showError ? "Enter an email address in the format name@example.com." : "We will use this address to send your receipt."}</p><button type="submit" className="min-h-11 rounded-md bg-accent px-4 font-medium text-white">Continue</button>{submitted && valid ? <p role="status" className="text-sm font-medium">Email looks valid. This local demo did not send anything.</p> : null}</form>;
 }
 
-function GuidedColorFixer({ foreground, background, onApply }: { foreground: string; background: string; onApply: (side: "foreground" | "background", value: string) => void }) {
-  const fg = useMemo(() => parseCssColor(foreground), [foreground]);
-  const bg = useMemo(() => parseCssColor(background), [background]);
-  const canvas = useMemo(() => parseCssColor("#ffffff"), []);
-  const suggestions = useMemo(() => fg && bg && canvas ? suggestContrastCorrections(fg, bg, "normal-aa", canvas) : null, [bg, canvas, fg]);
-  const [adjustBackground, setAdjustBackground] = useState(false);
-  const [amount, setAmount] = useState(100);
-  const source = adjustBackground ? bg : fg; const suggestion = adjustBackground ? suggestions?.background : suggestions?.foreground;
-  const preview = source && suggestion ? { r: source.r + (suggestion.r - source.r) * amount / 100, g: source.g + (suggestion.g - source.g) * amount / 100, b: source.b + (suggestion.b - source.b) * amount / 100, a: 1 } : null;
-  const previewHex = preview ? toHex(preview).slice(0, 7) : adjustBackground ? background : foreground;
-  const ratio = adjustBackground ? contrast(foreground, previewHex) : contrast(previewHex, background);
-  const canAdjust = Boolean(source && suggestion && preview);
-  return <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="guided-color-fix-title"><div><h2 id="guided-color-fix-title" className="text-base font-semibold">Guided WCAG AA color adjustment</h2><p className="text-sm text-muted">Explore the nearest passing lightness while preserving hue. This uses WCAG relative luminance, not APCA.</p></div><fieldset className="flex flex-wrap gap-4 text-sm"><legend className="sr-only">Color to adjust</legend><label className="flex min-h-11 items-center gap-2"><input type="radio" name="guided-color-side" checked={!adjustBackground} onChange={() => setAdjustBackground(false)} />Foreground</label><label className="flex min-h-11 items-center gap-2"><input type="radio" name="guided-color-side" checked={adjustBackground} onChange={() => setAdjustBackground(true)} />Background</label></fieldset>{canAdjust ? <><label className="flex items-center justify-between gap-3 text-sm" htmlFor="color-adjustment"><span>Adjustment</span><output>{amount}% · {ratio?.toFixed(2)}:1 {ratio !== null && ratio >= 4.5 ? "Pass" : "Below 4.5:1"}</output></label><input id="color-adjustment" type="range" min="0" max="100" step="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="min-h-11 w-full accent-accent" aria-label={`Adjust ${adjustBackground ? "background" : "foreground"} lightness toward a WCAG AA passing color`} /><div className="flex min-h-16 items-center justify-between gap-3 rounded-lg p-4" style={{ color: adjustBackground ? foreground : previewHex, backgroundColor: adjustBackground ? previewHex : background }}><strong>Live text preview</strong><span className="font-mono text-xs">{adjustBackground ? foreground : previewHex} on {adjustBackground ? previewHex : background}</span></div><Button type="button" className="min-h-11" onClick={() => onApply(adjustBackground ? "background" : "foreground", previewHex)}>Apply suggested {adjustBackground ? "background" : "foreground"}</Button></> : <p className="text-sm text-muted">Enter valid colors. The pair may already pass, or no passing change is available along the selected color's lightness path.</p>}</section>;
+export function AccessibilityEngine({ toolId }: { toolId: string }) {
+  const parsed = parseToolId(toolId);
+  const rawKind = parsed.kind as string;
+  const kind = accessibilityKindFromToolId(toolId) as Kind;
+  const studio = accessibilityStudioForKind(kind);
+  if (studio?.id === "contrast-checker") {
+    const initialMode: ColorStudioMode = rawKind === "color-blindness" ? "vision" : parsed.action === "helper" ? "fix" : parsed.action === "preview" ? "preview" : parsed.action === "generator" ? "export" : "check";
+    return <AccessibleColorChecker key={toolId} initialMode={initialMode} />;
+  }
+  return <AccessibilityStudioForm key={toolId} toolId={toolId} kind={kind} initialAction={parsed.action} studioName={studio?.name ?? `${titleCase(kind)} Studio`} />;
 }
 
-export function AccessibilityEngine({ toolId }: { toolId: string }) {
-  const { kind, action } = parseToolId(toolId);
-  if (toolId === "accessible-color-checker") return <AccessibleColorChecker />;
+function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { toolId: string; kind: Kind; initialAction: Action; studioName: string }) {
+  const [action, setAction] = useState<Action>(initialAction);
   const [fg, setFg] = useState("#000000"); const [bg, setBg] = useState("#ffffff");
   const [text, setText] = useState(""); const [size, setSize] = useState("16px"); const [lineHeight, setLineHeight] = useState("1.5");
   const [html, setHtml] = useState(""); const [role, setRole] = useState("button");
@@ -601,9 +645,13 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
   const [previewSize, setPreviewSize] = useState(18); const [previewLeading, setPreviewLeading] = useState(1.5);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [axeReport, setAxeReport] = useState(""); const [axeRunning, setAxeRunning] = useState(false);
-  const output = useMemo(() => buildOutput(kind, action, { fg, bg: kind === "accessible-color" && action === "generator" ? fg : bg, text, size, lineHeight, html, role, focusWidth, focusOffset }), [action, bg, fg, focusOffset, focusWidth, html, kind, lineHeight, role, size, text]);
+  const output = useMemo(() => buildOutput(kind, action, { fg, bg, text, size, lineHeight, html, role, focusWidth, focusOffset }), [action, bg, fg, focusOffset, focusWidth, html, kind, lineHeight, role, size, text]);
   const sampleHtml = kind === "alt-text" ? '<img src="logo.svg" alt="">\n<img src="event.jpg">' : kind === "aria" ? '<button aria-label="" aria-expanded="false">Open</button>' : kind === "focus-state" ? "button:focus { outline: none; }" : kind === "keyboard-navigation" ? '<div tabindex="4" onclick="openMenu()">Menu</div>' : kind === "form" ? '<form><input type="email"><button>Submit</button></form>' : kind === "motion" ? "button { animation: pulse 1s infinite; }" : "";
   const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && action !== "generator" && !(kind === "alt-text" && action === "helper");
+  const actionModes: Array<{ id: Action; label: string }> = [
+    { id: "checker", label: "Check" }, { id: "generator", label: "Generate" }, { id: "helper", label: "Coach / fix" },
+    { id: "preview", label: "Preview" }, { id: "simulator", label: "Test" },
+  ];
   const runAxe = async () => {
     setAxeRunning(true);
     setAxeReport(await scanMarkupWithAxe(html));
@@ -621,35 +669,28 @@ export function AccessibilityEngine({ toolId }: { toolId: string }) {
     setAxeReport("");
   };
   return <div className="space-y-5">
-    <p className="text-sm text-muted">Runs on this device; your text and markup stay in your browser. Use results as guidance, not an accessibility certification.</p>
+    <header><p className="text-xs font-semibold uppercase tracking-wide text-accent">Accessibility Studio</p><h2 className="mt-1 text-xl font-semibold">{studioName}</h2><p className="mt-1 text-sm text-muted">Choose a workflow below. Processing stays in this browser; results are guidance, not certification.</p></header>
+    <StudioModeTabs modes={actionModes} value={action} onChange={setAction} label={`${studioName} workflow`} />
     <div className="grid gap-4 sm:grid-cols-2">
-      {(kind === "contrast" || kind === "accessible-color" || kind === "color-blindness") && <>
-        <ColorInput label={action === "generator" ? "Base color" : "Foreground / first color"} value={fg} onChange={setFg} parsed={parseCssColor(fg)} />
-        {action !== "generator" || kind !== "accessible-color" ? <ColorInput label="Background / second color" value={bg} onChange={setBg} parsed={parseCssColor(bg)} /> : null}
-      </>}
       {kind === "focus-state" && action === "generator" && <>
         <ColorInput label="Focus ring color" value={fg} onChange={setFg} parsed={parseCssColor(fg)} />
         <ColorInput label="Dark-mode ring color" value={bg} onChange={setBg} parsed={parseCssColor(bg)} />
         <label className="flex flex-col gap-1.5"><Label>Ring width (px)</Label><Input type="number" min="2" max="8" value={focusWidth} onChange={(e) => setFocusWidth(e.target.value)} /></label>
         <label className="flex flex-col gap-1.5"><Label>Ring offset (px)</Label><Input type="number" min="1" max="10" value={focusOffset} onChange={(e) => setFocusOffset(e.target.value)} /></label>
       </>}
-      {kind === "font-size" && action !== "generator" && <label className="flex flex-col gap-1.5"><Label>Font size</Label><Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="16px or 1rem" /></label>}
-      {kind === "line-height" && <><label className="flex flex-col gap-1.5"><Label>Font size</Label><Input value={size} onChange={(e) => setSize(e.target.value)} /></label><label className="flex flex-col gap-1.5"><Label>Line height</Label><Input value={lineHeight} onChange={(e) => setLineHeight(e.target.value)} placeholder="1.5" /></label></>}
+      {kind === "focus-state" && ["preview", "simulator"].includes(action) && <><ColorInput label="Light-surface focus ring" value={fg} onChange={setFg} parsed={parseCssColor(fg)} /><ColorInput label="Dark-surface focus ring" value={bg} onChange={setBg} parsed={parseCssColor(bg)} /></>}
+      {kind === "text-readability" && <><label className="flex flex-col gap-1.5"><Label>Font size (CSS px / rem)</Label><Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="16px or 1rem" /></label><label className="flex flex-col gap-1.5"><Label>Line height</Label><Input value={lineHeight} onChange={(e) => setLineHeight(e.target.value)} placeholder="1.5" /></label></>}
       {(kind === "text-readability" || kind === "alt-text" && action === "helper") && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>{kind === "alt-text" ? "Describe the image and its purpose" : "Text (English estimate)"}</Label><Textarea className="min-h-32 text-base" value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === "alt-text" ? "What is in the image? Why is it included here?" : "Paste English text to analyze…"} /></label>}
       {kind === "aria" && action === "generator" && <label className="flex flex-col gap-1.5"><Label>Pattern to generate</Label><select className="min-h-11 rounded-md border border-border bg-surface px-3 text-base" value={role} onChange={(e) => setRole(e.target.value)}><option value="button">Button</option><option value="dialog">Dialog</option><option value="disclosure">Disclosure</option><option value="tablist">Tabs</option><option value="checkbox">Checkbox</option><option value="link">Link</option></select></label>}
       {needsHtml && <label className="flex flex-col gap-1.5 sm:col-span-2"><Label>{kind === "alt-text" && action === "simulator" ? "Paste multiple image tags (up to 50)" : "HTML / CSS to inspect"}</Label><Textarea className="min-h-40 font-mono text-sm" value={html} onChange={(e) => setHtml(e.target.value)} placeholder={kind === "alt-text" && action === "simulator" ? '<img src="banner.jpg">\n<img src="avatar.png" alt="Profile photo">' : "Paste the relevant HTML or CSS…"} /></label>}
       {needsHtml && sampleHtml ? <Button type="button" variant="outline" className="min-h-11 sm:col-span-2" onClick={() => setHtml(sampleHtml)}>Load example snippet</Button> : null}
     </div>
-    {kind === "color-blindness" && action === "generator" ? <p className="text-sm text-muted">Create safer combinations by avoiding red/green-only distinctions. Add labels, icons, or patterns to communicate state.</p> : null}
-    <ResultPanel items={[{ label: "Tool", value: `${titleCase(kind)} ${action}` }, { label: "Processing", value: "On device · no upload", primary: true }]} />
+    <ResultPanel items={[{ label: "Studio mode", value: `${studioName} · ${action}` }, { label: "Processing", value: "On device · no upload", primary: true }]} />
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><div className="flex flex-wrap gap-2"><CopyButton text={output} /><Button className="min-h-11" type="button" variant="outline" size="sm" onClick={() => downloadText(output, `env-${toolId}.txt`)}>Download</Button><Button className="min-h-11" type="button" variant="ghost" size="sm" onClick={reset}>Reset</Button></div></div>
-    {(kind === "contrast" || kind === "accessible-color") && action === "preview" && <ColorContexts foreground={fg} background={bg} />}
-    {(kind === "contrast" || kind === "accessible-color") && action === "helper" ? <GuidedColorFixer foreground={fg} background={bg} onApply={(side, value) => side === "foreground" ? setFg(value) : setBg(value)} /> : null}
-    {kind === "color-blindness" && action === "preview" && <ColorVisionContexts foreground={fg} background={bg} />}
     {kind === "aria" && action === "preview" ? <AccessibilityTreePreview html={html} /> : null}
     {kind === "form" && action === "simulator" ? <AccessibleFormPlayground /> : null}
-    {(kind === "font-size" || kind === "line-height") && ["preview", "simulator"].includes(action) && <section className="space-y-3 rounded-xl border border-border p-4"><div className="flex items-center justify-between"><Label htmlFor="accessibility-size-slider">Preview size</Label><output htmlFor="accessibility-size-slider">{previewSize}px</output></div><input id="accessibility-size-slider" className="min-h-11 w-full accent-accent" type="range" min="12" max="48" step="1" value={previewSize} onChange={(e) => setPreviewSize(Number(e.target.value))} aria-label="Preview text size" />{kind === "line-height" ? <div className="flex items-center justify-between"><Label htmlFor="accessibility-leading-slider">Line height</Label><output htmlFor="accessibility-leading-slider">{previewLeading.toFixed(2)}</output><input id="accessibility-leading-slider" className="min-h-11 w-40 accent-accent" type="range" min="1" max="2.5" step="0.05" value={previewLeading} onChange={(e) => setPreviewLeading(Number(e.target.value))} aria-label="Preview line height" /></div> : null}<p className="rounded-lg bg-surface-2 p-4" style={{ fontSize: `${previewSize}px`, lineHeight: kind === "line-height" ? previewLeading : 1.5 }}>Accessible design gives people more than one way to understand and use content, across different screens and preferences.</p></section>}
-    {(["focus-state", "keyboard-navigation"].includes(kind) && ["preview", "simulator"].includes(action)) ? <FocusPlayground /> : null}
+    {kind === "text-readability" && ["preview", "simulator"].includes(action) && <section className="space-y-3 rounded-xl border border-border p-4"><div className="flex items-center justify-between"><Label htmlFor="accessibility-size-slider">Preview size</Label><output htmlFor="accessibility-size-slider">{previewSize}px</output></div><input id="accessibility-size-slider" className="min-h-11 w-full accent-accent" type="range" min="12" max="48" step="1" value={previewSize} onChange={(e) => setPreviewSize(Number(e.target.value))} aria-label="Preview text size" /><div className="flex items-center justify-between"><Label htmlFor="accessibility-leading-slider">Line height</Label><output htmlFor="accessibility-leading-slider">{previewLeading.toFixed(2)}</output><input id="accessibility-leading-slider" className="min-h-11 w-40 accent-accent" type="range" min="1" max="2.5" step="0.05" value={previewLeading} onChange={(e) => setPreviewLeading(Number(e.target.value))} aria-label="Preview line height" /></div><p className="rounded-lg bg-surface-2 p-4" style={{ fontSize: `${previewSize}px`, lineHeight: previewLeading }}>{text || "Accessible design gives people more than one way to understand and use content, across different screens and preferences."}</p></section>}
+    {(["focus-state", "keyboard-navigation"].includes(kind) && ["preview", "simulator"].includes(action)) ? <FocusPlayground focusColor={fg} darkColor={bg} /> : null}
     {kind === "motion" && ["preview", "simulator"].includes(action) ? <section className="space-y-3 rounded-xl border border-border p-4"><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={reducedMotion} onChange={(e) => setReducedMotion(e.target.checked)} className="size-5 accent-accent" />Reduce non-essential motion</label><div className={`motion-preview-box rounded-lg bg-accent-soft p-5 text-center font-medium text-accent ${reducedMotion ? "motion-preview-reduced" : "motion-preview-active"}`}>Motion sample · {reducedMotion ? "reduced" : "full"}</div><p className="text-xs text-muted">This is a local demo only. Also test your operating system's reduced-motion preference.</p></section> : null}
     <pre aria-live="polite" aria-atomic="true" className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-sm leading-6 text-bg">{output}</pre>
     {needsHtml ? <section className="space-y-3 rounded-xl border border-border bg-surface-2 p-4" aria-labelledby="axe-scan-heading">

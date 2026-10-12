@@ -32,9 +32,8 @@ struct HomeView: View {
             .map { $0 }
     }
     private var mostUsedTools: [Tool] {
-        let allTools = store.catalog.tools + (store.catalog.relatedReferenceTools ?? [])
-        let byID = Dictionary(allTools.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return Array(store.mostUsedIDs.compactMap { byID[$0] }.prefix(10))
+        var seen = Set<String>()
+        return Array(store.mostUsedIDs.compactMap { store.catalog.displayTool(for: $0) }.filter { seen.insert($0.id).inserted }.prefix(10))
     }
 
     var body: some View {

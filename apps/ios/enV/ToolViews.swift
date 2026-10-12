@@ -1250,6 +1250,7 @@ struct NativeTextToolView: View {
 struct NativeAccessibilityToolView: View {
     let tool: Tool
     @State private var input = ""
+    @State private var studioMode: String
     @State private var foreground = "#000000"
     @State private var background = "#ffffff"
     @State private var fontSize = "16px"
@@ -1258,31 +1259,85 @@ struct NativeAccessibilityToolView: View {
     @State private var focusOffset = "3px"
     @State private var ariaPattern = "button"
     @State private var output = ""
+    @State private var previewSize = 18.0
+    @State private var previewLineHeight = 1.5
+    @State private var focusDark = false
+    @State private var focusForced = false
+    @State private var showFocusRing = false
+    @State private var focusInput = ""
+    @State private var motionOn = false
+    @State private var reduceMotion = false
+    @State private var demoEmail = ""
+    @State private var demoSubmitted = false
+    @State private var demoValid = false
+
+    init(tool: Tool) {
+        self.tool = tool
+        let rawKind = NativeAccessibilityEngine.kind(tool.id)
+        let suffix = tool.id.components(separatedBy: "-").last ?? "checker"
+        let initial = rawKind == "color-blindness" ? "vision" : (["checker", "generator", "helper", "preview", "simulator"].contains(suffix) ? suffix : "checker")
+        _studioMode = State(initialValue: initial)
+    }
     private var kind: String { NativeAccessibilityEngine.kind(tool.id) }
-    private var colorTool: Bool { ["contrast", "accessible-color", "color-blindness"].contains(kind) }
-    private var sizeTool: Bool { ["font-size", "line-height"].contains(kind) }
-    private var textTool: Bool { kind == "text-readability" }
-    private var altCoach: Bool { tool.id == "alt-text-helper" }
-    private var focusGenerator: Bool { tool.id == "focus-state-generator" }
-    private var codeTool: Bool { !tool.id.hasSuffix("-generator") && !colorTool && !sizeTool && !textTool && !altCoach }
+    private var studioKind: String { ["accessible-color", "color-blindness"].contains(kind) ? "contrast" : ["font-size", "line-height"].contains(kind) ? "text-readability" : kind }
+    private var colorTool: Bool { studioKind == "contrast" }
+    private var sizeTool: Bool { studioKind == "text-readability" }
+    private var textTool: Bool { studioKind == "text-readability" }
+    private var altCoach: Bool { kind == "alt-text" && studioMode == "helper" }
+    private var focusGenerator: Bool { kind == "focus-state" && studioMode == "generator" }
+    private var modes: [String] { colorTool ? ["checker", "generator", "helper", "preview", "simulator", "vision"] : ["checker", "generator", "helper", "preview", "simulator"] }
+    private var engineToolID: String { studioMode == "vision" ? "color-blindness-preview" : "\(studioKind)-\(studioMode)" }
+    private var codeTool: Bool { studioMode != "generator" && !colorTool && !sizeTool && !altCoach && !(kind == "form" && studioMode == "simulator") }
+    private var studioTitle: String { ["contrast": "Color Contrast Studio", "alt-text": "Alt Text Studio", "focus-state": "Focus State Studio", "text-readability": "Text & Readability Studio", "aria": "ARIA Studio", "motion": "Motion & Reduced Motion Studio", "keyboard-navigation": "Keyboard Navigation Studio", "form": "Form Accessibility Studio"][studioKind] ?? tool.name }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText(studioTitle).font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
             enVCharacterSpacedText(tool.description)
                 .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envInk)
             enVCharacterSpacedText("Runs on this device · your text and markup are not uploaded.")
                 .font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(modes, id: \.self) { mode in
+                        let title = mode == "checker" ? "Check" : mode == "generator" ? "Generate" : mode == "helper" ? "Coach / fix" : mode == "preview" ? "Preview" : mode == "simulator" ? "Test" : "Color vision"
+                        Button { studioMode = mode; output = "" } label: {
+                            enVCharacterSpacedText("\(studioMode == mode ? "✓ " : "")\(title)")
+                                .font(.envScaled(size: 13, weight: studioMode == mode ? .semibold : .regular))
+                                .foregroundStyle(studioMode == mode ? Color.white : Color.accentColor)
+                                .padding(.horizontal, 14).frame(minHeight: 48)
+                                .background(studioMode == mode ? Color.accentColor : Color.clear, in: Capsule())
+                                .overlay(Capsule().stroke(Color.accentColor, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(title)\(studioMode == mode ? ", selected" : "")")
+                    }
+                }
+            }
             if colorTool {
                 NativeInputField(title: "Foreground color", text: $foreground)
                 NativeInputField(title: "Background color", text: $background)
+                if studioMode == "helper" {
+                    Text("Tap a passing WCAG AA option to apply it as the foreground.").font(.caption).foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(NativeAccessibilityEngine.passingForegroundColors(background: background), id: \.self) { candidate in
+                                Button(candidate) { foreground = candidate; output = "" }
+                                    .buttonStyle(.bordered).frame(minHeight: 48)
+                                    .accessibilityLabel("Apply foreground color \(candidate)")
+                                    .accessibilityHint("Candidate meets 4.5 to 1 WCAG AA contrast against the current background")
+                            }
+                        }
+                    }
+                }
             }
-            if focusGenerator {
+            if focusGenerator || (kind == "focus-state" && ["preview", "simulator"].contains(studioMode)) {
                 NativeInputField(title: "Focus ring color (HEX)", text: $foreground)
                 NativeInputField(title: "Dark-mode ring color (HEX)", text: $background)
                 NativeInputField(title: "Ring width (CSS px)", text: $focusWidth)
                 NativeInputField(title: "Ring offset (CSS px)", text: $focusOffset)
             }
-            if tool.id == "aria-generator" {
+            if kind == "aria" && studioMode == "generator" {
                 Picker("Pattern", selection: $ariaPattern) {
                     Text("Button").tag("button"); Text("Dialog").tag("dialog"); Text("Disclosure").tag("disclosure")
                     Text("Tabs").tag("tabs"); Text("Checkbox").tag("checkbox"); Text("Link").tag("link")
@@ -1290,7 +1345,7 @@ struct NativeAccessibilityToolView: View {
             }
             if sizeTool {
                 NativeInputField(title: "Font size (CSS px/rem)", text: $fontSize)
-                if kind == "line-height" { NativeInputField(title: "Line height", text: $lineHeight) }
+                NativeInputField(title: "Line height", text: $lineHeight)
             }
             if codeTool || textTool || altCoach {
                 enVCharacterSpacedText(altCoach ? "Image description" : textTool ? "English text" : "HTML / CSS snippet")
@@ -1303,11 +1358,18 @@ struct NativeAccessibilityToolView: View {
                     .accessibilityHint(altCoach ? "Drafts three alternatives on this device; verify them against the actual image." : "Paste only the relevant snippet for a focused review.")
             }
             if codeTool && !altCoach { Button("Load sample") { input = sampleInput }.buttonStyle(.bordered).frame(maxWidth: .infinity, alignment: .leading) }
-            Button { output = NativeAccessibilityEngine.analyze(toolID: tool.id, input: tool.id == "aria-generator" ? ariaPattern : input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight, focusWidth: focusWidth, focusOffset: focusOffset) } label: {
-                Label(tool.id.hasSuffix("-generator") ? "Generate locally" : "Run local review", systemImage: "play.fill")
+            if colorTool && studioMode == "preview" { colorPreview }
+            if colorTool && studioMode == "vision" { colorVisionPreview }
+            if sizeTool && ["preview", "simulator"].contains(studioMode) { typeScalePreview }
+            if kind == "focus-state" && ["preview", "simulator"].contains(studioMode) { focusPreview }
+            if kind == "keyboard-navigation" && ["preview", "simulator"].contains(studioMode) { focusPreview }
+            if kind == "motion" && ["preview", "simulator"].contains(studioMode) { motionPreview }
+            if kind == "form" && studioMode == "simulator" { formPreview }
+            Button { output = NativeAccessibilityEngine.analyze(toolID: engineToolID, input: kind == "aria" && studioMode == "generator" ? ariaPattern : input, foreground: foreground, background: background, fontSize: fontSize, lineHeight: lineHeight, focusWidth: focusWidth, focusOffset: focusOffset) } label: {
+                Label(studioMode == "generator" ? "Generate locally" : studioMode == "helper" ? "Get local coaching" : ["preview", "simulator", "vision"].contains(studioMode) ? "Run local preview / test" : "Run local review", systemImage: "play.fill")
                     .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             }.buttonStyle(.borderedProminent)
-            Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; focusWidth = "3px"; focusOffset = "3px"; ariaPattern = "button"; output = "" } label: {
+            Button { input = ""; foreground = "#000000"; background = "#ffffff"; fontSize = "16px"; lineHeight = "1.5"; focusWidth = "3px"; focusOffset = "3px"; ariaPattern = "button"; previewSize = 18; previewLineHeight = 1.5; demoEmail = ""; demoSubmitted = false; demoValid = false; output = "" } label: {
                 Label("Reset fields", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             }.buttonStyle(.bordered)
             if !output.isEmpty {
@@ -1323,6 +1385,89 @@ struct NativeAccessibilityToolView: View {
             enVCharacterSpacedText("Static snippet checks only. Manually test keyboard order, browser zoom, screen readers, and the complete page; results do not certify WCAG conformance.")
                 .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
         }
+    }
+    private var colorPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Live color preview").font(.headline)
+            Text("Sample body text on the selected background. Also inspect real UI states and non-text boundaries.").font(.body)
+            Button("Sample action") {}.buttonStyle(.bordered).tint(accessibilityColor(foreground))
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(accessibilityColor(foreground)).background(accessibilityColor(background), in: RoundedRectangle(cornerRadius: 12))
+    }
+    private var colorVisionPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Color-vision approximations").font(.headline)
+            Text("Illustrative matrix transforms—not a clinical simulation. Never use color as the only signal.").font(.caption).foregroundStyle(.secondary)
+            ForEach(NativeAccessibilityEngine.colorVisionPreviewPairs(foreground, background), id: \.label) { pair in
+                Text("\(pair.label)\nSample text · \(pair.foreground) on \(pair.background)")
+                    .font(.subheadline).padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(accessibilityColor(pair.foreground)).background(accessibilityColor(pair.background), in: RoundedRectangle(cornerRadius: 9))
+            }
+        }.accessibilityElement(children: .contain)
+    }
+    private var typeScalePreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Type-scale preview · \(Int(previewSize)) pt · line spacing \(previewLineHeight, specifier: "%.2f")").font(.headline)
+            Slider(value: $previewSize, in: 12...48, step: 1).accessibilityLabel("Preview text size")
+            Slider(value: $previewLineHeight, in: 1...2.5, step: 0.05).accessibilityLabel("Preview line height")
+            Text(input.isEmpty ? "Accessible content should remain readable when people enlarge type and adjust spacing." : input)
+                .font(.system(size: previewSize)).lineSpacing(max(0, previewSize * (previewLineHeight - 1)))
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
+        }
+    }
+    private var focusPreview: some View {
+        let surface = focusForced ? Color.black : focusDark ? Color(red: 0.07, green: 0.09, blue: 0.14) : Color.envSurface2
+        let foregroundColor = focusForced || focusDark ? Color.white : Color.envInk
+        let ring = focusForced ? Color.yellow : accessibilityColor(focusDark ? background : foreground)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Keyboard focus playground").font(.headline)
+            Text("Use a hardware keyboard, VoiceOver, or switch control to navigate these native controls.").font(.caption).foregroundStyle(.secondary)
+            Toggle("Dark surface", isOn: $focusDark).onChange(of: focusDark) { _, value in if value { focusForced = false } }
+            Toggle("Forced-colors visual mock", isOn: $focusForced).onChange(of: focusForced) { _, value in if value { focusDark = false } }
+            Toggle("Show focus-ring preview", isOn: $showFocusRing).accessibilityHint("Visual sample only; navigate with the keyboard to test actual focus behavior.")
+            VStack(alignment: .leading, spacing: 10) {
+                Button("Keyboard target") {}.buttonStyle(.borderedProminent).overlay(RoundedRectangle(cornerRadius: 8).stroke(showFocusRing ? ring : .clear, lineWidth: 4))
+                Button("Sample secondary action") {}.buttonStyle(.bordered).foregroundStyle(foregroundColor)
+                TextField("Sample text field", text: $focusInput)
+                    .textFieldStyle(.roundedBorder).overlay(RoundedRectangle(cornerRadius: 6).stroke(showFocusRing ? ring : .clear, lineWidth: 4))
+            }.padding(14).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(foregroundColor).background(surface, in: RoundedRectangle(cornerRadius: 10))
+            Text("Forced-colors is a visual mock only. Verify actual iOS accessibility settings and contrast with users.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var motionPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Reduced-motion playground").font(.headline)
+            Toggle("Reduce this demo's motion", isOn: $reduceMotion)
+            Button(motionOn ? "Stop motion" : "Play motion") { motionOn.toggle() }.buttonStyle(.bordered)
+            Text("●").font(.title).offset(x: motionOn && !reduceMotion ? 70 : 0)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: motionOn)
+            Text("Local preview only; also test the system Reduce Motion setting.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var formPreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Interactive validation demo").font(.headline)
+            Text("This sample is local; it never submits or stores your input.").font(.caption).foregroundStyle(.secondary)
+            TextField("Email address", text: $demoEmail)
+                .textContentType(.emailAddress).keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
+                .accessibilityLabel("Email address").accessibilityHint("Required for this local validation sample")
+                .textFieldStyle(.roundedBorder)
+            if demoSubmitted && !demoValid {
+                Label("Enter a valid email address, for example name@example.com.", systemImage: "exclamationmark.circle.fill")
+                    .foregroundStyle(.red).accessibilityLabel("Error: email address is required or invalid")
+            }
+            Button("Validate sample form") {
+                demoSubmitted = true
+                demoValid = demoEmail.contains("@") && demoEmail.split(separator: "@").last?.contains(".") == true
+            }.buttonStyle(.borderedProminent).frame(maxWidth: .infinity, minHeight: 48)
+            if demoValid { Label("Valid. Nothing was sent.", systemImage: "checkmark.circle.fill").foregroundStyle(.green).accessibilityAddTraits(.updatesFrequently) }
+        }.accessibilityElement(children: .contain)
+    }
+    private func accessibilityColor(_ value: String) -> Color {
+        let clean = value.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard clean.count == 6, let number = UInt64(clean, radix: 16) else { return Color.envInk }
+        return Color(red: Double((number >> 16) & 255) / 255, green: Double((number >> 8) & 255) / 255, blue: Double(number & 255) / 255)
     }
     private var sampleInput: String {
         switch kind {

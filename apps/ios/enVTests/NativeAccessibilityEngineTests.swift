@@ -2,6 +2,13 @@ import XCTest
 @testable import enV
 
 final class NativeAccessibilityEngineTests: XCTestCase {
+    func testColorVisionStudioProvidesFourLabeledApproximationPairs() {
+        let pairs = NativeAccessibilityEngine.colorVisionPreviewPairs("#cc3322", "#ffffff")
+        XCTAssertEqual(pairs.count, 4)
+        XCTAssertTrue(pairs.contains { $0.label.contains("Protanopia") })
+        XCTAssertTrue(pairs.contains { $0.label.contains("Achromatopsia") })
+        XCTAssertTrue(pairs.allSatisfy { $0.foreground.hasPrefix("#") && $0.background.hasPrefix("#") })
+    }
     func testMissingAndFilenameAltTextProduceActionableFindings() {
         let report = NativeAccessibilityEngine.analyze(toolID: "alt-text-checker", input: "<img src=\"hero.jpg\"><img src=\"logo.png\" alt=\"logo.png\">")
         XCTAssertTrue(report.contains("image-alt"))

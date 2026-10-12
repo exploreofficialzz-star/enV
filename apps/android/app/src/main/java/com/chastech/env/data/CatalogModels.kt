@@ -109,11 +109,16 @@ private val webSearchSynonyms = mapOf(
     "hash" to listOf("checksum", "digest", "sha", "md5"), "color" to listOf("colour", "hex", "rgb"),
     "mockup" to listOf("fake", "demo", "chat", "screenshot"), "invoice" to listOf("bill", "receipt"), "pdf" to listOf("document"),
     "encode" to listOf("encoding", "base64"), "decode" to listOf("decoding"),
+    "a11y" to listOf("accessibility"), "contrast" to listOf("color contrast", "wcag"),
+    "alt" to listOf("alt-text", "image description"), "focus" to listOf("focus ring", "focus state"),
+    "aria" to listOf("accessible name", "accessibility tree"), "tab" to listOf("keyboard navigation", "tab order"),
+    "animation" to listOf("motion", "reduced motion"), "readability" to listOf("plain language", "text spacing"),
 )
 
 fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedReferences: Boolean = false): List<ToolRecord> {
     val q = query.trim().lowercase()
-    val candidates = if (includeRelatedReferences) tools + relatedReferenceTools else tools
+    val sourceCandidates = if (includeRelatedReferences) tools + relatedReferenceTools else tools
+    val candidates = sourceCandidates.filter { it.category != "accessibility" } + accessibilityDiscoveryTools().filter { it.category == "accessibility" }
     if (q.isEmpty()) return candidates.sortedByDescending { it.popularity }.take(limit)
     val tokens = q.split(Regex("[^a-z0-9%+]+" )).filter { it.length > 1 || it == "%" }
     val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
@@ -135,10 +140,7 @@ fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedR
 }
 
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {
-    val needle = query.trim().lowercase()
-    return (tools + relatedReferenceTools).asSequence().filter { categoryId == null || it.category == categoryId }.filter { tool ->
-        needle.isEmpty() || sequenceOf(tool.name, tool.description, tool.id, tool.slug).plus(tool.keywords.asSequence()).plus(tool.tags).any { it.lowercase().contains(needle) }
-    }.sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name }).toList()
+    return webSearch(query, includeRelatedReferences = true).filter { categoryId == null || it.category == categoryId }
 }
 
 private fun relatedAlphabeticalKey(value: String): String =
@@ -150,9 +152,9 @@ private fun relatedAlphabeticalKey(value: String): String =
 
 /** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
-    val relatedCandidates = tools + relatedReferenceTools
-    val byId = relatedCandidates.associateBy { it.id }
-    val related = tool.related.mapNotNull(byId::get).filter { it.status != "planned" }
+    val relatedCandidates = accessibilityDiscoveryTools()
+    val byId = (tools + relatedReferenceTools).associateBy { it.id }
+    val related = tool.related.mapNotNull { accessibilityStudioForId(it) ?: byId[it] }.filter { it.status != "planned" }
     if (related.size >= limit) return related.take(limit)
     val seen = (setOf(tool.id) + related.map { it.id })
     val rest = relatedCandidates.asSequence()

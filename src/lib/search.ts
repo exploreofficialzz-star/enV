@@ -21,6 +21,14 @@ const SYNONYMS: Record<string, string[]> = {
   pdf: ["document"],
   encode: ["encoding", "base64"],
   decode: ["decoding"],
+  a11y: ["accessibility"],
+  contrast: ["color contrast", "wcag"],
+  alt: ["alt-text", "image description"],
+  focus: ["focus ring", "focus state"],
+  aria: ["accessible name", "accessibility tree"],
+  tab: ["keyboard navigation", "tab order"],
+  animation: ["motion", "reduced motion"],
+  readability: ["plain language", "text spacing"],
 };
 
 function tokens(q: string): string[] {

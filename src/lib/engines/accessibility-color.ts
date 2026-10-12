@@ -44,21 +44,27 @@ function clamp(value: number, min: number, max: number): number {
 function parsePercentOrNumber(value: string, max: number, allowUnitless = true): number | null {
   const clean = value.trim();
   if (/%$/.test(clean)) {
-    const n = Number.parseFloat(clean.slice(0, -1));
+    const token = clean.slice(0, -1);
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(token)) return null;
+    const n = Number(token);
     return Number.isFinite(n) ? clamp((n / 100) * max, 0, max) : null;
   }
   if (!allowUnitless) return null;
-  const n = Number.parseFloat(clean);
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(clean)) return null;
+  const n = Number(clean);
   return Number.isFinite(n) ? clamp(n, 0, max) : null;
 }
 
 function parseAlpha(value: string): number | null {
   const clean = value.trim();
   if (/%$/.test(clean)) {
-    const n = Number.parseFloat(clean.slice(0, -1));
+    const token = clean.slice(0, -1);
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(token)) return null;
+    const n = Number(token);
     return Number.isFinite(n) ? clamp(n / 100, 0, 1) : null;
   }
-  const n = Number.parseFloat(clean);
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(clean)) return null;
+  const n = Number(clean);
   return Number.isFinite(n) ? clamp(n, 0, 1) : null;
 }
 
@@ -106,10 +112,12 @@ function parseRgbFunction(input: string): RgbaColor | null {
 
 function parseHue(value: string): number | null {
   const clean = value.trim().toLowerCase();
-  const n = Number.parseFloat(clean);
+  const match = clean.match(/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(deg|rad|turn)?$/i);
+  if (!match) return null;
+  const n = Number(match[1]);
   if (!Number.isFinite(n)) return null;
-  if (clean.endsWith("turn")) return ((n * 360) % 360 + 360) % 360;
-  if (clean.endsWith("rad")) return ((n * 180) / Math.PI % 360 + 360) % 360;
+  if (match[2] === "turn") return ((n * 360) % 360 + 360) % 360;
+  if (match[2] === "rad") return ((n * 180) / Math.PI % 360 + 360) % 360;
   return ((n % 360) + 360) % 360;
 }
 
@@ -349,7 +357,7 @@ function closestPassingOpacity(
   if (source.a >= 0.999) return null;
 
   let best: RgbaColor | null = null;
-  for (let i = 0; i <= 200; i += 1) {
+  for (let i = Math.ceil(source.a * 200); i <= 200; i += 1) {
     const candidate = { ...source, a: i / 200 };
     const ratio = adjusted === "foreground"
       ? contrastRatio(candidate, background, canvas)
