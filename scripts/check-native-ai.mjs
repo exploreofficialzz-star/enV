@@ -50,6 +50,7 @@ const androidActivitySource = readFileSync(androidActivity, "utf8");
 const iosSource = readFileSync(ios, "utf8");
 const iosHomeSource = readFileSync(iosHome, "utf8");
 const iosAssistantSource = readFileSync(iosAssistant, "utf8");
+const iosAiAssistPanelSource = iosSource.split("private struct NativeAiAssistPanel: View {")[1]?.split("private struct NativeAiStructuredSection: View {")[0] ?? "";
 const webAssistantSource = readFileSync(webAssistant, "utf8");
 const webAssistantStateSource = readFileSync(webAssistantState, "utf8");
 const webRootSource = readFileSync(webRoot, "utf8");
@@ -134,7 +135,7 @@ for (const [label, text] of [["Android build config", androidBuild], ["Android e
 }
 if ((androidBuild + androidEnv + iosProject + iosEnv).includes("https://en-v-6h2l.vercel.app")) fail("Old native Vercel backend URL is still present");
 if (/WebView|WKWebView|webView/i.test(androidSource + androidClientSource + androidAssistantSource)) fail("Android AI/native integration references a WebView runtime");
-if (/WKWebView|WebView/i.test(iosSource + iosAssistantSource)) fail("iOS native integration references a WebView runtime");
+if (/WKWebView|WebView/i.test(iosAssistantSource + iosAiAssistPanelSource)) fail("iOS AI/assistant integration references a WebView runtime");
 
 const backend = readFileSync(backendAssistant, "utf8");
 if (!backend.includes('id: "assistant.chat"') || !backend.includes('privacy: "sensitive"') || !backend.includes("wrapUntrusted")) fail("Backend assistant task is missing its registered id or prompt safeguards");

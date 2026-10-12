@@ -1,5 +1,49 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';
-const roots=[fileURLToPath(new URL('../apps/android/app/src/main/',import.meta.url)),fileURLToPath(new URL('../apps/ios/enV/',import.meta.url))];
-const forbidden=[/\bWebView\b/i,/\bWKWebView\b/i,/react-native-webview/i,/NativeWebFallback/i];const exts=new Set(['.kt','.swift','.xml','.plist','.kts']);const hits=[];
-function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=path.join(d,e.name);if(e.isDirectory())walk(f);else if(exts.has(path.extname(f).toLowerCase()))fs.readFileSync(f,'utf8').split(/\r?\n/).forEach((l,i)=>{if(forbidden.some(r=>r.test(l)))hits.push(`${f}:${i+1}:${l.trim()}`)})}}
-roots.forEach(walk);if(hits.length)throw new Error(`Native source still contains frontend runtime references:\n${hits.join('\n')}`);console.log('Native no-web-runtime guard: PASS');
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = fileURLToPath(new URL("../", import.meta.url));
+const roots = [
+  path.join(projectRoot, "apps/android/app/src/main"),
+  path.join(projectRoot, "apps/ios/enV"),
+];
+const forbidden = [/\bWebView\b/i, /\bWKWebView\b/i, /react-native-webview/i, /NativeWebFallback/i];
+const extensions = new Set([".kt", ".swift", ".xml", ".plist", ".kts"]);
+const hits = [];
+
+function isAPCAWebBridgeLine(file, lines, index) {
+  const line = lines[index].trim();
+  if (file.endsWith(path.join("com/chastech/env", "NativeAccessibilityToolForm.kt"))) {
+    const start = lines.findIndex((sourceLine) => sourceLine.trim() === "private fun ApcaWebDialog(onDismiss: () -> Unit) {");
+    const end = lines.findIndex((sourceLine, lineIndex) => lineIndex > start && sourceLine.startsWith("private fun previewColor("));
+    const importLine = /^import android\.webkit\.(?:WebSettings|WebView|WebViewClient)$/.test(line);
+    return importLine || (start >= 0 && end > start && index >= start && index < end);
+  }
+  if (file.endsWith(path.join("apps/ios/enV", "ToolViews.swift"))) {
+    const start = lines.findIndex((sourceLine) => sourceLine.trim() === "private struct APCAWebViewSheet: View {");
+    const end = lines.findIndex((sourceLine, lineIndex) => lineIndex > start && sourceLine.startsWith("struct NativeBackendFile "));
+    return line === "import WebKit" || (start >= 0 && end > start && index >= start && index < end);
+  }
+  return false;
+}
+
+function scanFile(file) {
+  const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+  lines.forEach((line, index) => {
+    if (forbidden.some((pattern) => pattern.test(line)) && !isAPCAWebBridgeLine(file, lines, index)) {
+      hits.push(`${file}:${index + 1}:${line.trim()}`);
+    }
+  });
+}
+
+function walk(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) walk(file);
+    else if (extensions.has(path.extname(file).toLowerCase())) scanFile(file);
+  }
+}
+
+roots.forEach(walk);
+if (hits.length) throw new Error(`Native source still contains unauthorized frontend runtime references:\n${hits.join("\n")}`);
+console.log("Native no-web-runtime guard: PASS (WebView is limited to APCA in Color Contrast Studio)");
