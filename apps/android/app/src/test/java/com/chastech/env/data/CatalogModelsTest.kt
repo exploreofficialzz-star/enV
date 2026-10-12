@@ -29,15 +29,15 @@ class CatalogModelsTest {
         assertEquals("Estimates based on your inputs — not financial advice.", catalog.tools.single().nativeDisclaimerText())
     }
 
-    @Test fun searchesNameDescriptionKeywordsTagsAndSortsByPopularity() {
+    @Test fun searchesNameDescriptionKeywordsTagsAndRanksRelevanceBeforePopularity() {
         val catalog = Catalog.fromJson("""
             {"counts":{},"categories":[],"tools":[
               {"id":"a","name":"Alpha","description":"other","category":"x","keywords":["needle"],"tags":[],"popularity":2,"status":"active"},
               {"id":"b","name":"Beta","description":"needle description","category":"x","keywords":[],"tags":[],"popularity":9,"status":"active"},
               {"id":"c","name":"Gamma","description":"other","category":"y","keywords":[],"tags":["needle"],"popularity":99,"status":"active"}]}
         """.trimIndent())
-        assertEquals(listOf("c", "b", "a"), catalog.search("needle").map { it.id })
-        assertEquals(listOf("b", "a"), catalog.search("needle", "x").map { it.id })
+        assertEquals(listOf("a", "c", "b"), catalog.search("needle").map { it.id })
+        assertEquals(listOf("a", "b"), catalog.search("needle", "x").map { it.id })
     }
 
     @Test fun favoriteSetToggleIsDeterministic() {
