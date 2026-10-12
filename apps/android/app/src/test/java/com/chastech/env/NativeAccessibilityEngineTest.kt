@@ -24,15 +24,86 @@ class NativeAccessibilityEngineTest {
         val aria = NativeAccessibilityEngine.analyze("aria-checker", "<button role=\"pushbutton\" aria-labelledby=\"missing\"></button>")
         assertTrue(aria.contains("aria-valid-role"))
         assertTrue(aria.contains("aria-labelledby"))
-        val keyboard = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<div tabindex=\"3\"></div><div onclick=\"go()\"></div>")
+        val keyboard = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<div tabindex=\"3\"></div><div tabindex=\"0\" onclick=\"go()\"></div><div onclick=\"go()\"></div>")
         assertTrue(keyboard.contains("tabindex"))
         assertTrue(keyboard.contains("keyboard-operable"))
+    }
+
+    @Test fun catchesInvalidAriaNamesReferencesAndStateValues() {
+        val report = NativeAccessibilityEngine.analyze(
+            "aria-checker",
+            "<div aria-label='Loading'></div><button aria-expanded='yes' aria-controls='missing' aria-invalid=''>Open</button>"
+        )
+        assertTrue(report.contains("aria-prohibited-attr"))
+        assertTrue(report.contains("aria-value-expanded"))
+        assertTrue(report.contains("aria-reference"))
+        assertTrue(report.contains("aria-value-invalid"))
+    }
+
+    @Test fun catchesBrokenFormLabelsAndCustomButtonKeyboardActivation() {
+        val form = NativeAccessibilityEngine.analyze(
+            "form-checker",
+            "<label for='missing'>Email</label><input id='email' aria-invalid='true' aria-describedby='error-missing'>"
+        )
+        assertTrue(form.contains("label-reference"))
+        assertTrue(form.contains("error-description-reference"))
+        val keyboard = NativeAccessibilityEngine.analyze(
+            "keyboard-navigation-checker",
+            "<div role='button' tabindex='0' onclick='save()'>Save</div>"
+        )
+        assertTrue(keyboard.contains("custom-button-keyboard-activation"))
+    }
+
+
+    @Test fun keyboardStudioFlagsExplicitlyUndersizedTargetsAsReviewLeads() {
+        val inline = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<button id='tiny' style='width:18px;height:20px'>X</button>")
+        assertTrue(inline.contains("target-size-risk"))
+        assertTrue(inline.contains("2.5.8 Target Size (Minimum)"))
+        val css = NativeAccessibilityEngine.analyze("keyboard-navigation-checker", "<style>.icon-button { width: 20px; }</style><button class='icon-button'>Open</button>")
+        assertTrue(css.contains("target-size-risk"))
     }
 
     @Test fun detectsFormFocusAndMotionFindings() {
         assertTrue(NativeAccessibilityEngine.analyze("form-checker", "<input id=\"email\">").contains("label"))
         assertTrue(NativeAccessibilityEngine.analyze("focus-state-checker", "button:focus { outline: none; }").contains("focus-not-hidden"))
         assertTrue(NativeAccessibilityEngine.analyze("motion-checker", ".a { animation: spin 2s infinite; }").contains("reduced-motion"))
+    }
+
+    @Test fun motionCheckerDoesNotTrustMediaQueryPresenceAlone() {
+        val css = """
+            html { scroll-behavior: smooth; }
+            .ticker { animation: move 5s linear infinite; animation-play-state: running; }
+            @keyframes move { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+            @media (prefers-reduced-motion: reduce) { .other { color: inherit; } }
+        """.trimIndent()
+        val report = NativeAccessibilityEngine.analyze("motion-checker", css)
+        assertTrue(report.contains("reduced-motion-incomplete"))
+        assertTrue(report.contains("smooth-scroll-not-reduced"))
+        assertTrue(report.contains("auto-moving-content"))
+        assertTrue(report.contains("loop-without-pause"))
+    }
+
+    @Test fun motionCheckerFlagsFlashingAndScriptDrivenMotionIndependently() {
+        val source = """
+            <style>
+              .orb { animation: spin 2s infinite, pulse 800ms infinite alternate; }
+              @keyframes spin { to { transform: rotate(360deg); } }
+              @keyframes pulse { to { transform: scale(1.5); } }
+              .ticker { animation: move 5s infinite; }
+              @keyframes move { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+              .flash { animation-name: flash; animation-duration: 300ms; animation-iteration-count: infinite; }
+              @keyframes flash { 0% { background: #ff0000; } 50% { background: #000000; } 100% { background: #ff0000; } }
+              @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+            </style>
+            <script>window.addEventListener('scroll', () => { document.querySelector('.orb').style.transform = 'rotate(5deg)'; });</script>
+        """.trimIndent()
+        val report = NativeAccessibilityEngine.analyze("motion-checker", source)
+        assertTrue(report.contains("rapid-contrast-flash"))
+        assertTrue(report.contains("auto-moving-content"))
+        assertTrue(report.contains("loop-without-pause"))
+        assertTrue(report.contains("script-driven-motion"))
+        assertTrue(report.contains("script-motion-not-preference-aware"))
+        assertTrue(report.contains("competing-transform-animations"))
     }
 
     @Test fun suppliesContrastReadabilityAndKeepsAllVariantsLocal() {
@@ -84,3 +155,38 @@ class NativeAccessibilityEngineTest {
         assertTrue(helper.contains("Flesch Reading Ease"))
     }
 }
+
+
+    @Test fun ariaStudioDetectsMissingNamesButAcceptsCommonNamedControls() {
+        val bad = NativeAccessibilityEngine.analyze(
+            "aria-checker",
+            "<button id=\"empty-button\"></button>\n<a id=\"empty-link\" href=\"/help\"></a>\n<div id=\"custom-switch\" role=\"switch\" tabindex=\"0\"></div>"
+        )
+        assertTrue(bad.contains("button-name"))
+        assertTrue(bad.contains("link-name"))
+        assertTrue(bad.contains("custom-control-name"))
+        assertTrue(bad.contains("Finding ID: env-a11y:aria/button-name/button#empty-button"))
+        assertTrue(bad.contains("Finding ID: env-a11y:aria/link-name/a#empty-link"))
+        assertTrue(bad.contains("Finding ID: env-a11y:aria/custom-control-name/div#custom-switch"))
+
+        val good = NativeAccessibilityEngine.analyze(
+            "aria-checker",
+            "<button id=\"save\">Save changes</button><a href=\"/help\">Help center</a><div role=\"switch\" aria-label=\"Dark mode\" tabindex=\"0\"></div><button><img src=\"save.svg\" alt=\"Save\"></button><input type=\"submit\" value=\"Submit form\">"
+        )
+        assertFalse(Regex("button-name|link-name|custom-control-name").containsMatchIn(good))
+        val emptyReference = NativeAccessibilityEngine.analyze("aria-checker", "<span id=\"empty-label\"></span><button aria-labelledby=\"empty-label\"></button>")
+        assertTrue(emptyReference.contains("button-name"))
+        val validReference = NativeAccessibilityEngine.analyze("aria-checker", "<span id=\"label\">Launch search</span><button aria-labelledby=\"label\"></button>")
+        assertFalse(validReference.contains("button-name"))
+    }
+
+    @Test fun accessibilityReportsIncludeStableFindingIdsAndEvidence() {
+        val markup = "<main>\n  <img src=\"banner.png\">\n  <button id=\"primary-toggle\" aria-expanded=\"yes\">Open</button>\n</main>"
+        val first = NativeAccessibilityEngine.analyze("aria-checker", markup)
+        val second = NativeAccessibilityEngine.analyze("aria-checker", markup)
+        assertTrue(first.contains("Finding ID: env-a11y:aria/"))
+        assertTrue(first.contains("Source line: 3"))
+        assertTrue(first.contains("Evidence:"))
+        assertTrue(first.contains("Related WCAG criteria (review hints, not a failure verdict)"))
+        assertTrue(first.substringAfter("Finding ID:").substringBefore("\n") == second.substringAfter("Finding ID:").substringBefore("\n"))
+    }

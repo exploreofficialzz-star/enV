@@ -155,7 +155,7 @@ jobs:
       # GitHub-hosted emulator boot can fail before the app is installed when
       # the runner cannot expose ADB's TCP port 5554. Keep release packaging
       # authoritative while allowing that external smoke check to be non-blocking.
-      - name: Run native Android launch test on emulator
+      - name: Run native Android launch and accessibility tests on emulator
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -164,6 +164,16 @@ jobs:
           arch: x86_64
           profile: Pixel_6
           script: ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
+      - name: Upload Android instrumentation test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: env-android-accessibility-phase8-${{ github.sha }}
+          path: |
+            apps/android/app/build/outputs/androidTest-results/connected/debug/
+            apps/android/app/build/reports/androidTests/connected/debug/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Build signed release APK and AAB
         run: ./gradlew --no-daemon --max-workers=2 --stacktrace :app:assembleRelease :app:bundleRelease
       - name: Verify release APK signature

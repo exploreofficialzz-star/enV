@@ -1,0 +1,89 @@
+name: Phase 8 — rendered web accessibility audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "apps/shared/**"
+      - "scripts/audit-accessibility-live.mjs"
+      - "scripts/audit-accessibility-live.test.mjs"
+      - "scripts/lib/accessibility-live-audit.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "docs/accessibility-phase8-rendered-audit.md"
+      - "docs/accessibility-competitor-feedback-backlog.md"
+      - ".github/workflows/accessibility-phase8.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "apps/shared/**"
+      - "scripts/audit-accessibility-live.mjs"
+      - "scripts/audit-accessibility-live.test.mjs"
+      - "scripts/lib/accessibility-live-audit.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "docs/accessibility-phase8-rendered-audit.md"
+      - "docs/accessibility-competitor-feedback-backlog.md"
+      - ".github/workflows/accessibility-phase8.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: accessibility-phase8-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rendered-audit:
+    name: Build and scan rendered enV routes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build real enV web app
+        run: npm run build
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Start local production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/env-preview.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/env-preview.pid"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/ > /dev/null; then
+              echo "enV preview is responding."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/env-preview.log"
+          echo "enV preview did not become ready." >&2
+          exit 1
+      - name: Run rendered-route accessibility audit
+        run: npm run audit:accessibility:live -- --base-url=http://127.0.0.1:8080 --max-pages=40 --max-interactions=4 --fail-on-scan-errors
+      - name: Upload rendered audit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: env-accessibility-phase8-${{ github.sha }}
+          path: |
+            artifacts/accessibility-live-audit.json
+            artifacts/accessibility-live-audit.md
+            artifacts/accessibility-live-audit/screenshots/
+            ${{ runner.temp }}/env-preview.log
+          if-no-files-found: warn
+          retention-days: 30

@@ -42,6 +42,7 @@
         A60000000000000000000001 /* AssistantChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* AssistantChat.swift */; };
         C40000000000000000000001 /* NativeAccessibilityEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* NativeAccessibilityEngine.swift */; };
         C40000000000000000000002 /* NativeAccessibilityEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* NativeAccessibilityEngineTests.swift */; };
+		9B0000000000000000000001 /* AccessibilityAuditUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000003 /* AccessibilityAuditUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,44 +85,53 @@
         B60000000000000000000001 /* AssistantChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantChat.swift; sourceTree = "<group>"; };
         D10000000000000000000001 /* NativeAccessibilityEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAccessibilityEngine.swift; sourceTree = "<group>"; };
         D10000000000000000000002 /* NativeAccessibilityEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAccessibilityEngineTests.swift; sourceTree = "<group>"; };
+		9B0000000000000000000002 /* enVUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = enVUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B0000000000000000000003 /* AccessibilityAuditUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityAuditUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 	F10000000000000000000000 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 	F20000000000000000000000 /* Test Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		9B0000000000000000000007 /* enVUITests Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,); sourceTree = "<group>"; };
+        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,9B0000000000000000000004,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,); sourceTree = "<group>"; };
         444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (AAAAAAAAAAAAAAAAAAAAAAAA,191919111111111111111111,B10000000000000000000006,B10000000000000000000007,B10000000000000000000008,B10000000000000000000009,B1000000000000000000000A,D10000000000000000000002,); path = enVTests; sourceTree = "<group>"; };
-	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,); name = Products; sourceTree = "<group>"; };
+	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,9B0000000000000000000002,); name = Products; sourceTree = "<group>"; };
         C50000000000000000000001 /* enV */ = {isa = PBXGroup; children = (111111111111111111111111,121212121212121212121212,E10000000000000000000003,B40000000000000000000006,B40000000000000000000007,B40000000000000000000009,B10000000000000000000001,B10000000000000000000002,B40000000000000000000002,C30000000000000000000001,C30000000000000000000002,B10000000000000000000003,B40000000000000000000001,B40000000000000000000003,B40000000000000000000004,B10000000000000000000004,E1000000000000000000000E,181818111111111111111111,B10000000000000000000005,B40000000000000000000005,131313131313131313131313,141414141414141414141414,F10000000000000000000001,F10000000000000000000002,B60000000000000000000001,D10000000000000000000001); path = enV; sourceTree = "<group>"; };
+		9B0000000000000000000004 /* enVUITests */ = {isa = PBXGroup; children = (9B0000000000000000000003,); path = enVUITests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 	BBBBBBBBBBBBBBBBBBBBBBBB /* enV */ = {isa = PBXNativeTarget; buildConfigurationList = F60000000000000000000000; buildPhases = (C50000000000000000000002,F00000000000000000000000,F10000000000000000000000,); buildRules = (); dependencies = (); name = enV; productName = enV; productReference = 666666666666666666666666; productType = "com.apple.product-type.application"; };
 	CCCCCCCCCCCCCCCCCCCCCCCC /* enVTests */ = {isa = PBXNativeTarget; buildConfigurationList = F70000000000000000000000; buildPhases = (EEEEEEEEEEEEEEEEEEEEEEEE,F20000000000000000000000,); buildRules = (); dependencies = (F40000000000000000000000,); name = enVTests; productName = enVTests; productReference = 777777777777777777777777; productType = "com.apple.product-type.bundle.unit-test"; };
+		9B0000000000000000000005 /* enVUITests */ = {isa = PBXNativeTarget; buildConfigurationList = 9B0000000000000000000014; buildPhases = (9B0000000000000000000007,9B0000000000000000000006,9B0000000000000000000008,); buildRules = (); dependencies = (9B0000000000000000000009,); name = enVUITests; productName = enVUITests; productReference = 9B0000000000000000000002; productType = "com.apple.product-type.bundle.ui-testing"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-        ABCDEFABCDEFABCDEFABCDEF /* Project object */ = {isa = PBXProject; attributes = {LastSwiftUpdateCheck = 1500; LastUpgradeCheck = 1500; TargetAttributes = {BBBBBBBBBBBBBBBBBBBBBBBB = {CreatedOnToolsVersion = 15.0;}; CCCCCCCCCCCCCCCCCCCCCCCC = {CreatedOnToolsVersion = 15.0; TestTargetID = BBBBBBBBBBBBBBBBBBBBBBBB;}; }; }; buildConfigurationList = F50000000000000000000000; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = 222222222222222222222222; productRefGroup = 555555555555555555555555; projectDirPath = ""; projectRoot = ""; targets = (BBBBBBBBBBBBBBBBBBBBBBBB,CCCCCCCCCCCCCCCCCCCCCCCC,); };
+        ABCDEFABCDEFABCDEFABCDEF /* Project object */ = {isa = PBXProject; attributes = {LastSwiftUpdateCheck = 1500; LastUpgradeCheck = 1500; TargetAttributes = {BBBBBBBBBBBBBBBBBBBBBBBB = {CreatedOnToolsVersion = 15.0;}; CCCCCCCCCCCCCCCCCCCCCCCC = {CreatedOnToolsVersion = 15.0; TestTargetID = BBBBBBBBBBBBBBBBBBBBBBBB;}; 9B0000000000000000000005 = {CreatedOnToolsVersion = 15.0; TestTargetID = BBBBBBBBBBBBBBBBBBBBBBBB;}; }; }; buildConfigurationList = F50000000000000000000000; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = 222222222222222222222222; productRefGroup = 555555555555555555555555; projectDirPath = ""; projectRoot = ""; targets = (BBBBBBBBBBBBBBBBBBBBBBBB,CCCCCCCCCCCCCCCCCCCCCCCC,9B0000000000000000000005,); };
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 	F00000000000000000000000 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (161616161616161616161616 /* catalog.json in Resources */,76C612C7171249D4BA242035 /* native-icons in Resources */,A30000000000000000000002 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		9B0000000000000000000008 /* enVUITests Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
         EEEEEEEEEEEEEEEEEEEEEEEE /* Test Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (171717171717171717171717 /* CatalogCoreTests.swift in Sources */,191919222222222222222222 /* NativeTextEngineTests.swift in Sources */,A10000000000000000000006,A10000000000000000000007,A10000000000000000000008,A10000000000000000000009,A1000000000000000000000A,C40000000000000000000002,); runOnlyForDeploymentPostprocessing = 0; };
         C50000000000000000000002 /* App Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (151515151515151515151515,152525252525252525252525,E20000000000000000000003,A40000000000000000000006,A40000000000000000000007,A40000000000000000000009,A10000000000000000000001,A10000000000000000000002,E20000000000000000000007,A30000000000000000000001,A10000000000000000000003,E2000000000000000000000A,E2000000000000000000000B,E2000000000000000000000C,A10000000000000000000004,E2000000000000000000000E,181818222222222222222222,A10000000000000000000005,A40000000000000000000005,153535353535353535353535,154545454545454545454545,F20000000000000000000001,F20000000000000000000002,A60000000000000000000001,C40000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+		9B0000000000000000000006 /* enVUITests Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (9B0000000000000000000001 /* AccessibilityAuditUITests.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 	F40000000000000000000000 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = BBBBBBBBBBBBBBBBBBBBBBBB; targetProxy = F30000000000000000000000; };
+		9B0000000000000000000009 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = BBBBBBBBBBBBBBBBBBBBBBBB; targetProxy = 9B0000000000000000000010; };
 /* End PBXTargetDependency section */
 
 /* Begin PBXContainerItemProxy section */
         F30000000000000000000000 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = ABCDEFABCDEFABCDEFABCDEF; proxyType = 1; remoteGlobalIDString = BBBBBBBBBBBBBBBBBBBBBBBB; remoteInfo = enV; };
+		9B0000000000000000000010 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = ABCDEFABCDEFABCDEFABCDEF; proxyType = 1; remoteGlobalIDString = BBBBBBBBBBBBBBBBBBBBBBBB; remoteInfo = enV; };
 /* End PBXContainerItemProxy section */
 
 /* Begin XCBuildConfiguration section */
@@ -129,11 +139,14 @@
 		F90000000000000000000000 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 6; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = enV/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.env; PRODUCT_NAME = "$(TARGET_NAME)"; ENV_API_BASE_URL = https://env-q3mq.onrender.com; SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule"; TARGETED_DEVICE_FAMILY = "1,2"; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0;}; name = Release; };
 		FA0000000000000000000000 /* Test Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Debug; };
 		FB0000000000000000000000 /* Test Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envTests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/enV.app/enV";}; name = Release; };
+		9B0000000000000000000011 /* UI Test Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = enV; }; name = Debug; };
+		9B0000000000000000000012 /* UI Test Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.4; MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.chastech.envUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = enV; }; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 	F50000000000000000000000 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 	F60000000000000000000000 /* Build configuration list for enV */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 	F70000000000000000000000 /* Build configuration list for enVTests */ = {isa = XCConfigurationList; buildConfigurations = (FA0000000000000000000000,FB0000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		9B0000000000000000000014 /* Build configuration list for enVUITests */ = {isa = XCConfigurationList; buildConfigurations = (9B0000000000000000000011,9B0000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 }; rootObject = ABCDEFABCDEFABCDEFABCDEF /* Project object */; }

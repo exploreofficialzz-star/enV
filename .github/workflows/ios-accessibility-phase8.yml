@@ -1,0 +1,55 @@
+name: Phase 8 — native iOS accessibility UI tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "apps/shared/**"
+      - "docs/accessibility-phase8-rendered-audit.md"
+      - ".github/workflows/ios-accessibility-phase8.yml"
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "apps/shared/**"
+      - "docs/accessibility-phase8-rendered-audit.md"
+      - ".github/workflows/ios-accessibility-phase8.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: accessibility-phase8-ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-ui-audit:
+    name: Run SwiftUI accessibility audits on iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Report Xcode and simulator availability
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+      - name: Run native UI and system accessibility audits
+        id: ui-tests
+        continue-on-error: true
+        run: |
+          xcodebuild test \
+            -project apps/ios/enV.xcodeproj \
+            -scheme enV \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/enV-accessibility-phase8.xcresult"
+      - name: Upload Xcode test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: env-ios-accessibility-phase8-${{ github.sha }}
+          path: ${{ runner.temp }}/enV-accessibility-phase8.xcresult
+          if-no-files-found: warn
+          retention-days: 30

@@ -22,7 +22,7 @@ import {
 } from "@/lib/engines/accessibility-color";
 
 import { type Action, type ColorStudioMode, type Kind, colorStudioModeFromToolId, parseToolId } from "./accessibility-engine-utils";
-import { auditAccessibilityMarkup, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
+import { auditAccessibilityMarkup, formatAccessibilityAuditCsv, formatAccessibilityAuditJson, scanMarkupWithAxe } from "@/lib/engines/accessibility-audit";
 import { accessibilityKindFromToolId, accessibilityStudioForKind } from "@/lib/accessibility-studios";
 import { apcaContrast } from "@/lib/engines/accessibility-apca";
 
@@ -36,8 +36,8 @@ function ColorTokenExport({ foreground, background }: { foreground: string; back
   return <section className="space-y-4" aria-labelledby="color-export-title"><div><h2 id="color-export-title" className="text-base font-semibold">Copy-ready color tokens</h2><p className="text-sm text-muted">Re-check every real text size, state, and surface after applying these tokens.</p></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">CSS custom properties</h3><CopyButton text={css} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{css}</pre></div><div className="space-y-2"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-medium">Tailwind extension</h3><CopyButton text={tailwind} /></div><pre className="overflow-x-auto whitespace-pre-wrap rounded-lg bg-ink p-4 font-mono text-sm text-bg">{tailwind}</pre></div></section>;
 }
 const COLORS = ["#000000", "#111827", "#1f2937", "#374151", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#92400e", "#ffffff", "#f8fafc", "#e5e7eb", "#dbeafe", "#fef3c7"];
-function downloadText(text: string, filename: string) {
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+function downloadText(text: string, filename: string, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([text], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -645,6 +645,9 @@ function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { 
   const output = useMemo(() => buildOutput(kind, action, { fg, bg, text, size, lineHeight, html, role, focusWidth, focusOffset }), [action, bg, fg, focusOffset, focusWidth, html, kind, lineHeight, role, size, text]);
   const sampleHtml = kind === "alt-text" ? '<img src="logo.svg" alt="">\n<img src="event.jpg">' : kind === "aria" ? '<button aria-label="" aria-expanded="false">Open</button>' : kind === "focus-state" ? "button:focus { outline: none; }" : kind === "keyboard-navigation" ? '<div tabindex="4" onclick="openMenu()">Menu</div>' : kind === "form" ? '<form><input type="email"><button>Submit</button></form>' : kind === "motion" ? "button { animation: pulse 1s infinite; }" : "";
   const needsHtml = ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && action !== "generator" && !(kind === "alt-text" && action === "helper");
+  const structuredAudit = useMemo(() => action === "checker" && ["alt-text", "aria", "form", "keyboard-navigation", "focus-state", "motion"].includes(kind) && html.trim()
+    ? auditAccessibilityMarkup(`${kind}-checker`, html)
+    : null, [action, html, kind]);
   const actionModes: Array<{ id: Action; label: string }> = [
     { id: "checker", label: "Check" }, { id: "generator", label: "Generate" }, { id: "helper", label: "Coach / fix" },
     { id: "preview", label: "Preview" }, { id: "simulator", label: "Test" },
@@ -684,6 +687,13 @@ function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { 
     </div>
     <ResultPanel items={[{ label: "Studio mode", value: `${studioName} · ${action}` }, { label: "Processing", value: "On device · no upload", primary: true }]} />
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><div className="flex flex-wrap gap-2"><CopyButton text={output} /><Button className="min-h-11" type="button" variant="outline" size="sm" onClick={() => downloadText(output, `env-${toolId}.txt`)}>Download</Button><Button className="min-h-11" type="button" variant="ghost" size="sm" onClick={reset}>Reset</Button></div></div>
+    {structuredAudit ? <section className="space-y-2 rounded-xl border border-border p-3" aria-labelledby="structured-report-heading">
+      <div><h2 id="structured-report-heading" className="text-sm font-semibold">Portable audit report</h2><p className="mt-1 text-xs text-muted">Export this local static-check report for developers and designers. Includes stable finding IDs, source-line evidence, related WCAG review areas, and limitations; axe-core results below are a separate scan.</p></div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => downloadText(formatAccessibilityAuditJson(structuredAudit), `env-${toolId}-report.json`, "application/json;charset=utf-8")}>Export JSON</Button>
+        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => downloadText(formatAccessibilityAuditCsv(structuredAudit), `env-${toolId}-report.csv`, "text/csv;charset=utf-8")}>Export CSV</Button>
+      </div>
+    </section> : null}
     {kind === "aria" && action === "preview" ? <AccessibilityTreePreview html={html} /> : null}
     {kind === "form" && action === "simulator" ? <AccessibleFormPlayground /> : null}
     {kind === "text-readability" && ["preview", "simulator"].includes(action) && <section className="space-y-3 rounded-xl border border-border p-4"><div className="flex items-center justify-between"><Label htmlFor="accessibility-size-slider">Preview size</Label><output htmlFor="accessibility-size-slider">{previewSize}px</output></div><input id="accessibility-size-slider" className="min-h-11 w-full accent-accent" type="range" min="12" max="48" step="1" value={previewSize} onChange={(e) => setPreviewSize(Number(e.target.value))} aria-label="Preview text size" /><div className="flex items-center justify-between"><Label htmlFor="accessibility-leading-slider">Line height</Label><output htmlFor="accessibility-leading-slider">{previewLeading.toFixed(2)}</output><input id="accessibility-leading-slider" className="min-h-11 w-40 accent-accent" type="range" min="1" max="2.5" step="0.05" value={previewLeading} onChange={(e) => setPreviewLeading(Number(e.target.value))} aria-label="Preview line height" /></div><p className="rounded-lg bg-surface-2 p-4" style={{ fontSize: `${previewSize}px`, lineHeight: previewLeading }}>{text || "Accessible design gives people more than one way to understand and use content, across different screens and preferences."}</p></section>}
@@ -693,7 +703,7 @@ function AccessibilityStudioForm({ toolId, kind, initialAction, studioName }: { 
     {needsHtml ? <section className="space-y-3 rounded-xl border border-border bg-surface-2 p-4" aria-labelledby="axe-scan-heading">
       <div><h2 id="axe-scan-heading" className="text-sm font-semibold">Automated browser rules (axe-core)</h2><p className="mt-1 text-xs text-muted">Runs locally against an isolated copy of this snippet. It does not send the markup to a server.</p></div>
       <Button type="button" variant="outline" size="sm" onClick={runAxe} disabled={axeRunning || !html.trim()}>{axeRunning ? "Scanning locally…" : "Run axe-core scan"}</Button>
-      {axeReport ? <pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{axeReport}</pre> : null}
+      {axeReport ? <><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => downloadText(axeReport, `env-${toolId}-axe-core-report.txt`)}>Download axe-core report</Button></div><pre className="max-h-[34rem] overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{axeReport}</pre></> : null}
     </section> : null}
   </div>;
 }

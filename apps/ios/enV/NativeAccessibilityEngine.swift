@@ -12,6 +12,9 @@ public enum NativeAccessibilityEngine {
     private struct Element {
         let tag: String
         let attributes: [String: String]
+        let source: String
+        let innerMarkup: String
+        let textContent: String
         var target: String { "<\(tag)\(attributes["id"].map { "#\($0)" } ?? "")>" }
     }
     private struct Finding {
@@ -20,6 +23,11 @@ public enum NativeAccessibilityEngine {
         let message: String
         let target: String
         let fix: String
+        var id: String = ""
+        var line: Int? = nil
+        var evidence: String = ""
+        var relatedCriteria: [String] = []
+        var review: String = "manual-review"
     }
 
     static func supports(_ tool: Tool) -> Bool { tool.category == "accessibility" && tool.engine.type == "custom" }
@@ -63,11 +71,53 @@ public enum NativeAccessibilityEngine {
                 else if alt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { add("MINOR", "decorative-image", "Empty alt marks this image decorative; confirm that is correct.", element.target, "Keep empty alt only for decorative images.") }
             }
         case "aria":
+            // Document-level source checks only run when an HTML root/document is supplied.
+            if let htmlRoot = elements.first(where: { $0.tag == "html" }), (htmlRoot.attributes["lang"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                add("SERIOUS", "document-language", "The HTML root has no detectable language declaration.", "<html>", "Set a valid BCP 47 language tag such as lang=\"en\" and verify the actual page language.")
+            }
+            if !matches(input, pattern: #"<html\b|<head\b"#, options: [.caseInsensitive]).isEmpty {
+                let title = elements.first(where: { $0.tag == "title" })
+                if title == nil || (title?.textContent ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    add("MODERATE", "document-title", "A non-empty document title was not detected in this document-like snippet.", "<head>", "Provide a concise, descriptive <title>; usefulness still needs human review.")
+                }
+            }
+            var previousHeadingLevel = 0
+            for heading in elements where matches(heading.tag, pattern: #"^h[1-6]$"#).isEmpty == false {
+                let level = Int(heading.tag.dropFirst()) ?? 0
+                if previousHeadingLevel > 0 && level > previousHeadingLevel + 1 {
+                    add("MODERATE", "heading-order", "Heading level jumps from h\(previousHeadingLevel) to h\(level); verify the heading hierarchy.", heading.target, "Use heading levels that reflect the content structure. A skipped level is a review lead, not automatically a WCAG failure.")
+                }
+                previousHeadingLevel = level
+            }
             for element in elements {
-                if let role = element.attributes["role"]?.split(whereSeparator: { $0.isWhitespace }).first.map(String.init)?.lowercased(), !validRoles.contains(role) { add("SERIOUS", "aria-valid-role", "Unknown ARIA role '\(role)'.", element.target, "Use a valid WAI-ARIA role or native HTML semantics.") }
+                let role = element.attributes["role"]?.split(whereSeparator: { $0.isWhitespace }).first.map(String.init)?.lowercased()
+                if let role, !validRoles.contains(role) { add("SERIOUS", "aria-valid-role", "Unknown ARIA role '\(role)'.", element.target, "Use a valid WAI-ARIA role or native HTML semantics.") }
                 if element.attributes.keys.contains("aria-label") && (element.attributes["aria-label"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { add("MODERATE", "aria-label", "aria-label is empty.", element.target, "Give the control a name or remove the empty attribute.") }
+                if element.attributes["aria-label"] != nil && ["div", "span", "p", "li"].contains(element.tag) && (role == nil || ["generic", "none", "presentation"].contains(role!)) && (element.attributes["aria-labelledby"] ?? "").isEmpty { add("SERIOUS", "aria-prohibited-attr", "aria-label is used on a generic container without a role that supports an accessible name.", element.target, "Prefer a native semantic element or an accurate role that supports naming; do not add a role just to silence the checker.") }
                 for missing in (element.attributes["aria-labelledby"] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init) where !idSet.contains(missing) { add("SERIOUS", "aria-labelledby", "aria-labelledby references missing id '\(missing)'.", element.target, "Reference an existing, unique id.") }
+                for attribute in ["aria-describedby", "aria-controls", "aria-owns", "aria-details", "aria-errormessage", "aria-flowto"] {
+                    for missing in (element.attributes[attribute] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init) where !idSet.contains(missing) { add("MODERATE", "aria-reference", "\(attribute) references missing id '\(missing)'. Dynamic content may create this target later, so verify the rendered state.", element.target, "Ensure \(attribute) points to an existing element in each relevant state, or remove the stale reference.") }
+                }
                 if element.attributes["aria-hidden"]?.lowercased() == "true" && (["a", "button", "input", "select", "textarea"].contains(element.tag) || element.attributes["tabindex"] != nil) { add("SERIOUS", "aria-hidden-focus", "Focusable content is hidden from the accessibility tree.", element.target, "Remove aria-hidden or make the hidden subtree non-interactive.") }
+                let validTokens: [String: Set<String>] = [
+                    "aria-checked": ["true", "false", "mixed"], "aria-pressed": ["true", "false", "mixed"],
+                    "aria-selected": ["true", "false"], "aria-expanded": ["true", "false"], "aria-hidden": ["true", "false"],
+                    "aria-disabled": ["true", "false"], "aria-required": ["true", "false"], "aria-readonly": ["true", "false"], "aria-busy": ["true", "false"],
+                    "aria-invalid": ["true", "false", "grammar", "spelling"]
+                ]
+                for (attribute, allowed) in validTokens {
+                    if let value = element.attributes[attribute]?.lowercased(), !allowed.contains(value) { add("MODERATE", "aria-value-\(attribute.replacingOccurrences(of: "aria-", with: ""))", "\(attribute) has invalid value '\(value)'.", element.target, "Use one of \(allowed.sorted().joined(separator: ", ")) and only use the attribute when supported by the element's role.") }
+                }
+                if let live = element.attributes["aria-live"]?.lowercased(), !["off", "polite", "assertive"].contains(live) { add("MODERATE", "aria-value-live", "aria-live has invalid value '\(live)'.", element.target, "Use off, polite, or assertive and avoid unnecessarily interrupting assistive technology.") }
+                let controlRoles: Set<String> = ["button", "link", "checkbox", "radio", "switch", "tab", "menuitem", "menuitemcheckbox", "menuitemradio", "option"]
+                let inputType = element.attributes["type"]?.lowercased() ?? ""
+                if element.tag == "button" || (element.tag == "input" && ["button", "submit", "reset"].contains(inputType)) {
+                    if !hasAccessibleName(element, elements: elements) { add("SERIOUS", "button-name", "Button has no detectable accessible name in the supplied markup.", element.target, "Give the button meaningful visible text, a valid aria-label/aria-labelledby, or a meaningful value for input buttons.") }
+                } else if element.tag == "a" && element.attributes["href"] != nil {
+                    if !hasAccessibleName(element, elements: elements) { add("SERIOUS", "link-name", "Link has no detectable accessible name in the supplied markup.", element.target, "Provide meaningful link text or an accessible name that communicates the link purpose in context.") }
+                } else if let role, controlRoles.contains(role), !["a", "button", "input", "select", "textarea", "summary"].contains(element.tag), !hasAccessibleName(element, elements: elements) {
+                    add("SERIOUS", "custom-control-name", "Custom role=\(role) has no detectable accessible name.", element.target, "Prefer a native interactive element or give the custom control a meaningful accessible name and validate its computed name in a browser.")
+                }
             }
             for id in duplicates { add("SERIOUS", "duplicate-id", "The id '\(id)' is duplicated.", "#\(id)", "Make ids unique so accessible-name references resolve correctly.") }
         case "form":
@@ -76,11 +126,54 @@ public enum NativeAccessibilityEngine {
                 let explicit = !(element.attributes["aria-label"] ?? "").isEmpty || !(element.attributes["aria-labelledby"] ?? "").isEmpty
                 if !explicit && !(element.attributes["id"].map(labelIDs.contains) ?? false) { add("SERIOUS", "label", "Form control has no detectable explicit label.", element.target, "Associate a visible label using for/id, or provide aria-label/aria-labelledby.") }
                 if element.attributes["aria-invalid"] == "true" && (element.attributes["aria-describedby"] ?? "").isEmpty { add("MODERATE", "error-description", "Invalid control has no error-description reference.", element.target, "Connect readable error text with aria-describedby.") }
+                if element.attributes["aria-invalid"] == "true" && (element.attributes["aria-describedby"] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init).contains(where: { !idSet.contains($0) }) { add("MODERATE", "error-description-reference", "Invalid control references an error description missing from this snippet.", element.target, "Ensure the error element exists in the rendered state and explains how to correct the issue.") }
+            }
+            for label in elements where label.tag == "label" && !(label.attributes["for"] ?? "").isEmpty {
+                if let targetID = label.attributes["for"], !idSet.contains(targetID) { add("MODERATE", "label-reference", "Label references a missing form-control id '\(targetID)'.", label.target, "Match the label's for value to a unique control id, or wrap the control inside the label.") }
             }
         case "keyboard-navigation":
             for element in elements {
                 if let tab = Int(element.attributes["tabindex"] ?? ""), tab > 0 { add("MODERATE", "tabindex", "Positive tabindex can create a confusing focus order.", element.target, "Use natural DOM order and avoid tabindex values above zero.") }
-                if ["div", "span", "li"].contains(element.tag) && element.attributes["onclick"] != nil && element.attributes["role"] == nil && element.attributes["tabindex"] == nil { add("SERIOUS", "keyboard-operable", "Click-only non-interactive element may not be keyboard operable.", element.target, "Prefer a native button/link; otherwise provide keyboard support and focusability.") }
+                let role = element.attributes["role"]?.lowercased()
+                let hasClick = element.attributes["onclick"] != nil || !matches(element.source, pattern: #"onClick\s*="#, options: [.caseInsensitive]).isEmpty
+                let hasKeyboard = !matches(element.source, pattern: #"on(?:key(?:down|up|press))\s*="#, options: [.caseInsensitive]).isEmpty
+                if ["div", "span", "li"].contains(element.tag) && hasClick && role != "button" && role != "link" && !hasKeyboard { add("SERIOUS", "keyboard-operable", element.attributes["tabindex"] != nil ? "Focusable custom content has a click handler but no detectable keyboard activation handler." : "Click handler on a non-interactive element may not be focusable or keyboard operable.", element.target, "Prefer a native button/link. If custom behavior is essential, expose the correct role, provide sequential focus, and implement expected Enter/Space activation.") }
+                if (role == "button" || role == "link") && !["a", "button", "input", "select", "textarea", "summary"].contains(element.tag) && element.attributes["tabindex"] == nil { add("SERIOUS", "custom-control-focus", "Custom role=\(role ?? "unknown") is not in the sequential keyboard order.", element.target, "Use a native button/link, or add tabindex=0 and implement expected keyboard behavior.") }
+                if ["button", "link", "checkbox", "radio", "switch", "tab"].contains(role ?? "") && !["a", "button", "input", "select", "textarea", "summary"].contains(element.tag) && hasClick && !hasKeyboard { add("SERIOUS", role == "button" ? "custom-button-keyboard-activation" : "custom-control-keyboard-activation", "Custom role=\(role ?? "unknown") has a click handler but no detectable keyboard handler in its opening tag.", element.target, "Prefer a native semantic control. Otherwise, implement the role's expected keyboard interaction and test with keyboard and assistive technology.") }
+
+                let nativeInteractive = ["a", "button", "input", "select", "textarea", "summary"].contains(element.tag) && (element.tag != "a" || element.attributes["href"] != nil)
+                let customInteractive = ["button", "link", "checkbox", "radio", "switch", "tab", "slider", "combobox"].contains(role ?? "")
+                if nativeInteractive || customInteractive {
+                    let classes = Set((element.attributes["class"] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init))
+                    var declarations = element.attributes["style"] ?? ""
+                    for rule in matches(input, pattern: #"([^{}]+)\{([^{}]*)\}"#) {
+                        let parts = rule.components(separatedBy: "{")
+                        guard parts.count >= 2 else { continue }
+                        let selectors = parts[0].split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .whitespacesAndNewlines).last ?? "" }
+                        let matchesElement = selectors.contains { raw in
+                            let selector = raw.components(separatedBy: ":").first ?? raw
+                            let tag = matches(selector, pattern: #"^[a-z][\w-]*"#, options: [.caseInsensitive]).first
+                            let id = matches(selector, pattern: #"#([\w-]+)"#).first?.dropFirst()
+                            let ruleClasses = matches(selector, pattern: #"\.([\w-]+)"#).map { String($0.dropFirst()) }
+                            return (tag == nil || tag?.lowercased() == element.tag) && (id == nil || String(id!) == element.attributes["id"]) && ruleClasses.allSatisfy(classes.contains) && !selector.contains("[") && !selector.contains("*")
+                        }
+                        if matchesElement { declarations += ";" + parts.dropFirst().joined(separator: "{").components(separatedBy: "}").first! }
+                    }
+                    func dimension(_ names: [String]) -> Double? {
+                        for name in names {
+                            if let numberText = capture(declarations, pattern: #"(?:^|[;{\s])"# + NSRegularExpression.escapedPattern(for: name) + #"\s*:\s*(\d+(?:\.\d+)?)px\b"#, group: 1, options: [.caseInsensitive]),
+                               let number = Double(numberText) { return number }
+                        }
+                        return nil
+                    }
+                    let width = dimension(["width", "inline-size"])
+                    let height = dimension(["height", "block-size"])
+                    let minWidth = dimension(["min-width", "min-inline-size"])
+                    let minHeight = dimension(["min-height", "min-block-size"])
+                    if (width != nil && width! < 24 && (minWidth == nil || minWidth! < 24)) || (height != nil && height! < 24 && (minHeight == nil || minHeight! < 24)) {
+                        add("MODERATE", "target-size-risk", "Explicit target dimensions (\(width.map { String($0) } ?? "auto") × \(height.map { String($0) } ?? "auto") CSS px) may fall below 24 × 24 CSS px. Spacing or other WCAG exceptions may apply.", element.target, "Check rendered size and spacing. Meet 24 × 24 CSS px or document an applicable WCAG 2.2 SC 2.5.8 exception; test touch and pointer use.")
+                    }
+                }
             }
             if matches(input, pattern: #":focus(?:-visible)?"#, options: [.caseInsensitive]).isEmpty { add("MODERATE", "visible-focus", "No focus indicator rule was found.", "CSS", "Provide a clearly visible :focus-visible indicator and test in context.") }
         case "focus-state":
@@ -88,16 +181,235 @@ public enum NativeAccessibilityEngine {
             if rules.isEmpty { add("SERIOUS", "focus-visible", "No :focus or :focus-visible rule was found.", "CSS", "Add a visible :focus-visible indicator with sufficient contrast and offset.") }
             for rule in rules where matches(rule, pattern: #"outline\s*:\s*(none|0)"#, options: [.caseInsensitive]).isEmpty == false && matches(rule, pattern: #"(box-shadow|border)\s*:\s*(?!none|0)"#, options: [.caseInsensitive]).isEmpty { add("SERIOUS", "focus-not-hidden", "Focus outline is removed without a replacement.", rule.components(separatedBy: "{").first ?? "CSS", "Keep the outline or add a clearly visible replacement indicator.") }
         case "motion":
-            let animated = matches(input, pattern: #"animation(?:-name)?\s*:|@keyframes|transition\s*:"#, options: [.caseInsensitive]).isEmpty == false
-            if animated && matches(input, pattern: #"prefers-reduced-motion\s*:\s*reduce"#, options: [.caseInsensitive]).isEmpty { add("SERIOUS", "reduced-motion", "Motion CSS has no reduced-motion path.", "CSS motion", "Respect prefers-reduced-motion and remove non-essential animation.") }
-            if matches(input, pattern: #"<marquee|blink\s*\("#, options: [.caseInsensitive]).isEmpty == false { add("SERIOUS", "flashing-motion", "Blinking or marquee-style content was found.", "animated content", "Remove it or provide safe controls and ensure safe flash thresholds.") }
+            findings.append(contentsOf: inspectMotion(input))
+            if !matches(input, pattern: #"<marquee\b|blink\s*\("#, options: [.caseInsensitive]).isEmpty { add("SERIOUS", "flashing-motion", "Legacy marquee/blink content was detected; its visual and timing behavior needs manual review.", "animated content", "Remove legacy marquee/blink behavior, or provide user controls and verify the actual flash rate/area.") }
         default:
             add("MINOR", "scope", "Use a focused checker for markup findings.", kind, "Choose the corresponding checker and paste the relevant source snippet.")
         }
 
         findings.sort { severityRank($0.severity) == severityRank($1.severity) ? $0.rule < $1.rule : severityRank($0.severity) < severityRank($1.severity) }
-        let details = findings.isEmpty ? "No matching issues were detected in the supplied snippet. A clean snippet is not proof of conformance." : findings.enumerated().map { "\($0.offset + 1). [\($0.element.severity)] \($0.element.rule): \($0.element.message)\n   Target: \($0.element.target)\n   Fix: \($0.element.fix)" }.joined(separator: "\n")
-        return "\(kind.uppercased()) LOCAL REVIEW\nElements inspected: \(elements.count)\nFindings: \(findings.count) (critical: 0 · serious: \(findings.filter { $0.severity == "SERIOUS" }.count) · moderate: \(findings.filter { $0.severity == "MODERATE" }.count) · minor: \(findings.filter { $0.severity == "MINOR" }.count))\n\n\(details)\n\nScope: Static snippet checks only. This does not inspect a live page or accessibility tree, test assistive technology, or certify WCAG conformance. Manually verify keyboard and screen-reader behavior."
+        var identityCounts: [String: Int] = [:]
+        let enriched = findings.map { original -> Finding in
+            var finding = original
+            let targetSlug = finding.target.lowercased().replacingOccurrences(of: #"[^a-z0-9._#@-]+"#, with: "-", options: .regularExpression).trimmingCharacters(in: CharacterSet(charactersIn: "-")).prefix(64)
+            let identity = "\(kind)/\(finding.rule)/\(targetSlug.isEmpty ? "snippet" : String(targetSlug))"
+            let occurrence = (identityCounts[identity] ?? 0) + 1
+            identityCounts[identity] = occurrence
+            let location = sourceLocation(input, target: finding.target, rule: finding.rule)
+            finding.id = "env-a11y:\(identity)\(occurrence > 1 ? ":\(occurrence)" : "")"
+            finding.line = location.line
+            finding.evidence = location.evidence
+            finding.relatedCriteria = relatedCriteria(finding.rule)
+            finding.review = ["image-alt", "aria-valid-role", "duplicate-id", "label-reference", "aria-value-expanded", "aria-value-live", "aria-value-invalid"].contains(finding.rule) ? "verify-in-context" : "manual-review"
+            return finding
+        }
+        let details = enriched.isEmpty ? "No matching issues were detected in the supplied snippet. A clean snippet is not proof of conformance." : enriched.enumerated().map {
+            "\($0.offset + 1). [\($0.element.severity)] \($0.element.rule): \($0.element.message)\n   Finding ID: \($0.element.id)\n   Target: \($0.element.target) · Source line: \($0.element.line.map(String.init) ?? "unresolved")\n   Evidence: \($0.element.evidence)\n   Related WCAG criteria (review hints, not a failure verdict): \($0.element.relatedCriteria.isEmpty ? "No specific mapping assigned" : $0.element.relatedCriteria.joined(separator: ", "))\n   Review: \($0.element.review)\n   Fix: \($0.element.fix)"
+        }.joined(separator: "\n")
+        return "\(kind.uppercased()) LOCAL REVIEW\nElements inspected: \(elements.count)\nFindings: \(enriched.count) (critical: 0 · serious: \(enriched.filter { $0.severity == "SERIOUS" }.count) · moderate: \(enriched.filter { $0.severity == "MODERATE" }.count) · minor: \(enriched.filter { $0.severity == "MINOR" }.count))\n\n\(details)\n\nScope: Static snippet checks only. This does not inspect a live page or accessibility tree, test assistive technology, or certify WCAG conformance. Related criteria are review guidance, not proof of failure. Manually verify keyboard and screen-reader behavior."
+    }
+
+    private static func relatedCriteria(_ rule: String) -> [String] {
+        if ["image-alt", "decorative-image", "filename-alt"].contains(rule) { return ["1.1.1 Non-text Content"] }
+        if rule == "svg-name" { return ["1.1.1 Non-text Content", "4.1.2 Name, Role, Value"] }
+        if rule.hasPrefix("aria-") || ["duplicate-id", "button-name", "custom-control-name"].contains(rule) { return ["4.1.2 Name, Role, Value"] }
+        if rule == "link-name" { return ["2.4.4 Link Purpose (In Context)", "4.1.2 Name, Role, Value"] }
+        if ["label", "label-reference"].contains(rule) { return ["3.3.2 Labels or Instructions", "4.1.2 Name, Role, Value"] }
+        if rule.hasPrefix("error-description") { return ["3.3.1 Error Identification", "3.3.3 Error Suggestion"] }
+        if rule.contains("keyboard") || rule == "custom-control-focus" { return ["2.1.1 Keyboard", "4.1.2 Name, Role, Value"] }
+        if rule == "tabindex" { return ["2.4.3 Focus Order"] }
+        if rule == "target-size-risk" { return ["2.5.8 Target Size (Minimum)"] }
+        if rule == "document-language" { return ["3.1.1 Language of Page"] }
+        if rule == "document-title" { return ["2.4.2 Page Titled"] }
+        if rule == "heading-order" { return ["1.3.1 Info and Relationships"] }
+        if rule.contains("focus") { return ["2.4.7 Focus Visible"] }
+        if ["reduced-motion", "reduced-motion-incomplete", "script-driven-motion", "script-motion-not-preference-aware"].contains(rule) { return ["2.3.3 Animation from Interactions", "2.2.2 Pause, Stop, Hide"] }
+        if rule == "smooth-scroll-not-reduced" { return ["2.3.3 Animation from Interactions"] }
+        if ["rapid-contrast-flash", "flashing-motion"].contains(rule) { return ["2.3.1 Three Flashes or Below Threshold"] }
+        if ["auto-moving-content", "loop-without-pause"].contains(rule) { return ["2.2.2 Pause, Stop, Hide"] }
+        return []
+    }
+
+    private static func sourceLocation(_ source: String, target: String, rule: String) -> (line: Int?, evidence: String) {
+        let lines = source.components(separatedBy: .newlines)
+        var index: Int? = nil
+        if let range = target.range(of: #"^<[^>]+#([^>]+)>$"#, options: .regularExpression) {
+            let fragment = String(target[range])
+            if let id = fragment.split(separator: "#").last?.dropLast(), !id.isEmpty {
+                let escaped = NSRegularExpression.escapedPattern(for: String(id))
+                index = lines.firstIndex { !matches($0, pattern: #"\bid\s*=\s*['\"]"# + escaped + #"['\"]"#, options: [.caseInsensitive]).isEmpty }
+            }
+        }
+        if index == nil, target.hasPrefix("@keyframes") { index = lines.firstIndex { $0.localizedCaseInsensitiveContains(target) } }
+        if index == nil, target.count < 100, !target.hasPrefix("<"), target != "CSS" { index = lines.firstIndex { $0.contains(target) } }
+        if index == nil, let tag = capture(target, pattern: #"^<([a-z][\w:-]*)"#, group: 1, options: [.caseInsensitive]) { index = lines.firstIndex { !matches($0, pattern: #"<"# + NSRegularExpression.escapedPattern(for: tag) + #"(?:\s|>|/)"#, options: [.caseInsensitive]).isEmpty } }
+        if index == nil {
+            let pattern: String
+            switch rule {
+            case "rapid-contrast-flash": pattern = #"@(?:-webkit-)?keyframes|background(?:-color)?\s*:"#
+            case "auto-moving-content": pattern = #"@(?:-webkit-)?keyframes|translateX\s*\("#
+            case "loop-without-pause": pattern = #"animation(?:-iteration-count)?\s*:[^;]*infinite"#
+            case "smooth-scroll-not-reduced": pattern = #"scroll-behavior\s*:\s*smooth"#
+            case "script-driven-motion", "script-motion-not-preference-aware": pattern = #"addEventListener|requestAnimationFrame|setInterval|\.style\.(?:transform|translate|rotate|scale)\s*=|\.animate\s*\("#
+            case "reduced-motion": pattern = #"animation\s*:|transition\s*:|@(?:-webkit-)?keyframes"#
+            case "reduced-motion-incomplete": pattern = #"@media[^\n]*prefers-reduced-motion"#
+            case "transition-all": pattern = #"transition\s*:\s*all"#
+            default: pattern = ""
+            }
+            if !pattern.isEmpty { index = lines.firstIndex { !matches($0, pattern: pattern, options: [.caseInsensitive]).isEmpty } }
+        }
+        guard let index else { return (nil, "Source location could not be resolved; inspect the target manually.") }
+        let evidence = lines[index..<min(lines.count, index + 3)].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (index + 1, String(evidence.prefix(500)))
+    }
+
+    private static func cssBlock(_ source: String, pattern: String) -> (name: String, body: String)? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+              let matchRange = Range(match.range, in: source),
+              let open = source[matchRange.upperBound...].firstIndex(of: "{") else { return nil }
+        let name: String
+        if match.numberOfRanges > 1, let group = Range(match.range(at: 1), in: source) { name = String(source[group]) }
+        else { name = String(source[matchRange]) }
+        var depth = 0
+        var quote: Character?
+        var escaped = false
+        var index = open
+        while index < source.endIndex {
+            let ch = source[index]
+            if escaped { escaped = false; index = source.index(after: index); continue }
+            if ch == "\\" { escaped = true; index = source.index(after: index); continue }
+            if let currentQuote = quote { if ch == currentQuote { quote = nil }; index = source.index(after: index); continue }
+            if ch == "'" || ch == "\"" { quote = ch; index = source.index(after: index); continue }
+            if ch == "{" { depth += 1 }
+            if ch == "}" {
+                depth -= 1
+                if depth == 0 {
+                    let bodyStart = source.index(after: open)
+                    return (name, String(source[bodyStart..<index]))
+                }
+            }
+            index = source.index(after: index)
+        }
+        return nil
+    }
+
+    /// Deterministic native motion checks. Findings are heuristic review leads, not certification.
+    private static func inspectMotion(_ input: String) -> [Finding] {
+        var findings: [Finding] = []
+        func add(_ severity: String, _ rule: String, _ message: String, _ target: String, _ fix: String) {
+            findings.append(Finding(severity: severity, rule: rule, message: message, target: target, fix: fix))
+        }
+        let css = input.replacingOccurrences(of: #"/\*[\s\S]*?\*/"#, with: "", options: .regularExpression)
+        let animated = !matches(css, pattern: #"animation(?:-name)?\s*:|@(?:-webkit-)?keyframes|transition(?:-property)?\s*:"#, options: [.caseInsensitive]).isEmpty
+        let reducedBlock = cssBlock(css, pattern: #"@media\s*\([^)]*prefers-reduced-motion\s*:\s*reduce[^)]*\)"#)?.body ?? ""
+        let hasReducedBlock = !reducedBlock.isEmpty || !matches(css, pattern: #"@media\s*\([^)]*prefers-reduced-motion\s*:\s*reduce"#, options: [.caseInsensitive]).isEmpty
+        let jsMotion = !matches(input, pattern: #"(?:addEventListener\s*\(\s*['\"](?:scroll|wheel|pointermove|mousemove|touchmove)['\"]|requestAnimationFrame\s*\(|setInterval\s*\()[\s\S]{0,500}(?:transform|translate|rotate|scale|animation|style\.)"#, options: [.caseInsensitive]).isEmpty ||
+            !matches(input, pattern: #"\.style\.(?:transform|translate|rotate|scale)\s*=|\.animate\s*\("#, options: [.caseInsensitive]).isEmpty
+
+        if animated && !hasReducedBlock {
+            add("SERIOUS", "reduced-motion", "Motion CSS is present but no prefers-reduced-motion: reduce block was found.", "CSS animation/transition", "Provide a reduced-motion alternative that removes non-essential movement, disables smooth scrolling, and preserves essential information.")
+        } else if animated && hasReducedBlock {
+            let animationOverride = !matches(reducedBlock, pattern: #"animation\s*:\s*none\b|animation-name\s*:\s*none\b|animation-duration\s*:\s*(?:0(?:\.0+)?(?:ms|s)|0?\.0*1ms|1ms)\b|animation-iteration-count\s*:\s*1\b"#, options: [.caseInsensitive]).isEmpty
+            let transitionOverride = !matches(reducedBlock, pattern: #"transition\s*:\s*none\b|transition-property\s*:\s*none\b|transition-duration\s*:\s*(?:0(?:\.0+)?(?:ms|s)|0?\.0*1ms|1ms)\b"#, options: [.caseInsensitive]).isEmpty
+            let hasAnimation = !matches(css, pattern: #"animation(?:-name)?\s*:|@(?:-webkit-)?keyframes"#, options: [.caseInsensitive]).isEmpty
+            let hasTransition = !matches(css, pattern: #"transition(?:-property)?\s*:"#, options: [.caseInsensitive]).isEmpty
+            if (hasAnimation && !animationOverride) || (hasTransition && !transitionOverride) { add("MODERATE", "reduced-motion-incomplete", "A reduced-motion media query exists, but it does not visibly override every animation/transition type used by this snippet.", "@media (prefers-reduced-motion: reduce)", "Inspect the media block and disable or materially reduce the motion types actually used.") }
+        }
+        if !matches(css, pattern: #"scroll-behavior\s*:\s*smooth\b"#, options: [.caseInsensitive]).isEmpty && matches(reducedBlock, pattern: #"scroll-behavior\s*:\s*auto\b"#, options: [.caseInsensitive]).isEmpty {
+            add("MODERATE", "smooth-scroll-not-reduced", "Smooth scrolling is enabled but the reduced-motion block does not switch it to auto.", "CSS scroll behavior", "Set scroll-behavior: auto in the reduced-motion block and also verify script-driven scrolling.")
+        }
+        if !matches(css, pattern: #"transition\s*:\s*all\b"#, options: [.caseInsensitive]).isEmpty { add("MINOR", "transition-all", "A broad transition: all declaration may animate properties that were not intended to move.", "CSS transition declaration", "List only properties that need transitions and respect reduced-motion preferences.") }
+
+        // Walk source offsets so each named keyframe is analyzed independently.
+        var namedKeyframes: [(name: String, body: String)] = []
+        let keyframeRegex = try? NSRegularExpression(pattern: #"@(?:-webkit-)?keyframes\s+([\w-]+)"#, options: [.caseInsensitive])
+        if let keyframeRegex {
+            let ranges = keyframeRegex.matches(in: css, range: NSRange(css.startIndex..., in: css))
+            for range in ranges {
+                guard let swiftRange = Range(range.range, in: css) else { continue }
+                let tail = String(css[swiftRange.lowerBound...])
+                if let block = cssBlock(tail, pattern: #"^@(?:-webkit-)?keyframes\s+([\w-]+)"#) { namedKeyframes.append((block.name, block.body)) }
+            }
+        }
+        for frame in namedKeyframes {
+            let name = frame.name
+            let escapedName = NSRegularExpression.escapedPattern(for: name)
+            let namePattern = #"\b"# + escapedName + #"\b"#
+            let ruleMatches = matches(css, pattern: #"([^{}]+)\{([^{}]*)\}"#)
+            var matchingRule: String? = nil
+            for rule in ruleMatches {
+                let declarations = capture(rule, pattern: #"([^{}]+)\{([^{}]*)\}"#, group: 2) ?? ""
+                var values: [String] = []
+                if let animationValue = capture(declarations, pattern: #"animation\s*:\s*([^;]+)"#, group: 1, options: [.caseInsensitive]) { values.append(animationValue) }
+                if let nameValue = capture(declarations, pattern: #"animation-name\s*:\s*([^;]+)"#, group: 1, options: [.caseInsensitive]) { values.append(nameValue) }
+                var referencesThisAnimation = false
+                for value in values {
+                    for part in value.components(separatedBy: ",") {
+                        if !matches(part, pattern: namePattern, options: [.caseInsensitive]).isEmpty {
+                            referencesThisAnimation = true
+                            break
+                        }
+                    }
+                    if referencesThisAnimation { break }
+                }
+                if referencesThisAnimation {
+                    matchingRule = rule
+                    break
+                }
+            }
+            let animationDecl: String
+            if let matchingRule {
+                animationDecl = capture(matchingRule, pattern: #"([^{}]+)\{([^{}]*)\}"#, group: 2) ?? ""
+            } else {
+                animationDecl = ""
+            }
+            let shorthand = capture(animationDecl, pattern: #"animation\s*:\s*([^;]+)"#, group: 1, options: [.caseInsensitive]) ?? ""
+            var animationItem: String? = nil
+            for part in shorthand.components(separatedBy: ",") {
+                if !matches(part, pattern: namePattern, options: [.caseInsensitive]).isEmpty {
+                    animationItem = part
+                    break
+                }
+            }
+            let durationSource = animationItem ?? animationDecl
+            let durationPattern = #"(?:^|\s)(\d*\.?\d+)(ms|s)\b"#
+            let durationText: String?
+            let durationUnit: String?
+            if let localDuration = capture(durationSource, pattern: durationPattern, group: 1, options: [.caseInsensitive]), let localUnit = capture(durationSource, pattern: durationPattern, group: 2, options: [.caseInsensitive]) {
+                durationText = localDuration
+                durationUnit = localUnit
+            } else {
+                durationText = capture(animationDecl, pattern: #"animation-duration\s*:\s*(\d*\.?\d+)(ms|s)\b"#, group: 1, options: [.caseInsensitive])
+                durationUnit = capture(animationDecl, pattern: #"animation-duration\s*:\s*(\d*\.?\d+)(ms|s)\b"#, group: 2, options: [.caseInsensitive])
+            }
+            let milliseconds: Double?
+            if let durationText, let durationValue = Double(durationText) {
+                milliseconds = durationValue * ((durationUnit ?? "ms").lowercased() == "s" ? 1000 : 1)
+            } else {
+                milliseconds = nil
+            }
+            let repeatsInShorthand = !matches(animationItem ?? "", pattern: #"\binfinite\b"#, options: [.caseInsensitive]).isEmpty
+            let repeatsByCount = !matches(animationDecl, pattern: #"animation-iteration-count\s*:\s*(?:infinite|[2-9]|[1-9]\d+)\b"#, options: [.caseInsensitive]).isEmpty
+            let repeats = repeatsInShorthand || repeatsByCount
+            let backgroundCount = matches(frame.body, pattern: #"background(?:-color)?\s*:"#, options: [.caseInsensitive]).count
+            let highContrast = !matches(frame.body, pattern: #"\b(red|black|white|yellow|lime|fuchsia)\b"#, options: [.caseInsensitive]).isEmpty || !matches(frame.body, pattern: #"#(?:f00|000|fff|ff0|0f0|f0f|ff0000|000000|ffffff|ffff00|00ff00|ff00ff)\b"#, options: [.caseInsensitive]).isEmpty
+            if backgroundCount >= 2 && highContrast && repeats, let milliseconds, milliseconds <= 500 { add("SERIOUS", "rapid-contrast-flash", "Keyframes '\(name)' rapidly alternate high-contrast background colors (\(Int(milliseconds))ms per cycle). This is a risk signal, not a measured WCAG flash test.", "@keyframes \(name)", "Remove the flashing effect or measure it against WCAG flash thresholds; reduced duration alone does not prove safety.") }
+            if !matches(frame.body, pattern: #"translateX\s*\("#, options: [.caseInsensitive]).isEmpty && repeats { add("MODERATE", "auto-moving-content", "Keyframes '\(name)' move content horizontally in a repeating animation.", "@keyframes \(name)", "Provide a user-operable pause/stop mechanism and disable non-essential movement for reduced-motion users.") }
+        }
+        if !matches(css, pattern: #"(?:animation\s*:[^;{}]*\binfinite\b|animation-iteration-count\s*:\s*infinite\b)"#, options: [.caseInsensitive]).isEmpty && matches(css, pattern: #"animation-play-state\s*:\s*paused"#, options: [.caseInsensitive]).isEmpty && matches(input, pattern: #"classList\.(add|remove|toggle)\s*\([^)]*(pause|paused|motion-off|animation-off)"#, options: [.caseInsensitive]).isEmpty {
+            add("MODERATE", "loop-without-pause", "One or more animations loop indefinitely, and no clear animation pause/resume mechanism was detected.", "CSS infinite animation", "Add a user-operable pause/stop control that actually stops each affected animation.")
+        }
+        if jsMotion {
+            add("MODERATE", "script-driven-motion", "JavaScript appears to change transform/animation state; CSS media-query overrides do not automatically stop this code path.", "JavaScript motion handler", "Guard non-essential script-driven movement with matchMedia('(prefers-reduced-motion: reduce)') and listen for preference changes.")
+            if matches(input, pattern: #"matchMedia\s*\([^)]*prefers-reduced-motion"#, options: [.caseInsensitive]).isEmpty { add("MODERATE", "script-motion-not-preference-aware", "No JavaScript check for prefers-reduced-motion was detected alongside script-driven movement.", "JavaScript motion handler", "Check matchMedia('(prefers-reduced-motion: reduce)') before starting script-driven motion and respond when the preference changes.") }
+        }
+        for rule in matches(css, pattern: #"([^{}]+)\{([^{}]*)\}"#) {
+            guard let animation = capture(rule, pattern: #"animation\s*:\s*([^;]+)"#, group: 1, options: [.caseInsensitive]) else { continue }
+            let writers = namedKeyframes.filter { frame in !matches(animation, pattern: #"\b"# + NSRegularExpression.escapedPattern(for: frame.name) + #"\b"#, options: [.caseInsensitive]).isEmpty && !matches(frame.body, pattern: #"transform\s*:"#, options: [.caseInsensitive]).isEmpty }.map(\.name)
+            if writers.count > 1 { add("MODERATE", "competing-transform-animations", "Concurrent keyframes (\(writers.joined(separator: ", "))) both write to transform and may override each other.", String(rule.components(separatedBy: "{").first ?? "CSS").trimmingCharacters(in: .whitespacesAndNewlines), "Combine transform operations into one keyframe animation or use separate nested elements.") }
+        }
+        return findings
     }
 
     private static func helperGuide(_ kind: String) -> String {
@@ -167,19 +479,60 @@ public enum NativeAccessibilityEngine {
     }
 
     private static func parse(_ input: String) -> [Element] {
-        matches(input.replacingOccurrences(of: #"<!--[\s\S]*?-->"#, with: "", options: .regularExpression), pattern: #"<([a-zA-Z][\w:-]*)\b([^<>]*)>"#).compactMap { tag in
-            let parts = matches(tag, pattern: #"^<([a-zA-Z][\w:-]*)\b([^<>]*)>"#).first
-            guard let parts, let range = parts.range(of: #"^<[a-zA-Z][\w:-]*"#, options: .regularExpression) else { return nil }
-            let name = String(tag[range].dropFirst()).lowercased()
+        let clean = input.replacingOccurrences(of: #"<!--[\s\S]*?-->"#, with: "", options: .regularExpression)
+        let voidTags: Set<String> = ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]
+        let tagMatches = matches(clean, pattern: #"<[a-zA-Z][\w:-]*\b[^<>]*>"#)
+        var cursor = clean.startIndex
+        var output: [Element] = []
+        for tag in tagMatches {
+            guard let opening = clean.range(of: tag, range: cursor..<clean.endIndex) else { continue }
+            cursor = opening.upperBound
+            guard let name = capture(tag, pattern: #"^<([a-zA-Z][\w:-]*)\b"#, group: 1)?.lowercased() else { continue }
             var attrs = [String: String]()
             for attr in matches(tag, pattern: #"([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?"#) {
-                let fields = matches(attr, pattern: #"^([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?"#).first ?? attr
-                let key = fields.components(separatedBy: "=").first?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-                let value = attr.replacingOccurrences(of: #"^([^\s=/>]+)\s*=\s*"?"#, with: "", options: .regularExpression).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-                if !key.isEmpty { attrs[key] = value }
+                guard let key = capture(attr, pattern: #"^([^\s=/>]+)"#, group: 1)?.lowercased() else { continue }
+                let value = capture(attr, pattern: #"^[^\s=/>]+\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, group: 1)
+                    ?? capture(attr, pattern: #"^[^\s=/>]+\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, group: 2)
+                    ?? capture(attr, pattern: #"^[^\s=/>]+\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, group: 3)
+                    ?? ""
+                attrs[key] = value
             }
-            return Element(tag: name, attributes: attrs)
+            let inner: String
+            if voidTags.contains(name) || tag.hasSuffix("/>") {
+                inner = ""
+            } else if let close = clean.range(of: #"</\s*\#(NSRegularExpression.escapedPattern(for: name))\s*>"#, options: .regularExpression.union(.caseInsensitive), range: cursor..<clean.endIndex) {
+                inner = String(clean[cursor..<close.lowerBound])
+            } else {
+                inner = ""
+            }
+            let text = inner.replacingOccurrences(of: #"<[^>]*>"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+            output.append(Element(tag: name, attributes: attrs, source: tag, innerMarkup: inner, textContent: text))
         }
+        return output
+    }
+
+    private static func hasAccessibleName(_ element: Element, elements: [Element]) -> Bool {
+        let attributes = element.attributes
+        if !(attributes["aria-label"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let byID = Dictionary(elements.compactMap { candidate -> (String, Element)? in
+            guard let id = candidate.attributes["id"] else { return nil }
+            return (id, candidate)
+        }, uniquingKeysWith: { first, _ in first })
+        let labelledBy = (attributes["aria-labelledby"] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        if !labelledBy.isEmpty && labelledBy.allSatisfy({ byID[$0] != nil }) {
+            let referencedText = labelledBy.compactMap { byID[$0] }.map { candidate in
+                let a = candidate.attributes
+                return (candidate.textContent.isEmpty ? (a["aria-label"] ?? a["title"] ?? a["alt"] ?? a["value"] ?? "") : candidate.textContent).trimmingCharacters(in: .whitespacesAndNewlines)
+            }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !referencedText.isEmpty { return true }
+        }
+        if !(attributes["title"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(attributes["alt"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let type = attributes["type"]?.lowercased() ?? ""
+        if element.tag == "input" && ["button", "submit", "reset"].contains(type) && !(attributes["value"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if ["button", "a"].contains(element.tag) && !element.textContent.isEmpty { return true }
+        if matches(element.innerMarkup, pattern: #"<img\b[^>]*\balt\s*=\s*(['\"])[^'\"]+['\"]"#, options: [.caseInsensitive]).isEmpty == false { return true }
+        if matches(element.innerMarkup, pattern: #"<svg\b[\s\S]*?<title\b[^>]*>[^<]+</title>"#, options: [.caseInsensitive]).isEmpty == false { return true }
+        return attributes["role"] != nil && !element.textContent.isEmpty
     }
 
     private static func matches(_ input: String, pattern: String, options: NSRegularExpression.Options = []) -> [String] {
