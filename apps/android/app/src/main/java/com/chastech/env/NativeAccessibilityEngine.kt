@@ -118,14 +118,57 @@ object NativeAccessibilityEngine {
             }
             "form" -> {
                 val labels = elements.filter { it.tag == "label" }.mapNotNull { it.attrs["for"] }.toSet()
-                elements.filter { it.tag in setOf("input", "select", "textarea") && it.attrs["type"] !in setOf("hidden", "submit", "button", "reset") }.forEach { e ->
-                    val id = e.attrs["id"]
-                    if (e.attrs["aria-label"].isNullOrBlank() && e.attrs["aria-labelledby"].isNullOrBlank() && (id == null || id !in labels)) add("SERIOUS", "label", "Form control has no detectable explicit label.", target(e), "Associate a visible label using for/id, or provide aria-label/aria-labelledby.")
-                    if (e.attrs["aria-invalid"] == "true" && e.attrs["aria-describedby"].isNullOrBlank()) add("MODERATE", "error-description", "Invalid control has no error-description reference.", target(e), "Connect readable error text with aria-describedby.")
-                    if (e.attrs["aria-invalid"] == "true" && e.attrs["aria-describedby"]?.split(Regex("\\s+"))?.filter(String::isNotBlank)?.orEmpty()?.any { it !in idSet } == true) add("MODERATE", "error-description-reference", "Invalid control references an error description missing from this snippet.", target(e), "Ensure the error element exists in the rendered state and explains how to correct the issue.")
+                val formControls = elements.filter {
+                    it.tag in setOf("input", "select", "textarea") &&
+                        it.attrs["type"] !in setOf("hidden", "submit", "button", "reset", "image")
                 }
-                elements.filter { it.tag == "label" && !it.attrs["for"].isNullOrBlank() }.forEach { label ->
-                    if (label.attrs["for"] !in idSet) add("MODERATE", "label-reference", "Label references a missing form-control id '${label.attrs["for"]}'.", target(label), "Match the label's for value to a unique control id, or wrap the control inside the label.")
+                formControls.forEach { e ->
+                    val id = e.attrs["id"]
+                    val explicit = !e.attrs["aria-label"].isNullOrBlank() || !e.attrs["aria-labelledby"].isNullOrBlank()
+                    val associated = id != null && id in labels
+                    val hasPlaceholder = !e.attrs["placeholder"].isNullOrBlank()
+                    val titleOnly = !e.attrs["title"].isNullOrBlank() && !explicit && !associated
+                    if (!explicit && !associated) {
+                        add("SERIOUS", "label", "Form control has no detectable programmatic label.", target(e), "Add a visible <label for=\"…\"> that matches this control's id, wrap the control in a <label>, or provide aria-label/aria-labelledby.")
+                        if (hasPlaceholder) add("MODERATE", "placeholder-label", "Placeholder text is present but is not a programmatic label and often disappears while typing.", target(e), "Keep a persistent visible label; do not rely on placeholder alone for the accessible name.")
+                        if (titleOnly) add("MODERATE", "title-label", "Only a title attribute is present; title is not a reliable visible label for form controls.", target(e), "Provide a visible <label> (or aria-label/aria-labelledby) in addition to any title tooltip.")
+                    }
+                    if (e.attrs["aria-invalid"] == "true") {
+                        val describedBy = e.attrs["aria-describedby"]
+                        if (describedBy.isNullOrBlank()) {
+                            add("MODERATE", "error-description", "Invalid form control has no detectable description reference for its error.", target(e), "Associate concise error text with aria-describedby on this control and expose the error state.")
+                        } else if (describedBy.split(Regex("\\s+")).filter(String::isNotBlank).any { it !in idSet }) {
+                            add("MODERATE", "error-description-reference", "Invalid form control references an error description missing from this snippet.", target(e), "Ensure the error element exists in the rendered state and explains how to correct the issue.")
+                        }
+                    }
+                }
+                elements.filter { it.tag == "label" }.forEach { label ->
+                    val forId = label.attrs["for"]
+                    if (!forId.isNullOrBlank()) {
+                        if (forId !in idSet) add("MODERATE", "label-reference", "Label references a missing form-control id '$forId'.", target(label), "Match the label's for value to a unique control id, or wrap the control inside the label.")
+                    } else if (!Regex("<(input|select|textarea)\\b", RegexOption.IGNORE_CASE).containsMatchIn(label.innerMarkup) && label.textContent.isNotBlank()) {
+                        add("MODERATE", "label-unassociated", "Label text is present but is not associated with a control via for/id or wrapping.", target(label), "Add for=\"control-id\" matching a unique control id, or place the control inside the label.")
+                    }
+                }
+                val radios = formControls.filter { it.attrs["type"]?.lowercase() == "radio" }
+                radios.mapNotNull { it.attrs["name"] }.distinct().forEach { name ->
+                    val group = radios.filter { it.attrs["name"] == name }
+                    if (group.size >= 2) {
+                        val hasFieldset = Regex("<fieldset\\b", RegexOption.IGNORE_CASE).containsMatchIn(markup) &&
+                            Regex("<legend\\b", RegexOption.IGNORE_CASE).containsMatchIn(markup)
+                        if (!hasFieldset) add("MODERATE", "radio-group", "Radio group name=\"$name\" has ${group.size} options but no fieldset/legend grouping was detected.", target(group.first()), "Wrap related radios in <fieldset> with a <legend> that names the group.")
+                    }
+                }
+                val checkboxes = formControls.filter { it.attrs["type"]?.lowercase() == "checkbox" }
+                if (checkboxes.size >= 2) {
+                    val hasFieldset = Regex("<fieldset\\b", RegexOption.IGNORE_CASE).containsMatchIn(markup) &&
+                        Regex("<legend\\b", RegexOption.IGNORE_CASE).containsMatchIn(markup)
+                    if (!hasFieldset) add("MINOR", "checkbox-group", "Multiple checkboxes detected without fieldset/legend grouping.", target(checkboxes.first()), "When checkboxes form a related set, wrap them in <fieldset> with a descriptive <legend>.")
+                }
+                elements.filter {
+                    it.tag == "button" || (it.tag == "input" && it.attrs["type"] in setOf("submit", "button", "image"))
+                }.forEach { e ->
+                    if (!hasAccessibleName(e, elements)) add("SERIOUS", "button-name", "Button has no detectable accessible name.", target(e), "Give the button meaningful text or an aria-label that describes its action. Icon-only buttons need an accessible name.")
                 }
             }
             "keyboard-navigation" -> {
@@ -449,7 +492,7 @@ object NativeAccessibilityEngine {
         sb.append("Normal text AAA (7:1): ${if (aaaNormal) "PASS" else "FAIL"}\n")
         sb.append("UI / graphics AA (3:1): ${if (uiAA) "PASS" else "FAIL"}")
         if (suggestions) {
-            sb.append("\n\nForeground alternatives suggested for this background (AA normal):\n")
+            sb.append("\n\nSuggested foreground alternatives on this background (AA normal):\n")
             sb.append(alternatives)
             sb.append("\n\nApply one alternative at a time, then recheck in the real product surface.")
         }

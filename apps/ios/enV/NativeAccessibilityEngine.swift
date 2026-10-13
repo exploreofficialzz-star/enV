@@ -122,14 +122,70 @@ public enum NativeAccessibilityEngine {
             for id in duplicates { add("SERIOUS", "duplicate-id", "The id '\(id)' is duplicated.", "#\(id)", "Make ids unique so accessible-name references resolve correctly.") }
         case "form":
             let labelIDs = Set(elements.filter { $0.tag == "label" }.compactMap { $0.attributes["for"] })
-            for element in elements where ["input", "select", "textarea"].contains(element.tag) && !["hidden", "submit", "button", "reset"].contains(element.attributes["type"] ?? "") {
-                let explicit = !(element.attributes["aria-label"] ?? "").isEmpty || !(element.attributes["aria-labelledby"] ?? "").isEmpty
-                if !explicit && !(element.attributes["id"].map(labelIDs.contains) ?? false) { add("SERIOUS", "label", "Form control has no detectable explicit label.", element.target, "Associate a visible label using for/id, or provide aria-label/aria-labelledby.") }
-                if element.attributes["aria-invalid"] == "true" && (element.attributes["aria-describedby"] ?? "").isEmpty { add("MODERATE", "error-description", "Invalid control has no error-description reference.", element.target, "Connect readable error text with aria-describedby.") }
-                if element.attributes["aria-invalid"] == "true" && (element.attributes["aria-describedby"] ?? "").split(whereSeparator: { $0.isWhitespace }).map(String.init).contains(where: { !idSet.contains($0) }) { add("MODERATE", "error-description-reference", "Invalid control references an error description missing from this snippet.", element.target, "Ensure the error element exists in the rendered state and explains how to correct the issue.") }
+            let formControls = elements.filter {
+                ["input", "select", "textarea"].contains($0.tag) &&
+                !["hidden", "submit", "button", "reset", "image"].contains($0.attributes["type"] ?? "")
             }
-            for label in elements where label.tag == "label" && !(label.attributes["for"] ?? "").isEmpty {
-                if let targetID = label.attributes["for"], !idSet.contains(targetID) { add("MODERATE", "label-reference", "Label references a missing form-control id '\(targetID)'.", label.target, "Match the label's for value to a unique control id, or wrap the control inside the label.") }
+            for element in formControls {
+                let explicit = !(element.attributes["aria-label"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || !(element.attributes["aria-labelledby"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let associated = element.attributes["id"].map(labelIDs.contains) ?? false
+                let hasPlaceholder = !(element.attributes["placeholder"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let titleOnly = !(element.attributes["title"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !explicit && !associated
+                if !explicit && !associated {
+                    add("SERIOUS", "label", "Form control has no detectable programmatic label.", element.target, "Add a visible <label for=\"…\"> that matches this control's id, wrap the control in a <label>, or provide aria-label/aria-labelledby.")
+                    if hasPlaceholder {
+                        add("MODERATE", "placeholder-label", "Placeholder text is present but is not a programmatic label and often disappears while typing.", element.target, "Keep a persistent visible label; do not rely on placeholder alone for the accessible name.")
+                    }
+                    if titleOnly {
+                        add("MODERATE", "title-label", "Only a title attribute is present; title is not a reliable visible label for form controls.", element.target, "Provide a visible <label> (or aria-label/aria-labelledby) in addition to any title tooltip.")
+                    }
+                }
+                if element.attributes["aria-invalid"] == "true" {
+                    let describedBy = (element.attributes["aria-describedby"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if describedBy.isEmpty {
+                        add("MODERATE", "error-description", "Invalid form control has no detectable description reference for its error.", element.target, "Associate concise error text with aria-describedby on this control and expose the error state.")
+                    } else if describedBy.split(whereSeparator: { $0.isWhitespace }).map(String.init).contains(where: { !idSet.contains($0) }) {
+                        add("MODERATE", "error-description-reference", "Invalid form control references an error description missing from this snippet.", element.target, "Ensure the error element exists in the rendered state and explains how to correct the issue.")
+                    }
+                }
+            }
+            for label in elements where label.tag == "label" {
+                let forId = (label.attributes["for"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !forId.isEmpty {
+                    if !idSet.contains(forId) {
+                        add("MODERATE", "label-reference", "Label references a missing form-control id '\(forId)'.", label.target, "Match the label's for value to a unique control id, or wrap the control inside the label.")
+                    }
+                } else if matches(label.innerMarkup, pattern: #"<(input|select|textarea)\b"#, options: [.caseInsensitive]).isEmpty
+                            && !label.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    add("MODERATE", "label-unassociated", "Label text is present but is not associated with a control via for/id or wrapping.", label.target, "Add for=\"control-id\" matching a unique control id, or place the control inside the label.")
+                }
+            }
+            let radios = formControls.filter { ($0.attributes["type"] ?? "").lowercased() == "radio" }
+            let radioNames = Set(radios.compactMap { $0.attributes["name"] }.filter { !$0.isEmpty })
+            for name in radioNames {
+                let group = radios.filter { $0.attributes["name"] == name }
+                if group.count >= 2 {
+                    let hasFieldset = !matches(input, pattern: #"<fieldset\b"#, options: [.caseInsensitive]).isEmpty
+                        && !matches(input, pattern: #"<legend\b"#, options: [.caseInsensitive]).isEmpty
+                    if !hasFieldset {
+                        add("MODERATE", "radio-group", "Radio group name=\"\(name)\" has \(group.count) options but no fieldset/legend grouping was detected.", group[0].target, "Wrap related radios in <fieldset> with a <legend> that names the group.")
+                    }
+                }
+            }
+            let checkboxes = formControls.filter { ($0.attributes["type"] ?? "").lowercased() == "checkbox" }
+            if checkboxes.count >= 2 {
+                let hasFieldset = !matches(input, pattern: #"<fieldset\b"#, options: [.caseInsensitive]).isEmpty
+                    && !matches(input, pattern: #"<legend\b"#, options: [.caseInsensitive]).isEmpty
+                if !hasFieldset {
+                    add("MINOR", "checkbox-group", "Multiple checkboxes detected without fieldset/legend grouping.", checkboxes[0].target, "When checkboxes form a related set, wrap them in <fieldset> with a descriptive <legend>.")
+                }
+            }
+            for element in elements where element.tag == "button"
+                || (element.tag == "input" && ["submit", "button", "image"].contains(element.attributes["type"] ?? "")) {
+                if !hasAccessibleName(element, elements: elements) {
+                    add("SERIOUS", "button-name", "Button has no detectable accessible name.", element.target, "Give the button meaningful text or an aria-label that describes its action. Icon-only buttons need an accessible name.")
+                }
             }
         case "keyboard-navigation":
             for element in elements {
@@ -570,7 +626,7 @@ public enum NativeAccessibilityEngine {
         UI / graphics AA (3:1): \(uiAA ? "PASS" : "FAIL")
         """
         if suggestions {
-            report += "\n\nForeground alternatives suggested for this background (AA normal):\n"
+            report += "\n\nSuggested foreground alternatives on this background (AA normal):\n"
             report += alternatives.isEmpty ? "No built-in palette candidate reached 4.5:1. Adjust hue or lightness and recheck." : alternatives
             report += "\n\nApply one alternative at a time, then recheck in the real product surface."
         }

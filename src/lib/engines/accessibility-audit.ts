@@ -200,20 +200,76 @@ function inspectMarkup(kind: string, markup: string, elements: MarkupElement[]):
   }
 
   if (kind === "form") {
-    for (const el of elements.filter((x) => CONTROL.has(x.tag) && !(x.tag === "input" && ["hidden", "submit", "button", "reset", "image"].includes((x.attributes.type ?? "text").toLowerCase())))) {
+    const formControls = elements.filter((x) => {
+      if (!CONTROL.has(x.tag)) return false;
+      if (x.tag !== "input") return true;
+      const type = (x.attributes.type ?? "text").toLowerCase();
+      return !["hidden", "submit", "button", "reset", "image"].includes(type);
+    });
+    for (const el of formControls) {
       const id = el.attributes.id;
       const explicit = Boolean((el.attributes["aria-label"] ?? "").trim() || (el.attributes["aria-labelledby"] ?? "").trim());
-      const associated = Boolean(elements.some((label) => label.tag === "label" && label.attributes.for === id) || el.wrappedByLabel);
-      if (!explicit && !associated) push(findings, "serious", "label", "Form control has no detectable programmatic label.", elementName(el), "Add a visible <label for=\"…\"> or an aria-label/aria-labelledby name.");
-      if (el.attributes["aria-invalid"] === "true" && !(el.attributes["aria-describedby"] ?? "").trim()) push(findings, "moderate", "error-description", "Invalid form control has no detectable description reference for its error.", elementName(el), "Associate concise error text with aria-describedby and expose the error state.");
-      const descriptions = (el.attributes["aria-describedby"] ?? "").trim().split(/\s+/).filter(Boolean);
-      if (el.attributes["aria-invalid"] === "true" && descriptions.some((ref) => !idSet.has(ref))) push(findings, "moderate", "error-description-reference", "Invalid form control references an error description that is missing from this snippet.", elementName(el), "Ensure the error element exists in the rendered state and its text explains how to correct the issue.");
+      const associated = Boolean((id && elements.some((label) => label.tag === "label" && label.attributes.for === id)) || el.wrappedByLabel);
+      const hasPlaceholder = Boolean((el.attributes.placeholder ?? "").trim());
+      const titleOnly = Boolean((el.attributes.title ?? "").trim()) && !explicit && !associated;
+
+      if (!explicit && !associated) {
+        push(findings, "serious", "label", "Form control has no detectable programmatic label.", elementName(el), "Add a visible <label for=\"…\"> that matches this control's id, wrap the control in a <label>, or provide aria-label/aria-labelledby.");
+        if (hasPlaceholder) {
+          push(findings, "moderate", "placeholder-label", "Placeholder text is present but is not a programmatic label and often disappears while typing.", elementName(el), "Keep a persistent visible label; do not rely on placeholder alone for the accessible name.");
+        }
+        if (titleOnly) {
+          push(findings, "moderate", "title-label", "Only a title attribute is present; title is not a reliable visible label for form controls.", elementName(el), "Provide a visible <label> (or aria-label/aria-labelledby) in addition to any title tooltip.");
+        }
+      }
+
+      if (el.attributes["aria-invalid"] === "true") {
+        const describedBy = (el.attributes["aria-describedby"] ?? "").trim();
+        if (!describedBy) {
+          push(findings, "moderate", "error-description", "Invalid form control has no detectable description reference for its error.", elementName(el), "Associate concise error text with aria-describedby on this control and expose the error state.");
+        } else {
+          const descriptions = describedBy.split(/\s+/).filter(Boolean);
+          if (descriptions.some((ref) => !idSet.has(ref))) {
+            push(findings, "moderate", "error-description-reference", "Invalid form control references an error description that is missing from this snippet.", elementName(el), "Ensure the error element exists in the rendered state and its text explains how to correct the issue.");
+          }
+        }
+      }
     }
-    for (const label of elements.filter((x) => x.tag === "label" && (x.attributes.for ?? "").trim())) {
-      if (!idSet.has(label.attributes.for)) push(findings, "moderate", "label-reference", `Label references missing form-control id “${label.attributes.for}”.`, elementName(label), "Make the label's for value match a unique control id, or wrap the control inside the label.");
+
+    // Labels that have text but neither for= nor a wrapped control
+    for (const label of elements.filter((x) => x.tag === "label")) {
+      const forId = (label.attributes.for ?? "").trim();
+      if (forId) {
+        if (!idSet.has(forId)) push(findings, "moderate", "label-reference", `Label references missing form-control id “${forId}”.`, elementName(label), "Make the label's for value match a unique control id, or wrap the control inside the label.");
+      } else if (!label.innerMarkup.match(/<(input|select|textarea)\b/i) && label.textContent.trim()) {
+        push(findings, "moderate", "label-unassociated", "Label text is present but is not associated with a control via for/id or wrapping.", elementName(label), "Add for=\"control-id\" matching a unique control id, or place the control inside the label.");
+      }
     }
-    for (const el of elements.filter((x) => x.tag === "button" || (x.tag === "input" && ["submit", "button"].includes((x.attributes.type ?? "").toLowerCase())))) {
-      if (!hasAccessibleName(el, elements)) push(findings, "serious", "button-name", "Button has no detectable accessible name.", elementName(el), "Give the button meaningful text or an aria-label that describes its action.");
+
+    // Radio / checkbox groups without fieldset+legend
+    const radios = formControls.filter((x) => x.tag === "input" && (x.attributes.type ?? "").toLowerCase() === "radio");
+    const radioNames = [...new Set(radios.map((r) => r.attributes.name).filter(Boolean))];
+    for (const name of radioNames) {
+      const group = radios.filter((r) => r.attributes.name === name);
+      if (group.length >= 2) {
+        const hasFieldset = /<fieldset\b/i.test(markup) && /<legend\b/i.test(markup);
+        if (!hasFieldset) {
+          push(findings, "moderate", "radio-group", `Radio group name=\"${name}\" has ${group.length} options but no fieldset/legend grouping was detected.`, elementName(group[0]), "Wrap related radios in <fieldset> with a <legend> that names the group.");
+        }
+      }
+    }
+    const checkboxes = formControls.filter((x) => x.tag === "input" && (x.attributes.type ?? "").toLowerCase() === "checkbox");
+    if (checkboxes.length >= 2) {
+      const hasFieldset = /<fieldset\b/i.test(markup) && /<legend\b/i.test(markup);
+      if (!hasFieldset) {
+        push(findings, "minor", "checkbox-group", "Multiple checkboxes detected without fieldset/legend grouping.", elementName(checkboxes[0]), "When checkboxes form a related set, wrap them in <fieldset> with a descriptive <legend>.");
+      }
+    }
+
+    for (const el of elements.filter((x) => x.tag === "button" || (x.tag === "input" && ["submit", "button", "image"].includes((x.attributes.type ?? "").toLowerCase())))) {
+      if (!hasAccessibleName(el, elements)) {
+        push(findings, "serious", "button-name", "Button has no detectable accessible name.", elementName(el), "Give the button meaningful text or an aria-label that describes its action. Icon-only buttons need an accessible name.");
+      }
     }
   }
 
@@ -291,6 +347,11 @@ const RELATED_CRITERIA: Record<string, string[]> = {
   "duplicate-id": ["4.1.2 Name, Role, Value"],
   "label": ["3.3.2 Labels or Instructions", "4.1.2 Name, Role, Value"],
   "label-reference": ["3.3.2 Labels or Instructions", "4.1.2 Name, Role, Value"],
+  "label-unassociated": ["3.3.2 Labels or Instructions", "1.3.1 Info and Relationships"],
+  "placeholder-label": ["3.3.2 Labels or Instructions"],
+  "title-label": ["3.3.2 Labels or Instructions"],
+  "radio-group": ["1.3.1 Info and Relationships", "3.3.2 Labels or Instructions"],
+  "checkbox-group": ["1.3.1 Info and Relationships", "3.3.2 Labels or Instructions"],
   "button-name": ["4.1.2 Name, Role, Value"],
   "link-name": ["2.4.4 Link Purpose (In Context)", "4.1.2 Name, Role, Value"],
   "custom-control-name": ["4.1.2 Name, Role, Value"],
