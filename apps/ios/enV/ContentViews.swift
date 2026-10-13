@@ -233,6 +233,7 @@ private struct DiscoveryToolCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Open \(tool.name)")
         .padding(16)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
@@ -263,6 +264,7 @@ private struct WebHomeSearchSuggestion: View {
             .padding(.horizontal, 16).padding(.vertical, 10)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Open \(tool.name)")
     }
 }
 

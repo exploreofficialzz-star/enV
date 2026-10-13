@@ -123,16 +123,22 @@ struct RootTabView: View {
                 onInformation: { informationRouter.open($0) },
                 onAssistant: { selectedTab = NativeTab.assistant.rawValue },
             )
+                .tabItem { Label("Home", systemImage: "house") }
                 .tag(NativeTab.home.rawValue)
             AssistantChatView(messages: $assistantMessages, draft: $assistantDraft)
+                .tabItem { Label("AI assistant", systemImage: "sparkles") }
                 .tag(NativeTab.assistant.rawValue)
             ToolsView(toolsQuery: $searchQuery, onSearchNoMatch: { selectedTab = NativeTab.search.rawValue })
+                .tabItem { Label("Tools", systemImage: "square.grid.2x2") }
                 .tag(NativeTab.tools.rawValue)
             SearchView(query: $searchQuery)
+                .tabItem { Label("Search tools", systemImage: "magnifyingglass") }
                 .tag(NativeTab.search.rawValue)
             SavedView()
+                .tabItem { Label("Saved tools", systemImage: "heart") }
                 .tag(NativeTab.saved.rawValue)
             AccountView()
+                .tabItem { Label("Account", systemImage: "person") }
                 .tag(NativeTab.account.rawValue)
         }
         .environmentObject(informationRouter)

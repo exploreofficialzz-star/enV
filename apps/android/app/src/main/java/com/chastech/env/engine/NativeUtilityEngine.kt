@@ -1312,11 +1312,17 @@ object NativeUtilityEngine {
                 val header = parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
                 val payload = parseJson(b64UrlDecode(parts[1])) as? JSONObject ?: error("JWT payload must be a JSON object.")
                 val exp = (payload.opt("exp") as? Number)?.toDouble()
-                val expiresAt = exp?.let { seconds -> runCatching { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((seconds * 1000).toLong())) }.getOrElse { "out-of-range" } } ?: "none"
+                fun epochMillis(seconds: Double): Long? {
+                    val millis = seconds * 1000.0
+                    if (!millis.isFinite() || millis >= Long.MAX_VALUE.toDouble() || millis <= Long.MIN_VALUE.toDouble()) return null
+                    return millis.toLong()
+                }
+                val expiresAt = exp?.let { seconds -> epochMillis(seconds)?.let { millis -> runCatching { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli(millis)) }.getOrElse { "out-of-range" } } ?: "out-of-range" } ?: "none"
                 val expired: Any = exp?.let { System.currentTimeMillis() / 1000.0 >= it } ?: JSONObject.NULL
                 fun claimTime(key: String): Any {
                     val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL
-                    val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull()
+                    val millis = epochMillis(seconds) ?: return JSONObject().put("unixSeconds", seconds).put("status", "out-of-range")
+                    val instant = runCatching { Instant.ofEpochMilli(millis) }.getOrNull()
                         ?: return JSONObject().put("unixSeconds", seconds).put("status", "out-of-range")
                     val now = System.currentTimeMillis() / 1000.0
                     val status = when(key) { "exp" -> if(now >= seconds) "expired" else "valid"; "nbf" -> if(now < seconds) "not-yet-valid" else "active"; "iat" -> if(seconds > now) "issued-in-the-future" else "valid"; else -> "informational" }

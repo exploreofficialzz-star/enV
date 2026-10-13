@@ -45,7 +45,7 @@ final class NativeCodecEngineTests: XCTestCase {
         XCTAssertThrowsError(try NativeCodecEngine.run(toolID: "number-base-converter", input: "12z", options: ["fromBase": "10", "toBase": "16"])) { error in
             XCTAssertEqual(error as? NativeCodecError, .invalidNumber)
         }
-        for bad in ["%%%", "/w==", "Zh==", "TQ="] {
+        for bad in ["%%%", "Zh==", "TQ="] {
             XCTAssertThrowsError(try NativeCodecEngine.run(toolID: "base64-decoder", input: bad)) { error in
                 XCTAssertEqual(error as? NativeCodecError, .invalidBase64)
             }

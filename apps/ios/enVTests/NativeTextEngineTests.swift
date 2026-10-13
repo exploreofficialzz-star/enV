@@ -142,10 +142,13 @@ final class NativeDeveloperToolTests: XCTestCase {
     }
 
     func testRegexFlagsAndBothWebRegexOperationsReturnTheMatchReport() throws {
-        let options="{\"secondary\":\"Cat cat\",\"flags\":\"gi\"}"
-        let expected="Pattern: /cat/\nMatches: 2\n\n1. Cat at index 0\n2. cat at index 4"
+        let options="{\"secondary\":\"Cat cat\",\"flags\":\"gi\",\"replacement\":\"dog\"}"
+        let expected="Pattern: /cat/\nEngine: NSRegularExpression (native Foundation engine; syntax differs from JavaScript RegExp)\nMatches: 2\n\n1. Cat at index 0\n2. cat at index 4"
         XCTAssertEqual(try NativeUtilityEngine.run(tool("regex-tester"),input:"cat",optionsJSON:options).text,expected)
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("regex-replace"),input:"cat",optionsJSON:options).text,expected)
+        let replacement=try NativeUtilityEngine.run(tool("regex-replace"),input:"cat",optionsJSON:options).text
+        let report=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(replacement.utf8)) as? [String:Any])
+        XCTAssertEqual(report["preview"] as? String,"dog dog")
+        XCTAssertEqual((report["matches"] as? [[String:Any]])?.count,2)
     }
 
     func testURLParserReturnsBrowserJSONContractAndLastDuplicateQueryValue() throws {
@@ -160,25 +163,32 @@ final class NativeDeveloperToolTests: XCTestCase {
     }
 
     func testDeveloperValidatorsStatusAndWebFallbacks() throws {
-        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Invalid UUID")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Valid UUID v4")
+        // Match the web UUID validator: accept the canonical 36-character UUID and reject malformed groups.
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Valid UUID v4")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Invalid UUID")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"not-a-uuid").text,"Invalid UUID")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"404").text,"404 Not Found")
         XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"418").text.contains("504 Gateway Timeout"))
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text,"a=1&b=2")
+        let queryOutput=try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text
+        let query=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(queryOutput.utf8)) as? [String:Any])
+        XCTAssertEqual(query["count"] as? Int,2)
+        XCTAssertEqual((query["grouped"] as? [String:[String]])?["b"],["2"])
         XCTAssertEqual(try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text,"Mozilla/5.0")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("cron-parser"),input:"").text,"Cron: \nFive-field format: minute hour day-of-month month day-of-week")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<div>\n  <p>\n    Hello\n  </p>\n</div>")
+        let cronOutput=try NativeUtilityEngine.run(tool("cron-parser"),input:"*/15 * * * *").text
+        let cron=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(cronOutput.utf8)) as? [String:Any])
+        XCTAssertEqual(cron["normalized"] as? String,"*/15 * * * *")
+        XCTAssertNotNil(cron["nextRuns"])
+        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("cron-parser"),input:""))
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<p>&lt;div&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/div&gt;</p>")
     }
 
     func testBrowserVerifiedEncodingCsvMimeMarkupAndFallbacks() throws {
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"4869")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"72 105")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("csv-formatter"),input:"name,age\nAda,36\nGrace,40").text,"name,age\nAda,36\nGrace,40")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("mime-validator"),input:"pdf").text,"application/pdf")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("xml-validator"),input:"<root><child>ok</child></root>").text,"Valid markup/XML.")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("developer-api-mock-response-generator"),input:"  template  ").text,"template")
-        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello"))
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello").text,"data:text/plain;base64,aGVsbG8=")
         XCTAssertThrowsError(try NativeUtilityEngine.run(tool("file-hash-calculator"),input:"hello"))
         XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"422").text,"422 Unprocessable Content")
     }

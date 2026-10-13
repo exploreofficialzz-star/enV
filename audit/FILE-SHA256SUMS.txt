@@ -59,7 +59,7 @@ f37d4c45e952815d1400b510e421982f2f47398f467d98527bcc7467b15d6196  ./apps/android
 9cbe1743502a28fcefe7d3c11d6946fe9451963475929254fdeb60ff1a960910  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeNumberParser.kt
 4e9b6e8104b50aa8d915f2c64545b8270f6265ec0fd4944645724ae89b855c14  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeTextEngine.kt
 0662897d74b63947bf9e83a59a6928f8467d34e4950c64988aef7913e745fee2  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUrlMediaInfoEngine.kt
-f46358c7b884eae5cfd38c067494da67740795cb7153d32cd3789d45f255e8b9  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
+f3f2ddb09324e7d8339ba3b6145a7ddf37713af1ff80795b5c2b867da201bc6d  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
 a5a6943104c54c75d00194fbe7695dd226a31700d966a581794cf9b42f7a1bcc  ./apps/android/app/src/main/java/com/chastech/env/ui/CharacterSpacedText.kt
 eb419c899f54683787373df2e02605370c8363276f5375492b85d8c7c7df2024  ./apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt
 509b375ceba9e1e77fb488c06683862b5c85651711d44ac2ed965a76f235425a  ./apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt
@@ -89,7 +89,7 @@ d726d7be7753d79929f28575e58323e7293f1344cba82304df4410068fb49d3b  ./apps/android
 8f31c31ef92b214703d4c244b5b976ea3f881d5d293bb3712411fb538712b10f  ./apps/android/app/src/test/java/com/chastech/env/NativeAiMicroEngineTest.kt
 2ca858c397bf9c68480109a5f26f5f779465a1f7fe6a9b574fd48ab6294b463e  ./apps/android/app/src/test/java/com/chastech/env/NativeBackendRequestTest.kt
 f4c41cb22a37ff499f4c0efa4dd9ba5b3deaf3f7f9d9f7654739a27ab393ebb8  ./apps/android/app/src/test/java/com/chastech/env/NativeBarcodeEngineTest.kt
-462feeba2d0aa44f9024b291ab62e7e3218e810c34a3dd8b9be07f91e4ca3021  ./apps/android/app/src/test/java/com/chastech/env/NativeDeveloperToolTest.kt
+4442d27da30c5a116b60352205779b61ef5e0dcf136370263070ae31d25e10d1  ./apps/android/app/src/test/java/com/chastech/env/NativeDeveloperToolTest.kt
 f922fb3b599fb93fe82d24d8e400403a888624753fe1c3dd3e3aad7b6b21709b  ./apps/android/app/src/test/java/com/chastech/env/NativeEventEngineTest.kt
 88683ecb4540619f24e5d19a4bcb7793452ad447aadf2edc5052569e8eb791d8  ./apps/android/app/src/test/java/com/chastech/env/NativeProductivityEngineTest.kt
 6175572ff852a3620d56aa670a164bd0f28238f5ca282b868ac97c7798017b93  ./apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt
@@ -143,7 +143,7 @@ d66f242bd06ca002e2adaff46b447d18de17820bd601305c1fb59c6edb8b5839  ./apps/ios/enV
 fa4f02676ce6eb5179658db3076dab2aa39b7749e94fd5b7c87f646892c54e00  ./apps/ios/enV/CatalogCore.swift
 481a0c992930ed8b146e4812b5938f3c1d7f96fd39a579bb47426b6f6e60f505  ./apps/ios/enV/ContactExchangeController.swift
 ccb56a9ec8b362cef9e9416f8b04d97e982b0972f276f5f6ec0040b96dea0446  ./apps/ios/enV/ContactExchangeView.swift
-c93a27eab29b99ce15c6e8e0267c6c8aa1ea953e14b27c6caa99e81af0f079f9  ./apps/ios/enV/ContentViews.swift
+a7ad7d4e89e897267db1e39b0bf7745df1aaef90ce7d13c1b7517b841f29071d  ./apps/ios/enV/ContentViews.swift
 1310a564b1d4cf4331a4527bec6262bc955a79434a158047bd9ded1f24222f2b  ./apps/ios/enV/Info.plist
 3c10c1a4b69c5f060d20009aa6e1d64bf262ed60091809f56d7474f197953242  ./apps/ios/enV/NativeAccessibilityEngine.swift
 396c36f6a933566e9652fba83ba0af0c99c1478cee24468ad35e99d36b28c448  ./apps/ios/enV/NativeBusinessEngine.swift
@@ -164,15 +164,15 @@ be647328a92321ebc8d2b261b0680f3d56a566380f37bd586fe1ef78d0cd45c8  ./apps/ios/enV
 d7f51061287af1872bc5906740a2b0dff47e8d7af2e723a8b4da4f8db1c079e3  ./apps/ios/enV/NativeUrlMediaInfoEngine.swift
 b5429b73211b5c6bc5315cd31433ec58ed09098c75c6f8afbf5184aa024d2440  ./apps/ios/enV/NativeUtilityEngine.swift
 4d69cd7d5671caa811ffada11510689cae27f3911c656bea7fb948a284152423  ./apps/ios/enV/ToolViews.swift
-312de7ff801a1f1f5b5b1337a905531860a96128c50579c25fd9b265788c5a33  ./apps/ios/enV/enVApp.swift
+aecf5414c2d97f952554523fc8620404a1d1f061249a292e2f3cfc206fd0a87f  ./apps/ios/enV/enVApp.swift
 b68096c17562e1fef9a27d32ed49a45f7ab5812fd08eedff95f56bc05abe96db  ./apps/ios/enVTests/CatalogCoreTests.swift
 41806a6e37fcbaedaba8b8f34d2a47ec3e0cb54307255e65b12ae4ceffe0cdfd  ./apps/ios/enVTests/NativeAccessibilityEngineTests.swift
-e9cb4ef199febed9b6fdd12f9fd4ebebabfa10da5eb857d60f1bb61393181642  ./apps/ios/enVTests/NativeCodecEngineTests.swift
+86ca1e24136a59b5c00279160cb9d5b249d4b1aeb23e10b3842d42ba51f3b0ad  ./apps/ios/enVTests/NativeCodecEngineTests.swift
 a703aaca51656d73b47160d141ce11c7a4bc4715116e47c53b211fd62d740018  ./apps/ios/enVTests/NativeColorEngineTests.swift
 163725ecbee95ad798ac61c07fdfa8524ee87af13b512fc80267bfea7c20a88b  ./apps/ios/enVTests/NativeDateTimeEngineTests.swift
 0d4c608310ff15c1c5cd02d6b6fc112d9a0c02b0bc5752ef2ebc5b00e94f3d7c  ./apps/ios/enVTests/NativeDeveloperStudioTests.swift
 26c24d70fe7e8574f056002013bc7385584002316533759f670e3257028870f1  ./apps/ios/enVTests/NativeMimeEngineTests.swift
-4db9545cc9bd55ee89422dd30ae75468dc8ac44a690f74130af98d773c5ba40f  ./apps/ios/enVTests/NativeTextEngineTests.swift
+8c8ab33f0eb35cb51cfef66ce4997165ae04815d2a42034d9fd34b25fb2be14f  ./apps/ios/enVTests/NativeTextEngineTests.swift
 97d8615e51ea9ef92ff60495400a02e0ca535fcffd0bfaf4eba667eb6f6d207f  ./apps/ios/enVTests/NativeUrlMediaInfoEngineTests.swift
 b843323b93056b8985095f1fd666aef3b82b141f24ea19734d9f2f39fccbd506  ./apps/ios/enVUITests/AccessibilityAuditUITests.swift
 dc00968dc2848a1e91d93944c5ec430a4544510883d181200e51b6468bd42da4  ./apps/ios/native-family-coverage/ai.txt
