@@ -3,7 +3,20 @@ import UIKit
 
 extension Font {
     static func envScaled(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
-        .system(size: size * 1.11, weight: weight, design: design, relativeTo: .body)
+        let nominalSize = size * 1.11
+        let textStyle: TextStyle
+        switch nominalSize {
+        case ..<12: textStyle = .caption2
+        case ..<13: textStyle = .caption
+        case ..<14.5: textStyle = .footnote
+        case ..<16: textStyle = .subheadline
+        case ..<18.5: textStyle = .body
+        case ..<21: textStyle = .title3
+        case ..<25: textStyle = .title2
+        case ..<32: textStyle = .title
+        default: textStyle = .largeTitle
+        }
+        return .system(textStyle, design: design, weight: weight)
     }
 }
 

@@ -1248,6 +1248,24 @@ struct NativeTextToolView: View {
     private func reset() { input = ""; compare = ""; output = ""; options = [:]; error = nil; diffSummary = nil }
 }
 
+private struct DynamicTypePreviewText: View {
+    @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat
+    let text: String
+    let lineHeight: Double
+
+    init(text: String, size: CGFloat, lineHeight: Double) {
+        self.text = text
+        self.lineHeight = lineHeight
+        _scaledSize = ScaledMetric(wrappedValue: size, relativeTo: .body)
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: scaledSize))
+            .lineSpacing(max(0, scaledSize * CGFloat(lineHeight - 1)))
+    }
+}
+
 struct NativeAccessibilityToolView: View {
     let tool: Tool
     @State private var showAPCAWebView = false
@@ -1367,7 +1385,7 @@ struct NativeAccessibilityToolView: View {
                 enVCharacterSpacedText(altCoach ? "Image description" : textTool ? "English text" : "HTML / CSS snippet")
                     .font(.envScaled(size: 13, weight: .semibold))
                 TextEditor(text: $input)
-                    .font(.system(size: 16, weight: .regular, design: codeTool && !altCoach ? .monospaced : .default, relativeTo: .body))
+                    .font(.system(.body, design: codeTool && !altCoach ? .monospaced : .default))
                     .frame(minHeight: 160)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                     .accessibilityLabel(altCoach ? "Describe the image and its purpose" : textTool ? "English text for readability analysis" : "HTML or CSS snippet to analyze")
@@ -1395,7 +1413,7 @@ struct NativeAccessibilityToolView: View {
                 }.buttonStyle(.bordered).accessibilityHint("Copies the full local result to the clipboard")
                 ShareLink(item: output) { Label("Share or save report", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 48, alignment: .leading) }
                     .buttonStyle(.bordered)
-                Text(output).font(.system(size: 14, weight: .regular, design: .monospaced, relativeTo: .body)).textSelection(.enabled)
+                Text(output).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
                     .accessibilityLabel("Accessibility analysis result")
             }
             enVCharacterSpacedText("Static snippet checks only. Manually test keyboard order, browser zoom, screen readers, and the complete page; results do not certify WCAG conformance.")
@@ -1432,8 +1450,11 @@ struct NativeAccessibilityToolView: View {
             Text("Type-scale preview · \(Int(previewSize)) pt · line spacing \(previewLineHeight, specifier: "%.2f")").font(.headline)
             Slider(value: $previewSize, in: 12...48, step: 1).accessibilityLabel("Preview text size")
             Slider(value: $previewLineHeight, in: 1...2.5, step: 0.05).accessibilityLabel("Preview line height")
-            Text(input.isEmpty ? "Accessible content should remain readable when people enlarge type and adjust spacing." : input)
-                .font(.system(size: previewSize, weight: .regular, design: .default, relativeTo: .body)).lineSpacing(max(0, previewSize * (previewLineHeight - 1)))
+            DynamicTypePreviewText(
+                text: input.isEmpty ? "Accessible content should remain readable when people enlarge type and adjust spacing." : input,
+                size: CGFloat(previewSize),
+                lineHeight: previewLineHeight
+            )
                 .padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
         }
     }
