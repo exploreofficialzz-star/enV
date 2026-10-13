@@ -112,4 +112,15 @@ class NativeDeveloperToolTest {
         val bad = runCatching { NativeUtilityEngine.run(tool("developer-sql-query-builder"), "{\"table\":\"users; DROP TABLE users\"}") }.exceptionOrNull()
         assertTrue(bad?.message?.contains("identifier", ignoreCase = true) == true)
     }
+
+    @Test fun secureTokenGeneratorUsesBoundedUrlSafeOutput() {
+        val secureTool = tool("secure-token", engineType = "generator", category = "utilities")
+        val token = NativeUtilityEngine.run(secureTool, optionsJson = "{\"length\":64}").text
+        assertEquals(64, token.length)
+        assertTrue(token.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' })
+        assertTrue(runCatching { NativeUtilityEngine.run(secureTool, optionsJson = "{\"length\":0}") }.isFailure)
+        assertTrue(runCatching { NativeUtilityEngine.run(secureTool, optionsJson = "{\"length\":5000}") }.isFailure)
+        assertTrue(runCatching { NativeUtilityEngine.run(secureTool, optionsJson = "{\"length\":1.5}") }.isFailure)
+        assertTrue(runCatching { NativeUtilityEngine.run(secureTool, optionsJson = "{\"length\":\"oops\"}") }.isFailure)
+    }
 }

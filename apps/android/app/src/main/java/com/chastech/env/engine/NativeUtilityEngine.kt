@@ -11,6 +11,8 @@ import java.net.URLEncoder
 import java.io.StringReader
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.text.Normalizer
 import java.time.LocalDate
 import java.time.Instant
@@ -19,6 +21,7 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Locale
 import java.util.UUID
 import javax.xml.parsers.DocumentBuilderFactory
@@ -145,12 +148,58 @@ object NativeUtilityEngine {
         return out
     }
 
+    private val secureRandom = SecureRandom()
+
     private fun num(opts: Map<String, String>, key: String, defaultValue: Int): Int = opts[key]?.toDoubleOrNull()?.toInt() ?: defaultValue
     private fun pick(values: List<String>) = values[Random.nextInt(values.size)]
     private fun rnd(n: Int): Int = if (n <= 0) 0 else Random.nextInt(n)
     private fun token(length: Int): String {
+        require(length in 0..500) { "Token length must be between 0 and 500 characters." }
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        return buildString { repeat(max(0, length)) { append(chars[rnd(chars.length)]) } }
+        return buildString { repeat(length) { append(chars[rnd(chars.length)]) } }
+    }
+
+    /** Parse security-sensitive length without the lossy truncation used by casual generator options. */
+    private fun secureTokenLength(opts: Map<String, String>): Int {
+        val raw = opts["length"]?.trim().orEmpty()
+        if (raw.isEmpty()) return 32
+        val value = raw.toDoubleOrNull()
+        require(value != null && value.isFinite() && value % 1.0 == 0.0 && value in 1.0..500.0) {
+            "Secure token length must be an integer from 1 through 500 characters."
+        }
+        return value.toInt()
+    }
+
+    /** Security-sensitive tokens use SecureRandom, never the casual pseudo-random generator above. */
+    private fun secureToken(length: Int): String {
+        require(length in 1..500) { "Secure token length must be between 1 and 500 characters." }
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        return buildString(length) { repeat(length) { append(chars[secureRandom.nextInt(chars.length)]) } }
+    }
+
+    /** Strict text decode: reject bad padding, noncanonical pad bits, and invalid UTF-8. */
+    private fun decodeBase64Text(input: String, urlSafe: Boolean = false): String {
+        val compact = input.filterNot { it.isWhitespace() }
+        val alphabet = if (urlSafe) "[A-Za-z0-9_-]" else "[A-Za-z0-9+/]"
+        require(Regex("^(?:$alphabet)*(?:={0,2})$").matches(compact)) { "Invalid ${if (urlSafe) "Base64URL" else "Base64"} alphabet or padding." }
+        val padIndex = compact.indexOf('=')
+        val core = if (padIndex < 0) compact else compact.substring(0, padIndex)
+        val padding = if (padIndex < 0) 0 else compact.length - padIndex
+        require(core.length % 4 != 1 && (padding == 0 || (compact.length % 4 == 0 && ((padding == 1 && core.length % 4 == 3) || (padding == 2 && core.length % 4 == 2))))) {
+            "Invalid ${if (urlSafe) "Base64URL" else "Base64"} length or padding."
+        }
+        val normalized = core + "=".repeat((4 - core.length % 4) % 4)
+        val decoder = if (urlSafe) java.util.Base64.getUrlDecoder() else java.util.Base64.getDecoder()
+        val bytes = try { decoder.decode(normalized) } catch (_: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid ${if (urlSafe) "Base64URL" else "Base64"} input.")
+        }
+        val canonical = (if (urlSafe) java.util.Base64.getUrlEncoder() else java.util.Base64.getEncoder()).withoutPadding().encodeToString(bytes)
+        require(canonical == core) { "Non-canonical ${if (urlSafe) "Base64URL" else "Base64"} trailing bits." }
+        return try {
+            StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
+        } catch (_: java.nio.charset.CharacterCodingException) {
+            throw IllegalArgumentException("Decoded bytes are not valid UTF-8 text.")
+        }
     }
     private fun hex(length: Int): String {
         val chars = "0123456789abcdef"
@@ -185,7 +234,7 @@ object NativeUtilityEngine {
             "passphrase" -> List(num(opts,"words",6)) { pick(WORDS) }.joinToString("-")
             "random-string" -> token(num(opts,"length",16))
             "random-hex" -> hex(num(opts,"length",16))
-            "secure-token" -> token(num(opts,"length",32))
+            "secure-token" -> secureToken(secureTokenLength(opts))
             "random-number-generator" -> {
                 val minValue = opts["min"]?.toDoubleOrNull() ?: 1.0; val maxValue = opts["max"]?.toDoubleOrNull() ?: 100.0
                 val lo = min(minValue,maxValue); val hi=max(minValue,maxValue)
@@ -284,7 +333,7 @@ object NativeUtilityEngine {
         return when(op){
             "url-parser","url-query-parser","url-origin","url-path-analyzer" -> {
                 val u=URI((opts["url"] ?: input).ifBlank { "https://example.com/path?x=1" }); val host=u.host ?: ""; val query=u.rawQuery ?: ""; val path=u.path.ifBlank { "/" }
-                when(op){"url-parser" -> "Protocol: ${u.scheme ?: ""}\nUsername: ${u.userInfo?.substringBefore(":") ?: "—"}\nHost: ${u.rawAuthority ?: ""}\nHostname: $host\nPort: ${if(u.port==-1) "default" else u.port}\nPath: $path\nQuery: ${if(query.isBlank()) "—" else "?$query"}\nHash: ${if(u.rawFragment==null) "—" else "#${u.rawFragment}"}\nOrigin: ${(if(u.scheme!=null) "${u.scheme}://" else "")}${u.rawAuthority ?: ""}";"url-origin" -> "${u.scheme}://${u.rawAuthority}";"url-path-analyzer" -> "Path: $path\nSegments: ${path.split("/").filter{it.isNotEmpty()}.size}\nLast segment: ${path.split("/").filter{it.isNotEmpty()}.lastOrNull() ?: "—"}"; else -> if(query.isBlank()) "No query parameters." else query.split("&").filter{it.isNotBlank()}.joinToString("\n") { val p=it.split("=",limit=2); "${decodeURIComponent(p[0])} = ${if(p.size>1) decodeURIComponent(p[1]) else ""}" }}
+                when(op){"url-parser" -> "Protocol: ${u.scheme ?: ""}\nUsername: ${u.userInfo?.substringBefore(":") ?: "—"}\nHost: ${u.rawAuthority ?: ""}\nHostname: $host\nPort: ${if(u.port==-1) "default" else u.port}\nPath: $path\nQuery: ${if(query.isBlank()) "—" else "?$query"}\nHash: ${if(u.rawFragment==null) "—" else "#${u.rawFragment}"}\nOrigin: ${(if(u.scheme!=null) "${u.scheme}://" else "")}${u.rawAuthority ?: ""}";"url-origin" -> "${u.scheme}://${u.rawAuthority}";"url-path-analyzer" -> "Path: $path\nSegments: ${path.split("/").filter{it.isNotEmpty()}.size}\nLast segment: ${path.split("/").filter{it.isNotEmpty()}.lastOrNull() ?: "—"}"; else -> if(query.isBlank()) "No query parameters." else query.split("&").filter{it.isNotBlank()}.joinToString("\n") { val p=it.split("=",limit=2); "${decodeURIComponent(p[0].replace("+", "%20"))} = ${if(p.size>1) decodeURIComponent(p[1].replace("+", "%20")) else ""}" }}
             }
             "url-query-builder" -> { val u=URI(opts["url"] ?: input.ifBlank { "https://example.com/search" }); val name=opts["name"] ?: "q"; val value=opts["value"] ?: ""; val existing=u.rawQuery?.let{ "$it&" } ?: ""; "${u.scheme}://${u.rawAuthority}${u.rawPath}?${existing}${encodeURIComponent(name)}=${encodeURIComponent(value)}${if(u.rawFragment!=null) "#${u.rawFragment}" else ""}" }
             "url-encode" -> encodeURIComponent(opts["text"] ?: input)
@@ -364,21 +413,7 @@ object NativeUtilityEngine {
         return sb.toString()
     }
 
-    private fun decodeURIComponent(input: String): String {
-        val out = java.io.ByteArrayOutputStream()
-        var i = 0
-        while (i < input.length) {
-            val c = input[i]
-            if (c == '%' && i + 2 < input.length) {
-                out.write(input.substring(i + 1, i + 3).toInt(16))
-                i += 3
-            } else {
-                out.write(c.code)
-                i++
-            }
-        }
-        return out.toByteArray().toString(StandardCharsets.UTF_8)
-    }
+    private fun decodeURIComponent(input: String): String = NativeCodecEngine.run("url-decoder", input).output
 
     private fun esc(s: String): String = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
@@ -394,8 +429,7 @@ object NativeUtilityEngine {
         val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
         val flags = opts["flags"] ?: "g"
         fun b64UrlDecode(value: String): String {
-            val normalized = value.replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
-            return String(Base64.decode(normalized, Base64.DEFAULT), StandardCharsets.UTF_8)
+            return decodeBase64Text(value, urlSafe = true)
         }
         fun parseJson(raw: String): Any {
             StrictJsonValidator(raw).validate()
@@ -416,9 +450,9 @@ object NativeUtilityEngine {
         fun uuidValid(raw: String): String = developerUuidValidation(raw)
         fun uuid(): String = UUID.randomUUID().toString()
         fun decode(kind: String, raw: String): String = when(kind) {
-            "base64" -> String(java.util.Base64.getDecoder().decode(raw.replace(Regex("\\s"), "")), StandardCharsets.UTF_8)
-            "base64url" -> String(java.util.Base64.getUrlDecoder().decode(raw.trim().replace(Regex("\\s"), "")), StandardCharsets.UTF_8)
-            "uri" -> URLDecoder.decode(raw.replace("+", "%20"), StandardCharsets.UTF_8.name())
+            "base64" -> decodeBase64Text(raw)
+            "base64url" -> decodeBase64Text(raw, urlSafe = true)
+            "uri" -> decodeURIComponent(raw)
             "unicode" -> raw.replace(Regex("\\u([0-9a-fA-F]{4})")) { it.groupValues[1].toInt(16).toChar().toString() }
             "html" -> raw.replace("&lt;","<").replace("&gt;",">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
             else -> raw
@@ -845,8 +879,7 @@ object NativeUtilityEngine {
         val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
         val flags = opts["flags"] ?: "g"
         fun b64UrlDecode(value: String): String {
-            val normalized = value.replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
-            return String(Base64.decode(normalized, Base64.DEFAULT), StandardCharsets.UTF_8)
+            return decodeBase64Text(value, urlSafe = true)
         }
         val base = lower.removePrefix("developer-").substringBefore('-')
         val suffix = Regex("(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare)$").find(lower)?.groupValues?.get(1) ?: ""
@@ -984,8 +1017,8 @@ object NativeUtilityEngine {
             return result.toString(2)
         }
         fun decode(kind: String, raw: String): String = when (kind) {
-            "base64" -> String(Base64.decode(raw.replace(Regex("\\s"), ""), Base64.DEFAULT), StandardCharsets.UTF_8)
-            "uri" -> URLDecoder.decode(raw.replace("+", "%20"), StandardCharsets.UTF_8.name())
+            "base64" -> decodeBase64Text(raw)
+            "uri" -> decodeURIComponent(raw)
             "unicode" -> raw.replace(Regex("\\\\u([0-9a-fA-F]{4})")) { it.groupValues[1].toInt(16).toChar().toString() }
             "html" -> raw.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
             else -> raw
@@ -1173,11 +1206,16 @@ object NativeUtilityEngine {
         return when {
             lower.contains("file-hash") -> throw IllegalArgumentException("Choose a local file in the native file-hash picker; text input is not a substitute for file bytes.")
             lower.contains("hash-compare") || lower.contains("hash-diff") -> {
-                val left = input.trim().lowercase(Locale.US).replace(Regex("\\s+"), "")
-                val right = secondary.trim().lowercase(Locale.US).replace(Regex("\\s+"), "")
-                require(left.isNotEmpty() && right.isNotEmpty()) { "Enter both hash values to compare." }
-                val equal = left.length == right.length && left.indices.fold(0) { acc, i -> acc or (left[i].code xor right[i].code) } == 0
-                JSONObject().put("equal",equal).put("leftLength",left.length).put("rightLength",right.length).put("note","Comparison normalizes case and whitespace; it does not verify a signature.").toString(2)
+                val rawLeft = input.trim().replace(Regex("\\s+"), "")
+                val rawRight = secondary.trim().replace(Regex("\\s+"), "")
+                require(rawLeft.isNotEmpty() && rawRight.isNotEmpty()) { "Enter both hash values to compare." }
+                val digestLengths = setOf(32, 40, 48, 64, 96, 128)
+                fun isHexDigest(value: String) = value.length in digestLengths && value.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }
+                val normalizeHex = isHexDigest(rawLeft) && isHexDigest(rawRight)
+                val left = if (normalizeHex) rawLeft.lowercase(Locale.US) else rawLeft
+                val right = if (normalizeHex) rawRight.lowercase(Locale.US) else rawRight
+                val equal = left == right
+                JSONObject().put("equal",equal).put("leftLength",left.length).put("rightLength",right.length).put("comparison",if(normalizeHex) "hex-digest-case-insensitive" else "exact-string").put("note","Display comparison only; not a timing-safe authentication primitive or signature verification.").toString(2)
             }
             lower.contains("hash") || lower.contains("md5") || lower.contains("sha1") || lower.contains("sha-1") || lower.contains("sha256") || lower.contains("sha-256") || lower.contains("sha512") || lower.contains("sha-512") || lower.contains("sha384") || lower.contains("sha-384") -> developerHashBytes(op,input.toByteArray(StandardCharsets.UTF_8))
             lower.contains("data-uri") -> {
@@ -1186,8 +1224,8 @@ object NativeUtilityEngine {
                     require(input.startsWith("data:") && comma >= 0) { "Enter a valid data URI containing a comma separator." }
                     val metadata = input.substring(0, comma)
                     val payload = input.substring(comma + 1)
-                    if (metadata.endsWith(";base64", true)) String(Base64.decode(payload, Base64.DEFAULT), StandardCharsets.UTF_8)
-                    else java.net.URLDecoder.decode(payload.replace("+", "%2B"), StandardCharsets.UTF_8.name())
+                    if (metadata.endsWith(";base64", true)) decodeBase64Text(payload)
+                    else decodeURIComponent(payload)
                 } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
             }
             lower.contains("unix-timestamp") || lower.contains("timestamp-converter") || lower.contains("epoch-converter") -> developerTimestamp(input)

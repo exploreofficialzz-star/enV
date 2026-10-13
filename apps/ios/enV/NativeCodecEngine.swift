@@ -10,6 +10,7 @@ public struct NativeCodecResult: Equatable {
 public enum NativeCodecError: LocalizedError, Equatable {
     case unknownCodec(String)
     case invalidBase64
+    case invalidUTF8Text
     case invalidURL
     case invalidHTML
     case missingValue
@@ -21,6 +22,7 @@ public enum NativeCodecError: LocalizedError, Equatable {
         switch self {
         case .unknownCodec(let id): return "Unknown codec: \(id)"
         case .invalidBase64: return "Invalid Base64"
+        case .invalidUTF8Text: return "Decoded bytes are not valid UTF-8 text"
         case .invalidURL: return "Invalid URL encoding"
         case .invalidHTML: return "Invalid HTML entity"
         case .missingValue: return "Missing value"
@@ -44,6 +46,7 @@ public enum NativeCodecEngine {
         "md5-hash": "md5",
         "sha1-hash": "sha1",
         "sha256-hash": "sha256",
+        "sha384-hash": "sha384",
         "sha512-hash": "sha512",
         "unicode-converter": "unicode",
         "url-decoder": "url-decode",
@@ -73,17 +76,19 @@ public enum NativeCodecEngine {
         case "md5": output = digestMD5(input)
         case "sha1": output = digestSHA1(input)
         case "sha256": output = digestSHA256(input)
+        case "sha384": output = digestSHA384(input)
         case "sha512": output = digestSHA512(input)
         case "multi-hash": output = [
             "MD5\t\(digestMD5(input))",
             "SHA-1\t\(digestSHA1(input))",
             "SHA-256\t\(digestSHA256(input))",
+            "SHA-384\t\(digestSHA384(input))",
             "SHA-512\t\(digestSHA512(input))"
         ].joined(separator: "\n")
         case "hash-compare":
-            let a = (options["a"] ?? input).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let b = (options["b"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            output = timingSafeEqual(a, b) ? "match" : "different"
+            let a = (options["a"] ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
+            let b = (options["b"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            output = digestsEqualForDisplay(a, b) ? "match" : "different"
         case "base-convert": output = try baseConvert(input, options)
         default: throw NativeCodecError.unknownCodec(operation)
         }
@@ -93,6 +98,7 @@ public enum NativeCodecEngine {
     private static func digestMD5(_ input: String) -> String { Insecure.MD5.hash(data: Data(input.utf8)).hexString }
     private static func digestSHA1(_ input: String) -> String { Insecure.SHA1.hash(data: Data(input.utf8)).hexString }
     private static func digestSHA256(_ input: String) -> String { SHA256.hash(data: Data(input.utf8)).hexString }
+    private static func digestSHA384(_ input: String) -> String { SHA384.hash(data: Data(input.utf8)).hexString }
     private static func digestSHA512(_ input: String) -> String { SHA512.hash(data: Data(input.utf8)).hexString }
 
     private static func htmlEncode(_ input: String) -> String {
@@ -107,7 +113,8 @@ public enum NativeCodecEngine {
         var value = input
         value = value.replacingOccurrences(of: "&lt;", with: "<", options: [.caseInsensitive])
         value = value.replacingOccurrences(of: "&gt;", with: ">", options: [.caseInsensitive])
-        // The web implementation intentionally does not decode &quot; here.
+        value = value.replacingOccurrences(of: "&quot;", with: "\"", options: [.caseInsensitive])
+        value = value.replacingOccurrences(of: "&apos;", with: "'", options: [.caseInsensitive])
         value = value.replacingOccurrences(of: "&#39;|'{1}", with: "'", options: [.regularExpression, .caseInsensitive])
         value = try replaceMatches(value, pattern: "&#([0-9]+);", transform: { match in
             guard let n = Int(match), let scalar = UnicodeScalar(n), n <= 0x10ffff else { throw NativeCodecError.invalidHTML }
@@ -140,7 +147,8 @@ public enum NativeCodecEngine {
     }
 
     private static func decodeURL(_ input: String) throws -> String {
-        let value = input.replacingOccurrences(of: "+", with: "%20")
+        // URI-component decoding keeps '+' literal. Form/query parsers handle '+' as space.
+        let value = input
         var output = ""
         var index = value.startIndex
         while index < value.endIndex {
@@ -167,15 +175,24 @@ public enum NativeCodecEngine {
     private static func decodeBase64(_ input: String) throws -> String {
         let cleaned = input.replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
         let valid = cleaned.range(of: "^[A-Za-z0-9+/]*={0,2}$", options: .regularExpression) != nil && cleaned.count % 4 != 1
-        guard valid, let data = Data(base64Encoded: cleaned) ?? Data(base64Encoded: cleaned + String(repeating: "=", count: (4 - cleaned.count % 4) % 4)) else { throw NativeCodecError.invalidBase64 }
-        return String(decoding: data, as: UTF8.self)
+        guard valid else { throw NativeCodecError.invalidBase64 }
+        let body = String(cleaned.prefix { $0 != "=" })
+        let suppliedPadding = cleaned.count - body.count
+        let expectedPadding = (4 - body.count % 4) % 4
+        guard suppliedPadding == 0 || (cleaned.count % 4 == 0 && suppliedPadding == expectedPadding) else { throw NativeCodecError.invalidBase64 }
+        guard let data = Data(base64Encoded: body + String(repeating: "=", count: expectedPadding)), data.base64EncodedString().replacingOccurrences(of: "=+$", with: "", options: .regularExpression) == body else { throw NativeCodecError.invalidBase64 }
+        guard let decoded = String(data: data, encoding: .utf8) else { throw NativeCodecError.invalidUTF8Text }
+        return decoded
     }
 
-    private static func timingSafeEqual(_ a: String, _ b: String) -> Bool {
-        let left = Array(a.utf16), right = Array(b.utf16), count = max(left.count, right.count)
-        var difference = left.count == right.count ? 0 : 1
-        for i in 0..<count { difference |= Int(left[safe: i] ?? 0) ^ Int(right[safe: i] ?? 0) }
-        return difference == 0
+    private static func digestsEqualForDisplay(_ a: String, _ b: String) -> Bool {
+        // This is not a constant-time authentication primitive. Compare text precisely,
+        // except that common hexadecimal digest lengths are case-insensitive.
+        let digestLengths: Set<Int> = [32, 40, 48, 64, 96, 128]
+        func isHexDigest(_ value: String) -> Bool {
+            digestLengths.contains(value.count) && value.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) }
+        }
+        return isHexDigest(a) && isHexDigest(b) ? a.caseInsensitiveCompare(b) == .orderedSame : a == b
     }
 
     private static func baseConvert(_ input: String, _ options: [String: String]) throws -> String {

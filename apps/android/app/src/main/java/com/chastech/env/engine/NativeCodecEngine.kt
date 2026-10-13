@@ -24,6 +24,7 @@ object NativeCodecEngine {
         "md5-hash" to "md5",
         "sha1-hash" to "sha1",
         "sha256-hash" to "sha256",
+        "sha384-hash" to "sha384",
         "sha512-hash" to "sha512",
         "unicode-converter" to "unicode",
         "url-decoder" to "url-decode",
@@ -52,17 +53,19 @@ object NativeCodecEngine {
             "md5" -> digest("MD5", input)
             "sha1" -> digest("SHA-1", input)
             "sha256" -> digest("SHA-256", input)
+            "sha384" -> digest("SHA-384", input)
             "sha512" -> digest("SHA-512", input)
             "multi-hash" -> listOf(
                 "MD5\t${digest("MD5", input)}",
                 "SHA-1\t${digest("SHA-1", input)}",
                 "SHA-256\t${digest("SHA-256", input)}",
+                "SHA-384\t${digest("SHA-384", input)}",
                 "SHA-512\t${digest("SHA-512", input)}"
             ).joinToString("\n")
             "hash-compare" -> {
-                val a = (options["a"] ?: input).trim().lowercase(Locale.ROOT)
-                val b = (options["b"] ?: "").trim().lowercase(Locale.ROOT)
-                if (timingSafeEqual(a, b)) "match" else "different"
+                val a = (options["a"] ?: input).trim()
+                val b = (options["b"] ?: "").trim()
+                if (digestsEqualForDisplay(a, b)) "match" else "different"
             }
             "base-convert" -> baseConvert(input, options)
             else -> throw IllegalArgumentException("Unknown codec: $operation")
@@ -84,7 +87,8 @@ object NativeCodecEngine {
         var value = input
             .replace(Regex("&lt;", RegexOption.IGNORE_CASE), "<")
             .replace(Regex("&gt;", RegexOption.IGNORE_CASE), ">")
-            // The web implementation intentionally does not decode &quot; here.
+            .replace(Regex("&quot;", RegexOption.IGNORE_CASE), "\"")
+            .replace(Regex("&apos;", RegexOption.IGNORE_CASE), "'")
             .replace(Regex("&#39;|'", setOf(RegexOption.IGNORE_CASE)), "'")
         value = Regex("&#(\\d+);").replace(value) { match -> codePoint(match.groupValues[1].toLongOrNull(10)) }
         value = Regex("&#x([0-9a-f]+);", RegexOption.IGNORE_CASE).replace(value) { match -> codePoint(match.groupValues[1].toLongOrNull(16)) }
@@ -132,7 +136,9 @@ object NativeCodecEngine {
     }
 
     private fun decodeUrl(input: String): String {
-        val value = input.replace("+", "%20")
+        // This is URI-component decoding: '+' is literal data. Form/query parsing
+        // has a separate contract where '+' represents a space.
+        val value = input
         val out = StringBuilder()
         var i = 0
         while (i < value.length) {
@@ -163,21 +169,30 @@ object NativeCodecEngine {
 
     private fun decodeBase64(input: String): String {
         val cleaned = input.replace(Regex("\\s+"), "")
-        require(cleaned.matches(Regex("[A-Za-z0-9+/]*={0,2}")) && cleaned.length % 4 != 1) { "Invalid Base64" }
+        require(cleaned.matches(Regex("[A-Za-z0-9+/]*={0,2}")) && cleaned.length % 4 != 1) { "Invalid Base64: check the alphabet, padding, and length." }
+        val body = cleaned.trimEnd('=')
+        val suppliedPadding = cleaned.length - body.length
+        val expectedPadding = (4 - body.length % 4) % 4
+        require(suppliedPadding == 0 || (cleaned.length % 4 == 0 && suppliedPadding == expectedPadding)) { "Invalid Base64: padding is not canonical." }
+        val bytes = try {
+            Base64.getDecoder().decode(body + "=".repeat(expectedPadding))
+        } catch (_: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid Base64: alphabet or encoded length is invalid.")
+        }
+        require(Base64.getEncoder().withoutPadding().encodeToString(bytes) == body) { "Invalid Base64: non-canonical padding bits." }
         return try {
-            val bytes = Base64.getDecoder().decode(cleaned)
-            val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE)
+            val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
             decoder.decode(ByteBuffer.wrap(bytes)).toString()
-        } catch (_: Exception) {
-            throw IllegalArgumentException("Invalid Base64")
+        } catch (_: java.nio.charset.CharacterCodingException) {
+            throw IllegalArgumentException("Decoded Base64 bytes are not valid UTF-8 text.")
         }
     }
 
-    private fun timingSafeEqual(a: String, b: String): Boolean {
-        val max = maxOf(a.length, b.length)
-        var diff = if (a.length == b.length) 0 else 1
-        for (i in 0 until max) diff = diff or ((a.getOrNull(i)?.code ?: 0) xor (b.getOrNull(i)?.code ?: 0))
-        return diff == 0
+    private fun digestsEqualForDisplay(a: String, b: String): Boolean {
+        // Do not call this timing-safe: this is display comparison, not an auth primitive.
+        val digestLengths = setOf(32, 40, 48, 64, 96, 128)
+        val isHex = { value: String -> value.length in digestLengths && value.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' } }
+        return if (isHex(a) && isHex(b)) a.equals(b, ignoreCase = true) else a == b
     }
 
     private fun baseConvert(input: String, options: Map<String, String>): String {

@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
 import { hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
+import { decodeData as decodeSharedData, encodeData as encodeSharedData } from "@/lib/engines/developer-utils";
 import type { ToolMeta } from "@/types/tool";
 import { getAllTools, toolPath } from "@/lib/registry";
 
@@ -121,28 +122,13 @@ function jsonToCsv(input: string): string {
   return csvString([keys, ...value.map((v) => keys.map((k) => typeof (v as any)?.[k] === "object" ? JSON.stringify((v as any)[k]) : String((v as any)?.[k] ?? "")))]);
 }
 
+// Legacy/fallback routes delegate to the same strict shared codec helpers used by direct utility pages.
 function decodeData(input: string, kind: string): string {
-  if (kind === "base64") return new TextDecoder().decode(Uint8Array.from(atob(input.replace(/\s+/g, "")), (c) => c.charCodeAt(0)));
-  if (kind === "uri") return decodeURIComponent(input.replace(/\+/g, "%20"));
-  if (kind === "unicode") return input.replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-  if (kind === "html") return input.replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&amp;/gi, "&");
-  return input;
+  return decodeSharedData(input, kind);
 }
 
 function encodeData(input: string, kind: string): string {
-  if (kind === "base64") { const bytes = new TextEncoder().encode(input); let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary); }
-  if (kind === "uri") return encodeURIComponent(input);
-  if (kind === "unicode") return Array.from(input).flatMap((character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
-    if (codePoint <= 0xffff) return [`\\u${codePoint.toString(16).padStart(4, "0")}`];
-    const scalar = codePoint - 0x10000;
-    return [
-      `\\u${(0xd800 + (scalar >> 10)).toString(16).padStart(4, "0")}`,
-      `\\u${(0xdc00 + (scalar & 0x3ff)).toString(16).padStart(4, "0")}`,
-    ];
-  }).join("");
-  if (kind === "html") return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  return input;
+  return encodeSharedData(input, kind);
 }
 
 function uuidValid(input: string): string {

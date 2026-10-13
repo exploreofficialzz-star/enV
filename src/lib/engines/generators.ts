@@ -107,8 +107,14 @@ export function runGenerator(op: string, opts: Record<string, string>): string {
       return token(num(opts, "length", 16));
     case "random-hex":
       return hex(num(opts, "length", 16));
-    case "secure-token":
-      return token(num(opts, "length", 32));
+    case "secure-token": {
+      // Reject invalid requested entropy lengths instead of silently substituting a default.
+      const requested = opts.length === undefined || opts.length.trim() === "" ? 32 : Number(opts.length);
+      if (!Number.isInteger(requested) || requested < 1 || requested > 500) {
+        throw new Error("Secure token length must be an integer from 1 through 500 characters.");
+      }
+      return token(requested);
+    }
     case "random-number": {
       const min = Number(opts.min ?? 1);
       const max = Number(opts.max ?? 100);

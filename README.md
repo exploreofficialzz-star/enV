@@ -135,3 +135,7 @@ Security boundaries include:
 - no arbitrary downloader command input from clients
 
 The corresponding catalog downloader tools remain Coming Soon until a deployment has a real `yt-dlp` runtime and the provider operation has been validated end-to-end.
+
+## Developer category audit & competitive research
+
+The Developer category's source audit, implementation changelog, and research-to-fix evidence maps are maintained under `audit/`. The latest research pass is [Deep Research & Enhancement Round 3](audit/DEEP-RESEARCH-ENHANCEMENT-ROUND3-2026-10-13.md); the broader competitor review is [Competitive Research & Implementation Review](audit/COMPETITIVE-RESEARCH-AND-IMPLEMENTATION-REVIEW-2026-10-13.md). The focused Web engine tests and route/catalog-preservation checks are reproducible via `npm run check:developer`, `npm run check:developer-routes`, and the Node test command documented in the latest audit. Build blockers and the distinction between source checks and actual Android/iOS builds are explicitly recorded there.

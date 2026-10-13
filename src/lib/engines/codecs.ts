@@ -1,6 +1,6 @@
 import { md5 } from "../md5.ts";
 
-export type HashAlgo = "SHA-1" | "SHA-256" | "SHA-512";
+export type HashAlgo = "SHA-1" | "SHA-256" | "SHA-384" | "SHA-512";
 
 function bytesToHex(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -39,7 +39,8 @@ function htmlDecode(input: string): string {
   return input
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
-    .replace(/"/gi, '"')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
     .replace(/&#39;|'/gi, "'")
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
@@ -74,13 +75,34 @@ function toHex(input: string): string {
 }
 
 function safeAtob(input: string): string {
+  // Accept canonical padded or unpadded RFC 4648 Base64, but never quietly
+  // discard bad characters or replace undecodable UTF-8 bytes with U+FFFD.
   const cleaned = input.replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned) || cleaned.length % 4 === 1) {
+    throw new Error("Invalid Base64: check the alphabet, padding, and length.");
+  }
+  const body = cleaned.replace(/=+$/, "");
+  const padding = cleaned.length - body.length;
+  const expectedPadding = (4 - (body.length % 4)) % 4;
+  if (padding > 0 && (cleaned.length % 4 !== 0 || padding !== expectedPadding)) {
+    throw new Error("Invalid Base64: padding is not canonical.");
+  }
+  let binary: string;
   try {
-    const binary = atob(cleaned);
-    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    binary = atob(body + "=".repeat(expectedPadding));
   } catch {
-    throw new Error("Invalid Base64");
+    throw new Error("Invalid Base64: alphabet or encoded length is invalid.");
+  }
+  // Keep syntax/canonicalization errors distinct from successfully decoded bytes
+  // that simply are not UTF-8 text. This makes malformed-input feedback actionable.
+  if (btoa(binary).replace(/=+$/, "") !== body) {
+    throw new Error("Invalid Base64: non-canonical trailing bits.");
+  }
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("Decoded Base64 bytes are not valid UTF-8 text.");
   }
 }
 
@@ -91,13 +113,12 @@ function safeBtoa(input: string): string {
   return btoa(binary);
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  const max = Math.max(a.length, b.length);
-  let diff = a.length === b.length ? 0 : 1;
-  for (let i = 0; i < max; i += 1) {
-    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  }
-  return diff === 0;
+function digestsEqualForDisplay(a: string, b: string): boolean {
+  // Hash comparison is a display utility, not a cryptographic authentication
+  // primitive. Normalize case only for same-length, even-sized hexadecimal
+  // digest strings; Base64 and arbitrary text must remain case-sensitive.
+  const isHexDigest = (value: string) => /^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{48}|[0-9a-f]{64}|[0-9a-f]{96}|[0-9a-f]{128})$/i.test(value);
+  return isHexDigest(a) && isHexDigest(b) ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 function baseConvert(input: string, opts?: Record<string, string>): string {
@@ -138,7 +159,7 @@ export async function runCodec(
       return encodeURIComponent(input);
     case "url-decode":
       try {
-        return decodeURIComponent(input.replace(/\+/g, "%20"));
+        return decodeURIComponent(input);
       } catch {
         throw new Error("Invalid URL encoding");
       }
@@ -160,25 +181,29 @@ export async function runCodec(
       return hashHex("SHA-1", input);
     case "sha256":
       return hashHex("SHA-256", input);
+    case "sha384":
+      return hashHex("SHA-384", input);
     case "sha512":
       return hashHex("SHA-512", input);
     case "multi-hash": {
-      const [sha1, sha256, sha512] = await Promise.all([
+      const [sha1, sha256, sha384, sha512] = await Promise.all([
         hashHex("SHA-1", input),
         hashHex("SHA-256", input),
+        hashHex("SHA-384", input),
         hashHex("SHA-512", input),
       ]);
       return [
         `MD5\t${md5(input)}`,
         `SHA-1\t${sha1}`,
         `SHA-256\t${sha256}`,
+        `SHA-384\t${sha384}`,
         `SHA-512\t${sha512}`,
       ].join("\n");
     }
     case "hash-compare": {
       const a = (opts?.a ?? input).trim();
       const b = (opts?.b ?? "").trim();
-      const match = timingSafeEqual(a.toLowerCase(), b.toLowerCase());
+      const match = digestsEqualForDisplay(a, b);
       return match ? "match" : "different";
     }
     case "base-convert":

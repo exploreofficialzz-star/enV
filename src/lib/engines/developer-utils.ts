@@ -1,14 +1,52 @@
+/** Decode text-oriented encodings strictly so malformed bytes never become replacement characters. */
 export function decodeData(input: string, kind: string): string {
   if (kind === "base64") {
     const compact = input.replace(/\s+/g, "");
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) throw new Error("Invalid Base64 input.");
-    return new TextDecoder().decode(Uint8Array.from(atob(compact), (c) => c.charCodeAt(0)));
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) throw new Error("Invalid Base64 input: unexpected character or padding.");
+    const firstPad = compact.indexOf("=");
+    const core = firstPad < 0 ? compact : compact.slice(0, firstPad);
+    const padding = firstPad < 0 ? 0 : compact.length - firstPad;
+    if (core.length % 4 === 1 || (padding > 0 && (compact.length % 4 !== 0 || (padding === 1 && core.length % 4 !== 3) || (padding === 2 && core.length % 4 !== 2)))) {
+      throw new Error("Invalid Base64 input: malformed length or padding.");
+    }
+    const normalized = core + "=".repeat((4 - (core.length % 4)) % 4);
+    let bytes: Uint8Array;
+    try { bytes = Uint8Array.from(atob(normalized), (c) => c.charCodeAt(0)); }
+    catch { throw new Error("Invalid Base64 input."); }
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    if (btoa(binary).replace(/=+$/, "") !== core) throw new Error("Invalid Base64 input: non-canonical trailing bits.");
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+    catch { throw new Error("Base64 decoded to bytes that are not valid UTF-8 text."); }
   }
-  if (kind === "uri") return decodeURIComponent(input.replace(/\+/g, "%20"));
-  if (kind === "unicode") return input.replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-  if (kind === "html") return input
-    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&amp;/gi, "&");
+  // URI-component semantics preserve literal '+'. Query/form parsing has a separate decoder.
+  if (kind === "uri") return decodeURIComponent(input);
+  if (kind === "unicode") {
+    const decoded = input.replace(/\\u([0-9a-f]{4})/gi, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
+    for (let i = 0; i < decoded.length; i++) {
+      const unit = decoded.charCodeAt(i);
+      if (unit >= 0xd800 && unit <= 0xdbff) {
+        const next = decoded.charCodeAt(i + 1);
+        if (!(next >= 0xdc00 && next <= 0xdfff)) throw new Error("Unicode escape contains an unpaired high surrogate.");
+        i++;
+      } else if (unit >= 0xdc00 && unit <= 0xdfff) throw new Error("Unicode escape contains an unpaired low surrogate.");
+    }
+    return decoded;
+  }
+  if (kind === "html") {
+    // Decode ampersands last so &amp;lt; becomes &lt;, not '<', in a single pass.
+    let decoded = input.replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&apos;|&#39;/gi, "'");
+    decoded = decoded.replace(/&#(\d+);/g, (_, digits: string) => {
+      const point = Number(digits);
+      if (!Number.isInteger(point) || point < 0 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) throw new Error("Invalid numeric HTML entity.");
+      return String.fromCodePoint(point);
+    }).replace(/&#x([0-9a-f]+);/gi, (_, digits: string) => {
+      const point = Number.parseInt(digits, 16);
+      if (!Number.isInteger(point) || point < 0 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) throw new Error("Invalid numeric HTML entity.");
+      return String.fromCodePoint(point);
+    });
+    return decoded.replace(/&amp;/gi, "&");
+  }
   return input;
 }
 
@@ -27,7 +65,9 @@ export function encodeData(input: string, kind: string): string {
 
 export function uuidValid(input: string): string {
   const value = input.trim();
-  const m = value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  if (/^00000000-0000-0000-0000-000000000000$/i.test(value)) return "Valid Nil UUID";
+  if (/^ffffffff-ffff-ffff-ffff-ffffffffffff$/i.test(value)) return "Valid Max UUID";
+  const m = value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-([1-8])[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   return m ? `Valid UUID v${m[1]}` : "Invalid UUID";
 }
 

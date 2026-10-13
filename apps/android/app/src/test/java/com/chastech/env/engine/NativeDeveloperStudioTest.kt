@@ -122,4 +122,17 @@ class NativeDeveloperStudioTest {
         assertEquals("issued-in-the-future", report.getJSONObject("claims").getJSONObject("iat").getString("status"))
     }
 
+    @Test fun strictCodecAndHashComparisonSemanticsMatchWebContract() {
+        assertEquals("a+b+c", run("url-decoder", "a+b%2Bc"))
+        assertEquals("M", run("base64-decoder", "TQ"))
+        for (bad in listOf("/w==", "Zh==", "TQ=")) {
+            assertTrue("Expected strict Base64 rejection for $bad", runCatching { run("base64-decoder", bad) }.isFailure)
+        }
+        val hex = JSONObject(run("hash-compare", "5D41402ABC4B2A76B9719D911017C592", "5d41402abc4b2a76b9719d911017c592"))
+        assertTrue(hex.getBoolean("equal"))
+        assertEquals("hex-digest-case-insensitive", hex.getString("comparison"))
+        val b64 = JSONObject(run("hash-compare", "AbCd+/==", "abcd+/=="))
+        assertFalse(b64.getBoolean("equal"))
+        assertEquals("exact-string", b64.getString("comparison"))
+    }
 }

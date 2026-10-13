@@ -8,7 +8,7 @@ class NativeCodecEngineTest {
     private val allIds = setOf(
         "ascii-converter", "base64-decoder", "base64-encoder", "binary-converter", "hash-compare",
         "hex-converter", "html-decoder", "html-encoder", "md5-hash", "sha1-hash", "sha256-hash",
-        "sha512-hash", "unicode-converter", "url-decoder", "url-encoder", "hash-generator", "number-base-converter"
+        "sha384-hash", "sha512-hash", "unicode-converter", "url-decoder", "url-encoder", "hash-generator", "number-base-converter"
     )
 
     @Test
@@ -23,7 +23,7 @@ class NativeCodecEngineTest {
         assertEquals("SGVsbG8g8J+MjQ==", NativeCodecEngine.run("base64-encoder", "Hello 🌍").output)
         assertEquals("Hello 🌍", NativeCodecEngine.run("base64-decoder", "SGVsbG8g8J+MjQ==").output)
         assertEquals("a%20b%3Ac!~*'()", NativeCodecEngine.run("url-encoder", "a b:c!~*'()").output)
-        assertEquals("a b+c", NativeCodecEngine.run("url-decoder", "a+b%2Bc").output)
+        assertEquals("a+b+c", NativeCodecEngine.run("url-decoder", "a+b%2Bc").output)
         assertEquals("&lt;x a=&#39;y&#39;&gt;&amp;quot;", NativeCodecEngine.run("html-encoder", "<x a='y'>&quot;").output)
         assertEquals("<x a='y'>&quot; & <", NativeCodecEngine.run("html-decoder", "&lt;x a=&#39;y&#39;&gt;&amp;quot; &#x26; &#60;").output)
     }
@@ -36,8 +36,12 @@ class NativeCodecEngineTest {
         assertEquals("41f09f8c8d", NativeCodecEngine.run("hex-converter", "A🌍").output)
         assertEquals("900150983cd24fb0d6963f7d28e17f72", NativeCodecEngine.run("md5-hash", "abc").output)
         assertEquals("a9993e364706816aba3e25717850c26c9cd0d89d", NativeCodecEngine.run("sha1-hash", "abc").output)
-        assertEquals("match", NativeCodecEngine.run("hash-compare", options = mapOf("a" to " ABC ", "b" to "abc")).output)
+        assertEquals("cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7", NativeCodecEngine.run("sha384-hash", "abc").output)
+        assertEquals("match", NativeCodecEngine.run("hash-compare", options = mapOf("a" to "900150983CD24FB0D6963F7D28E17F72", "b" to "900150983cd24fb0d6963f7d28e17f72")).output)
         assertEquals("different", NativeCodecEngine.run("hash-compare", options = mapOf("a" to "abc", "b" to "abd")).output)
+        assertEquals("different", NativeCodecEngine.run("hash-compare", options = mapOf("a" to "AbCd", "b" to "abcd")).output)
+        assertEquals("QWxwaGE=", NativeCodecEngine.run("base64-encoder", "Alpha").output)
+        assertTrue(NativeCodecEngine.run("hash-generator", "abc").output.contains("SHA-384\tcb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"))
     }
 
     @Test
@@ -52,6 +56,16 @@ class NativeCodecEngineTest {
         try {
             NativeCodecEngine.run("base64-decoder", "%%%")
             throw AssertionError("invalid Base64 accepted")
-        } catch (error: IllegalArgumentException) { assertEquals("Invalid Base64", error.message) }
+        } catch (error: IllegalArgumentException) { assertTrue(error.message.orEmpty().contains("Invalid Base64")) }
+        for (bad in listOf("/w==", "Zh==", "TQ=")) {
+            try { NativeCodecEngine.run("base64-decoder", bad); throw AssertionError("invalid Base64 accepted: $bad") }
+            catch (error: IllegalArgumentException) { assertTrue(error.message.orEmpty().contains("Base64")) }
+        }
+        assertEquals("M", NativeCodecEngine.run("base64-decoder", "TQ").output)
+        try {
+            NativeCodecEngine.run("base64-decoder", "/w==")
+            throw AssertionError("invalid UTF-8 accepted")
+        } catch (error: IllegalArgumentException) { assertTrue(error.message.orEmpty().contains("UTF-8")) }
+        assertEquals("\"quoted' &quot; 🌍", NativeCodecEngine.run("html-decoder", "&quot;quoted&apos; &amp;quot; &#x1F30D;").output)
     }
 }

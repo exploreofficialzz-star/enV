@@ -128,4 +128,33 @@ final class NativeDeveloperStudioTests: XCTestCase {
         XCTAssertEqual((claims["iat"] as? [String: Any])?["status"] as? String, "issued-in-the-future")
     }
 
+    func testStrictCodecAndHashComparisonSemanticsMatchWebContract() throws {
+        XCTAssertEqual(try run("url-decoder", "a+b%2Bc"), "a+b+c")
+        XCTAssertEqual(try run("base64-decoder", "TQ"), "M")
+        for bad in ["/w==", "Zh==", "TQ="] {
+            XCTAssertThrowsError(try run("base64-decoder", bad), "Expected strict Base64 rejection for \(bad)")
+        }
+        let hexRaw = try run("hash-compare", "5D41402ABC4B2A76B9719D911017C592", secondary: "5d41402abc4b2a76b9719d911017c592")
+        let hex = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(hexRaw.utf8)) as? [String: Any])
+        XCTAssertEqual(hex["equal"] as? Bool, true)
+        XCTAssertEqual(hex["comparison"] as? String, "hex-digest-case-insensitive")
+        let base64Raw = try run("hash-compare", "AbCd+/==", secondary: "abcd+/==")
+        let base64 = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(base64Raw.utf8)) as? [String: Any])
+        XCTAssertEqual(base64["equal"] as? Bool, false)
+        XCTAssertEqual(base64["comparison"] as? String, "exact-string")
+    }
+
+    func testSecureTokenGeneratorUsesBoundedUrlSafeOutput() throws {
+        let secureTool = Tool(id: "secure-token", name: "secure-token", slug: "secure-token", description: "", category: "utilities", subcategory: nil,
+                              keywords: [], tags: [], icon: "Code", popularity: 0, featured: false, clientSide: true,
+                              requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [],
+                              engine: ToolEngine(type: "generator", id: "secure-token", op: "secure-token"))
+        let output = try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":64}").text
+        XCTAssertEqual(output.count, 64)
+        XCTAssertTrue(output.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") })
+        XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":0}"))
+        XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":5000}"))
+        XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":1.5}"))
+        XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":\"oops\"}"))
+    }
 }

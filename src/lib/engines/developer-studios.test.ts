@@ -200,3 +200,19 @@ test("Regex Studio bounds batch input and skips long samples for high-risk patte
   assert.equal(report.results[1].executionSkipped, false);
   assert.match(report.performanceRisk, /skipped/i);
 });
+
+
+test("hash compare treats hexadecimal digests case-insensitively but preserves Base64 case", async () => {
+  const hex = JSON.parse((await runDeveloperStudio("hash-compare", "5D41402ABC4B2A76B9719D911017C592", "5d41402abc4b2a76b9719d911017c592"))!);
+  assert.equal(hex.equal, true);
+  assert.equal(hex.comparison, "hex-digest-case-insensitive");
+  const b64 = JSON.parse((await runDeveloperStudio("hash-compare", "AbCd+/==", "abcd+/=="))!);
+  assert.equal(b64.equal, false);
+  assert.equal(b64.comparison, "exact-string");
+});
+
+test("URL component decoder keeps plus literal while form-query parser maps plus to space", async () => {
+  assert.equal(await runDeveloperStudio("url-decoder", "a+b%2Bc"), "a+b+c");
+  const report = JSON.parse((await runDeveloperStudio("query-string-parser", "q=a+b%2Bc"))!);
+  assert.equal(report.entries[0].value, "a b+c");
+});

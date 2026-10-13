@@ -118,3 +118,17 @@ The route-level smoke result is stored at `audit/developer-route-smoke-results.j
 ## Honest status
 
 This package contains substantial in-place implementations and regression coverage across all three source platforms, and the measured Web Developer route smoke and catalog-preservation checks pass. It should **not** be interpreted as proof that every one of the 474 tools matches or exceeds specialist competitors, that every suffix uses a complete standards-grade parser, or that Android/iOS binaries have built successfully. Remaining work is identified by the checks above rather than hidden behind an “all green” claim.
+
+## Deep research hardening refresh — 13 October 2026 (latest pass)
+
+- Focused Web engine command (`node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/codecs.test.ts src/lib/engines/developer-studios.test.ts src/lib/engines/developer-utils.test.ts src/lib/engines/generators.test.ts`) — **39/39 passed** after separating invalid Base64 syntax, non-canonical pad bits, and invalid UTF-8 diagnostics.
+- `node scripts/check-developer.mjs` — passed; 474 Developer entries remain active with unique IDs/slugs and original slug order/engine routing unchanged.
+- `npm run check:developer-routes` — passed; 446 Web operations, failures=0, generic placeholders=0, expected domain errors=1.
+- `kotlinc apps/android/app/src/main/java/com/chastech/env/engine/NativeCodecEngine.kt -d /tmp/env-audit-check/native-codec.jar` — passed standalone compilation of the pure Kotlin codec engine, including direct SHA-384 mapping. This is not a full Android build.
+- `swiftc -parse apps/ios/enV/NativeCodecEngine.swift apps/ios/enV/NativeUtilityEngine.swift apps/ios/enVTests/NativeCodecEngineTests.swift apps/ios/enVTests/NativeDeveloperStudioTests.swift` — passed Swift syntax parsing only; not a full Xcode typecheck/build.
+- Native tests added for direct SHA-384 vectors, distinct invalid UTF-8 handling, and rejection of fractional/nonnumeric secure-token lengths. The Android Gradle/JUnit and iOS/XCTest suites remain authored but not executable in this environment due to unavailable Gradle download/Xcode toolchain.
+- Updated research and evidence-to-fix mapping: `audit/DEEP-RESEARCH-ENHANCEMENT-ROUND3-2026-10-13.md`.
+
+## Research status and claim boundary
+
+Competitive findings are based on current official pages, release notes, public issue trackers and self-selected comments. They identify hypotheses and concrete test targets; they are not representative market-wide ratings or independent replication of every issue. enV should only claim comparative superiority after running common correctness/performance/privacy/device test fixtures and publishing the results.

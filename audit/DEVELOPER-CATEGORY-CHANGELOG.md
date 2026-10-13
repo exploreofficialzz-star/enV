@@ -22,3 +22,11 @@
 - Verification results, known environment blockers, and honest capability limitations are documented in `DEVELOPER-CATEGORY-AUDIT-2026-10-13.md`.
 
 Research evidence and feedback mapping: `audit/COMPETITIVE-RESEARCH-AND-IMPLEMENTATION-REVIEW-2026-10-13.md`.
+
+## Deep research & hardening pass — 13 October 2026
+- Added `audit/DEEP-RESEARCH-ENHANCEMENT-ROUND3-2026-10-13.md`, linking verified current documentation, selected current issue reports, maintainer release notes, security advisories, and user-community feedback to concrete fixes and open gaps.
+- Tightened `src/lib/engines/codecs.ts` Base64 error diagnostics so invalid alphabet/length, non-canonical trailing bits, and decoded invalid UTF-8 are not conflated.
+- Added direct SHA-384 tool-ID mapping and known-answer coverage in Kotlin and Swift codec engines; SHA-384 was already part of multi-hash output.
+- Added precise secure-token length parsing in Kotlin and Swift so fractional/nonnumeric lengths cannot be silently truncated or converted into the default length; cryptographic token output remains sourced from OS-backed secure RNGs.
+- Expanded native test fixtures to cover direct SHA-384, invalid Base64 UTF-8, fractional token lengths, and non-numeric token lengths.
+- Focused Web engine suite passes 39/39; 474 Developer catalog identity/route checks and 446 Web route smoke checks pass. Standalone Kotlin codec compilation and Swift syntax parsing passed. Full app builds remain blocked by unavailable dependencies/toolchains as recorded in the audit.

@@ -845,10 +845,15 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
   }
 
   if (lower.includes("hash-compare") || lower.includes("hash-diff")) {
-    const left = value.toLowerCase().replace(/\s/g, ""); const right = secondary.trim().toLowerCase().replace(/\s/g, "");
-    if (!left || !right) throw new Error("Enter both hash values to compare.");
+    const rawLeft = value.trim().replace(/\s/g, ""); const rawRight = secondary.trim().replace(/\s/g, "");
+    if (!rawLeft || !rawRight) throw new Error("Enter both hash values to compare.");
+    // Hexadecimal digests are conventionally case-insensitive. Base64 and arbitrary strings are not.
+    const hexDigestLengths = new Set([32, 40, 48, 64, 96, 128]);
+    const isHexDigest = (v: string) => hexDigestLengths.has(v.length) && /^[a-f0-9]+$/i.test(v);
+    const left = isHexDigest(rawLeft) && isHexDigest(rawRight) ? rawLeft.toLowerCase() : rawLeft;
+    const right = isHexDigest(rawLeft) && isHexDigest(rawRight) ? rawRight.toLowerCase() : rawRight;
     const equal = left.length === right.length && [...left].reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ right.charCodeAt(i)), 0) === 0;
-    return JSON.stringify({ equal, leftLength: left.length, rightLength: right.length, note: "String comparison is normalized and length-checked; this is not a cryptographic verification operation." }, null, 2);
+    return JSON.stringify({ equal, leftLength: left.length, rightLength: right.length, comparison: isHexDigest(rawLeft) && isHexDigest(rawRight) ? "hex-digest-case-insensitive" : "exact-string", note: "Display comparison only; this is not a cryptographic timing-safe comparison or signature verification." }, null, 2);
   }
   if (lower.includes("hash") || lower.includes("sha256") || lower.includes("sha-256") || lower.includes("md5") || lower.includes("sha1") || lower.includes("sha-1") || lower.includes("sha512") || lower.includes("sha-512")) {
     if (suffix === "explainer") return "A cryptographic hash maps input bytes to a fixed-length digest. Hashing is one-way and is not encryption. MD5 and SHA-1 are unsuitable for modern collision-resistant security uses; use a password-hashing scheme, not a fast hash, for passwords. This tool hashes locally.";
@@ -969,7 +974,7 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
 
   if (lower.includes("url") || lower.includes("uri")) {
     if (lower.includes("encoder")) return encodeURIComponent(input);
-    if (lower.includes("decoder")) { try { return decodeURIComponent(input.replace(/\+/g, "%20")); } catch { throw new Error("Invalid percent escape in URL-encoded input."); } }
+    if (lower.includes("decoder")) { try { return decodeURIComponent(input); } catch { throw new Error("Invalid percent escape in URL-encoded input."); } }
     if (lower.includes("validator") || lower.includes("tester")) { let url: URL; try { url = new URL(value); } catch { throw new Error("Enter a valid absolute URL, including its scheme (for example, https://example.com)."); } if (!/^https?:$/.test(url.protocol)) throw new Error("Only http: and https: URLs are accepted by this URL validator."); return `Valid ${url.protocol.slice(0,-1).toUpperCase()} URL: ${url.origin}`; }
     try { const u = new URL(value); return JSON.stringify({ href: u.href, protocol: u.protocol, username: u.username, hostname: u.hostname, port: u.port, pathname: u.pathname, search: u.search, hash: u.hash, origin: u.origin, params: [...u.searchParams.entries()].map(([key,val])=>({key,value:val})), note: "Query parameters are preserved as ordered key/value pairs, including duplicate keys." }, null, 2); } catch { throw new Error("Enter a valid absolute URL, including its scheme (for example, https://example.com)."); }
   }
