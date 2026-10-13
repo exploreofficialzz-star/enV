@@ -173,7 +173,10 @@ final class NativeDeveloperToolTests: XCTestCase {
         let query=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(queryOutput.utf8)) as? [String:Any])
         XCTAssertEqual(query["count"] as? Int,2)
         XCTAssertEqual((query["grouped"] as? [String:[String]])?["b"],["2"])
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text,"Mozilla/5.0")
+        let userAgentOutput=try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text
+        let userAgent=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(userAgentOutput.utf8)) as? [String:Any])
+        XCTAssertEqual(userAgent["raw"] as? String,"Mozilla/5.0")
+        XCTAssertEqual(userAgent["browser"] as? String,"Unknown")
         let cronOutput=try NativeUtilityEngine.run(tool("cron-parser"),input:"*/15 * * * *").text
         let cron=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(cronOutput.utf8)) as? [String:Any])
         XCTAssertEqual(cron["normalized"] as? String,"*/15 * * * *")

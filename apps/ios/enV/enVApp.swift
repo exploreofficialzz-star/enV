@@ -132,7 +132,7 @@ struct RootTabView: View {
                 .tabItem { Label("Tools", systemImage: "square.grid.2x2") }
                 .tag(NativeTab.tools.rawValue)
             SearchView(query: $searchQuery)
-                .tabItem { Label("Search tools", systemImage: "magnifyingglass") }
+                .tabItem { Label("Search tab", systemImage: "magnifyingglass") }
                 .tag(NativeTab.search.rawValue)
             SavedView()
                 .tabItem { Label("Saved tools", systemImage: "heart") }

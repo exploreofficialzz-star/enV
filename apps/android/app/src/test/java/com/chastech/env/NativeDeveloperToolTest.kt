@@ -96,7 +96,9 @@ class NativeDeveloperToolTest {
         assertEquals(2, query.getInt("count"))
         assertEquals("a", query.getJSONArray("entries").getJSONObject(0).getString("key"))
         assertEquals("2", query.getJSONArray("entries").getJSONObject(1).getString("value"))
-        assertEquals("Mozilla/5.0", NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
+        val userAgent = JSONObject(NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
+        assertEquals("Mozilla/5.0", userAgent.getString("raw"))
+        assertEquals("Unknown", userAgent.getString("browser"))
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
         assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
     }
