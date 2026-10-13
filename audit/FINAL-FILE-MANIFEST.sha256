@@ -22,7 +22,7 @@ dce98e763ded636ff83f18f8f48de2f1c13860f8036485ff594010f5aeee637c  ./apps/android
 04b14523485ddf5bacac54d46b2a4034ac462972d2209f9ddf25f591c666d416  ./apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt
 23fcb871505cfa36cd11ea6329dcc3f433f9d8cb17c063783d1b897772925050  ./apps/android/app/src/main/java/com/chastech/env/ContactExchangeController.kt
 806fae6cd93cc6ce79d44c7214347d62335b53d2ee0e29945e97baf71c43d8b7  ./apps/android/app/src/main/java/com/chastech/env/ContactExchangeScreen.kt
-1c6fa8dce34dfa237ce0944929ef243fe5135a732c2acdfea62ce259cfcf2159  ./apps/android/app/src/main/java/com/chastech/env/MainActivity.kt
+958330b7dbe3e1f47651265d8882c8ddc08f714b682815ecb0bd639422b4ff1f  ./apps/android/app/src/main/java/com/chastech/env/MainActivity.kt
 8ab7aec97c926485282413fe81e32be9ee2b6686c3866849ed90b27db24355e7  ./apps/android/app/src/main/java/com/chastech/env/NativeAccessibilityEngine.kt
 10c4621109b2a026429ac999a135ff5daec34b613661dc20d887295df565c7e4  ./apps/android/app/src/main/java/com/chastech/env/NativeAccessibilityToolForm.kt
 5adce531f3785d4cf53071d043737e012a817e8ebeadef404854351dec254601  ./apps/android/app/src/main/java/com/chastech/env/NativeAiAssistPanel.kt
@@ -59,7 +59,7 @@ f37d4c45e952815d1400b510e421982f2f47398f467d98527bcc7467b15d6196  ./apps/android
 9cbe1743502a28fcefe7d3c11d6946fe9451963475929254fdeb60ff1a960910  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeNumberParser.kt
 4e9b6e8104b50aa8d915f2c64545b8270f6265ec0fd4944645724ae89b855c14  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeTextEngine.kt
 0662897d74b63947bf9e83a59a6928f8467d34e4950c64988aef7913e745fee2  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUrlMediaInfoEngine.kt
-c0780d0efd88763a9cc029f3cef7e9a0fa19e7e573bbdfb007fc4733efeef179  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
+8f7ffbae3540bf6592d36f40864a3fc6e376d143e8f9f4e62fade18d5caf70a7  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
 a5a6943104c54c75d00194fbe7695dd226a31700d966a581794cf9b42f7a1bcc  ./apps/android/app/src/main/java/com/chastech/env/ui/CharacterSpacedText.kt
 eb419c899f54683787373df2e02605370c8363276f5375492b85d8c7c7df2024  ./apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt
 509b375ceba9e1e77fb488c06683862b5c85651711d44ac2ed965a76f235425a  ./apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt
@@ -162,8 +162,8 @@ be647328a92321ebc8d2b261b0680f3d56a566380f37bd586fe1ef78d0cd45c8  ./apps/ios/enV
 3df1ab820373e35b2eb41f8c25ac35c687fd437c4eda65fe742067b2e8165822  ./apps/ios/enV/NativeNumberParser.swift
 63e6f41af4aff5eb1b631d1e074519c215edb16b3a4d76614182c85a2a397698  ./apps/ios/enV/NativeTextEngine.swift
 d7f51061287af1872bc5906740a2b0dff47e8d7af2e723a8b4da4f8db1c079e3  ./apps/ios/enV/NativeUrlMediaInfoEngine.swift
-068703d2fa2f37d008e2d11dad7958e0fce50f71b26ac1621198645a12336345  ./apps/ios/enV/NativeUtilityEngine.swift
-73b8fce5fefe57435e111ed3e285856df40e0ff4ef7772d9cfeed25efe4e7a9d  ./apps/ios/enV/ToolViews.swift
+bcb2fdaea26d9442e10c5dd2875a8aaf3a4c98403bf748d758413f2e315d5d1e  ./apps/ios/enV/NativeUtilityEngine.swift
+4d69cd7d5671caa811ffada11510689cae27f3911c656bea7fb948a284152423  ./apps/ios/enV/ToolViews.swift
 312de7ff801a1f1f5b5b1337a905531860a96128c50579c25fd9b265788c5a33  ./apps/ios/enV/enVApp.swift
 b68096c17562e1fef9a27d32ed49a45f7ab5812fd08eedff95f56bc05abe96db  ./apps/ios/enVTests/CatalogCoreTests.swift
 41806a6e37fcbaedaba8b8f34d2a47ec3e0cb54307255e65b12ae4ceffe0cdfd  ./apps/ios/enVTests/NativeAccessibilityEngineTests.swift
