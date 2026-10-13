@@ -1604,19 +1604,137 @@ private fun NativeUtilityToolForm(tool: ToolRecord) {
 }
 
 internal object NativeDeveloperToolFormPolicy {
-    fun needsSecondInput(op: String): Boolean = listOf("diff", "regex", "replace", "compare").any(op::contains)
-    fun needsRegexFlags(op: String): Boolean = op.contains("regex")
+    fun needsSecondInput(op: String): Boolean = listOf("diff", "regex", "replace", "compare", "json-path", "jsonpath", "uuid-generator", "uuid-batch", "http-request-builder").any { op.lowercase().contains(it) }
+    fun needsRegexFlags(op: String): Boolean = op.contains("regex", ignoreCase = true)
+    fun needsReplacement(op: String): Boolean = op.contains("regex-replace", ignoreCase = true)
+    fun isFileHash(op: String): Boolean = op.contains("file-hash", ignoreCase = true)
+    fun actionLabel(op: String): String = when {
+        op.contains("formatter", true) || op.contains("beautifier", true) -> "Format"
+        op.contains("minifier", true) -> "Minify"
+        op.contains("validator", true) -> "Validate"
+        op.contains("regex-tester", true) -> "Test pattern"
+        op.contains("encoder", true) -> "Encode"
+        op.contains("decoder", true) -> "Decode"
+        op.contains("generator", true) || op.contains("builder", true) -> "Generate"
+        op.contains("parser", true) -> "Parse"
+        op.contains("diff", true) || op.contains("compare", true) -> "Compare"
+        op.contains("explainer", true) -> "Explain"
+        op.contains("hash", true) -> "Calculate hash"
+        else -> "Run"
+    }
+    fun example(op: String): Pair<String, String> {
+        val value = op.lowercase(Locale.US)
+        val uuid = "550e8400-e29b-41d4-a716-446655440000"
+        val sha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        val jwt = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJleGFtcGxlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9."
+        return when {
+            value.contains("file-hash") -> "" to ""
+            value.contains("json-path") || value.contains("jsonpath") -> "{\"user\":{\"name\":\"Ada\"},\"items\":[{\"id\":1},{\"id\":2}]}" to "$.items[0].id"
+            value.contains("json-diff") -> "{\"name\":\"Ada\",\"active\":true}" to "{\"name\":\"Ada Lovelace\",\"active\":true}"
+            value.contains("json") && value.endsWith("-decoder") -> "eyJuYW1lIjoiQWRhIiwiaXRlbXMiOlsxLDJdfQ==" to ""
+            value.contains("hash-compare") || value.contains("hash-diff") -> sha256 to sha256
+            value.endsWith("-diff") -> "before\nold-value\n" to "after\nnew-value\n"
+            value.contains("json") -> "{\"name\":\"Ada\",\"items\":[1,2],\"active\":true}" to ""
+            value.contains("query-string-parser") || value.contains("query-parser") -> "q=one&q=two&space=hello+world" to ""
+            value.contains("query-string-builder") || value.contains("url-query-builder") -> "{\"q\":\"hello world\",\"tag\":[\"a\",\"b\"]}" to ""
+            value.contains("developer-sql-query-builder") || value.contains("sql-query-builder") -> "{\"table\":\"users\",\"columns\":[\"id\",\"email\"],\"filters\":[{\"column\":\"active\",\"operator\":\"=\",\"value\":true}],\"limit\":25}" to ""
+            value.contains("graphql-variables-builder") -> "{\"id\":\"example-123\",\"active\":true}" to ""
+            value.contains("graphql-query-builder") -> "Example" to ""
+            value.contains("api-mock-response") -> "{\"id\":\"example-1\",\"message\":\"Mock response\"}" to ""
+            value.contains("webhook") && (value.contains("generator") || value.contains("builder")) -> "order.paid" to ""
+            value.contains("jwt-claim-builder") || value.contains("jwt-payload-generator") || value == "jwt-encoder" || value == "jwt-generator" -> "{\"sub\":\"example-user\",\"iat\":1700000000,\"exp\":4102444800}" to ""
+            value.contains("jwt") -> jwt to ""
+            value.contains("regex-replace") -> "\\bcat\\b" to "cat CAT catalog"
+            value.contains("regex") -> "\\bcat\\b" to "A cat, a CAT, and a catalog."
+            value.contains("cron") && value.endsWith("-decoder") -> "Ki8xNSAqICogKiAq" to ""
+            value.contains("cron") -> "*/15 * * * *" to ""
+            value.contains("timestamp") || value.contains("epoch") -> "1700000000" to ""
+            value.contains("uuid-generator") || value.contains("uuid-batch-generator") -> "" to "10"
+            value.contains("uuid-decoder") -> uuid.replace("-", "") to ""
+            value.contains("uuid") -> uuid to ""
+            value.contains("hash-compare") || value.contains("hash-diff") -> sha256 to sha256
+            value.contains("hash-decoder") -> sha256 to ""
+            value.contains("hash") && listOf("validator", "tester", "formatter", "beautifier", "minifier", "parser", "inspector").any { value.endsWith("-$it") } -> sha256 to ""
+            value.contains("hash") -> "hello" to ""
+            value.contains("base64") && listOf("decoder", "formatter", "beautifier", "minifier", "converter", "parser", "inspector", "preview", "validator", "tester").any { value.endsWith("-$it") } -> "SGk=" to ""
+            value.contains("base64") -> "enV 🚀 — local and private" to ""
+            value.contains("ascii") && listOf("decoder", "validator", "tester", "parser").any { value.endsWith("-$it") } -> "72 105" to ""
+            value.contains("ascii") -> "Hello" to ""
+            value.contains("binary") && listOf("decoder", "validator", "tester", "parser").any { value.endsWith("-$it") } -> "01001000 01101001" to ""
+            value.contains("binary") -> "Hi" to ""
+            value.contains("hex") && listOf("decoder", "validator", "tester", "parser").any { value.endsWith("-$it") } -> "48 69" to ""
+            value.contains("hex") -> "Hello" to ""
+            value.contains("unicode") && listOf("decoder", "validator", "tester").any { value.endsWith("-$it") } -> "\\u0041\\u0020\\ud83d\\ude80" to ""
+            value.contains("unicode") -> "A 🚀" to ""
+            listOf("docker", "git", "graphql", "http", "javascript", "kubernetes", "markdown", "nginx", "openapi", "sql", "typescript", "yaml", "csv", "mime").any { value.startsWith("$it-") || value.startsWith("developer-$it-") } && value.endsWith("-decoder") -> "SGk=" to ""
+            value.contains("data-uri") && value.contains("decoder") -> "data:text/plain;base64,SGk=" to ""
+            (value.contains("html") || value.contains("xml") || value.contains("svg")) && value.endsWith("-decoder") -> "&lt;root&gt;Hi&lt;/root&gt;" to ""
+            value.contains("css") && value.endsWith("-decoder") -> "hello\\a world" to ""
+            value.contains("data-uri") -> "Hello from enV" to ""
+            (value.contains("url") || value.contains("uri")) && value.contains("decoder") -> "hello%20world%20%26%20tea" to ""
+            (value.contains("url") || value.contains("uri")) && value.contains("encoder") -> "hello world & tea" to ""
+            value.contains("url") || value.contains("uri") -> "https://example.com/path?q=one&q=two#section" to ""
+            value.contains("cookie-parser") -> "session=abc123; theme=dark; consent=yes" to ""
+            value.contains("header-builder") -> "{\"Accept\":\"application/json\",\"X-Example\":\"enV\"}" to ""
+            value.contains("ip-header-parser") -> "X-Forwarded-For: 192.0.2.1, 10.0.0.2" to ""
+            value.contains("status-code") || value.contains("http-status") -> "404" to ""
+            value.contains("mime") || value.contains("content-type") -> "json" to ""
+            value.contains("csv") && value.endsWith("-decoder") -> "SGk=" to ""
+            value.contains("csv") && listOf("validator", "tester", "parser", "formatter", "beautifier", "minifier", "inspector").any { value.endsWith("-$it") } -> "name,quote\nAda,\"Hello, world\"\nGrace,\"She said \"\"hi\"\"\"" to ""
+            value.contains("csv") -> "[{\"name\":\"Ada\",\"age\":36},{\"name\":\"Grace\",\"age\":37}]" to ""
+            value.contains("xml") || value.contains("html") || value.contains("svg") -> "<root><name>Ada</name></root>" to ""
+            value.contains("css") -> ".card { color: #0d9f8a; padding: 16px; }" to ""
+            value.contains("sql") -> "SELECT id, name FROM users WHERE active = true ORDER BY name;" to ""
+            value.contains("yaml") -> "app:\n  name: enV\n  enabled: true" to ""
+            value.contains("graphql") -> "query Example(\$id: ID!) { user(id: \$id) { id name } }" to ""
+            value.contains("markdown-to-html") -> "# Hello\n\nA paragraph with **bold** and [a link](https://example.test)." to ""
+            value.contains("markdown") -> "# Hello\n\nA paragraph with **bold**." to ""
+            value.contains("gitignore") -> "node" to ""
+            value.contains("docker") -> "node" to ""
+            value.contains("nginx") -> "server { listen 80; server_name example.test; }" to ""
+            value.contains("readme") -> "enV Developer Studio" to ""
+            value.contains("environment-variable") -> "APP_ENV\nAPI_BASE_URL\nLOG_LEVEL" to ""
+            value.contains("openapi") -> "enV Example API" to ""
+            value.contains("branch-name") -> "Add local hash utilities" to ""
+            value.contains("commit-message") -> "fix: handle empty input safely" to ""
+            value.contains("changelog") -> "Unreleased\nImprove local developer utilities\nFix invalid input errors" to ""
+            value.contains("user-agent") -> "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" to ""
+            value.contains("http-request-builder") -> "https://api.example.test/v1?q=hi" to "POST"
+            value.contains("http") && !value.contains("encoder") && !value.contains("decoder") -> "GET /health HTTP/1.1\nHost: api.example.test\nAccept: application/json" to ""
+            value.contains("semantic-version") -> "1.2.3 patch" to ""
+            else -> "Example input for $op" to ""
+        }
+    }
 }
 
 @Composable
 private fun NativeDeveloperToolForm(tool: ToolRecord) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val op = tool.engine.extras["op"] ?: tool.engine.id
+    val fileHash = NativeDeveloperToolFormPolicy.isFileHash(op)
     var input by rememberSaveable(tool.id) { mutableStateOf("") }
     var secondary by rememberSaveable(tool.id) { mutableStateOf("") }
     var flags by rememberSaveable(tool.id) { mutableStateOf("g") }
+    var replacement by rememberSaveable(tool.id) { mutableStateOf("dog") }
+    var selectedFileName by rememberSaveable(tool.id) { mutableStateOf("") }
+    var selectedFileUri by rememberSaveable(tool.id) { mutableStateOf("") }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            selectedFileUri = uri.toString()
+            runCatching {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (index >= 0) cursor.getString(index).orEmpty() else "Selected local file"
+                    } else "Selected local file"
+                } ?: "Selected local file"
+            }.onSuccess { selectedFileName = it; error = "" }
+                .onFailure { error = it.message ?: "Unable to read file metadata." }
+        }
+    }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) runCatching {
             context.contentResolver.openOutputStream(uri)?.use { it.write(output.toByteArray(Charsets.UTF_8)) }
@@ -1625,23 +1743,55 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InputField(input, { input = it }, "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Text("Runs entirely on this device. Nothing is uploaded.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = {
+                val (sample, sampleSecondary) = NativeDeveloperToolFormPolicy.example(op)
+                input = sample; secondary = sampleSecondary; flags = if (op.contains("regex", true)) "gi" else "g"; replacement = "dog"; output = ""; error = ""
+            }) { Text("Load example") }
+            Text("Ctrl/⌘+Enter support is available on Web; native uses the action button.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (fileHash) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { filePicker.launch(arrayOf("*/*")) }) { Text("Choose local file") }
+                Text(selectedFileName.ifBlank { "Select a file to hash locally" }, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        InputField(input, { input = it }, if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
         if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) {
-            InputField(secondary, { secondary = it }, "Second input / test string", minLines = 5, tall = true)
+            InputField(secondary, { secondary = it }, when { op.contains("regex", true) -> "Test text"; op.contains("json-path", true) || op.contains("jsonpath", true) -> "JSON path (e.g. $.items[0].id)"; op.contains("uuid", true) -> "Batch count"; else -> "Second input" }, minLines = 4, tall = true)
         }
         if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) {
-            InputField(flags, { flags = it }, "Regex flags", minLines = 1, singleLine = true)
+            InputField(flags, { flags = it }, "Regex flags (g/i/m/s)", minLines = 1, singleLine = true)
+        }
+        if (NativeDeveloperToolFormPolicy.needsReplacement(op)) {
+            InputField(replacement, { replacement = it }, "Replacement text", minLines = 1, singleLine = true)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                val options = JSONObject().apply {
-                    if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) put("secondary", secondary)
-                    if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) put("flags", flags)
-                }.toString()
-                runCatching { NativeUtilityEngine.run(tool, input, options) }
-                    .fold({ output = it.text; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
-            }) { Text("Run tool") }
-            Button(onClick = { input = ""; secondary = ""; output = ""; error = "" }) { Text("Reset") }
+                scope.launch {
+                    runCatching {
+                        if (fileHash) {
+                            require(selectedFileUri.isNotBlank()) { "Choose a local file first. File bytes are never uploaded." }
+                            withContext(Dispatchers.IO) {
+                                val uri = Uri.parse(selectedFileUri)
+                                context.contentResolver.openInputStream(uri)?.use { NativeUtilityEngine.hashDeveloperFileStream(op, it) }
+                                    ?: throw IllegalArgumentException("Unable to open the selected local file.")
+                            }
+                        } else {
+                            val options = JSONObject().apply {
+                                if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) put("secondary", secondary)
+                                if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) put("flags", flags)
+                                if (NativeDeveloperToolFormPolicy.needsReplacement(op)) put("replacement", replacement)
+                            }.toString()
+                            withContext(Dispatchers.Default) { NativeUtilityEngine.run(tool, input, options).text }
+                        }
+                    }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
+                }
+            }) { Text(NativeDeveloperToolFormPolicy.actionLabel(op)) }
+            OutlinedButton(onClick = { input = ""; secondary = ""; flags = "g"; replacement = "dog"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))

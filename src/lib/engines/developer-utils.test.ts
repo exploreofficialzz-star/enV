@@ -23,3 +23,10 @@ test("developer UUID validator and common MIME/status maps", () => {
   assert.equal(MIME_TYPES.avif, "image/avif");
   assert.equal(MIME_TYPES.webm, "video/webm");
 });
+
+
+test("developer UUID validator accepts RFC variant/version layout and rejects malformed segment lengths", () => {
+  assert.equal(uuidValid("550e8400-e29b-41d4-a716-446655440000"), "Valid UUID v4");
+  assert.equal(uuidValid("550e8400-e29b-41d4-a716-4466554400000"), "Invalid UUID");
+  assert.equal(uuidValid("550e8400-e29b-41d4-1716-446655440000"), "Invalid UUID");
+});

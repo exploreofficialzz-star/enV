@@ -1,0 +1,272 @@
+# enV Developer Category — Full Competitive Upgrade Prompt
+## Goal
+Systematically and simultaneously upgrade EVERY tool in the enV Developer category (https://envtools.store/tools/developer — currently ~474 tools) so the category as a whole competes with and outperforms the full systems of the top players — not just their free tiers.
+
+**Hard rules**
+- DO NOT remove any existing tools or URLs.
+- DO NOT merge tools by deleting pages. Upgrade in place; related tools may share engines and cross-link as “Studios / families,” but every slug must remain.
+- All processing MUST stay 100% client-side / on-device (nothing uploaded). This is a non-negotiable differentiator.
+- Apply upgrades systematically across Web first; structure engines so Android (Kotlin) and iOS (Swift) can receive the same logic later without redesign.
+- Prefer deterministic, testable, local algorithms. No server round-trips for format/encode/hash/decode/validate.
+
+---
+
+## Competitive landscape (who we are beating)
+
+| Player | Strength | Weakness we exploit |
+|--------|----------|---------------------|
+| **CyberChef** (GCHQ) | 300+ ops, recipe chains, powerful | Steep learning curve, dated UI, not mobile-friendly, overkill for one-shot tasks |
+| **DevToys** | Native, offline, smart paste detection | Desktop-only, install required, no shareable tool URLs |
+| **IT-Tools** | Large collection, good UX, self-hostable | Needs deploy; public instances are not always trusted |
+| **CodeBeautify / JSONFormatter.org** | SEO + huge catalog | Server-side processing; documented leaks of API keys/passwords; heavy ads |
+| **FreeFormatter** | Many formatters | Ads, server-side, dated UX |
+| **jwt.io** | JWT decode standard | Privacy fears (paste production tokens); edit/forge friction; JS number precision issues on large ints |
+| **regex101 / RegExr** | Best-in-class regex UX | Single-purpose; not a full toolkit |
+| **crontab.guru** | Cron explanation | Narrow |
+| **transform.tools** | Nice converters | Limited scope |
+| **JSON Editor Online** | Strong JSON tree/edit | Narrow product |
+| Aggregators (10015, etc.) | Many tools | Ads, inconsistent privacy, template quality |
+
+**Market truth from reviews/HN/Reddit (use these as design requirements):**
+1. **Privacy is the #1 pain** — Developers paste JWTs, API payloads, connection strings, keys. Sites that upload data (CodeBeautify/JSONFormatter style) are actively discouraged. Local/client-side is a selling point, not a footnote.
+2. **Ads and clutter** — Heavy ad pages feel hostile and slow.
+3. **Fragmentation** — Devs hate opening 8 different sites. One coherent toolkit wins.
+4. **CyberChef is powerful but scary** — For “format this JSON” people want one focused page, not a recipe builder.
+5. **DevToys is loved for offline + paste detection** — Web equivalent: instant load, auto-detect input type, zero install.
+6. **JWT tools** — Need clear “decode only, no verify” labeling; human-readable exp/iat; warn on large integers / precision; never claim signature verification unless truly implemented with user-supplied key.
+7. **Regex tools** — Live highlight, groups, flags, replace preview, engine note (JS vs others).
+8. **Cron** — Human explanation + next N run times (local + UTC).
+9. **Hashes** — Multiple algorithms side-by-side; text + file; hex/base64 output; compare mode.
+10. **JSON** — Format + minify + validate with **exact error path/line**; optional path query; optional schema later; tree view is a plus.
+11. **Mobile** — Most competitors are weak on mobile. Touch-friendly layouts are a real advantage.
+12. **Generic template smell** — “X utility for the enV toolkit” with one Input + Run tool is not competitive. Every page must feel purpose-built.
+
+---
+
+## Current enV Developer state (from audit)
+
+**Working / keep and deepen (core):**
+- JSON Formatter (pretty works)
+- JWT Decoder (header/payload/expiry present)
+- Base64 Encoder / Decoder (correct)
+- UUID Generator (v4 works, can batch)
+- SHA256 / MD5 (correct digests)
+- Unix Timestamp Converter (epoch ↔ ISO works)
+- JWT Expiration Checker
+- Regex Tester (matches work)
+- HTTP Status Lookup
+
+**Weak / templated (majority of the ~474):**
+- Mass families: *-beautifier|converter|decoder|diff|encoder|explainer|generator|inspector|minifier|parser|preview|tester|validator for ascii, binary, css, csv, docker, git, graphql, hash, hex, html, http, javascript, jwt, kubernetes, markdown, mime, nginx, openapi, sql, yaml, etc.
+- Many developer-* helpers (gitignore, http-header-builder, docker-compose, openapi, readme, etc.) still show generic copy and thin Input+Run UX.
+- Overlapping JSON tools (formatter/beautifier/minifier/validator) without a unified multi-mode experience.
+- Inconsistent action labels (Run tool / Convert / Calculate).
+- Weak or empty useful output on many generator stubs.
+
+**Strategy: keep every URL, upgrade every implementation.**
+Group into **Studios / shared engines** so related tools share real logic, rich UI modes, and cross-links — without deleting pages.
+
+---
+
+## Target architecture: Developer Studios (without removing tools)
+
+Create shared engines + multi-mode UIs. Each existing tool page becomes a focused entry into a Studio or a specialized mode of one.
+
+### Studio map (implement engines once, wire many URLs)
+
+1. **JSON Studio**
+   - Modes: Format, Minify, Validate, Path query, Diff (two panes), Tree view, Convert ↔ YAML/CSV when libraries allow client-side
+   - Exact error line/path on invalid JSON
+   - Big-int safety note for large numbers
+   - Pages that map here: json-formatter, json-beautifier, json-minifier, json-validator, json-*, dummy-json-generator, developer-json-schema-generator, etc.
+
+2. **JWT Studio**
+   - Modes: Decode, Expiration check, Claim inspector (standard claims annotated), Payload builder, optional “forge with user-supplied secret” clearly labeled
+   - Never claim verification without user key; banner: “Decode only — signature not verified”
+   - Pages: jwt-decoder, jwt-expiration-checker, developer-jwt-*, jwt-*
+
+3. **Regex Studio**
+   - Live match highlight, capture groups, flags (g/i/m/s/u), replace preview, match list with indexes, “JS engine” label
+   - Pages: regex-tester, regex-replace, developer-regex-*
+
+4. **Hash Studio**
+   - MD5, SHA-1, SHA-256, SHA-384, SHA-512 side-by-side; text + file; hex / base64; Compare two hashes
+   - Pages: sha256-hash, md5-hash, sha1-hash, sha512-hash, hash-compare, file-hash-calculator, hash-*
+
+5. **Encoding Studio**
+   - Base64 (std + URL-safe), URL encode/decode, HTML entities, Hex, Binary, ASCII, Unicode, Data URI
+   - Auto-detect where reasonable
+   - Pages: base64-*, url-*, html-encoder/decoder, hex-*, binary-*, ascii-*, unicode-*, data-uri-*
+
+6. **Time & Cron Studio**
+   - Unix seconds/ms ↔ ISO ↔ local; timezone list; Cron: validate 5-field, plain-English explain, next 10 runs local+UTC
+   - Pages: unix-timestamp-converter, cron-generator, cron-parser, cron-*
+
+7. **UUID Studio**
+   - v4 batch, validate, optional nil/v1 if feasible client-side without heavy deps
+   - Pages: uuid-generator, uuid-validator, developer-uuid-batch-generator
+
+8. **SQL Studio**
+   - Format, minify, basic parse feedback (not full engine execution)
+   - Pages: sql-formatter, sql-*, developer-sql-*
+
+9. **Markup / Style Studio**
+   - HTML / CSS / JS / XML / YAML / Markdown format + minify + basic validate/preview where safe
+   - Pages: html-*, css-*, javascript-*, xml-*, yaml-*, markdown-*
+
+10. **HTTP / API Studio**
+    - Status lookup, header builder, query string parser/builder, content-type/MIME, CORS/CSP helpers, cookie parser, user-agent parse
+    - Pages: http-status-lookup, mime-lookup, query-string-parser, developer-http-*, developer-cors-*, developer-csp-*, developer-cookie-*, user-agent-parser
+
+11. **DevOps / Config generators** (upgrade stubs to real templates)
+    - gitignore (by stack), Dockerfile, docker-compose, nginx snippet, editorconfig, env var examples, OpenAPI example/schema starters, GraphQL query/variables, license text, README skeleton, commit message helper, branch name helper, changelog helper, semantic version calculator
+    - Each must output **copy-ready real content**, not “utility for enV toolkit”
+    - Pages: all developer-gitignore-*, developer-docker-*, developer-nginx-*, developer-openapi-*, developer-graphql-*, developer-readme-*, developer-license-*, developer-commit-*, developer-branch-*, developer-changelog-*, developer-editorconfig-*, developer-environment-*, developer-semantic-*
+
+12. **Diff / Inspect family**
+    - Text/JSON/YAML diff where possible; inspectors show structure stats
+    - Pages: *-diff, *-inspector, *-parser, *-preview, *-tester, *-explainer — each must do something real for its domain or clearly route into the parent Studio with pre-selected mode
+
+---
+
+## Mandatory UX standard (every tool page)
+
+For **every** Developer tool page:
+
+1. **Privacy strip (visible):** “Runs entirely on this device. Nothing is uploaded.”
+2. **Clear primary action** — consistent verbs: Format / Minify / Validate / Encode / Decode / Generate / Parse / Explain / Compare
+3. **Useful empty state** — example input + one-click “Load example”
+4. **Copy + Download** on outputs
+5. **Error quality** — never silent fail; show precise messages (JSON path/line, invalid Base64, bad cron field, etc.)
+6. **Related tools** — link siblings in the same Studio (not random unrelated tools)
+7. **No generic description** — replace “X utility for the enV toolkit” with a one-line job statement (what it does + privacy)
+8. **Mobile** — stacked panes, large touch targets, no horizontal trap for editors
+9. **Keyboard** — Ctrl/Cmd+Enter runs primary action where applicable
+10. **Deterministic** — same input → same output; document algorithm (e.g. SHA-256 via Web Crypto)
+
+---
+
+## Feature bar to meet or beat (by family)
+
+### JSON
+- Format, minify, validate with line/path errors
+- Optional sort keys
+- Diff two documents
+- Path query (simple JSONPath or key search)
+- Tree view if feasible
+- Note on duplicate keys / large numbers
+
+### JWT
+- Header + payload pretty-print
+- Standard claims annotated (exp, iat, nbf, sub, iss, aud) with human times
+- Expired / not-yet-valid flags
+- Signature present boolean; no false “verified”
+- Large integer warning (JS Number limits)
+- Builder mode for payload/claims
+
+### Regex
+- Live highlighting, groups, indices
+- Flags UI
+- Replace with preview
+- Cheat-sheet / common patterns
+- Explicit “JavaScript RegExp engine”
+
+### Hash
+- Multi-algo parallel
+- File hash via FileReader + Web Crypto / pure JS fallback
+- Compare mode (timing-safe string compare for equality display)
+- Output encoding toggle
+
+### Base64 / URL / HTML entities
+- Std + URL-safe Base64
+- UTF-8 safe
+- Encode/decode swap
+- Invalid input errors
+
+### Cron
+- 5-field validate/normalize
+- English explanation
+- Next 10 fire times (local + UTC)
+- Common presets (every minute, hourly, daily, etc.)
+
+### Timestamp
+- Seconds vs milliseconds auto-detect
+- ISO, local string, UTC
+- “Now” button
+
+### Generators (gitignore, docker, nginx, openapi, readme, etc.)
+- Stack/preset selectors
+- Real copy-paste output
+- Short comments in generated files explaining options
+- No lorem-only placeholders pretending to be production config
+
+---
+
+## Implementation order (systematic + simultaneous)
+
+### Phase A — Shared foundations (do first, unblocks all)
+1. Client-side engine module(s): JSON, JWT decode, Base64, URL, hashes (Web Crypto), UUID v4, cron parse/next, timestamp, regex runner
+2. Shared UI primitives: PrivacyStrip, ExampleLoader, CopyDownload, ErrorBanner, ModeTabs, RelatedTools
+3. Replace all generic meta descriptions sitewide for Developer tools
+
+### Phase B — Core Studios (highest traffic)
+1. JSON Studio + wire all json-* pages
+2. JWT Studio + wire all jwt-* pages
+3. Encoding Studio + base64/url/html/hex/binary/ascii
+4. Hash Studio + all hash-*
+5. Regex Studio
+6. Time & Cron Studio
+7. UUID Studio
+
+### Phase C — Formatters
+HTML, CSS, JS, SQL, YAML, XML, Markdown — real format/minify where libraries are acceptable client-side; otherwise honest “basic indent only” with no fake claims
+
+### Phase D — HTTP/API + DevOps generators
+Upgrade every developer-* generator from stub to preset-driven real output
+
+### Phase E — Remaining template suffixes
+For each remaining *-explainer|inspector|tester|preview|parser|diff|converter|validator:
+- Attach to parent Studio engine
+- Give domain-specific behavior OR clear mode deep-link into parent Studio
+- Never leave “utility for the enV toolkit” as the only copy
+
+### Phase F — Hard QA
+- Golden tests for: JSON format/validate, JWT decode/exp, Base64 roundtrip, SHA-256("hello"), UUID v4 shape, cron next runs, URL encode spaces/ampersands
+- Mobile pass on top 20 tools
+- Privacy check: no network requests carrying user payload (except explicit user-initiated external URL tools if any)
+
+---
+
+## Copy / positioning rules (beat CodeBeautify-class sites)
+
+- Lead with privacy: “On device · no upload”
+- Never imply server processing
+- JWT: always “decode only unless you provide a key”
+- Avoid hype; be precise (“5-field cron”, “JS RegExp”, “SHA-256 via Web Crypto”)
+- Related tools must be same family
+
+---
+
+## Success criteria (category stands out)
+
+1. Every one of the ~474 URLs loads a **non-generic**, working tool experience
+2. Core tasks match or beat specialist sites (jwt.io decode clarity, regex101-style feedback, crontab.guru-style cron explanation, correct hashes)
+3. Privacy story is stronger and more visible than CodeBeautify / server-side aggregators
+4. UX is simpler than CyberChef for one-shot tasks, broader than single-purpose sites
+5. Mobile usable for format/encode/decode/hash/jwt/regex
+6. No tool left with only “X utility for the enV toolkit” + empty Run
+7. Shared engines mean bugfixes improve whole families at once
+
+---
+
+## Deliverables expected from you (the agent)
+
+1. Shared engine code (Web TypeScript) for the Studios above
+2. UI mode patterns applied across families
+3. Updated copy for all Developer tool entry points (no generic toolkit filler)
+4. Wiring so existing slugs keep working and gain real behavior
+5. Test fixtures / golden outputs for core algorithms
+6. Short changelog: what each family gained vs previous template state
+7. List of any library choices (must remain client-side and license-safe)
+
+Start with Phase A + Phase B. Work family-by-family until every Developer tool is upgraded in place. Do not delete tools. Make the Developer category a privacy-first, high-quality alternative to CyberChef + DevToys + jwt.io + regex101 + crontab.guru + CodeBeautify combined for daily one-shot and power workflows.

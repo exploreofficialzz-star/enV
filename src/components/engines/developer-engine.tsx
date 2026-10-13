@@ -1,12 +1,36 @@
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
+import { hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
+import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
+import type { ToolMeta } from "@/types/tool";
+import { getAllTools, toolPath } from "@/lib/registry";
 
-type Props = { op: string };
+type Props = { op: string; tool?: ToolMeta };
+
+const STUDIO_FAMILIES = [
+  "api-mock", "file-hash", "environment-variable", "semantic-version", "branch-name", "commit-message", "content-type", "query-string", "data-uri", "timestamp", "javascript", "typescript", "kubernetes", "graphql", "openapi", "markdown", "base64", "unicode", "binary", "ascii", "docker", "nginx", "http", "mime", "regex", "cron", "uuid", "json", "jwt", "hash", "sha", "md5", "hex", "url", "uri", "html", "xml", "svg", "css", "csv", "sql", "yaml", "git", "cookie", "webhook", "readme", "license", "editorconfig", "changelog", "csp", "cors", "ip-header", "status-code", "user-agent", "dummy-json",
+].sort((a, b) => b.length - a.length);
+
+function studioFamily(slug: string): string {
+  const normalized = slug.replace(/^developer-/, "");
+  if (normalized.startsWith("gitignore")) return "git";
+  if (normalized.startsWith("dockerfile")) return "docker";
+  if (normalized.startsWith("unix-timestamp") || normalized.startsWith("epoch") || normalized.startsWith("cron")) return "time";
+  if (normalized.startsWith("xml-") || normalized.startsWith("html-") || normalized.startsWith("svg-") || normalized === "markdown-to-html") return "markup";
+  const family = STUDIO_FAMILIES.find((prefix) => normalized === prefix || normalized.startsWith(`${prefix}-`));
+  if (family === "file-hash" || family === "sha" || family === "md5") return "hash";
+  if (family === "environment-variable") return "environment-variable";
+  if (family === "content-type" || family === "mime") return "http";
+  if (family === "query-string") return "url";
+  if (family === "ip-header" || family === "status-code" || family === "user-agent" || family === "cookie" || family === "csp" || family === "cors") return "http";
+  if (family === "data-uri" || family === "base64" || family === "unicode" || family === "binary" || family === "ascii" || family === "hex" || family === "url" || family === "uri" || family === "html") return "encoding";
+  return family ?? normalized.split("-")[0];
+}
 
 function b64urlDecode(value: string): string {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
@@ -108,13 +132,24 @@ function decodeData(input: string, kind: string): string {
 function encodeData(input: string, kind: string): string {
   if (kind === "base64") { const bytes = new TextEncoder().encode(input); let binary = ""; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary); }
   if (kind === "uri") return encodeURIComponent(input);
-  if (kind === "unicode") return [...input].map((c) => `\\u${(c.codePointAt(0) ?? 0).toString(16).padStart(4, "0")}`).join("");
+  if (kind === "unicode") return Array.from(input).flatMap((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 0xffff) return [`\\u${codePoint.toString(16).padStart(4, "0")}`];
+    const scalar = codePoint - 0x10000;
+    return [
+      `\\u${(0xd800 + (scalar >> 10)).toString(16).padStart(4, "0")}`,
+      `\\u${(0xdc00 + (scalar & 0x3ff)).toString(16).padStart(4, "0")}`,
+    ];
+  }).join("");
   if (kind === "html") return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   return input;
 }
 
 function uuidValid(input: string): string {
-  const m = input.trim().match(/^[0-9a-f]{8}-[0-9a-f]{4}-([1-5])[89ab][0-9a-f]{3}-[89ab][0-9a-f]{4}-[0-9a-f]{12}$/i);
+  const value = input.trim();
+  if (/^00000000-0000-0000-0000-000000000000$/i.test(value)) return "Valid Nil UUID";
+  if (/^ffffffff-ffff-ffff-ffff-ffffffffffff$/i.test(value)) return "Valid Max UUID";
+  const m = value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-([1-8])[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   return m ? `Valid UUID v${m[1]}` : "Invalid UUID";
 }
 
@@ -141,7 +176,7 @@ function urlInfo(input: string): string {
 
 const HTTP_STATUS: Record<string, string> = { "200":"OK", "201":"Created", "204":"No Content", "301":"Moved Permanently", "302":"Found", "304":"Not Modified", "400":"Bad Request", "401":"Unauthorized", "403":"Forbidden", "404":"Not Found", "405":"Method Not Allowed", "409":"Conflict", "422":"Unprocessable Content", "429":"Too Many Requests", "500":"Internal Server Error", "502":"Bad Gateway", "503":"Service Unavailable", "504":"Gateway Timeout" };
 
-function generic(op: string, input: string, secondary: string, flags = "g"): string {
+function legacyGeneric(op: string, input: string, secondary: string, flags = "g"): string {
   const lower = op.toLowerCase();
   const base = lower.replace(/^developer-/, "").split("-")[0];
   const suffix = lower.match(/(?:^|-)((?:formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer))$/)?.[1] ?? "";
@@ -215,28 +250,97 @@ function generic(op: string, input: string, secondary: string, flags = "g"): str
   return input;
 }
 
-export function DeveloperEngine({ op }: Props) {
+function actionLabel(op: string): string {
+  const lower = op.toLowerCase();
+  if (lower.includes("formatter") || lower.includes("beautifier")) return "Format";
+  if (lower.includes("minifier")) return "Minify";
+  if (lower.includes("validator") || lower.includes("tester")) return lower.includes("regex") ? "Test pattern" : "Validate";
+  if (lower.includes("encoder")) return "Encode";
+  if (lower.includes("decoder")) return "Decode";
+  if (lower.includes("generator") || lower.includes("builder")) return "Generate";
+  if (lower.includes("parser")) return "Parse";
+  if (lower.includes("diff") || lower.includes("compare")) return "Compare";
+  if (lower.includes("explainer")) return "Explain";
+  if (lower.includes("hash")) return "Calculate hash";
+  return "Run";
+}
+
+export function DeveloperEngine({ op, tool }: Props) {
+  const example = useMemo(() => developerStudioExample(op), [op]);
   const [input, setInput] = useState("");
   const [secondary, setSecondary] = useState("");
   const [flags, setFlags] = useState("g");
+  const [replacement, setReplacement] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [out, setOut] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const needsSecond = useMemo(() => /diff|regex|replace|compare/.test(op), [op]);
-  const run = () => {
-    try { setError(null); setOut(generic(op, input, secondary, flags)); }
-    catch (e) { setOut(""); setError(e instanceof Error ? e.message : "Could not process this input."); }
+  const [busy, setBusy] = useState(false);
+  const needsSecond = useMemo(() => /diff|regex|replace|compare|json-path|uuid-generator|uuid-batch|http-request-builder/.test(op), [op]);
+  const isRegexReplace = op.toLowerCase().includes("regex-replace");
+  const isFileHash = op.toLowerCase().includes("file-hash");
+  const toolSlug = tool?.slug;
+  const relatedTools = useMemo(() => {
+    if (!toolSlug) return [];
+    const family = studioFamily(toolSlug);
+    const rank = (slug: string) => {
+      const ending = slug.split("-").at(-1) ?? "";
+      const ordered = ["formatter", "validator", "minifier", "diff", "inspector", "parser", "generator", "decoder", "encoder", "explainer", "tester", "preview", "calculator", "builder", "lookup", "helper"];
+      const index = ordered.indexOf(ending);
+      return index < 0 ? ordered.length : index;
+    };
+    return getAllTools()
+      .filter((candidate) => candidate.category === "developer" && candidate.slug !== toolSlug && candidate.status !== "planned" && studioFamily(candidate.slug) === family)
+      .sort((a, b) => rank(a.slug) - rank(b.slug) || a.name.localeCompare(b.name))
+      .slice(0, 6);
+  }, [toolSlug]);
+  const run = async () => {
+    setBusy(true);
+    try {
+      setError(null);
+      if (isFileHash) {
+        if (!selectedFile) throw new Error("Choose a local file first. The file bytes will be read in this browser and will not be uploaded.");
+        // A bounded whole-file Web Crypto read avoids silently allocating a multi-gigabyte buffer.
+        // Larger files need a streaming/incremental hash implementation rather than a risky arrayBuffer().
+        if (selectedFile.size > 256 * 1024 * 1024) throw new Error("This browser hash mode is limited to 256 MiB per file to protect memory. Use a trusted local streaming hash tool for larger files.");
+        const algorithms = op.toLowerCase().includes("md5") ? ["MD5"] : op.toLowerCase().includes("sha256") ? ["SHA-256"] : ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"];
+        setOut(await hashBytes(new Uint8Array(await selectedFile.arrayBuffer()), algorithms));
+      } else {
+        const dedicated = await runDeveloperStudio(op, input, secondary, flags, new Date(), replacement);
+        const result = dedicated ?? legacyGeneric(op, input, secondary, flags);
+        setOut(result);
+      }
+    } catch (e) {
+      setOut("");
+      setError(e instanceof Error ? e.message : "Could not process this input.");
+    } finally { setBusy(false); }
   };
+  const loadExample = () => { setInput(example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setOut(""); setError(null); };
+  const handleEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void run(); } };
   return <div className="space-y-4">
-    <div className="grid gap-4 md:grid-cols-2">
-      <label className="block space-y-1.5"><Label htmlFor="dev-input">Input</Label><Textarea id="dev-input" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-52 font-mono" placeholder="Paste your code, data, token, URL, or text here…" /></label>
-      {needsSecond ? <label className="block space-y-1.5"><Label htmlFor="dev-secondary">Second input / test string</Label><Textarea id="dev-secondary" value={secondary} onChange={(e) => setSecondary(e.target.value)} className="min-h-52 font-mono" /></label> : null}
+    <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm" role="note">
+      <span className="font-medium">On-device processing.</span> Text operations run in this browser; input is not uploaded by this tool. File hashing reads the selected file locally.
     </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={loadExample}>Load example</Button>
+      <span className="text-xs text-muted">Use Ctrl/⌘ + Enter to run.</span>
+    </div>
+    {isFileHash ? <div className="space-y-1.5"><Label htmlFor="dev-file">Local file</Label><input id="dev-file" type="file" onChange={(event) => { setSelectedFile(event.target.files?.[0] ?? null); setOut(""); setError(null); }} className="block w-full rounded-md border border-border p-2 text-sm" /><p className="text-xs text-muted">{selectedFile ? `${selectedFile.name} · ${selectedFile.size.toLocaleString()} bytes` : "The file never leaves this device."}</p></div> : null}
+    <div className="grid gap-4 md:grid-cols-2">
+      <label className="block space-y-1.5"><Label htmlFor="dev-input">{op.toLowerCase().includes("regex") ? "Regular expression" : "Input"}</Label><Textarea id="dev-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder="Paste your code, data, token, URL, or text here…" /></label>
+      {needsSecond ? <label className="block space-y-1.5"><Label htmlFor="dev-secondary">{op.toLowerCase().includes("regex") ? "Test text" : op.toLowerCase().includes("json-path") ? "JSON path" : "Second input"}</Label><Textarea id="dev-secondary" value={secondary} onChange={(e) => setSecondary(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder={op.toLowerCase().includes("json-path") ? "$.items[0].id" : op.toLowerCase().includes("regex") ? 'One sample or JSON array, e.g. ["order-12", "invoice-8"]' : "Paste comparison input or test text…"} /></label> : null}
+    </div>
+    {op.toLowerCase().includes("regex") ? <p className="text-xs text-muted" role="note">Engine: JavaScript RegExp on Web. For independent test cases, paste a JSON array of strings into Test text. The same flags apply to each sample. Suspected high-backtracking patterns may be skipped for long samples to protect responsiveness; this is a heuristic, not a general execution timeout.</p> : null}
     <div className="flex flex-wrap items-end gap-3">
-      {op.includes("regex") ? <label className="space-y-1.5"><Label htmlFor="dev-flags">Regex flags</Label><Input id="dev-flags" value={flags} onChange={(e) => setFlags(e.target.value)} className="w-28 font-mono" /></label> : null}
-      <Button type="button" onClick={run}>Run tool</Button>
-      <Button type="button" variant="ghost" onClick={() => { setInput(""); setSecondary(""); setOut(""); setError(null); }}>Reset</Button>
+      {op.toLowerCase().includes("regex") ? <label className="space-y-1.5"><Label htmlFor="dev-flags">Regex flags</Label><Input id="dev-flags" value={flags} onChange={(e) => setFlags(e.target.value)} className="w-28 font-mono" /></label> : null}
+      {isRegexReplace ? <label className="space-y-1.5"><Label htmlFor="dev-replacement">Replacement</Label><Input id="dev-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-48 font-mono" placeholder="Replacement text" /></label> : null}
+      <Button type="button" onClick={() => void run()} disabled={busy}>{busy ? "Processing…" : actionLabel(op)}</Button>
+      <Button type="button" variant="ghost" onClick={() => { setInput(""); setSecondary(""); setFlags("g"); setReplacement(""); setSelectedFile(null); setOut(""); setError(null); }}>Reset</Button>
     </div>
     <ErrorBanner message={error} />
     <CodeResult code={out} filename={`env-${op}.txt`} />
+    {relatedTools.length ? <nav aria-label="Related Developer Studio tools" className="space-y-2 border-t border-border pt-3">
+      <h2 className="text-sm font-medium">Related tools in this Studio</h2>
+      <div className="flex flex-wrap gap-2">{relatedTools.map((related) => <a key={related.id} href={toolPath(related)} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2">{related.name}</a>)}</div>
+    </nav> : null}
   </div>;
 }

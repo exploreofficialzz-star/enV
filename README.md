@@ -28,6 +28,16 @@ npm run build
 
 `npm run build` creates the Vercel/Nitro production output. It deliberately does **not** mutate a database during a Vercel build. Authentication is disabled by default.
 
+## Developer utilities audit
+
+The Developer category's platform-specific implementation notes, regression evidence, competitor/user-feedback research, known limitations, and next-priority backlog are maintained in:
+
+- [Developer category audit and verification record](audit/DEVELOPER-CATEGORY-AUDIT-2026-10-13.md)
+- [Competitive research and feedback-to-fix mapping](audit/COMPETITIVE-RESEARCH-AND-IMPLEMENTATION-REVIEW-2026-10-13.md)
+- [Developer category changelog](audit/DEVELOPER-CATEGORY-CHANGELOG.md)
+
+The reports distinguish source-level changes and automated Web checks from Android/iOS builds and device/network tests that have not run in environments with the required SDKs.
+
 ## Vercel deployment
 
 The repository is configured for Vercel through the Nitro Vercel preset in `vite.config.ts` and `vercel.json`.

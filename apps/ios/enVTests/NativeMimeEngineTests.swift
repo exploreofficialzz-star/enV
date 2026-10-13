@@ -8,6 +8,10 @@ final class NativeMimeEngineTests: XCTestCase {
         Tool(id: id, name: id, slug: id, description: "", category: category, subcategory: nil, keywords: [], tags: [], icon: "File", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "mime", id: "lookup", op: "lookup"))
     }
 
+    private func developerTool(_ id: String) -> Tool {
+        Tool(id: id, name: id, slug: id, description: "", category: "developer", subcategory: nil, keywords: [], tags: [], icon: "Code", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "developer", id: id, op: id))
+    }
+
     func testCanonicalActiveMimeIDsHaveTheSameLocalLookupOperation() {
         XCTAssertEqual(NativeMimeEngine.supportedToolIDs, activeIDs)
         activeIDs.forEach { XCTAssertEqual(NativeMimeEngine.operation(forToolID: $0), "lookup") }
@@ -48,5 +52,28 @@ final class NativeMimeEngineTests: XCTestCase {
         XCTAssertEqual(NativeMimeEngine.inspect(fileName: "sound.wav", bytes: [0x52, 0x49, 0x46, 0x46]).entry?.ext, "webp")
         XCTAssertNil(NativeMimeEngine.operation(forToolID: "mime-encoder"))
         XCTAssertThrowsError(try NativeMimeEngine.run(toolID: "mime-encoder"))
+    }
+
+
+    func testNativeDeveloperFileHashMatchesSHA256GoldenVector() throws {
+        let result = NativeUtilityEngine.hashDeveloperFileData(op: "sha256-hash", data: Data("hello".utf8))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any])
+        let hashes = try XCTUnwrap(object["hashes"] as? [[String: Any]])
+        XCTAssertEqual(hashes.first?["digest"] as? String, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")
+        XCTAssertEqual(object["localOnly"] as? Bool, true)
+    }
+
+    func testNativeDeveloperSQLQueryBuilderUsesParameterPlaceholders() throws {
+        let spec: [String: Any] = ["table": "users", "columns": ["id", "email"], "filters": [["column": "active", "operator": "=", "value": true]], "limit": 25]
+        let data = try JSONSerialization.data(withJSONObject: spec, options: [.sortedKeys])
+        let result = try NativeUtilityEngine.run(developerTool("developer-sql-query-builder"), input: String(decoding: data, as: UTF8.self)).text
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any])
+        XCTAssertTrue((object["sql"] as? String ?? "").contains("WHERE \"active\" = ? LIMIT 25"))
+        XCTAssertEqual((object["parameters"] as? [Any])?.count, 1)
+        XCTAssertThrowsError(try NativeUtilityEngine.run(developerTool("developer-sql-query-builder"), input: "{\"table\":\"users; DROP TABLE users\"}"))
+    }
+
+    func testNativeHashDecoderRejectsImpossibleReverseOperation() throws {
+        XCTAssertThrowsError(try NativeUtilityEngine.run(developerTool("hash-decoder"), input: "abc"))
     }
 }

@@ -3,6 +3,7 @@ package com.chastech.env
 import com.chastech.env.data.EngineInfo
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.engine.NativeUtilityEngine
+import java.io.ByteArrayInputStream
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -51,10 +52,13 @@ class NativeDeveloperToolTest {
     }
 
     @Test fun regexFieldsFlagsAndReplaceToolFollowTheWebMatchReport() {
-        val options = JSONObject().put("secondary", "Cat cat").put("flags", "gi").toString()
-        val expected = "Pattern: /cat/\nMatches: 2\n\n1. Cat at index 0\n2. cat at index 4"
-        assertEquals(expected, NativeUtilityEngine.run(tool("regex-tester"), "cat", options).text)
-        assertEquals(expected, NativeUtilityEngine.run(tool("regex-replace"), "cat", options).text)
+        val options = JSONObject().put("secondary", "Cat cat").put("flags", "gi").put("replacement", "dog").toString()
+        val matches = NativeUtilityEngine.run(tool("regex-tester"), "cat", options).text
+        assertTrue(matches.contains("Matches: 2"))
+        assertTrue(matches.contains("Cat at index 0"))
+        val replaced = JSONObject(NativeUtilityEngine.run(tool("regex-replace"), "cat", options).text)
+        assertEquals("dog dog", replaced.getString("preview"))
+        assertEquals(2, replaced.getJSONArray("matches").length())
     }
 
     @Test fun urlParserReturnsBrowserJsonContractAndLastDuplicateQueryValue() {
@@ -72,26 +76,40 @@ class NativeDeveloperToolTest {
     }
 
     @Test fun browserVerifiedEncodingCsvMimeMarkupAndFallbacksMatch() {
-        assertEquals("4869", NativeUtilityEngine.run(tool("ascii-encoder"), "Hi").text)
+        assertEquals("72 105", NativeUtilityEngine.run(tool("ascii-encoder"), "Hi").text)
         assertEquals("name,age\nAda,36\nGrace,40", NativeUtilityEngine.run(tool("csv-formatter"), "name,age\nAda,36\nGrace,40").text)
         assertEquals("application/pdf", NativeUtilityEngine.run(tool("mime-validator"), "pdf").text)
         assertEquals("Valid markup/XML.", NativeUtilityEngine.run(tool("xml-validator"), "<root><child>ok</child></root>").text)
-        assertEquals("template", NativeUtilityEngine.run(tool("developer-api-mock-response-generator"), "  template  ").text)
-        val invalidUrl = runCatching { NativeUtilityEngine.run(tool("data-uri-generator"), "hello") }.exceptionOrNull()
-        assertTrue(invalidUrl?.message?.contains("Failed to construct 'URL': Invalid URL") == true)
-        assertEquals("Use a local file input for the file hash tool.", runCatching { NativeUtilityEngine.run(tool("file-hash-calculator"), "hello") }.exceptionOrNull()?.message)
+        assertTrue(JSONObject(NativeUtilityEngine.run(tool("developer-api-mock-response-generator"), "{\"id\":1}").text).getJSONObject("meta").getBoolean("mock"))
+        assertEquals("data:text/plain;base64,aGVsbG8=", NativeUtilityEngine.run(tool("data-uri-generator"), "hello").text)
+        assertTrue(runCatching { NativeUtilityEngine.run(tool("file-hash-calculator"), "hello") }.exceptionOrNull()?.message?.contains("local file") == true)
         assertEquals("422 Unprocessable Content", NativeUtilityEngine.run(tool("http-status-lookup"), "422").text)
     }
 
     @Test fun webDocumentedValidatorsStatusAndFallbacksMatch() {
-        assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
-        assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
+        assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
+        assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "not-a-uuid").text)
         assertEquals("404 Not Found", NativeUtilityEngine.run(tool("http-status-lookup"), "404").text)
         assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "418").text.contains("504 Gateway Timeout"))
         assertEquals("a=1&b=2", NativeUtilityEngine.run(tool("query-string-parser"), "a=1&b=2").text)
         assertEquals("Mozilla/5.0", NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
-        assertEquals("Cron: \nFive-field format: minute hour day-of-month month day-of-week", NativeUtilityEngine.run(tool("cron-parser"), "").text)
+        assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
         assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
+    }
+
+    @Test fun nativeFileHashUsesRawBytesAndMatchesSHA256GoldenVector() {
+        val report = JSONObject(NativeUtilityEngine.hashDeveloperFileStream("sha256-hash", ByteArrayInputStream("hello".toByteArray())))
+        assertEquals("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", report.getJSONArray("hashes").getJSONObject(0).getString("digest"))
+        assertTrue(report.getBoolean("localOnly"))
+    }
+
+    @Test fun nativeSQLQueryBuilderUsesBoundParametersAndRejectsUnsafeIdentifiers() {
+        val spec = JSONObject().put("table", "users").put("columns", org.json.JSONArray(listOf("id", "email"))).put("filters", org.json.JSONArray().put(JSONObject().put("column", "active").put("operator", "=").put("value", true))).put("limit", 25)
+        val result = JSONObject(NativeUtilityEngine.run(tool("developer-sql-query-builder"), spec.toString()).text)
+        assertTrue(result.getString("sql").contains("WHERE \"active\" = ? LIMIT 25"))
+        assertEquals(true, result.getJSONArray("parameters").get(0))
+        val bad = runCatching { NativeUtilityEngine.run(tool("developer-sql-query-builder"), "{\"table\":\"users; DROP TABLE users\"}") }.exceptionOrNull()
+        assertTrue(bad?.message?.contains("identifier", ignoreCase = true) == true)
     }
 }

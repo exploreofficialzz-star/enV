@@ -99,7 +99,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
     case "file-converter":
       return <FileConverterEngine op={tool.engine.op} />;
     case "developer":
-      return <DeveloperEngine op={tool.engine.op} />;
+      return <DeveloperEngine op={tool.engine.op} tool={tool} />;
     case "pdf":
       return <PdfEngine op={tool.engine.op} />;
     case "mime":

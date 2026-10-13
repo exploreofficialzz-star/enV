@@ -711,8 +711,105 @@ private struct NativeUtilityToolView: View {
 }
 
 enum NativeDeveloperToolFormPolicy {
-    static func needsSecondInput(_ op:String) -> Bool { ["diff","regex","replace","compare"].contains { op.contains($0) } }
-    static func needsRegexFlags(_ op:String) -> Bool { op.contains("regex") }
+    static func needsSecondInput(_ op:String) -> Bool { ["diff","regex","replace","compare","json-path","jsonpath","uuid-generator","uuid-batch","http-request-builder"].contains { op.localizedCaseInsensitiveContains($0) } }
+    static func needsRegexFlags(_ op:String) -> Bool { op.localizedCaseInsensitiveContains("regex") }
+    static func needsReplacement(_ op:String) -> Bool { op.localizedCaseInsensitiveContains("regex-replace") }
+    static func isFileHash(_ op:String) -> Bool { op.localizedCaseInsensitiveContains("file-hash") }
+    static func actionLabel(_ op:String) -> String {
+        if op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier") { return "Format" }
+        if op.localizedCaseInsensitiveContains("minifier") { return "Minify" }
+        if op.localizedCaseInsensitiveContains("validator") { return "Validate" }
+        if op.localizedCaseInsensitiveContains("regex-tester") { return "Test pattern" }
+        if op.localizedCaseInsensitiveContains("encoder") { return "Encode" }
+        if op.localizedCaseInsensitiveContains("decoder") { return "Decode" }
+        if op.localizedCaseInsensitiveContains("generator") || op.localizedCaseInsensitiveContains("builder") { return "Generate" }
+        if op.localizedCaseInsensitiveContains("parser") { return "Parse" }
+        if op.localizedCaseInsensitiveContains("diff") || op.localizedCaseInsensitiveContains("compare") { return "Compare" }
+        if op.localizedCaseInsensitiveContains("explainer") { return "Explain" }
+        if op.localizedCaseInsensitiveContains("hash") { return "Calculate hash" }
+        return "Run"
+    }
+    static func example(_ op:String) -> (input:String, secondary:String) {
+        let lower=op.lowercased()
+        let uuid="550e8400-e29b-41d4-a716-446655440000"
+        let sha256="2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        let jwt="eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJleGFtcGxlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9."
+        if lower.contains("file-hash") { return ("","") }
+        if lower.contains("json-path") || lower.contains("jsonpath") { return ("{\"user\":{\"name\":\"Ada\"},\"items\":[{\"id\":1},{\"id\":2}]}", "$.items[0].id") }
+        if lower.contains("json-diff") { return ("{\"name\":\"Ada\",\"active\":true}", "{\"name\":\"Ada Lovelace\",\"active\":true}") }
+        if lower.contains("json") && lower.hasSuffix("-decoder") { return ("eyJuYW1lIjoiQWRhIiwiaXRlbXMiOlsxLDJdfQ==", "") }
+        if lower.contains("hash-compare") || lower.contains("hash-diff") { return (sha256,sha256) }
+        if lower.hasSuffix("-diff") { return ("before\nold-value\n", "after\nnew-value\n") }
+        if lower.contains("json") { return ("{\"name\":\"Ada\",\"items\":[1,2],\"active\":true}", "") }
+        if lower.contains("query-string-parser") || lower.contains("query-parser") { return ("q=one&q=two&space=hello+world","") }
+        if lower.contains("query-string-builder") || lower.contains("url-query-builder") { return ("{\"q\":\"hello world\",\"tag\":[\"a\",\"b\"]}","") }
+        if lower.contains("developer-sql-query-builder") || lower.contains("sql-query-builder") { return ("{\"table\":\"users\",\"columns\":[\"id\",\"email\"],\"filters\":[{\"column\":\"active\",\"operator\":\"=\",\"value\":true}],\"limit\":25}","") }
+        if lower.contains("graphql-variables-builder") { return ("{\"id\":\"example-123\",\"active\":true}","") }
+        if lower.contains("graphql-query-builder") { return ("Example","") }
+        if lower.contains("api-mock-response") { return ("{\"id\":\"example-1\",\"message\":\"Mock response\"}","") }
+        if lower.contains("webhook") && (lower.contains("generator") || lower.contains("builder")) { return ("order.paid","") }
+        if lower.contains("jwt-claim-builder") || lower.contains("jwt-payload-generator") || lower=="jwt-encoder" || lower=="jwt-generator" { return ("{\"sub\":\"example-user\",\"iat\":1700000000,\"exp\":4102444800}","") }
+        if lower.contains("jwt") { return (jwt,"") }
+        if lower.contains("regex-replace") { return (#"\bcat\b"#, "cat CAT catalog") }
+        if lower.contains("regex") { return (#"\bcat\b"#, "A cat, a CAT, and a catalog.") }
+        if lower.contains("cron") && lower.hasSuffix("-decoder") { return ("Ki8xNSAqICogKiAq","") }
+        if lower.contains("cron") { return ("*/15 * * * *","") }
+        if lower.contains("timestamp") || lower.contains("epoch") { return ("1700000000","") }
+        if lower.contains("uuid-generator") || lower.contains("uuid-batch-generator") { return ("","10") }
+        if lower.contains("uuid-decoder") { return (uuid.replacingOccurrences(of:"-",with:""),"") }
+        if lower.contains("uuid") { return (uuid,"") }
+        if lower.contains("hash-compare") || lower.contains("hash-diff") { return (sha256,sha256) }
+        if lower.contains("hash-decoder") { return (sha256,"") }
+        if lower.contains("hash") && ["validator","tester","formatter","beautifier","minifier","parser","inspector"].contains(where:{lower.hasSuffix("-\($0)")}) { return (sha256,"") }
+        if lower.contains("hash") { return ("hello","") }
+        if lower.contains("base64") && ["decoder","formatter","beautifier","minifier","converter","parser","inspector","preview","validator","tester"].contains(where:{lower.hasSuffix("-\($0)")}) { return ("SGk=","") }
+        if lower.contains("base64") { return ("enV 🚀 — local and private","") }
+        if lower.contains("ascii") && ["decoder","validator","tester","parser"].contains(where:{lower.hasSuffix("-\($0)")}) { return ("72 105","") }
+        if lower.contains("ascii") { return ("Hello","") }
+        if lower.contains("binary") && ["decoder","validator","tester","parser"].contains(where:{lower.hasSuffix("-\($0)")}) { return ("01001000 01101001","") }
+        if lower.contains("binary") { return ("Hi","") }
+        if lower.contains("hex") && ["decoder","validator","tester","parser"].contains(where:{lower.hasSuffix("-\($0)")}) { return ("48 69","") }
+        if lower.contains("hex") { return ("Hello","") }
+        if lower.contains("unicode") && ["decoder","validator","tester"].contains(where:{lower.hasSuffix("-\($0)")}) { return (#"\u0041\u0020\ud83d\ude80"#,"") }
+        if lower.contains("unicode") { return ("A 🚀","") }
+        if ["docker","git","graphql","http","javascript","kubernetes","markdown","nginx","openapi","sql","typescript","yaml","csv","mime"].contains(where:{lower.hasPrefix("\($0)-") || lower.hasPrefix("developer-\($0)-")}) && lower.hasSuffix("-decoder") { return ("SGk=","") }
+        if lower.contains("data-uri") && lower.contains("decoder") { return ("data:text/plain;base64,SGk=","") }
+        if (lower.contains("html") || lower.contains("xml") || lower.contains("svg")) && lower.hasSuffix("-decoder") { return ("&lt;root&gt;Hi&lt;/root&gt;","") }
+        if lower.contains("css") && lower.hasSuffix("-decoder") { return ("hello\\a world","") }
+        if lower.contains("data-uri") { return ("Hello from enV","") }
+        if (lower.contains("url") || lower.contains("uri")) && lower.contains("decoder") { return ("hello%20world%20%26%20tea","") }
+        if (lower.contains("url") || lower.contains("uri")) && lower.contains("encoder") { return ("hello world & tea","") }
+        if lower.contains("url") || lower.contains("uri") { return ("https://example.com/path?q=one&q=two#section","") }
+        if lower.contains("cookie-parser") { return ("session=abc123; theme=dark; consent=yes","") }
+        if lower.contains("header-builder") { return ("{\"Accept\":\"application/json\",\"X-Example\":\"enV\"}","") }
+        if lower.contains("ip-header-parser") { return ("X-Forwarded-For: 192.0.2.1, 10.0.0.2","") }
+        if lower.contains("status-code") || lower.contains("http-status") { return ("404","") }
+        if lower.contains("mime") || lower.contains("content-type") { return ("json","") }
+        if lower.contains("csv") && lower.hasSuffix("-decoder") { return ("SGk=","") }
+        if lower.contains("csv") && ["validator","tester","parser","formatter","beautifier","minifier","inspector"].contains(where:{lower.hasSuffix("-\($0)")}) { return ("name,quote\nAda,\"Hello, world\"\nGrace,\"She said \"\"hi\"\"\"","") }
+        if lower.contains("csv") { return ("[{\"name\":\"Ada\",\"age\":36},{\"name\":\"Grace\",\"age\":37}]","") }
+        if lower.contains("xml") || lower.contains("html") || lower.contains("svg") { return ("<root><name>Ada</name></root>","") }
+        if lower.contains("css") { return (".card { color: #0d9f8a; padding: 16px; }","") }
+        if lower.contains("sql") { return ("SELECT id, name FROM users WHERE active = true ORDER BY name;","") }
+        if lower.contains("yaml") { return ("app:\n  name: enV\n  enabled: true","") }
+        if lower.contains("graphql") { return ("query Example($id: ID!) { user(id: $id) { id name } }","") }
+        if lower.contains("markdown-to-html") { return ("# Hello\n\nA paragraph with **bold** and [a link](https://example.test).","") }
+        if lower.contains("markdown") { return ("# Hello\n\nA paragraph with **bold**.","") }
+        if lower.contains("gitignore") { return ("node","") }
+        if lower.contains("docker") { return ("node","") }
+        if lower.contains("nginx") { return ("server { listen 80; server_name example.test; }","") }
+        if lower.contains("readme") { return ("enV Developer Studio","") }
+        if lower.contains("environment-variable") { return ("APP_ENV\nAPI_BASE_URL\nLOG_LEVEL","") }
+        if lower.contains("openapi") { return ("enV Example API","") }
+        if lower.contains("branch-name") { return ("Add local hash utilities","") }
+        if lower.contains("commit-message") { return ("fix: handle empty input safely","") }
+        if lower.contains("changelog") { return ("Unreleased\nImprove local developer utilities\nFix invalid input errors","") }
+        if lower.contains("user-agent") { return ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36","") }
+        if lower.contains("http-request-builder") { return ("https://api.example.test/v1?q=hi","POST") }
+        if lower.contains("http") && !lower.contains("encoder") && !lower.contains("decoder") { return ("GET /health HTTP/1.1\nHost: api.example.test\nAccept: application/json","") }
+        if lower.contains("semantic-version") { return ("1.2.3 patch","") }
+        return ("Example input for \(op)","")
+    }
 }
 
 private struct NativePlainTextDocument: FileDocument {
@@ -745,18 +842,39 @@ private struct NativeDeveloperToolView: View {
     @State private var input=""
     @State private var secondary=""
     @State private var flags="g"
+    @State private var replacement="dog"
     @State private var output=""
     @State private var error:String?
     @State private var isExporting=false
+    @State private var isImporting=false
+    @State private var selectedFileName=""
     private var op:String { tool.engine.op ?? tool.engine.id ?? tool.id }
+    private var isFileHash:Bool { NativeDeveloperToolFormPolicy.isFileHash(op) }
 
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
-            NativeDeveloperTextArea(title:"Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
-            if NativeDeveloperToolFormPolicy.needsSecondInput(op) { NativeDeveloperTextArea(title:"Second input / test string",text:$secondary) }
-            if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags",text:$flags) }
+            Text("Runs entirely on this device. Nothing is uploaded.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(Color.envSurface2,in:RoundedRectangle(cornerRadius:10))
             HStack(spacing:10) {
-                Button("Run tool",action:run).buttonStyle(.borderedProminent)
+                Button("Load example") {
+                    let sample=NativeDeveloperToolFormPolicy.example(op)
+                    input=sample.input; secondary=sample.secondary; flags=op.contains("regex") ? "gi" : "g"; replacement="dog"; output=""; error=nil
+                }.buttonStyle(.bordered)
+                Text("Text tools process locally on this device.").font(.caption).foregroundStyle(.secondary)
+            }
+            if isFileHash {
+                HStack(spacing:10) {
+                    Button("Choose local file") { isImporting=true }.buttonStyle(.bordered)
+                    Text(selectedFileName.isEmpty ? "Select a file to hash locally" : selectedFileName).font(.footnote).lineLimit(2).truncationMode(.middle)
+                }
+            }
+            NativeDeveloperTextArea(title:op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
+            if NativeDeveloperToolFormPolicy.needsSecondInput(op) {
+                NativeDeveloperTextArea(title:op.contains("regex") ? "Test text" : op.contains("json-path") || op.contains("jsonpath") ? "JSON path (e.g. $.items[0].id)" : op.contains("uuid") ? "Batch count" : "Second input",text:$secondary)
+            }
+            if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags (g/i/m/s)",text:$flags) }
+            if NativeDeveloperToolFormPolicy.needsReplacement(op) { NativeInputField(title:"Replacement text",text:$replacement) }
+            HStack(spacing:10) {
+                Button(NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
                 Button("Reset",action:reset).buttonStyle(.bordered)
             }
             if !output.isEmpty {
@@ -767,6 +885,19 @@ private struct NativeDeveloperToolView: View {
             }
             NativeOutputView(output:output,error:error)
         }
+        .fileImporter(isPresented:$isImporting,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
+            do {
+                let url=try result.get()
+                let gotAccess=url.startAccessingSecurityScopedResource()
+                defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
+                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+                let size=(attributes[.size] as? NSNumber)?.int64Value ?? 0
+                guard size <= 2 * 1024 * 1024 * 1024 else { throw NativeSimpleError.message("File exceeds the 2 GiB local hashing safety limit.") }
+                let data=try Data(contentsOf:url,options:.mappedIfSafe)
+                output=NativeUtilityEngine.hashDeveloperFileData(op:op,data:data)
+                selectedFileName=url.lastPathComponent; error=nil
+            } catch let caughtError { output=""; error=caughtError.localizedDescription }
+        }
         .fileExporter(isPresented:$isExporting,document:NativePlainTextDocument(text:output),contentType:.plainText,defaultFilename:"env-\(op).txt") { result in
             if case let .failure(caughtError)=result { error=caughtError.localizedDescription }
         }
@@ -776,13 +907,18 @@ private struct NativeDeveloperToolView: View {
         var options=[String:String]()
         if NativeDeveloperToolFormPolicy.needsSecondInput(op) { options["secondary"]=secondary }
         if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { options["flags"]=flags }
+        if NativeDeveloperToolFormPolicy.needsReplacement(op) { options["replacement"]=replacement }
         do {
+            if isFileHash {
+                if selectedFileName.isEmpty { throw NativeSimpleError.message("Choose a local file first. File bytes are never uploaded.") }
+                return
+            }
             let data=try JSONSerialization.data(withJSONObject:options,options:[.sortedKeys])
             let raw=String(data:data,encoding:.utf8) ?? "{}"
             output=try NativeUtilityEngine.run(tool,input:input,optionsJSON:raw).text; error=nil
         } catch let caughtError { output=""; error=caughtError.localizedDescription }
     }
-    private func reset() { input=""; secondary=""; output=""; error=nil }
+    private func reset() { input=""; secondary=""; flags="g"; replacement="dog"; output=""; error=nil; selectedFileName="" }
 }
 
 private struct NativeConverterToolView: View {
