@@ -59,7 +59,7 @@ f37d4c45e952815d1400b510e421982f2f47398f467d98527bcc7467b15d6196  ./apps/android
 9cbe1743502a28fcefe7d3c11d6946fe9451963475929254fdeb60ff1a960910  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeNumberParser.kt
 4e9b6e8104b50aa8d915f2c64545b8270f6265ec0fd4944645724ae89b855c14  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeTextEngine.kt
 0662897d74b63947bf9e83a59a6928f8467d34e4950c64988aef7913e745fee2  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUrlMediaInfoEngine.kt
-8f7ffbae3540bf6592d36f40864a3fc6e376d143e8f9f4e62fade18d5caf70a7  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
+f46358c7b884eae5cfd38c067494da67740795cb7153d32cd3789d45f255e8b9  ./apps/android/app/src/main/java/com/chastech/env/engine/NativeUtilityEngine.kt
 a5a6943104c54c75d00194fbe7695dd226a31700d966a581794cf9b42f7a1bcc  ./apps/android/app/src/main/java/com/chastech/env/ui/CharacterSpacedText.kt
 eb419c899f54683787373df2e02605370c8363276f5375492b85d8c7c7df2024  ./apps/android/app/src/main/java/com/chastech/env/ui/EnVBrandAssets.kt
 509b375ceba9e1e77fb488c06683862b5c85651711d44ac2ed965a76f235425a  ./apps/android/app/src/main/java/com/chastech/env/ui/Theme.kt
@@ -162,7 +162,7 @@ be647328a92321ebc8d2b261b0680f3d56a566380f37bd586fe1ef78d0cd45c8  ./apps/ios/enV
 3df1ab820373e35b2eb41f8c25ac35c687fd437c4eda65fe742067b2e8165822  ./apps/ios/enV/NativeNumberParser.swift
 63e6f41af4aff5eb1b631d1e074519c215edb16b3a4d76614182c85a2a397698  ./apps/ios/enV/NativeTextEngine.swift
 d7f51061287af1872bc5906740a2b0dff47e8d7af2e723a8b4da4f8db1c079e3  ./apps/ios/enV/NativeUrlMediaInfoEngine.swift
-bcb2fdaea26d9442e10c5dd2875a8aaf3a4c98403bf748d758413f2e315d5d1e  ./apps/ios/enV/NativeUtilityEngine.swift
+b5429b73211b5c6bc5315cd31433ec58ed09098c75c6f8afbf5184aa024d2440  ./apps/ios/enV/NativeUtilityEngine.swift
 4d69cd7d5671caa811ffada11510689cae27f3911c656bea7fb948a284152423  ./apps/ios/enV/ToolViews.swift
 312de7ff801a1f1f5b5b1337a905531860a96128c50579c25fd9b265788c5a33  ./apps/ios/enV/enVApp.swift
 b68096c17562e1fef9a27d32ed49a45f7ab5812fd08eedff95f56bc05abe96db  ./apps/ios/enVTests/CatalogCoreTests.swift

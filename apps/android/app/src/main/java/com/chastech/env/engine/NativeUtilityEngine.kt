@@ -1,6 +1,5 @@
 package com.chastech.env.engine
 
-import android.util.Base64
 import com.chastech.env.data.ToolRecord
 import org.json.JSONArray
 import org.json.JSONObject
@@ -178,6 +177,8 @@ object NativeUtilityEngine {
     }
 
     /** Strict text decode: reject bad padding, noncanonical pad bits, and invalid UTF-8. */
+    private fun encodeBase64NoWrap(bytes: ByteArray): String = java.util.Base64.getEncoder().encodeToString(bytes)
+
     private fun decodeBase64Text(input: String, urlSafe: Boolean = false): String {
         val compact = input.filterNot { it.isWhitespace() }
         val alphabet = if (urlSafe) "[A-Za-z0-9_-]" else "[A-Za-z0-9+/]"
@@ -341,7 +342,7 @@ object NativeUtilityEngine {
             "port-lookup","port-reference" -> { val name=opts["name"]?.trim()?.lowercase(); if(!name.isNullOrBlank()) commonPorts.entries.filter { it.value.lowercase().contains(name) }.joinToString("\n") { "${it.key}: ${it.value}" }.ifBlank { "No match in the common-port reference." } else { val p=(opts["port"] ?: input).toIntOrNull() ?: 443; commonPorts[p]?.let { "$p/TCP or UDP: $it" } ?: "$p: not in the built-in common-port reference." } }
             "http-status-reference" -> httpStatuses.joinToString("\n") { "${it.first}: ${it.second}" }
             "header-format","header-parser" -> lines(opts["headers"] ?: input.ifBlank { "Content-Type: application/json\nAuthorization: Bearer YOUR_TOKEN" }).map { line -> val i=line.indexOf(":"); if(i>0) "${line.substring(0,i).trim()}: ${line.substring(i+1).trim()}" else line }.let { rows -> if(op=="header-parser") rows.map { val i=it.indexOf(":"); if(i>0) "${it.substring(0,i)} → ${it.substring(i+1).trim()}" else it }.joinToString("\n") else rows.joinToString("\n") }
-            "basic-auth-header" -> "Basic ${Base64.encodeToString("${opts["username"] ?: ""}:${opts["password"] ?: ""}".toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
+            "basic-auth-header" -> "Basic ${encodeBase64NoWrap("${opts["username"] ?: ""}:${opts["password"] ?: ""}".toByteArray(StandardCharsets.UTF_8))}"
             "bearer-header" -> "Bearer ${opts["token"] ?: input}"
             "connection-info" -> "Online status is device/runtime dependent; native engine cannot expose browser Network Information API fields."
             "http-method-reference" -> httpMethods.joinToString("\n") { "${it.first}: ${it.second}" }
@@ -422,7 +423,7 @@ object NativeUtilityEngine {
         if (value.equals("00000000-0000-0000-0000-000000000000", true)) return "Valid Nil UUID (all-zero identifier)."
         if (value.equals("ffffffff-ffff-ffff-ffff-ffffffffffff", true)) return "Valid Max UUID (all-one identifier)."
         val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-8])[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(value)
-        return match?.groupValues?.get(1)?.let { "Valid UUID version $it (RFC variant)." } ?: "Invalid UUID: expected canonical 8-4-4-4-12 form with UUID version 1–8 and RFC variant."
+        return match?.groupValues?.get(1)?.let { "Valid UUID v$it" } ?: "Invalid UUID"
     }
 
     private fun runDeveloper(op: String, input: String, opts: Map<String, String>): String {
@@ -604,44 +605,75 @@ object NativeUtilityEngine {
      * nodes are built. This traversal counts the structure but never mutates or uploads the document.
      */
     private fun developerJsonInspector(raw: String, maxNodes: Int = 100_000): String {
-        require(raw.toByteArray(StandardCharsets.UTF_8).size <= 50 * 1024 * 1024) {
+        val byteCount = raw.toByteArray(StandardCharsets.UTF_8).size
+        require(byteCount <= 50 * 1024 * 1024) {
             "JSON input exceeds the 50 MiB inspection safety limit; inspect smaller sections."
         }
-        // The caller also performs the dispatcher’s strict JSON parse; use JSONTokener here to
-        // avoid coupling this reusable class-level helper to a local dispatcher function.
-        val root = org.json.JSONTokener(raw).nextValue()
-        fun typeOf(value: Any?): String = when (value) {
-            is JSONObject -> "object"; is JSONArray -> "array"; JSONObject.NULL -> "null"
-            is String -> "string"; is Number -> "number"; is Boolean -> "boolean"; else -> "unknown"
+        // Validate syntax without materializing an object: Android JSONTokener rejects duplicate
+        // object keys, but inspection must report them rather than fail on otherwise-valid JSON.
+        StrictJsonValidator(raw).validate()
+        var index = 0
+        var nodes = 0; var maxDepth = 0; var objects = 0; var arrays = 0
+        var properties = 0; var arrayItems = 0; var strings = 0
+        var truncated = false; var stopped = false
+        val duplicates = mutableListOf<String>()
+        fun whitespace() { while (index < raw.length && raw[index] in charArrayOf(' ', '\t', '\r', '\n')) index++ }
+        fun readString(): String {
+            val start = index++
+            while (index < raw.length) {
+                val ch = raw[index++]
+                if (ch == '\\' && index < raw.length) index++
+                else if (ch == '"') break
+            }
+            return org.json.JSONTokener(raw.substring(start, index)).nextValue() as String
         }
-        var nodes=0; var maxDepth=0; var objects=0; var arrays=0; var properties=0; var arrayItems=0; var strings=0
-        val stack=java.util.ArrayDeque<Pair<Any?,Int>>()
-        stack.addLast(root to 0)
-        while (stack.isNotEmpty() && nodes < maxNodes) {
-            val (value,depth)=stack.removeLast(); nodes++; maxDepth=maxOf(maxDepth,depth)
-            when(value) {
-                is JSONObject -> { objects++; val keys=value.keys(); val entries=mutableListOf<Pair<String,Any?>>()
-                    while(keys.hasNext()) { val key=keys.next(); entries += key to value.opt(key) }
-                    properties += entries.size; entries.forEach { stack.addLast(it.second to depth+1) }
+        fun value(path: String, depth: Int) {
+            whitespace()
+            if (stopped) return
+            if (nodes >= maxNodes || depth > 100) { truncated = true; stopped = true; return }
+            nodes++; maxDepth = maxOf(maxDepth, depth)
+            when (raw[index]) {
+                '"' -> { strings++; readString() }
+                '{' -> {
+                    objects++; index++; whitespace()
+                    val keys = mutableSetOf<String>()
+                    if (index < raw.length && raw[index] == '}') index++ else while (!stopped) {
+                        whitespace(); val key = readString(); properties++
+                        val child = "$path[${JSONObject.quote(key)}]"
+                        if (!keys.add(key)) duplicates += child
+                        whitespace(); index++ // colon; syntax was already checked above
+                        value(child, depth + 1); whitespace()
+                        if (stopped) break
+                        if (raw[index] == '}') { index++; break }
+                        index++ // comma
+                    }
                 }
-                is JSONArray -> { arrays++; arrayItems += value.length(); for(i in value.length()-1 downTo 0) stack.addLast(value.opt(i) to depth+1) }
-                is String -> strings++
+                '[' -> {
+                    arrays++; index++; whitespace(); var item = 0
+                    if (index < raw.length && raw[index] == ']') index++ else while (!stopped) {
+                        arrayItems++; value("$path[$item]", depth + 1); item++; whitespace()
+                        if (stopped) break
+                        if (raw[index] == ']') { index++; break }
+                        index++ // comma
+                    }
+                }
+                else -> while (index < raw.length && raw[index] !in charArrayOf(',', ']', '}', ' ', '\t', '\r', '\n')) index++
             }
         }
-        val truncated=stack.isNotEmpty()
-        val unsafe=scanUnsafeJsonIntegerTokens(raw)
-        val (duplicateKeys, duplicateScanTruncated)=scanDuplicateJsonKeyPaths(raw)
-        val warnings=JSONArray()
-        if(unsafe.length()>0) warnings.put("Raw integer tokens exceed JavaScript's exact integer range; keep exact identifiers as strings when interoperating with JavaScript.")
-        if(duplicateKeys.isNotEmpty()) warnings.put("Duplicate object keys are ambiguous; parsers commonly keep only the last occurrence.")
-        if(truncated) warnings.put("Structural traversal stopped at $maxNodes nodes to protect responsiveness.")
-        if(duplicateScanTruncated) warnings.put("Duplicate-key scan reached its 100,000-node limit; keys below that point may not have been inspected.")
+        value("$", 0)
+        val rootIndex = raw.indexOfFirst { !it.isWhitespace() }
+        val rootType = when (raw[rootIndex]) { '{' -> "object"; '[' -> "array"; '"' -> "string"; 't','f' -> "boolean"; 'n' -> "null"; else -> "number" }
+        val unsafe = scanUnsafeJsonIntegerTokens(raw)
+        val warnings = JSONArray()
+        if (unsafe.length() > 0) warnings.put("Raw integer tokens exceed JavaScript's exact integer range; keep exact identifiers as strings when interoperating with JavaScript.")
+        if (duplicates.isNotEmpty()) warnings.put("Duplicate object keys are ambiguous; parsers commonly keep only the last occurrence.")
+        if (truncated) warnings.put("Structural inspection or duplicate-key scan stopped at its safety limit.")
         warnings.put("This is structural inspection, not JSON Schema validation.")
-        return JSONObject().put("rootType",typeOf(root)).put("characters",raw.length).put("utf8Bytes",raw.toByteArray(StandardCharsets.UTF_8).size)
-            .put("nodeCount",nodes).put("maximumDepth",maxDepth).put("objectCount",objects).put("arrayCount",arrays)
-            .put("propertyCount",properties).put("arrayItems",arrayItems).put("stringCount",strings).put("unsafeIntegerTokens",unsafe)
-            .put("duplicateKeys",JSONArray(duplicateKeys.distinct().take(100))).put("duplicateScanTruncated",duplicateScanTruncated)
-            .put("truncated",truncated).put("warnings",warnings).put("privacy","Inspection is local; no network request is made.").toString(2)
+        return JSONObject().put("rootType", rootType).put("characters", raw.length).put("utf8Bytes", byteCount)
+            .put("nodeCount", nodes).put("maximumDepth", maxDepth).put("objectCount", objects).put("arrayCount", arrays)
+            .put("propertyCount", properties).put("arrayItems", arrayItems).put("stringCount", strings).put("unsafeIntegerTokens", unsafe)
+            .put("duplicateKeys", JSONArray(duplicates.distinct().take(100))).put("duplicateScanTruncated", truncated)
+            .put("truncated", truncated).put("warnings", warnings).put("privacy", "Inspection is local; no network request is made.").toString(2)
     }
 
     /** Parse JSON container structure only to detect duplicate decoded key strings without scanning quoted text as syntax. */
@@ -732,7 +764,7 @@ object NativeUtilityEngine {
         val values = JSONArray()
         algorithms.forEach { algorithm ->
             val digest = MessageDigest.getInstance(algorithm).digest(bytes)
-            val value = if (encoding == "base64") Base64.encodeToString(digest,Base64.NO_WRAP) else digest.joinToString("") { "%02x".format(Locale.US,it.toInt() and 0xff) }
+            val value = if (encoding == "base64") encodeBase64NoWrap(digest) else digest.joinToString("") { "%02x".format(Locale.US,it.toInt() and 0xff) }
             values.put(JSONObject().put("algorithm",algorithm).put("encoding",encoding).put("digest",value))
         }
         return JSONObject().put("localOnly",true).put("note","MD5 and SHA-1 are legacy checksums, not password-hashing algorithms.").put("hashes",values).toString(2)
@@ -763,7 +795,7 @@ object NativeUtilityEngine {
         val rows = JSONArray()
         digests.forEach { (algorithm, digest) ->
             val bytes = digest.digest()
-            val value = if (encoding == "base64") Base64.encodeToString(bytes, Base64.NO_WRAP) else bytes.joinToString("") { "%02x".format(Locale.US, it.toInt() and 0xff) }
+            val value = if (encoding == "base64") encodeBase64NoWrap(bytes) else bytes.joinToString("") { "%02x".format(Locale.US, it.toInt() and 0xff) }
             rows.put(JSONObject().put("algorithm", algorithm).put("encoding", encoding).put("digest", value))
         }
         return JSONObject().put("localOnly", true).put("bytesRead", total).put("note", "MD5 and SHA-1 are legacy checksums, not password-hashing algorithms.").put("hashes", rows).toString(2)
@@ -868,7 +900,7 @@ object NativeUtilityEngine {
                     .put("meta", JSONObject().put("generatedLocally", true).put("signature", JSONObject.NULL)).toString(2) + "\n"
             }
             lower.contains("sql-schema-generator") -> "CREATE TABLE example_records (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n"
-            lower.contains("sql-query-builder") -> "SELECT id, name, created_at\nFROM example_records\nWHERE id = :id\nORDER BY created_at DESC;\n\n-- Replace the table, columns and parameter names for your schema.\n"
+            lower.contains("sql-query-builder") && lower.contains("generator") -> "SELECT id, name, created_at\nFROM example_records\nWHERE id = :id\nORDER BY created_at DESC;\n\n-- Replace the table, columns and parameter names for your schema.\n"
             lower.contains("regex-generator") -> "Common Java/Kotlin-compatible starter patterns (review for your exact requirements):\nEmail-like text: [^\\s@]+@[^\\s@]+\\.[^\\s@]+\nDigits: \\d+\nWhitespace: \\s+\nStart: ^\nEnd: $\n"
             else -> null
         }
@@ -1024,7 +1056,7 @@ object NativeUtilityEngine {
             else -> raw
         }
         fun encode(kind: String, raw: String): String = when (kind) {
-            "base64" -> Base64.encodeToString(raw.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
+            "base64" -> encodeBase64NoWrap(raw.toByteArray(StandardCharsets.UTF_8))
             "uri" -> encodeURIComponent(raw)
             "unicode" -> raw.codePoints().toArray().joinToString("") { "\\u%04x".format(Locale.US, it) }
             "html" -> raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
@@ -1226,10 +1258,10 @@ object NativeUtilityEngine {
                     val payload = input.substring(comma + 1)
                     if (metadata.endsWith(";base64", true)) decodeBase64Text(payload)
                     else decodeURIComponent(payload)
-                } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
+                } else "data:text/plain;base64,${encodeBase64NoWrap(input.toByteArray(StandardCharsets.UTF_8))}"
             }
             lower.contains("unix-timestamp") || lower.contains("timestamp-converter") || lower.contains("epoch-converter") -> developerTimestamp(input)
-            lower.contains("cron") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })
+            lower.contains("cron") && suffix !in setOf("encoder", "decoder") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })
             listOf("regex-tester", "regex-replace", "regex-generator", "regex-explainer").any(lower::contains) -> {
                 require(secondary.isNotEmpty()) { "Enter a sample string, or a JSON array of sample strings, in the second field." }
                 val regexFlags = if (flags.contains('g')) flags else "${flags}g"
@@ -1280,9 +1312,16 @@ object NativeUtilityEngine {
                 val header = parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
                 val payload = parseJson(b64UrlDecode(parts[1])) as? JSONObject ?: error("JWT payload must be a JSON object.")
                 val exp = (payload.opt("exp") as? Number)?.toDouble()
-                val expiresAt = exp?.let { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((it * 1000).toLong())) } ?: "none"
+                val expiresAt = exp?.let { seconds -> runCatching { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((seconds * 1000).toLong())) }.getOrElse { "out-of-range" } } ?: "none"
                 val expired: Any = exp?.let { System.currentTimeMillis() / 1000.0 >= it } ?: JSONObject.NULL
-                fun claimTime(key: String): Any { val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL; val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull() ?: return JSONObject.NULL; val status = when(key) { "exp" -> if(System.currentTimeMillis()/1000.0 >= seconds) "expired" else "valid"; "nbf" -> if(System.currentTimeMillis()/1000.0 < seconds) "not-yet-valid" else "active"; else -> "informational" }; return JSONObject().put("unixSeconds",seconds).put("iso",DateTimeFormatter.ISO_INSTANT.format(instant)).put("status",status) }
+                fun claimTime(key: String): Any {
+                    val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL
+                    val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull()
+                        ?: return JSONObject().put("unixSeconds", seconds).put("status", "out-of-range")
+                    val now = System.currentTimeMillis() / 1000.0
+                    val status = when(key) { "exp" -> if(now >= seconds) "expired" else "valid"; "nbf" -> if(now < seconds) "not-yet-valid" else "active"; "iat" -> if(seconds > now) "issued-in-the-future" else "valid"; else -> "informational" }
+                    return JSONObject().put("unixSeconds",seconds).put("iso",DateTimeFormatter.ISO_INSTANT.format(instant)).put("status",status)
+                }
                 val claims=JSONObject().put("exp",claimTime("exp")).put("iat",claimTime("iat")).put("nbf",claimTime("nbf")).put("sub",payload.opt("sub")).put("iss",payload.opt("iss")).put("aud",payload.opt("aud"))
                 val largeIntegerWarning = Regex("""(?:"[^"]+"\s*:\s*)?-?\d{16,}(?:\D|$)""").containsMatchIn(b64UrlDecode(parts[1]))
                 JSONObject().put("warning","DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.").put("header", header).put("payload", payload).put("claims",claims).put("signaturePresent", parts[2].isNotEmpty()).put("signatureVerified",false).put("expiresAt", expiresAt).put("expired", expired).put("largeIntegerPrecisionWarning",if(largeIntegerWarning) "Large integers may lose precision when parsed as JavaScript/Double numbers." else JSONObject.NULL).toString(2)
@@ -1408,7 +1447,7 @@ object NativeUtilityEngine {
                 lower.contains("sort") -> stringifyJson(sortValue(parseJson(input)))
                 suffix == "generator" && input.isBlank() -> "{\"id\":\"example-1\",\"name\":\"Example\",\"active\":true,\"items\":[]}"
                 suffix == "minifier" -> pretty(input, 0)
-                suffix == "inspector" || suffix == "parser" -> { parseJson(input); developerJsonInspector(input) }
+                suffix == "inspector" || suffix == "parser" -> developerJsonInspector(input)
                 suffix == "explainer" -> { val parsed=parseJson(input); val type=when(parsed){is JSONObject->"object";is JSONArray->"array";JSONObject.NULL->"null";is String->"string";is Number->"number";is Boolean->"boolean";else->"unknown"}; JSONObject().put("rootType",type).put("note","JSON parser semantics can overwrite duplicate keys; very large integers may lose precision in floating-point consumers.").toString(2) }
                 suffix in setOf("formatter", "beautifier", "preview", "tester") -> pretty(input)
                 suffix == "validator" -> { parseJson(input); val duplicates=scanDuplicateJsonKeyPaths(input).first.distinct(); if(duplicates.isEmpty()) "Valid JSON (RFC 8259-compatible parser)." else "Valid JSON syntax, but duplicate object keys were found at ${duplicates.take(20).joinToString(", ")}; common parsers keep only the final value." }
@@ -1425,6 +1464,7 @@ object NativeUtilityEngine {
                 suffix == "generator" -> "id,name,active\n1,Ada,true\n2,Grace,true"
                 else -> localSuffixFallback("csv")
             }
+            lower.contains("markdown-to-html") -> markdownToHtml(input)
             lower.contains("xml") || lower.contains("html") || lower.contains("svg") -> when {
                 suffix == "validator" || suffix == "tester" -> if (validateMarkup(input)) "Valid markup/XML." else throw IllegalArgumentException("Invalid markup/XML.")
                 suffix == "minifier" -> minifyText(input)
