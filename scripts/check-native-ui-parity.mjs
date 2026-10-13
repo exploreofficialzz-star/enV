@@ -83,7 +83,7 @@ assert.match(iosContent, /Calendar\.current\.component\(\.year, from: \.now\)/);
 assert.match(android, /SearchBox\(catalog, query, onQuery, onTool\) \{ searchFocused = it \}/);
 assert.match(android, /contentDescription = "Search tools"/);
 assert.match(iosContent, /enVCharacterSpacedText\("Search tools"\)/);
-assert.match(iosContent, /TextField\("Search tools", text: \$text\)/);
+assert.match(iosContent, /TextField\("Search tools", text: \$text(?:, prompt:[^\n]*)?\)/);
 assert.match(iosContent, /\.accessibilityLabel\("Search tools"\)/);
 assert.match(android, /suggestions\.firstOrNull\(\)\?\.let \{ onTool\(it\.id\) \}/);
 assert.match(android, /if \(focused && value\.isNotBlank\(\)\) \{[\s\S]*?Popup\(alignment = Alignment\.TopStart[\s\S]*?suggestions\.forEach/);

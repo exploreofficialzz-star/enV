@@ -458,7 +458,7 @@ struct ToolsView: View {
                             Spacer(minLength: 4)
                             HStack(spacing: 10) {
                                 EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                                TextField("Search tools", text: $toolsQuery, prompt: Text("Search tools").foregroundColor(Color.envInk))
+                                TextField("Search tools", text: $toolsQuery)
                                     .font(.envScaled(size: 14, weight: .regular))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
