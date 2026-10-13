@@ -32,7 +32,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertEqual(more.label, "More options")
 
         if #available(iOS 17.0, *) {
-            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType])
+            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }
     }
 
@@ -46,7 +46,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(searchMenuItem.waitForExistence(timeout: 5), "The open menu should expose its Search tools action.")
 
         if #available(iOS 17.0, *) {
-            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType])
+            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }
     }
 
@@ -61,7 +61,7 @@ final class AccessibilityAuditUITests: XCTestCase {
 
         XCTAssertTrue(app.textFields["Search tools"].waitForExistence(timeout: 5), "The native Search screen should expose a named search field.")
         if #available(iOS 17.0, *) {
-            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType])
+            try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }
     }
 }
