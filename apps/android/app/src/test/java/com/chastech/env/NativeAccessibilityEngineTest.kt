@@ -111,7 +111,7 @@ class NativeAccessibilityEngineTest {
         assertTrue(NativeAccessibilityEngine.analyze("text-readability-checker", "This is a short sentence.").contains("Flesch Reading Ease"))
         assertTrue(NativeAccessibilityEngine.analyze("color-blindness-simulator", "", "#ff0000", "#00ff00").contains("Protanopia approximation"))
         assertTrue(NativeAccessibilityEngine.analyze("color-blindness-simulator", "", "#ff0000", "#00ff00").contains("#"))
-        assertTrue(NativeAccessibilityEngine.analyze("accessible-color-generator", "", "#777777", "#ffffff").contains("Foreground alternatives"))
+        assertTrue(NativeAccessibilityEngine.analyze("accessible-color-generator", "", "#777777", "#ffffff").contains("Suggested foreground alternatives"))
         assertTrue(NativeAccessibilityEngine.analyze("line-height-checker", "", fontSize = "16px", lineHeight = "24px").contains("Ratio: 1.50"))
         assertTrue(NativeAccessibilityEngine.analyze("font-size-generator", "").contains("--type-body: clamp"))
         assertTrue(NativeAccessibilityEngine.supports("aria-simulator", "accessibility"))

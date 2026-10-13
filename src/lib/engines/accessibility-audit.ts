@@ -46,8 +46,8 @@ const KNOWN_ROLES = new Set((
   "figure form generic grid gridcell group heading img link list listbox listitem log main marquee " +
   "math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option " +
   "presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search " +
-  "searchbox separator slider spinbutton status strong subscript superscript switch tab tabpanel " +
-  "table term textbox timer toolbar tooltip tree treegrid treeitem"
+  "searchbox separator slider spinbutton status strong subscript superscript switch tab tablist " +
+  "tabpanel table term textbox timer toolbar tooltip tree treegrid treeitem"
 ).split(/\s+/));
 const INTERACTIVE = new Set(["a", "button", "input", "select", "textarea", "summary"]);
 const CONTROL = new Set(["input", "select", "textarea"]);

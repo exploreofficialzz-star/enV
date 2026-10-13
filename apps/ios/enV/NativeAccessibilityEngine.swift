@@ -7,7 +7,7 @@ public enum NativeAccessibilityEngine {
         public let background: String
     }
     private static let actions = ["checker", "generator", "helper", "preview", "simulator"]
-    private static let validRoles = Set("alert alertdialog application article banner blockquote button caption cell checkbox code columnheader combobox complementary contentinfo definition dialog directory document feed figure form generic grid gridcell group heading img link list listbox listitem log main marquee math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search searchbox separator slider spinbutton status strong subscript superscript switch tab tabpanel table term textbox timer toolbar tooltip tree treegrid treeitem".split(separator: " ").map(String.init))
+    private static let validRoles = Set("alert alertdialog application article banner blockquote button caption cell checkbox code columnheader combobox complementary contentinfo definition dialog directory document feed figure form generic grid gridcell group heading img link list listbox listitem log main marquee math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search searchbox separator slider spinbutton status strong subscript superscript switch tab tablist tabpanel table term textbox timer toolbar tooltip tree treegrid treeitem".split(separator: " ").map(String.init))
 
     private struct Element {
         let tag: String

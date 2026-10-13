@@ -8,7 +8,17 @@ import kotlin.math.roundToInt
 /** Local, deterministic WCAG-oriented accessibility checks for Android. Static snippets are not conformance certification. */
 object NativeAccessibilityEngine {
     private val actions = listOf("checker", "generator", "helper", "preview", "simulator")
-    private val roles = setOf("alert", "alertdialog", "application", "article", "banner", "button", "checkbox", "combobox", "complementary", "contentinfo", "dialog", "form", "grid", "heading", "img", "link", "list", "listbox", "main", "menu", "navigation", "option", "progressbar", "radio", "region", "search", "slider", "status", "switch", "tab", "tabpanel", "textbox", "toolbar", "tree", "treeitem")
+    private val roles = setOf(
+        "alert", "alertdialog", "application", "article", "banner", "blockquote", "button", "caption", "cell",
+        "checkbox", "code", "columnheader", "combobox", "complementary", "contentinfo", "definition", "dialog",
+        "directory", "document", "feed", "figure", "form", "generic", "grid", "gridcell", "group", "heading",
+        "img", "link", "list", "listbox", "listitem", "log", "main", "marquee", "math", "menu", "menubar",
+        "menuitem", "menuitemcheckbox", "menuitemradio", "meter", "navigation", "none", "note", "option",
+        "presentation", "progressbar", "radio", "radiogroup", "region", "row", "rowgroup", "rowheader",
+        "scrollbar", "search", "searchbox", "separator", "slider", "spinbutton", "status", "strong",
+        "subscript", "superscript", "switch", "tab", "tablist", "tabpanel", "table", "term", "textbox",
+        "timer", "toolbar", "tooltip", "tree", "treegrid", "treeitem"
+    )
     private val tagPattern = Regex("<([a-zA-Z][\\w:-]*)\\b([^<>]*)>")
     private val attrPattern = Regex("([^\\s=/>]+)(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+)))?")
 
