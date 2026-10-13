@@ -44,7 +44,7 @@ struct HomeView: View {
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)
-                            TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText, prompt: Text(isHomeSearchFocused ? "" : "Search for a tool").foregroundColor(Color.envInk))
+                            TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
                                 .font(.envScaled(size: horizontalSizeClass == .regular ? 18 : 16, weight: .regular))
                                 .multilineTextAlignment(.leading)
                                 .focused($isHomeSearchFocused)
