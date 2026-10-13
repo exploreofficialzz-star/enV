@@ -1249,7 +1249,7 @@ struct NativeTextToolView: View {
 }
 
 private struct DynamicTypePreviewText: View {
-    @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat
+    @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat = 18
     let text: String
     let lineHeight: Double
 
