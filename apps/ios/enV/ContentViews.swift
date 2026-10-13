@@ -44,7 +44,7 @@ struct HomeView: View {
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)
-                            TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText)
+                            TextField(isHomeSearchFocused ? "" : "Search for a tool", text: $searchText, prompt: Text(isHomeSearchFocused ? "" : "Search for a tool").foregroundColor(Color.envInk))
                                 .font(.envScaled(size: horizontalSizeClass == .regular ? 18 : 16, weight: .regular))
                                 .multilineTextAlignment(.leading)
                                 .focused($isHomeSearchFocused)
@@ -458,7 +458,7 @@ struct ToolsView: View {
                             Spacer(minLength: 4)
                             HStack(spacing: 10) {
                                 EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                                TextField("Search tools", text: $toolsQuery)
+                                TextField("Search tools", text: $toolsQuery, prompt: Text("Search tools").foregroundColor(Color.envInk))
                                     .font(.envScaled(size: 14, weight: .regular))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
@@ -715,7 +715,7 @@ struct SearchResultsView: View {
                 }
                 HStack(spacing: 10) {
                     EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                    TextField("Search tools", text: $text)
+                    TextField("Search tools", text: $text, prompt: Text("Search tools").foregroundColor(Color.envInk))
                         .font(.envScaled(size: 16, weight: .regular))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
