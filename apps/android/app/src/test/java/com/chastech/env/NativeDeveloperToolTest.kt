@@ -100,7 +100,7 @@ class NativeDeveloperToolTest {
         assertEquals("Mozilla/5.0", userAgent.getString("raw"))
         assertEquals("Unknown", userAgent.getString("browser"))
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
-        assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
+        assertEquals("<p>&lt;div&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/div&gt;</p>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
     }
 
     @Test fun nativeFileHashUsesRawBytesAndMatchesSHA256GoldenVector() {

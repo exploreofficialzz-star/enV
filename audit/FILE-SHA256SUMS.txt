@@ -89,7 +89,7 @@ d726d7be7753d79929f28575e58323e7293f1344cba82304df4410068fb49d3b  ./apps/android
 8f31c31ef92b214703d4c244b5b976ea3f881d5d293bb3712411fb538712b10f  ./apps/android/app/src/test/java/com/chastech/env/NativeAiMicroEngineTest.kt
 2ca858c397bf9c68480109a5f26f5f779465a1f7fe6a9b574fd48ab6294b463e  ./apps/android/app/src/test/java/com/chastech/env/NativeBackendRequestTest.kt
 f4c41cb22a37ff499f4c0efa4dd9ba5b3deaf3f7f9d9f7654739a27ab393ebb8  ./apps/android/app/src/test/java/com/chastech/env/NativeBarcodeEngineTest.kt
-c0300400fad9f2d1bbd2364f1b40194c3ab2eedd7fefdd31d8a2114172ee4e84  ./apps/android/app/src/test/java/com/chastech/env/NativeDeveloperToolTest.kt
+32a2a25e05ed6b9d9b8a110fc179a8913c0d956e3f1bc5c33ad1d45290d7545b  ./apps/android/app/src/test/java/com/chastech/env/NativeDeveloperToolTest.kt
 f922fb3b599fb93fe82d24d8e400403a888624753fe1c3dd3e3aad7b6b21709b  ./apps/android/app/src/test/java/com/chastech/env/NativeEventEngineTest.kt
 88683ecb4540619f24e5d19a4bcb7793452ad447aadf2edc5052569e8eb791d8  ./apps/android/app/src/test/java/com/chastech/env/NativeProductivityEngineTest.kt
 6175572ff852a3620d56aa670a164bd0f28238f5ca282b868ac97c7798017b93  ./apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt
