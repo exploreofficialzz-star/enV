@@ -887,7 +887,8 @@ private struct NativeDeveloperToolView: View {
         }
         .fileImporter(isPresented:$isImporting,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
             do {
-                let url=try result.get()
+                let urls=try result.get()
+                guard let url=urls.first else { return }
                 let gotAccess=url.startAccessingSecurityScopedResource()
                 defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
                 let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
