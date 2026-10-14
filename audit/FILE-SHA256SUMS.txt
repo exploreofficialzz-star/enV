@@ -3,7 +3,7 @@
 dcd5efc2f3d448392b1526ab72c4b6309ee7d6d5486e689640facbba8d45b6f1  ./.env.example
 65b1023623fb87849b0d7e7a39141bd9d2662d98dcd55fefc9e8bf1683d2d934  ./.gitattributes
 a7f30d8839ab9853ec4e19396e20b2135bf9626a31f7bfee21e4ab5f7a3af23d  ./.github/workflows/accessibility-phase8.yml
-dd3c9d4f5d9a41cec2b026184e8d786b34715a3d4461e73657d33c76ddd54b74  ./.github/workflows/android-build.yml
+8e2f02979c7d0f88a29d344d7acd7f1db842014c3701086d03731551e0f9db19  ./.github/workflows/android-build.yml
 18fa9d71aa695139e0b8fa7b6526d356655027878696a09b7abaee85ead91467  ./.github/workflows/ios-accessibility-phase8.yml
 bf3a591a3775c46e807723c7b859a3f01fb68b5f007a61bf6c6efcb32e261bde  ./.github/workflows/ios-build.yml
 eb9270d4c9401bb895fa71a5876c5dc61c47e1bfdaa220c578571b9b18c44bf2  ./.github/workflows/production-check.yml

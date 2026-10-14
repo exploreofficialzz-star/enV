@@ -3,7 +3,7 @@
 dcd5efc2f3d448392b1526ab72c4b6309ee7d6d5486e689640facbba8d45b6f1  ./.env.example
 65b1023623fb87849b0d7e7a39141bd9d2662d98dcd55fefc9e8bf1683d2d934  ./.gitattributes
 a7f30d8839ab9853ec4e19396e20b2135bf9626a31f7bfee21e4ab5f7a3af23d  ./.github/workflows/accessibility-phase8.yml
-dd3c9d4f5d9a41cec2b026184e8d786b34715a3d4461e73657d33c76ddd54b74  ./.github/workflows/android-build.yml
+8e2f02979c7d0f88a29d344d7acd7f1db842014c3701086d03731551e0f9db19  ./.github/workflows/android-build.yml
 18fa9d71aa695139e0b8fa7b6526d356655027878696a09b7abaee85ead91467  ./.github/workflows/ios-accessibility-phase8.yml
 bf3a591a3775c46e807723c7b859a3f01fb68b5f007a61bf6c6efcb32e261bde  ./.github/workflows/ios-build.yml
 eb9270d4c9401bb895fa71a5876c5dc61c47e1bfdaa220c578571b9b18c44bf2  ./.github/workflows/production-check.yml
@@ -282,7 +282,7 @@ ecc7901bf866e736c0cc3acc70f6b935719e4331b7d121c8d0ceb16a92b98cc0  ./audit/DEVELO
 de9f7fb3f1da44b3d7a066fd68688f351b8b3f9ca668893d92f090eb5338e315  ./audit/DEVELOPER-CATEGORY-AUDIT-2026-10-13.md
 c06c02698f61b6db6cb95dc4e6cc8acf05d96d6191121f46c715de69bb837abe  ./audit/DEVELOPER-CATEGORY-CHANGELOG.md
 dab3e61b05c256526c4bbe0b9ae998185cc3f14997425c91aa8eecefae0be30a  ./audit/DEVELOPER-HARD-RETEST-REMEDIATION-2026-10-13.md
-4f6ed227991a01b24bc2f3255d0a2a8c737c426f4dba7c148f1f3e10e1290b70  ./audit/FILE-SHA256SUMS.txt
+7046fb8e4ec4af719454822d61b2d49c95bdb80d0ab2a4ea34feb528d73e8b4d  ./audit/FILE-SHA256SUMS.txt
 ef5478a074eb096450abfffee53b1b9f907ee79056420e0244e3006c4e118f85  ./audit/ROUND4-VERIFICATION-RESULTS-2026-10-13.md
 f2c04d0d63e4b1fd2c0b8d7f586761a0327f51ecf73f1700696297ab029814cb  ./audit/ROUND5-VERIFICATION-RESULTS-2026-10-13.md
 07de11b73a0108ff49c3489a59cd378b9801c934832e0794c5979ee5d8fa151d  ./audit/developer-route-smoke-results.json
