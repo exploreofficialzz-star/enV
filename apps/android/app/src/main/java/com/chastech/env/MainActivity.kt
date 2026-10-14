@@ -145,6 +145,7 @@ import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
@@ -1255,16 +1256,6 @@ private fun NativeBarcodeToolForm(toolId: String) {
     var images by remember(toolId) { mutableStateOf(emptyList<android.graphics.Bitmap>()) }
     var exportText by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
-    fun recipeConfiguration(): String {
-        val steps = JSONArray()
-        recipeSteps.forEachIndexed { index, step ->
-            val entry = JSONObject().put("name", "${index + 1}. $step").put("op", step)
-            if (step == "replace-literal") entry.put("find", recipeFind).put("replacement", recipeReplacementText)
-            if (step == "json-pointer-get") entry.put("pointer", recipePointer)
-            steps.put(entry)
-        }
-        return JSONObject().put("input", recipeSource).put("steps", steps).toString()
-    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         fields.forEach { field ->
             val hint = if (field.options.isEmpty()) field.label else "${field.label} · ${field.options.joinToString(" / ")}"
@@ -1824,6 +1815,16 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
         }.onFailure { error = it.message ?: "Unable to save output." }
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    fun recipeConfiguration(): String {
+        val steps = JSONArray()
+        recipeSteps.forEachIndexed { index, step ->
+            val entry = JSONObject().put("name", "${index + 1}. $step").put("op", step)
+            if (step == "replace-literal") entry.put("find", recipeFind).put("replacement", recipeReplacementText)
+            if (step == "json-pointer-get") entry.put("pointer", recipePointer)
+            steps.put(entry)
+        }
+        return JSONObject().put("input", recipeSource).put("steps", steps).toString()
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
             Text("Runs entirely on this device. Nothing is uploaded.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
