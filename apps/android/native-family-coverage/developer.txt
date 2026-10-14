@@ -215,6 +215,7 @@ javascript-decoder
 javascript-diff
 javascript-encoder
 javascript-explainer
+javascript-formatter
 javascript-generator
 javascript-inspector
 javascript-parser
@@ -330,6 +331,7 @@ sql-decoder
 sql-diff
 sql-encoder
 sql-explainer
+sql-formatter
 sql-generator
 sql-inspector
 sql-minifier

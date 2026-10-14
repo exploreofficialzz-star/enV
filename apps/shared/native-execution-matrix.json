@@ -67311,7 +67311,7 @@
       "name": "JavaScript Formatter",
       "status": "active",
       "category": "developer",
-      "engine": "text",
+      "engine": "developer",
       "android": "offline-native",
       "ios": "offline-native"
     },
@@ -68526,7 +68526,7 @@
       "name": "SQL Formatter",
       "status": "active",
       "category": "developer",
-      "engine": "text",
+      "engine": "developer",
       "android": "offline-native",
       "ios": "offline-native"
     },
