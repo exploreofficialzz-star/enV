@@ -230,7 +230,7 @@ class NativeDeveloperStudioTest {
         val report = JSONObject(NativeDeveloperRecipe.run(config.toString()))
         assertEquals("completed", report.getString("status"))
         assertEquals(3, report.getInt("stepsCompleted"))
-        assertEquals("enV 🚀\nline two\nline two", report.getString("finalOutput"))
+        assertEquals("enV 🚀\nline two", report.getString("finalOutput"))
         assertEquals("ok", report.getJSONArray("steps").getJSONObject(0).getString("status"))
         assertTrue(report.getString("privacy").contains("does not upload"))
     }

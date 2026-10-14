@@ -1043,7 +1043,6 @@ object NativeUtilityEngine {
                     .put("meta", JSONObject().put("generatedLocally", true).put("signature", JSONObject.NULL)).toString(2) + "\n"
             }
             lower.contains("sql-schema-generator") -> "CREATE TABLE example_records (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n"
-            lower.contains("sql-query-builder") -> "SELECT id, name, created_at\nFROM example_records\nWHERE id = :id\nORDER BY created_at DESC;\n\n-- Replace the table, columns and parameter names for your schema.\n"
             lower.contains("regex-generator") -> "Common Java/Kotlin-compatible starter patterns (review for your exact requirements):\nEmail-like text: [^\\s@]+@[^\\s@]+\\.[^\\s@]+\nDigits: \\d+\nWhitespace: \\s+\nStart: ^\nEnd: $\n"
             else -> null
         }
@@ -1060,6 +1059,7 @@ object NativeUtilityEngine {
             return NativeRegexStudio.run(input, secondary, flags, opts["replacement"] ?: "", opts["mode"] ?: "test")
         }
         if (lower == "http-status-reference") return httpStatuses.joinToString("\n") { "${it.first}: ${it.second}" + if (it.first == 418) " (IANA registry: unused; teapot meaning is historical)" else "" }
+        if (lower == "json-inspector") return developerJsonInspector(input)
         if (lower.startsWith("cron-")) return when (lower) {
             "cron-encoder" -> { val expression = input.trim(); developerCron(expression); java.util.Base64.getEncoder().encodeToString(expression.toByteArray(StandardCharsets.UTF_8)) }
             "cron-decoder" -> { val expression = decodeBase64Text(input).trim(); "$expression\n\n${developerCron(expression)}" }
@@ -1190,6 +1190,7 @@ object NativeUtilityEngine {
                 else "<p>${escape(line).replace(Regex("\\*\\*(.+?)\\*\\*"), "<strong>$1</strong>").replace(Regex("\\*(.+?)\\*"), "<em>$1</em>")}</p>"
             }
         }
+        if (lower == "markdown-to-html") return markdownToHtml(input)
         fun validateMarkup(raw: String): Boolean = runCatching {
             val factory = DocumentBuilderFactory.newInstance().apply {
                 setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
@@ -1451,7 +1452,7 @@ object NativeUtilityEngine {
                     val payload = input.substring(comma + 1)
                     val decoded = if (metadata.endsWith(";base64", true)) decodeBase64Text(payload) else decodeURIComponent(payload)
                     "MIME metadata: $metadata\nMode: ${if (metadata.endsWith(";base64", true)) "Base64-decoded" else "percent-decoded"} UTF-8 text\n\n$decoded\n\nNote: This tool returns text, not arbitrary binary bytes; use a file-aware decoder for binary payloads."
-                } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}\n\nNote: Encodes the input as UTF-8 text bytes; this is not an arbitrary binary-file encoder."
+                } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
             }
             lower.contains("unix-timestamp") || lower.contains("timestamp-converter") || lower.contains("epoch-converter") -> developerTimestamp(input)
             lower.contains("cron") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })
@@ -1535,7 +1536,13 @@ object NativeUtilityEngine {
                 val count = (secondary.toDoubleOrNull() ?: 10.0).toInt().coerceIn(1, 1000)
                 List(count) { UUID.randomUUID().toString() }.joinToString("\n")
             }
-            lower.contains("uuid") && (lower.contains("validator") || lower.contains("tester")) -> developerUuidValidation(input).replace(Regex("^Valid UUID version (\\d+) \\(RFC variant\\)\\.$"), "Valid UUID v$1")
+            lower.contains("uuid") && (lower.contains("validator") || lower.contains("tester")) -> developerUuidValidation(input).let { result ->
+                when {
+                    result.startsWith("Valid UUID version ") -> result.replace(Regex("^Valid UUID version (\\d+) \\(RFC variant\\)\\.$"), "Valid UUID v$1")
+                    result.startsWith("Invalid UUID") -> "Invalid UUID"
+                    else -> result
+                }
+            }
             lower.contains("uuid") && suffix in setOf("formatter", "beautifier", "minifier", "converter", "parser", "inspector", "preview", "explainer") -> {
                 val compact = input.trim().replace("-", "").lowercase(Locale.US)
                 when (suffix) {
