@@ -1051,6 +1051,7 @@ object NativeUtilityEngine {
 
     private fun runDeveloperParity(op: String, input: String, opts: Map<String, String>): String {
         val lower = op.lowercase(Locale.US)
+        if (lower == "developer-recipe-runner") return NativeDeveloperRecipe.run(input)
         val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
         val flags = opts["flags"] ?: "g"
         // Keep the generator route's original starter-pattern behavior, while every tester,

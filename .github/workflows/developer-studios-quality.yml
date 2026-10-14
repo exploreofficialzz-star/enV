@@ -5,6 +5,23 @@ on:
     branches: [main]
     paths:
       - "src/lib/engines/**"
+      - "src/lib/developer-studios-catalog*"
+      - "src/components/engines/developer-studio-engine.tsx"
+      - "src/components/engines/developer-recipe-workbench.tsx"
+      - "src/components/engines/tool-engine.tsx"
+      - "src/lib/registry.ts"
+      - "src/routes/tools/$category/index.tsx"
+      - "src/routes/tools/$category/$slug.tsx"
+      - "apps/android/app/src/main/java/com/chastech/env/data/DeveloperStudios.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt"
+      - "apps/ios/enV/CatalogCore.swift"
+      - "apps/ios/enV/ToolViews.swift"
+      - "apps/ios/enV/NativeDeveloperRecipe.swift"
+      - "apps/ios/enVTests/CatalogCoreTests.swift"
+      - "apps/ios/enVTests/NativeDeveloperStudioTests.swift"
+      - "apps/ios/enVTests/DeveloperStudioGoldenFixtures.swift"
       - "src/components/engines/developer-engine.tsx"
       - "src/components/engines/io-engines.tsx"
       - "tests/fixtures/developer-studio-golden.json"
@@ -20,6 +37,23 @@ on:
   pull_request:
     paths:
       - "src/lib/engines/**"
+      - "src/lib/developer-studios-catalog*"
+      - "src/components/engines/developer-studio-engine.tsx"
+      - "src/components/engines/developer-recipe-workbench.tsx"
+      - "src/components/engines/tool-engine.tsx"
+      - "src/lib/registry.ts"
+      - "src/routes/tools/$category/index.tsx"
+      - "src/routes/tools/$category/$slug.tsx"
+      - "apps/android/app/src/main/java/com/chastech/env/data/DeveloperStudios.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt"
+      - "apps/ios/enV/CatalogCore.swift"
+      - "apps/ios/enV/ToolViews.swift"
+      - "apps/ios/enV/NativeDeveloperRecipe.swift"
+      - "apps/ios/enVTests/CatalogCoreTests.swift"
+      - "apps/ios/enVTests/NativeDeveloperStudioTests.swift"
+      - "apps/ios/enVTests/DeveloperStudioGoldenFixtures.swift"
       - "src/components/engines/developer-engine.tsx"
       - "src/components/engines/io-engines.tsx"
       - "tests/fixtures/developer-studio-golden.json"
@@ -57,6 +91,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install exact locked dependencies
         run: npm ci
+      - name: Verify cross-platform recipe operation parity
+        run: npm run check:developer:recipe-parity
       - name: Verify shared cross-platform golden fixtures
         run: npm run check:developer:fixtures
       - name: Verify catalog, route and static privacy contracts
@@ -68,6 +104,7 @@ jobs:
       - name: Run focused Developer Studio regression suite
         run: >-
           node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test
+          src/lib/developer-studios-catalog.test.ts
           src/lib/engines/developer-studios.test.ts
           src/lib/engines/precise-formatters.test.ts
           src/lib/engines/regex-studio.test.ts

@@ -79,6 +79,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -109,6 +110,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.chastech.env.data.Catalog
+import com.chastech.env.data.NativeDeveloperStudios
+import com.chastech.env.data.developerStudioTools
+import com.chastech.env.data.developerStudioForLegacyTool
 import com.chastech.env.data.accessibilityDiscoveryTools
 import com.chastech.env.data.accessibilityStudioForId
 import com.chastech.env.data.displayTool
@@ -128,6 +132,7 @@ import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
 import com.chastech.env.engine.NativeConverterEngine
 import com.chastech.env.engine.NativeDateTimeEngine
+import com.chastech.env.engine.NativeDeveloperRecipe
 import com.chastech.env.engine.NativeExpansionCalculatorEngine
 import com.chastech.env.engine.NativeMathExerciseEngine
 import com.chastech.env.engine.NativeMimeEngine
@@ -702,7 +707,11 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
 private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> Unit, onTool: (String) -> Unit) {
     val category = catalog.categories.find { it.id == categoryId }
     val tools = remember(catalog, categoryId) {
-        val source = if (categoryId == "accessibility") catalog.accessibilityDiscoveryTools() else catalog.tools + catalog.relatedReferenceTools
+        val source = when (categoryId) {
+            "accessibility" -> catalog.accessibilityDiscoveryTools()
+            "developer" -> catalog.tools + catalog.relatedReferenceTools + catalog.developerStudioTools()
+            else -> catalog.tools + catalog.relatedReferenceTools
+        }
         source.filter { it.category == categoryId }
             .sortedWith(compareByDescending<ToolRecord> { it.popularity }.thenBy { it.name })
     }
@@ -929,6 +938,7 @@ private fun ToolDetail(
     val backend = nativeBackendSupported(tool)
     val context = LocalContext.current
     val related = remember(catalog, tool) { catalog.relatedTools(tool, Int.MAX_VALUE) }
+    val parentDeveloperStudio = remember(catalog, tool) { catalog.developerStudioForLegacyTool(tool) }
     var visibleRelatedCount by remember(tool.id) { mutableIntStateOf(6) }
     val categoryName = catalog.categories.firstOrNull { it.id == tool.category }?.name ?: tool.category
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -959,6 +969,27 @@ private fun ToolDetail(
             }
             tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            }
+            if (parentDeveloperStudio != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Part of ${parentDeveloperStudio.name}", style = MaterialTheme.typography.titleSmall)
+                            Text("Switch between related local developer tasks in the grouped Studio workspace.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        OutlinedButton(onClick = { onRelatedTool(parentDeveloperStudio.id) }) { Text("Open Studio") }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
             Spacer(Modifier.height(24.dp))
             Card(
@@ -1224,6 +1255,16 @@ private fun NativeBarcodeToolForm(toolId: String) {
     var images by remember(toolId) { mutableStateOf(emptyList<android.graphics.Bitmap>()) }
     var exportText by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    fun recipeConfiguration(): String {
+        val steps = JSONArray()
+        recipeSteps.forEachIndexed { index, step ->
+            val entry = JSONObject().put("name", "${index + 1}. $step").put("op", step)
+            if (step == "replace-literal") entry.put("find", recipeFind).put("replacement", recipeReplacementText)
+            if (step == "json-pointer-get") entry.put("pointer", recipePointer)
+            steps.put(entry)
+        }
+        return JSONObject().put("input", recipeSource).put("steps", steps).toString()
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         fields.forEach { field ->
             val hint = if (field.options.isEmpty()) field.label else "${field.label} · ${field.options.joinToString(" / ")}"
@@ -1643,6 +1684,12 @@ internal object NativeDeveloperToolFormPolicy {
         val sha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         val jwt = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJleGFtcGxlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9."
         return when {
+            value == "developer-recipe-runner" -> JSONObject().put("input", "  <p>Hello   <strong>enV</strong> 🚀</p>\r\n").put("steps", JSONArray()
+                .put(JSONObject().put("name", "Normalize line endings").put("op", "normalize-newlines"))
+                .put(JSONObject().put("name", "Remove paragraph tag").put("op", "replace-literal").put("find", "<p>").put("replacement", ""))
+                .put(JSONObject().put("name", "Remove closing paragraph tag").put("op", "replace-literal").put("find", "</p>").put("replacement", ""))
+                .put(JSONObject().put("name", "Collapse whitespace").put("op", "collapse-whitespace"))
+                .put(JSONObject().put("name", "Trim").put("op", "trim"))).toString() to ""
             value.contains("file-hash") -> "" to ""
             value.contains("json-path") || value.contains("jsonpath") -> "{\"user\":{\"name\":\"Ada\"},\"items\":[{\"id\":1},{\"id\":2}]}" to "$.items[0].id"
             value.contains("json-diff") -> "{\"name\":\"Ada\",\"active\":true}" to "{\"name\":\"Ada Lovelace\",\"active\":true}"
@@ -1726,10 +1773,26 @@ internal object NativeDeveloperToolFormPolicy {
 private fun NativeDeveloperToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val op = tool.engine.extras["op"] ?: tool.engine.id
+    val studio = remember(tool.id) { NativeDeveloperStudios.forToolId(tool.id) }
+    var studioModeKey by rememberSaveable(tool.id) { mutableStateOf(studio?.modes?.firstOrNull()?.key.orEmpty()) }
+    var encodingDirection by rememberSaveable(tool.id) { mutableStateOf("encode") }
+    val selectedStudioMode = studio?.modes?.firstOrNull { it.key == studioModeKey } ?: studio?.modes?.firstOrNull()
+    val op = when {
+        selectedStudioMode == null -> tool.engine.extras["op"] ?: tool.engine.id
+        encodingDirection == "decode" && selectedStudioMode.decodeOp != null -> selectedStudioMode.decodeOp
+        else -> selectedStudioMode.op
+    }
+    val activeTool = remember(tool, op) { tool.copy(engine = tool.engine.copy(extras = tool.engine.extras + ("op" to op))) }
     val fileHash = NativeDeveloperToolFormPolicy.isFileHash(op)
+    val recipeRunner = op == "developer-recipe-runner"
     var input by rememberSaveable(tool.id) { mutableStateOf("") }
     var secondary by rememberSaveable(tool.id) { mutableStateOf("") }
+    var recipeSource by rememberSaveable(tool.id) { mutableStateOf("  <p>Hello   <strong>enV</strong> 🚀</p>\r\n") }
+    val recipeSteps = remember(tool.id) { mutableStateListOf("normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim") }
+    var recipeOperationMenuExpanded by remember(tool.id) { mutableStateOf(false) }
+    var recipeFind by rememberSaveable(tool.id) { mutableStateOf("<p>") }
+    var recipeReplacementText by rememberSaveable(tool.id) { mutableStateOf("") }
+    var recipePointer by rememberSaveable(tool.id) { mutableStateOf("/user/id") }
     var flags by rememberSaveable(tool.id) { mutableStateOf("g") }
     var replacement by rememberSaveable(tool.id) { mutableStateOf("") }
     var regexMode by rememberSaveable(tool.id) { mutableStateOf(if (op.contains("explainer", true)) "flavors" else "test") }
@@ -1765,10 +1828,30 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
             Text("Runs entirely on this device. Nothing is uploaded.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        if (studio != null) {
+            Text(studio.name, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(studio.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                studio.modes.forEach { mode ->
+                    FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = { studioModeKey = mode.key; encodingDirection = "encode"; output = ""; error = "" }, label = { Text(mode.label) })
+                }
+            }
+            if (selectedStudioMode?.decodeOp != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = encodingDirection == "encode", onClick = { encodingDirection = "encode"; output = ""; error = "" }, label = { Text("Encode") })
+                    FilterChip(selected = encodingDirection == "decode", onClick = { encodingDirection = "decode"; output = ""; error = "" }, label = { Text("Decode") })
+                }
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = {
                 val (sample, sampleSecondary) = NativeDeveloperToolFormPolicy.example(op)
-                input = sample; secondary = sampleSecondary; flags = if (op.contains("regex", true)) "gi" else "g"; replacement = if (op.contains("replace", true)) "dog" else ""; regexMode = "test"; sqlDialect = "postgresql"; output = ""; error = ""
+                if (recipeRunner) {
+                    recipeSource = "  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
+                    recipeSteps.clear(); recipeSteps.addAll(listOf("normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim"))
+                    recipeFind = "<p>"; recipeReplacementText = ""; recipePointer = "/user/id"
+                } else { input = sample; secondary = sampleSecondary }
+                flags = if (op.contains("regex", true)) "gi" else "g"; replacement = if (op.contains("replace", true)) "dog" else ""; regexMode = "test"; sqlDialect = "postgresql"; output = ""; error = ""
             }) { Text("Load example") }
             Text("Ctrl/⌘+Enter support is available on Web; native uses the action button.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1778,7 +1861,42 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                 Text(selectedFileName.ifBlank { "Select a file to hash locally" }, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }
         }
-        InputField(input, { input = it }, if (regexStudio && regexMode == "pipeline") "Default pattern (unused by layers)" else if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+        if (recipeRunner) {
+            Text("Recipe Pipeline", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("Build a bounded, deterministic transformation chain. Steps run in order; each result is inspectable, and nothing is uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            InputField(recipeSource, { recipeSource = it }, "Source text", placeholder = "Paste text, JSON, CSV, or encoded data…", minLines = 5, tall = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    OutlinedButton(onClick = { recipeOperationMenuExpanded = true }, enabled = recipeSteps.size < 16) { Text("Add step") }
+                    DropdownMenu(expanded = recipeOperationMenuExpanded, onDismissRequest = { recipeOperationMenuExpanded = false }) {
+                        NativeDeveloperRecipe.supportedOperations.forEach { operation ->
+                            DropdownMenuItem(text = { Text(operation) }, onClick = { if (recipeSteps.size < 16) recipeSteps.add(operation); recipeOperationMenuExpanded = false })
+                        }
+                    }
+                }
+                Text("${recipeSteps.size}/16 steps", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                recipeSteps.forEachIndexed { index, operation ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text("${index + 1}.", style = MaterialTheme.typography.labelMedium)
+                        Text(operation, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { if (index > 0) { val item = recipeSteps.removeAt(index); recipeSteps.add(index - 1, item) } }, enabled = index > 0) { Text("↑") }
+                        TextButton(onClick = { if (index < recipeSteps.lastIndex) { val item = recipeSteps.removeAt(index); recipeSteps.add(index + 1, item) } }, enabled = index < recipeSteps.lastIndex) { Text("↓") }
+                        TextButton(onClick = { recipeSteps.removeAt(index) }) { Text("×") }
+                    }
+                }
+            }
+            if (recipeSteps.contains("replace-literal")) {
+                InputField(recipeFind, { recipeFind = it }, "Literal text to find", minLines = 1)
+                InputField(recipeReplacementText, { recipeReplacementText = it }, "Replacement text (empty removes the match)", minLines = 1)
+                Text("These settings apply to each Replace Literal step in this native builder.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (recipeSteps.contains("json-pointer-get")) InputField(recipePointer, { recipePointer = it }, "RFC 6901 JSON Pointer", placeholder = "/items/0/id", minLines = 1)
+            OutlinedButton(onClick = { runCatching { copy(recipeConfiguration()) }.onFailure { error = it.message ?: "Could not serialize recipe." } }) { Text("Copy recipe JSON") }
+        } else {
+            InputField(input, { input = it }, if (regexStudio && regexMode == "pipeline") "Default pattern (unused by layers)" else if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+        }
         if (regexStudio) {
             Text("Regex Studio mode", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1829,12 +1947,12 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                                 if (regexStudio) put("mode", regexMode)
                                 if (sqlFormatter) put("dialect", sqlDialect)
                             }.toString()
-                            withContext(Dispatchers.Default) { NativeUtilityEngine.run(tool, input, options).text }
+                            withContext(Dispatchers.Default) { NativeUtilityEngine.run(activeTool, if (recipeRunner) recipeConfiguration() else input, options).text }
                         }
                     }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
                 }
             }) { Text(if (regexStudio) when (regexMode) { "test" -> "Run tests"; "benchmark" -> "Benchmark"; "pipeline" -> "Run pipeline"; "format" -> "Format regex"; else -> "Analyze flavors" } else NativeDeveloperToolFormPolicy.actionLabel(op)) }
-            OutlinedButton(onClick = { input = ""; secondary = ""; flags = "g"; replacement = ""; regexMode = "test"; sqlDialect = "postgresql"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
+            OutlinedButton(onClick = { input = ""; secondary = ""; recipeSource = ""; recipeSteps.clear(); recipeFind = ""; recipeReplacementText = ""; recipePointer = "/"; flags = "g"; replacement = ""; regexMode = "test"; sqlDialect = "postgresql"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))

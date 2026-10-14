@@ -118,7 +118,7 @@ private val webSearchSynonyms = mapOf(
 fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedReferences: Boolean = false): List<ToolRecord> {
     val q = query.trim().lowercase()
     val sourceCandidates = if (includeRelatedReferences) tools + relatedReferenceTools else tools
-    val candidates = sourceCandidates.filter { it.category != "accessibility" } + accessibilityDiscoveryTools().filter { it.category == "accessibility" }
+    val candidates = sourceCandidates.filter { it.category != "accessibility" && it.tags.none { tag -> tag == "developer-studio" } } + accessibilityDiscoveryTools().filter { it.category == "accessibility" } + developerStudioTools()
     if (q.isEmpty()) return candidates.sortedByDescending { it.popularity }.take(limit)
     val tokens = q.split(Regex("[^a-z0-9%+]+" )).filter { it.length > 1 || it == "%" }
     val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
@@ -152,8 +152,8 @@ private fun relatedAlphabeticalKey(value: String): String =
 
 /** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
-    val relatedCandidates = accessibilityDiscoveryTools()
-    val byId = (tools + relatedReferenceTools).associateBy { it.id }
+    val relatedCandidates = accessibilityDiscoveryTools() + developerStudioTools()
+    val byId = relatedCandidates.associateBy { it.id }
     val related = tool.related.mapNotNull { accessibilityStudioForId(it) ?: byId[it] }.filter { it.status != "planned" }
     if (related.size >= limit) return related.take(limit)
     val seen = (setOf(tool.id) + related.map { it.id })

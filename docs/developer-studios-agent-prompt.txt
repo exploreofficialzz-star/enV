@@ -1,0 +1,370 @@
+================================================================================
+enV DEVELOPER CATEGORY — STUDIO ARCHITECTURE AGENT PROMPT
+Mirror Accessibility Studios · Stand out vs full competitor systems
+DO NOT remove any existing tool URLs
+================================================================================
+
+# Mission
+
+Rebuild the Developer category (https://envtools.store/tools/developer — ~474 tools) using the **same Studio interface pattern** already proven on Accessibility (Color Contrast Studio, Alt Text Studio, ARIA Studio, Focus State Studio, Form Accessibility Studio, Keyboard Navigation Studio, etc.).
+
+Goal: the Developer category must **stand out against the full systems** of CyberChef, DevToys, IT-Tools, jwt.io, regex101, crontab.guru, and privacy-safe alternatives to CodeBeautify/JSONFormatter — not free tiers only.
+
+---
+
+# Hard rules
+
+1. **DO NOT remove any tool or URL.** Every existing `/tools/developer/*` slug stays live.
+2. **Studios are the product surface.** Individual tool pages become focused entry points / modes of a parent Studio (deep-link with mode pre-selected), not empty one-field templates.
+3. **100% client-side / on-device.** Nothing uploaded. Privacy is the primary competitive wedge (CodeBeautify/JSONFormatter server-side credential exposure is the industry cautionary tale).
+4. **Match Accessibility Studio UX quality:** multi-mode workspace, clear job statement, privacy strip, examples, copy/download, precise errors, related modes, mobile-ready.
+5. Web TypeScript first; engines structured so Android (Kotlin) and iOS (Swift) can share logic later.
+6. Deterministic engines + golden tests for every Studio core path.
+
+---
+
+# Why Studios (standout comparison)
+
+## Accessibility pattern to copy (enV already ships this)
+
+Accessibility does not dump 55 thin pages as the hero experience. It leads with **named Studios**:
+
+- Color Contrast Studio — WCAG 2.2 + APCA, vision simulation, export
+- Alt Text Studio — severity, coach, bulk, export
+- ARIA Studio — name/state, patterns, evidence
+- Focus State Studio — :focus-visible, playgrounds
+- Form Accessibility Studio — labels, errors, findings
+- Keyboard Navigation Studio — order, traps, evidence
+
+Each Studio is a **workspace**: modes, local processing, evidence-grade output, not “Input + Run tool.”
+
+## Developer today (problem)
+
+~474 tools: strong cores (JWT, Cron, Hash digests, UUID, Base64, improved JS/SQL format) + large template long-tail. SEO breadth is high; **workspace coherence is low** compared to Accessibility and compared to DevToys’ left-nav grouped toolkit.
+
+## Competitor systems (what “stand out” means)
+
+| Competitor | Full-system strength | Weakness enV Studios exploit |
+|------------|----------------------|------------------------------|
+| **CyberChef** | 300+ ops, recipe chains, client-side power | Steep UX; dated; poor mobile; overkill for one-shot |
+| **DevToys** | Native offline, smart paste, grouped tools, consistent UI | Install required; desktop-first; no shareable deep links |
+| **IT-Tools** | 80+ tools, good UX, self-host | Deploy/trust friction on public instances |
+| **jwt.io** | JWT decode reference | Privacy anxiety; precision issues; single-purpose |
+| **regex101** | Best live regex UX | Single-purpose |
+| **crontab.guru** | Best English cron | Narrow |
+| **CodeBeautify / JSONFormatter** | SEO catalog | Server-side history / credential exposure reports; ads |
+| **ToolCove-class** | Clean client-side web toolkit | Smaller catalog |
+
+**Standout formula for enV Developer Studios:**
+- DevToys-like **grouped workspace** inside the browser
+- Accessibility-like **Studio polish** (modes, evidence, privacy)
+- CyberChef **power without recipe friction** for daily tasks
+- Specialist **depth** (JWT safety, cron English, regex feedback) inside Studios
+- CodeBeautify **breadth without server risk**
+- Shareable URLs per tool/mode (DevToys cannot do this)
+
+---
+
+# Target architecture: Developer Studios
+
+Implement **12 Studios**. Each Studio is a first-class route (like Accessibility studios) with mode tabs. Map every existing slug into a Studio mode or deep-link.
+
+## 1. JSON Studio
+**Route:** `/tools/developer/json-studio` (and keep all json-* pages as mode entry points)
+
+**Modes:** Format · Minify · Validate · Diff · Path/Search · Tree (if feasible) · Convert (YAML/CSV when client-safe)
+
+**Must-have:**
+- Exact error line/position on invalid JSON
+- Visible warning when integers exceed Number.MAX_SAFE_INTEGER (never silent mutation without warning)
+- Duplicate-key behavior note
+- Example fixtures + Copy/Download
+- Privacy strip
+
+**Maps from:** json-formatter, json-beautifier, json-minifier, json-validator, json-*, dummy-json-generator, developer-json-schema-generator, etc.
+
+**Beat:** JSONFormatter.org (privacy), basic beautifiers (depth)
+
+---
+
+## 2. JWT Studio
+**Route:** `/tools/developer/jwt-studio`
+
+**Modes:** Decode · Expiration · Claims inspector · Payload builder · (Optional) Sign with user-supplied secret — clearly labeled
+
+**Must-have:**
+- Banner: “DECODE ONLY — signature not verified. Claims are untrusted.”
+- Standard claims annotated (exp, iat, nbf, sub, iss, aud) with human-readable times
+- Nested payload support
+- Large-integer / precision note where relevant
+- Privacy strip
+
+**Maps from:** jwt-decoder, jwt-expiration-checker, developer-jwt-*, jwt-*
+
+**Beat:** jwt.io on safety messaging + nested clarity + privacy
+
+---
+
+## 3. Regex Studio
+**Route:** `/tools/developer/regex-studio`
+
+**Modes:** Match · Replace · Explain/cheatsheet
+
+**Must-have:**
+- Live match list with indexes
+- Capture groups (named + numbered)
+- Flags UI (g i m s u)
+- Replace preview
+- Label: “JavaScript RegExp engine”
+- Common pattern presets
+
+**Maps from:** regex-tester, regex-replace, developer-regex-*
+
+**Beat:** approach regex101 feedback quality inside a multi-tool product
+
+---
+
+## 4. Hash Studio
+**Route:** `/tools/developer/hash-studio`
+
+**Modes:** Hash · Compare · File hash
+
+**Must-have:**
+- Side-by-side MD5, SHA-1, SHA-256, SHA-384, SHA-512
+- Web Crypto where available; documented fallbacks
+- Text + file (FileReader)
+- Hex / Base64 output toggle
+- Compare two digests
+- Golden: SHA256("hello") and MD5("hello") exact
+
+**Maps from:** sha256-hash, md5-hash, sha1-hash, sha512-hash, hash-compare, file-hash-calculator, hash-*
+
+**Beat:** single-algo sites; match DevToys multi-hash convenience
+
+---
+
+## 5. Encoding Studio
+**Route:** `/tools/developer/encoding-studio`
+
+**Modes:** Base64 (std + URL-safe) · URL · HTML entities · Hex · Binary · ASCII · Unicode · Data URI
+
+**Must-have:**
+- UTF-8 safe encode/decode
+- Invalid input errors
+- Swap / roundtrip helpers
+- Auto-detect where reasonable
+
+**Maps from:** base64-*, url-*, html-encoder/decoder, hex-*, binary-*, ascii-*, unicode-*, data-uri-*
+
+**Beat:** fragmented single encode pages
+
+---
+
+## 6. Time & Cron Studio
+**Route:** `/tools/developer/time-cron-studio`
+
+**Modes:** Timestamp · Cron explain · Cron next runs · Presets
+
+**Must-have:**
+- Seconds vs ms auto-detect
+- ISO / UTC / local
+- 5-field cron normalize + English explanation
+- Next 10 fire times (local + UTC)
+- Presets (every minute, hourly, daily, weekdays, etc.)
+
+**Maps from:** unix-timestamp-converter, cron-generator, cron-parser, cron-*
+
+**Beat:** crontab.guru on explanation; add next runs + timestamp in one Studio
+
+---
+
+## 7. UUID Studio
+**Route:** `/tools/developer/uuid-studio`
+
+**Modes:** Generate (batch) · Validate · (optional v1/nil if client-safe)
+
+**Must-have:**
+- UUID v4 correct variant/version bits
+- Batch generate
+- Validate shape + version
+
+**Maps from:** uuid-generator, uuid-validator, developer-uuid-batch-generator
+
+---
+
+## 8. SQL Studio
+**Route:** `/tools/developer/sql-studio`
+
+**Modes:** Format · Minify · (basic parse feedback — not execute)
+
+**Must-have:**
+- Real multi-line keyword-aware format (already proven path with sql-formatter-class output)
+- Dialect note if applicable
+- Never empty output on hard JOIN/GROUP queries
+
+**Maps from:** sql-formatter, sql-*, developer-sql-*
+
+---
+
+## 9. Markup & Style Studio
+**Route:** `/tools/developer/markup-studio`
+
+**Modes:** HTML · CSS · JavaScript · XML · YAML · Markdown preview
+
+**Must-have:**
+- Real multi-line format for JS/HTML/CSS/YAML (conservative lexical OK if documented)
+- Markdown live preview
+- Honest limits (formatting ≠ security audit / execution)
+
+**Maps from:** html-*, css-*, javascript-*, xml-*, yaml-*, markdown-*
+
+---
+
+## 10. HTTP & API Studio
+**Route:** `/tools/developer/http-api-studio`
+
+**Modes:** Status lookup · Headers · Query string · MIME/Content-Type · CORS · CSP · Cookies · User-Agent
+
+**Must-have:**
+- **Full HTTP status table** including 418 I’m a teapot, 422, 429, 503 (current hard-test gap)
+- Header builder with copy
+- Query parse/build
+- Privacy strip
+
+**Maps from:** http-status-lookup, mime-lookup, query-string-parser, developer-http-*, developer-cors-*, developer-csp-*, developer-cookie-*, user-agent-parser, http-*
+
+**P0:** Fix 418 lookup before claiming HTTP sector standout
+
+---
+
+## 11. DevOps Config Studio
+**Route:** `/tools/developer/devops-studio`
+
+**Modes:** gitignore · Dockerfile · docker-compose · nginx · editorconfig · env examples · OpenAPI starter · GraphQL · License · README · Commit message · Branch name · Changelog · Semver
+
+**Must-have:**
+- Stack/preset selectors
+- **Copy-ready real output** (not “utility for the enV toolkit”)
+- Short comments in generated files
+
+**Maps from:** all developer-gitignore-*, developer-docker-*, developer-nginx-*, developer-openapi-*, developer-graphql-*, developer-readme-*, developer-license-*, developer-commit-*, developer-branch-*, developer-changelog-*, developer-editorconfig-*, developer-environment-*, developer-semantic-*, docker-*, kubernetes-*, nginx-*, openapi-*, git-*
+
+---
+
+## 12. Diff & Inspect Studio
+**Route:** `/tools/developer/diff-inspect-studio`
+
+**Modes:** Text/JSON/YAML diff · Structure inspector · Preview · Tester hooks into parent domain where needed
+
+**Must-have:**
+- Side-by-side or unified diff for text/JSON
+- Structure stats for inspectors
+- Deep-link from `*-diff`, `*-inspector`, `*-parser`, `*-preview`, `*-tester`, `*-explainer` into the right mode or parent Studio
+
+---
+
+# Studio UI standard (copy Accessibility quality)
+
+Every Studio page and every legacy slug page must include:
+
+1. **Title + one-line job statement** (what it does + local/privacy)
+2. **Privacy strip:** “Runs entirely on this device. Nothing is uploaded.”
+3. **Mode tabs** (Studio) or clear primary action (legacy entry → Studio mode)
+4. **Load example**
+5. **Primary action** — Format / Decode / Hash / Match / Explain / Lookup / Generate…
+6. **Copy + Download** on results
+7. **Precise errors** — never silent fail
+8. **Related modes / sibling tools** in same Studio only
+9. **Mobile:** stacked panes, large targets, no horizontal editor trap
+10. **Keyboard:** Ctrl/Cmd+Enter runs primary action
+11. **No generic filler:** ban remaining “X utility for the enV toolkit” as sole description
+
+Category index (`/tools/developer`) should lead with the **12 Studios** (like Accessibility leads with Studios), with “See more tools” still listing the long-tail mapped pages.
+
+---
+
+# Implementation phases
+
+## Phase 0 — Studio shell (Accessibility parity)
+- Shared Studio layout component (header, privacy strip, mode tabs, example, copy/download, related)
+- Category page redesign: Studio cards first (same visual language as Accessibility Studio cards)
+- Routing: `/tools/developer/{studio-slug}` plus keep all existing slugs
+
+## Phase 1 — P0 correctness (from hard retests)
+1. HTTP Status full table + **418 teapot** hard pass
+2. JSON big-int **warning** always visible when unsafe (keep)
+3. Hash multi-algo panel foundation
+4. Ensure JS/SQL format never empty on hard fixtures (already improved — lock with tests)
+
+## Phase 2 — Core Studios live
+Ship and wire: JSON, JWT, Hash, Regex, Encoding, Time & Cron, UUID
+
+## Phase 3 — Format + HTTP + DevOps
+Markup & Style, SQL, HTTP & API, DevOps Config
+
+## Phase 4 — Diff/Inspect + long-tail mapping
+Every remaining `*-beautifier|converter|decoder|…|validator` and `developer-*` slug deep-links into a Studio mode with real engine behavior
+
+## Phase 5 — QA
+- Golden tests per Studio
+- Mobile pass top Studios
+- Network: no user payload POST
+- Accessibility category UX parity checklist (visual + interaction)
+
+---
+
+# Golden tests (must pass)
+
+| Studio | Fixture | Expect |
+|--------|---------|--------|
+| Hash | "hello" | SHA-256 = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824; MD5 = 5d41402abc4b2a76b9719d911017c592 |
+| JSON | id 9007199254740993 | Warning shown; pretty structure |
+| JSON Validate | {"a":1,} | Error with position |
+| JWT | sample with exp past | DECODE ONLY + claims + expiry time |
+| Cron | */15 9-17 * * 1-5 | English explanation includes 15-min + hour range; next runs |
+| HTTP | 418 | I’m a teapot (or standard description) |
+| URL | hello world | hello%20world |
+| UUID | generate | v4 shape batch |
+| Base64 | unicode | roundtrip-capable output |
+| JS Format | minified async | multi-line readable |
+| SQL Format | join/group/having | multi-line keywords |
+
+---
+
+# Deliverables for the builder agent
+
+1. Studio shell matching Accessibility Studio interaction quality
+2. 12 Studio routes with mode tabs and engines
+3. Mapping table: every existing developer slug → Studio + mode
+4. Legacy pages upgraded (deep-link or embedded mode) — **zero removals**
+5. Category index with Studio cards first
+6. Golden test suite results
+7. Changelog by Studio
+8. Client-side-only library list (license-safe)
+
+---
+
+# Success criteria (standout)
+
+1. Developer category **feels like Accessibility**: Studios first, not a wall of templates
+2. Daily tasks (JSON, JWT, Hash, Regex, Cron, Encode, UUID) match or beat specialists on clarity + privacy
+3. HTTP status sector no longer fails hard tests
+4. CyberChef users can do one-shots without recipes; DevToys users get browser + shareable URLs
+5. No server-side processing story — explicit advantage over CodeBeautify-class tools
+6. All ~474 URLs remain, all engine-backed or Studio deep-linked
+7. Mobile usable for top Studios
+
+---
+
+# Start order
+
+1. Phase 0 Studio shell (Accessibility parity)
+2. Phase 1 P0 (HTTP 418 + Hash multi-algo + lock JSON warning)
+3. Phase 2 core Studios
+4. Phases 3–5 until long-tail is fully mapped
+
+Build the Developer category as **Developer Studios** — same product language as Accessibility Studios — so enV is one coherent privacy-first toolkit that stands out against the full competitor systems above.
+
+================================================================================
+END OF AGENT PROMPT
+================================================================================

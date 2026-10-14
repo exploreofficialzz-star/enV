@@ -17,6 +17,29 @@ class CatalogModelsTest {
         assertEquals(7, catalog.relatedTools(studios.first { it.id == "aria-checker" }, 20).count { it.category == "accessibility" })
     }
 
+    @Test fun developerCategoryProjectsTwelveNativeStudiosWithoutDroppingSourceTools() {
+        val sources = NativeDeveloperStudios.specs.distinctBy { it.sourceId }.map { spec ->
+            ToolRecord(spec.sourceId, spec.sourceId, spec.sourceId, "source", "developer", emptyList(), emptyList(), "Code", 10, false, true, false, false, "active", emptyList(), EngineInfo("developer", spec.sourceId, mapOf("op" to (spec.modes.firstOrNull()?.op ?: spec.sourceId))))
+        }
+        val catalog = Catalog(1, "test", CatalogCounts(sources.size, sources.size, 0, 1), emptyList(), sources)
+        val studios = catalog.developerStudioTools()
+        assertEquals(12, studios.size)
+        assertEquals(12, studios.map { it.id }.distinct().size)
+        assertTrue(studios.all { it.engine.type == "developer" })
+        assertTrue(NativeDeveloperStudios.specs.all { it.modes.isNotEmpty() && it.modes.map { mode -> mode.key }.distinct().size == it.modes.size })
+        assertTrue(NativeDeveloperStudios.specs.any { spec -> spec.modes.any { it.key == "base64" && it.decodeOp == "base64-decoder" } })
+        assertEquals("developer-gitignore-generator", studios.first { it.id == "devops-studio" }.engine.extras["op"])
+        assertEquals(12, catalog.search("", "developer").count { "developer-studio" in it.tags })
+        assertTrue(catalog.tools.any { it.id == "json-formatter" })
+        assertTrue(NativeDeveloperStudios.specs.first { it.id == "json-studio" }.modes.any { it.key == "schema" })
+        assertTrue(NativeDeveloperStudios.specs.first { it.id == "markup-studio" }.modes.any { it.key == "samples" })
+        val legacyHash = ToolRecord("sha256-hash", "SHA-256", "sha256-hash", "", "developer", emptyList(), emptyList(), "Code", 1, false, true, false, false, "active", emptyList(), EngineInfo("codec", "sha256-hash"))
+        val legacySample = ToolRecord("lorem-ipsum-generator", "Lorem Ipsum", "lorem-ipsum-generator", "", "developer", emptyList(), emptyList(), "Code", 1, false, true, false, false, "active", emptyList(), EngineInfo("generator", "lorem-ipsum-generator"))
+        assertEquals("hash-studio", catalog.developerStudioForLegacyTool(legacyHash)?.id)
+        assertEquals("markup-studio", catalog.developerStudioForLegacyTool(legacySample)?.id)
+        assertEquals(null, catalog.developerStudioForLegacyTool(studios.first()))
+    }
+
     @Test fun parsesKnownFieldsAndIgnoresUnknownKeys() {
         val catalog = Catalog.fromJson("""
             {"schemaVersion":1,"catalogVersion":"test","counts":{"total":1,"active":1,"planned":0,"categories":1},

@@ -232,4 +232,118 @@ final class NativeDeveloperStudioTests: XCTestCase {
         XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":1.5}"))
         XCTAssertThrowsError(try NativeUtilityEngine.run(secureTool, optionsJSON: "{\"length\":\"oops\"}"))
     }
+
+
+    func testCrossPlatformRecipePipelineIsBoundedInspectableAndPreservesUnicode() throws {
+        let input = "  enV 🚀\r\nline two\rline two  "
+        let recipe = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": input, "steps": [["op": "normalize-newlines", "name": "Normalize newlines"], ["op": "trim"], ["op": "unique-lines"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(recipe).utf8)) as? [String: Any])
+        XCTAssertEqual(report["status"] as? String, "completed")
+        XCTAssertEqual(report["stepsCompleted"] as? Int, 3)
+        XCTAssertEqual(report["finalOutput"] as? String, "enV 🚀\nline two")
+        XCTAssertTrue((report["privacy"] as? String ?? "").contains("does not upload"))
+    }
+
+    func testRecipeJSONOperationsPreserveRawLargeIntegersAndRefuseAmbiguousSort() throws {
+        let raw = #"{"id":9007199254740993,"message":"hello"}"#
+        let recipe = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": raw, "steps": [["op": "json-format"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(recipe).utf8)) as? [String: Any])
+        XCTAssertTrue((report["finalOutput"] as? String ?? "").contains("9007199254740993"))
+        XCTAssertTrue((report["warnings"] as? [String] ?? []).contains { $0.contains("Unsafe integer") })
+        let duplicate = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": #"{"a":1,"a":2}"#, "steps": [["op": "json-sort-keys"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(duplicate)) { error in XCTAssertTrue(error.localizedDescription.contains("duplicate object keys")) }
+    }
+
+    func testRecipeJSONPointerUsesRFC6901EscapesAndPreservesLargeNumbers() throws {
+        let config = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": DeveloperStudioGoldenFixtures.recipePointerInput, "steps": [["op": "json-pointer-get", "pointer": DeveloperStudioGoldenFixtures.recipePointerPath]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(config).utf8)) as? [String: Any])
+        XCTAssertEqual(report["finalOutput"] as? String, DeveloperStudioGoldenFixtures.recipePointerOutput)
+        XCTAssertTrue((report["warnings"] as? [String] ?? []).contains { $0.contains("Unsafe integer") })
+        let duplicate = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": #"{"a":1,"a":2}"#, "steps": [["op": "json-pointer-get", "pointer": "/a"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(duplicate)) { error in XCTAssertTrue(error.localizedDescription.contains("ambiguous duplicate object keys")) }
+        let badIndex = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": #"{"items":[1,2]}"#, "steps": [["op": "json-pointer-get", "pointer": "/items/01"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(badIndex)) { error in XCTAssertTrue(error.localizedDescription.contains("canonical array index")) }
+    }
+
+    func testRecipeCSVTransformsRoundTripQuotedFieldsAndRejectAmbiguousRecords() throws {
+        let csvConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": DeveloperStudioGoldenFixtures.recipeCSVInput, "steps": [["op": "csv-to-json"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let csvReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(csvConfig).utf8)) as? [String: Any])
+        let jsonOutput = try XCTUnwrap(csvReport["finalOutput"] as? String)
+        XCTAssertEqual(jsonOutput, DeveloperStudioGoldenFixtures.recipeCSVExpectedJSON)
+        let jsonConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": jsonOutput, "steps": [["op": "json-to-csv"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let csvOutput = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(jsonConfig).utf8)) as? [String: Any])
+        XCTAssertEqual(csvOutput["finalOutput"] as? String, DeveloperStudioGoldenFixtures.recipeCSVExpectedCSV)
+        let duplicateHeaders = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "name,name\na,b", "steps": [["op": "csv-to-json"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(duplicateHeaders)) { error in XCTAssertTrue(error.localizedDescription.contains("headers must be unique")) }
+        let malformed = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "name,note\nAda,\"unfinished", "steps": [["op": "csv-to-json"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(malformed)) { error in XCTAssertTrue(error.localizedDescription.contains("ends inside a quoted field")) }
+    }
+
+    func testRecipeStrictCodecsRoundTripUnicodeAndRejectNonCanonicalBase64() throws {
+        let config = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "enV 🚀", "steps": [["op": "base64-encode"], ["op": "base64-decode"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(config).utf8)) as? [String: Any])
+        XCTAssertEqual(report["finalOutput"] as? String, "enV 🚀")
+        let invalid = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "Zh==", "steps": [["op": "base64-decode"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(invalid)) { error in XCTAssertTrue(error.localizedDescription.contains("canonical")) }
+    }
+
+    func testRecipeLimitsAndUnknownOperationsFailClosed() throws {
+        let many = Array(repeating: ["op": "trim"], count: 17)
+        let limit = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "x", "steps": many], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(limit)) { error in XCTAssertTrue(error.localizedDescription.contains("between 1 and 16")) }
+        let unknown = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "x", "steps": [["op": "eval"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(unknown)) { error in XCTAssertTrue(error.localizedDescription.contains("unsupported operation")) }
+    }
+
+    func testRecipeLinesAndUnicodeNormalizationUsePortableSemantics() throws {
+        let reverse = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "🚀 first\nsecond\nthird\n", "steps": [["op": "reverse-lines"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let reverseReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(reverse).utf8)) as? [String: Any])
+        XCTAssertEqual(reverseReport["finalOutput"] as? String, "third\nsecond\n🚀 first\n")
+        let unicode = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "\u{FEFF}Cafe\u{0301}\n\n", "steps": [["op": "strip-bom"], ["op": "unicode-normalize-nfc"], ["op": "remove-final-newline"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let unicodeReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(unicode).utf8)) as? [String: Any])
+        XCTAssertEqual(unicodeReport["finalOutput"] as? String, "Café\n")
+        let compatibility = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "①", "steps": [["op": "unicode-normalize-nfkc"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let compatReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(compatibility).utf8)) as? [String: Any])
+        XCTAssertEqual(compatReport["finalOutput"] as? String, "1")
+        XCTAssertTrue((compatReport["warnings"] as? [String] ?? []).contains { $0.contains("compatibility normalization") })
+    }
+
+    func testRecipeConfigurationRejectsDuplicateTopLevelKeys() {
+        let duplicate = "{\"input\":\"first\",\"input\":\"second\",\"steps\":[{\"op\":\"trim\"}]}"
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(duplicate)) { error in XCTAssertTrue(error.localizedDescription.contains("Recipe configuration contains duplicate object keys and is ambiguous")) }
+    }
+
+    func testRecipeLiteralReplacementPreflightsOversizedExpansion() throws {
+        let step: [String: Any] = ["op": "replace-literal", "find": "x", "replacement": String(repeating: "a", count: 100_000)]
+        let config = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": String(repeating: "x", count: 30), "steps": [step]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(config)) { error in XCTAssertTrue(error.localizedDescription.contains("Literal replacement would exceed 2097152 UTF-8 bytes")) }
+    }
+
+    func testRecipeCSVRoundTripQuotesCRLFInsideField() throws {
+        let source = "name,note\r\nAda,\"line one\r\nline two\"\r\n"
+        let toJsonConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": source, "steps": [["op": "csv-to-json"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let toJson = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(toJsonConfig).utf8)) as? [String: Any])
+        let toCsvConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": toJson["finalOutput"]!, "steps": [["op": "json-to-csv"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let toCsv = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(toCsvConfig).utf8)) as? [String: Any])
+        XCTAssertEqual(toCsv["finalOutput"] as? String, "name,note\nAda,\"line one\r\nline two\"\n")
+    }
+
+    func testRecipeJSONDepthAndPrettyOutputBudgetsRejectHostileInputs() throws {
+        let tooDeep = String(repeating: "[", count: 2_000) + "0" + String(repeating: "]", count: 2_000)
+        let depthConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": tooDeep, "steps": [["op": "json-validate"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(depthConfig)) { error in XCTAssertTrue(error.localizedDescription.contains("JSON nesting exceeds the safety depth of 128")) }
+        let amplifier = String(repeating: "[", count: 80) + Array(repeating: "0", count: 13_500).joined(separator: ",") + String(repeating: "]", count: 80)
+        let formatConfig = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": amplifier, "steps": [["op": "json-format"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        XCTAssertThrowsError(try NativeDeveloperRecipe.run(formatConfig)) { error in XCTAssertTrue(error.localizedDescription.contains("JSON formatting would exceed 2097152 UTF-8 bytes")) }
+    }
+
+    func testRecipeFinalNewlineAndCodePointSortingAreDeterministic() throws {
+        let add = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "line", "steps": [["op": "ensure-final-newline"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let addReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(add).utf8)) as? [String: Any])
+        XCTAssertEqual(addReport["finalOutput"] as? String, "line\n")
+        let sorted = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "z\nA\na\n🚀", "steps": [["op": "sort-lines"]]], options: [.fragmentsAllowed]), encoding: .utf8))
+        let sortReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(sorted).utf8)) as? [String: Any])
+        XCTAssertEqual(sortReport["finalOutput"] as? String, "A\na\nz\n🚀")
+    }
+
 }

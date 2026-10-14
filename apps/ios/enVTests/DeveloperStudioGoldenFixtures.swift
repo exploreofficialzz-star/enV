@@ -24,6 +24,12 @@ enum DeveloperStudioGoldenFixtures {
   static let jsonInput = "{\"id\":9007199254740993,\"dup\":1,\"dup\":2,\"memo\":\"9007199254740993\"}"
   static let unsafeInteger = "9007199254740993"
   static let duplicateKey = "dup"
+  static let recipePointerInput = "{\"a/b\":{\"~key\":[{\"id\":9007199254740993}]}}"
+  static let recipePointerPath = "/a~1b/~0key/0/id"
+  static let recipePointerOutput = "9007199254740993"
+  static let recipeCSVInput = "name,note,id\r\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\r\n"
+  static let recipeCSVExpectedJSON = "[\n  {\n    \"name\": \"Ada, Lovelace\",\n    \"note\": \"said \\\"hello\\\"\",\n    \"id\": \"9007199254740993\"\n  }\n]"
+  static let recipeCSVExpectedCSV = "name,note,id\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\n"
   static let sha256Hello = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
   static let md5Hello = "5d41402abc4b2a76b9719d911017c592"
 }

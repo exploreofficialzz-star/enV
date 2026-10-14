@@ -5,14 +5,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
-import { hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
+import { DEVELOPER_HTTP_STATUS, hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { runRegexStudio, type RegexStudioMode } from "@/lib/engines/regex-studio";
 import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
 import { decodeData as decodeSharedData, encodeData as encodeSharedData } from "@/lib/engines/developer-utils";
 import type { ToolMeta } from "@/types/tool";
 import { getAllTools, toolPath } from "@/lib/registry";
+import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
-type Props = { op: string; tool?: ToolMeta };
+type Props = { op: string; tool?: ToolMeta; initialInput?: string };
 
 const STUDIO_FAMILIES = [
   "api-mock", "file-hash", "environment-variable", "semantic-version", "branch-name", "commit-message", "content-type", "query-string", "data-uri", "timestamp", "javascript", "typescript", "kubernetes", "graphql", "openapi", "markdown", "base64", "unicode", "binary", "ascii", "docker", "nginx", "http", "mime", "regex", "cron", "uuid", "json", "jwt", "hash", "sha", "md5", "hex", "url", "uri", "html", "xml", "svg", "css", "csv", "sql", "yaml", "git", "cookie", "webhook", "readme", "license", "editorconfig", "changelog", "csp", "cors", "ip-header", "status-code", "user-agent", "dummy-json",
@@ -161,7 +162,11 @@ function urlInfo(input: string): string {
   return JSON.stringify({ href: u.href, protocol: u.protocol, username: u.username, hostname: u.hostname, port: u.port, pathname: u.pathname, search: u.search, hash: u.hash, origin: u.origin, params: Object.fromEntries(u.searchParams.entries()) }, null, 2);
 }
 
-const HTTP_STATUS: Record<string, string> = { "200":"OK", "201":"Created", "204":"No Content", "301":"Moved Permanently", "302":"Found", "304":"Not Modified", "400":"Bad Request", "401":"Unauthorized", "403":"Forbidden", "404":"Not Found", "405":"Method Not Allowed", "409":"Conflict", "422":"Unprocessable Content", "429":"Too Many Requests", "500":"Internal Server Error", "502":"Bad Gateway", "503":"Service Unavailable", "504":"Gateway Timeout" };
+// Keep legacy fallback and the primary Studio lookup aligned; this prevents
+// older Developer routes from silently losing specialist status codes like 418.
+const HTTP_STATUS: Record<string, string> = Object.fromEntries(
+  Object.entries(DEVELOPER_HTTP_STATUS).map(([code, name]) => [code, name]),
+);
 
 function legacyGeneric(op: string, input: string, secondary: string, flags = "g"): string {
   const lower = op.toLowerCase();
@@ -252,9 +257,9 @@ function actionLabel(op: string): string {
   return "Run";
 }
 
-export function DeveloperEngine({ op, tool }: Props) {
+export function DeveloperEngine({ op, tool, initialInput }: Props) {
   const example = useMemo(() => developerStudioExample(op), [op]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput ?? "");
   const [secondary, setSecondary] = useState("");
   const [flags, setFlags] = useState("g");
   const [replacement, setReplacement] = useState("");
@@ -273,6 +278,13 @@ export function DeveloperEngine({ op, tool }: Props) {
   const isSqlFormatter = /sql-(?:formatter|beautifier)/i.test(op);
   const isFileHash = op.toLowerCase().includes("file-hash");
   const toolSlug = tool?.slug;
+  const parentStudio = useMemo(() => tool && !tool.tags.includes("developer-studio") ? developerStudioForLegacySlug(tool.slug) : null, [tool]);
+  const parentMode = parentStudio && tool ? developerModeForLegacySlug(parentStudio, tool.slug) : undefined;
+  const parentAction = parentStudio && tool ? developerActionForLegacySlug(parentStudio, tool.slug) : "encode";
+  const legacyEngineOp = tool && "op" in tool.engine ? tool.engine.op : undefined;
+  const parentStudioUrl = parentStudio && tool
+    ? `/tools/developer/${parentStudio.slug}?mode=${encodeURIComponent(parentMode ?? parentStudio.modes[0]?.key ?? "format")}${legacyEngineOp ? `&op=${encodeURIComponent(legacyEngineOp)}` : ""}${parentAction === "decode" ? "&action=decode" : ""}`
+    : undefined;
   const relatedTools = useMemo(() => {
     if (!toolSlug) return [];
     const family = studioFamily(toolSlug);
@@ -313,9 +325,10 @@ export function DeveloperEngine({ op, tool }: Props) {
       setError(e instanceof Error ? e.message : "Could not process this input.");
     } finally { regexAbort.current = null; setBusy(false); }
   };
-  const loadExample = () => { setInput(example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setRegexMode("test"); setOut(""); setError(null); };
+  const loadExample = () => { setInput(initialInput ?? example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setRegexMode("test"); setOut(""); setError(null); };
   const handleEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void run(); } };
   return <div className="space-y-4">
+    {parentStudio ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm"><div><p className="font-medium">Part of {parentStudio.name}</p><p className="mt-0.5 text-xs text-muted">Open the grouped workspace to switch between related developer tasks.</p></div><a href={parentStudioUrl} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 font-medium hover:bg-surface-2">Open Studio</a></div> : null}
     <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm" role="note">
       <span className="font-medium">On-device processing.</span> Text operations run in this browser; input is not uploaded by this tool. File hashing reads the selected file locally.
     </div>
@@ -341,11 +354,11 @@ export function DeveloperEngine({ op, tool }: Props) {
         : regexMode === "format" ? <p className="text-xs text-muted" role="note">Produces a source-preserving readable representation. It does not add the unsupported free-spacing flag to JavaScript regexes.</p>
         : regexMode === "benchmark" ? <p className="text-xs text-muted" role="note">Benchmarks your selected samples on this device. Results vary by browser and device; likely high-backtracking patterns are bounded by a worker deadline.</p>
         : <p className="text-xs text-muted [overflow-wrap:anywhere]" role="note">Engine: JavaScript RegExp. Paste a JSON array or {`{"samples":[{"label":"valid","text":"ORD-12","expectMatch":true},{"label":"invalid","text":"bad","expectMatch":false}]}`} for repeatable cases. Execution is isolated in a terminable Web Worker when available.</p>}
-      {(regexMode === "test" || regexMode === "benchmark") && <label className="block space-y-1.5"><Label htmlFor="dev-regex-replacement">Replacement preview (optional)</Label><Input id="dev-regex-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-full font-mono" placeholder="$<name>, $1, or replacement text" /></label>}
+      {(regexMode === "test" || regexMode === "benchmark") && <label className="block space-y-1.5"><Label htmlFor="dev-regex-replacement">{isRegexReplace ? "Replacement preview" : "Replacement preview (optional)"}</Label><Input id="dev-regex-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-full font-mono" placeholder="$<name>, $1, or replacement text" /></label>}
     </div> : null}
     <div className="flex flex-wrap items-end gap-3">
       {isRegexReplace && !isRegexTool ? <label className="space-y-1.5"><Label htmlFor="dev-replacement">Replacement</Label><Input id="dev-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-48 font-mono" placeholder="Replacement text" /></label> : null}
-      <Button type="button" onClick={() => void run()} disabled={busy}>{busy ? "Processing…" : isRegexTool ? (regexMode === "test" ? "Run tests" : regexMode === "benchmark" ? "Benchmark" : regexMode === "pipeline" ? "Run pipeline" : regexMode === "format" ? "Format regex" : "Analyze flavors") : actionLabel(op)}</Button>
+      <Button type="button" onClick={() => void run()} disabled={busy}>{busy ? "Processing…" : isRegexTool ? (regexMode === "test" ? (isRegexReplace ? "Preview replacement" : "Run tests") : regexMode === "benchmark" ? "Benchmark" : regexMode === "pipeline" ? "Run pipeline" : regexMode === "format" ? "Format regex" : "Analyze flavors") : actionLabel(op)}</Button>
       {busy && isRegexTool ? <Button type="button" variant="outline" onClick={() => regexAbort.current?.abort()}>Stop regex run</Button> : null}
       <Button type="button" variant="ghost" onClick={() => { regexAbort.current?.abort(); setInput(""); setSecondary(""); setFlags("g"); setReplacement(""); setRegexMode("test"); setSqlDialect("postgresql"); setSelectedFile(null); setOut(""); setError(null); }}>Reset</Button>
     </div>

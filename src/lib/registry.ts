@@ -2,14 +2,18 @@ import { tools as allTools } from "@/data/catalog";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
+import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 
 const byId = new Map(allTools.map((t) => [t.id, t]));
 const accessibilityStudios = makeAccessibilityStudioTools(allTools);
+const developerStudios = makeDeveloperStudioTools(allTools);
+const virtualStudios = [...accessibilityStudios, ...developerStudios];
 const byPath = new Map<string, ToolMeta>([
   ...allTools.map((t) => [`${t.category}/${t.slug}`, t] as const),
-  ...accessibilityStudios.map((t) => [`${t.category}/${t.slug}`, t] as const),
+  ...virtualStudios.map((t) => [`${t.category}/${t.slug}`, t] as const),
 ]);
-const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility"), ...accessibilityStudios];
+const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as const));
+const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility"), ...virtualStudios];
 
 export function getAllTools(): ToolMeta[] {
   return allTools;
@@ -25,6 +29,8 @@ export function getActiveTools(): ToolMeta[] {
 }
 
 export function getToolById(id: string): ToolMeta | undefined {
+  const virtual = byVirtualId.get(id);
+  if (virtual) return virtual;
   const tool = byId.get(id);
   return tool?.category === "accessibility" ? studioToolForLegacy(tool, allTools) : tool;
 }
@@ -43,12 +49,22 @@ function alphabeticalKey(value: string): string {
 }
 
 export function getToolsByCategory(category: CategoryId): ToolMeta[] {
-  return (category === "accessibility" ? accessibilityStudios : allTools.filter((t) => t.category === category))
-    .slice()
-    .sort((a, b) =>
-      alphabeticalKey(a.name).localeCompare(alphabeticalKey(b.name)) ||
-      a.id.localeCompare(b.id),
-    );
+  const items = category === "accessibility"
+    ? accessibilityStudios
+    : category === "developer"
+      ? [...developerStudios, ...allTools.filter((t) => t.category === category)]
+      : allTools.filter((t) => t.category === category);
+  return items.slice().sort((a, b) => {
+    // Keep the twelve workspace entry points first. The original long-tail list
+    // follows alphabetically, so every existing catalog URL remains discoverable.
+    if (category === "developer") {
+      const aStudio = a.tags.includes("developer-studio");
+      const bStudio = b.tags.includes("developer-studio");
+      if (aStudio !== bStudio) return aStudio ? -1 : 1;
+      if (aStudio && bStudio) return b.popularity - a.popularity || a.id.localeCompare(b.id);
+    }
+    return alphabeticalKey(a.name).localeCompare(alphabeticalKey(b.name)) || a.id.localeCompare(b.id);
+  });
 }
 
 export function getFeaturedTools(limit = 8): ToolMeta[] {

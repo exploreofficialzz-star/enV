@@ -91,6 +91,7 @@ struct ToolDetailView: View {
     private var backend: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool) }
     private var local: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeCoverage.isLocallyExecutable(tool) }
     private var relatedTools: [Tool] { store.catalog.relatedTools(for: tool, limit: Int.max) }
+    private var parentDeveloperStudio: Tool? { store.catalog.developerStudio(forLegacyTool: tool) }
     private var categoryName: String { store.category(named: tool.category)?.name ?? tool.category }
     private var relatedColumns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 8), count: compact ? 1 : 2) }
 
@@ -122,6 +123,31 @@ struct ToolDetailView: View {
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(.top, 12)
+                }
+
+                if let parentDeveloperStudio {
+                    NavigationLink(value: parentDeveloperStudio) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                enVCharacterSpacedText("Part of \(parentDeveloperStudio.name)")
+                                    .font(.envScaled(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.envInk)
+                                enVCharacterSpacedText("Switch between related local developer tasks in the grouped Studio workspace.")
+                                    .font(.envScaled(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.envMuted)
+                            }
+                            Spacer(minLength: 8)
+                            enVCharacterSpacedText("Open Studio")
+                                .font(.envScaled(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.envAccent)
+                            EnVIcon(name: "ArrowRight", size: 16, tint: .envAccent)
+                        }
+                        .padding(14)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.6), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 16)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -734,6 +760,7 @@ enum NativeDeveloperToolFormPolicy {
         let uuid="550e8400-e29b-41d4-a716-446655440000"
         let sha256="2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         let jwt="eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJleGFtcGxlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9."
+        if lower == "developer-recipe-runner" { return (#"{"input":"  <p>Hello   <strong>enV</strong> 🚀</p>\r\n","steps":[{"name":"Normalize line endings","op":"normalize-newlines"},{"name":"Remove paragraph tag","op":"replace-literal","find":"<p>","replacement":""},{"name":"Remove closing paragraph tag","op":"replace-literal","find":"</p>","replacement":""},{"name":"Collapse whitespace","op":"collapse-whitespace"},{"name":"Trim","op":"trim"}]}"#, "") }
         if lower.contains("file-hash") { return ("","") }
         if lower.contains("json-path") || lower.contains("jsonpath") { return ("{\"user\":{\"name\":\"Ada\"},\"items\":[{\"id\":1},{\"id\":2}]}", "$.items[0].id") }
         if lower.contains("json-diff") { return ("{\"name\":\"Ada\",\"active\":true}", "{\"name\":\"Ada Lovelace\",\"active\":true}") }
@@ -839,8 +866,15 @@ private struct NativeDeveloperTextArea: View {
 
 private struct NativeDeveloperToolView: View {
     let tool:Tool
+    @State private var studioModeKey = ""
+    @State private var encodingDirection = "encode"
     @State private var input=""
     @State private var secondary=""
+    @State private var recipeSource="  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
+    @State private var recipeSteps=["normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim"]
+    @State private var recipeFind="<p>"
+    @State private var recipeReplacementText=""
+    @State private var recipePointer="/user/id"
     @State private var flags="g"
     @State private var replacement=""
     @State private var regexMode="test"
@@ -850,8 +884,21 @@ private struct NativeDeveloperToolView: View {
     @State private var isExporting=false
     @State private var isImporting=false
     @State private var selectedFileName=""
-    private var op:String { tool.engine.op ?? tool.engine.id ?? tool.id }
+    private var studioSpec: NativeDeveloperStudioSpec? { nativeDeveloperStudioSpecs.first { $0.id == tool.id || $0.slug == tool.slug } }
+    private var selectedStudioMode: NativeDeveloperStudioMode? { studioSpec?.modes.first { $0.key == studioModeKey } ?? studioSpec?.modes.first }
+    private var op:String {
+        guard let mode = selectedStudioMode else { return tool.engine.op ?? tool.engine.id ?? tool.id }
+        if encodingDirection == "decode", let decodeOp = mode.decodeOp { return decodeOp }
+        return mode.op
+    }
+    private var activeTool: Tool {
+        Tool(id: tool.id, name: tool.name, slug: tool.slug, description: tool.description, category: tool.category, subcategory: tool.subcategory,
+             keywords: tool.keywords, tags: tool.tags, icon: tool.icon, popularity: tool.popularity, featured: tool.featured,
+             clientSide: tool.clientSide, requiresBackend: tool.requiresBackend, requiresAuth: tool.requiresAuth, status: tool.status,
+             disclaimer: tool.disclaimer, related: tool.related, engine: ToolEngine(type: tool.engine.type, id: tool.engine.id, op: op, configuration: tool.engine.configuration))
+    }
     private var isFileHash:Bool { NativeDeveloperToolFormPolicy.isFileHash(op) }
+    private var isRecipeRunner:Bool { op == "developer-recipe-runner" }
     private var isRegexStudio:Bool { op.localizedCaseInsensitiveContains("regex") && !op.localizedCaseInsensitiveContains("regex-generator") }
     private var isSQLFormatter:Bool { op.localizedCaseInsensitiveContains("sql") && (op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier")) }
 
@@ -859,15 +906,34 @@ private struct NativeDeveloperToolView: View {
         self.tool = tool
         let operation = tool.engine.op ?? tool.engine.id ?? tool.id
         _regexMode = State(initialValue: operation.localizedCaseInsensitiveContains("explainer") ? "flavors" : "test")
+        _studioModeKey = State(initialValue: nativeDeveloperStudioSpecs.first(where: { $0.id == tool.id || $0.slug == tool.slug })?.modes.first?.key ?? "")
     }
 
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
             Text("Runs entirely on this device. Nothing is uploaded.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(Color.envSurface2,in:RoundedRectangle(cornerRadius:10))
+            if let studioSpec {
+                Text(studioSpec.name).font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
+                Text(studioSpec.description).font(.footnote).foregroundStyle(.secondary)
+                Picker("Studio mode", selection: $studioModeKey) {
+                    ForEach(studioSpec.modes) { mode in Text(mode.label).tag(mode.key) }
+                }.pickerStyle(.menu).accessibilityLabel("\(studioSpec.name) mode")
+                if selectedStudioMode?.decodeOp != nil {
+                    Picker("Encoding direction", selection: $encodingDirection) {
+                        Text("Encode").tag("encode")
+                        Text("Decode").tag("decode")
+                    }.pickerStyle(.segmented)
+                }
+            }
             HStack(spacing:10) {
                 Button("Load example") {
                     let sample=NativeDeveloperToolFormPolicy.example(op)
-                    input=sample.input; secondary=sample.secondary; flags=op.contains("regex") ? "gi" : "g"; replacement=op.contains("replace") ? "dog" : ""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil
+                    if isRecipeRunner {
+                        recipeSource="  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
+                        recipeSteps=["normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim"]
+                        recipeFind="<p>"; recipeReplacementText=""; recipePointer="/user/id"
+                    } else { input=sample.input; secondary=sample.secondary }
+                    flags=op.contains("regex") ? "gi" : "g"; replacement=op.contains("replace") ? "dog" : ""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil
                 }.buttonStyle(.bordered)
                 Text("Text tools process locally on this device.").font(.caption).foregroundStyle(.secondary)
             }
@@ -877,7 +943,42 @@ private struct NativeDeveloperToolView: View {
                     Text(selectedFileName.isEmpty ? "Select a file to hash locally" : selectedFileName).font(.footnote).lineLimit(2).truncationMode(.middle)
                 }
             }
-            NativeDeveloperTextArea(title:isRegexStudio && regexMode == "pipeline" ? "Default pattern (unused by layers)" : op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
+            if isRecipeRunner {
+                VStack(alignment:.leading,spacing:10) {
+                    Text("Recipe Pipeline").font(.headline).foregroundStyle(Color.envTeal)
+                    Text("Compose a deterministic, bounded transformation chain. Each step runs in order; inputs and intermediate output stay on this device.").font(.footnote).foregroundStyle(.secondary)
+                    NativeDeveloperTextArea(title:"Source text",text:$recipeSource,placeholder:"Paste text, JSON, CSV, or encoded data…")
+                    HStack {
+                        Menu("Add step") {
+                            ForEach(NativeDeveloperRecipe.supportedOperations,id: \.self) { operation in
+                                Button(operation) { if recipeSteps.count < 16 { recipeSteps.append(operation) } }
+                            }
+                        }.disabled(recipeSteps.count >= 16)
+                        Spacer()
+                        Text("\(recipeSteps.count)/16 steps").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(recipeSteps.indices,id: \.self) { index in
+                        HStack(spacing:6) {
+                            Text("\(index + 1). \(recipeSteps[index])").font(.system(.footnote,design:.monospaced)).frame(maxWidth:.infinity,alignment:.leading)
+                            Button("↑") { if index > 0 { recipeSteps.swapAt(index,index - 1) } }.disabled(index == 0)
+                            Button("↓") { if index + 1 < recipeSteps.count { recipeSteps.swapAt(index,index + 1) } }.disabled(index + 1 >= recipeSteps.count)
+                            Button("×") { recipeSteps.remove(at:index) }.accessibilityLabel("Remove \(recipeSteps[index]) step")
+                        }.buttonStyle(.borderless)
+                    }
+                    if recipeSteps.contains("replace-literal") {
+                        NativeInputField(title:"Literal text to find",text:$recipeFind)
+                        NativeInputField(title:"Replacement text (empty removes matches)",text:$recipeReplacementText)
+                        Text("These values apply to each Replace Literal step in the native builder.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if recipeSteps.contains("json-pointer-get") { NativeInputField(title:"RFC 6901 JSON Pointer",text:$recipePointer) }
+                    Button("Copy recipe JSON") {
+                        do { UIPasteboard.general.string = try recipeConfiguration(); error = nil }
+                        catch let caughtError { error = caughtError.localizedDescription }
+                    }.buttonStyle(.bordered)
+                }
+            } else {
+                NativeDeveloperTextArea(title:isRegexStudio && regexMode == "pipeline" ? "Default pattern (unused by layers)" : op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
+            }
             if isRegexStudio {
                 Picker("Regex Studio mode", selection:$regexMode) {
                     Text("Test / assertions").tag("test"); Text("Benchmark").tag("benchmark"); Text("Substitution pipeline").tag("pipeline"); Text("Format regex").tag("format"); Text("Flavor hints").tag("flavors")
@@ -894,7 +995,7 @@ private struct NativeDeveloperToolView: View {
             if isRegexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags (g/i/m/s/u; platform engine-specific)",text:$flags) }
             if (isRegexStudio && ["test", "benchmark"].contains(regexMode)) || (!isRegexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op)) { NativeInputField(title:"Replacement preview (optional)",text:$replacement) }
             HStack(spacing:10) {
-                Button(isRegexStudio ? (regexMode == "test" ? "Run tests" : regexMode == "benchmark" ? "Benchmark" : regexMode == "pipeline" ? "Run pipeline" : regexMode == "format" ? "Format regex" : "Analyze flavors") : NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
+                Button(isRecipeRunner ? "Run recipe" : isRegexStudio ? (regexMode == "test" ? "Run tests" : regexMode == "benchmark" ? "Benchmark" : regexMode == "pipeline" ? "Run pipeline" : regexMode == "format" ? "Format regex" : "Analyze flavors") : NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
                 Button("Reset",action:reset).buttonStyle(.bordered)
             }
             if !output.isEmpty {
@@ -924,6 +1025,18 @@ private struct NativeDeveloperToolView: View {
         }
     }
 
+    private func recipeConfiguration() throws -> String {
+        let steps:[[String:Any]] = recipeSteps.enumerated().map { index, operation in
+            var step:[String:Any] = ["name":"\(index + 1). \(operation)", "op":operation]
+            if operation == "replace-literal" { step["find"] = recipeFind; step["replacement"] = recipeReplacementText }
+            if operation == "json-pointer-get" { step["pointer"] = recipePointer }
+            return step
+        }
+        let data = try JSONSerialization.data(withJSONObject:["input":recipeSource,"steps":steps],options:[.sortedKeys])
+        guard let configuration=String(data:data,encoding:.utf8) else { throw NativeSimpleError.message("Could not encode recipe configuration as UTF-8.") }
+        return configuration
+    }
+
     private func run() {
         var options=[String:String]()
         if isRegexStudio || NativeDeveloperToolFormPolicy.needsSecondInput(op) { options["secondary"]=secondary }
@@ -938,10 +1051,11 @@ private struct NativeDeveloperToolView: View {
             }
             let data=try JSONSerialization.data(withJSONObject:options,options:[.sortedKeys])
             let raw=String(data:data,encoding:.utf8) ?? "{}"
-            output=try NativeUtilityEngine.run(tool,input:input,optionsJSON:raw).text; error=nil
+            let engineInput = isRecipeRunner ? try recipeConfiguration() : input
+            output=try NativeUtilityEngine.run(activeTool,input:engineInput,optionsJSON:raw).text; error=nil
         } catch let caughtError { output=""; error=caughtError.localizedDescription }
     }
-    private func reset() { input=""; secondary=""; flags="g"; replacement=""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil; selectedFileName="" }
+    private func reset() { input=""; secondary=""; recipeSource=""; recipeSteps=[]; recipeFind=""; recipeReplacementText=""; recipePointer="/"; flags="g"; replacement=""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil; selectedFileName="" }
 }
 
 private struct NativeConverterToolView: View {

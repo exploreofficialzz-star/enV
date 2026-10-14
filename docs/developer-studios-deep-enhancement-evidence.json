@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-14",
+  "scope": "enV Developer Studios; TypeScript/Web, native Kotlin/Android, native Swift/iOS",
+  "results": {
+    "focused_web_tests": {
+      "status": "pass",
+      "passed": 55,
+      "failed": 0,
+      "command": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/developer-studios.test.ts src/lib/developer-studios-catalog.test.ts"
+    },
+    "cross_platform_behavioral_differential": {
+      "status": "pass",
+      "passed": 20,
+      "failed": 0,
+      "note": "Engine harnesses exercise corresponding TypeScript/Kotlin/Swift operations; test harness shims are not production Android/Xcode builds."
+    },
+    "hostile_input_error_parity": {
+      "status": "pass",
+      "passed": 4,
+      "failed": 0,
+      "cases": [
+        "JSON nesting limit",
+        "pretty JSON output budget",
+        "literal replacement expansion budget",
+        "duplicate recipe configuration keys"
+      ]
+    },
+    "recipe_operation_parity": {
+      "status": "pass",
+      "count": 33,
+      "platforms": [
+        "TypeScript",
+        "Kotlin",
+        "Swift"
+      ],
+      "note": "Exact operation ordering, implementation dispatch, resource limits, duplicate-key guards, and visual native UI wiring checked."
+    },
+    "studio_catalog_parity": {
+      "status": "pass",
+      "studios": 12,
+      "modes": 75,
+      "platforms": [
+        "TypeScript",
+        "Kotlin",
+        "Swift"
+      ]
+    },
+    "legacy_route_audit": {
+      "status": "pass_with_environment_blockers",
+      "original_slugs": 474,
+      "mapped_slugs": 474,
+      "executable_smoke_entries": 448,
+      "hard_failures": 0,
+      "mapping_failures": 0,
+      "generic_placeholders": 0,
+      "environment_blocked": 18,
+      "expected_domain_errors": 1,
+      "expected_domain_error_note": "A cryptographic hash cannot be decoded into original plaintext."
+    },
+    "privacy_source_guard": {
+      "status": "pass_static_only",
+      "guarded_files": 11,
+      "note": "Source-level static guard passed; it does not establish runtime network behavior. The Playwright browser network/storage audit remains a release gate."
+    },
+    "golden_fixture_sync": {
+      "status": "pass",
+      "note": "Shared fixture sync checker confirms TypeScript/Kotlin/Swift outputs are synchronized."
+    },
+    "swift_parser": {
+      "status": "pass",
+      "files": [
+        "apps/ios/enV/ToolViews.swift",
+        "apps/ios/enV/NativeDeveloperRecipe.swift",
+        "apps/ios/enVTests/NativeDeveloperStudioTests.swift",
+        "apps/ios/enVTests/DeveloperStudioGoldenFixtures.swift"
+      ]
+    },
+    "kotlin_recipe_engine_harness": {
+      "status": "pass_limited",
+      "note": "Recipe engine compiled and ran against local Android Base64/JSON test doubles; not a full Gradle build or use of production platform classes."
+    },
+    "swift_recipe_engine_harness": {
+      "status": "pass_limited",
+      "note": "Engine type-check/runtime harness uses a Linux CryptoKit interface stub for non-hash behavior; this does not validate real iOS CryptoKit SHA-256 output."
+    },
+    "web_production_build": {
+      "status": "blocked",
+      "detail": "npm run build failed because node_modules is absent and Vite could not be spawned (ENOENT)."
+    },
+    "android_gradle_build_and_tests": {
+      "status": "blocked",
+      "detail": "Gradle distribution download could not resolve services.gradle.org in this environment."
+    },
+    "ios_xcode_build_and_xctest": {
+      "status": "blocked",
+      "detail": "Xcode is unavailable on this Linux host."
+    },
+    "runtime_browser_privacy_audit": {
+      "status": "not_run",
+      "detail": "The Web app cannot start without the missing Vite dependency. Run audit:developer:browser:ci after npm ci in a network-enabled CI environment."
+    }
+  },
+  "research_sources": {
+    "CyberChef": "https://github.com/gchq/CyberChef",
+    "CyberChef_issues": "https://github.com/gchq/CyberChef/issues",
+    "DevToys": "https://github.com/DevToys-app/DevToys",
+    "DevToys_native_rewrite": "https://github.com/toy-forge/devtoys",
+    "regex101_Pro": "https://support.regex101.com/application/regex101-pro/",
+    "regex101_pipeline": "https://docs.regex101.com/application/regex101-pro/substitution-pipeline/",
+    "IT_Tools_issues": "https://github.com/CorentinTh/it-tools/issues",
+    "RFC8259": "https://www.rfc-editor.org/rfc/rfc8259.html",
+    "RFC4648": "https://www.rfc-editor.org/rfc/rfc4648.html",
+    "RFC6901": "https://www.rfc-editor.org/rfc/rfc6901.html"
+  }
+}

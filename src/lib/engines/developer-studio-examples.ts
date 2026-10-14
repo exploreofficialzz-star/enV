@@ -5,6 +5,7 @@ export function developerStudioExample(op: string): { input: string; secondary?:
   const sha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
   const jwtToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJleGFtcGxlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9.";
   if (lower.includes("file-hash")) return { input: "" };
+  if (lower.includes("developer-recipe-runner")) return { input: JSON.stringify({ input: "  <p>Hello   <strong>enV</strong> 🚀</p>\r\n", steps: [{ name: "Normalize line endings", op: "normalize-newlines" }, { name: "Remove opening paragraph tag", op: "replace-literal", find: "<p>", replacement: "" }, { name: "Remove closing paragraph tag", op: "replace-literal", find: "</p>", replacement: "" }, { name: "Remove opening strong tag", op: "replace-literal", find: "<strong>", replacement: "" }, { name: "Remove closing strong tag", op: "replace-literal", find: "</strong>", replacement: "" }, { name: "Collapse whitespace", op: "collapse-whitespace" }, { name: "Trim", op: "trim" }] }, null, 2) };
   if (lower.includes("json-path") || lower.includes("jsonpath")) return { input: '{"user":{"name":"Ada"},"items":[{"id":1},{"id":2}]}', secondary: "$.items[0].id" };
   if (lower.includes("json-diff")) return { input: '{"name":"Ada","active":true}', secondary: '{"name":"Ada Lovelace","active":true}' };
   if (lower.includes("developer-json-schema-generator")) return { input: '{"name":"Ada","count":2,"ratio":1.5,"active":true}' };

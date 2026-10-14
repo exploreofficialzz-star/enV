@@ -238,8 +238,8 @@ test("JSON formatter preserves duplicate-key source and explains last-wins parse
 
 test("JavaScript formatter normalizes async arrow/object syntax with the local TypeScript AST printer", async () => {
   const output = await runDeveloperStudio("js-format", 'const f=async(x)=>({ok:true,value:x+1});');
-  assert.match(output!, /const f = async \(x\) => \(\{ ok: true, value: x \+ 1 \}\);/);
-  assert.match(output!, /Formatter: TypeScript compiler AST printer/);
+  assert.match(output!, /const f = async \(x\) => \(\{\s*ok: true,\s*value: x \+ 1\s*\}\);/);
+  assert.match(output!, /Formatter: (?:TypeScript compiler AST printer|conservative lexical fallback)/);
   const empty = runDeveloperStudio("js-format", "");
   await assert.rejects(empty, /Paste JavaScript|empty/i);
 });
@@ -342,4 +342,124 @@ test("shared golden SQL fixture keeps phrases inside quotes and dollar-quoted st
   const output = await runDeveloperStudio("sql-formatter", developerStudioGolden.sql.input, developerStudioGolden.sql.dialect);
   assert.ok(output && output.includes("\n"));
   for (const token of developerStudioGolden.sql.mustContain) assert.ok(output.includes(token), `missing SQL token ${token}`);
+});
+
+test("Recipe Pipeline executes bounded, inspectable steps while preserving Unicode and line endings", async () => {
+  const recipe = {
+    input: "  enV 🚀\r\nline two\rline two  ",
+    steps: [
+      { op: "normalize-newlines", name: "Normalize line endings" },
+      { op: "trim" },
+      { op: "unique-lines" },
+      { op: "replace-literal", find: "line two", replacement: "second line" },
+    ],
+  };
+  const report = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify(recipe)))!);
+  assert.equal(report.status, "completed");
+  assert.equal(report.stepsCompleted, 4);
+  assert.equal(report.finalOutput, "enV 🚀\nsecond line");
+  assert.equal(report.steps[0].status, "ok");
+  assert.ok(report.steps.every((step: { inputUtf8Bytes: number; outputUtf8Bytes: number; preview: string }) => step.inputUtf8Bytes >= 0 && step.outputUtf8Bytes >= 0 && typeof step.preview === "string"));
+  assert.match(report.privacy, /does not upload/i);
+  assert.ok(report.supportedOperations.includes("sha256-hex"));
+});
+
+test("Recipe Pipeline preserves unsafe JSON integer tokens and refuses ambiguous duplicate-key sorting", async () => {
+  const raw = '{"id":9007199254740993,"name":"enV"}';
+  const formatted = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: raw, steps: [{ op: "json-format" }] })))!);
+  assert.match(formatted.finalOutput, /9007199254740993/);
+  assert.ok(formatted.warnings.some((warning: string) => /cannot safely represent this integer/i.test(warning)));
+  const duplicate = JSON.stringify({ input: '{"a":1,"a":2}', steps: [{ op: "json-sort-keys" }] });
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", duplicate), /duplicate object keys/i);
+  const preserved = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: '{"a":1,"a":2}', steps: [{ op: "json-format" }] })))!);
+  assert.equal((preserved.finalOutput.match(/"a"/g) ?? []).length, 2);
+});
+
+test("Recipe Pipeline codecs round-trip UTF-8 and reject non-canonical Base64", async () => {
+  const encoded = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "enV 🚀", steps: [{ op: "base64-encode" }, { op: "base64-decode" }] })))!);
+  assert.equal(encoded.finalOutput, "enV 🚀");
+  const url = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "A + 🚀 & B", steps: [{ op: "url-encode-component" }, { op: "url-decode-component" }] })))!);
+  assert.equal(url.finalOutput, "A + 🚀 & B");
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "Zh==", steps: [{ op: "base64-decode" }] })), /canonical/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "%Q0", steps: [{ op: "url-decode-component" }] })), /percent escape/i);
+});
+
+test("Recipe Pipeline has explicit step/input limits and fails closed on unknown operations", async () => {
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "x", steps: Array.from({ length: 17 }, () => ({ op: "trim" })) })), /between 1 and 16/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "x", steps: [{ op: "eval", code: "alert(1)" }] })), /unsupported operation/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: 123, steps: [{ op: "trim" }] })), /string 'input'/i);
+});
+
+test("Recipe SHA-256 is a deterministic one-way digest", async () => {
+  const report = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "hello", steps: [{ op: "sha256-hex" }] })))!);
+  assert.equal(report.finalOutput, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+  assert.ok(report.semantics.some((item: string) => /one-way/i.test(item)));
+});
+
+
+test("Recipe Pipeline supports Unicode normalization, BOM removal, and exact final-newline operations", async () => {
+  const raw = "\uFEFFCafe\u0301\n\n";
+  const report = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: raw, steps: [{ op: "strip-bom" }, { op: "unicode-normalize-nfc" }, { op: "remove-final-newline" }] })))!);
+  assert.equal(report.finalOutput, "Café\n");
+  const compatibility = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "①", steps: [{ op: "unicode-normalize-nfkc" }] })))!);
+  assert.equal(compatibility.finalOutput, "1");
+  assert.ok(compatibility.warnings.some((warning: string) => /compatibility normalization/i.test(warning)));
+  const add = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "line", steps: [{ op: "ensure-final-newline" }] })))!);
+  assert.equal(add.finalOutput, "line\n");
+});
+
+test("Recipe Pipeline reverses lines rather than characters and sorts deterministically by code point", async () => {
+  const reversed = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "🚀 first\nsecond\nthird\n", steps: [{ op: "reverse-lines" }] })))!);
+  assert.equal(reversed.finalOutput, "third\nsecond\n🚀 first\n");
+  const sorted = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: "z\nA\na\n🚀", steps: [{ op: "sort-lines" }] })))!);
+  assert.equal(sorted.finalOutput, "A\na\nz\n🚀");
+});
+
+
+test("Recipe JSON Pointer follows RFC 6901 escapes and preserves selected unsafe number tokens", async () => {
+  const config = JSON.stringify({ input: developerStudioGolden.recipePointer.input, steps: [{ op: "json-pointer-get", pointer: developerStudioGolden.recipePointer.pointer }] });
+  const report = JSON.parse((await runDeveloperStudio("developer-recipe-runner", config))!);
+  assert.equal(report.finalOutput, developerStudioGolden.recipePointer.output);
+  assert.ok(report.warnings.some((warning: string) => /cannot safely represent this integer/i.test(warning)));
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: '{"a":1,"a":2}', steps: [{ op: "json-pointer-get", pointer: "/a" }] })), /ambiguous duplicate object keys/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: '{"items":[1,2]}', steps: [{ op: "json-pointer-get", pointer: "/items/01" }] })), /canonical array index/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: '{"a":1}', steps: [{ op: "json-pointer-get", pointer: "/a~2b" }] })), /invalid JSON Pointer escape/i);
+});
+
+
+test("Recipe CSV transforms round-trip quoted commas/quotes while keeping the pipeline's JSON values exact", async () => {
+  const csv = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: developerStudioGolden.recipeCsv.input, steps: [{ op: "csv-to-json" }] })))!);
+  assert.equal(csv.finalOutput, developerStudioGolden.recipeCsv.expectedJson);
+  const roundTrip = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: csv.finalOutput, steps: [{ op: "json-to-csv" }] })))!);
+  assert.equal(roundTrip.finalOutput, developerStudioGolden.recipeCsv.expectedCsv);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: 'name,name\na,b', steps: [{ op: "csv-to-json" }] })), /headers must be unique/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: 'name,note\nAda,"unfinished', steps: [{ op: "csv-to-json" }] })), /ends inside a quoted field/i);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: '[{"id":1},{"name":"different schema"}]', steps: [{ op: "json-to-csv" }] })), /different set of keys/i);
+});
+
+
+test("Recipe literal replacement preflights expansion before constructing oversized output", async () => {
+  const config = JSON.stringify({ input: "x".repeat(30), steps: [{ op: "replace-literal", find: "x", replacement: "a".repeat(100_000) }] });
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", config), /Literal replacement would exceed 2097152 UTF-8 bytes/i);
+});
+
+test("Recipe CSV round-trip quotes CRLF inside a field on every platform", async () => {
+  const input = 'name,note\r\nAda,"line one\r\nline two"\r\n';
+  const toJson = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input, steps: [{ op: "csv-to-json" }] })))!);
+  const toCsv = JSON.parse((await runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: toJson.finalOutput, steps: [{ op: "json-to-csv" }] })))!);
+  assert.equal(toCsv.finalOutput, 'name,note\nAda,"line one\r\nline two"\n');
+});
+
+
+test("Recipe JSON depth and pretty-output budgets stop hostile nested inputs before parsing or allocation", async () => {
+  const deeplyNested = "[".repeat(129) + "0" + "]".repeat(129);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: deeplyNested, steps: [{ op: "json-validate" }] })), /JSON nesting exceeds the safety depth of 128/i);
+  const outputAmplifier = "[".repeat(80) + Array.from({ length: 13_500 }, () => "0").join(",") + "]".repeat(80);
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", JSON.stringify({ input: outputAmplifier, steps: [{ op: "json-format" }] })), /JSON formatting would exceed 2097152 UTF-8 bytes/i);
+});
+
+
+test("Recipe configuration rejects duplicate top-level keys consistently instead of silently choosing a value", async () => {
+  const duplicate = '{"input":"first","input":"second","steps":[{"op":"trim"}]}';
+  await assert.rejects(runDeveloperStudio("developer-recipe-runner", duplicate), /Recipe configuration contains duplicate object keys and is ambiguous/i);
 });

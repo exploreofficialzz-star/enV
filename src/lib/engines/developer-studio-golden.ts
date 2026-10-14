@@ -140,5 +140,15 @@ export const developerStudioGolden = {
         ]
       }
     ]
+  },
+  "recipePointer": {
+    "input": "{\"a/b\":{\"~key\":[{\"id\":9007199254740993}]}}",
+    "pointer": "/a~1b/~0key/0/id",
+    "output": "9007199254740993"
+  },
+  "recipeCsv": {
+    "input": "name,note,id\r\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\r\n",
+    "expectedJson": "[\n  {\n    \"name\": \"Ada, Lovelace\",\n    \"note\": \"said \\\"hello\\\"\",\n    \"id\": \"9007199254740993\"\n  }\n]",
+    "expectedCsv": "name,note,id\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\n"
   }
 } as const;

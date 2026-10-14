@@ -12,6 +12,7 @@ import { ComingSoonPanel } from "@/components/tools/coming-soon";
 import { DocumentEngine } from "@/components/engines/document-engine";
 import { FileConverterEngine } from "@/components/engines/file-converter-engine";
 import { DeveloperEngine } from "@/components/engines/developer-engine";
+import { DeveloperStudioEngine } from "@/components/engines/developer-studio-engine";
 import { PdfEngine } from "@/components/engines/pdf-engine";
 import { MimeEngine } from "@/components/engines/mime-engine";
 import { SecurityEngine } from "@/components/engines/security-engine";
@@ -45,8 +46,11 @@ import { DocumentToolsEngine } from "@/components/engines/document-tools-engine"
 import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
 import { EventTemplateEngine } from "@/components/engines/event-template-engine";
 import { isEventTemplateTool } from "@/lib/events/event-templates";
+import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
-export function ToolEngine({ tool }: { tool: ToolMeta }) {
+type ToolEngineProps = { tool: ToolMeta; initialMode?: string; initialAction?: "encode" | "decode"; initialOp?: string };
+
+function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: ToolEngineProps) {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.envToolHydrated = tool.id;
@@ -66,6 +70,7 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
   // Accessibility Studios must override legacy per-tool engine metadata (for example,
   // contrast-checker was historically a generic color tool).
   if (tool.category === "accessibility") return <AccessibilityEngine toolId={tool.id} />;
+  if (tool.category === "developer" && tool.tags.includes("developer-studio")) return <DeveloperStudioEngine tool={tool} initialMode={initialMode} initialAction={initialAction} initialOp={initialOp} />;
 
   switch (tool.engine.type) {
     case "calculator":
@@ -149,4 +154,27 @@ export function ToolEngine({ tool }: { tool: ToolMeta }) {
     default:
       return <ComingSoonPanel tool={tool} />;
   }
+}
+
+
+/** Compatibility entry-point banner for Developer records whose original engine is
+ * codec/text/generator/MIME/date-time rather than the generic Developer dispatcher.
+ * Those original pages keep their working native engine and gain a mode-correct route
+ * to the consolidated parent Studio. */
+function LegacyDeveloperStudioLink({ tool }: { tool: ToolMeta }) {
+  const studio = developerStudioForLegacySlug(tool.slug);
+  const mode = developerModeForLegacySlug(studio, tool.slug);
+  const action = developerActionForLegacySlug(studio, tool.slug);
+  const href = `/tools/developer/${studio.slug}?mode=${encodeURIComponent(mode)}${action === "decode" ? "&action=decode" : ""}`;
+  return <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm">
+    <div><p className="font-medium">Part of {studio.name}</p><p className="mt-0.5 text-xs text-muted">Keep this original tool available, or open the grouped Studio for related modes.</p></div>
+    <a href={href} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 font-medium hover:bg-surface-2">Open Studio · {mode}</a>
+  </div>;
+}
+
+export function ToolEngine(props: ToolEngineProps) {
+  const { tool } = props;
+  const needsStudioLink = tool.category === "developer" && tool.engine.type !== "developer" && !tool.tags.includes("developer-studio");
+  if (needsStudioLink) return <div className="space-y-4"><LegacyDeveloperStudioLink tool={tool} /><ToolEngineContent {...props} /></div>;
+  return <ToolEngineContent {...props} />;
 }

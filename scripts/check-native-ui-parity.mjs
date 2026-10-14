@@ -232,7 +232,7 @@ assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.in
 assert.match(android, /authority\("en-v\.vercel\.app"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
 assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
 assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
-assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)\)\.filter \{ favoriteIDs\.contains/);
+assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
 assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
 assert.ok(iosTools.includes("https://en-v.vercel.app/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
 assert.match(iosContent, /NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);

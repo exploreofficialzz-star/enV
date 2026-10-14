@@ -851,75 +851,6 @@ function minifySafe(input: string, language: string): string {
   if (quote) throw new Error("Unterminated string literal; input was not minified.");
   return output.trim();
 }
-const SQL_DIALECTS = new Set(["sql", "postgresql", "mysql", "mariadb", "sqlite", "transactsql", "bigquery", "snowflake", "oracle", "redshift", "duckdb"]);
-function formatSql(input: string, dialectRaw = "sql"): string {
-  const dialect = dialectRaw.trim().toLowerCase() || "sql";
-  if (!SQL_DIALECTS.has(dialect)) throw new Error(`Unsupported SQL dialect '${dialectRaw}'. Choose one of: ${[...SQL_DIALECTS].join(", ")}.`);
-  if (input.length > 1_000_000) throw new Error("SQL formatter input exceeds the 1 MB local formatting limit.");
-  // Keywords in literals, quoted identifiers, and comments are not clauses.
-  const tokens: { text: string; kind: "word" | "literal" | "comment" | "punct" }[] = [];
-  let i = 0;
-  while (i < input.length) {
-    const ch = input[i];
-    if (/\s/.test(ch)) { i += 1; continue; }
-    if (ch === "-" && input[i + 1] === "-") { const start = i; i += 2; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
-    if (ch === "/" && input[i + 1] === "*") { const start = i; const close = input.indexOf("*/", i + 2); if (close < 0) throw new Error("SQL formatter found an unterminated block comment."); i = close + 2; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
-    // PostgreSQL-style dollar-quoted bodies must be consumed as one literal, so keywords
-    // such as FROM/WHERE inside a function body are never mistaken for outer clauses.
-    if ((dialect === "postgresql" || dialect === "redshift" || dialect === "duckdb") && ch === "$") {
-      const tag = input.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/)?.[0];
-      if (tag) { const start = i; const close = input.indexOf(tag, i + tag.length); if (close < 0) throw new Error(`SQL formatter found an unterminated dollar-quoted string (${tag}).`); i = close + tag.length; tokens.push({ text: input.slice(start, i), kind: "literal" }); continue; }
-    }
-    if (dialect === "mysql" && ch === "#") { const start = i; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
-    if (ch === "'" || ch === '"' || ch === "`" || ch === "[") {
-      const start = i; const closing = ch === "[" ? "]" : ch; i += 1;
-      while (i < input.length) {
-        if (input[i] === closing) { if (input[i + 1] === closing && closing !== "]") { i += 2; continue; } i += 1; break; }
-        if (input[i] === "\\" && ch === "'") i += 1;
-        i += 1;
-      }
-      tokens.push({ text: input.slice(start, i), kind: "literal" }); continue;
-    }
-    const word = input.slice(i).match(/^[A-Za-z_][A-Za-z0-9_$]*/);
-    if (word) { tokens.push({ text: word[0], kind: "word" }); i += word[0].length; continue; }
-    tokens.push({ text: ch, kind: "punct" }); i += 1;
-  }
-  if (!tokens.length) return "";
-  const major = new Set(["WITH", "RECURSIVE", "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "QUALIFY", "WINDOW", "PARTITION BY", "LIMIT", "OFFSET", "FETCH FIRST", "INSERT INTO", "UPDATE", "DELETE FROM", "VALUES", "UNION", "UNION ALL", "INTERSECT", "EXCEPT", "RETURNING", "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "ON CONFLICT", "DO UPDATE SET"]);
-  const joins = new Set(["JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "FULL JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "CROSS JOIN", "CROSS APPLY", "OUTER APPLY"]);
-  const output: string[] = [];
-  let depth = 0, line = "", previous = "";
-  const trimLine = () => { line = line.trimEnd(); };
-  const emit = () => { trimLine(); if (line.trim()) output.push(`${"  ".repeat(Math.max(0, depth))}${line.trimStart()}`); line = ""; };
-  const append = (text: string, needsSpace = true) => { if (needsSpace && line && !/[\s(.]$/.test(line) && !/^[,;).]/.test(text)) line += " "; line += text; };
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index]; const upper = token.kind === "word" ? token.text.toUpperCase() : "";
-    let phrase = upper, count = 1;
-    if (token.kind === "word" && tokens[index + 1]?.kind === "word") {
-      const two = `${upper} ${tokens[index + 1].text.toUpperCase()}`;
-      if ([...major, ...joins].includes(two)) { phrase = two; count = 2; }
-      else if (["LEFT OUTER JOIN", "RIGHT OUTER JOIN"].includes(`${two} ${tokens[index + 2]?.text.toUpperCase()}`) && tokens[index + 2]?.kind === "word") { phrase = `${two} ${tokens[index + 2].text.toUpperCase()}`; count = 3; }
-    }
-    const isMajor = token.kind === "word" && major.has(phrase);
-    const isJoin = token.kind === "word" && joins.has(phrase);
-    const isOn = token.kind === "word" && upper === "ON";
-    const isBoolean = token.kind === "word" && (upper === "AND" || upper === "OR");
-    if (isMajor || isJoin || isOn || isBoolean) {
-      emit(); depth = isJoin || isOn || isBoolean ? Math.max(1, depth) : 0; line = phrase; index += count - 1; previous = phrase; continue;
-    }
-    if (token.text === "(") { append("(", /^(IN|VALUES|EXISTS|NOT)$/i.test(previous)); depth += 1; }
-    else if (token.text === ")") { depth = Math.max(0, depth - 1); trimLine(); line += ")"; }
-    else if (token.text === ",") { trimLine(); line += ","; }
-    else if (token.text === ".") { trimLine(); line += "."; }
-    else if (token.text === ";") { trimLine(); line += ";"; emit(); depth = 0; }
-    else if (["=", "<", ">", "!", "+", "-", "*", "/", "<=", ">=", "<>", "!=", "%"].includes(token.text)) append(token.text);
-    else { append(token.text, true); if (token.kind === "comment") emit(); }
-    previous = token.text;
-  }
-  emit();
-  return output.join("\n").trim();
-}
-
 /** Dependency-light token-preserving fallback used if the TypeScript parser is unavailable. */
 function formatJavascriptConservative(input: string): string {
   type Token = { text: string; kind: "word" | "literal" | "comment" | "punct" | "operator" };
@@ -955,7 +886,7 @@ function formatJavascriptConservative(input: string): string {
     if (token.kind === "comment") { if (line.trim()) emit(); append(text); emit(); continue; }
     if (text === "{") { append("{", Boolean(line.trim()) && !/[.(\[]$/.test(line)); depth += 1; emit(); continue; }
     if (text === "}") { if (line.trim()) emit(); depth = Math.max(0, depth - 1); append("}"); if ([";", ",", ")", "]", ".", "(", "["].includes(after)) { /* next token remains adjacent */ } else emit(); continue; }
-    if (text === "(") { append("(", /^(if|for|while|switch|catch|with|function)$/.test(before)); parenDepth += 1; continue; }
+    if (text === "(") { append("(", /^(if|for|while|switch|catch|with|function|async)$/.test(before)); parenDepth += 1; continue; }
     if (text === ")") { trim(); line += ")"; parenDepth = Math.max(0, parenDepth - 1); continue; }
     if (text === "[") { append("["); continue; }
     if (text === "]") { trim(); line += "]"; continue; }
@@ -1244,11 +1175,414 @@ function suffixFallback(op: string, input: string, secondary: string, suffix: st
   return `${op}\nLocal input analysis completed: ${input.length} characters and ${bytes} UTF-8 bytes.\nNo semantic validation is claimed for this mode.`;
 }
 
+/** A bounded cross-platform recipe engine: only documented deterministic operations are allowed. */
+type DeveloperRecipeStep = { op: string; name?: string; find?: string; replace?: string; replacement?: string };
+const RECIPE_MAX_INPUT_BYTES = 1_048_576;
+const RECIPE_MAX_OUTPUT_BYTES = 2_097_152;
+const RECIPE_MAX_CONFIG_BYTES = 7 * 1_048_576; // A 1 MiB payload can expand when escaped inside recipe JSON.
+const RECIPE_MAX_STEPS = 16;
+const RECIPE_MAX_JSON_DEPTH = 128;
+const RECIPE_PREVIEW_CODE_POINTS = 1_200;
+function assertRecipeJsonDepth(source: string): void {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") {
+      depth += 1;
+      if (depth > RECIPE_MAX_JSON_DEPTH) throw new Error(`JSON nesting exceeds the safety depth of ${RECIPE_MAX_JSON_DEPTH}; split or simplify the document before processing.`);
+    } else if (ch === "}" || ch === "]") depth = Math.max(0, depth - 1);
+  }
+}
+function assertRecipePrettyJsonFits(source: string, minify = false): void {
+  const bytes = recipeUtf8Bytes(source);
+  let retainedBytes = bytes;
+  let extraBytes = 0;
+  let inString = false;
+  let escaped = false;
+  const stack: { kind: "object" | "array"; hasItems: boolean }[] = [];
+  const markParent = () => { const parent = stack.at(-1); if (parent) parent.hasItems = true; };
+  const nextNonWhitespace = (from: number) => {
+    let index = from;
+    while (index < source.length && /[ \t\r\n]/.test(source[index])) index += 1;
+    return source[index];
+  };
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { markParent(); inString = true; continue; }
+    if (/[ \t\r\n]/.test(ch)) { retainedBytes -= 1; continue; }
+    if (ch === "{" || ch === "[") {
+      markParent(); retainedBytes += 0;
+      const kind = ch === "{" ? "object" : "array";
+      stack.push({ kind, hasItems: false });
+      if (!minify && nextNonWhitespace(i + 1) !== (kind === "object" ? "}" : "]")) extraBytes += 1 + 2 * stack.length;
+      continue;
+    }
+    if (ch === "}" || ch === "]") {
+      const frame = stack.pop();
+      if (!minify && frame?.hasItems) extraBytes += 1 + 2 * stack.length;
+      continue;
+    }
+    if (ch === ",") { if (!minify) extraBytes += 1 + 2 * stack.length; continue; }
+    if (ch === ":") { if (!minify) extraBytes += 1; continue; }
+    markParent();
+  }
+  if (retainedBytes + extraBytes > RECIPE_MAX_OUTPUT_BYTES) throw new Error(`JSON formatting would exceed ${RECIPE_MAX_OUTPUT_BYTES} UTF-8 bytes; minify it first or reduce the input structure.`);
+}
+export const DEVELOPER_RECIPE_OPERATIONS: readonly string[] = [
+  "trim", "strip-bom", "normalize-newlines", "ensure-final-newline", "remove-final-newline", "collapse-whitespace", "remove-blank-lines", "sort-lines", "unique-lines", "reverse-lines",
+  "unicode-normalize-nfc", "unicode-normalize-nfd", "unicode-normalize-nfkc", "unicode-normalize-nfkd",
+  "replace-literal", "url-encode-component", "url-decode-component", "base64-encode", "base64-decode", "base64url-encode", "base64url-decode", "hex-encode", "hex-decode", "html-escape", "html-unescape",
+  "json-format", "json-minify", "json-sort-keys", "json-validate", "json-pointer-get", "csv-to-json", "json-to-csv", "sha256-hex",
+];
+
+function recipeCodePoints(value: string): number { return [...value].length; }
+function recipePreview(value: string): string {
+  const points = [...value];
+  return points.length <= RECIPE_PREVIEW_CODE_POINTS ? value : `${points.slice(0, RECIPE_PREVIEW_CODE_POINTS).join("")}… [preview truncated; ${points.length} code points total]`;
+}
+function recipeUtf8Bytes(value: string): number { return new TextEncoder().encode(value).byteLength; }
+function assertLiteralReplacementFits(current: string, find: string, replacement: string): void {
+  const currentBytes = recipeUtf8Bytes(current);
+  const growthPerMatch = recipeUtf8Bytes(replacement) - recipeUtf8Bytes(find);
+  if (growthPerMatch <= 0) return;
+  const allowedMatches = Math.floor((RECIPE_MAX_OUTPUT_BYTES - currentBytes) / growthPerMatch);
+  let matches = 0;
+  let searchFrom = 0;
+  while (true) {
+    const at = current.indexOf(find, searchFrom);
+    if (at < 0) return;
+    matches += 1;
+    if (matches > allowedMatches) throw new Error(`Literal replacement would exceed ${RECIPE_MAX_OUTPUT_BYTES} UTF-8 bytes; reduce the match count or replacement size before running.`);
+    searchFrom = at + find.length;
+  }
+}
+function recipeCompareCodePoints(a: string, b: string): number {
+  const left = [...a].map((ch) => ch.codePointAt(0) ?? 0);
+  const right = [...b].map((ch) => ch.codePointAt(0) ?? 0);
+  for (let i = 0; i < Math.min(left.length, right.length); i += 1) if (left[i] !== right[i]) return left[i] - right[i];
+  return left.length - right.length;
+}
+function recipeLines(input: string, transform: (lines: string[]) => string[]): string {
+  const normalized = input.replace(/\r\n?/g, "\n");
+  const trailingNewline = normalized.endsWith("\n");
+  const lines = normalized.split("\n");
+  if (trailingNewline) lines.pop();
+  const result = transform(lines);
+  return result.join("\n") + (trailingNewline ? "\n" : "");
+}
+function recipeEncodeBase64(input: string, urlSafe = false): string {
+  const bytes = new TextEncoder().encode(input);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  const encoded = btoa(binary);
+  return urlSafe ? encoded.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : encoded;
+}
+function recipeDecodeBase64(input: string, urlSafe = false): string {
+  const source = input.trim();
+  const alphabet = urlSafe ? /^[A-Za-z0-9_-]*={0,2}$/ : /^[A-Za-z0-9+/]*={0,2}$/;
+  if (!alphabet.test(source) || source.length % 4 === 1 || (/=/.test(source) && source.length % 4 !== 0)) {
+    throw new Error(`Invalid ${urlSafe ? "Base64URL" : "Base64"}: check its alphabet, padding, and length.`);
+  }
+  const unpadded = source.replace(/=+$/, "");
+  const normalized = (urlSafe ? unpadded.replace(/-/g, "+").replace(/_/g, "/") : unpadded) + "=".repeat((4 - unpadded.length % 4) % 4);
+  let binary: string;
+  try { binary = atob(normalized); } catch { throw new Error("Base64 input could not be decoded."); }
+  const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+  // atob can accept non-zero pad bits. Re-encode raw bytes and compare so malformed encodings fail closed.
+  let canonicalBinary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) canonicalBinary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  const canonicalEncoded = btoa(canonicalBinary).replace(/=+$/, "");
+  const normalizedUnpadded = urlSafe ? unpadded.replace(/-/g, "+").replace(/_/g, "/") : unpadded;
+  if (canonicalEncoded !== normalizedUnpadded) throw new Error("Base64 padding bits are not canonical; re-encode the value at its source.");
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { throw new Error("Decoded bytes are not valid UTF-8 text; this text recipe engine does not reinterpret binary files as text."); }
+}
+function recipeDecodeHex(input: string): string {
+  const value = input.replace(/[ \t\r\n]/g, "");
+  if (value.length % 2 !== 0 || !/^[a-f\d]*$/i.test(value)) throw new Error("Hex decode expects an even number of hexadecimal digits; spaces and line breaks are allowed.");
+  const bytes = new Uint8Array(value.match(/.{2}/g)?.map((pair) => Number.parseInt(pair, 16)) ?? []);
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { throw new Error("Hex bytes are not valid UTF-8 text; use a binary-aware workflow for arbitrary bytes."); }
+}
+function recipeDecodeUrl(input: string): string {
+  const bytes: number[] = [];
+  for (let i = 0; i < input.length;) {
+    if (input[i] === "%") {
+      const pair = input.slice(i + 1, i + 3);
+      if (!/^[0-9a-f]{2}$/i.test(pair)) throw new Error(`Invalid percent escape at character ${i + 1}; expected % followed by two hexadecimal digits.`);
+      bytes.push(Number.parseInt(pair, 16)); i += 3;
+    } else {
+      const cp = input.codePointAt(i)!;
+      const literal = String.fromCodePoint(cp);
+      bytes.push(...new TextEncoder().encode(literal));
+      i += literal.length;
+    }
+  }
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes)); }
+  catch { throw new Error("URL component contains malformed UTF-8 after percent decoding."); }
+}
+function recipeHtmlEscape(input: string): string {
+  return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function recipeHtmlUnescape(input: string): string {
+  const pattern = /&(amp|lt|gt|quot|apos|#39|#\d+|#x[0-9a-f]+);/gi;
+  return input.replace(pattern, (entity, raw: string) => {
+    const token = raw.toLowerCase();
+    const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'" };
+    if (token in named) return named[token];
+    const numeric = token.startsWith("#x") ? Number.parseInt(token.slice(2), 16) : Number.parseInt(token.slice(1), 10);
+    if (!Number.isInteger(numeric) || numeric < 0 || numeric > 0x10ffff || (numeric >= 0xd800 && numeric <= 0xdfff)) throw new Error(`Invalid numeric HTML character reference: ${entity}`);
+    return String.fromCodePoint(numeric);
+  });
+}
+
+/** Strict, bounded, RFC-4180-style CSV parsing: quoted commas/newlines and doubled quotes are supported. */
+function recipeParseCsv(input: string): string[][] {
+  const rows: string[][] = []; let row: string[] = []; let field = "";
+  let inQuotes = false; let afterQuote = false; let fieldStarted = false; let index = 0;
+  while (index < input.length) {
+    const char = input[index];
+    if (inQuotes) {
+      if (char === '"') {
+        if (input[index + 1] === '"') { field += '"'; index += 2; }
+        else { inQuotes = false; afterQuote = true; index += 1; }
+      } else { field += char; index += 1; }
+      continue;
+    }
+    if (afterQuote) {
+      if (char === ",") { row.push(field); field = ""; fieldStarted = false; afterQuote = false; index += 1; continue; }
+      if (char === "\r" || char === "\n") {
+        row.push(field); rows.push(row); row = []; field = ""; fieldStarted = false; afterQuote = false;
+        index += char === "\r" && input[index + 1] === "\n" ? 2 : 1; continue;
+      }
+      throw new Error(`Unexpected character after a closing CSV quote at character ${index + 1}. Only a comma, record ending, or end of input is valid.`);
+    }
+    if (char === '"') {
+      if (fieldStarted || field.length) throw new Error(`Unexpected quote inside an unquoted CSV field at character ${index + 1}.`);
+      inQuotes = true; fieldStarted = true; index += 1; continue;
+    }
+    if (char === ",") { row.push(field); field = ""; fieldStarted = false; index += 1; continue; }
+    if (char === "\r" || char === "\n") {
+      row.push(field); rows.push(row); row = []; field = ""; fieldStarted = false;
+      index += char === "\r" && input[index + 1] === "\n" ? 2 : 1; continue;
+    }
+    field += char; fieldStarted = true; index += 1;
+  }
+  if (inQuotes) throw new Error("CSV ends inside a quoted field; add its closing double quote.");
+  if (row.length || field.length || fieldStarted || afterQuote) { row.push(field); rows.push(row); }
+  return rows;
+}
+function recipeEscapeCsv(value: string): string {
+  return /[",\r\n]/.test(value) || /^\s|\s$/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+function recipeCsvToJson(input: string): string {
+  const rows = recipeParseCsv(input);
+  if (!rows.length) throw new Error("CSV input is empty; include a header row.");
+  const headers = rows[0];
+  if (!headers.length || headers.some((header) => !header.trim())) throw new Error("CSV header cells must be non-empty; rename blank columns before conversion.");
+  if (new Set(headers).size !== headers.length) throw new Error("CSV headers must be unique; duplicate column names would overwrite data in JSON objects.");
+  const result = rows.slice(1).map((values, index) => {
+    if (values.length !== headers.length) throw new Error(`CSV row ${index + 2} has ${values.length} fields but the header has ${headers.length}.`);
+    const object: JsonTokenObject = Object.create(null) as JsonTokenObject;
+    headers.forEach((header, column) => { Object.defineProperty(object, header, { value: values[column], enumerable: true, configurable: true, writable: true }); });
+    return object;
+  });
+  return JSON.stringify(result, null, 2);
+}
+function recipeJsonToCsv(input: string): string {
+  assertRecipeJsonDepth(input);
+  const duplicates: string[] = []; validateJsonDetailed(input, { duplicateKeyPaths: duplicates });
+  if (duplicates.length) throw new Error(`JSON-to-CSV refuses ambiguous duplicate object keys at ${[...new Set(duplicates)].slice(0, 10).join(", ")}.`);
+  const parsed = parseJsonTokenAware(input);
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error("JSON-to-CSV expects a non-empty array of objects so it can determine column headers.");
+  const records = parsed as JsonTokenObject[];
+  if (records.some((record) => !record || typeof record !== "object" || Array.isArray(record) || record instanceof JsonNumberToken)) throw new Error("JSON-to-CSV expects every array item to be an object; nested arrays should be converted separately.");
+  const headers = Object.keys(records[0]);
+  if (!headers.length || headers.some((header) => !header.trim())) throw new Error("JSON-to-CSV needs non-empty object keys to use as column headers.");
+  for (let index = 1; index < records.length; index += 1) {
+    const keys = Object.keys(records[index]);
+    if (keys.length !== headers.length || headers.some((key) => !Object.prototype.hasOwnProperty.call(records[index], key))) throw new Error(`JSON row ${index + 1} has a different set of keys than the first row; normalize the objects before converting.`);
+  }
+  const cell = (value: JsonTokenValue) => recipeEscapeCsv(typeof value === "string" ? value : stringifyJsonTokenAware(value, false));
+  return [headers.map(recipeEscapeCsv).join(","), ...records.map((record) => headers.map((header) => cell(record[header])).join(","))].join("\n") + "\n";
+}
+
+/** RFC 6901 JSON Pointer extraction with exact number-token preservation. */
+function recipeJsonPointerGet(input: string, pointer: string, warnings: string[]): string {
+  if (pointer !== "" && !pointer.startsWith("/")) throw new Error("json-pointer-get needs an RFC 6901 pointer: empty string for root or a path such as /user/id.");
+  assertRecipeJsonDepth(input);
+  const duplicatePaths: string[] = [];
+  validateJsonDetailed(input, { duplicateKeyPaths: duplicatePaths });
+  if (duplicatePaths.length) throw new Error(`JSON Pointer extraction refuses ambiguous duplicate object keys at ${[...new Set(duplicatePaths)].slice(0, 10).join(", ")}.`);
+  assertRecipePrettyJsonFits(input);
+  let selected: JsonTokenValue = parseJsonTokenAware(input);
+  const tokens = pointer === "" ? [] : pointer.slice(1).split("/").map((segment) => {
+    if (/~(?![01])/.test(segment)) throw new Error(`Invalid JSON Pointer escape in segment '${segment}'. Use ~0 for '~' and ~1 for '/'.`);
+    return segment.replace(/~1/g, "/").replace(/~0/g, "~");
+  });
+  for (const token of tokens) {
+    if (Array.isArray(selected)) {
+      if (!/^(?:0|[1-9]\d*)$/.test(token)) throw new Error(`JSON Pointer segment '${token}' is not a canonical array index.`);
+      const index = Number(token);
+      if (!Number.isSafeInteger(index) || index >= selected.length) throw new Error(`JSON Pointer segment '${token}' does not exist in the current array.`);
+      selected = selected[index];
+    } else if (selected && typeof selected === "object" && !(selected instanceof JsonNumberToken)) {
+      if (!Object.prototype.hasOwnProperty.call(selected, token)) throw new Error(`JSON Pointer property '${token}' does not exist.`);
+      selected = (selected as JsonTokenObject)[token];
+    } else throw new Error(`JSON Pointer cannot traverse into a scalar at segment '${token}'.`);
+  }
+  const output = stringifyJsonTokenAware(selected);
+  warnings.push(...jsonFormatterWarnings(output, []).filter((warning) => warning.startsWith("WARNING:")));
+  return output;
+}
+
+/** Execute a JSON-defined recipe. Operations never evaluate arbitrary code and are deliberately portable. */
+export async function runDeveloperRecipe(raw: string): Promise<string> {
+  if (recipeUtf8Bytes(raw) > RECIPE_MAX_CONFIG_BYTES) throw new Error("Recipe configuration exceeds the 7 MiB safety limit. Reduce the input or split this workflow into smaller recipes.");
+  assertRecipeJsonDepth(raw);
+  const configDuplicatePaths: string[] = [];
+  let recipeConfigSyntaxValid = false;
+  try { validateJsonDetailed(raw, { duplicateKeyPaths: configDuplicatePaths }); recipeConfigSyntaxValid = true; } catch { /* JSON.parse below supplies the user-facing syntax error. */ }
+  if (recipeConfigSyntaxValid && configDuplicatePaths.length) throw new Error(`Recipe configuration contains duplicate object keys and is ambiguous: ${[...new Set(configDuplicatePaths)].slice(0, 10).join(", ")}.`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch (error) { throw new Error(`Recipe configuration must be valid JSON: ${error instanceof Error ? error.message : String(error)}`); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Recipe configuration must be a JSON object with 'input' and 'steps' fields.");
+  const config = parsed as Record<string, unknown>;
+  if (typeof config.input !== "string") throw new Error("Recipe configuration needs a string 'input' field.");
+  if (recipeUtf8Bytes(config.input) > RECIPE_MAX_INPUT_BYTES) throw new Error("Recipe input exceeds the 1 MiB UTF-8 safety limit.");
+  if (!Array.isArray(config.steps) || config.steps.length < 1 || config.steps.length > RECIPE_MAX_STEPS) throw new Error(`Recipe must contain between 1 and ${RECIPE_MAX_STEPS} steps.`);
+  let current = config.input;
+  const rows: Record<string, unknown>[] = [];
+  const allWarnings: string[] = [];
+  const supported = DEVELOPER_RECIPE_OPERATIONS;
+  for (let index = 0; index < config.steps.length; index += 1) {
+    const rawStep = config.steps[index];
+    if (!rawStep || typeof rawStep !== "object" || Array.isArray(rawStep)) throw new Error(`Recipe step ${index + 1} must be an object.`);
+    const step = rawStep as Record<string, unknown>;
+    if (typeof step.op !== "string" || !supported.includes(step.op)) throw new Error(`Recipe step ${index + 1} has an unsupported operation. Supported operations: ${supported.join(", ")}.`);
+    const op = step.op;
+    const name = typeof step.name === "string" && step.name.trim() ? step.name.trim().slice(0, 100) : op;
+    const before = current;
+    const warnings: string[] = [];
+    try {
+      switch (op) {
+        case "trim": current = current.trim(); break;
+        case "strip-bom": current = current.startsWith("\uFEFF") ? current.slice(1) : current; break;
+        case "normalize-newlines": current = current.replace(/\r\n?/g, "\n"); break;
+        case "ensure-final-newline": if (!/[\r\n]$/.test(current)) current += "\n"; break;
+        case "remove-final-newline": current = current.replace(/\r\n$|\r$|\n$/, ""); break;
+        case "collapse-whitespace": current = current.replace(/[ \t\r\n\f\v]+/g, " "); break;
+        case "remove-blank-lines": current = recipeLines(current, (lines) => lines.filter((line) => !/^[ \t]*$/.test(line))); break;
+        case "sort-lines": current = recipeLines(current, (lines) => [...lines].sort(recipeCompareCodePoints)); break;
+        case "unique-lines": current = recipeLines(current, (lines) => { const seen = new Set<string>(); return lines.filter((line) => { if (seen.has(line)) return false; seen.add(line); return true; }); }); break;
+        case "reverse-lines": current = recipeLines(current, (lines) => [...lines].reverse()); break;
+        case "unicode-normalize-nfc": current = current.normalize("NFC"); break;
+        case "unicode-normalize-nfd": current = current.normalize("NFD"); break;
+        case "unicode-normalize-nfkc": current = current.normalize("NFKC"); if (before !== current) warnings.push("NFKC compatibility normalization changed one or more code points; review identifier/security-sensitive text before use."); break;
+        case "unicode-normalize-nfkd": current = current.normalize("NFKD"); if (before !== current) warnings.push("NFKD compatibility normalization changed one or more code points; review identifier/security-sensitive text before use."); break;
+        case "replace-literal": {
+          const find = step.find;
+          const replace = typeof step.replacement === "string" ? step.replacement : typeof step.replace === "string" ? step.replace : "";
+          if (typeof find !== "string" || !find) throw new Error("replace-literal needs a non-empty 'find' string.");
+          if (find.length > 10_000 || replace.length > 100_000) throw new Error("Literal search must be at most 10,000 characters and replacement at most 100,000 characters.");
+          assertLiteralReplacementFits(current, find, replace);
+          current = current.split(find).join(replace); break;
+        }
+        case "url-encode-component": current = encodeURIComponent(current); break;
+        case "url-decode-component": current = recipeDecodeUrl(current); break;
+        case "base64-encode": current = recipeEncodeBase64(current); break;
+        case "base64-decode": current = recipeDecodeBase64(current); break;
+        case "base64url-encode": current = recipeEncodeBase64(current, true); break;
+        case "base64url-decode": current = recipeDecodeBase64(current, true); break;
+        case "hex-encode": current = [...new TextEncoder().encode(current)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); break;
+        case "hex-decode": current = recipeDecodeHex(current); break;
+        case "html-escape": current = recipeHtmlEscape(current); break;
+        case "html-unescape": current = recipeHtmlUnescape(current); break;
+        case "json-format":
+        case "json-minify": {
+          assertRecipeJsonDepth(current);
+          const duplicates: string[] = [];
+          validateJsonDetailed(current, { duplicateKeyPaths: duplicates });
+          if (op === "json-format") assertRecipePrettyJsonFits(current);
+          current = formatJsonSource(current, op === "json-minify");
+          warnings.push(...jsonFormatterWarnings(before, duplicates));
+          break;
+        }
+        case "json-sort-keys": {
+          assertRecipeJsonDepth(current);
+          const duplicates: string[] = [];
+          validateJsonDetailed(current, { duplicateKeyPaths: duplicates });
+          assertRecipePrettyJsonFits(current);
+          if (duplicates.length) throw new Error(`Cannot sort keys without ambiguity: duplicate object keys were found at ${[...new Set(duplicates)].slice(0, 10).join(", ")}. Use json-format to preserve the original source instead.`);
+          current = stringifyJsonTokenAware(sortedJsonTokens(parseJsonTokenAware(current)), true);
+          warnings.push(...jsonFormatterWarnings(before, duplicates));
+          break;
+        }
+        case "json-validate": {
+          assertRecipeJsonDepth(current);
+          const duplicates: string[] = [];
+          const diagnostic = validateJsonDetailed(current, { duplicateKeyPaths: duplicates });
+          if (duplicates.length) warnings.push(`Duplicate object keys are syntactically accepted but ambiguous: ${[...new Set(duplicates)].slice(0, 10).join(", ")}.`);
+          warnings.push(...jsonFormatterWarnings(current, duplicates).filter((warning) => warning.startsWith("WARNING:")));
+          warnings.push(diagnostic);
+          break;
+        }
+        case "json-pointer-get": {
+          if (typeof step.pointer !== "string") throw new Error("json-pointer-get needs a string 'pointer' field (empty string selects the root).");
+          current = recipeJsonPointerGet(current, step.pointer, warnings);
+          break;
+        }
+        case "csv-to-json": current = recipeCsvToJson(current); break;
+        case "json-to-csv": current = recipeJsonToCsv(current); break;
+        case "sha256-hex": {
+          if (!globalThis.crypto?.subtle) throw new Error("Web Crypto SHA-256 is unavailable in this context. Open enV on HTTPS or a supported secure local origin; no remote fallback is used.");
+          const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(current));
+          current = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+          break;
+        }
+      }
+      const outputBytes = recipeUtf8Bytes(current);
+      if (outputBytes > RECIPE_MAX_OUTPUT_BYTES) throw new Error(`Step output exceeds the ${RECIPE_MAX_OUTPUT_BYTES.toLocaleString()} byte safety limit.`);
+      for (const warning of warnings) if (!allWarnings.includes(warning)) allWarnings.push(warning);
+      rows.push({ index: index + 1, name, operation: op, status: "ok", inputCharacters: recipeCodePoints(before), outputCharacters: recipeCodePoints(current), inputUtf8Bytes: recipeUtf8Bytes(before), outputUtf8Bytes: outputBytes, preview: recipePreview(current), warnings });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Recipe step ${index + 1} (“${name}”, ${op}) failed: ${detail} No partial output is being presented as a completed recipe.`);
+    }
+  }
+  return JSON.stringify({
+    schemaVersion: 1, mode: "recipe", engine: "enV deterministic local recipe engine", status: "completed",
+    stepsCompleted: rows.length, steps: rows, finalOutput: current, finalOutputCharacters: recipeCodePoints(current), finalOutputUtf8Bytes: recipeUtf8Bytes(current),
+    warnings: allWarnings,
+    supportedOperations: supported,
+    semantics: ["Operations are explicitly allow-listed; no eval, shell, network request, or arbitrary code execution.", "URL component decoding preserves '+' literally (unlike application/x-www-form-urlencoded parsing).", "Base64 operations accept strict standard or URL-safe alphabets, validate canonical padding bits, and decode UTF-8 text only.", "JSON formatting/minification preserve source numeric tokens and duplicate keys; key sorting and JSON Pointer extraction refuse ambiguous duplicate-key documents instead of silently discarding values.",
+      "json-pointer-get follows RFC 6901 escaping, including ~0 for tilde and ~1 for slash, and requires canonical array indexes.", "SHA-256 is one-way and must not be used as password hashing.", "NFKC/NFKD may change compatibility distinctions; normalization is not a universal security policy."],
+    privacy: "Processed in memory on this device by this engine; this engine does not upload or persist recipe input.",
+  }, null, 2);
+}
+
 /** Returns a result when this engine owns the operation, otherwise null for existing specialist engines. */
 export async function runDeveloperStudio(op: string, input: string, secondary = "", flags = "g", now = new Date(), replacement = ""): Promise<string | null> {
   const lower = op.toLowerCase();
   const suffix = lower.match(/(?:^|-)(formatter|format|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare|explainer)$/)?.[1] ?? "";
   const value = input.trim();
+
+  if (lower === "developer-recipe-runner") return runDeveloperRecipe(input);
 
   const template = generateDeveloperTemplate(lower, input, secondary, now); if (template !== null) return template;
   if (suffix === "diff" && lower.includes("json")) return structuredJsonDiff(input, secondary);

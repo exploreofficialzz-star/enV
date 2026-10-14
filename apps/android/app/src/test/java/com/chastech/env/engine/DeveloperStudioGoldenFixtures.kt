@@ -24,6 +24,12 @@ internal object DeveloperStudioGoldenFixtures {
   const val JSON_INPUT = "{\"id\":9007199254740993,\"dup\":1,\"dup\":2,\"memo\":\"9007199254740993\"}"
   const val UNSAFE_INTEGER = "9007199254740993"
   const val DUPLICATE_KEY = "dup"
+  const val RECIPE_POINTER_INPUT = "{\"a/b\":{\"~key\":[{\"id\":9007199254740993}]}}"
+  const val RECIPE_POINTER_PATH = "/a~1b/~0key/0/id"
+  const val RECIPE_POINTER_OUTPUT = "9007199254740993"
+  const val RECIPE_CSV_INPUT = "name,note,id\r\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\r\n"
+  const val RECIPE_CSV_EXPECTED_JSON = "[\n  {\n    \"name\": \"Ada, Lovelace\",\n    \"note\": \"said \\\"hello\\\"\",\n    \"id\": \"9007199254740993\"\n  }\n]"
+  const val RECIPE_CSV_EXPECTED_CSV = "name,note,id\n\"Ada, Lovelace\",\"said \"\"hello\"\"\",9007199254740993\n"
   const val SHA256_HELLO = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
   const val MD5_HELLO = "5d41402abc4b2a76b9719d911017c592"
 }

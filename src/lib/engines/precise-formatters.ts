@@ -9,6 +9,8 @@
  *   non-standard statement delimiters are outside its documented support.
  */
 
+import { formatSqlFallback } from "./sql-formatter-fallback.ts";
+
 export type StructuredFormatter = "css" | "html" | "xml" | "yaml" | "markdown" | "graphql";
 
 const MAX_FORMAT_INPUT_CHARS = 1_000_000;
@@ -76,6 +78,17 @@ export async function formatSqlWithDialect(input: string, dialectRaw = "postgres
   } catch (error) {
     const message = messageOf(error);
     if (message.startsWith("Unsupported SQL dialect") || message.includes("exceeds the 1 MB") || message.includes("returned empty output")) throw error;
+    // Missing optional package artifacts occur in constrained/test shells. Keep SQL usable with
+    // the bundled tokenizer, but state the fallback honestly instead of masquerading as a parser.
+    if (/Cannot find (?:package|module)|ERR_MODULE_NOT_FOUND|module not found/i.test(message) && /sql-formatter/i.test(message)) {
+      try {
+        const fallback = formatSqlFallback(input, language);
+        if (!fallback.trim()) throw new Error("The fallback formatter returned empty output.");
+        return `${fallback.trimEnd()}\n\nFormatter: enV conservative token-aware fallback, dialect '${language}' (local processing). This is layout assistance, not grammar-complete validation; SQL was not executed.`;
+      } catch (fallbackError) {
+        throw new Error(`SQL parser/formatter and conservative fallback could not format this ${language} input: ${messageOf(fallbackError)}. SQL was not executed.`);
+      }
+    }
     throw new Error(`SQL parser/formatter could not format this ${language} input${sourceLocation(error)}: ${message}. Check the selected dialect and query syntax; the query was not executed.`);
   }
 }

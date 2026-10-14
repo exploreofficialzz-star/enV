@@ -46,6 +46,28 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(sut.relatedTools(for: studios.first(where: { $0.id == "aria-checker" })!, limit: 20).filter { $0.category == "accessibility" }.count, 7)
     }
 
+    func testDeveloperCategoryProjectsTwelveNativeStudiosAndPreservesLegacyTools() {
+        let sourceIDs = Array(Set(nativeDeveloperStudioSpecs.map(\.sourceID))).sorted()
+        let sources = sourceIDs.map { id in
+            Tool(id: id, name: id, slug: id, description: "source", category: "developer", subcategory: nil, keywords: [], tags: [], icon: "Code", popularity: 10, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "developer", id: id, op: id))
+        }
+        let sut = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: sources, relatedReferenceTools: nil)
+        let studios = sut.developerStudioTools()
+        XCTAssertEqual(studios.count, 12)
+        XCTAssertEqual(Set(studios.map(\.id)).count, 12)
+        XCTAssertTrue(studios.allSatisfy { $0.engine.type == "developer" })
+        XCTAssertEqual(studios.first(where: { $0.id == "devops-studio" })?.engine.op, "developer-gitignore-generator")
+        XCTAssertEqual(sut.webSearch("", includeRelatedReferences: true).filter { $0.tags.contains("developer-studio") }.count, 12)
+        XCTAssertEqual(sut.tools.first(where: { $0.id == "json-formatter" })?.id, "json-formatter")
+        XCTAssertTrue(nativeDeveloperStudioSpecs.first(where: { $0.id == "json-studio" })?.modes.contains(where: { $0.key == "schema" }) == true)
+        XCTAssertTrue(nativeDeveloperStudioSpecs.first(where: { $0.id == "markup-studio" })?.modes.contains(where: { $0.key == "samples" }) == true)
+        let legacyHash = Tool(id: "sha256-hash", name: "SHA-256", slug: "sha256-hash", description: "", category: "developer", subcategory: nil, keywords: [], tags: [], icon: "Code", popularity: 1, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "codec", id: "sha256-hash", op: nil))
+        let legacySample = Tool(id: "lorem-ipsum-generator", name: "Lorem Ipsum", slug: "lorem-ipsum-generator", description: "", category: "developer", subcategory: nil, keywords: [], tags: [], icon: "Code", popularity: 1, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "generator", id: "lorem-ipsum-generator", op: nil))
+        XCTAssertEqual(sut.developerStudio(forLegacyTool: legacyHash)?.id, "hash-studio")
+        XCTAssertEqual(sut.developerStudio(forLegacyTool: legacySample)?.id, "markup-studio")
+        XCTAssertNil(sut.developerStudio(forLegacyTool: studios[0]))
+    }
+
     func testRelatedToolsExcludePlannedAndFillFromCategoryAlphabetically() {
         let current = Tool(id: "current", name: "Current", slug: "current", description: "", category: "text", subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: ["word-count", "future-tool"], engine: ToolEngine(type: "text", id: "current", op: nil))
         let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current], relatedReferenceTools: nil)

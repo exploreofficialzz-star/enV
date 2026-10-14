@@ -62,11 +62,11 @@ struct ToolEngine: Decodable, Hashable {
     let op: String?
     let configuration: [String: CatalogJSONValue]
 
-    init(type: String?, id: String?, op: String?) {
+    init(type: String?, id: String?, op: String?, configuration: [String: CatalogJSONValue] = [:]) {
         self.type = type
         self.id = id
         self.op = op
-        self.configuration = [:]
+        self.configuration = configuration
     }
 
     init(from decoder: Decoder) throws {
@@ -180,7 +180,7 @@ extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let sourceCandidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
-        let candidates = sourceCandidates.filter { $0.category != "accessibility" } + accessibilityDiscoveryTools().filter { $0.category == "accessibility" }
+        let candidates = sourceCandidates.filter { $0.category != "accessibility" && !$0.tags.contains("developer-studio") } + accessibilityDiscoveryTools().filter { $0.category == "accessibility" } + developerStudioTools()
         if q.isEmpty {
             return Array(candidates.enumerated().sorted {
                 $0.element.popularity == $1.element.popularity ? $0.offset < $1.offset : $0.element.popularity > $1.element.popularity
@@ -240,7 +240,7 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
 extension Catalog {
     /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
-        let candidates = accessibilityDiscoveryTools()
+        let candidates = accessibilityDiscoveryTools() + developerStudioTools()
         let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
         let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
         if related.count >= limit { return Array(related.prefix(limit)) }
@@ -329,19 +329,21 @@ final class CatalogStore: ObservableObject {
         }
     }
     var favoriteTools: [Tool] {
-        let matches = (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter { favoriteIDs.contains($0.id) }
+        let matches = (catalog.tools + (catalog.relatedReferenceTools ?? []) + catalog.developerStudioTools()).filter { favoriteIDs.contains($0.id) }
         var seen = Set<String>()
-        return matches.compactMap { catalog.accessibilityStudio(for: $0.id) ?? $0 }.filter { seen.insert($0.id).inserted }.sorted { $0.name < $1.name }
+        return matches.compactMap { catalog.accessibilityStudio(for: $0.id) ?? catalog.canonicalDeveloperStudio(for: $0.id) ?? $0 }.filter { seen.insert($0.id).inserted }.sorted { $0.name < $1.name }
     }
-    var featuredTools: [Tool] { (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter(\.featured).sorted { $0.popularity > $1.popularity } }
-    var popularTools: [Tool] { catalog.accessibilityDiscoveryTools().sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
+    var featuredTools: [Tool] { ((catalog.tools + (catalog.relatedReferenceTools ?? [])) + catalog.developerStudioTools()).filter(\.featured).sorted { $0.popularity > $1.popularity } }
+    var popularTools: [Tool] { (catalog.accessibilityDiscoveryTools() + catalog.developerStudioTools()).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
         if category == nil || category == "accessibility" {
             return catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
         }
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return (catalog.tools + (catalog.relatedReferenceTools ?? [])).filter { tool in
+        let originals = catalog.tools + (catalog.relatedReferenceTools ?? [])
+        let source = originals + (category == "developer" ? catalog.developerStudioTools() : [])
+        return source.filter { tool in
             (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
         }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
     }
@@ -417,6 +419,88 @@ extension Catalog {
     }
 
     func displayTool(for toolID: String) -> Tool? {
-        accessibilityStudio(for: toolID) ?? tools.first(where: { $0.id == toolID }) ?? (relatedReferenceTools ?? []).first(where: { $0.id == toolID })
+        accessibilityStudio(for: toolID) ?? canonicalDeveloperStudio(for: toolID) ?? tools.first(where: { $0.id == toolID }) ?? (relatedReferenceTools ?? []).first(where: { $0.id == toolID })
+    }
+}
+
+// MARK: - Native Developer Studios
+// These Swift-native catalog projections add the Studio discovery layer while
+// preserving every historical tool ID, slug, and source engine implementation.
+struct NativeDeveloperStudioMode: Identifiable, Hashable {
+    let key: String
+    let label: String
+    let op: String
+    let decodeOp: String?
+    var id: String { key }
+    init(_ key: String, _ label: String, _ op: String, _ decodeOp: String? = nil) {
+        self.key = key; self.label = label; self.op = op; self.decodeOp = decodeOp
+    }
+}
+
+struct NativeDeveloperStudioSpec: Identifiable, Hashable {
+    let id: String
+    let sourceID: String
+    let slug: String
+    let name: String
+    let description: String
+    let icon: String
+    let keywords: [String]
+    let modes: [NativeDeveloperStudioMode]
+}
+
+let nativeDeveloperStudioSpecs: [NativeDeveloperStudioSpec] = [
+    .init(id: "json-studio", sourceID: "json-formatter", slug: "json-studio", name: "JSON Studio", description: "Format, validate, compare, inspect, and query JSON locally while preserving large integer tokens and explaining parser caveats.", icon: "Braces", keywords: ["json", "format", "minify", "validate", "diff", "path", "tree", "large integer", "privacy"], modes: [.init("format", "Format", "json-formatter"), .init("minify", "Minify", "json-minifier"), .init("validate", "Validate", "json-validator"), .init("diff", "Diff", "json-diff"), .init("path", "Path / Search", "json-path-query"), .init("tree", "Tree / Inspect", "json-inspector"), .init("schema", "Schema", "developer-json-schema-generator"), .init("convert", "Convert to CSV", "json-to-csv"), .init("csv", "CSV tools", "csv-formatter")]),
+    .init(id: "jwt-studio", sourceID: "jwt-decoder", slug: "jwt-studio", name: "JWT Studio", description: "Decode tokens and inspect registered claims locally. Decoding never proves trust or signature validity.", icon: "ShieldCheck", keywords: ["jwt", "token", "claims", "expiration", "privacy"], modes: [.init("decode", "Decode", "jwt-decoder"), .init("expiration", "Expiration", "jwt-expiration-checker"), .init("claims", "Claims inspector", "jwt-inspector"), .init("payload", "Payload builder", "developer-jwt-payload-generator")]),
+    .init(id: "regex-studio", sourceID: "regex-tester", slug: "regex-studio", name: "Regex Studio", description: "Test and replace regular expressions, review captures and portability, and see engine-specific limitations.", icon: "Regex", keywords: ["regex", "match", "replace", "capture", "flags"], modes: [.init("match", "Match / Test", "regex-tester"), .init("replace", "Replace", "regex-replace"), .init("explain", "Explain", "developer-regex-explainer")]),
+    .init(id: "hash-studio", sourceID: "sha256-hash", slug: "hash-studio", name: "Hash Studio", description: "Calculate digest values, compare them, or hash local files without uploading their bytes. Hashes are not encryption.", icon: "Fingerprint", keywords: ["hash", "sha256", "md5", "sha1", "sha384", "sha512", "file hash"], modes: [.init("hash", "Multi-hash", "hash-generator"), .init("compare", "Compare", "hash-compare"), .init("file", "File hash", "file-hash-calculator")]),
+    .init(id: "encoding-studio", sourceID: "base64-encoder", slug: "encoding-studio", name: "Encoding Studio", description: "Encode and decode UTF-8 data across common web, text, and binary representations entirely on-device.", icon: "ArrowLeftRight", keywords: ["encoding", "decoding", "base64", "url", "html", "hex", "binary", "unicode"], modes: [.init("base64", "Base64", "base64-encoder", "base64-decoder"), .init("url", "URL", "url-encoder", "url-decoder"), .init("html", "HTML entities", "html-encoder", "html-decoder"), .init("hex", "Hex", "hex-encoder", "hex-decoder"), .init("binary", "Binary", "binary-encoder", "binary-decoder"), .init("ascii", "ASCII", "ascii-encoder", "ascii-decoder"), .init("unicode", "Unicode", "unicode-encoder", "unicode-decoder"), .init("data-uri", "Data URI", "data-uri-generator", "developer-data-uri-decoder")]),
+    .init(id: "time-cron-studio", sourceID: "cron-parser", slug: "time-cron-studio", name: "Time & Cron Studio", description: "Convert Unix timestamps and explain five-field cron schedules with upcoming times without contacting a scheduler.", icon: "Clock", keywords: ["cron", "timestamp", "unix", "UTC", "schedule"], modes: [.init("timestamp", "Timestamp", "unix-timestamp-converter"), .init("explain", "Cron explain", "cron-explainer"), .init("next-runs", "Next runs", "cron-parser"), .init("presets", "Presets", "cron-generator")]),
+    .init(id: "uuid-studio", sourceID: "uuid-generator", slug: "uuid-studio", name: "UUID Studio", description: "Generate UUID v4 batches and validate UUID shape, variant, and version bits locally.", icon: "Fingerprint", keywords: ["uuid", "guid", "v4", "batch", "validate"], modes: [.init("generate", "Generate batch", "uuid-generator"), .init("validate", "Validate", "uuid-validator")]),
+    .init(id: "sql-studio", sourceID: "sql-formatter", slug: "sql-studio", name: "SQL Studio", description: "Format and minify SQL using an explicit dialect. Queries are never executed; formatting is not full grammar validation.", icon: "Database", keywords: ["sql", "format", "minify", "dialect", "join", "group by"], modes: [.init("format", "Format", "sql-formatter"), .init("minify", "Minify", "sql-minifier"), .init("parse", "Parse feedback", "sql-parser"), .init("query", "Query builder", "developer-sql-query-builder"), .init("schema", "Schema generator", "developer-sql-schema-generator")]),
+    .init(id: "markup-studio", sourceID: "javascript-formatter", slug: "markup-studio", name: "Markup & Style Studio", description: "Format and inspect HTML, CSS, JavaScript, XML, YAML, and Markdown locally. Formatting is not code execution or a security audit.", icon: "FileCode", keywords: ["html", "css", "javascript", "xml", "yaml", "markdown"], modes: [.init("html", "HTML", "html-beautifier"), .init("css", "CSS", "css-beautifier"), .init("javascript", "JavaScript", "javascript-formatter"), .init("xml", "XML", "xml-beautifier"), .init("yaml", "YAML", "yaml-formatter"), .init("markdown", "Markdown preview", "markdown-preview"), .init("samples", "Sample content", "lorem-ipsum-generator")]),
+    .init(id: "http-api-studio", sourceID: "http-status-lookup", slug: "http-api-studio", name: "HTTP & API Studio", description: "Look up HTTP status codes, inspect query strings and content types, and draft header/security references locally.", icon: "Network", keywords: ["http", "api", "status", "418", "headers", "query", "mime", "cors", "csp"], modes: [.init("status", "Status codes", "http-status-lookup"), .init("headers", "Headers", "developer-http-header-builder"), .init("query", "Query string", "query-string-parser"), .init("mime", "MIME types", "developer-content-type-lookup"), .init("cors", "CORS", "developer-cors-header-helper"), .init("csp", "CSP", "developer-csp-header-generator"), .init("cookies", "Cookies", "developer-cookie-parser"), .init("user-agent", "User-Agent", "user-agent-parser")]),
+    .init(id: "devops-studio", sourceID: "developer-gitignore-generator", slug: "devops-studio", name: "DevOps Config Studio", description: "Generate copy-ready project config, container files, starter docs, API schemas, and release metadata with editable presets.", icon: "Container", keywords: ["devops", "docker", "compose", "nginx", "gitignore", "openapi", "graphql", "readme", "semver"], modes: [.init("gitignore", ".gitignore", "developer-gitignore-generator"), .init("dockerfile", "Dockerfile", "developer-dockerfile-helper"), .init("compose", "Compose", "developer-docker-compose-generator"), .init("nginx", "Nginx", "developer-nginx-config-generator"), .init("editorconfig", "EditorConfig", "developer-editorconfig-generator"), .init("env", ".env example", "developer-environment-variable-generator"), .init("openapi", "OpenAPI", "developer-openapi-example-generator"), .init("graphql", "GraphQL", "developer-graphql-query-builder"), .init("license", "License", "developer-license-generator"), .init("readme", "README", "developer-readme-generator"), .init("commit", "Commit message", "developer-commit-message-helper"), .init("branch", "Branch name", "developer-branch-name-generator"), .init("changelog", "Changelog", "developer-changelog-generator"), .init("semver", "Semver", "developer-semantic-version-calculator"), .init("mock", "API / webhook fixtures", "developer-api-mock-response-generator")]),
+    .init(id: "diff-inspect-studio", sourceID: "json-diff", slug: "diff-inspect-studio", name: "Diff & Inspect Studio", description: "Compare text, JSON, and YAML; inspect structure; preview data; and compose bounded deterministic transforms into a per-step-audited local recipe.", icon: "GitCompare", keywords: ["diff", "compare", "inspect", "structure", "preview", "recipe", "pipeline", "workflow"], modes: [.init("text-diff", "Text diff", "text-diff"), .init("json-diff", "JSON diff", "json-diff"), .init("yaml-diff", "YAML diff", "yaml-diff"), .init("inspect", "Structure inspector", "json-inspector"), .init("preview", "Preview", "markdown-preview"), .init("test", "JSON tester", "json-tester"), .init("recipe", "Recipe pipeline", "developer-recipe-runner")]),
+]
+
+extension Catalog {
+    func canonicalDeveloperStudio(for toolID: String) -> Tool? {
+        guard nativeDeveloperStudioSpecs.contains(where: { $0.id == toolID || $0.slug == toolID }) else { return nil }
+        return developerStudioTools().first { $0.id == toolID || $0.slug == toolID }
+    }
+
+    func developerStudioTools() -> [Tool] {
+        nativeDeveloperStudioSpecs.compactMap { spec in
+            guard let source = (tools + (relatedReferenceTools ?? [])).first(where: { $0.id == spec.sourceID }) else { return nil }
+            return Tool(id: spec.id, name: spec.name, slug: spec.slug, description: NativeCopy.text(spec.description), category: "developer", subcategory: source.subcategory,
+                        keywords: Array(Set(source.keywords + spec.keywords + ["studio", "offline", "privacy"])).sorted(), tags: Array(Set(source.tags + ["developer-studio", spec.id])).sorted(), icon: spec.icon,
+                        popularity: 1_000_000 - (nativeDeveloperStudioSpecs.firstIndex(of: spec) ?? 0), featured: true, clientSide: true, requiresBackend: false, requiresAuth: false,
+                        status: source.status, disclaimer: source.disclaimer, related: nativeDeveloperStudioSpecs.filter { $0.id != spec.id }.map(\.id),
+                        engine: ToolEngine(type: "developer", id: source.engine.id, op: spec.modes.first?.op, configuration: source.engine.configuration))
+        }
+    }
+
+    func developerStudio(for toolID: String) -> Tool? {
+        let id = toolID.lowercased().replacingOccurrences(of: "^developer-", with: "", options: .regularExpression)
+        let target: String
+        if ["yaml-diff", "text-diff", "csv-diff"].contains(id) || id.range(of: "^(yaml|text|csv|xml|html|css|sql|base64|url|hex|binary|ascii|unicode|uuid|jwt|regex)-diff$", options: .regularExpression) != nil { target = "diff-inspect-studio" }
+        else if id.hasPrefix("jwt") { target = "jwt-studio" }
+        else if id.hasPrefix("regex") { target = "regex-studio" }
+        else if ["hash", "md5", "file-hash", "sha1", "sha256", "sha384", "sha512"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) { target = "hash-studio" }
+        else if ["query-string", "url-query", "cookie", "cors", "csp", "ip-header", "status-code", "user-agent", "content-type", "mime", "http"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) { target = "http-api-studio" }
+        else if ["base64", "url", "uri", "hex", "binary", "ascii", "unicode", "data-uri"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) || ["json-decoder", "json-encoder", "html-decoder", "html-encoder"].contains(id) { target = "encoding-studio" }
+        else if ["cron", "unix-timestamp", "timestamp", "epoch"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) { target = "time-cron-studio" }
+        else if id.hasPrefix("uuid") { target = "uuid-studio" }
+        else if id.hasPrefix("sql") { target = "sql-studio" }
+        else if id.hasPrefix("csv") || id.hasPrefix("json") || id.hasPrefix("dummy-json") { target = "json-studio" }
+        else if ["html", "css", "javascript", "typescript", "xml", "svg", "yaml", "markdown", "lorem-ipsum"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) { target = "markup-studio" }
+        else if ["gitignore", "git", "docker", "dockerfile", "kubernetes", "nginx", "openapi", "graphql", "license", "readme", "editorconfig", "environment-variable", "semantic-version", "branch-name", "commit-message", "changelog", "webhook", "api-mock", "sql-query-builder", "sql-schema-generator"].contains(where: { id == $0 || id.hasPrefix($0 + "-") }) { target = "devops-studio" }
+        else { target = "diff-inspect-studio" }
+        return developerStudioTools().first { $0.id == target }
+    }
+
+    func developerStudio(forLegacyTool tool: Tool) -> Tool? {
+        guard tool.category == "developer", !tool.tags.contains("developer-studio") else { return nil }
+        return developerStudio(for: tool.slug)
     }
 }

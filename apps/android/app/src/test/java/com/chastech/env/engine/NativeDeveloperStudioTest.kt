@@ -218,4 +218,114 @@ class NativeDeveloperStudioTest {
         assertTrue(run("http-status-lookup", "104").contains("temporary IANA registration"))
     }
 
+
+
+    @Test fun crossPlatformRecipePipelineIsBoundedInspectableAndPreservesUnicode() {
+        val input = "  enV 🚀\r\nline two\rline two  "
+        val config = JSONObject().put("input", input).put("steps", JSONArray()
+            .put(JSONObject().put("op", "normalize-newlines").put("name", "Normalize newlines"))
+            .put(JSONObject().put("op", "trim"))
+            .put(JSONObject().put("op", "unique-lines")))
+        val report = JSONObject(NativeDeveloperRecipe.run(config.toString()))
+        assertEquals("completed", report.getString("status"))
+        assertEquals(3, report.getInt("stepsCompleted"))
+        assertEquals("enV 🚀\\nline two\\nline two", report.getString("finalOutput"))
+        assertEquals("ok", report.getJSONArray("steps").getJSONObject(0).getString("status"))
+        assertTrue(report.getString("privacy").contains("does not upload"))
+    }
+
+    @Test fun recipeJsonOperationsPreserveRawLargeIntegersAndRefuseAmbiguousSort() {
+        val raw = """{"id":9007199254740993,"message":"hello"}"""
+        val config = JSONObject().put("input", raw).put("steps", JSONArray().put(JSONObject().put("op", "json-format")))
+        val report = JSONObject(NativeDeveloperRecipe.run(config.toString()))
+        assertTrue(report.getString("finalOutput").contains("9007199254740993"))
+        assertTrue(report.getJSONArray("warnings").toString().contains("Unsafe integer"))
+        val duplicate = JSONObject().put("input", """{"a":1,"a":2}""").put("steps", JSONArray().put(JSONObject().put("op", "json-sort-keys")))
+        val message = runCatching { NativeDeveloperRecipe.run(duplicate.toString()) }.exceptionOrNull()?.message.orEmpty()
+        assertTrue(message.contains("duplicate object keys"))
+    }
+
+    @Test fun recipeJsonPointerUsesRfc6901EscapesAndPreservesLargeNumbers() {
+        val config = JSONObject().put("input", DeveloperStudioGoldenFixtures.RECIPE_POINTER_INPUT).put("steps", JSONArray().put(JSONObject().put("op", "json-pointer-get").put("pointer", DeveloperStudioGoldenFixtures.RECIPE_POINTER_PATH)))
+        val report = JSONObject(NativeDeveloperRecipe.run(config.toString()))
+        assertEquals(DeveloperStudioGoldenFixtures.RECIPE_POINTER_OUTPUT, report.getString("finalOutput"))
+        assertTrue(report.getJSONArray("warnings").toString().contains("Unsafe integer"))
+        val duplicate = JSONObject().put("input", """{"a":1,"a":2}""").put("steps", JSONArray().put(JSONObject().put("op", "json-pointer-get").put("pointer", "/a")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(duplicate.toString()) }.exceptionOrNull()?.message.orEmpty().contains("ambiguous duplicate object keys"))
+        val badIndex = JSONObject().put("input", """{"items":[1,2]}""").put("steps", JSONArray().put(JSONObject().put("op", "json-pointer-get").put("pointer", "/items/01")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(badIndex.toString()) }.exceptionOrNull()?.message.orEmpty().contains("canonical array index"))
+    }
+
+    @Test fun recipeCsvTransformsRoundTripQuotedFieldsAndFailOnAmbiguousRecords() {
+        val csvToJson = JSONObject(NativeDeveloperRecipe.run(JSONObject().put("input", DeveloperStudioGoldenFixtures.RECIPE_CSV_INPUT).put("steps", JSONArray().put(JSONObject().put("op", "csv-to-json"))).toString()))
+        assertEquals(DeveloperStudioGoldenFixtures.RECIPE_CSV_EXPECTED_JSON, csvToJson.getString("finalOutput"))
+        val jsonToCsv = JSONObject(NativeDeveloperRecipe.run(JSONObject().put("input", csvToJson.getString("finalOutput")).put("steps", JSONArray().put(JSONObject().put("op", "json-to-csv"))).toString()))
+        assertEquals(DeveloperStudioGoldenFixtures.RECIPE_CSV_EXPECTED_CSV, jsonToCsv.getString("finalOutput"))
+        val duplicateHeaders = JSONObject().put("input", "name,name\na,b").put("steps", JSONArray().put(JSONObject().put("op", "csv-to-json")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(duplicateHeaders.toString()) }.exceptionOrNull()?.message.orEmpty().contains("headers must be unique"))
+        val malformed = JSONObject().put("input", "name,note\nAda,\"unfinished").put("steps", JSONArray().put(JSONObject().put("op", "csv-to-json")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(malformed.toString()) }.exceptionOrNull()?.message.orEmpty().contains("ends inside a quoted field"))
+    }
+
+    @Test fun recipeStrictCodecsRoundTripUnicodeAndRejectNonCanonicalBase64() {
+        val config = JSONObject().put("input", "enV 🚀") .put("steps", JSONArray().put(JSONObject().put("op", "base64-encode")).put(JSONObject().put("op", "base64-decode")))
+        assertEquals("enV 🚀", JSONObject(NativeDeveloperRecipe.run(config.toString())).getString("finalOutput"))
+        val invalid = JSONObject().put("input", "Zh==").put("steps", JSONArray().put(JSONObject().put("op", "base64-decode")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(invalid.toString()) }.exceptionOrNull()?.message.orEmpty().contains("canonical"))
+    }
+
+    @Test fun recipeLimitsAndUnknownOperationsFailClosed() {
+        val tooMany = JSONArray(); repeat(17) { tooMany.put(JSONObject().put("op", "trim")) }
+        val limit = JSONObject().put("input", "x").put("steps", tooMany)
+        assertTrue(runCatching { NativeDeveloperRecipe.run(limit.toString()) }.exceptionOrNull()?.message.orEmpty().contains("between 1 and 16"))
+        val unknown = JSONObject().put("input", "x").put("steps", JSONArray().put(JSONObject().put("op", "eval")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(unknown.toString()) }.exceptionOrNull()?.message.orEmpty().contains("unsupported operation"))
+    }
+
+    @Test fun recipeLinesAndUnicodeNormalizationUsePortableSemantics() {
+        val reverse = JSONObject().put("input", "🚀 first\nsecond\nthird\n").put("steps", JSONArray().put(JSONObject().put("op", "reverse-lines")))
+        assertEquals("third\nsecond\n🚀 first\n", JSONObject(NativeDeveloperRecipe.run(reverse.toString())).getString("finalOutput"))
+        val unicode = JSONObject().put("input", "\uFEFFCafe\u0301\n\n").put("steps", JSONArray().put(JSONObject().put("op", "strip-bom")).put(JSONObject().put("op", "unicode-normalize-nfc")).put(JSONObject().put("op", "remove-final-newline")))
+        assertEquals("Café\n", JSONObject(NativeDeveloperRecipe.run(unicode.toString())).getString("finalOutput"))
+        val compat = JSONObject().put("input", "①").put("steps", JSONArray().put(JSONObject().put("op", "unicode-normalize-nfkc")))
+        val report = JSONObject(NativeDeveloperRecipe.run(compat.toString()))
+        assertEquals("1", report.getString("finalOutput"))
+        assertTrue(report.getJSONArray("warnings").toString().contains("compatibility normalization"))
+    }
+
+    @Test fun recipeConfigurationRejectsDuplicateTopLevelKeys() {
+        val duplicate = """{"input":"first","input":"second","steps":[{"op":"trim"}]}"""
+        assertTrue(runCatching { NativeDeveloperRecipe.run(duplicate) }.exceptionOrNull()?.message.orEmpty().contains("Recipe configuration contains duplicate object keys and is ambiguous"))
+    }
+
+    @Test fun recipeLiteralReplacementPreflightsOversizedExpansion() {
+        val step = JSONObject().put("op", "replace-literal").put("find", "x").put("replacement", "a".repeat(100_000))
+        val recipe = JSONObject().put("input", "x".repeat(30)).put("steps", JSONArray().put(step))
+        val message = runCatching { NativeDeveloperRecipe.run(recipe.toString()) }.exceptionOrNull()?.message.orEmpty()
+        assertTrue(message.contains("Literal replacement would exceed 2097152 UTF-8 bytes"))
+    }
+
+    @Test fun recipeCsvRoundTripQuotesCRLFInsideField() {
+        val source = "name,note\r\nAda,\"line one\r\nline two\"\r\n"
+        val toJson = JSONObject(NativeDeveloperRecipe.run(JSONObject().put("input", source).put("steps", JSONArray().put(JSONObject().put("op", "csv-to-json"))).toString()))
+        val toCsv = JSONObject(NativeDeveloperRecipe.run(JSONObject().put("input", toJson.getString("finalOutput")).put("steps", JSONArray().put(JSONObject().put("op", "json-to-csv"))).toString()))
+        assertEquals("name,note\nAda,\"line one\r\nline two\"\n", toCsv.getString("finalOutput"))
+    }
+
+    @Test fun recipeJsonDepthAndPrettyOutputBudgetsRejectHostileInputs() {
+        val tooDeep = "[".repeat(2_000) + "0" + "]".repeat(2_000)
+        val depthRecipe = JSONObject().put("input", tooDeep).put("steps", JSONArray().put(JSONObject().put("op", "json-validate")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(depthRecipe.toString()) }.exceptionOrNull()?.message.orEmpty().contains("JSON nesting exceeds the safety depth of 128"))
+        val amplifier = "[".repeat(80) + List(13_500) { "0" }.joinToString(",") + "]".repeat(80)
+        val formatRecipe = JSONObject().put("input", amplifier).put("steps", JSONArray().put(JSONObject().put("op", "json-format")))
+        assertTrue(runCatching { NativeDeveloperRecipe.run(formatRecipe.toString()) }.exceptionOrNull()?.message.orEmpty().contains("JSON formatting would exceed 2097152 UTF-8 bytes"))
+    }
+
+    @Test fun recipeFinalNewlineAndCodePointSortingAreDeterministic() {
+        val add = JSONObject().put("input", "line").put("steps", JSONArray().put(JSONObject().put("op", "ensure-final-newline")))
+        assertEquals("line\n", JSONObject(NativeDeveloperRecipe.run(add.toString())).getString("finalOutput"))
+        val sorted = JSONObject().put("input", "z\nA\na\n🚀").put("steps", JSONArray().put(JSONObject().put("op", "sort-lines")))
+        assertEquals("A\na\nz\n🚀", JSONObject(NativeDeveloperRecipe.run(sorted.toString())).getString("finalOutput"))
+    }
+
 }
