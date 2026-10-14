@@ -1993,7 +1993,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
             Text("Regex flags", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOf("g", "i", "m", "s", "u").forEach { flag ->
-                    FilterChip(selected = flag in flags, onClick = { flags = if (flag in flags) flags.filterNot { it == flag } else flags + flag }, label = { Text(flag) })
+                    FilterChip(selected = flag in flags, onClick = { flags = if (flag in flags) flags.filterNot { it.toString() == flag } else flags + flag }, label = { Text(flag) })
                 }
             }
             InputField(flags, { flags = it.filter { character -> character in "gimsu" }.toList().distinct().joinToString("") }, "Flags (editable; Java regex semantics)", minLines = 1, singleLine = true)
@@ -2001,10 +2001,10 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
         if ((regexStudio && regexMode in setOf("test", "benchmark")) || (!regexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op))) {
             InputField(replacement, { replacement = it }, "Replacement preview (optional)", minLines = 1, singleLine = true)
         }
-        val regexPreviewState = remember(input, secondary, flags, regexStudio, regexMode) {
+        val regexPreviewState: Pair<JSONObject?, String?> = remember(input, secondary, flags, regexStudio, regexMode) {
             if (regexStudio && regexMode == "test" && input.isNotEmpty() && secondary.isNotEmpty()) {
-                runCatching { JSONObject(NativeRegexHighlight.build(input, secondary, flags)) to null }
-                    .getOrElse { null to (it.message ?: "Live preview unavailable.") }
+                runCatching { JSONObject(NativeRegexHighlight.build(input, secondary, flags)) }
+                    .fold(onSuccess = { it to null }, onFailure = { null to (it.message ?: "Live preview unavailable.") })
             } else null to null
         }
         if (regexStudio && regexMode == "test" && secondary.isNotEmpty()) {
@@ -2018,7 +2018,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
                     if (segments != null) for (index in 0 until segments.length()) {
                         val segment = segments.optJSONObject(index) ?: continue
                         val segmentText = segment.optString("text")
-                        if (segment.optBoolean("isMatch")) withStyle(SpanStyle(background = MaterialTheme.colorScheme.primaryContainer, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)) { append(segmentText) }
+                        if (segment.optBoolean("isMatch")) withStyle(SpanStyle(background = MaterialTheme.colorScheme.primaryContainer, color = MaterialTheme.colorScheme.onPrimaryContainer)) { append(segmentText) }
                         else append(segmentText)
                     }
                 }
