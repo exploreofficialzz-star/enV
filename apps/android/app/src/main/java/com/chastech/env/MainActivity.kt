@@ -139,6 +139,7 @@ import com.chastech.env.engine.NativeDeveloperRecipe
 import com.chastech.env.engine.NativeExpansionCalculatorEngine
 import com.chastech.env.engine.NativeMathExerciseEngine
 import com.chastech.env.engine.NativeMimeEngine
+import com.chastech.env.engine.NativeRegexHighlight
 import com.chastech.env.engine.NativeTextEngine
 import com.chastech.env.engine.NativeUtilityEngine
 import com.chastech.env.ui.ChasTechnologiesLogo
@@ -2023,7 +2024,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
                     }
                 }
                 Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
-                    Text(highlighted, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(10.dp))
+                    androidx.compose.material3.Text(text = highlighted, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(10.dp))
                 }
                 val matches = preview.optJSONArray("matches")
                 val firstMatch = matches?.optJSONObject(0)

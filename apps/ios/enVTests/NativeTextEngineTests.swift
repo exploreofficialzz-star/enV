@@ -169,27 +169,36 @@ final class NativeDeveloperToolTests: XCTestCase {
     }
 
     func testDeveloperValidatorsStatusAndWebFallbacks() throws {
-        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Invalid UUID")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Valid UUID v4")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Valid UUID v4")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-71d4-a716-446655440000").text,"Valid UUID v7")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"00000000-0000-0000-0000-000000000000").text,"Valid Nil UUID")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"not-a-uuid").text,"Invalid UUID")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"404").text,"404 Not Found")
-        XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"418").text.contains("504 Gateway Timeout"))
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text,"a=1&b=2")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text,"Mozilla/5.0")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("cron-parser"),input:"").text,"Cron: \nFive-field format: minute hour day-of-month month day-of-week")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<div>\n  <p>\n    Hello\n  </p>\n</div>")
+        XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"404").text.hasPrefix("404 Not Found\n"))
+        XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"418").text.localizedCaseInsensitiveContains("teapot"))
+        let queryText = try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text
+        let query = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(queryText.utf8)) as? [String:Any])
+        XCTAssertEqual(query["count"] as? Int,2)
+        let queryGroups = try XCTUnwrap(query["grouped"] as? [String:[String]])
+        XCTAssertEqual(queryGroups["a"],["1"])
+        let agentText = try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text
+        let agent = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(agentText.utf8)) as? [String:Any])
+        XCTAssertEqual(agent["raw"] as? String,"Mozilla/5.0")
+        let cronText = try NativeUtilityEngine.run(tool("cron-parser"),input:"*/5 * * * *").text
+        let cron = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(cronText.utf8)) as? [String:Any])
+        XCTAssertEqual(cron["normalized"] as? String,"*/5 * * * *")
+        XCTAssertFalse(try XCTUnwrap(cron["upcomingRuns"] as? [Any]).isEmpty)
+        XCTAssertTrue(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text.contains("&lt;div&gt;"))
     }
 
     func testBrowserVerifiedEncodingCsvMimeMarkupAndFallbacks() throws {
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"4869")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"72 105")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("csv-formatter"),input:"name,age\nAda,36\nGrace,40").text,"name,age\nAda,36\nGrace,40")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("mime-validator"),input:"pdf").text,"application/pdf")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("xml-validator"),input:"<root><child>ok</child></root>").text,"Valid markup/XML.")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("developer-api-mock-response-generator"),input:"  template  ").text,"template")
-        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello"))
+        XCTAssertTrue(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello").text.hasPrefix("data:text/plain;base64,"))
         XCTAssertThrowsError(try NativeUtilityEngine.run(tool("file-hash-calculator"),input:"hello"))
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"422").text,"422 Unprocessable Content")
+        XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"422").text.hasPrefix("422 Unprocessable Content\n"))
     }
 }
 
