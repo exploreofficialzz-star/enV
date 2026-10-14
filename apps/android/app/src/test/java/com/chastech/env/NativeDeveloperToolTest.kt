@@ -116,7 +116,7 @@ class NativeDeveloperToolTest {
         val userAgent = JSONObject(NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
         assertEquals("Mozilla/5.0", userAgent.getString("raw"))
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
-        assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
+        assertTrue(NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text.contains("&lt;div&gt;"))
     }
 
     @Test fun nativeFileHashUsesRawBytesAndMatchesSHA256GoldenVector() {

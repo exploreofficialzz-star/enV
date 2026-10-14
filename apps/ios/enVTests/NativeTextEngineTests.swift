@@ -186,7 +186,7 @@ final class NativeDeveloperToolTests: XCTestCase {
         let cronText = try NativeUtilityEngine.run(tool("cron-parser"),input:"*/5 * * * *").text
         let cron = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(cronText.utf8)) as? [String:Any])
         XCTAssertEqual(cron["normalized"] as? String,"*/5 * * * *")
-        XCTAssertFalse(try XCTUnwrap(cron["upcomingRuns"] as? [Any]).isEmpty)
+        XCTAssertFalse(try XCTUnwrap(cron["nextRuns"] as? [Any]).isEmpty)
         XCTAssertTrue(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text.contains("&lt;div&gt;"))
     }
 
