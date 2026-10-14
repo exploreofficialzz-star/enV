@@ -199,10 +199,10 @@ dee005ad7537ba434fad1c61a6f2d8a0c01119eb5f379e41146009226272d127  ./apps/ios/nat
 d4966ee7bd9a55608e75691594d839ae56d191c719c766e0fcef44e6da3f6633  ./apps/ios/native-family-coverage/seo.txt
 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b  ./apps/ios/native-family-coverage/url-media-info.txt
 017dabcab5f0130e51272ff89f57b1458462f87bea779b2c36e7a66135be212f  ./apps/ios/native-tool-coverage.txt
-956ec6ed6d15246dce4fd8ed516d9f6d6f37219bca1d07f2cfe6135ef79a65d8  ./apps/shared/catalog.json
+a085ca9327bc8c26e90a39bad65053f954851ae913808ef2a1ece79e591aa769  ./apps/shared/catalog.json
 7d907b6fd9124b2df8333ef830fc6bb5707e874eb5fc8717a1400657ee05bfa7  ./apps/shared/execution-policy.json
 b636c9b59a63ac77e6754d488b55f26835d044e6f2fb0792e9f1c62afab7eda4  ./apps/shared/native-calculators.json
-c9a3bb48bc571ead1ae97ac954e28cb901a91f4b1accba73c9c5eca41a916ddd  ./apps/shared/native-engine-inventory.json
+07a9c1147dffbc68a46c23a41ddee6abbebc9481c9e0f5ebc2c6eb27a83fec31  ./apps/shared/native-engine-inventory.json
 30048f7b847cba4ec178d678cd9d2bb8fa124e7f45a4e01bac3616e7277be9af  ./apps/shared/native-execution-matrix.json
 556cea3238056609d651e3398296bb8be680dd5b677cbeb10fa0d0a0a7b7133a  ./apps/shared/native-icons/chas-technologies-logo.jpg
 47ec9d6fe1586a516e674fcc629c0600ee3e04707656adfcc39c8070edfbfe07  ./apps/shared/native-icons/icons/accessibility.png
@@ -282,7 +282,7 @@ ecc7901bf866e736c0cc3acc70f6b935719e4331b7d121c8d0ceb16a92b98cc0  ./audit/DEVELO
 de9f7fb3f1da44b3d7a066fd68688f351b8b3f9ca668893d92f090eb5338e315  ./audit/DEVELOPER-CATEGORY-AUDIT-2026-10-13.md
 c06c02698f61b6db6cb95dc4e6cc8acf05d96d6191121f46c715de69bb837abe  ./audit/DEVELOPER-CATEGORY-CHANGELOG.md
 dab3e61b05c256526c4bbe0b9ae998185cc3f14997425c91aa8eecefae0be30a  ./audit/DEVELOPER-HARD-RETEST-REMEDIATION-2026-10-13.md
-7046fb8e4ec4af719454822d61b2d49c95bdb80d0ab2a4ea34feb528d73e8b4d  ./audit/FILE-SHA256SUMS.txt
+b1058441ce09f81a562e9a23c973ea6199f24fb86fad9d715dd7581d86468009  ./audit/FILE-SHA256SUMS.txt
 ef5478a074eb096450abfffee53b1b9f907ee79056420e0244e3006c4e118f85  ./audit/ROUND4-VERIFICATION-RESULTS-2026-10-13.md
 f2c04d0d63e4b1fd2c0b8d7f586761a0327f51ecf73f1700696297ab029814cb  ./audit/ROUND5-VERIFICATION-RESULTS-2026-10-13.md
 07de11b73a0108ff49c3489a59cd378b9801c934832e0794c5979ee5d8fa151d  ./audit/developer-route-smoke-results.json
