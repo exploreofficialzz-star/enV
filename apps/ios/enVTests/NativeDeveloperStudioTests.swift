@@ -45,6 +45,12 @@ final class NativeDeveloperStudioTests: XCTestCase {
         XCTAssertTrue(try run("markdown-to-html", "# Hello\n\nA **bold** note").contains("<h1>Hello</h1>"))
     }
 
+    func testMarkupInspectorCapturesLowercaseTagNames() throws {
+        let raw = try run("html-inspector", "<html><Body><p>café</p></Body></html>")
+        let report = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
+        XCTAssertEqual(report["tags"] as? [String], ["html", "body", "p"])
+    }
+
     func testHttpStudioParsesRepeatedQueryValuesAndBuildsSafeHeaders() throws {
         let parsed = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(try run("query-string-parser", "q=one&q=two&space=hello+world").utf8)) as? [String: Any])
         XCTAssertEqual(parsed["count"] as? Int, 3)

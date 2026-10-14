@@ -59,6 +59,11 @@ class NativeDeveloperStudioTest {
         assertTrue(run("user-agent-parser", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36").contains("Windows"))
     }
 
+    @Test fun generatedGraphQLAndNginxTemplatesKeepLiteralVariables() {
+        assertTrue(run("graphql-query-builder", "").contains("query GetExample(\$id: ID!)"))
+        assertTrue(run("nginx-config-generator", "").contains("try_files \$uri \$uri/ =404;"))
+    }
+
     @Test fun uuidInspectionSupportsNilAndWebhookOutputRemainsValidJson() {
         assertTrue(run("uuid-validator", "00000000-0000-0000-0000-000000000000").startsWith("Valid Nil UUID"))
         val payload = JSONObject(run("webhook-payload-generator", "order.paid"))

@@ -217,8 +217,8 @@ object NativeTextEngine {
             factory.isXIncludeAware = false
             factory.isExpandEntityReferences = false
             runCatching { factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
-            runCatching { factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "") }
-            runCatching { factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "") }
+            runCatching { factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
+            runCatching { factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "") }
             runCatching { factory.setFeature("http://xml.org/sax/features/external-general-entities", false) }
             runCatching { factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
             runCatching { factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
@@ -231,8 +231,8 @@ object NativeTextEngine {
             val document = builder.parse(InputSource(StringReader(input)))
             val transformerFactory = TransformerFactory.newInstance()
             runCatching { transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
-            runCatching { transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "") }
-            runCatching { transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "") }
+            runCatching { transformerFactory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
+            runCatching { transformerFactory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalStylesheet", "") }
             val transformer = transformerFactory.newTransformer()
             transformer.setOutputProperty(OutputKeys.INDENT, "yes")
             runCatching { transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2") }

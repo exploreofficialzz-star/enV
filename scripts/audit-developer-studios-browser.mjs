@@ -47,34 +47,50 @@ try {
       report.networkLeaks.push({ method: request.method(), url: '[REDACTED URL; request payload marker detected]', hasBody: Boolean(request.postData()), payload: '[REDACTED]' });
     }
   });
+  const waitForInteractive = async (input) => {
+    const loadExample = page.getByRole('button', { name: 'Load example', exact: true });
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      await loadExample.click({ timeout: Math.min(timeout, 3000) });
+      if ((await input.inputValue()).trim()) return;
+      // SSR markup is visible before React hydrates it; verify a real state-changing interaction.
+      await page.waitForTimeout(100);
+    }
+    throw new Error('Developer Studio did not become interactive before the browser audit deadline.');
+  };
   for (const route of routes) {
     const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [] };
     try {
       await page.setViewportSize(report.viewport);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: 'domcontentloaded', timeout });
-      await page.getByLabel('Input').waitFor({ state: 'visible' }).catch(async () => page.getByLabel('Regular expression').waitFor({ state: 'visible' }));
+      const primaryInput = route.kind === 'regex' ? page.getByLabel('Regular expression') : page.getByLabel('Input');
+      await primaryInput.waitFor({ state: 'visible', timeout });
+      await waitForInteractive(primaryInput);
       routeReport.loaded = true;
       if (route.kind === 'regex') {
-        await page.getByLabel('Regular expression').fill('ENV_PRIVACY_SENTINEL_[A-Z0-9]+');
+        await primaryInput.fill('ENV_PRIVACY_SENTINEL_[A-Z0-9]+');
         await page.getByLabel(/Test text or batch JSON/).fill(JSON.stringify([{ label: 'privacy sample', text: sampleMarker, expectMatch: true }]));
         await page.getByLabel('Studio mode').selectOption('test');
         await page.getByRole('button', { name: /Run tests/i }).click();
-        await page.getByText(/sampleCount|privacy sample/i).last().waitFor({ state: 'visible', timeout }).catch(() => {});
-        const output = await page.locator('pre').last().innerText().catch(() => '');
+        const outputRegion = page.getByLabel('Formatted output');
+        await outputRegion.waitFor({ state: 'visible', timeout });
+        const output = await outputRegion.innerText();
         // Check the result panel, not body text: the input itself necessarily contains the sentinel.
         routeReport.actionWorked = output.includes(sampleMarker) && /assertionPassed|matchCount|results/i.test(output);
       } else if (route.kind === 'javascript') {
-        await page.getByLabel('Input').fill('const greet=async(name)=>{return await Promise.resolve("hi "+name);};');
+        await primaryInput.fill('const greet=async(name)=>{return await Promise.resolve("hi "+name);};');
         await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
-        await page.getByText(/async/i).last().waitFor({ state: 'visible', timeout }).catch(() => {});
-        const output = await page.locator('pre').last().innerText().catch(() => '');
+        const outputRegion = page.getByLabel('Formatted output');
+        await outputRegion.waitFor({ state: 'visible', timeout });
+        const output = await outputRegion.innerText();
         routeReport.actionWorked = output.includes('async') && output.includes('greet') && output.includes('\n') && output.trim().length > 20;
       } else {
-        await page.getByLabel('Input').fill("select a.id,a.name from accounts a left join orders o on o.account_id=a.id where a.note='FROM should stay in text' group by a.id,a.name having count(*)>0 order by a.name;");
-        await page.getByLabel('SQL dialect').selectOption('postgresql').catch(() => {});
+        await primaryInput.fill("select a.id,a.name from accounts a left join orders o on o.account_id=a.id where a.note='FROM should stay in text' group by a.id,a.name having count(*)>0 order by a.name;");
+        await page.getByLabel('SQL dialect').selectOption('postgresql');
         await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
-        await page.getByText(/GROUP BY/i).last().waitFor({ state: 'visible', timeout }).catch(() => {});
-        const output = await page.locator('pre').last().innerText().catch(() => '');
+        const outputRegion = page.getByLabel('Formatted output');
+        await outputRegion.waitFor({ state: 'visible', timeout });
+        const output = await outputRegion.innerText();
         routeReport.actionWorked = output.includes('GROUP BY') && output.includes("'FROM should stay in text'") && output.includes('sql-formatter');
       }
       routeReport.mobileOverflow = await page.evaluate(() => ({ viewportWidth: innerWidth, documentWidth: document.documentElement.scrollWidth, overflowing: document.documentElement.scrollWidth > innerWidth + 2 }));

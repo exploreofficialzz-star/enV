@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "30b4583a8fb2",
+  "catalogVersion": "6e40a2b5d21f",
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
@@ -116,12 +116,12 @@
     },
     {
       "family": "developer",
-      "total": 446,
-      "active": 446,
+      "total": 448,
+      "active": 448,
       "planned": 0,
-      "androidImplemented": 446,
-      "iosImplemented": 446,
-      "uniqueConfigurations": 446
+      "androidImplemented": 448,
+      "iosImplemented": 448,
+      "uniqueConfigurations": 448
     },
     {
       "family": "document-backend",
@@ -215,12 +215,12 @@
     },
     {
       "family": "text",
-      "total": 40,
-      "active": 40,
+      "total": 38,
+      "active": 38,
       "planned": 0,
-      "androidImplemented": 40,
-      "iosImplemented": 40,
-      "uniqueConfigurations": 36
+      "androidImplemented": 38,
+      "iosImplemented": 38,
+      "uniqueConfigurations": 34
     },
     {
       "family": "url-media",

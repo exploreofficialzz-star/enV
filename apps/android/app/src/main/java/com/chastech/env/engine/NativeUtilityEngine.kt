@@ -1026,7 +1026,7 @@ object NativeUtilityEngine {
             lower.contains("nginx") && lower.contains("generator") -> "server {\n    listen 80;\n    server_name example.com; # replace before deployment\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files \$uri \$uri/ /index.html; }\n    location = /health { access_log off; add_header Content-Type text/plain; return 200 \"ok\\n\"; }\n}\n"
             lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCorsGenerator(subject)
             (lower.contains("csp") || lower.contains("content-security-policy")) && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCspGenerator(subject)
-            lower.contains("graphql-query-builder") -> "query GetExample($id: ID!) {\n  node(id: $id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your schema.\n"
+            lower.contains("graphql-query-builder") -> "query GetExample(\$id: ID!) {\n  node(id: \$id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your schema.\n"
             lower.contains("graphql-variables") -> runCatching { JSONObject(subject.ifBlank { "{\\\"id\\\":\\\"REPLACE_WITH_ID\\\"}" }).toString(2) }.getOrElse { throw IllegalArgumentException("GraphQL variables must be valid JSON.") }
             lower.contains("jwt-claim-builder") || lower.contains("jwt-payload-generator") -> runCatching { JSONObject(subject.ifBlank { "{\\\"sub\\\":\\\"user-id\\\",\\\"iat\\\":${System.currentTimeMillis()/1000},\\\"exp\\\":${System.currentTimeMillis()/1000+3600}}" }).toString(2) }.getOrElse { throw IllegalArgumentException("JWT claims/payload must be valid JSON.") } + "\n\nPayload preview only: no signature was created or verified. Do not use as an authentication token."
             lower.contains("branch-name") -> subject.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"),"-").trim('-')
@@ -1311,7 +1311,7 @@ object NativeUtilityEngine {
                     "docker" -> "FROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nCMD [\"node\", \"server.js\"]\n"
                     "openapi" -> "openapi: 3.1.0\ninfo:\n  title: Example API\n  version: 1.0.0\npaths: {}\n"
                     "git" -> "# Common generated files\n.env\n*.log\n.DS_Store\n"
-                    "nginx" -> "server {\n  listen 80;\n  server_name example.test;\n  location / { try_files $uri $uri/ =404; }\n}\n"
+                    "nginx" -> "server {\n  listen 80;\n  server_name example.test;\n  location / { try_files \$uri \$uri/ =404; }\n}\n"
                     "csv" -> "id,name,active\n1,Ada,true\n2,Grace,true"
                     "yaml" -> "app:\n  name: example\n  enabled: true\n"
                     "markdown" -> "# Project title\n\nDescribe the purpose of this project.\n"

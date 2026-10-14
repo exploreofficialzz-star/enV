@@ -564,6 +564,14 @@ enum NativeUtilityEngine {
         return nil
     }
 
+    private static func developerMarkupTags(_ input: String) -> [String] {
+        guard let expression = try? NSRegularExpression(pattern: #"<([A-Za-z][\w:.-]*)\b"#) else { return [] }
+        let source = input as NSString
+        return expression.matches(in: input, range: NSRange(location: 0, length: source.length))
+            .prefix(500)
+            .map { source.substring(with: $0.range(at: 1)).lowercased() }
+    }
+
     private static func runDeveloperParity(_ op:String,input:String,options o:[String:String]) throws -> String {
         let lower=op.lowercased(), secondary=o["secondary"] ?? o["test"] ?? o["second"] ?? "", flags=o["flags"] ?? "g"
         // Native routes remain native: Foundation ICU powers Regex Studio on iOS. Keep the
@@ -592,17 +600,17 @@ enum NativeUtilityEngine {
                 var row:[String:Any] = ["type":type,"path":path]
                 if let before {row["before"]=before};if let after {row["after"]=after};changes.append(row)
             }
-            func walk(_ a:Any?,_ b:Any?,_ path:String,_ depth:Int) {
+            func walk(_ a:Any?,_ b:Any?,_ path:String,_ depth:Int) throws {
                 if changes.count >= 500 {truncated=true;return}
                 if depth > 100 {add("depth-limit",path,a,b);return}
                 guard let a else {add("added",path,nil,b);return};guard let b else {add("removed",path,a,nil);return}
                 if let lhs=a as? [String:Any],let rhs=b as? [String:Any] {
-                    for key in Set(lhs.keys).union(rhs.keys).sorted() { let escaped=compact(key);walk(lhs[key],rhs[key],"\(path)[\(escaped)]",depth+1) }
+                    for key in Set(lhs.keys).union(rhs.keys).sorted() { let escaped=try compact(key);try walk(lhs[key],rhs[key],"\(path)[\(escaped)]",depth+1) }
                 } else if let lhs=a as? [Any],let rhs=b as? [Any] {
-                    for index in 0..<max(lhs.count,rhs.count) {walk(index<lhs.count ? lhs[index] : nil,index<rhs.count ? rhs[index] : nil,"\(path)[\(index)]",depth+1)}
+                    for index in 0..<max(lhs.count,rhs.count) {try walk(index<lhs.count ? lhs[index] : nil,index<rhs.count ? rhs[index] : nil,"\(path)[\(index)]",depth+1)}
                 } else if canonical(a) != canonical(b) {add("changed",path,a,b)}
             }
-            walk(left,right,"$",0)
+            try walk(left,right,"$",0)
             return prettyJSONObject(["equal":changes.isEmpty && !truncated,"changeCount":changes.count,"changes":changes,"truncated":truncated,"note":"Whitespace and object key order are ignored. Arrays are compared by index; this is not a move-aware diff."])
         }
         func sortValue(_ value:Any)->Any {
@@ -1015,7 +1023,7 @@ enum NativeUtilityEngine {
             if lower.contains("to-json"){return try csvToJSON(input)};if suffix=="validator" || suffix=="tester"{let rows=csvRows(input);guard !rows.isEmpty else{throw NativeSimpleError.message("CSV is empty.")};return "Valid CSV with \(rows.count) rows and \(rows[0].count) columns."};if suffix=="minifier"{return csvString(csvRows(input))};if ["decoder","parser","formatter","beautifier","preview","inspector","converter"].contains(suffix){return csvString(csvRows(input))};return input
         }
         if lower.contains("xml") || lower.contains("html") || lower.contains("svg") {
-            if suffix=="validator" || suffix=="tester"{guard validMarkup(input) else{throw NativeSimpleError.message("Invalid markup/XML.")};return "Valid markup/XML."};if suffix=="minifier"{return minifyText(input)};if suffix=="encoder"{return try encode("html",input)};if suffix=="decoder"{return try decode("html",input)};if suffix=="explainer"{return "Markup represents nested elements and text. Well-formed XML parsing does not prove HTML accessibility, sanitization, schema conformance, or SVG safety."};if suffix=="inspector" || suffix=="parser"{return prettyJSONObject(["tags":Array(input.matches(of:#"<([A-Za-z][\\w:.-]*)\\b"#).map{$0.output}.prefix(500)),"characters":input.count,"lines":input.components(separatedBy:.newlines).count])};if suffix=="preview"{return String(input.prefix(2000))};if suffix=="generator"{return "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body><main><h1>Hello world</h1></main></body></html>\n"};return Self.formatDeveloperMarkup(input)
+            if suffix=="validator" || suffix=="tester"{guard validMarkup(input) else{throw NativeSimpleError.message("Invalid markup/XML.")};return "Valid markup/XML."};if suffix=="minifier"{return minifyText(input)};if suffix=="encoder"{return try encode("html",input)};if suffix=="decoder"{return try decode("html",input)};if suffix=="explainer"{return "Markup represents nested elements and text. Well-formed XML parsing does not prove HTML accessibility, sanitization, schema conformance, or SVG safety."};if suffix=="inspector" || suffix=="parser"{return prettyJSONObject(["tags":Self.developerMarkupTags(input),"characters":input.count,"lines":input.components(separatedBy:.newlines).count])};if suffix=="preview"{return String(input.prefix(2000))};if suffix=="generator"{return "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body><main><h1>Hello world</h1></main></body></html>\n"};return Self.formatDeveloperMarkup(input)
         }
         if ["sql","graphql","css","javascript","typescript","docker","nginx","kubernetes","git","openapi","markdown","yaml"].contains(where:lower.contains) {
             if lower.contains("markdown") && (suffix=="preview" || lower.contains("markdown-to-html")){return markdownToHTML(input)}
