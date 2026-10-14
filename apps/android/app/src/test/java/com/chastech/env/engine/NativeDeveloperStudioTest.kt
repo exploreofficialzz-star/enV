@@ -136,10 +136,13 @@ class NativeDeveloperStudioTest {
         assertTrue((0 until changed.getJSONArray("changes").length()).any { changed.getJSONArray("changes").getJSONObject(it).optString("path") == expectedPath })
     }
 
-    @Test fun cronWildcardStepsAreDocumentedAndJsonInspectorScansNumbersOutsideStrings() {
+    @Test fun cronWildcardStepsAreDocumented() {
         val cron = JSONObject(run("cron-parser", "0 0 */2 * MON"))
         assertTrue(cron.getString("explanation").contains("Vixie-style semantics"))
         assertTrue(cron.getJSONArray("nextRuns").length() > 0)
+    }
+
+    @Test fun jsonInspectorScansNumbersOutsideStringsAndFindsDuplicateKeys() {
         val report = JSONObject(run("json-inspector", """{"id":9007199254740993,"memo":"9007199254740993","items":[1,{"flag":true}],"name":"a","name":"b"}"""))
         assertEquals("object", report.getString("rootType"))
         assertTrue(report.getInt("nodeCount") >= 6)

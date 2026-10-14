@@ -1452,7 +1452,7 @@ object NativeUtilityEngine {
                     val payload = input.substring(comma + 1)
                     val decoded = if (metadata.endsWith(";base64", true)) decodeBase64Text(payload) else decodeURIComponent(payload)
                     "MIME metadata: $metadata\nMode: ${if (metadata.endsWith(";base64", true)) "Base64-decoded" else "percent-decoded"} UTF-8 text\n\n$decoded\n\nNote: This tool returns text, not arbitrary binary bytes; use a file-aware decoder for binary payloads."
-                } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
+                } else "data:text/plain;base64,${java.util.Base64.getEncoder().encodeToString(input.toByteArray(StandardCharsets.UTF_8))}"
             }
             lower.contains("unix-timestamp") || lower.contains("timestamp-converter") || lower.contains("epoch-converter") -> developerTimestamp(input)
             lower.contains("cron") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })

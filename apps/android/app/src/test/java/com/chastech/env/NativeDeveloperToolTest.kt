@@ -95,14 +95,14 @@ class NativeDeveloperToolTest {
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("developer-api-mock-response-generator"), "{\"id\":1}").text).getJSONObject("meta").getBoolean("mock"))
         assertEquals("data:text/plain;base64,aGVsbG8=", NativeUtilityEngine.run(tool("data-uri-generator"), "hello").text)
         assertTrue(runCatching { NativeUtilityEngine.run(tool("file-hash-calculator"), "hello") }.exceptionOrNull()?.message?.contains("local file") == true)
-        assertEquals("422 Unprocessable Content", NativeUtilityEngine.run(tool("http-status-lookup"), "422").text)
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "422").text.startsWith("422 Unprocessable Content"))
     }
 
     @Test fun webDocumentedValidatorsStatusAndFallbacksMatch() {
         assertEquals("Valid UUID v4", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-41d4-a716-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "not-a-uuid").text)
-        assertEquals("404 Not Found", NativeUtilityEngine.run(tool("http-status-lookup"), "404").text)
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "404").text.startsWith("404 Not Found"))
         assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "418").text.contains("teapot"))
         assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "422").text.contains("could not be processed"))
         assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "429").text.contains("Too many requests"))
