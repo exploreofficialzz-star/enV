@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { cronNextRuns, parseCron, hashText, runDeveloperStudio, validateJsonDetailed } from "./developer-studios.ts";
+import { developerStudioGolden } from "./developer-studio-golden.ts";
 
 const fixedNow = new Date("2026-01-01T00:00:00.000Z");
 
@@ -215,4 +216,130 @@ test("URL component decoder keeps plus literal while form-query parser maps plus
   assert.equal(await runDeveloperStudio("url-decoder", "a+b%2Bc"), "a+b+c");
   const report = JSON.parse((await runDeveloperStudio("query-string-parser", "q=a+b%2Bc"))!);
   assert.equal(report.entries[0].value, "a b+c");
+});
+
+test("JSON formatter preserves unsafe integer token digits and warns before parsing losses", async () => {
+  const output = await runDeveloperStudio("json-formatter", '{"id":9007199254740993,"ratio":1e+100,"name":"safe"}');
+  assert.match(output!, /JavaScript Number cannot safely represent this integer; value may be rounded/i);
+  assert.match(output!, /"id": 9007199254740993/);
+  assert.match(output!, /1e\+100/);
+  assert.doesNotMatch(output!, /9007199254740992/);
+  const minified = await runDeveloperStudio("json-minifier", '{"id":9007199254740993}');
+  assert.match(minified!, /\{"id":9007199254740993\}/);
+  assert.match(minified!, /WARNING:/);
+});
+
+test("JSON formatter preserves duplicate-key source and explains last-wins parser behavior", async () => {
+  const output = await runDeveloperStudio("json-beautifier", '{"dup":1,"nested":{"dup":2},"dup":3}');
+  assert.match(output!, /Duplicate object keys detected/);
+  assert.match(output!, /keep only the last value/i);
+  assert.equal((output!.match(/"dup"/g) || []).length, 3);
+});
+
+test("JavaScript formatter normalizes async arrow/object syntax with the local TypeScript AST printer", async () => {
+  const output = await runDeveloperStudio("js-format", 'const f=async(x)=>({ok:true,value:x+1});');
+  assert.match(output!, /const f = async \(x\) => \(\{ ok: true, value: x \+ 1 \}\);/);
+  assert.match(output!, /Formatter: TypeScript compiler AST printer/);
+  const empty = runDeveloperStudio("js-format", "");
+  await assert.rejects(empty, /Paste JavaScript|empty/i);
+});
+
+test("SQL hard-input formatter separates clauses without rewriting keywords inside literals", async () => {
+  const query = "select u.id,count(*) as n from users u join orders o on o.user_id=u.id where o.note='group by or order by' group by u.id having count(*)>1 order by n desc";
+  const output = await runDeveloperStudio("sql-format", query);
+  assert.ok(output!.split("\n").length >= 6);
+  assert.match(output!, /JOIN orders/);
+  assert.match(output!, /GROUP BY\s+u\.id/);
+  assert.match(output!, /ORDER BY\s+n DESC/i);
+  assert.match(output!, /'group by or order by'/);
+  assert.doesNotMatch(output!, /'group\n\s+by/);
+});
+
+test("HTTP status lookup explains teapot and common retryable/client/server statuses", async () => {
+  assert.match((await runDeveloperStudio("http-status-lookup", "418"))!, /^418 I'm a teapot\nCategory: Client error\nMeaning:.*(historical|unused).*teapot|Meaning:.*teapot.*(historical|unused)/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "422"))!, /Unprocessable Content[\s\S]*could not process/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "429"))!, /Retry-After/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "503"))!, /temporarily unable/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "104"))!, /temporary IANA registration/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "305"))!, /deprecated/i);
+  assert.match((await runDeveloperStudio("http-status-lookup", "306"))!, /Unused/i);
+  assert.match((await runDeveloperStudio("http-status-reference", ""))!, /104 Upload Resumption Supported/);
+  assert.match((await runDeveloperStudio("http-status-reference", ""))!, /305 Use Proxy/);
+  assert.match((await runDeveloperStudio("http-status-reference", ""))!, /306 \(Unused\)/);
+  await assert.rejects(runDeveloperStudio("http-status-lookup", "99"), /100 through 599/);
+});
+
+test("JSON Pointer supports escaped property names and preserves unsafe integer lexemes", async () => {
+  const report = await runDeveloperStudio("json-path-query", '{"a/b":{"~id":9007199254740993}}', "/a~1b/~0id");
+  assert.match(report!, /9007199254740993/);
+  assert.match(report!, /cannot safely represent|unsafe integer|precision/i);
+  await assert.rejects(runDeveloperStudio("json-path-query", '{"x":1}', "/bad~2escape"), /Invalid JSON Pointer escape/);
+});
+
+test("JWT decoder preserves exact header/payload JSON and flags unsafe numeric tokens", async () => {
+  const token = "e30.eyJpZCI6OTAwNzE5OTI1NDc0MDk5MywibmFtZSI6InN0cjkwMDcxOTkyNTQ3NDA5OTMifQ.";
+  const report = JSON.parse((await runDeveloperStudio("jwt-decoder", token))!);
+  assert.equal(report.signatureVerified, false);
+  assert.equal(report.payload.id, 9007199254740992, "the convenience claims object reflects JavaScript parse behavior");
+  assert.match(report.payloadRawJson, /"id":9007199254740993/);
+  assert.equal(report.rawNumericPrecision.payloadUnsafeIntegerTokens[0].token, "9007199254740993");
+  assert.match(report.largeIntegerPrecisionWarning, /rawJson|RawJson|exact source/i);
+});
+
+test("CORS generator validates credential wildcard combinations and emits allow-list middleware for multiple origins", async () => {
+  await assert.rejects(runDeveloperStudio("developer-cors-generator", JSON.stringify({ origins: ["*"], credentials: true })), /forbids.*credentialed|wildcard.*credential/i);
+  const out = await runDeveloperStudio("developer-cors-generator", JSON.stringify({ origins: ["https://a.example", "https://b.example"], methods: ["GET", "POST"], credentials: true }));
+  assert.match(out!, /allowedOrigins/);
+  assert.match(out!, /Vary/);
+  assert.match(out!, /Access-Control-Allow-Credentials/);
+  assert.doesNotMatch(out!, /Access-Control-Allow-Origin: https:\/\/a\.example, https:\/\/b\.example/);
+  await assert.rejects(runDeveloperStudio("developer-cors-generator", JSON.stringify({ origins: ["https://a.example/path"] })), /without path/i);
+});
+
+test("CSP generator safely composes directives and flags weak source expressions", async () => {
+  const out = await runDeveloperStudio("developer-csp-generator", JSON.stringify({ "script-src": ["'self'", "'unsafe-inline'"], "img-src": ["https://cdn.example.test"] }));
+  assert.match(out!, /default-src 'self'/);
+  assert.match(out!, /object-src 'none'/);
+  assert.match(out!, /unsafe source expressions/i);
+  await assert.rejects(runDeveloperStudio("developer-csp-generator", JSON.stringify({ "script-src": ["'self'; default-src *"] })), /semicolons|forbidden separator/i);
+});
+
+test("Data URI text generator and decoder label their byte/text limits", async () => {
+  const uri = await runDeveloperStudio("data-uri-generator", "Hello 世界", "text/plain;charset=utf-8");
+  assert.match(uri!, /^data:text\/plain;charset=utf-8;base64,/);
+  assert.match(uri!, /UTF-8 text bytes/);
+  const decoded = await runDeveloperStudio("data-uri-decoder", "data:text/plain;charset=utf-8;base64,SGVsbG8=");
+  assert.match(decoded!, /^Hello/);
+  assert.match(decoded!, /Payload mode: Base64 interpreted as UTF-8 text/);
+  await assert.rejects(runDeveloperStudio("data-uri-generator", "Hi", "not-a-mime"), /valid MIME type/i);
+});
+
+
+test("JSON diff and key sorting do not silently erase unsafe integer precision", async () => {
+  const diff = JSON.parse((await runDeveloperStudio("json-diff", '{"id":9007199254740992}', '{"id":9007199254740993}'))!);
+  assert.equal(diff.equal, false);
+  assert.ok(diff.changes.some((change: any) => change.path === "$[\"id\"]"));
+  const sorted = await runDeveloperStudio("json-key-sorter", '{"z":9007199254740993,"a":1}');
+  assert.match(sorted!, /9007199254740993/);
+  assert.ok(sorted!.indexOf('"a"') < sorted!.indexOf('"z"'));
+  assert.match(sorted!, /WARNING: JavaScript Number cannot safely represent this integer/);
+});
+
+
+test("CORS rejects invalid header names instead of emitting unsafe policy text", async () => {
+  await assert.rejects(runDeveloperStudio("cors-generator", JSON.stringify({ origins: ["https://app.example.com"], headers: ["X-Example\r\nInjected: yes"] })), /valid HTTP field-name tokens|line breaks/);
+});
+
+
+test("shared golden JavaScript formatter fixture produces readable multi-line output", async () => {
+  const output = await runDeveloperStudio("javascript-formatter", developerStudioGolden.javascript.input);
+  assert.ok(output && output.includes("\n"), "formatter must not return an empty or single-token result");
+  for (const token of developerStudioGolden.javascript.mustContain) assert.ok(output.includes(token), `missing ${token}`);
+  assert.match(output, /conservative local formatter|formatter/i);
+});
+
+test("shared golden SQL fixture keeps phrases inside quotes and dollar-quoted strings intact", async () => {
+  const output = await runDeveloperStudio("sql-formatter", developerStudioGolden.sql.input, developerStudioGolden.sql.dialect);
+  assert.ok(output && output.includes("\n"));
+  for (const token of developerStudioGolden.sql.mustContain) assert.ok(output.includes(token), `missing SQL token ${token}`);
 });

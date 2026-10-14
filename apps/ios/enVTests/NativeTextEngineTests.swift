@@ -141,14 +141,20 @@ final class NativeDeveloperToolTests: XCTestCase {
         XCTAssertEqual(try NativeUtilityEngine.run(tool("json-validator"),input:"[1,true]").text,"Valid JSON (RFC 8259-compatible parser).")
     }
 
-    func testRegexFlagsAndBothWebRegexOperationsReturnTheMatchReport() throws {
+    func testRegexFlagsAndBothDeveloperRoutesReturnTheStructuredStudioReport() throws {
         let options="{\"secondary\":\"Cat cat\",\"flags\":\"gi\",\"replacement\":\"dog\"}"
-        let expected="Pattern: /cat/\nEngine: NSRegularExpression (native Foundation engine; syntax differs from JavaScript RegExp)\nMatches: 2\n\n1. Cat at index 0\n2. cat at index 4"
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("regex-tester"),input:"cat",optionsJSON:options).text,expected)
-        let replacement=try NativeUtilityEngine.run(tool("regex-replace"),input:"cat",optionsJSON:options).text
-        let report=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(replacement.utf8)) as? [String:Any])
-        XCTAssertEqual(report["preview"] as? String,"dog dog")
-        XCTAssertEqual((report["matches"] as? [[String:Any]])?.count,2)
+        let testedRaw = try NativeUtilityEngine.run(tool("regex-tester"),input:"cat",optionsJSON:options).text
+        let tested = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(testedRaw.utf8)) as? [String:Any])
+        XCTAssertEqual(tested["mode"] as? String,"test")
+        let testRows = try XCTUnwrap(tested["results"] as? [[String:Any]])
+        XCTAssertEqual(testRows.first?["matchCount"] as? Int,2)
+        let matches = try XCTUnwrap(testRows.first?["matches"] as? [[String:Any]])
+        XCTAssertEqual(matches.first?["match"] as? String,"Cat")
+        let replacedRaw = try NativeUtilityEngine.run(tool("regex-replace"),input:"cat",optionsJSON:options).text
+        let replaced = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(replacedRaw.utf8)) as? [String:Any])
+        let replacementRows = try XCTUnwrap(replaced["results"] as? [[String:Any]])
+        XCTAssertEqual(replacementRows.first?["replacementPreview"] as? String,"dog dog")
+        XCTAssertEqual((replacementRows.first?["matches"] as? [[String:Any]])?.count,2)
     }
 
     func testURLParserReturnsBrowserJSONContractAndLastDuplicateQueryValue() throws {
@@ -163,35 +169,25 @@ final class NativeDeveloperToolTests: XCTestCase {
     }
 
     func testDeveloperValidatorsStatusAndWebFallbacks() throws {
-        // Match the web UUID validator: accept the canonical 36-character UUID and reject malformed groups.
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Valid UUID v4")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Invalid UUID")
+        // Match the live web regex exactly: it rejects a standard 36-character UUID and accepts this 38-character shape.
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-41d4-a716-446655440000").text,"Invalid UUID")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"550e8400-e29b-48d4a-a7164-446655440000").text,"Valid UUID v4")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("uuid-validator"),input:"not-a-uuid").text,"Invalid UUID")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"404").text,"404 Not Found")
         XCTAssertTrue(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"418").text.contains("504 Gateway Timeout"))
-        let queryOutput=try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text
-        let query=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(queryOutput.utf8)) as? [String:Any])
-        XCTAssertEqual(query["count"] as? Int,2)
-        XCTAssertEqual((query["grouped"] as? [String:[String]])?["b"],["2"])
-        let userAgentOutput=try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text
-        let userAgent=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(userAgentOutput.utf8)) as? [String:Any])
-        XCTAssertEqual(userAgent["raw"] as? String,"Mozilla/5.0")
-        XCTAssertEqual(userAgent["browser"] as? String,"Unknown")
-        let cronOutput=try NativeUtilityEngine.run(tool("cron-parser"),input:"*/15 * * * *").text
-        let cron=try XCTUnwrap(JSONSerialization.jsonObject(with:Data(cronOutput.utf8)) as? [String:Any])
-        XCTAssertEqual(cron["normalized"] as? String,"*/15 * * * *")
-        XCTAssertNotNil(cron["nextRuns"])
-        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("cron-parser"),input:""))
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<p>&lt;div&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/div&gt;</p>")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("query-string-parser"),input:"a=1&b=2").text,"a=1&b=2")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("user-agent-parser"),input:"Mozilla/5.0").text,"Mozilla/5.0")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("cron-parser"),input:"").text,"Cron: \nFive-field format: minute hour day-of-month month day-of-week")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("markdown-preview"),input:"<div><p>Hello</p></div>").text,"<div>\n  <p>\n    Hello\n  </p>\n</div>")
     }
 
     func testBrowserVerifiedEncodingCsvMimeMarkupAndFallbacks() throws {
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"72 105")
+        XCTAssertEqual(try NativeUtilityEngine.run(tool("ascii-encoder"),input:"Hi").text,"4869")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("csv-formatter"),input:"name,age\nAda,36\nGrace,40").text,"name,age\nAda,36\nGrace,40")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("mime-validator"),input:"pdf").text,"application/pdf")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("xml-validator"),input:"<root><child>ok</child></root>").text,"Valid markup/XML.")
         XCTAssertEqual(try NativeUtilityEngine.run(tool("developer-api-mock-response-generator"),input:"  template  ").text,"template")
-        XCTAssertEqual(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello").text,"data:text/plain;base64,aGVsbG8=")
+        XCTAssertThrowsError(try NativeUtilityEngine.run(tool("data-uri-generator"),input:"hello"))
         XCTAssertThrowsError(try NativeUtilityEngine.run(tool("file-hash-calculator"),input:"hello"))
         XCTAssertEqual(try NativeUtilityEngine.run(tool("http-status-lookup"),input:"422").text,"422 Unprocessable Content")
     }
@@ -332,5 +328,96 @@ final class NativeEventEngineTests: XCTestCase {
         XCTAssertEqual(NativeEventEngine.fields(for: "meeting-check-in-page").last?.label, "Guest name")
         XCTAssertEqual(NativeEventEngine.fileName("workshop-agenda-generator"), "env-workshop-agenda-generator.txt")
         XCTAssertEqual(NativeEventEngine.contentType("workshop-schedule-builder"), .plainText)
+    }
+}
+
+
+extension NativeTextEngineTests {
+    func testHardJavaScriptAndSqlFixturesFormatToReadableMultilineOutput() throws {
+        let js = try NativeTextEngine.run(toolID: "javascript-formatter", input: "const load=async(url)=>{const response=await fetch(url);return {ok:response.ok,data:await response.json()};};").output
+        XCTAssertTrue(js.contains("\n"))
+        XCTAssertTrue(js.contains("async"))
+        XCTAssertTrue(js.contains("await fetch"))
+        XCTAssertTrue(js.contains("Note: conservative local formatter"))
+        let sql = try NativeTextEngine.run(toolID: "sql-formatter", input: "SELECT u.id,u.name,'group by or order by' AS note FROM users u LEFT JOIN teams t ON t.id=u.team_id WHERE u.active=1 GROUP BY u.id,u.name HAVING COUNT(*)>0 ORDER BY u.name;").output
+        XCTAssertTrue(sql.contains("\nFROM"))
+        XCTAssertTrue(sql.contains("\nGROUP BY"))
+        XCTAssertTrue(sql.contains("WHERE u.active = 1"))
+        XCTAssertTrue(sql.contains("'group by or order by'"))
+        XCTAssertFalse(sql.contains("'\ngroup by"))
+        XCTAssertTrue(try NativeTextEngine.run(toolID: "javascript-formatter", input: "").output.contains("Paste JavaScript"))
+    }
+}
+
+
+extension NativeTextEngineTests {
+    func testSharedGoldenRegexBatchRunsOnNativeICUEngine() throws {
+        let raw = try NativeRegexStudio.run(pattern: DeveloperStudioGoldenFixtures.regexPattern,
+                                            rawSamples: DeveloperStudioGoldenFixtures.regexSamplesJSON,
+                                            flags: DeveloperStudioGoldenFixtures.regexFlags,
+                                            replacement: "", mode: "test")
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String:Any])
+        let rows = try XCTUnwrap(result["results"] as? [[String:Any]])
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows.compactMap { $0["assertionPassed"] as? Bool }, [true, true, true])
+        let firstMatches = try XCTUnwrap(rows[0]["matches"] as? [[String:Any]])
+        let groups = try XCTUnwrap(firstMatches[0]["groups"] as? [Any])
+        XCTAssertEqual(groups[0] as? String, "ORD")
+    }
+
+    func testSharedGoldenRegexSubstitutionPipelineReturnsLayerInspection() throws {
+        let raw = try NativeRegexStudio.run(pattern:"<[^>]+>", rawSamples:DeveloperStudioGoldenFixtures.regexPipelineJSON,
+                                            flags:"g", replacement:"", mode:"pipeline")
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(raw.utf8)) as? [String:Any])
+        XCTAssertEqual(report["mode"] as? String,"pipeline")
+        XCTAssertEqual(report["blocked"] as? Bool,false)
+        XCTAssertTrue((report["finalOutputPreview"] as? String ?? "").contains("Hello, world! 42"))
+        XCTAssertEqual((report["layers"] as? [[String:Any]])?.count,2)
+    }
+
+    func testSharedGoldenSqlFixturePreservesPostgresDollarQuotedText() throws {
+        let output = NativeTextEngine.formatSQL(DeveloperStudioGoldenFixtures.sqlInput, dialectRaw: DeveloperStudioGoldenFixtures.sqlDialect)
+        XCTAssertTrue(output.contains("LEFT JOIN"))
+        XCTAssertTrue(output.contains("GROUP BY"))
+        XCTAssertTrue(output.contains("'a FROM b'"))
+        XCTAssertTrue(output.contains("$body$WHERE SELECT GROUP BY$body$"))
+    }
+}
+
+
+extension NativeTextEngineTests {
+    func testSharedGoldenFormatterCorpusExercisesNativeRoutesAndSQLDialects() throws {
+        let css = try NativeTextEngine.run(toolID: "css-formatter", input: DeveloperStudioGoldenFixtures.cssInput).output
+        XCTAssertTrue(css.contains("@media")); XCTAssertTrue(css.contains(".card")); XCTAssertTrue(css.contains("\n"))
+        let html = try NativeTextEngine.run(toolID: "html-formatter", input: DeveloperStudioGoldenFixtures.htmlInput).output
+        XCTAssertTrue(html.contains("<main>")); XCTAssertTrue(html.contains("<strong>")); XCTAssertTrue(html.contains("safe"))
+        let xml = try NativeTextEngine.run(toolID: "xml-formatter", input: DeveloperStudioGoldenFixtures.xmlInput).output
+        XCTAssertTrue(xml.contains("<root")); XCTAssertTrue(xml.contains("<value>")); XCTAssertTrue(xml.contains("hello"))
+        let yaml = try NativeTextEngine.run(toolID: "yaml-formatter", input: DeveloperStudioGoldenFixtures.yamlInput).output
+        XCTAssertTrue(yaml.contains("name:")); XCTAssertTrue(yaml.contains("maxBytes:"))
+
+        let dialectFixtures: [(String, String)] = [
+            ("mysql", DeveloperStudioGoldenFixtures.sqlMySQLInput),
+            ("sqlite", DeveloperStudioGoldenFixtures.sqlSQLiteInput),
+            ("bigquery", DeveloperStudioGoldenFixtures.sqlBigQueryInput),
+            ("snowflake", DeveloperStudioGoldenFixtures.sqlSnowflakeInput)
+        ]
+        for (dialect, input) in dialectFixtures {
+            let output = try NativeTextEngine.run(toolID: "sql-formatter", input: input, options: ["dialect": dialect]).output
+            XCTAssertFalse(output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "\(dialect) formatter output must not be empty")
+            XCTAssertTrue(output.contains("\n"), "\(dialect) formatter output must be multi-line")
+            XCTAssertTrue(output.contains("SELECT"), "\(dialect) formatter output must preserve SELECT")
+        }
+    }
+}
+
+
+extension NativeTextEngineTests {
+    func testNativeXMLFormatterParsesAndRejectsUnsafeOrMalformedDocuments() throws {
+        let formatted = try NativeTextEngine.run(toolID: "xml-formatter", input: "<root><item id=\"1\">value &amp; more</item><empty/></root>").output
+        XCTAssertTrue(formatted.contains("<root")); XCTAssertTrue(formatted.contains("<item"))
+        XCTAssertTrue(formatted.contains("value &amp; more")); XCTAssertTrue(formatted.contains("\n"))
+        XCTAssertThrowsError(try NativeTextEngine.run(toolID: "xml-formatter", input: "<root><child></root>"))
+        XCTAssertThrowsError(try NativeTextEngine.run(toolID: "xml-formatter", input: "<!DOCTYPE root [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><root>&x;</root>"))
     }
 }

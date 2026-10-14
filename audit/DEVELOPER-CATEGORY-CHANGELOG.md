@@ -30,3 +30,46 @@ Research evidence and feedback mapping: `audit/COMPETITIVE-RESEARCH-AND-IMPLEMEN
 - Added precise secure-token length parsing in Kotlin and Swift so fractional/nonnumeric lengths cannot be silently truncated or converted into the default length; cryptographic token output remains sourced from OS-backed secure RNGs.
 - Expanded native test fixtures to cover direct SHA-384, invalid Base64 UTF-8, fractional token lengths, and non-numeric token lengths.
 - Focused Web engine suite passes 39/39; 474 Developer catalog identity/route checks and 446 Web route smoke checks pass. Standalone Kotlin codec compilation and Swift syntax parsing passed. Full app builds remain blocked by unavailable dependencies/toolchains as recorded in the audit.
+
+## Hard-ret test remediation — 13 October 2026
+- Fixed JSON formatter unsafe-integer silence by formatting original JSON number tokens lexically on Web and surfacing explicit unsafe-integer warnings; also call out duplicate-key last-wins ambiguity. Duplicate source member occurrences are retained in formatted output.
+- Expanded HTTP status explanations for 418 (I'm a teapot), 422, 429, and 503.
+- Replaced the live shared Text-engine's empty/spacing-only JavaScript formatter with a conservative lexical multi-line formatter and an explicit non-parser-completeness note.
+- Replaced the live shared Text-engine's simplistic SQL formatting with clause-aware formatting that protects literals, quoted identifiers, and comments.
+- Added Web hard-fixture regressions for unsafe JSON integers, duplicate keys, HTTP descriptions, and difficult minified JS/SQL; added native Kotlin/Swift text-engine and status/JSON regression tests.
+- Current focused Web tests: 31/31 passed; Developer catalog audit: 474 entries, unchanged IDs/order/routing; route smoke: 446 operations, zero failures or generic placeholders. Standalone Kotlin engine compilation and Swift syntax parsing passed; these are not full Android/iOS builds.
+- Full dependency-backed Web build/test, Android Gradle/JUnit, Xcode/XCTest, production deployment verification, and network-capture privacy proof remain blocked/unavailable. Exact detail: `audit/DEVELOPER-HARD-RETEST-REMEDIATION-2026-10-13.md`.
+
+
+## Deep research & premium-readiness hardening — Round 4 — 13 October 2026
+- Added `audit/DEEP-RESEARCH-ENHANCEMENT-ROUND4-2026-10-13.md` with fresh research on current HTTP registry semantics, resumable-upload draft status, JSON duplicate-key ambiguity, safe local-storage policy, regex101 Pro capabilities, CyberChef mobile discussion, DevToys workflow model, and parser-backed formatters.
+- Made Kotlin/Swift JSON formatting token-lossless for unsafe integer text and duplicate object keys rather than reserializing through ordinary number/object models.
+- Extended Web structural JSON diff/key sorting and JSON Pointer escaping tests for exact numeric tokens.
+- Exposed raw JWT header/payload JSON and unsafe numeric precision warnings across Web/Kotlin/Swift; no signature verification is claimed.
+- Added structured, input-validated CORS/CSP generators and expanded native regression tests; multi-origin output is explicitly pseudocode and not a drop-in production middleware package.
+- Expanded status references with temporary 104 and deprecated/unused 305/306 semantics; 418 retains the familiar teapot lookup while clearly noting that IANA currently marks it unused in general HTTP semantics.
+- Focused Web engine suite passes 41/41. Web production build, Android Gradle/JUnit, iOS XCTest, live deployment, network-capture privacy proof, and real-device QA remain unverified or blocked; details are documented in the Round 4 report.
+
+## Regex Studio, dialect formatting and cross-platform regression pass — Round 5 — 13 October 2026
+- Connected the advanced Regex Studio engine to the live Web Developer UI and added mode-aware controls on Web, Android and iOS for batch testing, bounded benchmarking, ordered substitution pipelines, safe source token display and static regex flavor notes.
+- Added named and numbered captures, per-sample assertions, replacement previews, bounded input/output and truncation reporting; fixed the Kotlin at-limit truncation ambiguity and pipeline stage input-length report.
+- Web regex calls use a terminable Worker with tested success cleanup, cancellation and hard deadline. Native Kotlin Java Pattern and Swift ICU execution report their inability to guarantee a killable deadline for one active match; they use conservative risk/input bounds rather than making the same claim as Web.
+- Added SQL dialect controls for standard SQL, PostgreSQL, MySQL, MariaDB, SQLite, T-SQL, BigQuery, Snowflake, Oracle, Redshift and DuckDB and wired them to Web, Kotlin and Swift lexical formatters. The formatter protects common string/comment/quoted regions and remains explicitly labeled non-parser-backed.
+- Added canonical cross-platform golden fixture source and TypeScript/Kotlin/Swift fixture synchronization/check command; fixtures cover multiple regex samples, named captures, substitution layers, hard JS/SQL formatting input, unsafe JSON integer and duplicate keys, and standard hash vectors.
+- Added static Developer privacy-source tripwire and a Playwright/axe runtime audit script for outgoing request sentinels, browser storage, serious/critical accessibility violations and narrow-width overflow.
+- Round 5 verification: **49/49 focused Web tests passed**; 474/474 Developer entries and 10,000-tool catalog checks passed; 446 route operations had zero failures/zero generic placeholders; Swift standalone regex runtime smoke passed; Kotlin SQL standalone runtime smoke and Kotlin regex typecheck passed; Swift syntax and Xcode project plist checks passed.
+- Full Web build/dependency-backed validation, Android Gradle/JUnit, Xcode/XCTest, Playwright runtime privacy/a11y, device QA, deployment, and quantitative competitor benchmarking remain not run or blocked. Detailed commands and limits: `audit/ROUND5-VERIFICATION-RESULTS-2026-10-13.md` and `audit/DEEP-RESEARCH-IMPLEMENTATION-ROUND5-2026-10-13.md`.
+
+## Parser-backed formatters, Worker safeguards, native XML, integrity remediation — Round 6 — 14 October 2026
+- Added `sql-formatter@15.9.0` (MIT) with explicit dialect selection, 1 MB input cap, non-empty output checks and limitation notes for Web SQL Formatter routes.
+- Integrated Prettier standalone with local plugins for CSS, HTML, YAML, Markdown and GraphQL; JavaScript/TypeScript continues on the project printer path.
+- All formatter work runs inside a disposable same-origin Worker with an 8-second hard deadline that terminates the Worker.
+- Conservative XML structure preflight (nesting, single root, entities, DOCTYPE rejection) ahead of Prettier HTML printer; limitation label present.
+- Android: JAXP DOM + Transformer XML formatter with XInclude/external-entity/DTD disabled and DOCTYPE rejection; retained native lexical SQL/CSS/HTML/JS/YAML.
+- iOS: FoundationXML XMLParser + local serializer with DOCTYPE rejection and size caps; retained native lexical formatters.
+- Extended shared golden fixtures for CSS/HTML/XML/YAML/Markdown/GraphQL and SQL dialects (PostgreSQL, MySQL, SQLite, BigQuery, Snowflake).
+- Added `scripts/developer-tool-benchmark.mjs` (median/p95 timing, output SHA-256).
+- Hardened browser audit script for result verification, sentinel egress, storage checks, 390×844 overflow and axe-core.
+- CI workflow `.github/workflows/developer-studios-quality.yml` for parser regression, fixtures, Playwright and benchmarks.
+- **Integrity remediation (post-archive):** Official registry integrity digest for `sql-formatter@15.9.0` inserted into `package-lock.json`. Catalog 474/474, golden fixtures synchronized.
+- Remaining: clean `npm ci` (Node 22), full 446-route smoke re-run, Android Gradle, iOS Xcode, live Playwright audit.

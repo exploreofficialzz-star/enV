@@ -1,15 +1,71 @@
+import { formatWithGrammar } from "./precise-formatters.ts";
 /**
  * enV Developer Studios — deterministic, client-side implementations shared by Web tool pages.
  * Scope is deliberately explicit: this module never performs network requests or executes user code.
  */
 
 const HTTP_STATUS: Record<number, string> = {
-  100: "Continue", 101: "Switching Protocols", 102: "Processing", 103: "Early Hints",
+  100: "Continue", 101: "Switching Protocols", 102: "Processing", 103: "Early Hints", 104: "Upload Resumption Supported (temporary registration)",
   200: "OK", 201: "Created", 202: "Accepted", 203: "Non-Authoritative Information", 204: "No Content", 205: "Reset Content", 206: "Partial Content", 207: "Multi-Status", 208: "Already Reported", 226: "IM Used",
-  300: "Multiple Choices", 301: "Moved Permanently", 302: "Found", 303: "See Other", 304: "Not Modified", 307: "Temporary Redirect", 308: "Permanent Redirect",
+  300: "Multiple Choices", 301: "Moved Permanently", 302: "Found", 303: "See Other", 304: "Not Modified", 305: "Use Proxy (deprecated)", 306: "(Unused)", 307: "Temporary Redirect", 308: "Permanent Redirect",
   400: "Bad Request", 401: "Unauthorized", 402: "Payment Required", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 406: "Not Acceptable", 407: "Proxy Authentication Required", 408: "Request Timeout", 409: "Conflict", 410: "Gone", 411: "Length Required", 412: "Precondition Failed", 413: "Content Too Large", 414: "URI Too Long", 415: "Unsupported Media Type", 416: "Range Not Satisfiable", 417: "Expectation Failed", 418: "I'm a teapot", 421: "Misdirected Request", 422: "Unprocessable Content", 423: "Locked", 424: "Failed Dependency", 425: "Too Early", 426: "Upgrade Required", 428: "Precondition Required", 429: "Too Many Requests", 431: "Request Header Fields Too Large", 451: "Unavailable For Legal Reasons",
   500: "Internal Server Error", 501: "Not Implemented", 502: "Bad Gateway", 503: "Service Unavailable", 504: "Gateway Timeout", 505: "HTTP Version Not Supported", 506: "Variant Also Negotiates", 507: "Insufficient Storage", 508: "Loop Detected", 510: "Not Extended", 511: "Network Authentication Required",
 };
+
+const HTTP_STATUS_DETAILS: Record<number, { meaning: string; action: string; retry?: string }> = {
+  100: { meaning: "The server has received the request headers; the client may send the request body.", action: "Continue sending the request body." },
+  101: { meaning: "The server is switching protocols as requested by the client.", action: "Continue using the negotiated protocol only if the upgrade was expected." },
+  103: { meaning: "Early Hints can let a browser begin loading likely-needed resources before the final response.", action: "Treat as an interim response; await the final status." },
+  104: { meaning: "Upload Resumption Supported is currently a temporary IANA registration, not a status clients should assume every server implements; its registration is listed to expire on 2026-11-13 unless renewed or updated.", action: "Use only when the specific resumable-upload protocol and server document this behavior; check current IANA/draft status before relying on it." },
+  200: { meaning: "The request succeeded. The response body depends on the method and endpoint.", action: "Validate the response schema and application-level result." },
+  201: { meaning: "A new resource was created as a result of the request.", action: "Check the response body and Location header when provided." },
+  202: { meaning: "The request was accepted for processing, but processing may not be complete.", action: "Use the API's job/status endpoint or callback contract to check completion." },
+  204: { meaning: "The request succeeded and the response intentionally has no content.", action: "Do not require a JSON response body." },
+  206: { meaning: "The server is returning a partial representation, typically for a Range request.", action: "Check Content-Range and ensure the client reassembles ranges correctly." },
+  301: { meaning: "The resource has a permanent redirect. Some clients may change POST to GET for historical compatibility.", action: "Update stored links when appropriate; use 308 when preserving the method is required." },
+  302: { meaning: "The resource is temporarily redirected. Some clients may change POST to GET for historical compatibility.", action: "Follow according to client policy; use 307 when method/body preservation is required." },
+  304: { meaning: "The cached representation is still valid after a conditional request.", action: "Reuse the cached representation; a 304 response has no content body." },
+  305: { meaning: "Use Proxy is deprecated and retained for historical/reference purposes; modern clients should not treat it as a routine redirect instruction.", action: "Avoid relying on 305; follow current security policy and use documented proxy configuration." },
+  306: { meaning: "Unused. The code is not available for ordinary server semantics in the current registry.", action: "Do not assign private semantics to 306 on public HTTP endpoints; use a documented extension code if needed." },
+  307: { meaning: "The redirect is temporary and the request method must not be changed.", action: "Follow the redirect while preserving the method and body." },
+  308: { meaning: "The redirect is permanent and the request method must not be changed.", action: "Update the target URL when appropriate and preserve method/body on redirect." },
+  400: { meaning: "The server cannot or will not process the request because it appears malformed or invalid.", action: "Inspect request syntax, required fields, encoding, and parameter names." },
+  401: { meaning: "The request lacks valid authentication credentials. It is not the same as authorization failure.", action: "Check the credential and the WWW-Authenticate challenge; avoid blindly retrying expired credentials." },
+  403: { meaning: "The server understood the request but refuses to fulfill it; re-authentication may not help.", action: "Check permissions, policy, resource ownership, and server access rules." },
+  404: { meaning: "No current representation was found, or the server is unwilling to disclose that one exists.", action: "Check the URL, resource identifier, deployment/base path, and whether the resource is intentionally hidden." },
+  405: { meaning: "The resource does not support the request method.", action: "Check the Allow header and the API's supported methods." },
+  408: { meaning: "The server did not receive a complete request within its wait limit.", action: "Check network latency, client upload behavior, and server/proxy timeouts before retrying." },
+  409: { meaning: "The request conflicts with the current state of the target resource.", action: "Reload current state and resolve the conflict; use idempotency/version controls where supported." },
+  410: { meaning: "The resource is no longer available and that condition is likely permanent.", action: "Remove stale references or use a replacement resource if documented." },
+  412: { meaning: "A request precondition evaluated to false, commonly an If-Match/ETag check.", action: "Refresh the representation and send the correct precondition." },
+  413: { meaning: "The request content exceeds a limit the server is willing to process.", action: "Reduce payload size or use the documented chunked/resumable upload flow." },
+  415: { meaning: "The request representation format is not supported for this resource or method.", action: "Check Content-Type and the endpoint's accepted media types." },
+  416: { meaning: "A requested byte range cannot be satisfied.", action: "Check the resource size and Content-Range behavior; retry without Range if appropriate." },
+  418: { meaning: "I'm a teapot is the historical RFC 2324 joke meaning. The current IANA HTTP Status Code Registry marks 418 as unused for general HTTP semantics, so this label is historical/application-specific rather than a currently registered general-purpose status meaning.", action: "Recognize the familiar teapot label, but inspect the particular server/API documentation; do not assume standard retry or protocol semantics." },
+  422: { meaning: "The server understood the content type and syntax but could not process the contained instructions.", action: "Read field-level validation details and correct semantic errors before retrying." },
+  425: { meaning: "The server is unwilling to risk processing a request that might be replayed.", action: "Use a safer connection/retry flow as defined by the protocol and endpoint." },
+  429: { meaning: "The client has sent too many requests in a given time interval.", action: "Apply backoff and honor Retry-After or the API's rate-limit reset headers.", retry: "Retry guidance: do not loop immediately; use exponential backoff with jitter and obey Retry-After." },
+  431: { meaning: "The request headers are too large for the server to process.", action: "Reduce cookie/header size and check proxy/server header limits." },
+  451: { meaning: "Access is denied for legal reasons in the server's context.", action: "Review the response body and applicable legal/policy notice; do not treat this as a transient network error." },
+  500: { meaning: "The server encountered an unexpected condition.", action: "Use a request/correlation ID to investigate logs; retry only when the operation is safe or idempotent." },
+  502: { meaning: "A gateway or proxy received an invalid response from an upstream server.", action: "Check upstream health, proxy routing, DNS, TLS, and intermediary logs." },
+  503: { meaning: "The server is temporarily unable to handle the request, often because of maintenance or overload.", action: "Check service health and Retry-After; use bounded backoff for safe/idempotent operations.", retry: "Retry guidance: honor Retry-After when present; otherwise use bounded exponential backoff with jitter." },
+  504: { meaning: "A gateway/proxy did not receive a timely upstream response.", action: "Check upstream latency and intermediary timeout budgets before retrying." },
+};
+
+function httpStatusClass(code: number): string {
+  return code < 200 ? "Informational (1xx)" : code < 300 ? "Success (2xx)" : code < 400 ? "Redirection (3xx)" : code < 500 ? "Client error (4xx)" : "Server error (5xx)";
+}
+function httpStatusLookup(raw: string): string {
+  const codeText = raw.trim();
+  if (!codeText) return Object.entries(HTTP_STATUS).sort(([a], [b]) => Number(a) - Number(b)).map(([code, name]) => `${code} ${name}${Number(code) === 418 ? " (IANA registry: unused; teapot meaning is historical)" : ""} — ${httpStatusClass(Number(code))}`).join("\n");
+  if (!/^\d{3}$/.test(codeText)) throw new Error("Enter a three-digit HTTP status code from 100 through 599, such as 418 or 503.");
+  const code = Number(codeText);
+  if (code < 100 || code > 599) throw new Error("HTTP status codes must be from 100 through 599.");
+  const name = HTTP_STATUS[code] ?? "Unassigned / extension status code";
+  const detail = HTTP_STATUS_DETAILS[code];
+  return `${code} ${name}\nCategory: ${code < 200 ? "Informational" : code < 300 ? "Success" : code < 400 ? "Redirection" : code < 500 ? "Client error" : "Server error"}\nMeaning: ${detail?.meaning ?? `${name}. This numeric code is not in the built-in registered-status table; semantics may be unassigned, reserved, or defined by a private extension.`}\nTypical next step: ${detail?.action ?? "Check the response body and the API/server documentation; do not assume an unassigned code has standard behavior."}${detail?.retry ? `\n${detail.retry}` : ""}\n\nLocal lookup only: no network request was sent. Status codes describe HTTP behavior; endpoint-specific response bodies and headers may add essential detail.`;
+}
 
 const MIME_TYPES: Record<string, string> = {
   json: "application/json", map: "application/json", js: "text/javascript", mjs: "text/javascript", cjs: "text/javascript", ts: "text/typescript", tsx: "text/tsx", jsx: "text/jsx", css: "text/css", scss: "text/x-scss", html: "text/html", htm: "text/html", csv: "text/csv", tsv: "text/tab-separated-values", xml: "application/xml", yaml: "application/yaml", yml: "application/yaml", toml: "application/toml", pdf: "application/pdf", wasm: "application/wasm", zip: "application/zip", gz: "application/gzip", tar: "application/x-tar", txt: "text/plain", md: "text/markdown", mdx: "text/mdx", sql: "application/sql", graphql: "application/graphql", gql: "application/graphql", proto: "text/plain", ini: "text/plain", conf: "text/plain", env: "text/plain", sh: "text/x-shellscript", py: "text/x-python", go: "text/x-go", rs: "text/x-rust", java: "text/x-java", kt: "text/x-kotlin", swift: "text/x-swift", c: "text/x-c", h: "text/x-c", cpp: "text/x-c++", hpp: "text/x-c++", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", avif: "image/avif", svg: "image/svg+xml", ico: "image/x-icon", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", avi: "video/x-msvideo", woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", otf: "font/otf",
@@ -45,7 +101,7 @@ export function validateJsonDetailed(input: string, options: { duplicateKeyPaths
     i += 1;
     while (i < input.length) {
       const code = input.charCodeAt(i);
-      if (input[i] === '"') { i += 1; try { return JSON.parse(input.slice(start, i)) as string; } catch { fail("Invalid string escape", path); } }
+      if (input[i] === '"') { i += 1; try { return JSON.parse(input.slice(start, i)) as string; } catch { return fail("Invalid string escape", path); } }
       if (code < 0x20) fail("Unescaped control character in string", path);
       if (input[i] === "\\") {
         i += 1;
@@ -165,31 +221,177 @@ function decodeAscii(input: string): string {
 function htmlEncode(input: string): string { return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
 function htmlDecode(input: string): string { return input.replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&amp;/gi, "&").replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16))); }
 
-function jsonPathQuery(input: string, path: string): string {
-  const root: unknown = JSON.parse(input); const normalized = path.trim();
-  if (!normalized || normalized === "$" || normalized === ".") return JSON.stringify(root, null, 2);
-  if (!normalized.startsWith("$") && !normalized.startsWith(".")) throw new Error("JSON path must start with '$' or '.'.");
-  const body = normalized.replace(/^\$\.?/, "").replace(/^\./, "");
-  const tokens: (string | number | "*")[] = [];
-  const expression = /\.?([^.[\]]+)|\[(\d+|\*|'[^']+'|\"[^\"]+\")\]/g;
-  let match: RegExpExecArray | null;
-  while ((match = expression.exec(body))) {
-    const bracket = match[2];
-    if (bracket === undefined) tokens.push(match[1]);
-    else if (bracket === "*") tokens.push("*");
-    else if (/^\d+$/.test(bracket)) tokens.push(Number(bracket));
-    else tokens.push(bracket.slice(1, -1));
+class JsonNumberToken { readonly raw: string; constructor(raw: string) { this.raw = raw; } }
+interface JsonTokenObject { [key: string]: JsonTokenValue }
+type JsonTokenValue = null | boolean | string | JsonNumberToken | JsonTokenValue[] | JsonTokenObject;
+
+/** Parse JSON structurally while retaining number tokens verbatim instead of round-tripping them
+ * through IEEE-754. Duplicate keys intentionally use last-value lookup semantics but are also
+ * surfaced as diagnostics by the caller, matching JSON.parse's common behavior. */
+function parseJsonTokenAware(input: string): JsonTokenValue {
+  let i = 0;
+  const ws = () => { while (i < input.length && /\s/.test(input[i])) i += 1; };
+  const parseString = (): string => {
+    const start = i;
+    if (input[i] !== '"') throw new Error(`Expected string at character ${i + 1}.`);
+    i += 1;
+    while (i < input.length) {
+      if (input[i] === "\\") { i += 2; continue; }
+      if (input[i++] === '"') return JSON.parse(input.slice(start, i)) as string;
+    }
+    throw new Error("Unterminated JSON string.");
+  };
+  const parseValue = (): JsonTokenValue => {
+    ws(); const ch = input[i];
+    if (ch === '"') return parseString();
+    if (ch === "{") {
+      i += 1; ws(); const out: Record<string, JsonTokenValue> = Object.create(null) as Record<string, JsonTokenValue>;
+      if (input[i] === "}") { i += 1; return out; }
+      while (i < input.length) {
+        ws(); const key = parseString(); ws(); if (input[i++] !== ":") throw new Error(`Expected ':' after JSON key at character ${i}.`);
+        Object.defineProperty(out, key, { value: parseValue(), enumerable: true, configurable: true, writable: true });
+        ws(); if (input[i] === "}") { i += 1; return out; }
+        if (input[i++] !== ",") throw new Error(`Expected ',' or '}' at character ${i}.`);
+      }
+      throw new Error("Unterminated JSON object.");
+    }
+    if (ch === "[") {
+      i += 1; ws(); const out: JsonTokenValue[] = [];
+      if (input[i] === "]") { i += 1; return out; }
+      while (i < input.length) {
+        out.push(parseValue()); ws(); if (input[i] === "]") { i += 1; return out; }
+        if (input[i++] !== ",") throw new Error(`Expected ',' or ']' at character ${i}.`);
+      }
+      throw new Error("Unterminated JSON array.");
+    }
+    for (const [literal, value] of [["true", true], ["false", false], ["null", null]] as const) {
+      if (input.startsWith(literal, i)) { i += literal.length; return value; }
+    }
+    const number = input.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    if (number) { i += number[0].length; return new JsonNumberToken(number[0]); }
+    throw new Error(`Unexpected JSON value at character ${i + 1}.`);
+  };
+  ws(); const value = parseValue(); ws();
+  if (i !== input.length) throw new Error(`Unexpected trailing JSON content at character ${i + 1}.`);
+  return value;
+}
+
+function stringifyJsonTokenAware(value: JsonTokenValue, pretty = true, depth = 0): string {
+  const pad = (level: number) => pretty ? "  ".repeat(level) : "";
+  const join = (items: string[]) => pretty ? `,\n${pad(depth + 1)}` : ",";
+  if (value instanceof JsonNumberToken) return value.raw;
+  if (value === null) return "null";
+  if (typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    if (!value.length) return "[]";
+    return `[${pretty ? `\n${pad(depth + 1)}` : ""}${value.map((item) => stringifyJsonTokenAware(item, pretty, depth + 1)).join(join(value as string[]))}${pretty ? `\n${pad(depth)}` : ""}]`;
   }
-  if (!tokens.length || body.replace(expression, "").replace(/[.]/g, "").length) throw new Error("Unsupported JSON path. Use $.user.name, $.items[0].id, or a quoted key such as $['display-name'].");
-  let values: unknown[] = [root];
+  const keys = Object.keys(value);
+  if (!keys.length) return "{}";
+  return `{${pretty ? `\n${pad(depth + 1)}` : ""}${keys.map((key) => `${JSON.stringify(key)}:${pretty ? " " : ""}${stringifyJsonTokenAware(value[key], pretty, depth + 1)}`).join(join(keys))}${pretty ? `\n${pad(depth)}` : ""}}`;
+}
+
+function jsonPathQuery(input: string, path: string): string {
+  const duplicateKeyPaths: string[] = [];
+  validateJsonDetailed(input, { duplicateKeyPaths });
+  const root = parseJsonTokenAware(input); const normalized = path.trim();
+  if (!normalized || normalized === "$" || normalized === ".") {
+    const formatted = stringifyJsonTokenAware(root);
+    const warnings = jsonFormatterWarnings(input, duplicateKeyPaths);
+    return [formatted, ...warnings].join("\n\n");
+  }
+  let tokens: (string | number | "*")[] = [];
+  if (normalized.startsWith("/")) {
+    // RFC 6901 JSON Pointer: ~1 is '/', ~0 is '~'; any other tilde escape is invalid.
+    tokens = normalized.slice(1).split("/").map((segment) => {
+      if (/~(?![01])/.test(segment)) throw new Error(`Invalid JSON Pointer escape in segment '${segment}'. Use ~0 for '~' and ~1 for '/'.`);
+      return segment.replace(/~1/g, "/").replace(/~0/g, "~");
+    });
+  } else {
+    if (!normalized.startsWith("$") && !normalized.startsWith(".")) throw new Error("Use JSONPath-like syntax ($.user.name, $.items[0].id) or an RFC 6901 JSON Pointer (/user/name). JSON Pointer escapes '/' as ~1 and '~' as ~0.");
+    const body = normalized.replace(/^\$\.?/, "").replace(/^\./, "");
+    const expression = /\.?([^.[\]]+)|\[(\d+|\*|'[^']+'|\"[^\"]+\")\]/g;
+    let match: RegExpExecArray | null; let consumed = "";
+    while ((match = expression.exec(body))) {
+      consumed += match[0]; const bracket = match[2];
+      if (bracket === undefined) tokens.push(match[1]);
+      else if (bracket === "*") tokens.push("*");
+      else if (/^\d+$/.test(bracket)) tokens.push(Number(bracket));
+      else tokens.push(bracket.slice(1, -1));
+    }
+    if (!tokens.length || body.replace(expression, "").replace(/[.]/g, "").length) throw new Error("Unsupported JSON path. Use $.user.name, $.items[0].id, or $['display-name']; alternatively use RFC 6901 /user/name.");
+  }
+  let values: JsonTokenValue[] = [root];
   for (const token of tokens) values = values.flatMap((value) => {
-    if (token === "*") return Array.isArray(value) ? value : value && typeof value === "object" ? Object.values(value as Record<string, unknown>) : [];
+    if (token === "*") return Array.isArray(value) ? value : value && typeof value === "object" && !(value instanceof JsonNumberToken) ? Object.values(value) : [];
     if (Array.isArray(value) && typeof token === "number") return token < value.length ? [value[token]] : [];
-    if (value && typeof value === "object" && typeof token === "string" && Object.prototype.hasOwnProperty.call(value, token)) return [(value as Record<string, unknown>)[token]];
+    if (value && typeof value === "object" && !(value instanceof JsonNumberToken) && !Array.isArray(value) && typeof token === "string" && Object.prototype.hasOwnProperty.call(value, token)) return [value[token]];
+    // In RFC 6901, array indices are decimal text and leading zeroes (except '0') are invalid.
+    if (Array.isArray(value) && typeof token === "string" && /^(?:0|[1-9]\d*)$/.test(token)) { const index = Number(token); return index < value.length ? [value[index]] : []; }
+    if (Array.isArray(value) && typeof token === "string" && token === "-") return [];
     return [];
   });
-  if (!values.length) throw new Error(`JSON path '${path}' did not match any value.`);
-  return JSON.stringify(values.length === 1 ? values[0] : values, null, 2);
+  if (!values.length) throw new Error(`JSON path or pointer '${path}' did not match any value.`);
+  const selected: JsonTokenValue = values.length === 1 ? values[0] : values;
+  const formatted = stringifyJsonTokenAware(selected);
+  const warnings = jsonFormatterWarnings(formatted, duplicateKeyPaths);
+  return [formatted, ...warnings].join("\n\n");
+}
+
+/**
+ * Format strict JSON without materializing numeric tokens as IEEE-754 Numbers.
+ * This preserves unsafe integer digits, exponent spelling, and duplicate object keys.
+ */
+function formatJsonSource(input: string, minify = false): string {
+  let output = "";
+  const stack: { kind: "object" | "array"; hasItems: boolean }[] = [];
+  const indent = (depth: number) => "  ".repeat(Math.max(0, depth));
+  const nextNonWhitespace = (from: number) => {
+    let index = from;
+    while (index < input.length && /\s/.test(input[index])) index += 1;
+    return input[index];
+  };
+  const markParent = () => { const parent = stack.at(-1); if (parent) parent.hasItems = true; };
+  for (let i = 0; i < input.length;) {
+    const ch = input[i];
+    if (/\s/.test(ch)) { i += 1; continue; }
+    if (ch === '"') {
+      markParent(); const start = i++;
+      while (i < input.length) { if (input[i] === "\\") { i += 2; continue; } if (input[i++] === '"') break; }
+      output += input.slice(start, i); continue;
+    }
+    if (ch === "{" || ch === "[") {
+      markParent(); output += ch;
+      const kind = ch === "{" ? "object" : "array";
+      stack.push({ kind, hasItems: false });
+      if (!minify && nextNonWhitespace(i + 1) !== (ch === "{" ? "}" : "]")) output += "\n" + indent(stack.length);
+      i += 1; continue;
+    }
+    if (ch === "}" || ch === "]") {
+      const current = stack.pop();
+      if (!current || (current.kind === "object" ? ch !== "}" : ch !== "]")) throw new Error("JSON formatter encountered an unbalanced container after validation.");
+      if (!minify && current.hasItems) output = output.trimEnd() + "\n" + indent(stack.length);
+      output += ch; i += 1; continue;
+    }
+    if (ch === ",") { output = output.trimEnd() + ","; if (!minify) output += "\n" + indent(stack.length); i += 1; continue; }
+    if (ch === ":") { output = output.trimEnd() + (minify ? ":" : ": "); i += 1; continue; }
+    const token = input.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|^(?:true|false|null)\b/);
+    if (token) { markParent(); output += token[0]; i += token[0].length; continue; }
+    throw new Error(`Unexpected JSON formatter token at character ${i + 1}; validate the input and try again.`);
+  }
+  return output.trim();
+}
+
+function jsonFormatterWarnings(input: string, duplicateKeyPaths: string[]): string[] {
+  const unsafe = scanUnsafeJsonIntegers(input);
+  const warnings: string[] = [];
+  if (unsafe.length) {
+    const examples = unsafe.slice(0, 5).map((item) => `${item.token} (line ${item.line}, column ${item.column})`).join(", ");
+    warnings.push(`WARNING: JavaScript Number cannot safely represent this integer; value may be rounded. The formatter preserved the raw numeric token text. Detected: ${examples}${unsafe.length > 5 ? ", …" : ""}`);
+  }
+  const duplicates = [...new Set(duplicateKeyPaths)];
+  if (duplicates.length) warnings.push(`NOTE: Duplicate object keys detected at ${duplicates.slice(0, 20).join(", ")}${duplicates.length > 20 ? ", …" : ""}. Duplicate-key JSON is ambiguous; many parsers including JSON.parse keep only the last value. The formatter preserves the source keys.`);
+  return warnings;
 }
 
 function sortJson(value: unknown): unknown {
@@ -222,13 +424,21 @@ function jwtDecode(token: string): string {
     const status = iso === null ? "out-of-range" : key === "exp" ? (now >= claim ? "expired" : "valid") : key === "nbf" ? (now < claim ? "not-yet-valid" : "active") : key === "iat" && claim > now ? "issued-in-the-future" : "informational";
     return { unixSeconds: claim, iso, status };
   };
-  const largeIntegerTokens = payloadText.match(/(?:"[^"\\]*(?:\\.[^"\\]*)*"\s*:\s*)?-?\d{16,}(?:\D|$)/g) ?? [];
+  const largeIntegerTokens = scanUnsafeJsonIntegers(payloadText);
+  const headerLargeIntegers = scanUnsafeJsonIntegers(headerText);
   return JSON.stringify({
     warning: "DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.",
     header, payload,
+    // Preserve exact source JSON so a viewer never has to rely on rounded JS numbers.
+    headerRawJson: headerText,
+    payloadRawJson: payloadText,
+    rawNumericPrecision: {
+      headerUnsafeIntegerTokens: headerLargeIntegers,
+      payloadUnsafeIntegerTokens: largeIntegerTokens,
+    },
     claims: { exp: timestamp("exp"), iat: timestamp("iat"), nbf: timestamp("nbf"), sub: payload.sub ?? null, iss: payload.iss ?? null, aud: payload.aud ?? null },
     signaturePresent: parts[2].length > 0, signatureVerified: false,
-    largeIntegerPrecisionWarning: largeIntegerTokens.length ? "Payload contains a potentially large integer. JavaScript JSON numbers may lose integer precision above 9,007,199,254,740,991." : null,
+    largeIntegerPrecisionWarning: (largeIntegerTokens.length || headerLargeIntegers.length) ? "Header or payload contains unsafe integer tokens. The parsed claims display may be rounded; headerRawJson/payloadRawJson preserve exact source digits." : null,
   }, null, 2);
 }
 
@@ -366,11 +576,65 @@ function generateLicense(owner: string): string {
   const year = new Date().getFullYear(); const who = owner.trim() || "[Copyright holder]";
   return `MIT License\n\nCopyright (c) ${year} ${who}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\nReview the license choice and placeholder before using this file in a repository.\n`;
 }
-function generateCsp(): string {
-  return `Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests\n\nReview required sources for scripts, styles, fonts, images, API calls and embedding before deployment. A strict policy can break application features if not tailored.\n`;
+function parseGeneratorObject(input: string, label: string): Record<string, unknown> | null {
+  if (!input.trim().startsWith("{")) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(input); } catch { throw new Error(`${label} configuration must be valid JSON.`); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${label} configuration must be a JSON object.`);
+  return parsed as Record<string, unknown>;
 }
-function generateCors(): string {
-  return `Access-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n\nReplace the example origin with an explicit allow-list. Avoid '*' for credentialed requests. Handle OPTIONS preflight responses in the server.\n`;
+function safeConfigStringList(value: unknown, field: string, defaults: string[]): string[] {
+  if (value === undefined) return defaults;
+  const items = typeof value === "string" ? [value] : value;
+  if (!Array.isArray(items) || items.some((item) => typeof item !== "string" || !item.trim() || /[\r\n,;]/.test(item))) throw new Error(`${field} must be a string or a list of non-empty strings without commas, semicolons, or line breaks.`);
+  return [...new Set((items as string[]).map((item) => item.trim()))];
+}
+function generateCsp(input = ""): string {
+  const config = parseGeneratorObject(input, "CSP");
+  if (!config) return `Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests\n\nReview required sources for scripts, styles, fonts, images, API calls and embedding before deployment. A strict policy can break application features if not tailored.\n`;
+  const entries = Object.entries(config);
+  if (!entries.length) throw new Error("Provide at least one CSP directive.");
+  const directives = new Set<string>(); const weakSources: string[] = [];
+  const rendered = entries.map(([rawName, rawValues]) => {
+    const name = rawName.toLowerCase();
+    if (!/^[a-z][a-z0-9-]*$/.test(name) || directives.has(name)) throw new Error(`Invalid or duplicate CSP directive: ${rawName}`);
+    directives.add(name);
+    const values = rawValues === undefined || rawValues === null ? [] : safeConfigStringList(rawValues, `CSP directive ${name}`, []);
+    if (values.some((value) => /[;\r\n]/.test(value))) throw new Error(`CSP directive ${name} contains a forbidden separator.`);
+    for (const value of values) if (value === "*" || value.toLowerCase() === "'unsafe-inline'" || value.toLowerCase() === "'unsafe-eval'" || /^http:\/*$/i.test(value)) weakSources.push(`${name} ${value}`);
+    return values.length ? `${name} ${values.join(" ")}` : name;
+  });
+  if (!directives.has("default-src")) rendered.unshift("default-src 'self'");
+  if (!directives.has("object-src")) rendered.push("object-src 'none'");
+  if (!directives.has("base-uri")) rendered.push("base-uri 'self'");
+  return `Content-Security-Policy: ${rendered.join("; ")}\n\n${weakSources.length ? `Review broad/unsafe source expressions before deployment: ${[...new Set(weakSources)].join(", ")}.` : "Review required script/style/font/image/connect/frame sources in a staging environment before enforcing this policy."} This generator does not inspect your application or guarantee a complete CSP.\n`;
+}
+function generateCors(input = ""): string {
+  const config = parseGeneratorObject(input, "CORS");
+  if (!config) return `Access-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n\nReplace the example origin with an explicit allow-list. Avoid '*' for credentialed requests. Handle OPTIONS preflight responses in the server.\n`;
+  const origins = safeConfigStringList(config.origins, "origins", ["https://app.example.com"]);
+  if (!origins.length) throw new Error(`origins must contain at least one explicitly allowed origin; use ["*"] only for public non-credentialed resources.`);
+  const methods = safeConfigStringList(config.methods, "methods", ["GET", "POST", "OPTIONS"]).map((method) => method.toUpperCase());
+  if (!methods.length) throw new Error("methods must contain at least one allowed HTTP method.");
+  const headers = safeConfigStringList(config.headers, "headers", ["Content-Type", "Authorization"]);
+  const expose = safeConfigStringList(config.exposeHeaders, "exposeHeaders", []);
+  const headerToken = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+  if ([...headers, ...expose].some((header) => !headerToken.test(header))) throw new Error("headers and exposeHeaders must contain valid HTTP field-name tokens.");
+  const credentials = config.credentials === undefined ? false : config.credentials;
+  if (typeof credentials !== "boolean") throw new Error("credentials must be true or false.");
+  const maxAge = config.maxAge === undefined ? 600 : Number(config.maxAge);
+  if (!Number.isInteger(maxAge) || maxAge < 0 || maxAge > 86400) throw new Error("maxAge must be an integer from 0 through 86400 seconds.");
+  for (const origin of origins) {
+    if (origin === "*") continue;
+    let parsed: URL;
+    try { parsed = new URL(origin); } catch { throw new Error(`Invalid CORS origin: ${origin}. Use an explicit http(s) origin, without a path.`); }
+    if (!/^https?:$/.test(parsed.protocol) || parsed.origin !== origin.replace(/\/$/, "")) throw new Error(`CORS origin '${origin}' must be only an http(s) scheme and authority, without path, query, credentials, or fragment.`);
+  }
+  if (credentials && origins.includes("*")) throw new Error("CORS forbids Access-Control-Allow-Origin: * for credentialed requests. Use a strict explicit origin allow-list.");
+  if (methods.some((method) => !/^[A-Z!#$%&'*+.^_`|~0-9-]+$/.test(method))) throw new Error("methods contains an invalid HTTP method token.");
+  const shared = `Access-Control-Allow-Methods: ${methods.join(", ")}\nAccess-Control-Allow-Headers: ${headers.join(", ")}\n${expose.length ? `Access-Control-Expose-Headers: ${expose.join(", ")}\n` : ""}${credentials ? "Access-Control-Allow-Credentials: true\n" : ""}Access-Control-Max-Age: ${maxAge}\n`;
+  if (origins.length === 1) return `Access-Control-Allow-Origin: ${origins[0]}\nVary: Origin\n${shared}\n${origins[0] === "*" ? "Public, non-credentialed CORS. Do not use cookies or credentialed requests with wildcard origin." : "Validate the request Origin on the server and answer OPTIONS preflight requests."} No request was sent by this local generator.\n`;
+  return `# CORS middleware configuration — reflect an origin only after exact allow-list matching; never comma-join origins into Access-Control-Allow-Origin.\nallowedOrigins = ${JSON.stringify(origins)}\n\nif request.origin is in allowedOrigins:\n    response.setHeader("Access-Control-Allow-Origin", request.origin)\n    response.setHeader("Vary", "Origin")\n${shared.split("\n").filter(Boolean).map((line) => `    response.setHeader(${JSON.stringify(line.split(": ")[0])}, ${JSON.stringify(line.slice(line.indexOf(": ") + 2))})`).join("\n")}\n\nReject unlisted origins and handle OPTIONS preflight. This is explanatory pseudocode, not directly executable middleware. No request was sent.\n`;
 }
 function generateNginx(): string {
   return `server {\n    listen 80;\n    server_name example.com; # replace before deployment\n    root /usr/share/nginx/html;\n    index index.html;\n\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n    location = /health {\n        access_log off;\n        add_header Content-Type text/plain;\n        return 200 "ok\\n";\n    }\n\n    # Configure TLS, security headers, caching and upload limits for your deployment.\n}\n`;
@@ -451,23 +715,56 @@ export function inspectJsonDetailed(input: string, maxNodes = 100_000): string {
 }
 
 /** Semantic JSON diff: report structural paths rather than confusing users with shifted line numbers. */
+function sortedJsonTokens(value: JsonTokenValue): JsonTokenValue {
+  if (Array.isArray(value)) return value.map(sortedJsonTokens);
+  if (value && typeof value === "object" && !(value instanceof JsonNumberToken)) {
+    const result: Record<string, JsonTokenValue> = Object.create(null) as Record<string, JsonTokenValue>;
+    for (const key of Object.keys(value).sort((a, b) => a.localeCompare(b))) Object.defineProperty(result, key, { value: sortedJsonTokens(value[key]), enumerable: true, configurable: true, writable: true });
+    return result;
+  }
+  return value;
+}
+function describeJsonDiffValue(value: JsonTokenValue): unknown {
+  if (value instanceof JsonNumberToken) {
+    const unsafe = !/[.eE]/.test(value.raw) && !Number.isSafeInteger(Number(value.raw));
+    return { kind: "json-number-token", raw: value.raw, unsafeInteger: unsafe, note: "Raw token is included so exact digits do not depend on JSON number precision." };
+  }
+  if (Array.isArray(value)) return value.map(describeJsonDiffValue);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, describeJsonDiffValue(item)]));
+  return value;
+}
+/** Semantic JSON diff that avoids converting numeric tokens to IEEE-754 values. */
 function structuredJsonDiff(leftRaw: string, rightRaw: string): string {
   if (leftRaw.length + rightRaw.length > 50 * 1024 * 1024) throw new Error("Combined JSON diff input exceeds the 50 MiB safety limit. Compare smaller sections for responsiveness.");
-  const left: unknown = JSON.parse(leftRaw); const right: unknown = JSON.parse(rightRaw);
+  const leftDuplicates: string[] = []; const rightDuplicates: string[] = [];
+  validateJsonDetailed(leftRaw, { duplicateKeyPaths: leftDuplicates }); validateJsonDetailed(rightRaw, { duplicateKeyPaths: rightDuplicates });
+  const left = parseJsonTokenAware(leftRaw); const right = parseJsonTokenAware(rightRaw);
+  const leftSorted = sortedJsonTokens(left); const rightSorted = sortedJsonTokens(right);
   const changes: { path: string; type: "added" | "removed" | "changed"; before?: unknown; after?: unknown; value?: unknown }[] = [];
-  const stable = (v: unknown): string => JSON.stringify(v, (_key, child) => child && typeof child === "object" && !Array.isArray(child) ? Object.fromEntries(Object.keys(child).sort().map((k) => [k, (child as Record<string, unknown>)[k]])) : child);
-  const walk = (a: unknown, b: unknown, path: string, depth: number): void => {
+  const stable = (v: JsonTokenValue): string => stringifyJsonTokenAware(sortedJsonTokens(v), false);
+  const walk = (a: JsonTokenValue | undefined, b: JsonTokenValue | undefined, path: string, depth: number): void => {
     if (changes.length >= 500) return;
+    if (a === undefined) { changes.push({ path, type: "added", value: describeJsonDiffValue(b!) }); return; }
+    if (b === undefined) { changes.push({ path, type: "removed", value: describeJsonDiffValue(a) }); return; }
     if (depth > 100) { if (stable(a) !== stable(b)) changes.push({ path, type: "changed", before: "[depth limit]", after: "[depth limit]" }); return; }
     if (stable(a) === stable(b)) return;
-    if (Array.isArray(a) && Array.isArray(b)) { for (let i = 0; i < Math.max(a.length, b.length) && changes.length < 500; i += 1) { const child = `${path}[${i}]`; if (i >= a.length) changes.push({ path: child, type: "added", value: b[i] }); else if (i >= b.length) changes.push({ path: child, type: "removed", value: a[i] }); else walk(a[i], b[i], child, depth + 1); } return; }
-    const objA = a !== null && typeof a === "object" && !Array.isArray(a) ? a as Record<string, unknown> : null;
-    const objB = b !== null && typeof b === "object" && !Array.isArray(b) ? b as Record<string, unknown> : null;
-    if (objA && objB) { const keys = [...new Set([...Object.keys(objA), ...Object.keys(objB)])].sort(); for (const key of keys) { if (changes.length >= 500) break; const child = `${path}[${JSON.stringify(key)}]`; if (!(key in objA)) changes.push({ path: child, type: "added", value: objB[key] }); else if (!(key in objB)) changes.push({ path: child, type: "removed", value: objA[key] }); else walk(objA[key], objB[key], child, depth + 1); } return; }
-    changes.push({ path, type: "changed", before: a, after: b });
+    if (Array.isArray(a) && Array.isArray(b)) {
+      for (let i = 0; i < Math.max(a.length, b.length) && changes.length < 500; i += 1) walk(a[i], b[i], `${path}[${i}]`, depth + 1);
+      return;
+    }
+    const objA = a && typeof a === "object" && !Array.isArray(a) && !(a instanceof JsonNumberToken) ? a as Record<string, JsonTokenValue> : null;
+    const objB = b && typeof b === "object" && !Array.isArray(b) && !(b instanceof JsonNumberToken) ? b as Record<string, JsonTokenValue> : null;
+    if (objA && objB) {
+      const keys = [...new Set([...Object.keys(objA), ...Object.keys(objB)])].sort((x, y) => x.localeCompare(y));
+      for (const key of keys) { if (changes.length >= 500) break; walk(Object.prototype.hasOwnProperty.call(objA, key) ? objA[key] : undefined, Object.prototype.hasOwnProperty.call(objB, key) ? objB[key] : undefined, `${path}[${JSON.stringify(key)}]`, depth + 1); }
+      return;
+    }
+    changes.push({ path, type: "changed", before: describeJsonDiffValue(a), after: describeJsonDiffValue(b) });
   };
-  walk(left, right, "$", 0);
-  return JSON.stringify({ equal: changes.length === 0, algorithm: "recursive structural comparison with sorted object keys", changeCount: changes.length, truncated: changes.length >= 500, changes, note: "JSON.parse may round unsafe large integers; inspect raw integer tokens when exact digits matter." }, null, 2);
+  walk(leftSorted, rightSorted, "$", 0);
+  const unsafe = { left: scanUnsafeJsonIntegers(leftRaw), right: scanUnsafeJsonIntegers(rightRaw) };
+  const duplicateWarnings = [leftDuplicates.length ? `Left input has duplicate object keys: ${[...new Set(leftDuplicates)].slice(0, 20).join(", ")}.` : "", rightDuplicates.length ? `Right input has duplicate object keys: ${[...new Set(rightDuplicates)].slice(0, 20).join(", ")}.` : ""].filter(Boolean);
+  return JSON.stringify({ equal: changes.length === 0, algorithm: "lossless numeric-token structural comparison with sorted object keys", changeCount: changes.length, truncated: changes.length >= 500, changes, unsafeIntegerTokens: unsafe, warnings: [...duplicateWarnings, unsafe.left.length || unsafe.right.length ? "Unsafe integer tokens are compared as exact source tokens. Changed numeric values use kind=json-number-token and raw=exact token." : ""].filter(Boolean), note: "Object key order is ignored; arrays are compared by index, not move-aware. Duplicate object keys are inherently ambiguous; lookup semantics use the final occurrence." }, null, 2);
 }
 function generateDeveloperTemplate(op: string, input: string, secondary: string, now = new Date()): string | null {
   const lower = op.toLowerCase(); const subject = (input.trim() || secondary.trim());
@@ -481,8 +778,8 @@ function generateDeveloperTemplate(op: string, input: string, secondary: string,
   if (lower.includes("readme") && lower.includes("generator")) return generateReadme(subject);
   if (lower.includes("license") && lower.includes("generator")) return generateLicense(subject);
   if (lower.includes("nginx") && lower.includes("generator")) return generateNginx();
-  if (lower.includes("cors") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCors();
-  if (lower.includes("csp") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCsp();
+  if (lower.includes("cors") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCors(input);
+  if (lower.includes("csp") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCsp(input);
   if (lower.includes("json-schema") && (lower.includes("generator") || lower.includes("builder"))) return generateJsonSchema(subject || '{"name":"Ada","active":true}');
   if (lower.includes("graphql-query-builder")) return `query GetExample($id: ID!) {\n  node(id: $id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your GraphQL schema.\n`;
   if (lower.includes("graphql-variables") && (lower.includes("builder") || lower.includes("generator") || lower.includes("formatter") || lower.includes("validator"))) { const raw = subject || '{"id":"REPLACE_WITH_ID"}'; return JSON.stringify(JSON.parse(raw), null, 2); }
@@ -554,11 +851,169 @@ function minifySafe(input: string, language: string): string {
   if (quote) throw new Error("Unterminated string literal; input was not minified.");
   return output.trim();
 }
-function formatSql(input: string): string {
-  const keywords = /\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|UNION|CREATE TABLE|ALTER TABLE|DROP TABLE|AND|OR)\b/gi;
-  const spaced = input.replace(/\s+/g, " ").replace(keywords, "\n$1").trim();
-  let depth = 0; return spaced.split("\n").map(line => { const clean = line.trim(); if (clean.startsWith(")")) depth = Math.max(0, depth-1); const result = `${"  ".repeat(depth)}${clean}`; depth += (clean.match(/\(/g) ?? []).length - (clean.match(/\)/g) ?? []).length; depth = Math.max(0, depth); return result; }).join("\n");
+const SQL_DIALECTS = new Set(["sql", "postgresql", "mysql", "mariadb", "sqlite", "transactsql", "bigquery", "snowflake", "oracle", "redshift", "duckdb"]);
+function formatSql(input: string, dialectRaw = "sql"): string {
+  const dialect = dialectRaw.trim().toLowerCase() || "sql";
+  if (!SQL_DIALECTS.has(dialect)) throw new Error(`Unsupported SQL dialect '${dialectRaw}'. Choose one of: ${[...SQL_DIALECTS].join(", ")}.`);
+  if (input.length > 1_000_000) throw new Error("SQL formatter input exceeds the 1 MB local formatting limit.");
+  // Keywords in literals, quoted identifiers, and comments are not clauses.
+  const tokens: { text: string; kind: "word" | "literal" | "comment" | "punct" }[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (/\s/.test(ch)) { i += 1; continue; }
+    if (ch === "-" && input[i + 1] === "-") { const start = i; i += 2; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "/" && input[i + 1] === "*") { const start = i; const close = input.indexOf("*/", i + 2); if (close < 0) throw new Error("SQL formatter found an unterminated block comment."); i = close + 2; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    // PostgreSQL-style dollar-quoted bodies must be consumed as one literal, so keywords
+    // such as FROM/WHERE inside a function body are never mistaken for outer clauses.
+    if ((dialect === "postgresql" || dialect === "redshift" || dialect === "duckdb") && ch === "$") {
+      const tag = input.slice(i).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/)?.[0];
+      if (tag) { const start = i; const close = input.indexOf(tag, i + tag.length); if (close < 0) throw new Error(`SQL formatter found an unterminated dollar-quoted string (${tag}).`); i = close + tag.length; tokens.push({ text: input.slice(start, i), kind: "literal" }); continue; }
+    }
+    if (dialect === "mysql" && ch === "#") { const start = i; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "'" || ch === '"' || ch === "`" || ch === "[") {
+      const start = i; const closing = ch === "[" ? "]" : ch; i += 1;
+      while (i < input.length) {
+        if (input[i] === closing) { if (input[i + 1] === closing && closing !== "]") { i += 2; continue; } i += 1; break; }
+        if (input[i] === "\\" && ch === "'") i += 1;
+        i += 1;
+      }
+      tokens.push({ text: input.slice(start, i), kind: "literal" }); continue;
+    }
+    const word = input.slice(i).match(/^[A-Za-z_][A-Za-z0-9_$]*/);
+    if (word) { tokens.push({ text: word[0], kind: "word" }); i += word[0].length; continue; }
+    tokens.push({ text: ch, kind: "punct" }); i += 1;
+  }
+  if (!tokens.length) return "";
+  const major = new Set(["WITH", "RECURSIVE", "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "QUALIFY", "WINDOW", "PARTITION BY", "LIMIT", "OFFSET", "FETCH FIRST", "INSERT INTO", "UPDATE", "DELETE FROM", "VALUES", "UNION", "UNION ALL", "INTERSECT", "EXCEPT", "RETURNING", "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "ON CONFLICT", "DO UPDATE SET"]);
+  const joins = new Set(["JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "FULL JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "CROSS JOIN", "CROSS APPLY", "OUTER APPLY"]);
+  const output: string[] = [];
+  let depth = 0, line = "", previous = "";
+  const trimLine = () => { line = line.trimEnd(); };
+  const emit = () => { trimLine(); if (line.trim()) output.push(`${"  ".repeat(Math.max(0, depth))}${line.trimStart()}`); line = ""; };
+  const append = (text: string, needsSpace = true) => { if (needsSpace && line && !/[\s(.]$/.test(line) && !/^[,;).]/.test(text)) line += " "; line += text; };
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]; const upper = token.kind === "word" ? token.text.toUpperCase() : "";
+    let phrase = upper, count = 1;
+    if (token.kind === "word" && tokens[index + 1]?.kind === "word") {
+      const two = `${upper} ${tokens[index + 1].text.toUpperCase()}`;
+      if ([...major, ...joins].includes(two)) { phrase = two; count = 2; }
+      else if (["LEFT OUTER JOIN", "RIGHT OUTER JOIN"].includes(`${two} ${tokens[index + 2]?.text.toUpperCase()}`) && tokens[index + 2]?.kind === "word") { phrase = `${two} ${tokens[index + 2].text.toUpperCase()}`; count = 3; }
+    }
+    const isMajor = token.kind === "word" && major.has(phrase);
+    const isJoin = token.kind === "word" && joins.has(phrase);
+    const isOn = token.kind === "word" && upper === "ON";
+    const isBoolean = token.kind === "word" && (upper === "AND" || upper === "OR");
+    if (isMajor || isJoin || isOn || isBoolean) {
+      emit(); depth = isJoin || isOn || isBoolean ? Math.max(1, depth) : 0; line = phrase; index += count - 1; previous = phrase; continue;
+    }
+    if (token.text === "(") { append("(", /^(IN|VALUES|EXISTS|NOT)$/i.test(previous)); depth += 1; }
+    else if (token.text === ")") { depth = Math.max(0, depth - 1); trimLine(); line += ")"; }
+    else if (token.text === ",") { trimLine(); line += ","; }
+    else if (token.text === ".") { trimLine(); line += "."; }
+    else if (token.text === ";") { trimLine(); line += ";"; emit(); depth = 0; }
+    else if (["=", "<", ">", "!", "+", "-", "*", "/", "<=", ">=", "<>", "!=", "%"].includes(token.text)) append(token.text);
+    else { append(token.text, true); if (token.kind === "comment") emit(); }
+    previous = token.text;
+  }
+  emit();
+  return output.join("\n").trim();
 }
+
+/** Dependency-light token-preserving fallback used if the TypeScript parser is unavailable. */
+function formatJavascriptConservative(input: string): string {
+  type Token = { text: string; kind: "word" | "literal" | "comment" | "punct" | "operator" };
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i];
+    if (/\s/.test(ch)) { i += 1; continue; }
+    if (ch === "/" && input[i + 1] === "/") { const start = i; i += 2; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "/" && input[i + 1] === "*") { const start = i; const close = input.indexOf("*/", i + 2); if (close < 0) throw new Error("JavaScript formatter found an unterminated block comment."); i = close + 2; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const start = i++; let closed = false;
+      while (i < input.length) { if (input[i] === "\\") { i += 2; continue; } if (input[i++] === ch) { closed = true; break; } }
+      if (!closed) throw new Error("JavaScript formatter found an unterminated string or template literal.");
+      tokens.push({ text: input.slice(start, i), kind: "literal" }); continue;
+    }
+    const word = input.slice(i).match(/^(?:[A-Za-z_$][\w$]*|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/);
+    if (word) { tokens.push({ text: word[0], kind: "word" }); i += word[0].length; continue; }
+    const op = input.slice(i).match(/^(?:===|!==|=>|\?\?|\?\.|&&|\|\||\*\*|==|!=|<=|>=|\+\+|--|\+=|-=|\*=|\/=|\.\.\.)/);
+    if (op) { tokens.push({ text: op[0], kind: "operator" }); i += op[0].length; continue; }
+    tokens.push({ text: ch, kind: "punct" }); i += 1;
+  }
+  if (!tokens.length) throw new Error("Paste JavaScript or TypeScript code to format.");
+  const lines: string[] = []; let line = ""; let depth = 0; let parenDepth = 0; let lineDepth = depth;
+  const indent = (atDepth = depth) => "  ".repeat(Math.max(0, atDepth));
+  const trim = () => { line = line.trimEnd(); };
+  const emit = () => { trim(); if (line.trim()) lines.push(indent(lineDepth) + line.trimStart()); line = ""; lineDepth = depth; };
+  const append = (text: string, space = false) => { if (!line && text) lineDepth = depth; if (space && line && !/[\s.(\[]$/.test(line) && !/^[,;).\]}]/.test(text)) line += " "; line += text; };
+  const prev = (index: number) => tokens[index - 1]?.text ?? "";
+  const next = (index: number) => tokens[index + 1]?.text ?? "";
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]; const text = token.text; const before = prev(index); const after = next(index);
+    if (token.kind === "comment") { if (line.trim()) emit(); append(text); emit(); continue; }
+    if (text === "{") { append("{", Boolean(line.trim()) && !/[.(\[]$/.test(line)); depth += 1; emit(); continue; }
+    if (text === "}") { if (line.trim()) emit(); depth = Math.max(0, depth - 1); append("}"); if ([";", ",", ")", "]", ".", "(", "["].includes(after)) { /* next token remains adjacent */ } else emit(); continue; }
+    if (text === "(") { append("(", /^(if|for|while|switch|catch|with|function)$/.test(before)); parenDepth += 1; continue; }
+    if (text === ")") { trim(); line += ")"; parenDepth = Math.max(0, parenDepth - 1); continue; }
+    if (text === "[") { append("["); continue; }
+    if (text === "]") { trim(); line += "]"; continue; }
+    if (text === "." || text === "?.") { trim(); line += text; continue; }
+    if (text === ",") { trim(); line += ","; emit(); continue; }
+    if (text === ";") { trim(); line += ";"; if (parenDepth > 0) append("", true); else emit(); continue; }
+    if (text === ":") { trim(); line += ":"; append("", true); continue; }
+    if (token.kind === "operator" || ["=", "+", "-", "*", "/", "%", "<", ">", "!", "&", "|", "?"].includes(text)) {
+      if (["++", "--", "!", "~", "..."].includes(text)) append(text); else { append(text, true); append("", true); }
+      continue;
+    }
+    const wordLike = token.kind === "word" || token.kind === "literal";
+    const previousWordLike = tokens[index - 1] && (tokens[index - 1].kind === "word" || tokens[index - 1].kind === "literal");
+    const shouldSpace = Boolean(line) && (Boolean(previousWordLike) || /^(return|throw|new|await|yield|typeof|delete|void|instanceof|in|of|else|async)$/.test(before) || (before === ")" && wordLike));
+    append(text, shouldSpace);
+  }
+  emit();
+  const result = lines.join("\n").trim();
+  if (!result) throw new Error("Formatter produced no output. Check that the source is not empty.");
+  return `${result}\n\nFormatter: conservative lexical fallback. Strings/comments are preserved; this is not a full ECMAScript parser.`;
+}
+
+/**
+ * Parser-backed JavaScript/TypeScript formatting using the project's already-installed
+ * TypeScript compiler dependency. It is dynamically loaded only when a user runs the formatter,
+ * rather than inflating every tool page's initial bundle. No source is sent to a service.
+ */
+async function formatJavascript(input: string, preferTypeScript = false): Promise<string> {
+  if (!input.trim()) throw new Error("Paste JavaScript or TypeScript code to format.");
+  if (input.length > 1_000_000) throw new Error("Code formatter input exceeds the 1 MB local formatting limit.");
+  try {
+    const ts = await import("typescript");
+    const jsxLikely = /(?:^|[=(:,\[>])\s*<[A-Za-z][A-Za-z0-9_.:-]*(?:\s|>|\/)/m.test(input) || /<\/[A-Za-z][A-Za-z0-9_.:-]*\s*>/.test(input);
+    const scriptKind = jsxLikely ? ts.ScriptKind.TSX : (preferTypeScript ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+    const fileName = jsxLikely ? "enV-input.tsx" : preferTypeScript ? "enV-input.ts" : "enV-input.js";
+    const sourceFile = ts.createSourceFile(fileName, input, ts.ScriptTarget.Latest, true, scriptKind);
+    const diagnostics = (sourceFile as unknown as { parseDiagnostics?: readonly import("typescript").Diagnostic[] }).parseDiagnostics ?? [];
+    if (diagnostics.length) {
+      const first = diagnostics[0];
+      const pos = first.start ?? 0;
+      const location = sourceFile.getLineAndCharacterOfPosition(pos);
+      const message = ts.flattenDiagnosticMessageText(first.messageText, "\n");
+      throw new Error(`Parser-backed formatter could not parse input at line ${location.line + 1}, column ${location.character + 1}: ${message}`);
+    }
+    const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, removeComments: false, omitTrailingSemicolon: false });
+    const formatted = printer.printFile(sourceFile).trimEnd();
+    if (!formatted) throw new Error("Parser returned no printable statements for this input.");
+    return `${formatted}\n\nFormatter: TypeScript compiler AST printer (local parser; source is not uploaded). This is formatting, not type-checking, linting, transpilation, or semantic-equivalence proof.`;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Parser-backed formatter")) throw error;
+    // Some test/embedded environments omit runtime modules even though the web app's install has
+    // them. Fall back honestly rather than return an empty result; report the execution engine.
+    if (error instanceof Error && error.message.includes("could not parse input")) throw error;
+    return formatJavascriptConservative(input);
+  }
+}
+
+
 function simpleMarkupInspect(input: string): string {
   const tags = [...input.matchAll(/<([A-Za-z][\w:-]*)\b[^>]*>/g)].map(m => m[1].toLowerCase());
   const headings = [...input.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].map(m => ({ level: Number(m[1]), text: m[2].replace(/<[^>]*>/g, "").trim() }));
@@ -591,7 +1046,7 @@ export async function hashBytes(bytes: Uint8Array, algorithms: string[] = ["MD5"
       const subtle = globalThis.crypto?.subtle;
       if (!subtle) throw new Error("Web Crypto is not available in this context. Use a secure context (HTTPS or localhost).");
       const digestName = algorithm.toUpperCase().replace(/^SHA(\d+)$/, "SHA-$1");
-      try { const digest = new Uint8Array(await subtle.digest(digestName, bytes.slice().buffer)); result = encoding === "base64" ? encodeBase64Utf8Bytes(digest) : [...digest].map(b => b.toString(16).padStart(2,"0")).join(""); }
+      try { const digestBuffer = new ArrayBuffer(bytes.byteLength); new Uint8Array(digestBuffer).set(bytes); const digest = new Uint8Array(await subtle.digest(digestName, digestBuffer)); result = encoding === "base64" ? encodeBase64Utf8Bytes(digest) : [...digest].map(b => b.toString(16).padStart(2,"0")).join(""); }
       catch { throw new Error(`Digest algorithm ${algorithm} is not supported by this browser.`); }
     }
     if (algorithm.toUpperCase() === "MD5" && encoding === "base64") result = encodeBase64Utf8Bytes(Uint8Array.from(result.match(/.{2}/g)!.map(hex => parseInt(hex,16))));
@@ -790,7 +1245,7 @@ function suffixFallback(op: string, input: string, secondary: string, suffix: st
 /** Returns a result when this engine owns the operation, otherwise null for existing specialist engines. */
 export async function runDeveloperStudio(op: string, input: string, secondary = "", flags = "g", now = new Date(), replacement = ""): Promise<string | null> {
   const lower = op.toLowerCase();
-  const suffix = lower.match(/(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare|explainer)$/)?.[1] ?? "";
+  const suffix = lower.match(/(?:^|-)(formatter|format|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare|explainer)$/)?.[1] ?? "";
   const value = input.trim();
 
   const template = generateDeveloperTemplate(lower, input, secondary, now); if (template !== null) return template;
@@ -890,10 +1345,10 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     return JSON.stringify({ headers: rows.map(m => ({ name: m[1], value: m[2].trim(), addresses: m[1].toLowerCase() === "x-forwarded-for" ? m[2].split(",").map(x => x.trim()).filter(Boolean) : undefined })), note: "Forwarding headers are attacker-controlled unless a trusted proxy strips and rewrites them. Do not use them alone for security decisions." }, null, 2);
   }
   if (lower.includes("status-code-explainer") || lower.includes("http-status-explainer")) {
-    const code = Number(value); if (!Number.isInteger(code) || code < 100 || code > 599) throw new Error("Enter an HTTP status code from 100 through 599.");
-    const name = HTTP_STATUS[code] || "Unassigned / extension status code";
-    const category = code < 200 ? "Informational" : code < 300 ? "Success" : code < 400 ? "Redirection" : code < 500 ? "Client error" : "Server error";
-    return JSON.stringify({ code, name, category, note: "Registry and server-specific behavior can vary; this lookup does not send an HTTP request." }, null, 2);
+    if (!/^\d{3}$/.test(value)) throw new Error("Enter a three-digit HTTP status code from 100 through 599.");
+    const code = Number(value); if (code < 100 || code > 599) throw new Error("HTTP status codes must be from 100 through 599.");
+    const name = HTTP_STATUS[code] || "Unassigned / extension status code"; const detail = HTTP_STATUS_DETAILS[code];
+    return JSON.stringify({ code, name, category: httpStatusClass(code), meaning: detail?.meaning ?? `${name}. This code is absent from the built-in registered-status table; consult the endpoint or applicable registry for exact semantics.`, typicalNextStep: detail?.action ?? "Inspect the response body, request, and API documentation; do not assume custom/unassigned statuses have standard behavior.", retryGuidance: detail?.retry ?? null, registeredInBuiltInTable: Object.hasOwn(HTTP_STATUS, code), localOnly: true, note: "This lookup never sends a request; real API behavior can be endpoint-specific." }, null, 2);
   }
   if (lower.includes("dummy-json-generator") || lower === "json-generator" || lower.endsWith("-json-generator")) {
     const count = Math.max(1, Math.min(100, Number(secondary || 3) || 3));
@@ -909,7 +1364,12 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
   if (lower.includes("json")) {
     if (lower.includes("path")) return jsonPathQuery(input, secondary || "$");
     if (lower.includes("diff")) return structuredJsonDiff(input, secondary);
-    if (lower.includes("sort")) return JSON.stringify(sortJson(JSON.parse(input)), null, 2);
+    if (lower.includes("sort")) {
+      const duplicates: string[] = []; validateJsonDetailed(input, { duplicateKeyPaths: duplicates });
+      const sorted = stringifyJsonTokenAware(sortedJsonTokens(parseJsonTokenAware(input)));
+      const warnings = jsonFormatterWarnings(input, duplicates);
+      return [sorted, warnings, duplicates.length ? "Duplicate keys are last-value-wins in object sorting because the object mapping is ambiguous." : ""].filter(Boolean).join("\n\n");
+    }
     if (lower.includes("schema") && (suffix === "generator" || suffix === "builder")) return generateJsonSchema(input);
     if (lower.includes("inspector") || lower.includes("explainer") || lower.includes("tree")) {
       const report = JSON.parse(inspectJsonDetailed(input)) as Record<string, any>;
@@ -928,8 +1388,17 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     if (suffix === "validator" || suffix === "tester") return validateJsonDetailed(input);
     if (suffix === "encoder") return encodeBase64Utf8(input);
     if (suffix === "decoder") return decodeBase64Utf8(input);
+    if (["formatter", "beautifier", "minifier"].includes(suffix)) {
+      const duplicateKeyPaths: string[] = [];
+      validateJsonDetailed(input, { duplicateKeyPaths });
+      const formatted = formatJsonSource(input, suffix === "minifier");
+      const warnings = jsonFormatterWarnings(input, duplicateKeyPaths);
+      return [...warnings, formatted].filter(Boolean).join("\n\n");
+    }
     const parsed = JSON.parse(input);
-    return JSON.stringify(parsed, null, lower.includes("minifier") ? 0 : 2);
+    const serialized = JSON.stringify(parsed, null, lower.includes("minifier") ? 0 : 2);
+    const warnings = jsonFormatterWarnings(input, []);
+    return [...warnings, serialized].filter(Boolean).join("\n\n");
   }
 
   if (lower.includes("jwt") && (suffix === "generator" || suffix === "encoder" || lower.includes("payload"))) {
@@ -965,8 +1434,19 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
   }
   if (lower.includes("html-entity") || (lower.includes("html") && (suffix === "encoder" || suffix === "decoder"))) return suffix === "encoder" ? htmlEncode(input) : htmlDecode(input);
   if (lower.includes("data-uri")) {
-    if (lower.includes("decoder")) { const match = input.match(/^data:([^,]*?),(.*)$/s); if (!match) throw new Error("Enter a valid data URI with a comma separating metadata and payload."); const meta = match[1]; return meta.includes(";base64") ? decodeBase64Utf8(match[2]) : decodeURIComponent(match[2]); }
-    const mime = secondary.trim() || "text/plain;charset=utf-8"; return `data:${mime};base64,${encodeBase64Utf8(input)}`;
+    if (lower.includes("decoder")) {
+      const match = input.match(/^data:([^,]*?),(.*)$/s);
+      if (!match) throw new Error("Enter a data URI (data:metadata,payload) with a comma separating metadata and payload.");
+      const meta = match[1]; const payload = match[2]; const isBase64 = /(?:^|;)base64(?:;|$)/i.test(meta);
+      let decoded: string;
+      try { decoded = isBase64 ? decodeBase64Utf8(payload) : decodeURIComponent(payload); }
+      catch (error) { throw new Error(`Unable to decode this data URI as UTF-8 text: ${error instanceof Error ? error.message : String(error)}. This tool is not a binary-file decoder.`); }
+      return `${decoded}\n\nData URI metadata: ${meta || "(default media type: text/plain;charset=US-ASCII)"}\nPayload mode: ${isBase64 ? "Base64 interpreted as UTF-8 text" : "percent-encoded text"}. Arbitrary binary payloads require a byte/buffer-aware workflow and are not represented losslessly here.`;
+    }
+    const rawMime = secondary.trim() || "text/plain;charset=utf-8";
+    const mime = rawMime.replace(/^data:/i, "").replace(/;base64$/i, "");
+    if (!mime || /[\r\n,]/.test(mime) || !/^[A-Za-z0-9!#$&^_.+\-]+\/[A-Za-z0-9!#$&^_.+\-]+(?:;[A-Za-z0-9!#$&^_.+\-]+=[A-Za-z0-9!#$&^_.+\-]+)*$/.test(mime)) throw new Error("Enter a valid MIME type and optional simple parameters, such as text/plain;charset=utf-8 or image/svg+xml.");
+    return `data:${mime};base64,${encodeBase64Utf8(input)}\n\nThis generator encodes UTF-8 text bytes. It does not read files or claim arbitrary binary-file support.`;
   }
 
   if (lower.includes("query-string-parser") || lower.includes("query-parser")) return parseQuery(input);
@@ -999,9 +1479,9 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
 
   if (lower.includes("cookie-parser")) return cookieParse(input);
   if (lower.includes("http-header") || lower.includes("header-builder") || lower.includes("header-format")) return headerBuilder(input);
-  if (lower.includes("cors") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCors();
-  if (lower.includes("csp") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCsp();
-  if (lower.includes("http-status") || lower.includes("status-code")) { const code = value; return code && HTTP_STATUS[Number(code)] ? `${code} ${HTTP_STATUS[Number(code)]}` : Object.entries(HTTP_STATUS).map(([c, message]) => `${c} ${message}`).join("\n"); }
+  if (lower.includes("cors") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCors(input);
+  if (lower.includes("csp") && (lower.includes("generator") || lower.includes("builder") || lower.includes("helper"))) return generateCsp(input);
+  if (lower.includes("http-status") || lower.includes("status-code")) return httpStatusLookup(input);
   if (lower.includes("mime") || lower.includes("content-type")) { const ext = value.replace(/^.*\./, "").replace(/^\./, "").toLowerCase(); return MIME_TYPES[ext] ?? Object.entries(MIME_TYPES).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}\t${v}`).join("\n"); }
 
   if (lower.includes("base64")) {
@@ -1041,7 +1521,7 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     if (suffix === "preview" || lower.includes("to-html") || lower.includes("markdown-html")) return markdownToHtmlLocal(input);
     if (suffix === "inspector" || suffix === "parser") return JSON.stringify({ lines: input.replace(/\r\n?/g,"\n").split("\n").length, headings: [...input.matchAll(/^\s*(#{1,6})\s+(.+)$/gm)].map(m => ({ level:m[1].length, text:m[2].trim() })), links: [...input.matchAll(/!?\[([^\]]*)\]\(([^)]+)\)/g)].map(m => ({ text:m[1], target:m[2] })), codeFenceCount:(input.match(/^\s*```/gm)||[]).length },null,2);
     if (suffix === "minifier") return input.replace(/\r\n?/g,"\n").split("\n").map(line=>line.trimEnd()).join("\n").replace(/\n{3,}/g,"\n\n").trim();
-    if (suffix === "formatter" || suffix === "beautifier" || suffix === "converter") return input.replace(/\r\n?/g,"\n").split("\n").map(line=>line.trimEnd()).join("\n").trimEnd()+"\n";
+    if (suffix === "formatter" || suffix === "beautifier" || suffix === "converter") return formatWithGrammar(input, "markdown");
   }
 
   if (lower.includes("xml") || lower.includes("html") || lower.includes("svg")) {
@@ -1050,6 +1530,7 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
       if (typeof DOMParser !== "undefined") { const doc = new DOMParser().parseFromString(input, "application/xml"); const parserError = doc.querySelector("parsererror"); if (parserError) throw new Error(`Invalid XML/markup: ${parserError.textContent?.trim() || "parser error"}`); return "Valid XML syntax. This does not guarantee HTML accessibility, security, or schema conformance."; }
       const stack: string[] = []; for (const m of input.matchAll(/<\/?([A-Za-z][\w:.-]*)\b[^>]*?>/g)) { const token=m[0]; const name=m[1].toLowerCase(); if(/^<\//.test(token)){if(stack.pop()!==name) throw new Error(`Mismatched closing tag: ${name}.`);} else if(!/\/>$/.test(token)&&! /^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/.test(name)) stack.push(name); } if(stack.length) throw new Error(`Unclosed markup tag: ${stack.at(-1)}.`); return "Markup tag nesting appears balanced. No full XML/HTML parser was available in this context.";
     }
+    if (suffix === "formatter" || suffix === "beautifier" || suffix === "preview") return formatWithGrammar(input, lower.includes("xml") || lower.includes("svg") ? "xml" : "html");
     if (lower.includes("inspector")) return simpleMarkupInspect(input);
     if (lower.includes("minifier")) return minifySafe(input, "html");
     if (lower.includes("encoder")) return htmlEncode(input);
@@ -1061,20 +1542,21 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     if (suffix === "decoder") return cssUnescapeContent(input);
     if (suffix === "generator") return `:root {\n  --primary: #0d9f8a;\n}\n\n.example {\n  color: var(--primary);\n  padding: 1rem;\n}\n`;
     if (suffix === "minifier") return minifySafe(input,"css");
-    if (suffix === "formatter" || suffix === "beautifier" || suffix === "preview") return formatCss(input);
+    if (suffix === "formatter" || suffix === "beautifier" || suffix === "preview") return formatWithGrammar(input, "css");
     if (suffix === "inspector" || suffix === "parser") return JSON.stringify({ rules:(input.match(/[^{}]+\{[^{}]*\}/g)||[]).map(rule=>({selector:rule.slice(0,rule.indexOf("{")).trim(),declarations:(rule.match(/:[^;{}]+/g)||[]).length})), atRules:(input.match(/@[-\w]+/g)||[]).length, braceCounts:{open:(input.match(/\{/g)||[]).length,close:(input.match(/\}/g)||[]).length}, note:"Rule inspection is lightweight and does not cover the complete CSS grammar."},null,2);
     if (suffix === "validator" || suffix === "tester") { if(!value) throw new Error("Paste CSS input first."); const opens=(input.match(/\{/g)||[]).length, closes=(input.match(/\}/g)||[]).length; if(opens!==closes) throw new Error(`CSS braces do not balance (${opens} opening, ${closes} closing).`); if(/(^|;)\s*:[^:]/m.test(input)) throw new Error("Found a declaration with no property name."); return "Basic CSS structure checks passed. This is not full CSS grammar or browser compatibility validation."; }
   }
   if (lower.includes("sql") && !lower.includes("query-builder")) {
     if (suffix === "generator") return `CREATE TABLE example_records (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n`;
     if (suffix === "minifier") return minifySafe(input,"sql");
-    if (suffix === "formatter" || suffix === "beautifier") return formatSql(input);
+    if (["formatter", "beautifier", "format"].includes(suffix)) return formatWithGrammar(input, "sql", secondary || "sql");
     if (suffix === "inspector" || suffix === "parser") return JSON.stringify({ statementCount:input.split(";").map(x=>x.trim()).filter(Boolean).length, keywords:[...new Set((input.match(/\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|FROM|WHERE|JOIN|GROUP BY|ORDER BY|LIMIT|VALUES|SET)\b/gi)||[]).map(x=>x.toUpperCase()))], parentheses:{open:(input.match(/\(/g)||[]).length,close:(input.match(/\)/g)||[]).length}, semicolons:(input.match(/;/g)||[]).length, note:"Lightweight SQL inspection only; no dialect-specific parser or database execution."},null,2);
     if (suffix === "validator" || suffix === "tester") { if(!value) throw new Error("Paste SQL input first."); const open=(input.match(/\(/g)||[]).length, close=(input.match(/\)/g)||[]).length; if(open!==close) throw new Error(`SQL parentheses do not balance (${open} opening, ${close} closing).`); if(/\b(SELECT|DELETE|UPDATE|INSERT)\b/i.test(input) && !/\b(FROM|INTO|SET|VALUES)\b/i.test(input)) throw new Error("SQL statement appears to be missing a required clause such as FROM, INTO, SET, or VALUES."); return "Basic SQL structure checks passed. Dialect syntax, schema references, and query safety are not fully validated."; }
   }
-  if (lower.includes("javascript") || lower.includes("typescript")) { if (suffix === "generator") return `/** Replace this example with your application logic. */\nexport function main() {\n  return { ok: true };\n}\n`; if (suffix === "minifier") return minifySafe(input,"javascript"); if (suffix === "formatter"||suffix === "beautifier") return input.replace(/\s*([=+])\s*/g," $1 ").replace(/\s*([{};,])\s*/g,"$1 ").trim(); }
+  if (lower.includes("javascript") || lower.includes("typescript") || lower === "js-format" || lower === "js-beautifier") { if (suffix === "generator") return `/** Replace this example with your application logic. */\nexport function main() {\n  return { ok: true };\n}\n`; if (suffix === "minifier") return minifySafe(input,"javascript"); if (["formatter", "beautifier", "format"].includes(suffix)) return formatJavascript(input, lower.includes("typescript")); }
   if (lower.includes("yaml")) {
     if (suffix === "generator") return `app:\n  name: example\n  enabled: true\n`;
+    if (suffix === "formatter" || suffix === "beautifier" || suffix === "converter") return formatWithGrammar(input, "yaml");
     if (!value) throw new Error("Paste YAML input first.");
     const normalized=input.replace(/\r\n?/g,"\n").split("\n").map(line=>line.replace(/[ \t]+$/g,"")).join("\n");
     if (suffix === "inspector" || suffix === "parser") return JSON.stringify({ lines:normalized.split("\n").length, mappings:(input.match(/^[ \t]*[^#\s][^:\n]*:[ \t]*/gm)||[]).length, sequences:(input.match(/^[ \t]*-[ \t]+/gm)||[]).length, tabsInIndent:input.split(/\r?\n/).some(line=>/^\s*\t/.test(line)), note:"This is a line-level YAML view, not a full YAML parser." },null,2);
@@ -1082,9 +1564,9 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     if (!(/^\s*[-?]\s+/.test(value) || /^[\w."'-]+\s*:/m.test(value) || value === "---")) throw new Error("Input does not resemble a basic YAML mapping or sequence.");
     if (suffix === "validator" || suffix === "tester") { const bad = normalized.split("\n").findIndex(line => /:\s*[^#].*:\s*[^#]/.test(line) && !/^\s*[^:]+:\s*['"].*['"]\s*$/.test(line)); if (bad >= 0) throw new Error(`Possible malformed scalar or mapping on line ${bad+1}. Full YAML syntax and schema validation are not available locally.`); return "Basic YAML shape check passed. Anchors, tags, block scalars and schema rules are not fully parsed."; }
     if (suffix === "minifier") return normalized.split("\n").map(line=>line.trim()).filter(Boolean).join("\n");
-    return normalized.trimEnd()+"\n";
+    return await formatWithGrammar(input, "yaml");
   }
-  if (lower.includes("graphql")) { if (lower.includes("validator")||lower.includes("tester")) { if(!value) throw new Error("Paste a GraphQL document first."); if(!/[{]/.test(value)||!/[}]/.test(value)) throw new Error("GraphQL document needs a selection set with matching braces. This is a basic structural check, not full schema validation."); let depth=0; for(const ch of value){if(ch==="{")depth++;if(ch==="}")depth--;if(depth<0)throw new Error("Unexpected closing brace in GraphQL document.");}if(depth!==0)throw new Error("GraphQL selection braces are unbalanced.");return "GraphQL selection braces are balanced. Schema/type validation is not performed."; } if(lower.includes("minifier"))return minifySafe(input,"graphql"); if(lower.includes("formatter")||lower.includes("beautifier")) return input.replace(/\s*([{}():,])\s*/g,"$1 ").replace(/\s+/g," ").trim(); }
+  if (lower.includes("graphql")) { if (lower.includes("validator")||lower.includes("tester")) { if(!value) throw new Error("Paste a GraphQL document first."); if(!/[{]/.test(value)||!/[}]/.test(value)) throw new Error("GraphQL document needs a selection set with matching braces. This is a basic structural check, not full schema validation."); let depth=0; for(const ch of value){if(ch==="{")depth++;if(ch==="}")depth--;if(depth<0)throw new Error("Unexpected closing brace in GraphQL document.");}if(depth!==0)throw new Error("GraphQL selection braces are unbalanced.");return "GraphQL selection braces are balanced. Schema/type validation is not performed."; } if(lower.includes("minifier"))return minifySafe(input,"graphql"); if(lower.includes("formatter")||lower.includes("beautifier")) return formatWithGrammar(input, "graphql"); }
 
   if (suffix === "encoder" && /^(docker|git|graphql|http|javascript|kubernetes|markdown|nginx|openapi|sql|typescript|yaml|csv|mime)$/.test(genericEncodingFamily)) return encodeBase64Utf8(input);
   if (suffix === "decoder" && /^(docker|git|graphql|http|javascript|kubernetes|markdown|nginx|openapi|sql|typescript|yaml|csv|mime)$/.test(genericEncodingFamily)) return decodeBase64Utf8(input);

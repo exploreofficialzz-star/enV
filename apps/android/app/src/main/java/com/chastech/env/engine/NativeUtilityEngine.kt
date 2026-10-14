@@ -1,5 +1,6 @@
 package com.chastech.env.engine
 
+import android.util.Base64
 import com.chastech.env.data.ToolRecord
 import org.json.JSONArray
 import org.json.JSONObject
@@ -82,7 +83,7 @@ object NativeUtilityEngine {
         20 to "FTP data",21 to "FTP control",22 to "SSH",23 to "Telnet",25 to "SMTP",53 to "DNS",67 to "DHCP server",68 to "DHCP client",80 to "HTTP",110 to "POP3",123 to "NTP",143 to "IMAP",161 to "SNMP",194 to "IRC",389 to "LDAP",443 to "HTTPS",445 to "SMB",465 to "SMTPS",587 to "SMTP submission",636 to "LDAPS",993 to "IMAPS",995 to "POP3S",1433 to "MS SQL Server",1521 to "Oracle",2049 to "NFS",2375 to "Docker",2376 to "Docker TLS",3000 to "Development HTTP",3306 to "MySQL",3389 to "RDP",5432 to "PostgreSQL",5672 to "AMQP",6379 to "Redis",8080 to "HTTP alternate",8443 to "HTTPS alternate",9200 to "Elasticsearch"
     )
 
-    private val httpStatuses = listOf(200 to "OK",201 to "Created",204 to "No Content",301 to "Moved Permanently",302 to "Found",304 to "Not Modified",400 to "Bad Request",401 to "Unauthorized",403 to "Forbidden",404 to "Not Found",405 to "Method Not Allowed",409 to "Conflict",422 to "Unprocessable Content",429 to "Too Many Requests",500 to "Internal Server Error",502 to "Bad Gateway",503 to "Service Unavailable",504 to "Gateway Timeout")
+    private val httpStatuses = listOf(100 to "Continue",101 to "Switching Protocols",102 to "Processing",103 to "Early Hints",104 to "Upload Resumption Supported (temporary registration)",200 to "OK",201 to "Created",202 to "Accepted",203 to "Non-Authoritative Information",204 to "No Content",205 to "Reset Content",206 to "Partial Content",207 to "Multi-Status",208 to "Already Reported",226 to "IM Used",300 to "Multiple Choices",301 to "Moved Permanently",302 to "Found",303 to "See Other",304 to "Not Modified",305 to "Use Proxy (deprecated)",306 to "(Unused)",307 to "Temporary Redirect",308 to "Permanent Redirect",400 to "Bad Request",401 to "Unauthorized",402 to "Payment Required",403 to "Forbidden",404 to "Not Found",405 to "Method Not Allowed",406 to "Not Acceptable",407 to "Proxy Authentication Required",408 to "Request Timeout",409 to "Conflict",410 to "Gone",411 to "Length Required",412 to "Precondition Failed",413 to "Content Too Large",414 to "URI Too Long",415 to "Unsupported Media Type",416 to "Range Not Satisfiable",417 to "Expectation Failed",418 to "I'm a teapot",421 to "Misdirected Request",422 to "Unprocessable Content",423 to "Locked",424 to "Failed Dependency",425 to "Too Early",426 to "Upgrade Required",428 to "Precondition Required",429 to "Too Many Requests",431 to "Request Header Fields Too Large",451 to "Unavailable For Legal Reasons",500 to "Internal Server Error",501 to "Not Implemented",502 to "Bad Gateway",503 to "Service Unavailable",504 to "Gateway Timeout",505 to "HTTP Version Not Supported",506 to "Variant Also Negotiates",507 to "Insufficient Storage",508 to "Loop Detected",510 to "Not Extended",511 to "Network Authentication Required")
     private val httpMethods = listOf("GET" to "Retrieve a representation","POST" to "Submit data for processing","PUT" to "Replace a resource","PATCH" to "Partially modify a resource","DELETE" to "Remove a resource","HEAD" to "Headers without response body","OPTIONS" to "Discover communication options","CONNECT" to "Establish a tunnel","TRACE" to "Diagnostic loop-back method")
     private val contentTypes = listOf("application/json","application/xml","application/x-www-form-urlencoded","multipart/form-data","text/plain","text/html","text/css","text/javascript","image/png","image/jpeg","image/webp","audio/mpeg","video/mp4")
 
@@ -177,8 +178,6 @@ object NativeUtilityEngine {
     }
 
     /** Strict text decode: reject bad padding, noncanonical pad bits, and invalid UTF-8. */
-    private fun encodeBase64NoWrap(bytes: ByteArray): String = java.util.Base64.getEncoder().encodeToString(bytes)
-
     private fun decodeBase64Text(input: String, urlSafe: Boolean = false): String {
         val compact = input.filterNot { it.isWhitespace() }
         val alphabet = if (urlSafe) "[A-Za-z0-9_-]" else "[A-Za-z0-9+/]"
@@ -340,9 +339,9 @@ object NativeUtilityEngine {
             "url-encode" -> encodeURIComponent(opts["text"] ?: input)
             "url-decode" -> decodeURIComponent(opts["text"] ?: input)
             "port-lookup","port-reference" -> { val name=opts["name"]?.trim()?.lowercase(); if(!name.isNullOrBlank()) commonPorts.entries.filter { it.value.lowercase().contains(name) }.joinToString("\n") { "${it.key}: ${it.value}" }.ifBlank { "No match in the common-port reference." } else { val p=(opts["port"] ?: input).toIntOrNull() ?: 443; commonPorts[p]?.let { "$p/TCP or UDP: $it" } ?: "$p: not in the built-in common-port reference." } }
-            "http-status-reference" -> httpStatuses.joinToString("\n") { "${it.first}: ${it.second}" }
+            "http-status-reference" -> httpStatuses.joinToString("\n") { "${it.first}: ${it.second}" + if (it.first == 418) " (IANA registry: unused; teapot meaning is historical)" else "" }
             "header-format","header-parser" -> lines(opts["headers"] ?: input.ifBlank { "Content-Type: application/json\nAuthorization: Bearer YOUR_TOKEN" }).map { line -> val i=line.indexOf(":"); if(i>0) "${line.substring(0,i).trim()}: ${line.substring(i+1).trim()}" else line }.let { rows -> if(op=="header-parser") rows.map { val i=it.indexOf(":"); if(i>0) "${it.substring(0,i)} → ${it.substring(i+1).trim()}" else it }.joinToString("\n") else rows.joinToString("\n") }
-            "basic-auth-header" -> "Basic ${encodeBase64NoWrap("${opts["username"] ?: ""}:${opts["password"] ?: ""}".toByteArray(StandardCharsets.UTF_8))}"
+            "basic-auth-header" -> "Basic ${Base64.encodeToString("${opts["username"] ?: ""}:${opts["password"] ?: ""}".toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}"
             "bearer-header" -> "Bearer ${opts["token"] ?: input}"
             "connection-info" -> "Online status is device/runtime dependent; native engine cannot expose browser Network Information API fields."
             "http-method-reference" -> httpMethods.joinToString("\n") { "${it.first}: ${it.second}" }
@@ -423,7 +422,7 @@ object NativeUtilityEngine {
         if (value.equals("00000000-0000-0000-0000-000000000000", true)) return "Valid Nil UUID (all-zero identifier)."
         if (value.equals("ffffffff-ffff-ffff-ffff-ffffffffffff", true)) return "Valid Max UUID (all-one identifier)."
         val match = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-([1-8])[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", RegexOption.IGNORE_CASE).matchEntire(value)
-        return match?.groupValues?.get(1)?.let { "Valid UUID v$it" } ?: "Invalid UUID"
+        return match?.groupValues?.get(1)?.let { "Valid UUID version $it (RFC variant)." } ?: "Invalid UUID: expected canonical 8-4-4-4-12 form with UUID version 1–8 and RFC variant."
     }
 
     private fun runDeveloper(op: String, input: String, opts: Map<String, String>): String {
@@ -488,7 +487,8 @@ object NativeUtilityEngine {
             op=="jwt-decoder" || op=="jwt-expiration-checker" -> {
                 val parts=input.trim().split('.')
                 require(parts.size==3){"A JWT compact token must contain three dot-separated parts."}
-                val header=parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
+                val headerText=b64UrlDecode(parts[0])
+                val header=parseJson(headerText) as? JSONObject ?: error("JWT header must be a JSON object.")
                 val payloadText=b64UrlDecode(parts[1])
                 val payload=parseJson(payloadText) as? JSONObject ?: error("JWT payload must be a JSON object.")
                 val now=System.currentTimeMillis()/1000.0
@@ -508,21 +508,24 @@ object NativeUtilityEngine {
                 }
                 val claims=JSONObject().put("exp",timeClaim("exp")).put("iat",timeClaim("iat")).put("nbf",timeClaim("nbf"))
                     .put("sub",payload.opt("sub") ?: JSONObject.NULL).put("iss",payload.opt("iss") ?: JSONObject.NULL).put("aud",payload.opt("aud") ?: JSONObject.NULL)
+                val headerUnsafe=scanUnsafeJsonIntegerTokens(headerText)
                 val unsafe=scanUnsafeJsonIntegerTokens(payloadText)
+                val allUnsafe=JSONArray(); for(i in 0 until headerUnsafe.length()) allUnsafe.put(headerUnsafe.getJSONObject(i)); for(i in 0 until unsafe.length()) allUnsafe.put(unsafe.getJSONObject(i))
                 JSONObject().put("warning","DECODE ONLY — signature not verified. Decoding does not prove the token is authentic or trusted.")
                     .put("header",header).put("payload",payload).put("claims",claims).put("signaturePresent",parts[2].isNotEmpty()).put("signatureVerified",false)
-                    .put("largeIntegerPrecisionWarning",if(unsafe.length()>0) "Payload includes integer tokens beyond JavaScript's exact integer range; viewers using binary floating point may lose precision." else JSONObject.NULL).put("largeIntegerTokens",unsafe).toString(2)
+                    .put("largeIntegerPrecisionWarning",if(allUnsafe.length()>0) "JWT header or payload contains integer tokens beyond JavaScript's exact integer range; parsed display fields may lose precision. Use headerRawJson and payloadRawJson to inspect the original digits." else JSONObject.NULL)
+                    .put("largeIntegerTokens",allUnsafe).put("headerRawJson",headerText).put("payloadRawJson",payloadText)
+                    .put("rawNumericPrecision",JSONObject().put("headerUnsafeIntegerTokens",headerUnsafe).put("payloadUnsafeIntegerTokens",unsafe)).toString(2)
             }
             op=="uuid-generator" -> List(max(1, min(100, (opts["count"]?.toIntOrNull() ?: 10)))) { uuid() }.joinToString("\n")
             op=="uuid-validator" -> uuidValid(input)
-            op=="json-beautifier" || op=="json-formatter" || op=="json-minifier" || op=="json-validator" -> { if(op=="json-validator"){parseJson(input);"Valid JSON (RFC 8259-compatible parser)."} else if(op=="json-minifier") jsonMin(input) else pretty(input) }
+            op=="json-beautifier" || op=="json-formatter" || op=="json-minifier" || op=="json-validator" -> {
+                if(op=="json-validator") { parseJson(input); "Valid JSON (RFC 8259-compatible parser)." }
+                else { val formatted=losslessJsonFormat(input, pretty = op!="json-minifier"); val warnings=developerJsonFormattingWarnings(input); if(warnings.isBlank()) formatted else "$warnings\n\n$formatted" }
+            }
             op=="query-string-parser" -> input
             op=="url-parser" -> developerUrlInfo(input)
-            op=="http-status-lookup" -> {
-                val code=input.trim()
-                httpStatuses.firstOrNull { it.first.toString()==code }?.let { "$code ${it.second}" }
-                    ?: httpStatuses.joinToString("\n") { "${it.first} ${it.second}" }
-            }
+            op=="http-status-lookup" -> developerHttpStatusLookup(input)
             op=="data-uri-generator" -> "data:text/plain;base64,${encode("base64",input)}"
             op=="markdown-preview" || op=="markdown-to-html" -> formatDeveloperMarkup(input)
             op=="user-agent-parser" -> input
@@ -605,75 +608,44 @@ object NativeUtilityEngine {
      * nodes are built. This traversal counts the structure but never mutates or uploads the document.
      */
     private fun developerJsonInspector(raw: String, maxNodes: Int = 100_000): String {
-        val byteCount = raw.toByteArray(StandardCharsets.UTF_8).size
-        require(byteCount <= 50 * 1024 * 1024) {
+        require(raw.toByteArray(StandardCharsets.UTF_8).size <= 50 * 1024 * 1024) {
             "JSON input exceeds the 50 MiB inspection safety limit; inspect smaller sections."
         }
-        // Validate syntax without materializing an object: Android JSONTokener rejects duplicate
-        // object keys, but inspection must report them rather than fail on otherwise-valid JSON.
-        StrictJsonValidator(raw).validate()
-        var index = 0
-        var nodes = 0; var maxDepth = 0; var objects = 0; var arrays = 0
-        var properties = 0; var arrayItems = 0; var strings = 0
-        var truncated = false; var stopped = false
-        val duplicates = mutableListOf<String>()
-        fun whitespace() { while (index < raw.length && raw[index] in charArrayOf(' ', '\t', '\r', '\n')) index++ }
-        fun readString(): String {
-            val start = index++
-            while (index < raw.length) {
-                val ch = raw[index++]
-                if (ch == '\\' && index < raw.length) index++
-                else if (ch == '"') break
-            }
-            return org.json.JSONTokener(raw.substring(start, index)).nextValue() as String
+        // The caller also performs the dispatcher’s strict JSON parse; use JSONTokener here to
+        // avoid coupling this reusable class-level helper to a local dispatcher function.
+        val root = org.json.JSONTokener(raw).nextValue()
+        fun typeOf(value: Any?): String = when (value) {
+            is JSONObject -> "object"; is JSONArray -> "array"; JSONObject.NULL -> "null"
+            is String -> "string"; is Number -> "number"; is Boolean -> "boolean"; else -> "unknown"
         }
-        fun value(path: String, depth: Int) {
-            whitespace()
-            if (stopped) return
-            if (nodes >= maxNodes || depth > 100) { truncated = true; stopped = true; return }
-            nodes++; maxDepth = maxOf(maxDepth, depth)
-            when (raw[index]) {
-                '"' -> { strings++; readString() }
-                '{' -> {
-                    objects++; index++; whitespace()
-                    val keys = mutableSetOf<String>()
-                    if (index < raw.length && raw[index] == '}') index++ else while (!stopped) {
-                        whitespace(); val key = readString(); properties++
-                        val child = "$path[${JSONObject.quote(key)}]"
-                        if (!keys.add(key)) duplicates += child
-                        whitespace(); index++ // colon; syntax was already checked above
-                        value(child, depth + 1); whitespace()
-                        if (stopped) break
-                        if (raw[index] == '}') { index++; break }
-                        index++ // comma
-                    }
+        var nodes=0; var maxDepth=0; var objects=0; var arrays=0; var properties=0; var arrayItems=0; var strings=0
+        val stack=java.util.ArrayDeque<Pair<Any?,Int>>()
+        stack.addLast(root to 0)
+        while (stack.isNotEmpty() && nodes < maxNodes) {
+            val (value,depth)=stack.removeLast(); nodes++; maxDepth=maxOf(maxDepth,depth)
+            when(value) {
+                is JSONObject -> { objects++; val keys=value.keys(); val entries=mutableListOf<Pair<String,Any?>>()
+                    while(keys.hasNext()) { val key=keys.next(); entries += key to value.opt(key) }
+                    properties += entries.size; entries.forEach { stack.addLast(it.second to depth+1) }
                 }
-                '[' -> {
-                    arrays++; index++; whitespace(); var item = 0
-                    if (index < raw.length && raw[index] == ']') index++ else while (!stopped) {
-                        arrayItems++; value("$path[$item]", depth + 1); item++; whitespace()
-                        if (stopped) break
-                        if (raw[index] == ']') { index++; break }
-                        index++ // comma
-                    }
-                }
-                else -> while (index < raw.length && raw[index] !in charArrayOf(',', ']', '}', ' ', '\t', '\r', '\n')) index++
+                is JSONArray -> { arrays++; arrayItems += value.length(); for(i in value.length()-1 downTo 0) stack.addLast(value.opt(i) to depth+1) }
+                is String -> strings++
             }
         }
-        value("$", 0)
-        val rootIndex = raw.indexOfFirst { !it.isWhitespace() }
-        val rootType = when (raw[rootIndex]) { '{' -> "object"; '[' -> "array"; '"' -> "string"; 't','f' -> "boolean"; 'n' -> "null"; else -> "number" }
-        val unsafe = scanUnsafeJsonIntegerTokens(raw)
-        val warnings = JSONArray()
-        if (unsafe.length() > 0) warnings.put("Raw integer tokens exceed JavaScript's exact integer range; keep exact identifiers as strings when interoperating with JavaScript.")
-        if (duplicates.isNotEmpty()) warnings.put("Duplicate object keys are ambiguous; parsers commonly keep only the last occurrence.")
-        if (truncated) warnings.put("Structural inspection or duplicate-key scan stopped at its safety limit.")
+        val truncated=stack.isNotEmpty()
+        val unsafe=scanUnsafeJsonIntegerTokens(raw)
+        val (duplicateKeys, duplicateScanTruncated)=scanDuplicateJsonKeyPaths(raw)
+        val warnings=JSONArray()
+        if(unsafe.length()>0) warnings.put("Raw integer tokens exceed JavaScript's exact integer range; keep exact identifiers as strings when interoperating with JavaScript.")
+        if(duplicateKeys.isNotEmpty()) warnings.put("Duplicate object keys are ambiguous; parsers commonly keep only the last occurrence.")
+        if(truncated) warnings.put("Structural traversal stopped at $maxNodes nodes to protect responsiveness.")
+        if(duplicateScanTruncated) warnings.put("Duplicate-key scan reached its 100,000-node limit; keys below that point may not have been inspected.")
         warnings.put("This is structural inspection, not JSON Schema validation.")
-        return JSONObject().put("rootType", rootType).put("characters", raw.length).put("utf8Bytes", byteCount)
-            .put("nodeCount", nodes).put("maximumDepth", maxDepth).put("objectCount", objects).put("arrayCount", arrays)
-            .put("propertyCount", properties).put("arrayItems", arrayItems).put("stringCount", strings).put("unsafeIntegerTokens", unsafe)
-            .put("duplicateKeys", JSONArray(duplicates.distinct().take(100))).put("duplicateScanTruncated", truncated)
-            .put("truncated", truncated).put("warnings", warnings).put("privacy", "Inspection is local; no network request is made.").toString(2)
+        return JSONObject().put("rootType",typeOf(root)).put("characters",raw.length).put("utf8Bytes",raw.toByteArray(StandardCharsets.UTF_8).size)
+            .put("nodeCount",nodes).put("maximumDepth",maxDepth).put("objectCount",objects).put("arrayCount",arrays)
+            .put("propertyCount",properties).put("arrayItems",arrayItems).put("stringCount",strings).put("unsafeIntegerTokens",unsafe)
+            .put("duplicateKeys",JSONArray(duplicateKeys.distinct().take(100))).put("duplicateScanTruncated",duplicateScanTruncated)
+            .put("truncated",truncated).put("warnings",warnings).put("privacy","Inspection is local; no network request is made.").toString(2)
     }
 
     /** Parse JSON container structure only to detect duplicate decoded key strings without scanning quoted text as syntax. */
@@ -727,6 +699,177 @@ object NativeUtilityEngine {
         return duplicates to truncated
     }
 
+    /**
+     * Lossless JSON whitespace formatter. Syntax is validated first, but output is emitted from
+     * the original token stream so unsafe integers and duplicate keys are not rewritten.
+     */
+    private fun losslessJsonFormat(raw: String, pretty: Boolean): String {
+        StrictJsonValidator(raw).validate()
+        val out = StringBuilder(raw.length + 32)
+        val stack = mutableListOf<Pair<Char, Boolean>>() // opening delimiter, has any members/items
+        var i = 0
+        fun indent(level: Int) = "  ".repeat(level.coerceAtLeast(0))
+        fun markParent() { if (stack.isNotEmpty()) stack[stack.lastIndex] = stack.last().first to true }
+        fun trimWhitespace() { while (out.isNotEmpty() && out.last().isWhitespace()) out.setLength(out.length - 1) }
+        while (i < raw.length) {
+            val ch = raw[i]
+            if (ch.isWhitespace()) { i++; continue }
+            if (ch == '"') {
+                markParent()
+                val start = i++
+                while (i < raw.length) {
+                    if (raw[i] == '\\') { i = (i + 2).coerceAtMost(raw.length); continue }
+                    val end = raw[i++]
+                    if (end == '"') break
+                }
+                out.append(raw, start, i)
+                continue
+            }
+            if (ch == '{' || ch == '[') {
+                markParent()
+                out.append(ch); stack += ch to false; i++
+                if (pretty) {
+                    val closing = if (ch == '{') '}' else ']'
+                    var look = i
+                    while (look < raw.length && raw[look].isWhitespace()) look++
+                    if (look < raw.length && raw[look] != closing) out.append('\n').append(indent(stack.size))
+                }
+                continue
+            }
+            if (ch == '}' || ch == ']') {
+                require(stack.isNotEmpty() && ((stack.last().first == '{' && ch == '}') || (stack.last().first == '[' && ch == ']'))) { "Malformed JSON container structure." }
+                val frame = stack.removeAt(stack.lastIndex)
+                if (pretty && frame.second) { trimWhitespace(); out.append('\n').append(indent(stack.size)) }
+                out.append(ch); i++; continue
+            }
+            if (ch == ',') {
+                trimWhitespace(); out.append(',')
+                if (pretty) out.append('\n').append(indent(stack.size))
+                i++; continue
+            }
+            if (ch == ':') {
+                trimWhitespace(); out.append(if (pretty) ": " else ":"); i++; continue
+            }
+            markParent(); out.append(ch); i++
+        }
+        require(stack.isEmpty()) { "Malformed JSON container structure." }
+        return out.toString()
+    }
+
+    /** Warnings for JSON formatter output; scanner ignores quoted string contents. */
+    private fun developerJsonFormattingWarnings(raw: String): String {
+        val warnings = mutableListOf<String>()
+        val unsafe = scanUnsafeJsonIntegerTokens(raw)
+        if (unsafe.length() > 0) warnings += "WARNING: JavaScript Number cannot safely represent this integer; value may be rounded. Native output may retain platform-specific numeric representation; keep exact identifiers as strings when interoperating with JavaScript. Tokens: " + (0 until minOf(unsafe.length(), 5)).joinToString(", ") { unsafe.getJSONObject(it).optString("token") }
+        val duplicates = scanDuplicateJsonKeyPaths(raw).first.distinct()
+        if (duplicates.isNotEmpty()) warnings += "NOTE: Duplicate object keys detected at ${duplicates.take(20).joinToString(", ")}; JSON parsers commonly keep only the last occurrence."
+        return warnings.joinToString("\n\n")
+    }
+
+    /** Explain the queried code; the operation is entirely local and never sends a request. */
+    private fun developerHttpStatusLookup(raw: String): String {
+        val code = raw.trim()
+        if (code.isBlank()) return httpStatuses.joinToString("\n") { "${it.first} ${it.second}" + if (it.first == 418) " (IANA registry: unused; teapot meaning is historical)" else "" }
+        val numeric = code.toIntOrNull() ?: throw IllegalArgumentException("Enter an HTTP status code from 100 through 599.")
+        require(numeric in 100..599) { "Enter an HTTP status code from 100 through 599." }
+        val name = httpStatuses.firstOrNull { it.first == numeric }?.second ?: "Unassigned / extension status code"
+        val category = when { numeric < 200 -> "Informational"; numeric < 300 -> "Success"; numeric < 400 -> "Redirection"; numeric < 500 -> "Client error"; else -> "Server error" }
+        val meaning = when (numeric) {
+            400 -> "The request is malformed. Action: check syntax, required fields, and request encoding."
+            401 -> "Authentication is missing or invalid. Action: check credentials and the authentication scheme; this differs from permission denial."
+            403 -> "The server refuses the request. Action: check authorization policy and account permissions."
+            404 -> "The resource was not found. Action: check the path, identifier, and route deployment."
+            409 -> "The request conflicts with current resource state. Action: refresh state or resolve the conflict before retrying."
+            104 -> "Upload Resumption Supported is currently a temporary IANA registration listed to expire on 2026-11-13 unless renewed or updated. Use only with a documented resumable-upload protocol."
+            305 -> "Use Proxy is deprecated; do not rely on it as a routine redirect instruction."
+            306 -> "Unused in the current general HTTP registry; do not assign private semantics to it on public endpoints."
+            418 -> "I'm a teapot is the historical RFC 2324 joke meaning. The current IANA HTTP Status Code Registry marks 418 as unused for general HTTP semantics; treat the teapot label as historical/application-specific and consult the service documentation."
+            422 -> "The server understood the request content type and syntax but could not process the contained instructions. Action: validate field-level and domain constraints."
+            429 -> "Too many requests in a time window. Action: respect Retry-After and use bounded backoff to avoid retry storms."
+            500 -> "The server hit an unexpected condition. Action: inspect server logs with a correlation ID; do not expose internals to end users."
+            502 -> "A gateway received an invalid upstream response. Action: inspect upstream health and gateway logs."
+            503 -> "The server is temporarily unable to handle the request, commonly due to overload or maintenance. Action: respect Retry-After and retry with bounded backoff."
+            504 -> "A gateway timed out waiting for an upstream. Action: inspect upstream latency and request deadlines."
+            else -> "$name. This local lookup does not send an HTTP request."
+        }
+        return "$numeric $name\nCategory: $category\nMeaning: $meaning\nLocal lookup only; no request is sent."
+    }
+
+    private fun configStringList(config: JSONObject, key: String, defaults: List<String>): List<String> {
+        if (!config.has(key) || config.isNull(key)) return defaults
+        val raw = config.get(key)
+        val values = when (raw) {
+            is String -> listOf(raw)
+            is JSONArray -> (0 until raw.length()).map { index -> raw.get(index) as? String ?: throw IllegalArgumentException("$key must contain only strings.") }
+            else -> throw IllegalArgumentException("$key must be a string or an array of strings.")
+        }
+        require(values.all { it.isNotBlank() && !it.contains(Regex("[\r\n,;]")) }) { "$key must contain non-empty strings without commas, semicolons, or line breaks." }
+        return values.map { it.trim() }.distinct()
+    }
+
+    /** Validated CORS helper; multi-origin output is explicit middleware pseudocode, never a comma-joined origin header. */
+    private fun developerCorsGenerator(raw: String): String {
+        if (!raw.trimStart().startsWith("{")) return "Access-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n\nReplace the sample with an explicit allow-list. Reject unlisted origins, handle OPTIONS preflight, and never use '*' with credentialed requests. No request was sent.\n"
+        val config = runCatching { JSONObject(raw) }.getOrElse { throw IllegalArgumentException("CORS configuration must be valid JSON.") }
+        val origins = configStringList(config, "origins", listOf("https://app.example.com")).map { origin ->
+            if (origin == "*") origin else {
+                val uri = runCatching { java.net.URI(origin) }.getOrNull()
+                require(uri != null && uri.scheme?.lowercase(Locale.US) in setOf("http", "https") && !uri.host.isNullOrBlank() && uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null && uri.rawPath.orEmpty().let { it.isEmpty() || it == "/" }) {
+                    "Invalid CORS origin '$origin'; use only an http(s) scheme and authority, without path, query, credentials, or fragment."
+                }
+                "${uri!!.scheme.lowercase(Locale.US)}://${uri.rawAuthority}".trimEnd('/')
+            }
+        }.distinct()
+        require(origins.isNotEmpty()) { "origins must contain at least one explicitly allowed origin." }
+        val methods = configStringList(config, "methods", listOf("GET", "POST", "OPTIONS")).map { it.uppercase(Locale.US) }
+        require(methods.isNotEmpty()) { "methods must contain at least one allowed method." }
+        require(methods.all { it.matches(Regex("^[!#$%&'*+.^_`|~0-9A-Z-]+$")) }) { "methods contains an invalid HTTP method token." }
+        val headers = configStringList(config, "headers", listOf("Content-Type", "Authorization"))
+        val expose = configStringList(config, "exposeHeaders", emptyList())
+        require((headers + expose).all { it.matches(Regex("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")) }) { "headers and exposeHeaders must contain valid HTTP field-name tokens." }
+        val credentials = if (config.has("credentials")) config.get("credentials") as? Boolean ?: throw IllegalArgumentException("credentials must be true or false.") else false
+        val maxAge = if (config.has("maxAge")) config.get("maxAge").toString().toDoubleOrNull()?.takeIf { it.isFinite() && it % 1.0 == 0.0 }?.toInt() ?: throw IllegalArgumentException("maxAge must be an integer from 0 through 86400 seconds.") else 600
+        require(maxAge in 0..86400) { "maxAge must be an integer from 0 through 86400 seconds." }
+        require(!(credentials && origins.contains("*"))) { "CORS forbids Access-Control-Allow-Origin: * for credentialed requests. Use a strict explicit origin allow-list." }
+        val shared = buildList {
+            add("Access-Control-Allow-Methods: ${methods.joinToString(", ")}")
+            add("Access-Control-Allow-Headers: ${headers.joinToString(", ")}")
+            if (expose.isNotEmpty()) add("Access-Control-Expose-Headers: ${expose.joinToString(", ")}")
+            if (credentials) add("Access-Control-Allow-Credentials: true")
+            add("Access-Control-Max-Age: $maxAge")
+        }
+        if (origins.size == 1) return "Access-Control-Allow-Origin: ${origins.first()}\nVary: Origin\n${shared.joinToString("\n")}\n\nValidate the Origin server-side and handle OPTIONS preflight. ${if (origins.first() == "*") "Wildcard is suitable only for intentionally public non-credentialed resources." else "This response is a template; enforce the allowed origin at the server."} No request was sent.\n"
+        return "# CORS middleware pseudocode — exact allow-list check is required. Never comma-join origins.\nallowedOrigins = ${JSONArray(origins).toString()}\n\nif request.origin is in allowedOrigins:\n    response.setHeader(\"Access-Control-Allow-Origin\", request.origin)\n    response.setHeader(\"Vary\", \"Origin\")\n${shared.joinToString("\n") { "    response.setHeader(\"${it.substringBefore(": ")}\", \"${it.substringAfter(": ")}\")" }}\n\nReject unlisted origins and handle OPTIONS preflight. This is explanatory pseudocode, not directly executable middleware. No request was sent.\n"
+    }
+
+    private fun developerCspGenerator(raw: String): String {
+        if (!raw.trimStart().startsWith("{")) return "Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests\n\nReview script, style, font, image, connect and frame requirements in staging before enforcement. A strict policy can break features; this generator does not inspect your application or guarantee completeness.\n"
+        val config = runCatching { JSONObject(raw) }.getOrElse { throw IllegalArgumentException("CSP configuration must be valid JSON.") }
+        require(config.length() > 0) { "Provide at least one CSP directive." }
+        val directives = linkedMapOf<String, List<String>>()
+        val weak = mutableListOf<String>()
+        val iterator = config.keys()
+        while (iterator.hasNext()) {
+            val original = iterator.next(); val name = original.lowercase(Locale.US)
+            require(name.matches(Regex("^[a-z][a-z0-9-]*$")) && !directives.containsKey(name)) { "Invalid or duplicate CSP directive: $original" }
+            val rawValues = config.opt(original)
+            val values = when (rawValues) {
+                null, JSONObject.NULL -> emptyList()
+                is String -> configStringList(JSONObject().put("value", rawValues), "value", emptyList())
+                is JSONArray -> configStringList(JSONObject().put("value", rawValues), "value", emptyList())
+                else -> throw IllegalArgumentException("CSP directive $name must be a string or array of strings.")
+            }
+            for (value in values) if (value == "*" || value.equals("'unsafe-inline'", true) || value.equals("'unsafe-eval'", true) || value.matches(Regex("(?i)^http:/+$"))) weak += "$name $value"
+            directives[name] = values
+        }
+        if (!directives.containsKey("default-src")) directives["default-src"] = listOf("'self'")
+        if (!directives.containsKey("object-src")) directives["object-src"] = listOf("'none'")
+        if (!directives.containsKey("base-uri")) directives["base-uri"] = listOf("'self'")
+        val policy = directives.entries.joinToString("; ") { (name, values) -> if (values.isEmpty()) name else "$name ${values.joinToString(" ")}" }
+        val review = if (weak.isNotEmpty()) "Review broad/unsafe source expressions before deployment: ${weak.distinct().joinToString(", ")}." else "Review required sources in staging before enforcing this policy."
+        return "Content-Security-Policy: $policy\n\n$review This generator does not inspect your application or guarantee a complete CSP.\n"
+    }
+
     /** Scan JSON number tokens outside quoted strings, so an ID embedded in text is not a false positive. */
     private fun scanUnsafeJsonIntegerTokens(raw: String, limit: Int = 50): JSONArray {
         val result=JSONArray(); var i=0; var line=1; var column=1
@@ -764,7 +907,7 @@ object NativeUtilityEngine {
         val values = JSONArray()
         algorithms.forEach { algorithm ->
             val digest = MessageDigest.getInstance(algorithm).digest(bytes)
-            val value = if (encoding == "base64") encodeBase64NoWrap(digest) else digest.joinToString("") { "%02x".format(Locale.US,it.toInt() and 0xff) }
+            val value = if (encoding == "base64") Base64.encodeToString(digest,Base64.NO_WRAP) else digest.joinToString("") { "%02x".format(Locale.US,it.toInt() and 0xff) }
             values.put(JSONObject().put("algorithm",algorithm).put("encoding",encoding).put("digest",value))
         }
         return JSONObject().put("localOnly",true).put("note","MD5 and SHA-1 are legacy checksums, not password-hashing algorithms.").put("hashes",values).toString(2)
@@ -795,7 +938,7 @@ object NativeUtilityEngine {
         val rows = JSONArray()
         digests.forEach { (algorithm, digest) ->
             val bytes = digest.digest()
-            val value = if (encoding == "base64") encodeBase64NoWrap(bytes) else bytes.joinToString("") { "%02x".format(Locale.US, it.toInt() and 0xff) }
+            val value = if (encoding == "base64") Base64.encodeToString(bytes, Base64.NO_WRAP) else bytes.joinToString("") { "%02x".format(Locale.US, it.toInt() and 0xff) }
             rows.put(JSONObject().put("algorithm", algorithm).put("encoding", encoding).put("digest", value))
         }
         return JSONObject().put("localOnly", true).put("bytesRead", total).put("note", "MD5 and SHA-1 are legacy checksums, not password-hashing algorithms.").put("hashes", rows).toString(2)
@@ -881,9 +1024,9 @@ object NativeUtilityEngine {
             lower.contains("readme") && lower.contains("generator") -> "# ${subject.ifBlank { "Project Name" }}\n\nDescribe what this project does and who it is for.\n\n## Features\n- Main capability\n- Key constraints and privacy model\n\n## Requirements\n- Supported runtime and tool versions\n\n## Getting started\n\n```sh\n# Replace with the project's documented install command\nnpm ci\nnpm run dev\n```\n\n## Configuration\nCopy .env.example to your local environment and provide the required values. Never commit secrets.\n\n## Tests\n```sh\nnpm test\n```\n\n## License\nDocument the license applied to this repository.\n"
             lower.contains("license") && lower.contains("generator") -> "MIT License\n\nCopyright (c) ${java.time.Year.now().value} ${subject.ifBlank { "[Copyright holder]" }}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY.\n\nReview the license and replace the placeholder before use.\n"
             lower.contains("nginx") && lower.contains("generator") -> "server {\n    listen 80;\n    server_name example.com; # replace before deployment\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files \$uri \$uri/ /index.html; }\n    location = /health { access_log off; add_header Content-Type text/plain; return 200 \"ok\\n\"; }\n}\n"
-            lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> "Access-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n\nUse an explicit origin allow-list. Avoid '*' for credentialed requests.\n"
-            lower.contains("csp") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> "Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests\n\nTailor this policy to the application's required scripts, styles, fonts, images, APIs and embedding.\n"
-            lower.contains("graphql-query-builder") -> "query GetExample(${ '$' }id: ID!) {\n  node(id: ${ '$' }id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your schema.\n"
+            lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCorsGenerator(subject)
+            (lower.contains("csp") || lower.contains("content-security-policy")) && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCspGenerator(subject)
+            lower.contains("graphql-query-builder") -> "query GetExample($id: ID!) {\n  node(id: $id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your schema.\n"
             lower.contains("graphql-variables") -> runCatching { JSONObject(subject.ifBlank { "{\\\"id\\\":\\\"REPLACE_WITH_ID\\\"}" }).toString(2) }.getOrElse { throw IllegalArgumentException("GraphQL variables must be valid JSON.") }
             lower.contains("jwt-claim-builder") || lower.contains("jwt-payload-generator") -> runCatching { JSONObject(subject.ifBlank { "{\\\"sub\\\":\\\"user-id\\\",\\\"iat\\\":${System.currentTimeMillis()/1000},\\\"exp\\\":${System.currentTimeMillis()/1000+3600}}" }).toString(2) }.getOrElse { throw IllegalArgumentException("JWT claims/payload must be valid JSON.") } + "\n\nPayload preview only: no signature was created or verified. Do not use as an authentication token."
             lower.contains("branch-name") -> subject.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"),"-").trim('-')
@@ -900,7 +1043,7 @@ object NativeUtilityEngine {
                     .put("meta", JSONObject().put("generatedLocally", true).put("signature", JSONObject.NULL)).toString(2) + "\n"
             }
             lower.contains("sql-schema-generator") -> "CREATE TABLE example_records (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n"
-            lower.contains("sql-query-builder") && lower.contains("generator") -> "SELECT id, name, created_at\nFROM example_records\nWHERE id = :id\nORDER BY created_at DESC;\n\n-- Replace the table, columns and parameter names for your schema.\n"
+            lower.contains("sql-query-builder") -> "SELECT id, name, created_at\nFROM example_records\nWHERE id = :id\nORDER BY created_at DESC;\n\n-- Replace the table, columns and parameter names for your schema.\n"
             lower.contains("regex-generator") -> "Common Java/Kotlin-compatible starter patterns (review for your exact requirements):\nEmail-like text: [^\\s@]+@[^\\s@]+\\.[^\\s@]+\nDigits: \\d+\nWhitespace: \\s+\nStart: ^\nEnd: $\n"
             else -> null
         }
@@ -910,11 +1053,16 @@ object NativeUtilityEngine {
         val lower = op.lowercase(Locale.US)
         val secondary = opts["secondary"] ?: opts["test"] ?: opts["second"] ?: ""
         val flags = opts["flags"] ?: "g"
+        // Keep the generator route's original starter-pattern behavior, while every tester,
+        // replacement, builder and explainer route uses the full native Regex Studio modes.
+        if (lower.contains("regex") && !lower.contains("generator")) {
+            return NativeRegexStudio.run(input, secondary, flags, opts["replacement"] ?: "", opts["mode"] ?: "test")
+        }
         fun b64UrlDecode(value: String): String {
             return decodeBase64Text(value, urlSafe = true)
         }
         val base = lower.removePrefix("developer-").substringBefore('-')
-        val suffix = Regex("(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare)$").find(lower)?.groupValues?.get(1) ?: ""
+        val suffix = Regex("(?:^|-)(formatter|format|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare)$").find(lower)?.groupValues?.get(1) ?: ""
 
         fun parseJson(raw: String): Any {
             StrictJsonValidator(raw).validate()
@@ -972,13 +1120,49 @@ object NativeUtilityEngine {
                 .put("note", "Whitespace and object key order are ignored. Arrays are compared by index; this is not a move-aware diff.").toString(2)
         }
         fun minifyText(raw: String): String = raw.replace(Regex("/\\*[\\s\\S]*?\\*/"), "").replace(Regex("<!--[\\s\\S]*?-->"), "").replace(Regex("\\s+"), " ").trim()
-        fun formatSql(raw: String): String {
-            val normalized = raw.trim().replace(Regex("\\s+"), " ")
-            if (normalized.isEmpty()) return ""
-            var formatted = normalized.replace(Regex("(?i)\\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|VALUES|SET|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|UNION|INSERT INTO|UPDATE|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE)\\b"), "\n$1")
-                .replace(Regex("\\s*,\\s*"), ", ").trim()
-            formatted = formatted.replace(Regex("(?m)^\\s*"), "")
-            return formatted.removePrefix("\n").trim()
+        fun formatSql(raw: String, dialectRaw: String = "postgresql"): String = NativeTextEngine.formatSQL(raw, dialectRaw)
+
+        fun formatJavaScript(raw: String): String {
+            val tokens = mutableListOf<Pair<String, String>>()
+            var i = 0
+            val operators = listOf("===", "!==", ">>>", "=>", "??", "?.", "&&", "||", "**", "==", "!=", "<=", ">=", "++", "--", "+=", "-=", "*=", "/=", "...", "??=")
+            while (i < raw.length) {
+                val ch = raw[i]
+                if (ch.isWhitespace()) { i++; continue }
+                if (ch == '/' && i + 1 < raw.length && raw[i + 1] == '/') { val start=i; while(i<raw.length && raw[i]!='\n') i++; tokens += raw.substring(start,i) to "comment"; continue }
+                if (ch == '/' && i + 1 < raw.length && raw[i + 1] == '*') { val start=i; val end=raw.indexOf("*/",i+2); if(end<0) throw IllegalArgumentException("JavaScript formatter found an unterminated block comment."); i=end+2; tokens += raw.substring(start,i) to "comment"; continue }
+                if (ch == '\'' || ch == '"' || ch == '`') { val start=i; i++; var closed=false; while(i<raw.length) { if(raw[i]=='\\') { i=(i+2).coerceAtMost(raw.length); continue }; if(raw[i++]==ch) {closed=true;break} }; if(!closed) throw IllegalArgumentException("JavaScript formatter found an unterminated string or template literal."); tokens += raw.substring(start,i) to "literal"; continue }
+                val word = Regex("^(?:[A-Za-z_$][A-Za-z0-9_$]*|(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)").find(raw.substring(i))
+                if(word!=null){tokens += word.value to "word";i+=word.value.length;continue}
+                val operator=operators.firstOrNull{raw.startsWith(it,i)}
+                if(operator!=null){tokens += operator to "operator";i+=operator.length;continue}
+                tokens += ch.toString() to "punct";i++
+            }
+            if(tokens.isEmpty()) throw IllegalArgumentException("Paste JavaScript or TypeScript code to format.")
+            val lines=mutableListOf<String>();var line="";var depth=0;var parenDepth=0;var lineDepth=0
+            fun emit(){val trimmed=line.trim();if(trimmed.isNotEmpty())lines += "  ".repeat(lineDepth.coerceAtLeast(0))+trimmed;line="";lineDepth=depth}
+            fun append(value:String,space:Boolean=false){if(line.isEmpty() && value.isNotEmpty())lineDepth=depth;if(space && line.isNotEmpty() && !line.last().isWhitespace() && line.last() !in ".([" && value.firstOrNull() !in listOf(',', ';', ')', ']', '}'))line+=" ";line+=value}
+            fun prev(index:Int)=tokens.getOrNull(index-1)?.first ?: ""
+            fun next(index:Int)=tokens.getOrNull(index+1)?.first ?: ""
+            for(index in tokens.indices){val(value,kind)=tokens[index];val before=prev(index);val after=next(index)
+                when {
+                    kind=="comment"->{if(line.isNotBlank())emit();append(value);emit()}
+                    value=="{"->{append(value,line.isNotBlank() && line.last() !in ".([" );depth++;emit()}
+                    value=="}"->{if(line.isNotBlank())emit();depth=(depth-1).coerceAtLeast(0);append("}");if(after !in setOf(";", ",", ")", "]", ".", "(", "["))emit()}
+                    value=="("->{append(value,before in setOf("if","for","while","switch","catch","with","function"));parenDepth++}
+                    value==")"->{line=line.trimEnd()+")";parenDepth=(parenDepth-1).coerceAtLeast(0)}
+                    value=="["->append(value)
+                    value=="]"->line=line.trimEnd()+"]"
+                    value=="." || value=="?."->line=line.trimEnd()+value
+                    value==","->{line=line.trimEnd()+",";emit()}
+                    value==";"->{line=line.trimEnd()+";";if(parenDepth==0)emit()}
+                    value==":"->{line=line.trimEnd()+":";append("",true)}
+                    kind=="operator" || value in setOf("=","+","-","*","/","%","<",">","!","&","|","?")->{if(value in setOf("++","--","!","~","..."))append(value) else {append(value,true);append("",true)}}
+                    else->{val wordLike=kind=="word"||kind=="literal";val previous=tokens.getOrNull(index-1);val previousWordLike=previous!=null && (previous.second=="word"||previous.second=="literal");append(value,line.isNotEmpty() && (previousWordLike || before in setOf("return","throw","new","await","yield","typeof","delete","void","instanceof","in","of","else","async") || (before==")"&&wordLike)))}
+                }
+            }
+            emit();val result=lines.joinToString("\n").trim();if(result.isEmpty())throw IllegalArgumentException("Formatter produced no output. Check that the source is not empty.")
+            return result+"\n\nNote: conservative local formatter; it preserves strings/comments and formats common blocks, calls, literals and operators, but is not a full ECMAScript parser."
         }
         fun formatCss(raw: String): String {
             var text = raw.replace(Regex("/\\*[\\s\\S]*?\\*/"), "").trim()
@@ -1056,7 +1240,7 @@ object NativeUtilityEngine {
             else -> raw
         }
         fun encode(kind: String, raw: String): String = when (kind) {
-            "base64" -> encodeBase64NoWrap(raw.toByteArray(StandardCharsets.UTF_8))
+            "base64" -> Base64.encodeToString(raw.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
             "uri" -> encodeURIComponent(raw)
             "unicode" -> raw.codePoints().toArray().joinToString("") { "\\u%04x".format(Locale.US, it) }
             "html" -> raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
@@ -1127,7 +1311,7 @@ object NativeUtilityEngine {
                     "docker" -> "FROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nCMD [\"node\", \"server.js\"]\n"
                     "openapi" -> "openapi: 3.1.0\ninfo:\n  title: Example API\n  version: 1.0.0\npaths: {}\n"
                     "git" -> "# Common generated files\n.env\n*.log\n.DS_Store\n"
-                    "nginx" -> "server {\n  listen 80;\n  server_name example.test;\n  location / { try_files \$uri \$uri/ =404; }\n}\n"
+                    "nginx" -> "server {\n  listen 80;\n  server_name example.test;\n  location / { try_files $uri $uri/ =404; }\n}\n"
                     "csv" -> "id,name,active\n1,Ada,true\n2,Grace,true"
                     "yaml" -> "app:\n  name: example\n  enabled: true\n"
                     "markdown" -> "# Project title\n\nDescribe the purpose of this project.\n"
@@ -1256,12 +1440,12 @@ object NativeUtilityEngine {
                     require(input.startsWith("data:") && comma >= 0) { "Enter a valid data URI containing a comma separator." }
                     val metadata = input.substring(0, comma)
                     val payload = input.substring(comma + 1)
-                    if (metadata.endsWith(";base64", true)) decodeBase64Text(payload)
-                    else decodeURIComponent(payload)
-                } else "data:text/plain;base64,${encodeBase64NoWrap(input.toByteArray(StandardCharsets.UTF_8))}"
+                    val decoded = if (metadata.endsWith(";base64", true)) decodeBase64Text(payload) else decodeURIComponent(payload)
+                    "MIME metadata: $metadata\nMode: ${if (metadata.endsWith(";base64", true)) "Base64-decoded" else "percent-decoded"} UTF-8 text\n\n$decoded\n\nNote: This tool returns text, not arbitrary binary bytes; use a file-aware decoder for binary payloads."
+                } else "data:text/plain;base64,${Base64.encodeToString(input.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)}\n\nNote: Encodes the input as UTF-8 text bytes; this is not an arbitrary binary-file encoder."
             }
             lower.contains("unix-timestamp") || lower.contains("timestamp-converter") || lower.contains("epoch-converter") -> developerTimestamp(input)
-            lower.contains("cron") && suffix !in setOf("encoder", "decoder") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })
+            lower.contains("cron") -> developerCron(input.ifBlank { if(lower.contains("generator")) "*/5 * * * *" else "" }.ifBlank { throw IllegalArgumentException("Enter a five-field cron expression: minute hour day-of-month month day-of-week.") })
             listOf("regex-tester", "regex-replace", "regex-generator", "regex-explainer").any(lower::contains) -> {
                 require(secondary.isNotEmpty()) { "Enter a sample string, or a JSON array of sample strings, in the second field." }
                 val regexFlags = if (flags.contains('g')) flags else "${flags}g"
@@ -1309,28 +1493,24 @@ object NativeUtilityEngine {
             lower.contains("jwt-") -> {
                 val parts = input.trim().split('.')
                 require(parts.size == 3) { "A JWT must contain three dot-separated parts." }
-                val header = parseJson(b64UrlDecode(parts[0])) as? JSONObject ?: error("JWT header must be a JSON object.")
-                val payload = parseJson(b64UrlDecode(parts[1])) as? JSONObject ?: error("JWT payload must be a JSON object.")
+                val headerRaw = b64UrlDecode(parts[0])
+                val payloadRaw = b64UrlDecode(parts[1])
+                val header = parseJson(headerRaw) as? JSONObject ?: error("JWT header must be a JSON object.")
+                val payload = parseJson(payloadRaw) as? JSONObject ?: error("JWT payload must be a JSON object.")
                 val exp = (payload.opt("exp") as? Number)?.toDouble()
-                fun epochMillis(seconds: Double): Long? {
-                    val millis = seconds * 1000.0
-                    if (!millis.isFinite() || millis >= Long.MAX_VALUE.toDouble() || millis <= Long.MIN_VALUE.toDouble()) return null
-                    return millis.toLong()
-                }
-                val expiresAt = exp?.let { seconds -> epochMillis(seconds)?.let { millis -> runCatching { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli(millis)) }.getOrElse { "out-of-range" } } ?: "out-of-range" } ?: "none"
+                val expiresAt = exp?.let { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((it * 1000).toLong())) } ?: "none"
                 val expired: Any = exp?.let { System.currentTimeMillis() / 1000.0 >= it } ?: JSONObject.NULL
-                fun claimTime(key: String): Any {
-                    val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL
-                    val millis = epochMillis(seconds) ?: return JSONObject().put("unixSeconds", seconds).put("status", "out-of-range")
-                    val instant = runCatching { Instant.ofEpochMilli(millis) }.getOrNull()
-                        ?: return JSONObject().put("unixSeconds", seconds).put("status", "out-of-range")
-                    val now = System.currentTimeMillis() / 1000.0
-                    val status = when(key) { "exp" -> if(now >= seconds) "expired" else "valid"; "nbf" -> if(now < seconds) "not-yet-valid" else "active"; "iat" -> if(seconds > now) "issued-in-the-future" else "valid"; else -> "informational" }
-                    return JSONObject().put("unixSeconds",seconds).put("iso",DateTimeFormatter.ISO_INSTANT.format(instant)).put("status",status)
-                }
+                fun claimTime(key: String): Any { val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL; val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull() ?: return JSONObject.NULL; val status = when(key) { "exp" -> if(System.currentTimeMillis()/1000.0 >= seconds) "expired" else "valid"; "nbf" -> if(System.currentTimeMillis()/1000.0 < seconds) "not-yet-valid" else "active"; else -> "informational" }; return JSONObject().put("unixSeconds",seconds).put("iso",DateTimeFormatter.ISO_INSTANT.format(instant)).put("status",status) }
                 val claims=JSONObject().put("exp",claimTime("exp")).put("iat",claimTime("iat")).put("nbf",claimTime("nbf")).put("sub",payload.opt("sub")).put("iss",payload.opt("iss")).put("aud",payload.opt("aud"))
-                val largeIntegerWarning = Regex("""(?:"[^"]+"\s*:\s*)?-?\d{16,}(?:\D|$)""").containsMatchIn(b64UrlDecode(parts[1]))
-                JSONObject().put("warning","DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.").put("header", header).put("payload", payload).put("claims",claims).put("signaturePresent", parts[2].isNotEmpty()).put("signatureVerified",false).put("expiresAt", expiresAt).put("expired", expired).put("largeIntegerPrecisionWarning",if(largeIntegerWarning) "Large integers may lose precision when parsed as JavaScript/Double numbers." else JSONObject.NULL).toString(2)
+                val headerUnsafe = scanUnsafeJsonIntegerTokens(headerRaw)
+                val payloadUnsafe = scanUnsafeJsonIntegerTokens(payloadRaw)
+                val allUnsafe = JSONArray()
+                for (i in 0 until headerUnsafe.length()) allUnsafe.put(headerUnsafe.getJSONObject(i))
+                for (i in 0 until payloadUnsafe.length()) allUnsafe.put(payloadUnsafe.getJSONObject(i))
+                JSONObject().put("warning","DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.").put("header", header).put("payload", payload).put("claims",claims).put("signaturePresent", parts[2].isNotEmpty()).put("signatureVerified",false).put("expiresAt", expiresAt).put("expired", expired)
+                    .put("largeIntegerPrecisionWarning",if(allUnsafe.length()>0) "JWT header or payload contains integer tokens beyond JavaScript's exact integer range; parsed display fields may lose precision. Use headerRawJson and payloadRawJson to inspect the original digits." else JSONObject.NULL)
+                    .put("headerRawJson",headerRaw).put("payloadRawJson",payloadRaw).put("largeIntegerTokens",allUnsafe)
+                    .put("rawNumericPrecision",JSONObject().put("headerUnsafeIntegerTokens",headerUnsafe).put("payloadUnsafeIntegerTokens",payloadUnsafe)).toString(2)
             }
             lower.contains("uuid-generator") || lower.contains("uuid-batch-generator") -> {
                 val count = (secondary.toDoubleOrNull() ?: 10.0).toInt().coerceIn(1, 1000)
@@ -1452,14 +1632,14 @@ object NativeUtilityEngine {
                 lower.contains("diff") -> jsonDiff(input, secondary)
                 lower.contains("sort") -> stringifyJson(sortValue(parseJson(input)))
                 suffix == "generator" && input.isBlank() -> "{\"id\":\"example-1\",\"name\":\"Example\",\"active\":true,\"items\":[]}"
-                suffix == "minifier" -> pretty(input, 0)
-                suffix == "inspector" || suffix == "parser" -> developerJsonInspector(input)
+                suffix == "minifier" -> losslessJsonFormat(input, pretty = false).let { formatted -> developerJsonFormattingWarnings(input).let { warning -> if (warning.isBlank()) formatted else "$warning\n\n$formatted" } }
+                suffix == "inspector" || suffix == "parser" -> { parseJson(input); developerJsonInspector(input) }
                 suffix == "explainer" -> { val parsed=parseJson(input); val type=when(parsed){is JSONObject->"object";is JSONArray->"array";JSONObject.NULL->"null";is String->"string";is Number->"number";is Boolean->"boolean";else->"unknown"}; JSONObject().put("rootType",type).put("note","JSON parser semantics can overwrite duplicate keys; very large integers may lose precision in floating-point consumers.").toString(2) }
-                suffix in setOf("formatter", "beautifier", "preview", "tester") -> pretty(input)
+                suffix in setOf("formatter", "beautifier", "preview", "tester") -> losslessJsonFormat(input, pretty = true).let { formatted -> if (suffix in setOf("formatter", "beautifier")) developerJsonFormattingWarnings(input).let { warning -> if (warning.isBlank()) formatted else "$warning\n\n$formatted" } else formatted }
                 suffix == "validator" -> { parseJson(input); val duplicates=scanDuplicateJsonKeyPaths(input).first.distinct(); if(duplicates.isEmpty()) "Valid JSON (RFC 8259-compatible parser)." else "Valid JSON syntax, but duplicate object keys were found at ${duplicates.take(20).joinToString(", ")}; common parsers keep only the final value." }
                 suffix == "encoder" -> encode("base64", input)
                 suffix == "decoder" -> decode("base64", input)
-                suffix == "converter" -> pretty(input)
+                suffix == "converter" -> losslessJsonFormat(input, pretty = true)
                 else -> localSuffixFallback("json")
             }
             lower.contains("csv") -> when {
@@ -1470,7 +1650,6 @@ object NativeUtilityEngine {
                 suffix == "generator" -> "id,name,active\n1,Ada,true\n2,Grace,true"
                 else -> localSuffixFallback("csv")
             }
-            lower.contains("markdown-to-html") -> markdownToHtml(input)
             lower.contains("xml") || lower.contains("html") || lower.contains("svg") -> when {
                 suffix == "validator" || suffix == "tester" -> if (validateMarkup(input)) "Valid markup/XML." else throw IllegalArgumentException("Invalid markup/XML.")
                 suffix == "minifier" -> minifyText(input)
@@ -1486,9 +1665,10 @@ object NativeUtilityEngine {
                 else -> formatDeveloperMarkup(input)
             }
             listOf("sql", "graphql", "css", "javascript", "typescript", "docker", "nginx", "kubernetes", "git", "openapi", "markdown", "yaml").any(lower::contains) -> when {
-                lower.contains("sql") && suffix in setOf("formatter", "beautifier") -> formatSql(input)
+                (lower.contains("javascript") || lower.contains("typescript") || base == "js") && suffix in setOf("format", "formatter", "beautifier") -> formatJavaScript(input)
+                lower.contains("sql") && suffix in setOf("format", "formatter", "beautifier") -> formatSql(input, opts["dialect"] ?: "sql")
                 lower.contains("sql") && suffix == "minifier" -> minifyText(input)
-                lower.contains("css") && suffix in setOf("formatter", "beautifier") -> formatCss(input)
+                lower.contains("css") && suffix in setOf("format", "formatter", "beautifier") -> formatCss(input)
                 lower.contains("css") && suffix == "minifier" -> minifyText(input)
                 lower.contains("markdown") && suffix == "preview" -> markdownToHtml(input)
                 lower.contains("markdown") && suffix in setOf("formatter", "beautifier") -> input.replace("\r\n", "\n").lines().joinToString("\n") { it.trimEnd() }.trim() + "\n"
@@ -1500,10 +1680,7 @@ object NativeUtilityEngine {
                 suffix == "decoder" -> decode("base64", input)
                 else -> localSuffixFallback(base)
             }
-            lower.contains("http-status") || lower.contains("status-code") -> {
-                val code = input.trim()
-                httpStatuses.firstOrNull { it.first.toString() == code }?.let { "$code ${it.second}" } ?: httpStatuses.joinToString("\n") { "${it.first} ${it.second}" }
-            }
+            lower.contains("http-status") || lower.contains("status-code") -> developerHttpStatusLookup(input)
             lower.contains("mime") || lower.contains("content-type") -> {
                 val map = linkedMapOf("json" to "application/json", "js" to "text/javascript", "css" to "text/css", "html" to "text/html", "csv" to "text/csv", "xml" to "application/xml", "pdf" to "application/pdf", "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "webp" to "image/webp", "svg" to "image/svg+xml", "txt" to "text/plain", "wasm" to "application/wasm")
                 val extension = input.trim().replace(Regex("^.*\\."), "").lowercase(Locale.US)

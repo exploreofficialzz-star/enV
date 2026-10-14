@@ -65,6 +65,8 @@ export function developerStudioExample(op: string): { input: string; secondary?:
   if (lower.includes("sql")) return { input: "SELECT id, name FROM users WHERE active = true ORDER BY name;" };
   if (lower.includes("yaml")) return { input: "app:\n  name: enV\n  enabled: true" };
   if (lower.includes("graphql")) return { input: "query Example($id: ID!) { user(id: $id) { id name } }" };
+  if (lower === "javascript-beautifier") return { input: 'const user={name:"Ada",active:true};function greet(user){return "Hello, "+user.name;}' };
+  if (lower === "typescript-beautifier" || lower === "typescript-formatter") return { input: 'interface User{name:string;active:boolean}const greet=(user:User):string=>{return "Hello, "+user.name;};' };
   if (lower.includes("markdown-to-html")) return { input: "# Hello\n\nA paragraph with **bold** and [a link](https://example.test)." };
   if (lower.includes("markdown")) return { input: "# Hello\n\nA paragraph with **bold**." };
   if (lower.includes("gitignore")) return { input: "node" };
@@ -83,4 +85,3 @@ export function developerStudioExample(op: string): { input: string; secondary?:
   if (lower.includes("semantic-version")) return { input: "1.2.3 patch" };
   return { input: "Example input for the selected developer utility." };
 }
-

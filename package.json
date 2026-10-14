@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "npm run check:production && node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/auth/sign-in-gate.test.ts src/lib/storage.test.ts src/lib/engines/codecs.test.ts src/lib/engines/units.test.ts src/lib/engines/stem-expansion.test.ts src/lib/engines/regular-calculators.test.ts src/lib/engines/media-noise.test.ts src/lib/engines/developer-utils.test.ts src/lib/engines/developer-studios.test.ts src/components/engines/security-engine-utils.test.ts src/components/engines/ecommerce-engine-utils.test.ts src/components/engines/relationship-engine-utils.test.ts src/components/engines/interactive-engine-utils.test.ts src/components/engines/gaming-engine-utils.test.ts src/components/engines/marketing-engine-utils.test.ts src/components/engines/webdesign-engine-utils.test.ts src/components/engines/mockups-category-engine-utils.test.ts src/components/engines/social-engine-utils.test.ts src/components/engines/document-engine-utils.test.ts src/components/engines/image-splitter-utils.test.ts src/components/engines/career-engine-utils.test.ts src/components/engines/accessibility-engine.test.ts src/lib/engines/accessibility-color.test.ts src/lib/engines/accessibility-audit.test.ts src/lib/engines/accessibility-motion-audit.test.ts src/lib/engines/accessibility-benchmark-corpus.test.ts src/components/engines/streaming-engine-utils.test.ts src/lib/image/image-core.test.ts src/lib/image/geometry.test.ts src/lib/image/pixels.test.ts src/lib/image/exif.test.ts src/lib/image/history.test.ts src/lib/image/calc.test.ts src/lib/image/cutout.test.ts src/lib/image/layout.test.ts src/lib/image/metadata-core.test.ts src/lib/image/batch-core.test.ts src/lib/media/shared-media.test.ts && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/calc/*.test.ts src/lib/engines/stem-calculators.test.ts src/lib/engines/formulas.test.ts src/lib/engines/calculator-golden.test.ts src/lib/engines/calculator-registry.test.ts && node --experimental-strip-types scripts/image-185-audit.mjs && node --experimental-strip-types --test src/lib/mockups/*.test.ts && node --experimental-strip-types --test src/lib/screenshots/*.test.ts && node --experimental-strip-types --test 'src/lib/ai/**/*.test.ts' && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/productivity/timer-engine.test.ts && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/events/event-templates.test.ts",
+    "test": "npm run check:production && node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/auth/sign-in-gate.test.ts src/lib/storage.test.ts src/lib/engines/codecs.test.ts src/lib/engines/units.test.ts src/lib/engines/stem-expansion.test.ts src/lib/engines/regular-calculators.test.ts src/lib/engines/media-noise.test.ts src/lib/engines/developer-utils.test.ts src/lib/engines/developer-studios.test.ts src/lib/engines/precise-formatters.test.ts src/lib/engines/regex-studio.test.ts src/lib/engines/transforms.test.ts src/components/engines/security-engine-utils.test.ts src/components/engines/ecommerce-engine-utils.test.ts src/components/engines/relationship-engine-utils.test.ts src/components/engines/interactive-engine-utils.test.ts src/components/engines/gaming-engine-utils.test.ts src/components/engines/marketing-engine-utils.test.ts src/components/engines/webdesign-engine-utils.test.ts src/components/engines/mockups-category-engine-utils.test.ts src/components/engines/social-engine-utils.test.ts src/components/engines/document-engine-utils.test.ts src/components/engines/image-splitter-utils.test.ts src/components/engines/career-engine-utils.test.ts src/components/engines/accessibility-engine.test.ts src/lib/engines/accessibility-color.test.ts src/lib/engines/accessibility-audit.test.ts src/lib/engines/accessibility-motion-audit.test.ts src/lib/engines/accessibility-benchmark-corpus.test.ts src/components/engines/streaming-engine-utils.test.ts src/lib/image/image-core.test.ts src/lib/image/geometry.test.ts src/lib/image/pixels.test.ts src/lib/image/exif.test.ts src/lib/image/history.test.ts src/lib/image/calc.test.ts src/lib/image/cutout.test.ts src/lib/image/layout.test.ts src/lib/image/metadata-core.test.ts src/lib/image/batch-core.test.ts src/lib/media/shared-media.test.ts && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/calc/*.test.ts src/lib/engines/stem-calculators.test.ts src/lib/engines/formulas.test.ts src/lib/engines/calculator-golden.test.ts src/lib/engines/calculator-registry.test.ts && node --experimental-strip-types scripts/image-185-audit.mjs && node --experimental-strip-types --test src/lib/mockups/*.test.ts && node --experimental-strip-types --test src/lib/screenshots/*.test.ts && node --experimental-strip-types --test 'src/lib/ai/**/*.test.ts' && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/productivity/timer-engine.test.ts && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/events/event-templates.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "check:catalog": "node scripts/check-catalog.mjs",
@@ -29,6 +29,10 @@
     "media:processor": "node scripts/media-processor.mjs",
     "check:processor": "node --check processor/server.mjs && node --check scripts/media-processor.mjs && node --check scripts/url-media-processor.mjs && node --check scripts/media/provider-registry.mjs && node --check scripts/media/url-security.mjs && node --check scripts/transcription-processor.mjs",
     "check:developer": "node scripts/check-developer.mjs",
+    "check:developer:privacy": "node scripts/check-developer-privacy.mjs",
+    "audit:developer:browser": "node scripts/audit-developer-studios-browser.mjs",
+    "audit:developer:browser:ci": "node scripts/run-developer-browser-audit.mjs",
+    "benchmark:developer": "node --experimental-strip-types scripts/developer-tool-benchmark.mjs",
     "check:production": "node scripts/check-production.mjs",
     "verify": "npm run check:production && npm run check:execution-policy && npm run check:catalog && npm run check:native-ai && npm run check:native-related && npm run check:native-backend-forms && npm run check:native-ui-parity && npm run check:accessibility-parity && npm run check:ai && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:calculators:registry && npm run audit:calculators:browser && npm run check:converters && npm run check:developer && npm run check:developer-routes && npm run check:screenshots && npm run export:native-execution-matrix && npm run check:native-calculators && npm run check:native-math-exercises && npm run check:native-coverage && npm run check:native-backend-dispatch && npm run check:native-executability && npm run check:native-no-web && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
     "check:coming-soon": "node --experimental-strip-types scripts/coming-soon-audit.mjs",
@@ -60,7 +64,8 @@
     "audit:events:browser": "node scripts/browser-event-tools-audit.mjs",
     "audit:accessibility:rendered": "node scripts/audit-accessibility-rendered.mjs",
     "audit:accessibility:live": "node scripts/audit-accessibility-live.mjs",
-    "check:developer-routes": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/audit-developer-studio-routes.mjs"
+    "check:developer-routes": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/audit-developer-studio-routes.mjs",
+    "check:developer:fixtures": "node scripts/sync-developer-golden-fixtures.mjs --check"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -108,6 +113,7 @@
     "nitro": "3.0.260610-beta",
     "pdf-lib": "^1.17.1",
     "pg": "^8.16.3",
+    "prettier": "^3.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -116,6 +122,7 @@
     "react-resizable-panels": "^4.6.5",
     "recharts": "^2.13.0",
     "sonner": "^2.0.7",
+    "sql-formatter": "15.9.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
     "tw-animate-css": "^1.3.4",
@@ -138,7 +145,6 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "playwright": "^1.62.0",
-    "prettier": "^3.4.0",
     "typescript-eslint": "^8.56.1"
   },
   "engines": {

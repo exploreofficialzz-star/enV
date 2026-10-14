@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
 import NaturalLanguage
 
 public struct TextStatistics: Equatable {
@@ -9,8 +12,49 @@ public struct NativeTextResult: Equatable {
     public init(output: String, statistics: TextStatistics? = nil, added: Int = 0, removed: Int = 0, unchanged: Int = 0) { self.output=output; self.statistics=statistics; self.added=added; self.removed=removed; self.unchanged=unchanged }
 }
 public enum NativeTextError: LocalizedError {
-    case unknownOperation, invalidJSON, invalidYAML, emptyCSV, invalidXML
-    public var errorDescription: String? { switch self { case .unknownOperation: return "Unknown text operation."; case .invalidJSON: return "Invalid JSON"; case .invalidYAML: return "Invalid YAML"; case .emptyCSV: return "Empty CSV"; case .invalidXML: return "Invalid XML" } }
+    case unknownOperation, invalidJSON, invalidYAML, emptyCSV, invalidXML, xmlInputTooLarge, unsafeXMLDoctype
+    public var errorDescription: String? { switch self { case .unknownOperation: return "Unknown text operation."; case .invalidJSON: return "Invalid JSON"; case .invalidYAML: return "Invalid YAML"; case .emptyCSV: return "Empty CSV"; case .invalidXML: return "Invalid XML"; case .xmlInputTooLarge: return "XML input exceeds the 1 MB local formatting limit."; case .unsafeXMLDoctype: return "XML DOCTYPE declarations are disabled in the local formatter to prevent external entity access." } }
+}
+
+
+private final class NativeXMLNode {
+    enum Kind { case document, element, text, cdata, comment, instruction }
+    let kind: Kind
+    var name = ""
+    var data = ""
+    var attributes: [String:String] = [:]
+    var children: [NativeXMLNode] = []
+    init(_ kind: Kind) { self.kind = kind }
+}
+
+/** Native Foundation XMLParser delegate. It builds a bounded, local document tree for serialization. */
+private final class NativeXMLFormattingDelegate: NSObject, XMLParserDelegate {
+    let document = NativeXMLNode(.document)
+    var parseError: Error?
+    private var stack: [NativeXMLNode] = []
+    override init() { stack = [document]; super.init() }
+    private func addText(_ value: String, kind: NativeXMLNode.Kind = .text) {
+        guard !value.isEmpty, let parent = stack.last else { return }
+        if kind == .text, let last = parent.children.last, last.kind == .text { last.data += value; return }
+        let node = NativeXMLNode(kind); node.data = value; parent.children.append(node)
+    }
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String:String]) {
+        let node = NativeXMLNode(.element); node.name = qName ?? elementName; node.attributes = attributeDict
+        stack.last?.children.append(node); stack.append(node)
+    }
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        if stack.count > 1 { stack.removeLast() }
+    }
+    func parser(_ parser: XMLParser, foundCharacters string: String) { addText(string) }
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        addText(String(data: CDATABlock, encoding: .utf8) ?? String(decoding: CDATABlock, as: UTF8.self), kind: .cdata)
+    }
+    func parser(_ parser: XMLParser, foundComment comment: String) { addText(comment, kind: .comment) }
+    func parser(_ parser: XMLParser, foundProcessingInstructionWithTarget target: String, data: String?) {
+        let node = NativeXMLNode(.instruction); node.name = target; node.data = data ?? ""; stack.last?.children.append(node)
+    }
+    func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) { self.parseError = parseError }
+    func parser(_ parser: XMLParser, validationErrorOccurred validationError: Error) { /* Validation is intentionally off; well-formedness is enforced by XMLParser. */ }
 }
 
 public enum NativeTextEngine {
@@ -66,7 +110,7 @@ public enum NativeTextEngine {
         case "dedupe-lines": var seen=Set<String>(); return input.components(separatedBy:"\n").filter{seen.insert($0).inserted}.joined(separator:"\n")
         case "find-replace": return findReplace(input,o); case "wrap": return wrap(input,max(8,Int(Double(o["width"] ?? "80") ?? 80))); case "word-freq": return wordFrequency(input)
         case "extract-emails": return uniqueMatches(input,"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"); case "extract-urls": return uniqueMatches(input,"https?://[^\\s<>\"'`]+",options:[.caseInsensitive]); case "list": return listify(input,o["style"] ?? "bullets")
-        case "sql-format": return sqlFormat(input); case "html-format","xml-format": return markup(input); case "css-format": return cssFormat(input); case "js-format": return jsFormat(input); case "yaml-format": return yamlFormat(input)
+        case "sql-format": return formatSQL(input, dialectRaw: o["dialect"] ?? "postgresql"); case "html-format": return markup(input); case "xml-format": return try xmlFormat(input); case "css-format": return cssFormat(input); case "js-format": return jsFormat(input); case "yaml-format": return yamlFormat(input)
         case "html-minify": return regexReplace(regexReplace(regexReplace(input,"<!--[\\s\\S]*?-->",""),">\\s+<"," ><"),"\\s+"," ").replacingOccurrences(of:" ><",with:"><").trimmingCharacters(in:.whitespacesAndNewlines)
         case "css-minify": return regexReplace(regexReplace(regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," "),"\\s*([{};:,>~+])\\s*","$1"),";}","}").trimmingCharacters(in:.whitespacesAndNewlines)
         case "js-minify": return jsMinify(input); case "json-to-csv": return try jsonToCSV(input); case "json-to-yaml": return try jsonToYAML(input); case "yaml-to-json": return try yamlToJSON(input); case "json-to-xml": return try jsonToXML(input); case "xml-to-json": return try xmlToJSON(input); case "keyword-density": return keywordDensity(input,o["keyword"] ?? "")
@@ -79,10 +123,170 @@ public enum NativeTextEngine {
     private static func uniqueMatches(_ input:String,_ pattern:String,options:NSRegularExpression.Options=[])->String { var seen=Set<String>(),out=[String](); for s in regexMatches(input,pattern,options:options){let v=regexReplace(s,"[),.;]+$","");if seen.insert(v).inserted{out.append(v)}};return out.joined(separator:"\n") }
     private static func listify(_ input:String,_ style:String)->String { let items=input.replacingOccurrences(of:"\r\n",with:"\n").split{ $0=="," || $0=="\n" }.map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}; if style=="numbered"{return items.enumerated().map{"\($0.offset+1). \($0.element)"}.joined(separator:"\n")};if style=="comma"{return items.joined(separator:", ")};return items.map{"- \($0)"}.joined(separator:"\n") }
 
-    private static func sqlFormat(_ input:String)->String { let compact=regexReplace(input,"\\s+"," ").trimmingCharacters(in:.whitespacesAndNewlines);guard !compact.isEmpty else{return ""}; let p="\\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|OUTER JOIN|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE|UNION ALL|UNION)\\b"; var s=replaceMatches(compact,p){$0.uppercased()}; s=replaceMatches(s,p){"\n"+$0}; return s.replacingOccurrences(of:", ",with:",\n  ").trimmingCharacters(in:.whitespacesAndNewlines) }
+    /// Conservative dialect-aware lexical formatter shared by all native SQL routes.
+    /// It protects literals, quoted identifiers and comments. It is not a complete SQL parser.
+    static func formatSQL(_ input:String, dialectRaw:String = "postgresql")->String {
+        let dialect = dialectRaw.lowercased().replacingOccurrences(of:"-", with:"_")
+        let supported = Set(["sql","postgresql","postgres","mysql","mariadb","sqlite","transactsql","tsql","bigquery","snowflake","oracle","redshift","duckdb"])
+        guard supported.contains(dialect) else { return "Unsupported SQL dialect '\(dialectRaw)'. Supported: \(supported.sorted().joined(separator: ", "))." }
+        guard input.utf8.count <= 1_000_000 else { return "SQL input exceeds the local 1 MB formatting limit." }
+        var protected:[String:String]=[:], masked="", chars=Array(input), i=0
+        func key()->String { "\u{E000}SQL\(protected.count)\u{E001}" }
+        while i < chars.count {
+            let c=chars[i]
+            let mysqlHashComment = (dialect == "mysql" || dialect == "mariadb") && c == "#"
+            if (c=="-" && i+1<chars.count && chars[i+1]=="-") || (c=="/" && i+1<chars.count && chars[i+1]=="*") || mysqlHashComment {
+                let start=i
+                if c=="-" || mysqlHashComment { i += c == "-" ? 2 : 1; while i<chars.count && chars[i] != "\n" {i+=1}; if i<chars.count {i+=1} }
+                else { i+=2; var closed=false; while i+1<chars.count {if chars[i]=="*" && chars[i+1]=="/" {i+=2;closed=true;break};i+=1};guard closed else{return "SQL formatter found an unterminated block comment."} }
+                let token=key(); protected[token]=String(chars[start..<i]); masked+=token; continue
+            }
+            if (dialect == "postgresql" || dialect == "postgres" || dialect == "redshift" || dialect == "duckdb") && c == "$" {
+                var tagEnd=i+1; while tagEnd<chars.count && (chars[tagEnd].isLetter || chars[tagEnd].isNumber || chars[tagEnd]=="_") {tagEnd+=1}
+                if tagEnd<chars.count && chars[tagEnd]=="$" {
+                    let tag=String(chars[i...tagEnd]), start=i; i=tagEnd+1; var close = -1, j=i
+                    while j+tag.count<=chars.count { if String(chars[j..<j+tag.count]) == tag {close=j;break}; j+=1 }
+                    guard close>=0 else{return "SQL formatter found an unterminated dollar-quoted string."}
+                    i=close+tag.count; let token=key(); protected[token]=String(chars[start..<i]); masked+=token; continue
+                }
+            }
+            if c=="'" || c=="\"" || c=="`" || c=="[" {
+                let start=i, close:Character = c=="[" ? "]" : c; i+=1; var closed=false
+                while i<chars.count { if chars[i]==close {if close != "]" && i+1<chars.count && chars[i+1]==close {i+=2;continue};i+=1;closed=true;break}; if c=="'" && chars[i]=="\\" && i+1<chars.count {i+=1};i+=1 }
+                guard closed else{return "SQL formatter found an unterminated quoted value or identifier."}
+                let token=key();protected[token]=String(chars[start..<i]);masked+=token;continue
+            }
+            masked.append(c);i+=1
+        }
+        let tokens = regexMatches(masked, #"\uE000SQL\d+\uE001|[A-Za-z_][A-Za-z0-9_$]*|(?:<=|>=|<>|!=|==|::|->>|->|\|\||&&|\?\?|:=)|[,.;()]|[^\s]"#)
+        if tokens.isEmpty {return ""}
+        let major=Set(["WITH","RECURSIVE","SELECT","FROM","WHERE","GROUP BY","ORDER BY","HAVING","LIMIT","OFFSET","FETCH FIRST","INSERT INTO","UPDATE","DELETE FROM","VALUES","UNION","UNION ALL","INTERSECT","EXCEPT","RETURNING","QUALIFY","WINDOW","PARTITION BY","CREATE TABLE","ALTER TABLE","DROP TABLE"])
+        let joins=Set(["JOIN","LEFT JOIN","RIGHT JOIN","INNER JOIN","FULL JOIN","LEFT OUTER JOIN","RIGHT OUTER JOIN","FULL OUTER JOIN","CROSS JOIN"])
+        var out=[String](), depth=0, line="", previous=""
+        func emit(){let v=line.trimmingCharacters(in:.whitespacesAndNewlines);if !v.isEmpty {out.append(String(repeating:"  ",count:max(0,depth))+v)};line=""}
+        func append(_ value:String,_ space:Bool=true){if space && !line.isEmpty && !line.last!.isWhitespace && !"(.".contains(line.last!) && !(value.first.map{",;).".contains($0)} ?? false) {line += " "};line += value}
+        var index=0
+        while index<tokens.count {
+            let value=tokens[index], upper=value.uppercased(); var phrase=upper, consumed=1
+            if index+1<tokens.count {let two="\(upper) \(tokens[index+1].uppercased())";if major.contains(two)||joins.contains(two){phrase=two;consumed=2}else if index+2<tokens.count && ["LEFT OUTER JOIN","RIGHT OUTER JOIN","FULL OUTER JOIN"].contains("\(two) \(tokens[index+2].uppercased())"){phrase="\(two) \(tokens[index+2].uppercased())";consumed=3}}
+            let reservedToken=value.hasPrefix("\u{E000}SQL")
+            if !reservedToken && (major.contains(phrase)||joins.contains(phrase)||["ON","AND","OR"].contains(upper)) {emit();depth = joins.contains(phrase)||["ON","AND","OR"].contains(upper) ? max(1,depth) : 0;line=phrase;index+=consumed;previous=phrase;continue}
+            switch value {case "(":append(value,["IN","VALUES","EXISTS","NOT"].contains(previous.uppercased()));depth+=1
+            case ")":depth=max(0,depth-1);line=line.trimmingCharacters(in:.whitespacesAndNewlines)+")"
+            case ",":line=line.trimmingCharacters(in:.whitespacesAndNewlines)+","
+            case ".":line=line.trimmingCharacters(in:.whitespacesAndNewlines)+"."
+            case ";":line=line.trimmingCharacters(in:.whitespacesAndNewlines)+";";emit();depth=0
+            default:append(value);if let original=protected[value],original.hasPrefix("--") || original.hasPrefix("#") {emit()}}
+            previous=value;index+=1
+        }
+        emit()
+        let formatted=out.joined(separator:"\n").replacingOccurrences(of:#",\s*"#,with:",\n  ",options:.regularExpression)
+        var restored=formatted
+        for (token,value) in protected {restored=restored.replacingOccurrences(of:token,with:value)}
+        return restored.trimmingCharacters(in:.whitespacesAndNewlines)
+    }
+
+    /** Secure native XML parser + formatter. External DTDs are rejected; data never leaves the app. */
+    private static func xmlFormat(_ input: String) throws -> String {
+        guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NativeTextError.invalidXML }
+        guard input.utf8.count <= 1_000_000 else { throw NativeTextError.xmlInputTooLarge }
+        guard input.range(of: "<!DOCTYPE", options: .caseInsensitive) == nil else { throw NativeTextError.unsafeXMLDoctype }
+        let parser = XMLParser(data: Data(input.utf8))
+        parser.shouldProcessNamespaces = false
+        parser.shouldResolveExternalEntities = false
+        let delegate = NativeXMLFormattingDelegate()
+        parser.delegate = delegate
+        let parsed = parser.parse()
+        guard parsed, delegate.parseError == nil else { throw NativeTextError.invalidXML }
+
+        func escapeText(_ value: String) -> String {
+            value.replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+        }
+        func escapeAttribute(_ value: String) -> String {
+            escapeText(value).replacingOccurrences(of: "\"", with: "&quot;")
+                .replacingOccurrences(of: "\r", with: "&#13;").replacingOccurrences(of: "\n", with: "&#10;").replacingOccurrences(of: "\t", with: "&#9;")
+        }
+        func render(_ node: NativeXMLNode, depth: Int, inheritedSpace: Bool = false, inline: Bool = false) -> String {
+            let indent = inline ? "" : String(repeating: "  ", count: max(0, depth))
+            switch node.kind {
+            case .document:
+                return node.children.filter { !($0.kind == .text && $0.data.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+                    .map { render($0, depth: depth, inheritedSpace: inheritedSpace, inline: false) }.joined(separator: "\n")
+            case .text: return indent + escapeText(node.data)
+            case .cdata: return indent + "<![CDATA[\(node.data)]]>"
+            case .comment: return indent + "<!--\(node.data)-->"
+            case .instruction: return indent + "<?\(node.name)\(node.data.isEmpty ? "" : " \(node.data)")?>"
+            case .element:
+                let preserveSpace = inheritedSpace || node.attributes["xml:space"] == "preserve"
+                let attrs = node.attributes.keys.sorted().map { " \($0)=\"\(escapeAttribute(node.attributes[$0] ?? ""))\"" }.joined()
+                let start = "<\(node.name)\(attrs)"
+                if node.children.isEmpty { return indent + start + "/>" }
+                let hasElement = node.children.contains { $0.kind == .element }
+                let hasMeaningfulText = node.children.contains { $0.kind == .text && !$0.data.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                if hasElement && !hasMeaningfulText && !preserveSpace {
+                    let blockChildren = node.children.filter { !($0.kind == .text && $0.data.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+                    let body = blockChildren.map { render($0, depth: depth + 1, inheritedSpace: preserveSpace, inline: false) }.joined(separator: "\n")
+                    return indent + start + ">\n\(body)\n\(indent)</\(node.name)>"
+                }
+                let body = node.children.map { render($0, depth: depth + 1, inheritedSpace: preserveSpace, inline: true) }.joined()
+                return indent + start + ">\(body)</\(node.name)>"
+            }
+        }
+        let declaration = input.range(of: "^\\s*(<\\?xml\\s+[^?]*\\?>)", options: .regularExpression).map { String(input[$0]).trimmingCharacters(in: .whitespacesAndNewlines) }
+        let body = render(delegate.document, depth: 0)
+        let result = ([declaration].compactMap { $0 } + [body]).filter { !$0.isEmpty }.joined(separator: "\n")
+        guard !result.isEmpty else { throw NativeTextError.invalidXML }
+        return result
+    }
+
     private static func markup(_ input:String)->String { let compact=regexReplace(input,">\\s+<", "><"); let tokens=regexReplace(compact,"(<[^>]+>)","\n$1\n").components(separatedBy:"\n").map{$0.trimmingCharacters(in:.whitespacesAndNewlines)}.filter{!$0.isEmpty}; let voids=Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);var d=0,out=[String]();for t in tokens{let close=t.hasPrefix("</");let open=t.hasPrefix("<") && !close && !t.hasPrefix("<?") && !t.hasPrefix("<!") && !t.hasSuffix("/>");let name=regexReplace(t,"^</?([^\\s>/]+).*","$1").lowercased();if close{d=max(0,d-1)};out.append(String(repeating:"  ",count:d)+t);if open && !voids.contains(name){d += 1}};return out.joined(separator:"\n") }
     private static func cssFormat(_ input:String)->String { var d=0,out=[String](),buf="";let src=regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," ").trimmingCharacters(in:.whitespacesAndNewlines);func flush(_ x:String){let t=x.trimmingCharacters(in:.whitespaces);if !t.isEmpty{out.append(String(repeating:"  ",count:max(0,d))+t)}};for ch in src{if ch=="{"{flush(buf+" {");buf="";d+=1}else if ch=="}"{if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf.hasSuffix(";") ? buf : buf+";")};buf="";d=max(0,d-1);out.append(String(repeating:"  ",count:d)+"}")}else if ch==";"{flush(buf.trimmingCharacters(in:.whitespaces)+";");buf=""}else{buf.append(ch)}};if !buf.trimmingCharacters(in:.whitespaces).isEmpty{flush(buf)};return out.joined(separator:"\n") }
-    private static func jsFormat(_ input:String)->String { var d=0,out="",quote:Character?=nil,line=false,block=false;var i=input.startIndex;while i<input.endIndex{let c=input[i],n=input.index(after:i)<input.endIndex ? input[input.index(after:i)] : "\0";if line{out.append(c);if c=="\n"{line=false};i=input.index(after:i);continue};if block{out.append(c);if c=="*" && n=="/"{out.append(n);i=input.index(i,offsetBy:2);block=false}else{i=input.index(after:i)};continue};if let q=quote{out.append(c);if c=="\\" && i != input.index(before:input.endIndex){let j=input.index(after:i);out.append(input[j]);i=input.index(after:j);continue};if c==q{quote=nil};i=input.index(after:i);continue};if c=="/" && n=="/"{line=true;out.append(c);i=input.index(after:i);continue};if c=="/" && n=="*"{block=true;out.append(c);i=input.index(after:i);continue};if c=="'" || c=="\"" || c=="`"{quote=c;out.append(c)}else if c=="{"{out += " {\n";d+=1;out += String(repeating:"  ",count:d)}else if c=="}"{d=max(0,d-1);out=out.trimmingCharacters(in:.whitespacesAndNewlines);out += "\n"+String(repeating:"  ",count:d)+"}";if n==";"{out.append(";");i=input.index(after:i)}}else if c==";"{out += ";\n"+String(repeating:"  ",count:d)}else{out.append(c)};i=input.index(after:i)};return regexReplace(regexReplace(out,"[ \\t]+\\n","\n"),"\\n{3,}","\n\n").trimmingCharacters(in:.whitespacesAndNewlines) }
+    private static func jsFormat(_ input:String)->String {
+        typealias Token=(text:String,kind:String)
+        var tokens:[Token]=[], chars=Array(input), i=0
+        let operators=["===","!==",">>>","=>","??=","??","?.","&&","||","**","==","!=","<=",">=","++","--","+=","-=","*=","/=","...","**=","<<",">>"]
+        func isWordStart(_ c:Character)->Bool { c.isLetter || c=="_" || c=="$" }
+        func isWordPart(_ c:Character)->Bool { c.isLetter || c.isNumber || c=="_" || c=="$" }
+        while i<chars.count {
+            let c=chars[i]
+            if c.isWhitespace {i+=1;continue}
+            if c=="/" && i+1<chars.count && chars[i+1]=="/" {let start=i;i+=2;while i<chars.count && chars[i] != "\n" {i+=1};tokens.append((String(chars[start..<i]),"comment"));continue}
+            if c=="/" && i+1<chars.count && chars[i+1]=="*" {let start=i;i+=2;var closed=false;while i+1<chars.count {if chars[i]=="*" && chars[i+1]=="/" {i+=2;closed=true;break};i+=1};guard closed else{return "JavaScript formatter found an unterminated block comment."};tokens.append((String(chars[start..<i]),"comment"));continue}
+            if c=="'" || c=="\"" || c=="`" {let start=i;i+=1;var closed=false;while i<chars.count {if chars[i]=="\\" {i=min(chars.count,i+2);continue};if chars[i]==c {i+=1;closed=true;break};i+=1};guard closed else{return "JavaScript formatter found an unterminated string or template literal."};tokens.append((String(chars[start..<i]),"literal"));continue}
+            if isWordStart(c) || c.isNumber {let start=i;i+=1;while i<chars.count && isWordPart(chars[i]) {i+=1};tokens.append((String(chars[start..<i]),"word"));continue}
+            if let op=operators.first(where:{op in i+op.count<=chars.count && String(chars[i..<i+op.count])==op}) {tokens.append((op,"operator"));i+=op.count;continue}
+            tokens.append((String(c),"punct"));i+=1
+        }
+        guard !tokens.isEmpty else{return "Paste JavaScript or TypeScript code to format."}
+        var out:[String]=[], line="", depth=0, parenDepth=0, lineDepth=0
+        func emit(){let value=line.trimmingCharacters(in:.whitespaces);if !value.isEmpty {out.append(String(repeating:"  ",count:max(0,lineDepth))+value)};line="";lineDepth=depth}
+        func append(_ value:String,_ space:Bool=false){if line.isEmpty && !value.isEmpty {lineDepth=depth};if space && !line.isEmpty && !line.last!.isWhitespace && !".([".contains(line.last!) && (value.first.map{!",;)]}".contains($0)} ?? true) {line+=" "};line+=value}
+        func prev(_ index:Int)->String { index>0 ? tokens[index-1].text : "" }
+        func next(_ index:Int)->String { index+1<tokens.count ? tokens[index+1].text : "" }
+        for index in tokens.indices {
+            let token=tokens[index], value=token.text, before=prev(index), after=next(index)
+            if token.kind=="comment" {if !line.trimmingCharacters(in:.whitespaces).isEmpty {emit()};append(value);emit();continue}
+            switch value {
+            case "{": append("{",!line.trimmingCharacters(in:.whitespaces).isEmpty && !".([".contains(line.last ?? " "));depth+=1;emit()
+            case "}": if !line.trimmingCharacters(in:.whitespaces).isEmpty {emit()};depth=max(0,depth-1);append("}");if ![";",",",")","]",".","(","["].contains(after){emit()}
+            case "(": append("(",["if","for","while","switch","catch","with","function"].contains(before));parenDepth+=1
+            case ")": line=line.trimmingCharacters(in:.whitespaces)+")";parenDepth=max(0,parenDepth-1)
+            case "[": append("[")
+            case "]": line=line.trimmingCharacters(in:.whitespaces)+"]"
+            case ".","?.": line=line.trimmingCharacters(in:.whitespaces)+value
+            case ",": line=line.trimmingCharacters(in:.whitespaces)+",";emit()
+            case ";": line=line.trimmingCharacters(in:.whitespaces)+";";if parenDepth==0 {emit()}
+            case ":": line=line.trimmingCharacters(in:.whitespaces)+":";append("",true)
+            default:
+                if token.kind=="operator" || ["=","+","-","*","/","%","<",">","!","&","|","?"].contains(value) {if ["++","--","!","~","..."].contains(value){append(value)}else{append(value,true);append("",true)}}
+                else {let prior=index>0 ? tokens[index-1] : nil;let previousWord=prior.map{$0.kind=="word" || $0.kind=="literal"} ?? false;let wordLike=token.kind=="word" || token.kind=="literal";append(value,!line.isEmpty && (previousWord || ["return","throw","new","await","yield","typeof","delete","void","instanceof","in","of","else","async"].contains(before) || (before==")" && wordLike)))}
+            }
+        }
+        emit();let result=out.joined(separator:"\n").trimmingCharacters(in:.whitespacesAndNewlines);guard !result.isEmpty else{return "Formatter produced no output. Check that the source is not empty."}
+        return result+"\n\nNote: conservative local formatter. It preserves strings/comments and formats common blocks, calls, literals, and operators; it is not a full ECMAScript parser."
+    }
     private static func yamlFormat(_ input:String)->String { input.components(separatedBy:"\n").map{$0.replacingOccurrences(of:"\t",with:"  ").trimmingCharacters(in:.whitespaces)}.joined(separator:"\n").replacingOccurrences(of:"\n{3,}",with:"\n\n",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines) }
     private static func jsMinify(_ input:String)->String {
         var out="", i=input.startIndex, quote:Character?=nil, line=false, block=false

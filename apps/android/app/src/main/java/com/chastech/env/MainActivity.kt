@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.OpenableColumns
-import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1353,9 +1352,10 @@ private fun NativeTextToolForm(toolId: String) {
     var keyword by rememberSaveable(toolId) { mutableStateOf("") }
     var wpm by rememberSaveable(toolId) { mutableStateOf("200") }
     var limit by rememberSaveable(toolId) { mutableStateOf("280") }
+    var dialect by rememberSaveable(toolId) { mutableStateOf("postgresql") }
     val counter = op.endsWith("counter") || op == "reading-time-calculator"
     val diff = op == "text-diff"
-    val options = NativeTextEngine.Options(find, replacement, width, style, keyword, limit, wpm)
+    val options = NativeTextEngine.Options(find, replacement, width, style, keyword, limit, wpm, dialect)
     val stats = NativeTextEngine.stats(input, wpm)
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1369,6 +1369,19 @@ private fun NativeTextToolForm(toolId: String) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("bullets", "numbered", "comma").forEach { value -> FilterChip(selected = style == value, onClick = { style = value }, label = { Text(value.replaceFirstChar { it.uppercase() }) }) } }
         }
         if (op == "keyword-density") InputField(keyword, { keyword = it }, "Keyword (optional)")
+        if (op == "sql-format") {
+            Text("SQL dialect", style = MaterialTheme.typography.labelLarge)
+            var dialectMenuExpanded by remember(toolId) { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { dialectMenuExpanded = true }) { Text(dialect.uppercase().replace("TRANSACTSQL", "T-SQL")) }
+                DropdownMenu(expanded = dialectMenuExpanded, onDismissRequest = { dialectMenuExpanded = false }) {
+                    listOf("sql", "postgresql", "mysql", "mariadb", "sqlite", "transactsql", "bigquery", "snowflake", "oracle", "redshift", "duckdb").forEach { item ->
+                        DropdownMenuItem(text = { Text(item.uppercase().replace("TRANSACTSQL", "T-SQL")) }, onClick = { dialect = item; dialectMenuExpanded = false })
+                    }
+                }
+            }
+            Text("Local lexer-based formatting; not a full grammar parser or query validator.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         InputField(input, { input = it }, if (counter) "Text" else "Input", minLines = 5, tall = true)
         if (diff) InputField(compare, { compare = it }, "New text", minLines = 5, tall = true)
         if (op == "reading-time-calculator") InputField(wpm, { wpm = it }, "Reading speed (words/min)", singleLine = true)
@@ -1379,7 +1392,7 @@ private fun NativeTextToolForm(toolId: String) {
         }
         ActionRow(
             onRun = { runCatching { NativeTextEngine.run(toolId, input, compare, options) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run tool" }) },
-            onReset = { input = ""; compare = ""; output = ""; error = ""; find = ""; replacement = ""; width = "80"; style = "bullets"; keyword = ""; wpm = "200"; limit = "280" }
+            onReset = { input = ""; compare = ""; output = ""; error = ""; find = ""; replacement = ""; width = "80"; style = "bullets"; keyword = ""; wpm = "200"; limit = "280"; dialect = "postgresql" }
         )
         ResultBox(output, error, ::copy)
     }
@@ -1717,7 +1730,11 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
     var input by rememberSaveable(tool.id) { mutableStateOf("") }
     var secondary by rememberSaveable(tool.id) { mutableStateOf("") }
     var flags by rememberSaveable(tool.id) { mutableStateOf("g") }
-    var replacement by rememberSaveable(tool.id) { mutableStateOf("dog") }
+    var replacement by rememberSaveable(tool.id) { mutableStateOf("") }
+    var regexMode by rememberSaveable(tool.id) { mutableStateOf(if (op.contains("explainer", true)) "flavors" else "test") }
+    var sqlDialect by rememberSaveable(tool.id) { mutableStateOf("postgresql") }
+    val regexStudio = op.contains("regex", true) && !op.contains("regex-generator", true)
+    val sqlFormatter = op.contains("sql", true) && (op.contains("formatter", true) || op.contains("beautifier", true))
     var selectedFileName by rememberSaveable(tool.id) { mutableStateOf("") }
     var selectedFileUri by rememberSaveable(tool.id) { mutableStateOf("") }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
@@ -1750,7 +1767,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = {
                 val (sample, sampleSecondary) = NativeDeveloperToolFormPolicy.example(op)
-                input = sample; secondary = sampleSecondary; flags = if (op.contains("regex", true)) "gi" else "g"; replacement = "dog"; output = ""; error = ""
+                input = sample; secondary = sampleSecondary; flags = if (op.contains("regex", true)) "gi" else "g"; replacement = if (op.contains("replace", true)) "dog" else ""; regexMode = "test"; sqlDialect = "postgresql"; output = ""; error = ""
             }) { Text("Load example") }
             Text("Ctrl/⌘+Enter support is available on Web; native uses the action button.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1760,15 +1777,37 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                 Text(selectedFileName.ifBlank { "Select a file to hash locally" }, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }
         }
-        InputField(input, { input = it }, if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
-        if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) {
-            InputField(secondary, { secondary = it }, when { op.contains("regex", true) -> "Test text"; op.contains("json-path", true) || op.contains("jsonpath", true) -> "JSON path (e.g. $.items[0].id)"; op.contains("uuid", true) -> "Batch count"; else -> "Second input" }, minLines = 4, tall = true)
+        InputField(input, { input = it }, if (regexStudio && regexMode == "pipeline") "Default pattern (unused by layers)" else if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+        if (regexStudio) {
+            Text("Regex Studio mode", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf("test", "benchmark", "pipeline", "format", "flavors").forEach { mode ->
+                    FilterChip(selected = regexMode == mode, onClick = { regexMode = mode }, label = { Text(mode.replaceFirstChar { it.uppercase() }) })
+                }
+            }
+            Text("Android uses the native Java regex engine. Risk heuristics and input limits reduce exposure, but a single Matcher call cannot be reliably force-cancelled on this thread; risky near-miss inputs are skipped.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) {
-            InputField(flags, { flags = it }, "Regex flags (g/i/m/s)", minLines = 1, singleLine = true)
+        if ((!regexStudio && NativeDeveloperToolFormPolicy.needsSecondInput(op)) || (regexStudio && regexMode in setOf("test", "benchmark", "pipeline"))) {
+            InputField(secondary, { secondary = it }, when { regexStudio && regexMode == "pipeline" -> "Pipeline JSON (input + ordered layers)"; regexStudio && regexMode == "benchmark" -> "Test strings JSON (short bounded samples)"; regexStudio && regexMode == "format" -> "Not used in Format mode"; regexStudio && regexMode == "flavors" -> "Not used in Flavor mode"; op.contains("regex", true) -> "Test text or JSON batch"; op.contains("json-path", true) || op.contains("jsonpath", true) -> "JSON path (e.g. $.items[0].id)"; op.contains("uuid", true) -> "Batch count"; else -> "Second input" }, minLines = 4, tall = true)
         }
-        if (NativeDeveloperToolFormPolicy.needsReplacement(op)) {
-            InputField(replacement, { replacement = it }, "Replacement text", minLines = 1, singleLine = true)
+        if (sqlFormatter) {
+            Text("SQL dialect", style = MaterialTheme.typography.labelLarge)
+            var dialectMenuExpanded by remember(tool.id) { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { dialectMenuExpanded = true }) { Text(sqlDialect.uppercase().replace("TRANSACTSQL", "T-SQL")) }
+                DropdownMenu(expanded = dialectMenuExpanded, onDismissRequest = { dialectMenuExpanded = false }) {
+                    listOf("sql", "postgresql", "mysql", "mariadb", "sqlite", "transactsql", "bigquery", "snowflake", "oracle", "redshift", "duckdb").forEach { dialect ->
+                        DropdownMenuItem(text = { Text(dialect.uppercase().replace("TRANSACTSQL", "T-SQL")) }, onClick = { sqlDialect = dialect; dialectMenuExpanded = false })
+                    }
+                }
+            }
+            Text("Conservative dialect-aware formatter; not a full SQL grammar validator.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (regexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op)) {
+            InputField(flags, { flags = it }, "Regex flags (g/i/m/s/u; platform engine-specific)", minLines = 1, singleLine = true)
+        }
+        if ((regexStudio && regexMode in setOf("test", "benchmark")) || (!regexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op))) {
+            InputField(replacement, { replacement = it }, "Replacement preview (optional)", minLines = 1, singleLine = true)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
@@ -1783,16 +1822,18 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                             }
                         } else {
                             val options = JSONObject().apply {
-                                if (NativeDeveloperToolFormPolicy.needsSecondInput(op)) put("secondary", secondary)
-                                if (NativeDeveloperToolFormPolicy.needsRegexFlags(op)) put("flags", flags)
-                                if (NativeDeveloperToolFormPolicy.needsReplacement(op)) put("replacement", replacement)
+                                if (regexStudio || NativeDeveloperToolFormPolicy.needsSecondInput(op)) put("secondary", secondary)
+                                if (regexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op)) put("flags", flags)
+                                if (regexStudio || NativeDeveloperToolFormPolicy.needsReplacement(op)) put("replacement", replacement)
+                                if (regexStudio) put("mode", regexMode)
+                                if (sqlFormatter) put("dialect", sqlDialect)
                             }.toString()
                             withContext(Dispatchers.Default) { NativeUtilityEngine.run(tool, input, options).text }
                         }
                     }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
                 }
-            }) { Text(NativeDeveloperToolFormPolicy.actionLabel(op)) }
-            OutlinedButton(onClick = { input = ""; secondary = ""; flags = "g"; replacement = "dog"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
+            }) { Text(if (regexStudio) when (regexMode) { "test" -> "Run tests"; "benchmark" -> "Benchmark"; "pipeline" -> "Run pipeline"; "format" -> "Format regex"; else -> "Analyze flavors" } else NativeDeveloperToolFormPolicy.actionLabel(op)) }
+            OutlinedButton(onClick = { input = ""; secondary = ""; flags = "g"; replacement = ""; regexMode = "test"; sqlDialect = "postgresql"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))

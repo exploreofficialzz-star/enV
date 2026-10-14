@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
 import { hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
+import { runRegexStudio, type RegexStudioMode } from "@/lib/engines/regex-studio";
 import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
 import { decodeData as decodeSharedData, encodeData as encodeSharedData } from "@/lib/engines/developer-utils";
 import type { ToolMeta } from "@/types/tool";
@@ -261,8 +262,15 @@ export function DeveloperEngine({ op, tool }: Props) {
   const [out, setOut] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const needsSecond = useMemo(() => /diff|regex|replace|compare|json-path|uuid-generator|uuid-batch|http-request-builder/.test(op), [op]);
+  const [regexMode, setRegexMode] = useState<RegexStudioMode>(() => op.toLowerCase().includes("explainer") ? "flavors" : "test");
+  const [sqlDialect, setSqlDialect] = useState("postgresql");
+  const regexAbort = useRef<AbortController | null>(null);
+  // Keep generator routes on their established starter-pattern behavior; tester/replace/builder/
+  // explainer routes use the advanced Studio. The native forms mirror this routing rule.
+  const isRegexTool = useMemo(() => /regex/.test(op.toLowerCase()) && !/regex-generator/.test(op.toLowerCase()), [op]);
+  const needsSecond = useMemo(() => isRegexTool ? ["test", "benchmark", "pipeline"].includes(regexMode) : /diff|replace|compare|json-path|uuid-generator|uuid-batch|http-request-builder/.test(op), [op, isRegexTool, regexMode]);
   const isRegexReplace = op.toLowerCase().includes("regex-replace");
+  const isSqlFormatter = /sql-(?:formatter|beautifier)/i.test(op);
   const isFileHash = op.toLowerCase().includes("file-hash");
   const toolSlug = tool?.slug;
   const relatedTools = useMemo(() => {
@@ -283,7 +291,12 @@ export function DeveloperEngine({ op, tool }: Props) {
     setBusy(true);
     try {
       setError(null);
-      if (isFileHash) {
+      if (isRegexTool) {
+        const controller = new AbortController();
+        regexAbort.current = controller;
+        const result = await runRegexStudio(input, secondary, flags, replacement, regexMode, controller.signal);
+        setOut(result);
+      } else if (isFileHash) {
         if (!selectedFile) throw new Error("Choose a local file first. The file bytes will be read in this browser and will not be uploaded.");
         // A bounded whole-file Web Crypto read avoids silently allocating a multi-gigabyte buffer.
         // Larger files need a streaming/incremental hash implementation rather than a risky arrayBuffer().
@@ -291,16 +304,16 @@ export function DeveloperEngine({ op, tool }: Props) {
         const algorithms = op.toLowerCase().includes("md5") ? ["MD5"] : op.toLowerCase().includes("sha256") ? ["SHA-256"] : ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"];
         setOut(await hashBytes(new Uint8Array(await selectedFile.arrayBuffer()), algorithms));
       } else {
-        const dedicated = await runDeveloperStudio(op, input, secondary, flags, new Date(), replacement);
+        const dedicated = await runDeveloperStudio(op, input, isSqlFormatter ? sqlDialect : secondary, flags, new Date(), replacement);
         const result = dedicated ?? legacyGeneric(op, input, secondary, flags);
         setOut(result);
       }
     } catch (e) {
       setOut("");
       setError(e instanceof Error ? e.message : "Could not process this input.");
-    } finally { setBusy(false); }
+    } finally { regexAbort.current = null; setBusy(false); }
   };
-  const loadExample = () => { setInput(example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setOut(""); setError(null); };
+  const loadExample = () => { setInput(example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setRegexMode("test"); setOut(""); setError(null); };
   const handleEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void run(); } };
   return <div className="space-y-4">
     <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm" role="note">
@@ -312,15 +325,29 @@ export function DeveloperEngine({ op, tool }: Props) {
     </div>
     {isFileHash ? <div className="space-y-1.5"><Label htmlFor="dev-file">Local file</Label><input id="dev-file" type="file" onChange={(event) => { setSelectedFile(event.target.files?.[0] ?? null); setOut(""); setError(null); }} className="block w-full rounded-md border border-border p-2 text-sm" /><p className="text-xs text-muted">{selectedFile ? `${selectedFile.name} · ${selectedFile.size.toLocaleString()} bytes` : "The file never leaves this device."}</p></div> : null}
     <div className="grid gap-4 md:grid-cols-2">
-      <label className="block space-y-1.5"><Label htmlFor="dev-input">{op.toLowerCase().includes("regex") ? "Regular expression" : "Input"}</Label><Textarea id="dev-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder="Paste your code, data, token, URL, or text here…" /></label>
-      {needsSecond ? <label className="block space-y-1.5"><Label htmlFor="dev-secondary">{op.toLowerCase().includes("regex") ? "Test text" : op.toLowerCase().includes("json-path") ? "JSON path" : "Second input"}</Label><Textarea id="dev-secondary" value={secondary} onChange={(e) => setSecondary(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder={op.toLowerCase().includes("json-path") ? "$.items[0].id" : op.toLowerCase().includes("regex") ? 'One sample or JSON array, e.g. ["order-12", "invoice-8"]' : "Paste comparison input or test text…"} /></label> : null}
+      <label className="block space-y-1.5"><Label htmlFor="dev-input">{isRegexTool && regexMode === "pipeline" ? "Default pattern (unused by layers)" : op.toLowerCase().includes("regex") ? "Regular expression" : "Input"}</Label><Textarea id="dev-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder="Paste your code, data, token, URL, or text here…" /></label>
+      {needsSecond ? <label className="block space-y-1.5"><Label htmlFor="dev-secondary">{isRegexTool ? regexMode === "pipeline" ? "Pipeline JSON (input + ordered layers)" : regexMode === "benchmark" ? "Test strings JSON" : "Test text or batch JSON" : op.toLowerCase().includes("json-path") ? "JSON path" : "Second input"}</Label><Textarea id="dev-secondary" value={secondary} onChange={(e) => setSecondary(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder={isRegexTool && regexMode === "pipeline" ? '{"input":"text","layers":[{"name":"Trim tags","pattern":"<[^>]+>","flags":"g","replacement":""}]}' : isRegexTool && regexMode === "benchmark" ? '["short sample", {"label":"adversarial near miss","text":"..."}]' : op.toLowerCase().includes("json-path") ? "$.items[0].id" : isRegexTool ? 'One sample or JSON array, e.g. ["order-12", "invoice-8"]' : "Paste comparison input or test text…"} /></label> : null}
     </div>
-    {op.toLowerCase().includes("regex") ? <p className="text-xs text-muted" role="note">Engine: JavaScript RegExp on Web. For independent test cases, paste a JSON array of strings into Test text. The same flags apply to each sample. Suspected high-backtracking patterns may be skipped for long samples to protect responsiveness; this is a heuristic, not a general execution timeout.</p> : null}
+    {isSqlFormatter ? <label className="block max-w-sm space-y-1.5"><Label htmlFor="dev-sql-dialect">SQL dialect</Label><select id="dev-sql-dialect" value={sqlDialect} onChange={(e) => setSqlDialect(e.target.value)} className="min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm"><option value="sql">Standard SQL</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option><option value="mariadb">MariaDB</option><option value="sqlite">SQLite</option><option value="transactsql">SQL Server (T-SQL)</option><option value="bigquery">BigQuery</option><option value="snowflake">Snowflake</option><option value="oracle">Oracle</option><option value="redshift">Redshift</option><option value="duckdb">DuckDB</option></select><p className="text-xs text-muted">Uses the bundled sql-formatter dialect grammar locally. It formats query layout; it does not inspect schema or execute SQL, and stored procedures or custom delimiters may be unsupported.</p></label> : null}
+    {isRegexTool ? <div className="space-y-3 rounded-lg border border-border p-3" aria-label="Regex Studio controls">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-1.5"><Label htmlFor="dev-regex-mode">Studio mode</Label><select id="dev-regex-mode" value={regexMode} onChange={(e) => setRegexMode(e.target.value as RegexStudioMode)} className="min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+          <option value="test">Test / assertions</option><option value="benchmark">Benchmark</option><option value="pipeline">Substitution pipeline</option><option value="format">Format regex source</option><option value="flavors">Flavor compatibility</option>
+        </select></label>
+        <label className="block space-y-1.5"><Label htmlFor="dev-flags">Regex flags (JavaScript execution)</Label><Input id="dev-flags" value={flags} onChange={(e) => setFlags(e.target.value)} className="w-full font-mono" /></label>
+      </div>
+      {regexMode === "pipeline" ? <p className="text-xs text-muted" role="note">Provide JSON: {`{"input":"text","layers":[{"name":"Trim tags","pattern":"<[^>]+>","flags":"g","replacement":""}]}`}. Each layer receives the previous layer's output; each step is inspectable. Runs in a terminable Web Worker.</p>
+        : regexMode === "flavors" ? <p className="text-xs text-muted" role="note">Shows static portability warnings for JavaScript, PCRE2, Python, Java, .NET and Go RE2. Only JavaScript RegExp is executed here; the tool does not claim cross-engine execution.</p>
+        : regexMode === "format" ? <p className="text-xs text-muted" role="note">Produces a source-preserving readable representation. It does not add the unsupported free-spacing flag to JavaScript regexes.</p>
+        : regexMode === "benchmark" ? <p className="text-xs text-muted" role="note">Benchmarks your selected samples on this device. Results vary by browser and device; likely high-backtracking patterns are bounded by a worker deadline.</p>
+        : <p className="text-xs text-muted" role="note">Engine: JavaScript RegExp. Paste a JSON array or {`{"samples":[{"label":"valid","text":"ORD-12","expectMatch":true},{"label":"invalid","text":"bad","expectMatch":false}]}`} for repeatable cases. Execution is isolated in a terminable Web Worker when available.</p>}
+      {(regexMode === "test" || regexMode === "benchmark") && <label className="block space-y-1.5"><Label htmlFor="dev-regex-replacement">Replacement preview (optional)</Label><Input id="dev-regex-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-full font-mono" placeholder="$<name>, $1, or replacement text" /></label>}
+    </div> : null}
     <div className="flex flex-wrap items-end gap-3">
-      {op.toLowerCase().includes("regex") ? <label className="space-y-1.5"><Label htmlFor="dev-flags">Regex flags</Label><Input id="dev-flags" value={flags} onChange={(e) => setFlags(e.target.value)} className="w-28 font-mono" /></label> : null}
-      {isRegexReplace ? <label className="space-y-1.5"><Label htmlFor="dev-replacement">Replacement</Label><Input id="dev-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-48 font-mono" placeholder="Replacement text" /></label> : null}
-      <Button type="button" onClick={() => void run()} disabled={busy}>{busy ? "Processing…" : actionLabel(op)}</Button>
-      <Button type="button" variant="ghost" onClick={() => { setInput(""); setSecondary(""); setFlags("g"); setReplacement(""); setSelectedFile(null); setOut(""); setError(null); }}>Reset</Button>
+      {isRegexReplace && !isRegexTool ? <label className="space-y-1.5"><Label htmlFor="dev-replacement">Replacement</Label><Input id="dev-replacement" value={replacement} onChange={(e) => setReplacement(e.target.value)} className="w-48 font-mono" placeholder="Replacement text" /></label> : null}
+      <Button type="button" onClick={() => void run()} disabled={busy}>{busy ? "Processing…" : isRegexTool ? (regexMode === "test" ? "Run tests" : regexMode === "benchmark" ? "Benchmark" : regexMode === "pipeline" ? "Run pipeline" : regexMode === "format" ? "Format regex" : "Analyze flavors") : actionLabel(op)}</Button>
+      {busy && isRegexTool ? <Button type="button" variant="outline" onClick={() => regexAbort.current?.abort()}>Stop regex run</Button> : null}
+      <Button type="button" variant="ghost" onClick={() => { regexAbort.current?.abort(); setInput(""); setSecondary(""); setFlags("g"); setReplacement(""); setRegexMode("test"); setSqlDialect("postgresql"); setSelectedFile(null); setOut(""); setError(null); }}>Reset</Button>
     </div>
     <ErrorBanner message={error} />
     <CodeResult code={out} filename={`env-${op}.txt`} />

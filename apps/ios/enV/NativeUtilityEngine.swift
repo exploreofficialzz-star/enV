@@ -213,7 +213,7 @@ enum NativeUtilityEngine {
         case "url-encode": return (o["text"] ?? input).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         case "url-decode": return (o["text"] ?? input).removingPercentEncoding ?? input
         case "port-lookup","port-reference": if let name=o["name"]?.lowercased(), !name.isEmpty { let rows=NativeUtilityEngine.ports.filter{$0.value.lowercased().contains(name)}.map{ "\($0.key): \($0.value)" }; return rows.isEmpty ? "No match in the common-port reference." : rows.joined(separator:"\n") }; let p=Int(o["port"] ?? input) ?? 443; return NativeUtilityEngine.ports[p].map{ "\(p)/TCP or UDP: \($0)" } ?? "\(p): not in the built-in common-port reference."
-        case "http-status-reference": return [(200,"OK"),(201,"Created"),(204,"No Content"),(301,"Moved Permanently"),(302,"Found"),(304,"Not Modified"),(400,"Bad Request"),(401,"Unauthorized"),(403,"Forbidden"),(404,"Not Found"),(405,"Method Not Allowed"),(409,"Conflict"),(429,"Too Many Requests"),(500,"Internal Server Error"),(502,"Bad Gateway"),(503,"Service Unavailable"),(504,"Gateway Timeout")].map{ "\($0.0): \($0.1)"}.joined(separator:"\n")
+        case "http-status-reference": return [(100,"Continue"),(101,"Switching Protocols"),(102,"Processing"),(103,"Early Hints"),(104,"Upload Resumption Supported (temporary registration)"),(200,"OK"),(201,"Created"),(202,"Accepted"),(203,"Non-Authoritative Information"),(204,"No Content"),(205,"Reset Content"),(206,"Partial Content"),(207,"Multi-Status"),(208,"Already Reported"),(226,"IM Used"),(300,"Multiple Choices"),(301,"Moved Permanently"),(302,"Found"),(303,"See Other"),(304,"Not Modified"),(305,"Use Proxy (deprecated)"),(306,"(Unused)"),(307,"Temporary Redirect"),(308,"Permanent Redirect"),(400,"Bad Request"),(401,"Unauthorized"),(402,"Payment Required"),(403,"Forbidden"),(404,"Not Found"),(405,"Method Not Allowed"),(406,"Not Acceptable"),(407,"Proxy Authentication Required"),(408,"Request Timeout"),(409,"Conflict"),(410,"Gone"),(411,"Length Required"),(412,"Precondition Failed"),(413,"Content Too Large"),(414,"URI Too Long"),(415,"Unsupported Media Type"),(416,"Range Not Satisfiable"),(417,"Expectation Failed"),(418,"I'm a teapot"),(421,"Misdirected Request"),(422,"Unprocessable Content"),(423,"Locked"),(424,"Failed Dependency"),(425,"Too Early"),(426,"Upgrade Required"),(428,"Precondition Required"),(429,"Too Many Requests"),(431,"Request Header Fields Too Large"),(451,"Unavailable For Legal Reasons"),(500,"Internal Server Error"),(501,"Not Implemented"),(502,"Bad Gateway"),(503,"Service Unavailable"),(504,"Gateway Timeout"),(505,"HTTP Version Not Supported"),(506,"Variant Also Negotiates"),(507,"Insufficient Storage"),(508,"Loop Detected"),(510,"Not Extended"),(511,"Network Authentication Required")].map{ "\($0.0): \($0.1)" + ($0.0 == 418 ? " (IANA registry: unused; teapot meaning is historical)" : "")}.joined(separator:"\n")
         case "header-format","header-parser": let rows=lines(o["headers"] ?? (input.isEmpty ? "Content-Type: application/json\nAuthorization: Bearer YOUR_TOKEN" : input)).map{ line in let p=line.firstIndex(of:":"); return p.map{ "\(line[..<$0].trimmingCharacters(in:.whitespaces)): \(line[line.index(after:$0)...].trimmingCharacters(in:.whitespaces))" } ?? line }; return op=="header-parser" ? rows.map{ row in let p=row.firstIndex(of:":"); return p.map{ "\(row[..<$0]) → \(row[row.index(after:$0)...].trimmingCharacters(in:.whitespaces))" } ?? row }.joined(separator:"\n") : rows.joined(separator:"\n")
         case "basic-auth-header": let user=o["username"] ?? ""; let pass=o["password"] ?? ""; return "Basic " + Data("\(user):\(pass)".utf8).base64EncodedString()
         case "bearer-header": return "Bearer \(o["token"] ?? input)"
@@ -299,14 +299,20 @@ enum NativeUtilityEngine {
         if op=="uuid-generator" { let count=max(1,min(100,Int(o["count"] ?? "10") ?? 10)); return (0..<count).map{_ in UUID().uuidString.lowercased()}.joined(separator:"\n") }
         if op=="uuid-validator" { return Self.uuidValidation(input) }
         if op=="json-validator" { _=try Self.jsonValue(input,pretty:false); return "Valid JSON (RFC 8259-compatible parser)." }
-        if op=="json-beautifier" || op=="json-formatter" { return try Self.jsonValue(input,pretty:true) }
-        if op=="json-minifier" { return try Self.jsonValue(input,pretty:false) }
+        if op=="json-beautifier" || op=="json-formatter" { let formatted=try Self.losslessJSONFormat(input,pretty:true); let warning=Self.jsonFormattingWarnings(input); return warning.isEmpty ? formatted : warning+"\n\n"+formatted }
+        if op=="json-minifier" { let formatted=try Self.losslessJSONFormat(input,pretty:false); let warning=Self.jsonFormattingWarnings(input); return warning.isEmpty ? formatted : warning+"\n\n"+formatted }
         if op=="query-string-parser" { return input }
         if op=="url-parser" { return try Self.developerURLInfo(input) }
         if op=="http-status-lookup" {
-            let rows=[("200","OK"),("201","Created"),("204","No Content"),("301","Moved Permanently"),("302","Found"),("304","Not Modified"),("400","Bad Request"),("401","Unauthorized"),("403","Forbidden"),("404","Not Found"),("405","Method Not Allowed"),("409","Conflict"),("422","Unprocessable Content"),("429","Too Many Requests"),("500","Internal Server Error"),("502","Bad Gateway"),("503","Service Unavailable"),("504","Gateway Timeout")]
+            let rows=[("100","Continue"),("101","Switching Protocols"),("102","Processing"),("103","Early Hints"),("200","OK"),("201","Created"),("202","Accepted"),("203","Non-Authoritative Information"),("204","No Content"),("205","Reset Content"),("206","Partial Content"),("300","Multiple Choices"),("301","Moved Permanently"),("302","Found"),("303","See Other"),("304","Not Modified"),("307","Temporary Redirect"),("308","Permanent Redirect"),("400","Bad Request"),("401","Unauthorized"),("402","Payment Required"),("403","Forbidden"),("404","Not Found"),("405","Method Not Allowed"),("406","Not Acceptable"),("407","Proxy Authentication Required"),("408","Request Timeout"),("409","Conflict"),("410","Gone"),("411","Length Required"),("412","Precondition Failed"),("413","Content Too Large"),("414","URI Too Long"),("415","Unsupported Media Type"),("416","Range Not Satisfiable"),("417","Expectation Failed"),("418","I'm a teapot"),("421","Misdirected Request"),("422","Unprocessable Content"),("423","Locked"),("424","Failed Dependency"),("425","Too Early"),("426","Upgrade Required"),("428","Precondition Required"),("429","Too Many Requests"),("431","Request Header Fields Too Large"),("451","Unavailable For Legal Reasons"),("500","Internal Server Error"),("501","Not Implemented"),("502","Bad Gateway"),("503","Service Unavailable"),("504","Gateway Timeout"),("505","HTTP Version Not Supported"),("506","Variant Also Negotiates"),("507","Insufficient Storage"),("508","Loop Detected"),("510","Not Extended"),("511","Network Authentication Required")]
             let code=input.trimmingCharacters(in:.whitespacesAndNewlines)
-            return rows.first(where:{$0.0==code}).map{"\($0.0) \($0.1)"} ?? rows.map{"\($0.0) \($0.1)"}.joined(separator:"\n")
+            if let item=rows.first(where:{$0.0==code}) {
+                let meaning: String
+                switch code { case "104": meaning="Meaning: Upload Resumption Supported is currently a temporary IANA registration listed to expire on 2026-11-13 unless renewed or updated. Use only with a documented resumable-upload protocol."; case "305": meaning="Meaning: Use Proxy is deprecated; do not rely on it as a routine redirect instruction."; case "306": meaning="Meaning: Unused in the current general HTTP registry; do not assign private semantics to it on public endpoints."; case "418": meaning="Meaning: I'm a teapot is the historical RFC 2324 joke meaning. The current IANA HTTP Status Code Registry marks 418 as unused for general HTTP semantics; treat the teapot label as historical/application-specific and consult the service documentation. Action: do not assume general-purpose retry semantics."; case "400": meaning="Meaning: The request is malformed. Action: Check syntax, required fields, and request encoding."; case "401": meaning="Meaning: Authentication is missing or invalid. Action: Check credentials and authentication scheme; 401 is not the same as permission denial."; case "403": meaning="Meaning: The server understood the request but refuses it. Action: Check account permissions and access policy."; case "404": meaning="Meaning: The resource was not found. Action: Check path, identifier, and deployment routing."; case "409": meaning="Meaning: The request conflicts with current resource state. Action: refresh state or resolve the conflict before retrying."; case "422": meaning="Meaning: The server understood the request content type and syntax, but could not process the contained instructions. Action: Validate field-level rules and domain constraints."; case "429": meaning="Meaning: Too many requests in a time window. Action: Respect Retry-After, apply backoff, and avoid retry storms."; case "500": meaning="Meaning: The server encountered an unexpected condition. Action: inspect server logs using a correlation ID; do not expose internals to users."; case "502": meaning="Meaning: A gateway received an invalid upstream response. Action: check upstream health and gateway logs."; case "503": meaning="Meaning: The server is temporarily unable to handle the request, often due to overload or maintenance. Action: respect Retry-After if present and retry with bounded backoff."; case "504": meaning="Meaning: A gateway timed out waiting for an upstream. Action: inspect upstream latency and request deadlines."; default: meaning="Meaning: \(item.1). Local lookup only; no request is sent." }
+                let category = (Int(item.0) ?? 0) < 200 ? "Informational" : (Int(item.0) ?? 0) < 300 ? "Success" : (Int(item.0) ?? 0) < 400 ? "Redirection" : (Int(item.0) ?? 0) < 500 ? "Client error" : "Server error"
+                return "\(item.0) \(item.1)\nCategory: \(category)\n\(meaning)\nLocal lookup only; no request is sent."
+            }
+            return rows.map{"\($0.0) \($0.1)" + ($0.0 == "418" ? " (IANA registry: unused; teapot meaning is historical)" : "")}.joined(separator:"\n")
         }
         if op=="data-uri-generator" { return "data:text/plain;base64,\(enc("base64",input))" }
         if op=="markdown-preview" || op=="markdown-to-html" { return Self.formatDeveloperMarkup(input) }
@@ -461,7 +467,74 @@ enum NativeUtilityEngine {
         return String(data: data, encoding: .utf8) ?? ""
     }
 
-    private static func developerTemplate(_ op: String, input: String, secondary: String) -> String? {
+    private static func configStringList(_ config:[String:Any],key:String,defaults:[String]) throws -> [String] {
+        guard let raw=config[key], !(raw is NSNull) else { return defaults }
+        let values:[String]
+        if let value=raw as? String { values=[value] }
+        else if let array=raw as? [Any] {
+            guard array.allSatisfy({$0 is String}) else { throw NativeSimpleError.message("\(key) must contain only strings.") }
+            values=array.compactMap{$0 as? String}
+        } else { throw NativeSimpleError.message("\(key) must be a string or an array of strings.") }
+        guard values.allSatisfy({ !$0.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && $0.range(of:#"[\r\n,;]"#,options:.regularExpression)==nil }) else { throw NativeSimpleError.message("\(key) must contain non-empty strings without commas, semicolons, or line breaks.") }
+        return Array(NSOrderedSet(array:values.map{$0.trimmingCharacters(in:.whitespacesAndNewlines)})) as? [String] ?? values
+    }
+
+    private static func developerCorsGenerator(_ raw:String) throws -> String {
+        guard raw.trimmingCharacters(in:.whitespacesAndNewlines).hasPrefix("{") else {
+            return "Access-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n\nReplace the sample with an explicit allow-list. Reject unlisted origins, handle OPTIONS preflight, and never use '*' with credentialed requests. No request was sent.\n"
+        }
+        guard let data=raw.data(using:.utf8),let config=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else { throw NativeSimpleError.message("CORS configuration must be a valid JSON object.") }
+        let origins=try configStringList(config,key:"origins",defaults:["https://app.example.com"]).map { origin -> String in
+            if origin=="*" { return origin }
+            guard let c=URLComponents(string:origin),let scheme=c.scheme?.lowercased(),["http","https"].contains(scheme),let host=c.host,!host.isEmpty,c.user==nil,c.password==nil,c.query==nil,c.fragment==nil,(c.path.isEmpty || c.path=="/") else { throw NativeSimpleError.message("Invalid CORS origin '\(origin)'; use an http(s) scheme and authority only, without a path, query, credentials or fragment.") }
+            let authority = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+            return "\(scheme)://\(authority)\(c.port.map{" :\($0)".replacingOccurrences(of:" ",with:"")} ?? "")"
+        }
+        let uniqueOrigins=Array(NSOrderedSet(array:origins)) as? [String] ?? origins
+        guard !uniqueOrigins.isEmpty else { throw NativeSimpleError.message("origins must contain at least one explicit origin.") }
+        let methods=try configStringList(config,key:"methods",defaults:["GET","POST","OPTIONS"]).map{$0.uppercased()}
+        guard !methods.isEmpty,methods.allSatisfy({$0.range(of:#"^[!#$%&'*+.^_`|~0-9A-Z-]+$"#,options:.regularExpression) != nil}) else { throw NativeSimpleError.message("methods must contain valid non-empty HTTP method tokens.") }
+        let headers=try configStringList(config,key:"headers",defaults:["Content-Type","Authorization"])
+        let expose=try configStringList(config,key:"exposeHeaders",defaults:[])
+        guard (headers+expose).allSatisfy({$0.range(of:#"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"#,options:.regularExpression) != nil}) else { throw NativeSimpleError.message("headers and exposeHeaders must contain valid HTTP field-name tokens.") }
+        let credentials:Bool
+        if let flag=config["credentials"] { guard let value=flag as? Bool else { throw NativeSimpleError.message("credentials must be true or false.") };credentials=value } else { credentials=false }
+        let maxAge:Int
+        if let value=config["maxAge"] { guard let number=value as? NSNumber,CFGetTypeID(number) != CFBooleanGetTypeID(),number.doubleValue.rounded()==number.doubleValue,(0...86400).contains(number.intValue) else { throw NativeSimpleError.message("maxAge must be an integer from 0 through 86400 seconds.") };maxAge=number.intValue } else {maxAge=600}
+        guard !(credentials && uniqueOrigins.contains("*")) else { throw NativeSimpleError.message("CORS forbids Access-Control-Allow-Origin: * for credentialed requests. Use an explicit allow-list.") }
+        var headersOut=["Access-Control-Allow-Methods: \(methods.joined(separator:", "))","Access-Control-Allow-Headers: \(headers.joined(separator:", "))"]
+        if !expose.isEmpty {headersOut.append("Access-Control-Expose-Headers: \(expose.joined(separator:", "))")}
+        if credentials {headersOut.append("Access-Control-Allow-Credentials: true")}
+        headersOut.append("Access-Control-Max-Age: \(maxAge)")
+        if uniqueOrigins.count==1 { return "Access-Control-Allow-Origin: \(uniqueOrigins[0])\nVary: Origin\n\(headersOut.joined(separator:"\n"))\n\nValidate Origin on the server and handle OPTIONS preflight. No request was sent.\n" }
+        let originsJSON=String(data:try JSONSerialization.data(withJSONObject:uniqueOrigins,options:[.sortedKeys]),encoding:.utf8) ?? "[]"
+        let rendered=headersOut.map { "    response.setHeader(\"\($0.components(separatedBy:": ")[0])\", \"\($0.components(separatedBy:": ").dropFirst().joined(separator:": "))\")" }.joined(separator:"\n")
+        return "# CORS middleware pseudocode — exact allow-list match only; never comma-join origins.\nallowedOrigins = \(originsJSON)\n\nif request.origin is in allowedOrigins:\n    response.setHeader(\"Access-Control-Allow-Origin\", request.origin)\n    response.setHeader(\"Vary\", \"Origin\")\n\(rendered)\n\nReject unlisted origins and handle OPTIONS preflight. This is explanatory pseudocode, not drop-in middleware. No request was sent.\n"
+    }
+
+    private static func developerCspGenerator(_ raw:String) throws -> String {
+        guard raw.trimmingCharacters(in:.whitespacesAndNewlines).hasPrefix("{") else { return "Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests\n\nReview scripts, styles, fonts, images, APIs and framing in staging before enforcement. A strict policy may break features; this generator does not inspect your app or guarantee completeness.\n" }
+        guard let data=raw.data(using:.utf8),let config=try? JSONSerialization.jsonObject(with:data) as? [String:Any],!config.isEmpty else { throw NativeSimpleError.message("CSP configuration must be a non-empty JSON object.") }
+        var directives:[(String,[String])]=[]
+        var weak:[String]=[]
+        for original in config.keys.sorted() {
+            let name=original.lowercased()
+            guard name.range(of:#"^[a-z][a-z0-9-]*$"#,options:.regularExpression) != nil else { throw NativeSimpleError.message("Invalid CSP directive: \(original)") }
+            let values:[String]
+            if config[original] is NSNull { values=[] }
+            else { values=try configStringList(config,key:original,defaults:[]) }
+            for value in values where value=="*" || value.lowercased()=="'unsafe-inline'" || value.lowercased()=="'unsafe-eval'" || value.range(of:#"(?i)^http:/+$"#,options:.regularExpression) != nil { weak.append("\(name) \(value)") }
+            directives.append((name,values))
+        }
+        if !directives.contains(where:{$0.0=="default-src"}) {directives.append(("default-src",["'self'"]))}
+        if !directives.contains(where:{$0.0=="object-src"}) {directives.append(("object-src",["'none'"]))}
+        if !directives.contains(where:{$0.0=="base-uri"}) {directives.append(("base-uri",["'self'"]))}
+        let policy=directives.map{ $0.1.isEmpty ? $0.0 : "\($0.0) \($0.1.joined(separator:" "))" }.joined(separator:"; ")
+        let review=weak.isEmpty ? "Review required sources in staging before enforcement." : "Review broad/unsafe sources before deployment: \(Array(Set(weak)).sorted().joined(separator:", "))."
+        return "Content-Security-Policy: \(policy)\n\n\(review) This generator does not inspect your application or guarantee a complete CSP.\n"
+    }
+
+    private static func developerTemplate(_ op: String, input: String, secondary: String) throws -> String? {
         let lower = op.lowercased(); let subject = input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? secondary.trimmingCharacters(in: .whitespacesAndNewlines) : input.trimmingCharacters(in: .whitespacesAndNewlines)
         if lower.contains("gitignore") && lower.contains("generator") {
             let stack = subject.isEmpty ? "node" : subject.lowercased()
@@ -476,8 +549,8 @@ enum NativeUtilityEngine {
         if lower.contains("readme") && lower.contains("generator") { return "# \(subject.isEmpty ? "Project Name" : subject)\n\nDescribe what the project does and who it serves.\n\n## Features\n- Core capability\n- Important constraints and privacy model\n\n## Requirements\nDocument supported runtime and tool versions.\n\n## Getting started\n\n```sh\nnpm ci\nnpm run dev\n```\n\n## Configuration\nUse environment-specific configuration and never commit secrets.\n\n## Tests\n```sh\nnpm test\n```\n\n## License\nDocument the repository's actual license.\n" }
         if lower.contains("license") && lower.contains("generator") { return "MIT License\n\nCopyright (c) \(Calendar.current.component(.year, from: Date())) \(subject.isEmpty ? "[Copyright holder]" : subject)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND.\n" }
         if lower.contains("nginx") && lower.contains("generator") { return "server {\n    listen 80;\n    server_name example.com;\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files $uri $uri/ =404; }\n    location ~ /\\. { deny all; }\n}\n" }
-        if lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) { return "# Example CORS policy. Replace with explicit trusted origins.\nAccess-Control-Allow-Origin: https://app.example.com\nVary: Origin\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\nAccess-Control-Allow-Headers: Content-Type, Authorization\nAccess-Control-Max-Age: 600\n# Never reflect arbitrary Origin values when credentials are enabled.\n" }
-        if (lower.contains("csp") || lower.contains("content-security-policy")) && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) { return "Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests\n# Add only reviewed script/style/image/connect sources required by your app.\n" }
+        if lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) { return try developerCorsGenerator(subject) }
+        if (lower.contains("csp") || lower.contains("content-security-policy")) && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) { return try developerCspGenerator(subject) }
         if lower.contains("graphql") && (lower.contains("generator") || lower.contains("builder") || lower.contains("query")) { return "query ExampleQuery($id: ID!) {\n  node(id: $id) {\n    id\n    __typename\n  }\n}\n\n# Variables JSON starter:\n{\n  \"id\": \"replace-with-node-id\"\n}\n" }
         if lower.contains("docker") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) { return "FROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nEXPOSE 3000\nCMD [\"npm\",\"start\"]\n" }
         if lower.contains("branch-name") && lower.contains("generator") { let clean = subject.lowercased().replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression).trimmingCharacters(in: CharacterSet(charactersIn: "-")); return "feature/\(clean.isEmpty ? "describe-change" : clean)\nfix/\(clean.isEmpty ? "describe-change" : clean)\n" }
@@ -493,6 +566,11 @@ enum NativeUtilityEngine {
 
     private static func runDeveloperParity(_ op:String,input:String,options o:[String:String]) throws -> String {
         let lower=op.lowercased(), secondary=o["secondary"] ?? o["test"] ?? o["second"] ?? "", flags=o["flags"] ?? "g"
+        // Native routes remain native: Foundation ICU powers Regex Studio on iOS. Keep the
+        // generator starter route intact; all other Regex Studio routes use the enhanced engine.
+        if lower.contains("regex") && !lower.contains("generator") {
+            return try NativeRegexStudio.run(pattern: input, rawSamples: secondary, flags: flags, replacement: o["replacement"] ?? "", mode: o["mode"] ?? "test")
+        }
         let base=lower.replacingOccurrences(of:"^developer-",with:"",options:.regularExpression).components(separatedBy:"-").first ?? lower
         let suffixPattern=try! NSRegularExpression(pattern:"(?:^|-)(formatter|validator|beautifier|minifier|parser|converter|generator|diff|inspector|preview|tester|decoder|encoder|explainer|helper|builder|calculator|lookup|checker|compare)$")
         let suffix=suffixPattern.firstMatch(in:lower,range:NSRange(lower.startIndex...,in:lower)).flatMap{Range($0.range(at:1),in:lower).map{String(lower[$0])}} ?? ""
@@ -519,7 +597,7 @@ enum NativeUtilityEngine {
                 if depth > 100 {add("depth-limit",path,a,b);return}
                 guard let a else {add("added",path,nil,b);return};guard let b else {add("removed",path,a,nil);return}
                 if let lhs=a as? [String:Any],let rhs=b as? [String:Any] {
-                    for key in Set(lhs.keys).union(rhs.keys).sorted() { let escaped=(try? compact(key)) ?? "\"\(key)\"";walk(lhs[key],rhs[key],"\(path)[\(escaped)]",depth+1) }
+                    for key in Set(lhs.keys).union(rhs.keys).sorted() { let escaped=compact(key);walk(lhs[key],rhs[key],"\(path)[\(escaped)]",depth+1) }
                 } else if let lhs=a as? [Any],let rhs=b as? [Any] {
                     for index in 0..<max(lhs.count,rhs.count) {walk(index<lhs.count ? lhs[index] : nil,index<rhs.count ? rhs[index] : nil,"\(path)[\(index)]",depth+1)}
                 } else if canonical(a) != canonical(b) {add("changed",path,a,b)}
@@ -533,13 +611,10 @@ enum NativeUtilityEngine {
             return value
         }
         func minifyText(_ value:String)->String { value.replacingOccurrences(of:"/\\*[\\s\\S]*?\\*/",with:"",options:.regularExpression).replacingOccurrences(of:"<!--[\\s\\S]*?-->",with:"",options:.regularExpression).replacingOccurrences(of:"\\s+",with:" ",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines) }
-        func formatSQL(_ raw:String)->String {
-            var text=raw.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:"\\s+",with:" ",options:.regularExpression)
-            guard !text.isEmpty else { return "" }
-            text=text.replacingOccurrences(of:#"(?i)\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|VALUES|SET|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|UNION|INSERT INTO|UPDATE|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE)\b"#,with:"\n$1",options:.regularExpression)
-            text=text.replacingOccurrences(of:"\\s*,\\s*",with:", ",options:.regularExpression)
-            return text.trimmingCharacters(in:.whitespacesAndNewlines)
+        func formatSQL(_ raw:String, dialectRaw:String = "postgresql")->String {
+            NativeTextEngine.formatSQL(raw, dialectRaw: dialectRaw)
         }
+
         func formatCSS(_ raw:String)->String {
             var text=raw.replacingOccurrences(of:"/\\*[\\s\\S]*?\\*/",with:"",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines)
             text=text.replacingOccurrences(of:"\\s*\\{\\s*",with:" {\n  ",options:.regularExpression)
@@ -642,15 +717,19 @@ enum NativeUtilityEngine {
         func urlInfo()throws -> String {do{return try Self.developerURLInfo(input)}catch{throw NativeSimpleError.message("Failed to construct 'URL': Invalid URL")}}
         func validURL()throws -> String {guard let components=URLComponents(string:input.trimmingCharacters(in:.whitespacesAndNewlines)),components.scheme != nil else{throw NativeSimpleError.message("Failed to construct 'URL': Invalid URL")};return "Valid URL/URI"}
         func validMarkup(_ value:String)->Bool {XMLParser(data:Data(value.utf8)).parse()}
-        let statuses=[("200","OK"),("201","Created"),("204","No Content"),("301","Moved Permanently"),("302","Found"),("304","Not Modified"),("400","Bad Request"),("401","Unauthorized"),("403","Forbidden"),("404","Not Found"),("405","Method Not Allowed"),("409","Conflict"),("422","Unprocessable Content"),("429","Too Many Requests"),("500","Internal Server Error"),("502","Bad Gateway"),("503","Service Unavailable"),("504","Gateway Timeout")]
+        let statuses=[("100","Continue"),("101","Switching Protocols"),("102","Processing"),("103","Early Hints"),("200","OK"),("201","Created"),("202","Accepted"),("203","Non-Authoritative Information"),("204","No Content"),("205","Reset Content"),("206","Partial Content"),("300","Multiple Choices"),("301","Moved Permanently"),("302","Found"),("303","See Other"),("304","Not Modified"),("307","Temporary Redirect"),("308","Permanent Redirect"),("400","Bad Request"),("401","Unauthorized"),("402","Payment Required"),("403","Forbidden"),("404","Not Found"),("405","Method Not Allowed"),("406","Not Acceptable"),("407","Proxy Authentication Required"),("408","Request Timeout"),("409","Conflict"),("410","Gone"),("411","Length Required"),("412","Precondition Failed"),("413","Content Too Large"),("414","URI Too Long"),("415","Unsupported Media Type"),("416","Range Not Satisfiable"),("417","Expectation Failed"),("418","I'm a teapot"),("421","Misdirected Request"),("422","Unprocessable Content"),("423","Locked"),("424","Failed Dependency"),("425","Too Early"),("426","Upgrade Required"),("428","Precondition Required"),("429","Too Many Requests"),("431","Request Header Fields Too Large"),("451","Unavailable For Legal Reasons"),("500","Internal Server Error"),("501","Not Implemented"),("502","Bad Gateway"),("503","Service Unavailable"),("504","Gateway Timeout"),("505","HTTP Version Not Supported"),("506","Variant Also Negotiates"),("507","Insufficient Storage"),("508","Loop Detected"),("510","Not Extended"),("511","Network Authentication Required")]
         let mime=[("json","application/json"),("js","text/javascript"),("css","text/css"),("html","text/html"),("csv","text/csv"),("xml","application/xml"),("pdf","application/pdf"),("png","image/png"),("jpg","image/jpeg"),("jpeg","image/jpeg"),("webp","image/webp"),("svg","image/svg+xml"),("txt","text/plain"),("wasm","application/wasm")]
 
         if lower.contains("data-uri") {
             if lower.hasSuffix("decoder") {
                 guard input.hasPrefix("data:"), let comma=input.firstIndex(of:",") else { throw NativeSimpleError.message("Enter a valid data URI containing a comma separator.") }
                 let metadata=String(input[..<comma]), payload=String(input[input.index(after:comma)...])
-                if metadata.lowercased().hasSuffix(";base64") { return try Self.strictBase64Text(payload) }
-                guard let text=payload.removingPercentEncoding else { throw NativeSimpleError.message("The data URI payload contains invalid percent encoding.") }; return text
+                if metadata.lowercased().hasSuffix(";base64") {
+                    let decoded = try Self.strictBase64Text(payload)
+                    return "MIME metadata: \(metadata)\nMode: Base64-decoded UTF-8 text\n\n\(decoded)\n\nNote: This text tool does not expose arbitrary binary bytes; use a file-aware tool for binary payloads."
+                }
+                guard let text=payload.removingPercentEncoding else { throw NativeSimpleError.message("The data URI payload contains invalid percent encoding.") }
+                return "MIME metadata: \(metadata)\nMode: percent-decoded UTF-8 text\n\n\(text)\n\nNote: This text tool does not expose arbitrary binary bytes; use a file-aware tool for binary payloads."
             }
             return "data:text/plain;base64,\(Data(input.utf8).base64EncodedString())"
         }
@@ -718,7 +797,7 @@ enum NativeUtilityEngine {
             let version=ua.range(of:#"(?i)(?:edg|opr|firefox|chrome|crios|version)/([0-9.]+)"#,options:.regularExpression).map{String(ua[$0]).components(separatedBy:"/").last ?? ""}
             return prettyJSONObject(["browser":browser,"browserVersion":version as Any? ?? NSNull(),"operatingSystem":os,"mobile":l.contains("mobile") || l.contains("android") || l.contains("iphone") || l.contains("ipad"),"raw":ua,"note":"User-agent strings are self-reported and can be spoofed; classification is heuristic."])
         }
-        if let template = Self.developerTemplate(lower, input: input, secondary: secondary) { return template }
+        if let template = try Self.developerTemplate(lower, input: input, secondary: secondary) { return template }
         if ["regex-tester","regex-replace","regex-generator","regex-explainer"].contains(where:lower.contains) {
             guard !secondary.isEmpty else{throw NativeSimpleError.message("Enter a sample string, or a JSON array of sample strings, in the second field.")}
             var opts=NSRegularExpression.Options();if flags.contains("i"){opts.insert(.caseInsensitive)};if flags.contains("m"){opts.insert(.anchorsMatchLines)};if flags.contains("s"){opts.insert(.dotMatchesLineSeparators)}
@@ -787,8 +866,10 @@ enum NativeUtilityEngine {
                 expiresAt=formatter.string(from:Date(timeIntervalSince1970:exp)); expired=now >= exp
             } else { expiresAt="none"; expired=NSNull() }
             let claims:[String:Any]=["exp":claimTime("exp"),"iat":claimTime("iat"),"nbf":claimTime("nbf"),"sub":payloadObject["sub"] ?? NSNull(),"iss":payloadObject["iss"] ?? NSNull(),"aud":payloadObject["aud"] ?? NSNull()]
-            let largeIntegerWarning = !Self.unsafeJSONIntegerTokens(payloadRaw).isEmpty
-            return prettyJSONObject(["warning":"DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.","header":header,"payload":payload,"claims":claims,"signaturePresent":!parts[2].isEmpty,"signatureVerified":false,"expiresAt":expiresAt,"expired":expired,"largeIntegerPrecisionWarning":largeIntegerWarning ? "Large integers may lose precision in JavaScript consumers; this native Swift display preserves JSON parsing semantics but does not establish signature validity." : NSNull(),"headerRaw":headerRaw])
+            let headerUnsafe = Self.unsafeJSONIntegerTokens(headerRaw)
+            let payloadUnsafe = Self.unsafeJSONIntegerTokens(payloadRaw)
+            let largeIntegerWarning = !headerUnsafe.isEmpty || !payloadUnsafe.isEmpty
+            return prettyJSONObject(["warning":"DECODE ONLY — signature not verified. Do not treat this display as proof of authenticity.","header":header,"payload":payload,"claims":claims,"signaturePresent":!parts[2].isEmpty,"signatureVerified":false,"expiresAt":expiresAt,"expired":expired,"largeIntegerPrecisionWarning":largeIntegerWarning ? "Large integer tokens were found. Parsed display fields may not preserve every digit on all platforms; use the exact raw JSON fields for inspection. This does not establish signature validity." : NSNull(),"headerRaw":headerRaw,"headerRawJson":headerRaw,"payloadRawJson":payloadRaw,"rawNumericPrecision":["headerUnsafeIntegerTokens":headerUnsafe,"payloadUnsafeIntegerTokens":payloadUnsafe]])
         }
         if lower.contains("uuid-generator") || lower.contains("uuid-batch-generator") {let number=Double(secondary) ?? 0,count=max(1,min(1000,number==0 ? 10:Int(number)));return (0..<count).map{_ in UUID().uuidString.lowercased()}.joined(separator:"\n")}
         if lower.contains("developer-sql-query-builder") || lower.contains("sql-query-builder") {
@@ -806,12 +887,12 @@ enum NativeUtilityEngine {
         if lower.contains("uuid") && suffix=="encoder" {
             let compact=input.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:"-",with:"")
             guard compact.range(of:#"^[0-9a-fA-F]{32}$"#,options:.regularExpression) != nil else { throw NativeSimpleError.message("Enter a canonical UUID in 8-4-4-4-12 hexadecimal form.") }
-            return stride(from:0,to:32,by:2).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:2);return String(repeating:"0",count:max(0,8-String(Int(compact[start..<end],radix:16)!,radix:2).count))+String(Int(compact[start..<end],radix:16)!,radix:2) }.joined(separator:" ")
+            return stride(from:0,to:32,by:2).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:2);String(repeating:"0",count:max(0,8-String(Int(compact[start..<end],radix:16)!,radix:2).count))+String(Int(compact[start..<end],radix:16)!,radix:2) }.joined(separator:" ")
         }
         if lower.contains("uuid") && suffix=="decoder" {
             let compact=input.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:#"[\s,:-]"#,with:"",options:.regularExpression)
             let hex:String
-            if compact.range(of:#"^[01]{128}$"#,options:.regularExpression) != nil { hex=stride(from:0,to:128,by:8).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:8);return String(repeating:"0",count:max(0,2-String(Int(compact[start..<end],radix:2)!,radix:16).count))+String(Int(compact[start..<end],radix:2)!,radix:16) }.joined() }
+            if compact.range(of:#"^[01]{128}$"#,options:.regularExpression) != nil { hex=stride(from:0,to:128,by:8).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:8);String(repeating:"0",count:max(0,2-String(Int(compact[start..<end],radix:2)!,radix:16).count))+String(Int(compact[start..<end],radix:2)!,radix:16) }.joined() }
             else if compact.range(of:#"^[0-9a-fA-F]{32}$"#,options:.regularExpression) != nil {hex=compact.lowercased()}
             else {throw NativeSimpleError.message("Enter exactly 128 binary digits or 32 hexadecimal digits to decode a UUID.")}
             return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
@@ -926,19 +1007,19 @@ enum NativeUtilityEngine {
         if lower.contains("json") {
             if lower.contains("to-csv"){return try jsonToCSV(input)};if lower.contains("diff"){return try jsonDiff(input,secondary)};if lower.contains("sort"){let value=sortValue(try json(input));let data=try JSONSerialization.data(withJSONObject:value,options:[.prettyPrinted,.sortedKeys,.fragmentsAllowed]);return String(data:data,encoding:.utf8) ?? ""}
             if suffix=="generator" && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty { return "{\"id\":\"example-1\",\"name\":\"Example\",\"active\":true,\"items\":[]}" }
-            if suffix=="minifier"{return try Self.jsonValue(input,pretty:false)}
+            if suffix=="minifier"{let formatted=try Self.losslessJSONFormat(input,pretty:false);let warning=Self.jsonFormattingWarnings(input);return warning.isEmpty ? formatted : warning+"\n\n"+formatted}
             if suffix=="inspector" || suffix=="parser" || suffix=="explainer" { return try Self.jsonInspector(input) }
-            if ["formatter","beautifier","preview","tester"].contains(suffix){return try pretty(input)};if suffix=="validator"{_ = try json(input);return "Valid JSON (RFC 8259-compatible parser)."};if suffix=="encoder"{return try encode("base64",input)};if suffix=="decoder"{return try decode("base64",input)};if suffix=="converter"{return try pretty(input)};return input
+            if ["formatter","beautifier","preview","tester"].contains(suffix){let formatted=try Self.losslessJSONFormat(input,pretty:true);if suffix=="formatter" || suffix=="beautifier" {let warning=Self.jsonFormattingWarnings(input);return warning.isEmpty ? formatted : warning+"\n\n"+formatted};return formatted};if suffix=="validator"{_ = try json(input);return "Valid JSON (RFC 8259-compatible parser)."};if suffix=="encoder"{return try encode("base64",input)};if suffix=="decoder"{return try decode("base64",input)};if suffix=="converter"{return try Self.losslessJSONFormat(input,pretty:true)};return input
         }
         if lower.contains("csv") {
             if lower.contains("to-json"){return try csvToJSON(input)};if suffix=="validator" || suffix=="tester"{let rows=csvRows(input);guard !rows.isEmpty else{throw NativeSimpleError.message("CSV is empty.")};return "Valid CSV with \(rows.count) rows and \(rows[0].count) columns."};if suffix=="minifier"{return csvString(csvRows(input))};if ["decoder","parser","formatter","beautifier","preview","inspector","converter"].contains(suffix){return csvString(csvRows(input))};return input
         }
         if lower.contains("xml") || lower.contains("html") || lower.contains("svg") {
-            if suffix=="validator" || suffix=="tester"{guard validMarkup(input) else{throw NativeSimpleError.message("Invalid markup/XML.")};return "Valid markup/XML."};if suffix=="minifier"{return minifyText(input)};if suffix=="encoder"{return try encode("html",input)};if suffix=="decoder"{return try decode("html",input)};if suffix=="explainer"{return "Markup represents nested elements and text. Well-formed XML parsing does not prove HTML accessibility, sanitization, schema conformance, or SVG safety."};if suffix=="inspector" || suffix=="parser"{return prettyJSONObject(["tags":Array(input.matches(of: /<([A-Za-z][\w:.-]*)\b/).map{$0.output}.prefix(500)),"characters":input.count,"lines":input.components(separatedBy:.newlines).count])};if suffix=="preview"{return String(input.prefix(2000))};if suffix=="generator"{return "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body><main><h1>Hello world</h1></main></body></html>\n"};return Self.formatDeveloperMarkup(input)
+            if suffix=="validator" || suffix=="tester"{guard validMarkup(input) else{throw NativeSimpleError.message("Invalid markup/XML.")};return "Valid markup/XML."};if suffix=="minifier"{return minifyText(input)};if suffix=="encoder"{return try encode("html",input)};if suffix=="decoder"{return try decode("html",input)};if suffix=="explainer"{return "Markup represents nested elements and text. Well-formed XML parsing does not prove HTML accessibility, sanitization, schema conformance, or SVG safety."};if suffix=="inspector" || suffix=="parser"{return prettyJSONObject(["tags":Array(input.matches(of:#"<([A-Za-z][\\w:.-]*)\\b"#).map{$0.output}.prefix(500)),"characters":input.count,"lines":input.components(separatedBy:.newlines).count])};if suffix=="preview"{return String(input.prefix(2000))};if suffix=="generator"{return "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>New page</title></head><body><main><h1>Hello world</h1></main></body></html>\n"};return Self.formatDeveloperMarkup(input)
         }
         if ["sql","graphql","css","javascript","typescript","docker","nginx","kubernetes","git","openapi","markdown","yaml"].contains(where:lower.contains) {
             if lower.contains("markdown") && (suffix=="preview" || lower.contains("markdown-to-html")){return markdownToHTML(input)}
-            if lower.contains("sql") && (suffix=="formatter" || suffix=="beautifier") { return formatSQL(input) }
+            if lower.contains("sql") && (suffix=="formatter" || suffix=="beautifier") { return formatSQL(input, dialectRaw:o["dialect"] ?? "sql") }
             if lower.contains("css") && (suffix=="formatter" || suffix=="beautifier") { return formatCSS(input) }
             if lower.contains("markdown") && (suffix=="formatter" || suffix=="beautifier") { return input.replacingOccurrences(of:"\r\n",with:"\n").components(separatedBy:"\n").map{$0.trimmingCharacters(in:.whitespaces)}.joined(separator:"\n")+"\n" }
             if lower.contains("markdown") && suffix=="generator" { return "# Project title\n\nDescribe the purpose of this project.\n" }
@@ -950,7 +1031,7 @@ enum NativeUtilityEngine {
             if lower.contains("yaml") && suffix=="generator" {return "app:\n  name: example\n  enabled: true\n"}
             return localSuffixFallback(base)
         }
-        if lower.contains("http-status") || lower.contains("status-code") {let code=input.trimmingCharacters(in:.whitespacesAndNewlines);return statuses.first(where:{$0.0==code}).map{"\($0.0) \($0.1)"} ?? statuses.map{"\($0.0) \($0.1)"}.joined(separator:"\n")}
+        if lower.contains("http-status") || lower.contains("status-code") {let code=input.trimmingCharacters(in:.whitespacesAndNewlines);if let item=statuses.first(where:{$0.0==code}) { let meaning: String; switch code { case "104": meaning="Meaning: Upload Resumption Supported is currently a temporary IANA registration; consult current IANA/draft status before relying on it."; case "305": meaning="Meaning: Use Proxy is deprecated."; case "306": meaning="Meaning: Unused in the current general HTTP registry."; case "418": meaning="Meaning: I'm a teapot is the historical RFC 2324 joke meaning. The current IANA HTTP Status Code Registry marks 418 as unused for general HTTP semantics; this label is historical/application-specific."; case "422": meaning="Meaning: The request syntax and content type were understood, but its instructions could not be processed."; case "429": meaning="Meaning: Too many requests in a time window; Retry-After may specify when to try again."; case "503": meaning="Meaning: The server is temporarily unable to handle the request, often due to overload or maintenance."; default: meaning="Meaning: \(item.1). Local lookup only; no request is sent." }; return "\(item.0) \(item.1)\n\(meaning)" };return statuses.map{"\($0.0) \($0.1)" + ($0.0 == "418" ? " (IANA registry: unused; teapot meaning is historical)" : "")}.joined(separator:"\n")}
         if lower.contains("mime") || lower.contains("content-type") {let ext=input.trimmingCharacters(in:.whitespacesAndNewlines).components(separatedBy:".").last?.lowercased() ?? "";return mime.first(where:{$0.0==ext}).map{$0.1} ?? mime.map{"\($0.0)\t\($0.1)"}.joined(separator:"\n")}
         if lower.contains("cron"){return "Cron: \(input.trimmingCharacters(in:.whitespacesAndNewlines))\nFive-field format: minute hour day-of-month month day-of-week"}
         if lower.contains("data-uri"){return try encode("base64",input)}
@@ -964,6 +1045,90 @@ enum NativeUtilityEngine {
     private static func esc(_ s:String)->String { s.replacingOccurrences(of:"&",with:"&amp;").replacingOccurrences(of:"<",with:"&lt;").replacingOccurrences(of:">",with:"&gt;").replacingOccurrences(of:"\"",with:"&quot;") }
     private static func prettyJSONObject(_ obj:[String:Any])->String { String(data:try! JSONSerialization.data(withJSONObject:obj,options:[.prettyPrinted]),encoding:.utf8)! }
     private static func lengthJSON(_ text:String,_ maxCount:Int,_ ok:String,_ bad:String)->String { prettyJSONObject(["characters":text.count,"guidance":text.count <= maxCount ? ok : bad]) }
+
+    /** Visible safety notes for formatting JSON that has duplicate keys or unsafe integer tokens. */
+    private static func jsonFormattingWarnings(_ raw:String) -> String {
+        var warnings:[String] = []
+        let unsafe=unsafeJSONIntegerTokens(raw)
+        if !unsafe.isEmpty {
+            let examples=unsafe.prefix(5).compactMap{$0["token"] as? String}.joined(separator:", ")
+            warnings.append("WARNING: JavaScript Number cannot safely represent this integer; value may be rounded. Native JSON serialization can use platform-specific numeric representations; keep exact identifiers as strings when interoperating with JavaScript. Tokens: \(examples)")
+        }
+        let duplicates=duplicateJSONKeyPaths(raw).0
+        if !duplicates.isEmpty { warnings.append("NOTE: Duplicate object keys detected at \(duplicates.prefix(20).joined(separator:", ")); duplicate-key JSON is ambiguous and many parsers keep only the last occurrence.") }
+        return warnings.joined(separator:"\n\n")
+    }
+
+    /**
+     * Format JSON from its original character stream after syntax validation.
+     * Unlike JSONSerialization round-tripping, this preserves unsafe integer digits and duplicate keys.
+     * It deliberately performs no key sorting or semantic transformation.
+     */
+    private static func losslessJSONFormat(_ raw:String,pretty:Bool) throws -> String {
+        _ = try JSONSerialization.jsonObject(with:Data(raw.utf8),options:[.fragmentsAllowed])
+        let characters=Array(raw)
+        var output=""
+        var stack:[(open:Character,hasItems:Bool)]=[]
+        var index=0
+        func spaces(_ count:Int)->String { String(repeating:" ",count:max(0,count*2)) }
+        func trimTrailingWhitespace() { while let last=output.last,last.isWhitespace { output.removeLast() } }
+        while index<characters.count {
+            let ch=characters[index]
+            if ch.isWhitespace { index += 1; continue }
+            if ch=="\"" {
+                if !stack.isEmpty { stack[stack.count-1].hasItems=true }
+                let start=index
+                index += 1
+                while index<characters.count {
+                    if characters[index]=="\\" { index=min(index+2,characters.count); continue }
+                    let end=characters[index]
+                    index += 1
+                    if end=="\"" { break }
+                }
+                output += String(characters[start..<index])
+                continue
+            }
+            if ch=="{" || ch=="[" {
+                if !stack.isEmpty { stack[stack.count-1].hasItems=true }
+                output.append(ch)
+                stack.append((open:ch,hasItems:false))
+                index += 1
+                if pretty {
+                    let closing:Character = ch=="{" ? "}" : "]"
+                    var lookahead=index
+                    while lookahead<characters.count && characters[lookahead].isWhitespace { lookahead += 1 }
+                    if lookahead<characters.count && characters[lookahead] != closing { output += "\n"+spaces(stack.count) }
+                }
+                continue
+            }
+            if ch=="}" || ch=="]" {
+                guard let frame=stack.last, (frame.open=="{" && ch=="}") || (frame.open=="[" && ch=="]") else { throw NativeSimpleError.message("Malformed JSON container structure.") }
+                _=stack.popLast()
+                if pretty && frame.hasItems { trimTrailingWhitespace(); output += "\n"+spaces(stack.count) }
+                output.append(ch)
+                index += 1
+                continue
+            }
+            if ch=="," {
+                trimTrailingWhitespace()
+                output.append(",")
+                if pretty { output += "\n"+spaces(stack.count) }
+                index += 1
+                continue
+            }
+            if ch==":" {
+                trimTrailingWhitespace()
+                output += pretty ? ": " : ":"
+                index += 1
+                continue
+            }
+            if !stack.isEmpty { stack[stack.count-1].hasItems=true }
+            output.append(ch)
+            index += 1
+        }
+        guard stack.isEmpty else { throw NativeSimpleError.message("Malformed JSON container structure.") }
+        return output
+    }
 
     private static func jsonValue(_ raw:String,pretty:Bool) throws -> String {
         let value=try JSONSerialization.jsonObject(with:Data(raw.utf8),options:[.fragmentsAllowed])

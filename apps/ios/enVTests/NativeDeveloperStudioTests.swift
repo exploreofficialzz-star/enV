@@ -62,6 +62,26 @@ final class NativeDeveloperStudioTests: XCTestCase {
         XCTAssertEqual((payload["meta"] as? [String: Any])?["generatedLocally"] as? Bool, true)
     }
 
+    func testJsonFormatterWarningsAndHttpStatusMeaningsAreVisible() throws {
+        let raw = #"{"id":9007199254740993,"dup":1,"dup":2}"#
+        let formatted = try run("json-formatter", raw)
+        XCTAssertTrue(formatted.contains("JavaScript Number cannot safely represent this integer"))
+        XCTAssertTrue(formatted.contains("9007199254740993"))
+        XCTAssertTrue(formatted.contains("Duplicate object keys"))
+        XCTAssertTrue(try run("http-status-lookup", "418").lowercased().contains("teapot"))
+        XCTAssertTrue(try run("http-status-lookup", "422").contains("could not be processed"))
+        XCTAssertTrue(try run("http-status-lookup", "429").contains("Too many requests"))
+        XCTAssertTrue(try run("http-status-lookup", "503").contains("temporarily unable"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("207: Multi-Status"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("418: I'm a teapot"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("503: Service Unavailable"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("104: Upload Resumption Supported"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("305: Use Proxy"))
+        XCTAssertTrue(try run("http-status-reference", "").contains("306: (Unused)"))
+        XCTAssertTrue(try run("http-status-lookup", "418").lowercased().contains("historical/application-specific"))
+        XCTAssertTrue(try run("http-status-lookup", "104").contains("temporary IANA registration"))
+    }
+
     func testHashDecoderDoesNotPretendHashesCanBeReversed() {
         XCTAssertThrowsError(try run("hash-decoder", "aabbcc")) { error in
             XCTAssertTrue(error.localizedDescription.lowercased().contains("one-way"))
@@ -70,7 +90,7 @@ final class NativeDeveloperStudioTests: XCTestCase {
     func testRegexBatchRunsSamplesIndependentlyAndReportsSkippedRiskyInput() throws {
         let batchRaw = try run("regex-tester", #"\d+"#, secondary: #"["one 12","no digits","34 and 56"]"#)
         let batch = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(batchRaw.utf8)) as? [String: Any])
-        XCTAssertEqual(batch["mode"] as? String, "batch")
+        XCTAssertEqual(batch["mode"] as? String, "test")
         XCTAssertEqual(batch["sampleCount"] as? Int, 3)
         XCTAssertEqual(batch["matchCount"] as? Int, 3)
         let riskySamples = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: [String(repeating: "a", count: 40) + "!", "safe"]), encoding: .utf8))
@@ -78,6 +98,16 @@ final class NativeDeveloperStudioTests: XCTestCase {
         let risk = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(riskyRaw.utf8)) as? [String: Any])
         let results = try XCTUnwrap(risk["results"] as? [[String: Any]])
         XCTAssertEqual(results.first?["executionSkipped"] as? Bool, true)
+    }
+
+    func testSharedGoldenRegexSubstitutionPipelineReturnsLayerInspection() throws {
+        let raw = try NativeRegexStudio.run(pattern:"<[^>]+>", rawSamples:DeveloperStudioGoldenFixtures.regexPipelineJSON,
+                                            flags:"g", replacement:"", mode:"pipeline")
+        let report = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(raw.utf8)) as? [String:Any])
+        XCTAssertEqual(report["mode"] as? String,"pipeline")
+        XCTAssertEqual(report["blocked"] as? Bool,false)
+        XCTAssertTrue((report["finalOutputPreview"] as? String ?? "").contains("Hello, world! 42"))
+        XCTAssertEqual((report["layers"] as? [[String:Any]])?.count,2)
     }
 
     func testSchemaGeneratorMergesHeterogeneousArrayRecords() throws {
@@ -126,6 +156,43 @@ final class NativeDeveloperStudioTests: XCTestCase {
         let claims = try XCTUnwrap(report["claims"] as? [String: Any])
         XCTAssertEqual((claims["exp"] as? [String: Any])?["status"] as? String, "out-of-range")
         XCTAssertEqual((claims["iat"] as? [String: Any])?["status"] as? String, "issued-in-the-future")
+    }
+
+
+    func testLosslessJSONFormatterPreservesUnsafeIntegerTokensAndDuplicateKeys() throws {
+        let raw = #"{"z":9007199254740993,"nested":{"id":9223372036854775807},"dup":1,"dup":2,"memo":"9007199254740993"}"#
+        let formatted = try run("json-formatter", raw)
+        XCTAssertTrue(formatted.contains("JavaScript Number cannot safely represent this integer"))
+        XCTAssertTrue(formatted.contains("9007199254740993"))
+        XCTAssertTrue(formatted.contains("9223372036854775807"))
+        XCTAssertTrue(formatted.contains("Duplicate object keys"))
+        let minified = try run("json-minifier", raw)
+        XCTAssertTrue(minified.contains("9007199254740993"))
+        XCTAssertTrue(minified.contains("9223372036854775807"))
+    }
+
+    func testJWTDecoderExposesExactRawHeaderAndPayloadWithPrecisionWarning() throws {
+        let token = "eyJhbGciOiJub25lIiwiaWQiOjkwMDcxOTkyNTQ3NDA5OTN9.eyJzdWIiOiJKYW5lIERvZSIsImlkIjo5MDA3MTk5MjU0NzQwOTkzfQ."
+        let raw = try run("jwt-decoder", token)
+        let report = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
+        XCTAssertEqual(report["signatureVerified"] as? Bool, false)
+        XCTAssertTrue((report["headerRawJson"] as? String ?? "").contains("9007199254740993"))
+        XCTAssertTrue((report["payloadRawJson"] as? String ?? "").contains("9007199254740993"))
+        XCTAssertTrue((report["largeIntegerPrecisionWarning"] as? String ?? "").contains("original digits"))
+    }
+
+
+    func testCORSAndCSPGeneratorsValidateSecuritySensitiveConfiguration() throws {
+        let corsConfig = #"{"origins":["https://app.example.com","https://admin.example.com"],"methods":["GET","POST"],"headers":["Content-Type","Authorization"],"credentials":true,"maxAge":300}"#
+        let cors = try run("developer-cors-generator", corsConfig)
+        XCTAssertTrue(cors.contains("https://app.example.com"))
+        XCTAssertTrue(cors.contains("https://admin.example.com"))
+        XCTAssertTrue(cors.contains("not drop-in middleware"))
+        let unsafeCors = #"{"origins":["*"],"credentials":true}"#
+        XCTAssertThrowsError(try run("developer-cors-generator", unsafeCors))
+        let csp = try run("developer-csp-generator", #"{"default-src":["'self'"],"script-src":["'self'","'unsafe-inline'"]}"#)
+        XCTAssertTrue(csp.contains("script-src 'self' 'unsafe-inline'"))
+        XCTAssertTrue(csp.contains("Review broad/unsafe sources"))
     }
 
     func testStrictCodecAndHashComparisonSemanticsMatchWebContract() throws {

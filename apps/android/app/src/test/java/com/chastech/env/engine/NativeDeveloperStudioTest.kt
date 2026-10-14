@@ -72,13 +72,42 @@ class NativeDeveloperStudioTest {
     }
     @Test fun regexBatchRunsEachSampleIndependentlyWithSafetyMetadata() {
         val batch = JSONObject(run("regex-tester", "\\d+", """["one 12","no digits","34 and 56"]"""))
-        assertEquals("batch", batch.getString("mode"))
+        assertEquals("test", batch.getString("mode"))
         assertEquals(3, batch.getInt("sampleCount"))
         assertEquals(3, batch.getInt("matchCount"))
         assertEquals(2, batch.getJSONArray("results").getJSONObject(2).getInt("matchCount"))
         val riskySamples = """["${"a".repeat(40)}!","safe"]"""
         val risk = JSONObject(run("regex-tester", "(a+)+$", riskySamples))
         assertTrue(risk.getJSONArray("results").getJSONObject(0).getBoolean("executionSkipped"))
+    }
+
+    @Test fun sharedGoldenRegexBatchAndPipelineFixturesExerciseNativeStudio() {
+        val batch = JSONObject(NativeRegexStudio.run(
+            DeveloperStudioGoldenFixtures.REGEX_PATTERN,
+            DeveloperStudioGoldenFixtures.REGEX_SAMPLES_JSON,
+            DeveloperStudioGoldenFixtures.REGEX_FLAGS,
+            "",
+            "test",
+        ))
+        assertEquals(3, batch.getInt("sampleCount"))
+        val rows = batch.getJSONArray("results")
+        assertEquals(true, rows.getJSONObject(0).getBoolean("assertionPassed"))
+        val firstMatch = rows.getJSONObject(0).getJSONArray("matches").getJSONObject(0)
+        assertEquals("ORD", firstMatch.getJSONArray("groups").getString(0))
+        assertEquals("ORD", firstMatch.getJSONObject("namedGroups").getString("kind"))
+        assertEquals("0187", firstMatch.getJSONObject("namedGroups").getString("id"))
+        val pipeline = JSONObject(NativeRegexStudio.run(
+            "<[^>]+>", DeveloperStudioGoldenFixtures.REGEX_PIPELINE_JSON, "g", "", "pipeline",
+        ))
+        assertTrue(pipeline.getString("finalOutputPreview").contains("Hello, world! 42"))
+    }
+
+    @Test fun sharedGoldenSqlUsesDialectAwareSharedFormatter() {
+        val output = NativeTextEngine.formatSQL(DeveloperStudioGoldenFixtures.SQL_INPUT, DeveloperStudioGoldenFixtures.SQL_DIALECT)
+        assertTrue(output.contains("LEFT JOIN"))
+        assertTrue(output.contains("GROUP BY"))
+        assertTrue(output.contains("'a FROM b'"))
+        assertTrue(output.contains("\$body\$WHERE SELECT GROUP BY\$body\$"))
     }
 
     @Test fun schemaGeneratorMergesHeterogeneousArrayRecords() {
@@ -122,6 +151,41 @@ class NativeDeveloperStudioTest {
         assertEquals("issued-in-the-future", report.getJSONObject("claims").getJSONObject("iat").getString("status"))
     }
 
+
+    @Test fun jsonFormatterPreservesUnsafeIntegerTokensWithoutSerializationRounding() {
+        val raw = """{"z":9007199254740993,"nested":{"id":9223372036854775807},"memo":"9007199254740993"}"""
+        val formatted = run("json-formatter", raw)
+        assertTrue(formatted.contains("WARNING: JavaScript Number cannot safely represent this integer"))
+        assertTrue(formatted.contains("9007199254740993"))
+        assertTrue(formatted.contains("9223372036854775807"))
+        assertTrue(formatted.contains(""memo": "9007199254740993""))
+        val minified = run("json-minifier", raw)
+        assertTrue(minified.contains("9007199254740993"))
+        assertTrue(minified.contains("9223372036854775807"))
+    }
+
+    @Test fun jwtDecoderKeepsRawHeaderAndPayloadForUnsafeIntegerReview() {
+        val token = "eyJhbGciOiJub25lIiwiaWQiOjkwMDcxOTkyNTQ3NDA5OTN9.eyJzdWIiOiJKYW5lIERvZSIsImlkIjo5MDA3MTk5MjU0NzQwOTkzfQ."
+        val report = JSONObject(run("jwt-decoder", token))
+        assertFalse(report.getBoolean("signatureVerified"))
+        assertTrue(report.getString("headerRawJson").contains("9007199254740993"))
+        assertTrue(report.getString("payloadRawJson").contains("9007199254740993"))
+        assertTrue(report.getString("largeIntegerPrecisionWarning").contains("original digits"))
+    }
+
+
+    @Test fun corsAndCspGeneratorsValidateSecuritySensitiveConfiguration() {
+        val config = """{"origins":["https://app.example.com","https://admin.example.com"],"methods":["GET","POST"],"headers":["Content-Type","Authorization"],"credentials":true,"maxAge":300}"""
+        val cors = run("developer-cors-generator", config)
+        assertTrue(cors.contains("allowedOrigins = ["https://app.example.com","https://admin.example.com"]"))
+        assertTrue(cors.contains("not directly executable middleware"))
+        val unsafeCors = """{"origins":["*"],"credentials":true}"""
+        assertTrue(runCatching { run("developer-cors-generator", unsafeCors) }.exceptionOrNull()?.message.orEmpty().contains("forbids Access-Control-Allow-Origin: *"))
+        val csp = run("developer-csp-generator", """{"default-src":["'self'"],"script-src":["'self'","'unsafe-inline'"]}""")
+        assertTrue(csp.contains("script-src 'self' 'unsafe-inline'"))
+        assertTrue(csp.contains("Review broad/unsafe source expressions"))
+    }
+
     @Test fun strictCodecAndHashComparisonSemanticsMatchWebContract() {
         assertEquals("a+b+c", run("url-decoder", "a+b%2Bc"))
         assertEquals("M", run("base64-decoder", "TQ"))
@@ -135,4 +199,16 @@ class NativeDeveloperStudioTest {
         assertFalse(b64.getBoolean("equal"))
         assertEquals("exact-string", b64.getString("comparison"))
     }
+
+    @Test fun httpRegistryIncludesRecentAndReservedStatusNuance() {
+        val reference = run("http-status-reference", "")
+        assertTrue(reference.contains("104: Upload Resumption Supported"))
+        assertTrue(reference.contains("305: Use Proxy"))
+        assertTrue(reference.contains("306: (Unused)"))
+        val teapot = run("http-status-lookup", "418")
+        assertTrue(teapot.contains("I'm a teapot"))
+        assertTrue(teapot.contains("historical/application-specific"))
+        assertTrue(run("http-status-lookup", "104").contains("temporary IANA registration"))
+    }
+
 }

@@ -174,16 +174,57 @@ function listify(input: string, opts?: Record<string, string>): string {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-const SQL_BREAK =
-  /\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|OUTER JOIN|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE|UNION ALL|UNION)\b/gi;
-
 function sqlFormat(input: string): string {
-  const compact = input.replace(/\s+/g, " ").trim();
-  if (!compact) return "";
-  return compact
-    .replace(SQL_BREAK, (m) => `\n${m.toUpperCase()}`)
-    .replace(/, /g, ",\n  ")
-    .trim();
+  // Tokenize literals, quoted identifiers and comments first: keywords inside them must never
+  // be reinterpreted as SQL clauses. This is a conservative formatter, not a dialect parser.
+  type Token = { text: string; kind: "word" | "literal" | "comment" | "punct" };
+  const tokens: Token[] = [];
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i]!;
+    if (/\s/.test(ch)) { i += 1; continue; }
+    if (ch === "-" && input[i + 1] === "-") { const start = i; i += 2; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "/" && input[i + 1] === "*") { const start = i; const close = input.indexOf("*/", i + 2); if (close < 0) throw new Error("SQL formatter found an unterminated block comment."); i = close + 2; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (["'", "\"", "`", "["].includes(ch)) {
+      const start = i; const closing = ch === "[" ? "]" : ch; i += 1; let closed = false;
+      while (i < input.length) {
+        if (input[i] === closing) { if (input[i + 1] === closing && closing !== "]") { i += 2; continue; } i += 1; closed = true; break; }
+        if (input[i] === "\\" && ch === "'" && i + 1 < input.length) i += 1;
+        i += 1;
+      }
+      if (!closed) throw new Error("SQL formatter found an unterminated quoted value or identifier.");
+      tokens.push({ text: input.slice(start, i), kind: "literal" }); continue;
+    }
+    const word = input.slice(i).match(/^[A-Za-z_][A-Za-z0-9_$]*/);
+    if (word) { tokens.push({ text: word[0], kind: "word" }); i += word[0].length; continue; }
+    tokens.push({ text: ch, kind: "punct" }); i += 1;
+  }
+  if (!tokens.length) return "";
+  const major = new Set(["SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET", "INSERT INTO", "UPDATE", "DELETE FROM", "VALUES", "UNION", "RETURNING", "CREATE TABLE", "ALTER TABLE", "DROP TABLE"]);
+  const joins = new Set(["JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "FULL JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "CROSS JOIN"]);
+  const output: string[] = []; let depth = 0; let line = ""; let previous = "";
+  const emit = () => { const value = line.trim(); if (value) output.push(`${"  ".repeat(Math.max(0, depth))}${value}`); line = ""; };
+  const append = (value: string, needsSpace = true) => { if (needsSpace && line && !/[\s(.]$/.test(line) && !/^[,;).]/.test(value)) line += " "; line += value; };
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!; const upper = token.kind === "word" ? token.text.toUpperCase() : "";
+    let phrase = upper; let consumed = 1;
+    if (token.kind === "word" && tokens[index + 1]?.kind === "word") {
+      const two = `${upper} ${tokens[index + 1]!.text.toUpperCase()}`;
+      if (major.has(two) || joins.has(two)) { phrase = two; consumed = 2; }
+      else if (tokens[index + 2]?.kind === "word" && ["LEFT OUTER JOIN", "RIGHT OUTER JOIN"].includes(`${two} ${tokens[index + 2]!.text.toUpperCase()}`)) { phrase = `${two} ${tokens[index + 2]!.text.toUpperCase()}`; consumed = 3; }
+    }
+    const isMajor = token.kind === "word" && major.has(phrase); const isJoin = token.kind === "word" && joins.has(phrase);
+    const isOn = token.kind === "word" && upper === "ON"; const isBoolean = token.kind === "word" && ["AND", "OR"].includes(upper);
+    if (isMajor || isJoin || isOn || isBoolean) { emit(); depth = isJoin || isOn || isBoolean ? Math.max(1, depth) : 0; line = phrase; index += consumed - 1; previous = phrase; continue; }
+    if (token.text === "(") { append("(", /^(IN|VALUES|EXISTS|NOT)$/i.test(previous)); depth += 1; }
+    else if (token.text === ")") { depth = Math.max(0, depth - 1); line = `${line.trimEnd()})`; }
+    else if (token.text === ",") line = `${line.trimEnd()},`;
+    else if (token.text === ".") line = `${line.trimEnd()}.`;
+    else if (token.text === ";") { line = `${line.trimEnd()};`; emit(); depth = 0; }
+    else { append(token.text); if (token.kind === "comment") emit(); }
+    previous = token.text;
+  }
+  emit(); return output.join("\n").trim();
 }
 
 function indentMarkup(input: string): string {
@@ -238,98 +279,49 @@ function cssFormat(input: string): string {
 }
 
 function jsFormat(input: string): string {
-  let indent = 0;
-  let out = "";
-  let i = 0;
-  let inStr: string | null = null;
-  let inLine = false;
-  let inBlock = false;
+  // Deliberately token-preserving and conservative. It does not claim to parse the full
+  // ECMAScript grammar, but it always rejects empty input instead of silently returning it.
+  type Token = { text: string; kind: "word" | "literal" | "comment" | "punct" | "operator" };
+  const tokens: Token[] = []; let i = 0;
+  const operators = ["===", "!==", ">>>", "=>", "??=", "??", "?.", "&&", "||", "**", "==", "!=", "<=", ">=", "++", "--", "+=", "-=", "*=", "/=", "...", "**=", "<<", ">>"];
   while (i < input.length) {
     const ch = input[i]!;
-    const next = input[i + 1];
-    if (inLine) {
-      out += ch;
-      if (ch === "\n") inLine = false;
-      i += 1;
-      continue;
-    }
-    if (inBlock) {
-      out += ch;
-      if (ch === "*" && next === "/") {
-        out += "/";
-        i += 2;
-        inBlock = false;
-        continue;
-      }
-      i += 1;
-      continue;
-    }
-    if (inStr) {
-      out += ch;
-      if (ch === "\\" && i + 1 < input.length) {
-        out += input[i + 1];
-        i += 2;
-        continue;
-      }
-      if (ch === inStr) inStr = null;
-      i += 1;
-      continue;
-    }
-    if (ch === "/" && next === "/") {
-      inLine = true;
-      out += ch;
-      i += 1;
-      continue;
-    }
-    if (ch === "/" && next === "*") {
-      inBlock = true;
-      out += ch;
-      i += 1;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === "`") {
-      inStr = ch;
-      out += ch;
-      i += 1;
-      continue;
-    }
-    if (ch === "{") {
-      out += " {\n";
-      indent += 1;
-      out += "  ".repeat(indent);
-      i += 1;
-      while (input[i] === " " || input[i] === "\n" || input[i] === "\t") i += 1;
-      continue;
-    }
-    if (ch === "}") {
-      indent = Math.max(0, indent - 1);
-      out = out.replace(/[ \t]*$/, "");
-      if (!out.endsWith("\n")) out += "\n";
-      out += `${"  ".repeat(indent)}}`;
-      i += 1;
-      if (input[i] === ";") {
-        out += ";";
-        i += 1;
-      }
-      out += "\n" + "  ".repeat(indent);
-      while (input[i] === " " || input[i] === "\n" || input[i] === "\t") i += 1;
-      continue;
-    }
-    if (ch === ";") {
-      out += ";\n" + "  ".repeat(indent);
-      i += 1;
-      while (input[i] === " " || input[i] === "\n" || input[i] === "\t") i += 1;
-      continue;
-    }
-    if (ch === "\n") {
-      out += "\n" + "  ".repeat(indent);
-      i += 1;
-      continue;
-    }
-    out += ch;
-    i += 1;
+    if (/\s/.test(ch)) { i += 1; continue; }
+    if (ch === "/" && input[i + 1] === "/") { const start = i; i += 2; while (i < input.length && input[i] !== "\n") i += 1; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (ch === "/" && input[i + 1] === "*") { const start = i; const close = input.indexOf("*/", i + 2); if (close < 0) throw new Error("JavaScript formatter found an unterminated block comment."); i = close + 2; tokens.push({ text: input.slice(start, i), kind: "comment" }); continue; }
+    if (["'", "\"", "`"].includes(ch)) { const start = i++; let closed = false; while (i < input.length) { if (input[i] === "\\") { i += 2; continue; } if (input[i++] === ch) { closed = true; break; } } if (!closed) throw new Error("JavaScript formatter found an unterminated string or template literal."); tokens.push({ text: input.slice(start, i), kind: "literal" }); continue; }
+    const word = input.slice(i).match(/^(?:[A-Za-z_$][\w$]*|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/);
+    if (word) { tokens.push({ text: word[0], kind: "word" }); i += word[0].length; continue; }
+    const operator = operators.find((op) => input.startsWith(op, i));
+    if (operator) { tokens.push({ text: operator, kind: "operator" }); i += operator.length; continue; }
+    tokens.push({ text: ch, kind: "punct" }); i += 1;
   }
-  return out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!tokens.length) throw new Error("Paste JavaScript or TypeScript code to format.");
+  const lines: string[] = []; let line = ""; let depth = 0; let parenDepth = 0; let lineDepth = 0;
+  const emit = () => { const value = line.trim(); if (value) lines.push(`${"  ".repeat(Math.max(0, lineDepth))}${value}`); line = ""; lineDepth = depth; };
+  const append = (value: string, space = false) => { if (!line && value) lineDepth = depth; if (space && line && !/[\s.(\[]$/.test(line) && !/^[,;).\]}]/.test(value)) line += " "; line += value; };
+  const prev = (index: number) => tokens[index - 1]?.text ?? ""; const next = (index: number) => tokens[index + 1]?.text ?? "";
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!; const text = token.text; const before = prev(index); const after = next(index);
+    if (token.kind === "comment") { if (line.trim()) emit(); append(text); emit(); continue; }
+    if (text === "{") { append("{", Boolean(line.trim()) && !/[.(\[]$/.test(line)); depth += 1; emit(); continue; }
+    if (text === "}") { if (line.trim()) emit(); depth = Math.max(0, depth - 1); append("}"); if (![";", ",", ")", "]", ".", "(", "["].includes(after)) emit(); continue; }
+    if (text === "(") { append("(", /^(if|for|while|switch|catch|with|function)$/.test(before)); parenDepth += 1; continue; }
+    if (text === ")") { line = `${line.trimEnd()})`; parenDepth = Math.max(0, parenDepth - 1); continue; }
+    if (text === "[") { append("["); continue; }
+    if (text === "]") { line = `${line.trimEnd()}]`; continue; }
+    if (text === "." || text === "?.") { line = `${line.trimEnd()}${text}`; continue; }
+    if (text === ",") { line = `${line.trimEnd()},`; emit(); continue; }
+    if (text === ";") { line = `${line.trimEnd()};`; if (parenDepth === 0) emit(); continue; }
+    if (text === ":") { line = `${line.trimEnd()}:`; append("", true); continue; }
+    if (token.kind === "operator" || ["=", "+", "-", "*", "/", "%", "<", ">", "!", "&", "|", "?"].includes(text)) { if (["++", "--", "!", "~", "..."].includes(text)) append(text); else { append(text, true); append("", true); } continue; }
+    const wordLike = token.kind === "word" || token.kind === "literal"; const previous = tokens[index - 1];
+    const previousWordLike = Boolean(previous && ["word", "literal"].includes(previous.kind));
+    append(text, Boolean(line) && (previousWordLike || /^(return|throw|new|await|yield|typeof|delete|void|instanceof|in|of|else|async)$/.test(before) || (before === ")" && wordLike)));
+  }
+  emit(); const result = lines.join("\n").trim();
+  if (!result) throw new Error("Formatter produced no output. Check that the source is not empty.");
+  return `${result}\n\nNote: conservative local formatter. It preserves strings/comments and formats common blocks, calls, literals, and operators; it is not a full ECMAScript parser.`;
 }
 
 function yamlFormat(input: string): string {

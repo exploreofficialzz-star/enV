@@ -842,7 +842,9 @@ private struct NativeDeveloperToolView: View {
     @State private var input=""
     @State private var secondary=""
     @State private var flags="g"
-    @State private var replacement="dog"
+    @State private var replacement=""
+    @State private var regexMode="test"
+    @State private var sqlDialect="postgresql"
     @State private var output=""
     @State private var error:String?
     @State private var isExporting=false
@@ -850,6 +852,14 @@ private struct NativeDeveloperToolView: View {
     @State private var selectedFileName=""
     private var op:String { tool.engine.op ?? tool.engine.id ?? tool.id }
     private var isFileHash:Bool { NativeDeveloperToolFormPolicy.isFileHash(op) }
+    private var isRegexStudio:Bool { op.localizedCaseInsensitiveContains("regex") && !op.localizedCaseInsensitiveContains("regex-generator") }
+    private var isSQLFormatter:Bool { op.localizedCaseInsensitiveContains("sql") && (op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier")) }
+
+    init(tool: Tool) {
+        self.tool = tool
+        let operation = tool.engine.op ?? tool.engine.id ?? tool.id
+        _regexMode = State(initialValue: operation.localizedCaseInsensitiveContains("explainer") ? "flavors" : "test")
+    }
 
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
@@ -857,7 +867,7 @@ private struct NativeDeveloperToolView: View {
             HStack(spacing:10) {
                 Button("Load example") {
                     let sample=NativeDeveloperToolFormPolicy.example(op)
-                    input=sample.input; secondary=sample.secondary; flags=op.contains("regex") ? "gi" : "g"; replacement="dog"; output=""; error=nil
+                    input=sample.input; secondary=sample.secondary; flags=op.contains("regex") ? "gi" : "g"; replacement=op.contains("replace") ? "dog" : ""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil
                 }.buttonStyle(.bordered)
                 Text("Text tools process locally on this device.").font(.caption).foregroundStyle(.secondary)
             }
@@ -867,14 +877,24 @@ private struct NativeDeveloperToolView: View {
                     Text(selectedFileName.isEmpty ? "Select a file to hash locally" : selectedFileName).font(.footnote).lineLimit(2).truncationMode(.middle)
                 }
             }
-            NativeDeveloperTextArea(title:op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
-            if NativeDeveloperToolFormPolicy.needsSecondInput(op) {
-                NativeDeveloperTextArea(title:op.contains("regex") ? "Test text" : op.contains("json-path") || op.contains("jsonpath") ? "JSON path (e.g. $.items[0].id)" : op.contains("uuid") ? "Batch count" : "Second input",text:$secondary)
+            NativeDeveloperTextArea(title:isRegexStudio && regexMode == "pipeline" ? "Default pattern (unused by layers)" : op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
+            if isRegexStudio {
+                Picker("Regex Studio mode", selection:$regexMode) {
+                    Text("Test / assertions").tag("test"); Text("Benchmark").tag("benchmark"); Text("Substitution pipeline").tag("pipeline"); Text("Format regex").tag("format"); Text("Flavor hints").tag("flavors")
+                }.pickerStyle(.menu).accessibilityLabel("Regex Studio mode")
+                Text("iOS uses Foundation ICU (NSRegularExpression). Conservative risk checks and bounded workloads are used; a single in-process match cannot be force-cancelled, so risky near-miss cases are skipped.").font(.footnote).foregroundStyle(.secondary)
             }
-            if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags (g/i/m/s)",text:$flags) }
-            if NativeDeveloperToolFormPolicy.needsReplacement(op) { NativeInputField(title:"Replacement text",text:$replacement) }
+            if (!isRegexStudio && NativeDeveloperToolFormPolicy.needsSecondInput(op)) || (isRegexStudio && ["test", "benchmark", "pipeline"].contains(regexMode)) {
+                NativeDeveloperTextArea(title:isRegexStudio && regexMode == "pipeline" ? "Pipeline JSON (input + ordered layers)" : isRegexStudio && regexMode == "benchmark" ? "Test strings JSON" : isRegexStudio ? "Test text or batch JSON" : op.contains("json-path") || op.contains("jsonpath") ? "JSON path (e.g. $.items[0].id)" : op.contains("uuid") ? "Batch count" : "Second input",text:$secondary)
+            }
+            if isSQLFormatter {
+                Picker("SQL dialect", selection:$sqlDialect) { Text("Generic SQL").tag("sql"); Text("PostgreSQL").tag("postgresql"); Text("MySQL").tag("mysql"); Text("MariaDB").tag("mariadb"); Text("SQLite").tag("sqlite"); Text("SQL Server / T-SQL").tag("transactsql"); Text("BigQuery").tag("bigquery"); Text("Snowflake").tag("snowflake"); Text("Oracle").tag("oracle"); Text("Redshift").tag("redshift"); Text("DuckDB").tag("duckdb") }.pickerStyle(.menu).accessibilityLabel("SQL dialect")
+                Text("Uses a local dialect-aware lexer, not a full SQL grammar parser or query validator.").font(.footnote).foregroundStyle(.secondary)
+            }
+            if isRegexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags (g/i/m/s/u; platform engine-specific)",text:$flags) }
+            if (isRegexStudio && ["test", "benchmark"].contains(regexMode)) || (!isRegexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op)) { NativeInputField(title:"Replacement preview (optional)",text:$replacement) }
             HStack(spacing:10) {
-                Button(NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
+                Button(isRegexStudio ? (regexMode == "test" ? "Run tests" : regexMode == "benchmark" ? "Benchmark" : regexMode == "pipeline" ? "Run pipeline" : regexMode == "format" ? "Format regex" : "Analyze flavors") : NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
                 Button("Reset",action:reset).buttonStyle(.bordered)
             }
             if !output.isEmpty {
@@ -887,8 +907,7 @@ private struct NativeDeveloperToolView: View {
         }
         .fileImporter(isPresented:$isImporting,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
             do {
-                let urls=try result.get()
-                guard let url=urls.first else { throw NativeSimpleError.message("Choose a file first.") }
+                let url=try result.get()
                 let gotAccess=url.startAccessingSecurityScopedResource()
                 defer { if gotAccess { url.stopAccessingSecurityScopedResource() } }
                 let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
@@ -906,9 +925,11 @@ private struct NativeDeveloperToolView: View {
 
     private func run() {
         var options=[String:String]()
-        if NativeDeveloperToolFormPolicy.needsSecondInput(op) { options["secondary"]=secondary }
-        if NativeDeveloperToolFormPolicy.needsRegexFlags(op) { options["flags"]=flags }
-        if NativeDeveloperToolFormPolicy.needsReplacement(op) { options["replacement"]=replacement }
+        if isRegexStudio || NativeDeveloperToolFormPolicy.needsSecondInput(op) { options["secondary"]=secondary }
+        if isRegexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op) { options["flags"]=flags }
+        if isRegexStudio || NativeDeveloperToolFormPolicy.needsReplacement(op) { options["replacement"]=replacement }
+        if isRegexStudio { options["mode"]=regexMode }
+        if isSQLFormatter { options["dialect"]=sqlDialect }
         do {
             if isFileHash {
                 if selectedFileName.isEmpty { throw NativeSimpleError.message("Choose a local file first. File bytes are never uploaded.") }
@@ -919,7 +940,7 @@ private struct NativeDeveloperToolView: View {
             output=try NativeUtilityEngine.run(tool,input:input,optionsJSON:raw).text; error=nil
         } catch let caughtError { output=""; error=caughtError.localizedDescription }
     }
-    private func reset() { input=""; secondary=""; flags="g"; replacement="dog"; output=""; error=nil; selectedFileName="" }
+    private func reset() { input=""; secondary=""; flags="g"; replacement=""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil; selectedFileName="" }
 }
 
 private struct NativeConverterToolView: View {
@@ -1362,6 +1383,12 @@ struct NativeTextToolView: View {
             if isDiff { enVCharacterSpacedText("Original text").font(.subheadline.weight(.semibold)); editor($input); enVCharacterSpacedText("New text").font(.subheadline.weight(.semibold)); editor($compare) }
             else { enVCharacterSpacedText("Input").font(.subheadline.weight(.semibold)); editor($input) }
             ForEach(optionNames, id: \.self) { name in TextField(label(name), text: Binding(get: { options[name, default: defaultValue(name)] }, set: { options[name] = $0 })).textFieldStyle(.roundedBorder) }
+            if tool.id == "sql-formatter" {
+                Picker("SQL dialect", selection: Binding(get: { options["dialect", default: "postgresql"] }, set: { options["dialect"] = $0 })) {
+                    Text("Generic SQL").tag("sql"); Text("PostgreSQL").tag("postgresql"); Text("MySQL").tag("mysql"); Text("MariaDB").tag("mariadb"); Text("SQLite").tag("sqlite"); Text("SQL Server / T-SQL").tag("transactsql"); Text("BigQuery").tag("bigquery"); Text("Snowflake").tag("snowflake"); Text("Oracle").tag("oracle"); Text("Redshift").tag("redshift"); Text("DuckDB").tag("duckdb")
+                }.pickerStyle(.menu).accessibilityLabel("SQL dialect")
+                Text("Uses a local dialect-aware lexer, not a full SQL grammar parser or query validator.").font(.footnote).foregroundStyle(.secondary)
+            }
             if isCounter { let s = NativeTextEngine.statistics(input, wpm: options["wpm"] ?? "200"); LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], alignment: .leading) { stat("Words", s.words); stat("Characters", s.characters); stat("No spaces", s.charactersWithoutSpaces); stat("Sentences", s.sentences); stat("Paragraphs", s.paragraphs); stat("Reading", "\(s.readingMinutes) min") } }
             if tool.id == "word-counter" || tool.id == "character-counter" { let s = NativeTextEngine.statistics(input); let metric = tool.id == "word-counter" ? s.words : s.characters; let limit = max(1, Int(options["limit"] ?? "1") ?? 1); enVCharacterSpacedText(metric <= limit ? "\(limit - metric) remaining" : "\(metric - limit) over").font(.subheadline).foregroundStyle(.secondary) }
             HStack {

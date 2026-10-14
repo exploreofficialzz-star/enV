@@ -8,6 +8,7 @@ import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { transforms } from "@/lib/engines/transforms";
+import { runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { runCodec } from "@/lib/engines/codecs";
 import { runGenerator } from "@/lib/engines/generators";
 import { runDateTime } from "@/lib/engines/datetime";
@@ -48,6 +49,12 @@ const TEXT_OPTION_FIELDS: Partial<Record<string, UiField[]>> = {
     },
   ],
   "keyword-density": [{ name: "keyword", label: "Keyword", type: "text" }],
+  "sql-format": [{ name: "dialect", label: "SQL dialect", type: "select", defaultValue: "postgresql", options: [
+    { value: "sql", label: "Generic SQL" }, { value: "postgresql", label: "PostgreSQL" }, { value: "mysql", label: "MySQL" },
+    { value: "mariadb", label: "MariaDB" }, { value: "sqlite", label: "SQLite" }, { value: "transactsql", label: "SQL Server / T-SQL" },
+    { value: "bigquery", label: "BigQuery" }, { value: "snowflake", label: "Snowflake" }, { value: "oracle", label: "Oracle" },
+    { value: "redshift", label: "Redshift" }, { value: "duckdb", label: "DuckDB" },
+  ] }],
 };
 
 function segmentWords(input: string): string[] {
@@ -146,7 +153,18 @@ export function TextEngine({ op }: { op: string }) {
     );
   }
 
-  const run = () => wrap(() => {
+  const run = () => wrap(async () => {
+    // The catalog routes javascript-formatter and sql-formatter through the Text engine.
+    // Delegate to the same audited Developer engines so the visible route and Studio tests
+    // exercise the same implementation; do not leave a weak parallel regex/SQL formatter.
+    if (op === "js-format") {
+      const result = await runDeveloperStudio("javascript-formatter", input);
+      if (result !== null) return result;
+    }
+    if (op === "sql-format") {
+      const result = await runDeveloperStudio("sql-formatter", input, opts.dialect ?? "postgresql");
+      if (result !== null) return result;
+    }
     const fn = transforms[op];
     if (!fn) throw new Error("Unknown text operation.");
     return fn(input, opts);
@@ -154,6 +172,8 @@ export function TextEngine({ op }: { op: string }) {
   return (
     <div className="space-y-4">
       {extra.length ? <FieldGrid fields={extra} values={opts} onChange={(n, v) => setOpts((o) => ({ ...o, [n]: v }))} /> : null}
+      {op === "sql-format" ? <p className="text-xs text-muted">Uses the bundled sql-formatter dialect grammar locally. It formats syntax, does not inspect your schema or execute SQL, and stored procedures or custom delimiters may be unsupported.</p> : null}
+      {op === "js-format" ? <p className="text-xs text-muted">Uses the local TypeScript compiler parser/printer. Syntax errors include line and column details; source code is not uploaded.</p> : null}
       <label className="block space-y-1.5"><Label htmlFor="text-in">Input</Label><Textarea id="text-in" value={input} onChange={(e) => setInput(e.target.value)} className="min-h-44 font-mono" /></label>
       <div className="flex flex-wrap gap-2"><Button type="button" onClick={run}>Run</Button><Button type="button" variant="ghost" onClick={() => { setInput(""); setOut(""); setError(null); }}>Reset</Button></div>
       <ErrorBanner message={error} />

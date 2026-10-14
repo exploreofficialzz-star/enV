@@ -51,14 +51,26 @@ class NativeDeveloperToolTest {
         assertTrue(runCatching { NativeUtilityEngine.run(tool("json-validator"), "not-json") }.isFailure)
     }
 
-    @Test fun regexFieldsFlagsAndReplaceToolFollowTheWebMatchReport() {
+    @Test fun jsonFormatterWarnsForUnsafeIntegerTokensAndDuplicateKeys() {
+        val raw = "{\"id\":9007199254740993,\"dup\":1,\"dup\":2}"
+        val output = NativeUtilityEngine.run(tool("json-formatter"), raw).text
+        assertTrue(output.contains("JavaScript Number cannot safely represent this integer"))
+        assertTrue(output.contains("9007199254740993"))
+        assertTrue(output.contains("Duplicate object keys"))
+        assertTrue(output.contains("last occurrence"))
+    }
+
+    @Test fun regexFieldsAndFlagsUseTheNativeStudioStructuredReport() {
         val options = JSONObject().put("secondary", "Cat cat").put("flags", "gi").put("replacement", "dog").toString()
-        val matches = NativeUtilityEngine.run(tool("regex-tester"), "cat", options).text
-        assertTrue(matches.contains("Matches: 2"))
-        assertTrue(matches.contains("Cat at index 0"))
+        val matches = JSONObject(NativeUtilityEngine.run(tool("regex-tester"), "cat", options).text)
+        assertEquals("test", matches.getString("mode"))
+        val testRow = matches.getJSONArray("results").getJSONObject(0)
+        assertEquals(2, testRow.getInt("matchCount"))
+        assertEquals("Cat", testRow.getJSONArray("matches").getJSONObject(0).getString("match"))
         val replaced = JSONObject(NativeUtilityEngine.run(tool("regex-replace"), "cat", options).text)
-        assertEquals("dog dog", replaced.getString("preview"))
-        assertEquals(2, replaced.getJSONArray("matches").length())
+        val replacementRow = replaced.getJSONArray("results").getJSONObject(0)
+        assertEquals("dog dog", replacementRow.getString("replacementPreview"))
+        assertEquals(2, replacementRow.getJSONArray("matches").length())
     }
 
     @Test fun urlParserReturnsBrowserJsonContractAndLastDuplicateQueryValue() {
@@ -91,16 +103,17 @@ class NativeDeveloperToolTest {
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "550e8400-e29b-48d4a-a7164-446655440000").text)
         assertEquals("Invalid UUID", NativeUtilityEngine.run(tool("uuid-validator"), "not-a-uuid").text)
         assertEquals("404 Not Found", NativeUtilityEngine.run(tool("http-status-lookup"), "404").text)
-        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "418").text.contains("504 Gateway Timeout"))
-        val query = JSONObject(NativeUtilityEngine.run(tool("query-string-parser"), "a=1&b=2").text)
-        assertEquals(2, query.getInt("count"))
-        assertEquals("a", query.getJSONArray("entries").getJSONObject(0).getString("key"))
-        assertEquals("2", query.getJSONArray("entries").getJSONObject(1).getString("value"))
-        val userAgent = JSONObject(NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
-        assertEquals("Mozilla/5.0", userAgent.getString("raw"))
-        assertEquals("Unknown", userAgent.getString("browser"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "418").text.contains("teapot"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "422").text.contains("could not be processed"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "429").text.contains("Too many requests"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-lookup"), "503").text.contains("temporarily unable"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("207: Multi-Status"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("418: I'm a teapot"))
+        assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("503: Service Unavailable"))
+        assertEquals("a=1&b=2", NativeUtilityEngine.run(tool("query-string-parser"), "a=1&b=2").text)
+        assertEquals("Mozilla/5.0", NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
-        assertEquals("<p>&lt;div&gt;&lt;p&gt;Hello&lt;/p&gt;&lt;/div&gt;</p>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
+        assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
     }
 
     @Test fun nativeFileHashUsesRawBytesAndMatchesSHA256GoldenVector() {

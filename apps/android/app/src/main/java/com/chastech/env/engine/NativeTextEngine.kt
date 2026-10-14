@@ -4,6 +4,17 @@ import java.text.Normalizer
 import java.text.BreakIterator
 import java.util.LinkedHashMap
 import java.util.Locale
+import java.io.StringReader
+import java.io.StringWriter
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
+import org.xml.sax.InputSource
+import org.xml.sax.SAXParseException
+import org.xml.sax.helpers.DefaultHandler
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -12,7 +23,7 @@ object NativeTextEngine {
     data class Options(
         val find: String = "", val replace: String = "", val width: String = "80",
         val style: String = "bullets", val keyword: String = "", val limit: String = "280",
-        val wpm: String = "200"
+        val wpm: String = "200", val dialect: String = "postgresql"
     )
     data class Stats(val words: Int, val characters: Int, val charactersNoSpaces: Int, val sentences: Int, val paragraphs: Int, val lines: Int, val readingSeconds: Int) {
         val readingMinutes: Int get() = if (readingSeconds == 0) 0 else max(1, ceil(readingSeconds / 60.0).toInt())
@@ -87,8 +98,9 @@ object NativeTextEngine {
             "extract-emails" -> uniqueMatches(input, Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"))
             "extract-urls" -> uniqueMatches(input, Regex("https?://[^\\s<>\"'`]+", RegexOption.IGNORE_CASE))
             "list" -> listify(input, options)
-            "sql-format" -> sqlFormat(input)
-            "html-format", "xml-format" -> indentMarkup(input)
+            "sql-format" -> formatSQL(input, options.dialect)
+            "html-format" -> indentMarkup(input)
+            "xml-format" -> formatXml(input)
             "css-format" -> cssFormat(input)
             "js-format" -> jsFormat(input)
             "yaml-format" -> input.replace("\t", "  ").split(Regex("\\r?\n")).joinToString("\n") { it.trimEnd() }.replace(Regex("\n{3,}"), "\n\n").trim()
@@ -123,10 +135,162 @@ object NativeTextEngine {
     private fun wordFreq(input: String): String { val c = mutableMapOf<String, Int>(); Regex("[a-z0-9]+(?:'[a-z0-9]+)?", RegexOption.IGNORE_CASE).findAll(input).forEach { c[it.value.lowercase(Locale.ROOT)] = (c[it.value.lowercase(Locale.ROOT)] ?: 0) + 1 }; return c.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).joinToString("\n") { "${it.key}\t${it.value}" } }
     private fun uniqueMatches(input: String, regex: Regex): String { val seen = LinkedHashSet<String>(); regex.findAll(input).forEach { seen.add(it.value.trimEnd(',', ')', '.', ';')) }; return seen.joinToString("\n") }
     private fun listify(input: String, o: Options): String { val items = input.split(Regex("\\r?\n|,")).map { it.trim() }.filter { it.isNotEmpty() }; return when (o.style) { "numbered" -> items.mapIndexed { i, x -> "${i + 1}. $x" }.joinToString("\n"); "comma" -> items.joinToString(", "); else -> items.joinToString("\n") { "- $it" } } }
-    private fun sqlFormat(input: String): String { val compact = input.replace(Regex("\\s+"), " ").trim(); if (compact.isEmpty()) return ""; return Regex("\\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|OUTER JOIN|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT INTO|VALUES|UPDATE|SET|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE|UNION ALL|UNION)\\b", RegexOption.IGNORE_CASE).replace(compact) { "\n${it.value.uppercase(Locale.ROOT)}" }.replace(", ", ",\n  ").trim() }
+    /** Conservative dialect-aware lexical SQL formatter. It preserves quoted/comment tokens;
+     * it is intentionally not represented as a full SQL parser or syntax validator. */
+    internal fun formatSQL(input: String, dialectRaw: String = "postgresql"): String {
+        val dialect = dialectRaw.lowercase(Locale.ROOT)
+        val supported = setOf("sql", "postgresql", "postgres", "mysql", "mariadb", "sqlite", "transactsql", "tsql", "bigquery", "snowflake", "oracle", "redshift", "duckdb")
+        require(dialect in supported) { "Unsupported SQL dialect '$dialectRaw'. Supported: ${supported.sorted().joinToString(", ")}." }
+        val protected = LinkedHashMap<String, String>()
+        val chars = input.toCharArray(); val masked = StringBuilder(); var i = 0
+        fun token(): String = "\uE000SQL${protected.size}\uE001"
+        while (i < chars.size) {
+            val c = chars[i]
+            if ((c == '-' && i + 1 < chars.size && chars[i + 1] == '-') ||
+                (c == '/' && i + 1 < chars.size && chars[i + 1] == '*') ||
+                ((dialect == "mysql" || dialect == "mariadb") && c == '#')) {
+                val start = i
+                when {
+                    c == '-' -> { i += 2; while (i < chars.size && chars[i] != '\n') i++; if (i < chars.size) i++ }
+                    c == '/' -> { i += 2; var closed = false; while (i + 1 < chars.size) { if (chars[i] == '*' && chars[i + 1] == '/') { i += 2; closed = true; break }; i++ }; require(closed) { "SQL formatter found an unterminated block comment." } }
+                    else -> { while (i < chars.size && chars[i] != '\n') i++; if (i < chars.size) i++ }
+                }
+                val key = token(); protected[key] = String(chars, start, i - start); masked.append(key); continue
+            }
+            if ((dialect in setOf("postgresql", "postgres", "redshift", "duckdb")) && c == '$') {
+                var tagEnd = i + 1; while (tagEnd < chars.size && (chars[tagEnd].isLetterOrDigit() || chars[tagEnd] == '_')) tagEnd++
+                if (tagEnd < chars.size && chars[tagEnd] == '$') {
+                    val tag = String(chars, i, tagEnd - i + 1); val start = i; i = tagEnd + 1; var close = -1; var j = i
+                    while (j + tag.length <= chars.size) { if (String(chars, j, tag.length) == tag) { close = j; break }; j++ }
+                    require(close >= 0) { "SQL formatter found an unterminated PostgreSQL dollar-quoted string." }
+                    i = close + tag.length; val key = token(); protected[key] = String(chars, start, i - start); masked.append(key); continue
+                }
+            }
+            if (c == '\'' || c == '"' || c == '`' || c == '[') {
+                val start = i; val close = if (c == '[') ']' else c; i++; var closed = false
+                while (i < chars.size) { if (chars[i] == close) { if (close != ']' && i + 1 < chars.size && chars[i + 1] == close) { i += 2; continue }; i++; closed = true; break }; if (c == '\'' && chars[i] == '\\' && i + 1 < chars.size) i++; i++ }
+                require(closed) { "SQL formatter found an unterminated quoted value or identifier." }
+                val key = token(); protected[key] = String(chars, start, i - start); masked.append(key); continue
+            }
+            masked.append(c); i++
+        }
+        val tokens = Regex("[A-Za-z_][A-Za-z0-9_$]*|\\uE000SQL\\d+\\uE001|(?:<=|>=|<>|!=|==|::|->>|->|\\|\\||&&|\\?\\?|:=)|[^\\s]").findAll(masked.toString()).map { it.value }.toList()
+        val major = setOf("SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET", "INSERT INTO", "UPDATE", "DELETE FROM", "VALUES", "RETURNING", "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "UNION")
+        val joins = setOf("JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "FULL JOIN", "CROSS JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN")
+        val out = mutableListOf<String>(); var depth = 0; val line = StringBuilder(); var previous = ""
+        fun emit() { val value = line.toString().trim(); if (value.isNotEmpty()) out += "  ".repeat(depth.coerceAtLeast(0)) + value; line.setLength(0) }
+        fun append(value: String, space: Boolean = true) { if (space && line.isNotEmpty() && !line.last().isWhitespace() && line.last() !in "(." && (value.isNotEmpty() && value.first() !in ",;).") ) line.append(' '); line.append(value) }
+        var index = 0
+        while (index < tokens.size) {
+            val current = tokens[index]; val upper = current.uppercase(Locale.ROOT); var phrase = upper; var consumed = 1
+            if (index + 1 < tokens.size) { val two = "$upper ${tokens[index + 1].uppercase(Locale.ROOT)}"; if (two in major || two in joins) { phrase = two; consumed = 2 } else if (index + 2 < tokens.size && "$two ${tokens[index + 2].uppercase(Locale.ROOT)}" in joins) { phrase = "$two ${tokens[index + 2].uppercase(Locale.ROOT)}"; consumed = 3 } }
+            val isReservedToken = current.startsWith("\uE000SQL")
+            if (!isReservedToken && (phrase in major || phrase in joins || upper in setOf("ON", "AND", "OR"))) {
+                emit(); if (phrase in joins || upper in setOf("ON", "AND", "OR")) depth = max(1, depth) else depth = 0
+                line.append(phrase); index += consumed; previous = phrase; continue
+            }
+            when (current) {
+                "(" -> { append(current, previous.uppercase(Locale.ROOT) in setOf("IN", "VALUES", "EXISTS", "NOT")); depth++ }
+                ")" -> { depth = max(0, depth - 1); line.append(")") }
+                "," -> { line.append(",") }
+                "." -> { line.append(".") }
+                ";" -> { line.append(";"); emit(); depth = 0 }
+                else -> { append(current); if (protected[current]?.let { it.startsWith("--") || it.startsWith("#") } == true) emit() }
+            }
+            previous = current; index++
+        }
+        emit()
+        return out.joinToString("\n").replace(Regex(",\\s*"), ",\n  ").replace(Regex("\\uE000SQL(\\d+)\\uE001")) { protected["\uE000SQL${it.groupValues[1]}\uE001"] ?: it.value }.trim()
+    }
+
     private fun indentMarkup(input: String): String { val voidish = Regex("^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$", RegexOption.IGNORE_CASE); val tokens = input.replace(Regex(">\\s+<"), "><").replace(Regex("(<[^>]+>)"), "\n$1\n").split("\n").map { it.trim() }.filter { it.isNotEmpty() }; var depth = 0; val out = mutableListOf<String>(); tokens.forEach { token -> val close = token.startsWith("</"); val open = Regex("^<[^/!?]").containsMatchIn(token) && !token.endsWith("/>"); val name = token.replace(Regex("^</?([^\\s>/]+).*$"), "$1"); if (close) depth = max(0, depth - 1); out += "  ".repeat(depth) + token; if (open && !voidish.matches(name)) depth++ }; return out.joinToString("\n") }
+    /** Secure native XML parse + serializer. DOCTYPE is intentionally rejected to prevent XXE and network resolution. */
+    private fun formatXml(input: String): String {
+        require(input.isNotBlank()) { "Paste XML input before formatting." }
+        require(input.length <= 1_000_000) { "XML input exceeds the 1 MB local formatting limit." }
+        require(!Regex("<!DOCTYPE\\b", RegexOption.IGNORE_CASE).containsMatchIn(input)) {
+            "XML DOCTYPE declarations are disabled in the local formatter to prevent external entity access. Remove the DOCTYPE and retry."
+        }
+        try {
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            factory.isXIncludeAware = false
+            factory.isExpandEntityReferences = false
+            runCatching { factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "") }
+            runCatching { factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "") }
+            runCatching { factory.setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            runCatching { factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
+            val builder = factory.newDocumentBuilder()
+            builder.setEntityResolver { _, _ -> InputSource(StringReader("")) }
+            builder.setErrorHandler(object : DefaultHandler() {
+                override fun error(exception: SAXParseException) { throw exception }
+                override fun fatalError(exception: SAXParseException) { throw exception }
+            })
+            val document = builder.parse(InputSource(StringReader(input)))
+            val transformerFactory = TransformerFactory.newInstance()
+            runCatching { transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "") }
+            runCatching { transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "") }
+            val transformer = transformerFactory.newTransformer()
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes")
+            runCatching { transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2") }
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, if (input.trimStart().startsWith("<?xml", ignoreCase = true)) "no" else "yes")
+            val writer = StringWriter()
+            transformer.transform(DOMSource(document), StreamResult(writer))
+            val result = writer.toString().trimEnd()
+            check(result.isNotBlank()) { "The native XML serializer returned empty output." }
+            return result
+        } catch (error: Exception) {
+            val detail = error.message?.replace(Regex("\\s+"), " ")?.take(240).orEmpty()
+            throw IllegalArgumentException("Native XML parser/formatter could not process this input locally${if (detail.isNotBlank()) ": $detail" else ""}. No document was uploaded.", error)
+        }
+    }
+
     private fun cssFormat(input: String): String { var indent = 0; val out = mutableListOf<String>(); val src = input.replace(Regex("/\\*[\\s\\S]*?\\*/"), "").replace(Regex("\\s+"), " ").trim(); var buf = ""; fun flush(line: String) { if (line.trim().isNotEmpty()) out += "  ".repeat(max(0, indent)) + line.trim() }; src.forEach { ch -> when(ch) { '{' -> { flush("$buf {"); buf = ""; indent++ }; '}' -> { if (buf.trim().isNotEmpty()) flush(if (buf.trim().endsWith(';')) buf else "${buf};"); buf = ""; indent = max(0, indent - 1); out += "  ".repeat(indent) + "}" }; ';' -> { flush("${buf.trim()};"); buf = "" }; else -> buf += ch } }; if (buf.trim().isNotEmpty()) flush(buf); return out.joinToString("\n") }
-    private fun jsFormat(input: String): String { var indent = 0; var out = StringBuilder(); var i = 0; var quote: Char? = null; var line = false; var block = false; while (i < input.length) { val ch = input[i]; val next = input.getOrNull(i + 1); when { line -> { out.append(ch); if (ch == '\n') line = false; i++ }; block -> { out.append(ch); if (ch == '*' && next == '/') { out.append('/'); i += 2; block = false } else i++ }; quote != null -> { out.append(ch); if (ch == '\\' && i + 1 < input.length) { out.append(input[i + 1]); i += 2 } else { if (ch == quote) quote = null; i++ } }; ch == '/' && next == '/' -> { line = true; out.append(ch); i += 1 }; ch == '/' && next == '*' -> { block = true; out.append(ch); i += 1 }; ch == '\'' || ch == '"' || ch == '`' -> { quote = ch; out.append(ch); i++ }; ch == '{' -> { out.append(" {\n"); indent++; out.append("  ".repeat(indent)); i++; while (input.getOrNull(i) in listOf(' ', '\n', '\t')) i++ }; ch == '}' -> { indent = max(0, indent - 1); while (out.endsWith(" ") || out.endsWith("\t")) out.delete(out.length - 1, out.length); if (!out.endsWith("\n")) out.append('\n'); out.append("  ".repeat(indent)).append('}'); i++; if (input.getOrNull(i) == ';') { out.append(';'); i++ }; out.append('\n').append("  ".repeat(indent)); while (input.getOrNull(i) in listOf(' ', '\n', '\t')) i++ }; ch == ';' -> { out.append(";\n").append("  ".repeat(indent)); i++; while (input.getOrNull(i) in listOf(' ', '\n', '\t')) i++ }; ch == '\n' -> { out.append("\n").append("  ".repeat(indent)); i++ }; else -> { out.append(ch); i++ } } }; return out.toString().replace(Regex("[ \t]+\n"), "\n").replace(Regex("\n{3,}"), "\n\n").trim() }
+    private fun jsFormat(input: String): String {
+        data class Token(val text: String, val kind: String)
+        val tokens = mutableListOf<Token>(); var i = 0
+        val operators = listOf("===", "!==", ">>>", "=>", "??=", "??", "?.", "&&", "||", "**", "==", "!=", "<=", ">=", "++", "--", "+=", "-=", "*=", "/=", "...", "**=", "<<", ">>")
+        while (i < input.length) {
+            val ch = input[i]
+            if (ch.isWhitespace()) { i++; continue }
+            if (ch == '/' && input.getOrNull(i + 1) == '/') { val start=i; i+=2; while(i<input.length && input[i]!='\n') i++; tokens += Token(input.substring(start,i),"comment"); continue }
+            if (ch == '/' && input.getOrNull(i + 1) == '*') { val start=i; val end=input.indexOf("*/",i+2); require(end>=0) { "JavaScript formatter found an unterminated block comment." }; i=end+2; tokens += Token(input.substring(start,i),"comment"); continue }
+            if (ch == '\'' || ch == '"' || ch == '`') { val start=i++; var closed=false; while(i<input.length) { if(input[i]=='\\') {i=(i+2).coerceAtMost(input.length);continue}; if(input[i++]==ch){closed=true;break} }; require(closed) { "JavaScript formatter found an unterminated string or template literal." }; tokens += Token(input.substring(start,i),"literal"); continue }
+            val word = Regex("^(?:[A-Za-z_$][\\w$]*|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)").find(input.substring(i))
+            if (word != null) { tokens += Token(word.value,"word");i+=word.value.length;continue }
+            val operator=operators.firstOrNull{input.startsWith(it,i)}
+            if(operator!=null){tokens+=Token(operator,"operator");i+=operator.length;continue}
+            tokens+=Token(ch.toString(),"punct");i++
+        }
+        require(tokens.isNotEmpty()) { "Paste JavaScript or TypeScript code to format." }
+        val lines=mutableListOf<String>();var line="";var depth=0;var parenDepth=0;var lineDepth=0
+        fun emit(){val value=line.trim();if(value.isNotEmpty())lines += "  ".repeat(lineDepth.coerceAtLeast(0))+value;line="";lineDepth=depth}
+        fun append(value:String,space:Boolean=false){if(line.isEmpty()&&value.isNotEmpty())lineDepth=depth;if(space&&line.isNotEmpty()&&!line.last().isWhitespace()&&line.last() !in ".(["&&value.firstOrNull() !in listOf(',', ';', ')', ']', '}'))line+=" ";line+=value}
+        fun prev(index:Int)=tokens.getOrNull(index-1)?.text ?: ""
+        fun next(index:Int)=tokens.getOrNull(index+1)?.text ?: ""
+        for(index in tokens.indices){val token=tokens[index];val value=token.text;val before=prev(index);val after=next(index)
+            when {
+                token.kind=="comment"->{if(line.isNotBlank())emit();append(value);emit()}
+                value=="{"->{append("{",line.isNotBlank()&&line.last() !in ".([" );depth++;emit()}
+                value=="}"->{if(line.isNotBlank())emit();depth=(depth-1).coerceAtLeast(0);append("}");if(after !in setOf(";",",",")","]",".","(","["))emit()}
+                value=="("->{append("(",before in setOf("if","for","while","switch","catch","with","function"));parenDepth++}
+                value==")"->{line=line.trimEnd()+")";parenDepth=(parenDepth-1).coerceAtLeast(0)}
+                value=="["->append("[")
+                value=="]"->line=line.trimEnd()+"]"
+                value=="."||value=="?."->line=line.trimEnd()+value
+                value==","->{line=line.trimEnd()+",";emit()}
+                value==";"->{line=line.trimEnd()+";";if(parenDepth==0)emit()}
+                value==":"->{line=line.trimEnd()+":";append("",true)}
+                token.kind=="operator"||value in setOf("=","+","-","*","/","%","<",">","!","&","|","?")->if(value in setOf("++","--","!","~","..."))append(value)else{append(value,true);append("",true)}
+                else->{val wordLike=token.kind=="word"||token.kind=="literal";val prior=tokens.getOrNull(index-1);val priorWord=prior!=null&&(prior.kind=="word"||prior.kind=="literal");append(value,line.isNotEmpty()&&(priorWord||before in setOf("return","throw","new","await","yield","typeof","delete","void","instanceof","in","of","else","async")||(before==")"&&wordLike)))}
+            }
+        }
+        emit();val result=lines.joinToString("\n").trim();require(result.isNotEmpty()){"Formatter produced no output. Check that the source is not empty."}
+        return result+"\n\nNote: conservative local formatter. It preserves strings/comments and formats common blocks, calls, literals, and operators; it is not a full ECMAScript parser."
+    }
     private fun cssMinify(input: String) = input.replace(Regex("/\\*[\\s\\S]*?\\*/"), "").replace(Regex("\\s+"), " ").replace(Regex("\\s*([{};:,>~+])\\s*"), "$1").replace(";}", "}").trim()
     private fun jsMinify(input: String): String { var out = StringBuilder(); var i = 0; var quote: Char? = null; var line = false; var block = false; while (i < input.length) { val ch = input[i]; val n = input.getOrNull(i + 1); when { line -> { if (ch == '\n') line = false; i++ }; block -> { if (ch == '*' && n == '/') { block = false; i += 2 } else i++ }; quote != null -> { out.append(ch); if (ch == '\\' && i + 1 < input.length) { out.append(input[i + 1]); i += 2 } else { if (ch == quote) quote = null; i++ } }; ch == '/' && n == '/' -> { line = true; i += 2 }; ch == '/' && n == '*' -> { block = true; i += 2 }; ch == '\'' || ch == '"' || ch == '`' -> { quote = ch; out.append(ch); i++ }; ch.isWhitespace() -> { val p = out.lastOrNull() ?: ' '; val q = input.getOrNull(i + 1) ?: ' '; if ((p.isLetterOrDigit() || p == '_' || p == '$') && (q.isLetterOrDigit() || q == '_' || q == '$')) out.append(' '); i++ }; else -> { out.append(ch); i++ } } }; return out.toString().trim() }
 
