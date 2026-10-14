@@ -110,8 +110,11 @@ class NativeDeveloperToolTest {
         assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("207: Multi-Status"))
         assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("418: I'm a teapot"))
         assertTrue(NativeUtilityEngine.run(tool("http-status-reference"), "").text.contains("503: Service Unavailable"))
-        assertEquals("a=1&b=2", NativeUtilityEngine.run(tool("query-string-parser"), "a=1&b=2").text)
-        assertEquals("Mozilla/5.0", NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
+        val query = JSONObject(NativeUtilityEngine.run(tool("query-string-parser"), "a=1&b=2").text)
+        assertEquals(2, query.getInt("count"))
+        assertEquals("1", query.getJSONObject("grouped").getJSONArray("a").getString(0))
+        val userAgent = JSONObject(NativeUtilityEngine.run(tool("user-agent-parser"), "Mozilla/5.0").text)
+        assertEquals("Mozilla/5.0", userAgent.getString("raw"))
         assertTrue(JSONObject(NativeUtilityEngine.run(tool("cron-parser"), "*/15 * * * *").text).has("nextRuns"))
         assertEquals("<div>\n  <p>\n    Hello\n  </p>\n</div>", NativeUtilityEngine.run(tool("markdown-preview"), "<div><p>Hello</p></div>").text)
     }
