@@ -62,6 +62,7 @@ export function developerStudioExample(op: string): { input: string; secondary?:
   if (lower.includes("xml") || lower.includes("html") || lower.includes("svg")) return { input: "<root><name>Ada</name></root>" };
   if (lower.includes("css") && lower.endsWith("-decoder")) return { input: "hello\\a world" };
   if (lower.includes("css")) return { input: '.card { color: #0d9f8a; content: "hello\\a world"; padding: 16px; }' };
+  if (lower === "javascript-formatter") return { input: 'const greet=async(name)=>{return await Promise.resolve("hi "+name);};' };
   if (lower.includes("sql")) return { input: "SELECT id, name FROM users WHERE active = true ORDER BY name;" };
   if (lower.includes("yaml")) return { input: "app:\n  name: enV\n  enabled: true" };
   if (lower.includes("graphql")) return { input: "query Example($id: ID!) { user(id: $id) { id name } }" };

@@ -1,8 +1,8 @@
 {
   "date": "2026-10-13",
   "scope": "All catalog entries category=developer and engine.type=developer (Web local engine smoke using each tool’s own Load example fixture)",
-  "catalogEntries": 446,
-  "passed": 446,
+  "catalogEntries": 448,
+  "passed": 448,
   "intentionalDomainErrors": 1,
   "failures": [],
   "suspiciousGenericFallbacks": [],

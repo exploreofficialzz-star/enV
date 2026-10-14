@@ -1903,9 +1903,9 @@
     "slug": "javascript-formatter",
     "category": "developer",
     "status": "active",
-    "engineType": "text",
+    "engineType": "developer",
     "engineId": null,
-    "engineOp": "js-format"
+    "engineOp": "javascript-formatter"
   },
   {
     "id": "javascript-generator",
@@ -3118,9 +3118,9 @@
     "slug": "sql-formatter",
     "category": "developer",
     "status": "active",
-    "engineType": "text",
+    "engineType": "developer",
     "engineId": null,
-    "engineOp": "sql-format"
+    "engineOp": "sql-formatter"
   },
   {
     "id": "sql-generator",

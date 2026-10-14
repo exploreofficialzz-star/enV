@@ -65,14 +65,14 @@ try {
         routeReport.actionWorked = output.includes(sampleMarker) && /assertionPassed|matchCount|results/i.test(output);
       } else if (route.kind === 'javascript') {
         await page.getByLabel('Input').fill('const greet=async(name)=>{return await Promise.resolve("hi "+name);};');
-        await page.getByRole('button', { name: /^Run$/i }).click();
+        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
         await page.getByText(/async/i).last().waitFor({ state: 'visible', timeout }).catch(() => {});
         const output = await page.locator('pre').last().innerText().catch(() => '');
-        routeReport.actionWorked = output.includes('async') && output.includes('\n') && output.trim().length > 20;
+        routeReport.actionWorked = output.includes('async') && output.includes('greet') && output.includes('\n') && output.trim().length > 20;
       } else {
         await page.getByLabel('Input').fill("select a.id,a.name from accounts a left join orders o on o.account_id=a.id where a.note='FROM should stay in text' group by a.id,a.name having count(*)>0 order by a.name;");
         await page.getByLabel('SQL dialect').selectOption('postgresql').catch(() => {});
-        await page.getByRole('button', { name: /^Run$/i }).click();
+        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
         await page.getByText(/GROUP BY/i).last().waitFor({ state: 'visible', timeout }).catch(() => {});
         const output = await page.locator('pre').last().innerText().catch(() => '');
         routeReport.actionWorked = output.includes('GROUP BY') && output.includes("'FROM should stay in text'") && output.includes('sql-formatter');

@@ -986,6 +986,8 @@ function formatJavascriptConservative(input: string): string {
 async function formatJavascript(input: string, preferTypeScript = false): Promise<string> {
   if (!input.trim()) throw new Error("Paste JavaScript or TypeScript code to format.");
   if (input.length > 1_000_000) throw new Error("Code formatter input exceeds the 1 MB local formatting limit.");
+  // Keep the browser path lightweight; the TypeScript compiler import is retained for Node/native checks.
+  if (typeof window !== "undefined") return formatJavascriptConservative(input);
   try {
     const ts = await import("typescript");
     const jsxLikely = /(?:^|[=(:,\[>])\s*<[A-Za-z][A-Za-z0-9_.:-]*(?:\s|>|\/)/m.test(input) || /<\/[A-Za-z][A-Za-z0-9_.:-]*\s*>/.test(input);
