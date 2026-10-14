@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { CodeResult } from "@/components/engines/result-panel";
 import { DEVELOPER_HTTP_STATUS, hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
-import { runRegexStudio, type RegexStudioMode } from "@/lib/engines/regex-studio";
+import { runRegexStudio, buildRegexHighlightSegments, type RegexStudioMode } from "@/lib/engines/regex-studio";
 import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
 import { decodeData as decodeSharedData, encodeData as encodeSharedData } from "@/lib/engines/developer-utils";
 import type { ToolMeta } from "@/types/tool";
@@ -363,6 +363,43 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
       <Button type="button" variant="ghost" onClick={() => { regexAbort.current?.abort(); setInput(""); setSecondary(""); setFlags("g"); setReplacement(""); setRegexMode("test"); setSqlDialect("postgresql"); setSelectedFile(null); setOut(""); setError(null); }}>Reset</Button>
     </div>
     <ErrorBanner message={error} />
+    {isRegexTool && regexMode === "test" ? (() => {
+      // Live highlight: pattern in secondary for regex-tester path used by runRegexStudio(input, secondary...)
+      // Actually call is runRegexStudio(input, secondary, flags) — read order from source
+      // runRegexStudio(input, secondary) → pattern=input, samples=secondary
+      let pattern = input.trim();
+      let sample = secondary.trim();
+      if (!pattern || !sample) {
+        return <p className="text-xs text-muted">Enter a pattern (first field) and sample text (second field) for live match highlighting. JavaScript RegExp · local only.</p>;
+      }
+      try {
+        const hl = buildRegexHighlightSegments(pattern, sample, flags || "g");
+        return (
+          <div className="space-y-2 rounded-lg border border-border bg-surface p-3 sm:p-4" aria-label="Live regex match highlight">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+              <span className="font-medium text-foreground">Live highlight</span>
+              <span>{hl.matchCount} match{hl.matchCount === 1 ? "" : "es"}{hl.truncated ? " (truncated)" : ""} · {hl.engine}</span>
+            </div>
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-3 font-mono text-sm leading-6" tabIndex={0}>
+              {hl.segments.map((seg, i) => (
+                seg.isMatch
+                  ? <mark key={i} className="rounded-sm bg-amber-200/90 px-0.5 text-foreground dark:bg-amber-500/40">{seg.text}</mark>
+                  : <span key={i}>{seg.text}</span>
+              ))}
+            </pre>
+            {hl.matches[0]?.groups?.length ? (
+              <ul className="space-y-1 text-xs text-muted">
+                {hl.matches[0].groups.map((g, i) => (
+                  <li key={i}><span className="font-medium text-foreground">Group {g.groupName ?? g.groupIndex}</span>: {g.text}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        );
+      } catch (e) {
+        return <p className="text-xs text-amber-700 dark:text-amber-400" role="status">{e instanceof Error ? e.message : "Invalid pattern for live highlight."}</p>;
+      }
+    })() : null}
     <CodeResult code={out} filename={`env-${op}.txt`} />
     {relatedTools.length ? <nav aria-label="Related Developer Studio tools" className="space-y-2 border-t border-border pt-3">
       <h2 className="text-sm font-medium">Related tools in this Studio</h2>

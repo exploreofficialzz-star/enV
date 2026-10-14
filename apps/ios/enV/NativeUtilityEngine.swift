@@ -534,12 +534,38 @@ enum NativeUtilityEngine {
         return "Content-Security-Policy: \(policy)\n\n\(review) This generator does not inspect your application or guarantee a complete CSP.\n"
     }
 
+    private static func developerDockerfile(_ stackRaw: String) -> String {
+        switch stackRaw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "python", "flask", "django", "fastapi": return "# Python ASGI template; adapt the module and command to your app.\nFROM python:3.12-slim\nENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\nWORKDIR /app\nCOPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nUSER 10001\nEXPOSE 8000\nCMD [\"uvicorn\",\"main:app\",\"--host\",\"0.0.0.0\",\"--port\",\"8000\"]\n"
+        case "go", "golang": return "# Multi-stage Go build; adjust module path and binary name if needed.\nFROM golang:1.23-alpine AS build\nWORKDIR /src\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app/app ./...\nFROM alpine:3.20\nRUN adduser -D -H appuser\nWORKDIR /app\nCOPY --from=build /app/app ./app\nUSER appuser\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+        case "java", "kotlin": return "# Maven/JVM template; adapt for Gradle-based projects.\nFROM maven:3.9-eclipse-temurin-21 AS build\nWORKDIR /workspace\nCOPY pom.xml ./\nRUN mvn -B -q dependency:go-offline\nCOPY src ./src\nRUN mvn -B -q package -DskipTests\nFROM eclipse-temurin:21-jre\nWORKDIR /app\nCOPY --from=build /workspace/target/*.jar /app/app.jar\nUSER 10001\nEXPOSE 8080\nENTRYPOINT [\"java\",\"-jar\",\"/app/app.jar\"]\n"
+        case "rust": return "# Rust release build; set the executable name to your Cargo package name.\nFROM rust:1.82-alpine AS build\nRUN apk add --no-cache musl-dev\nWORKDIR /src\nCOPY Cargo.toml Cargo.lock ./\nCOPY src ./src\nRUN cargo build --release\nFROM alpine:3.20\nRUN adduser -D -H appuser\nWORKDIR /app\nCOPY --from=build /src/target/release/app ./app\nUSER appuser\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+        case "swift": return "# Swift Package Manager template; executable target defaults to 'App'.\nFROM swift:6.2-jammy AS build\nWORKDIR /src\nCOPY Package.swift ./\nCOPY Sources ./Sources\nRUN swift build -c release\nFROM swift:6.2-jammy\nWORKDIR /app\nCOPY --from=build /src/.build/release/App ./app\nUSER 10001\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+        case "static", "html", "nginx": return "FROM nginx:1.27-alpine\nCOPY ./dist/ /usr/share/nginx/html/\nEXPOSE 80\nHEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1\n"
+        case "android": return "# Android is a mobile package, not a long-running server container.\n# This image creates a CI build environment; publish the generated APK/AAB separately.\nFROM gradle:8.10.2-jdk17\nWORKDIR /workspace\nCOPY . .\nRUN chmod +x ./gradlew && ./gradlew --no-daemon assembleDebug\nCMD [\"sh\",\"-c\",\"find . -path '*/build/outputs/apk/*/*.apk' -o -path '*/build/outputs/bundle/*/*.aab'\"]\n"
+        case "generic": return "# Generic template intentionally avoids guessing a stack/runtime.\nFROM alpine:3.20\nWORKDIR /app\nCOPY . .\n# Add reviewed runtime dependencies and an unprivileged command for your project.\nCMD [\"sh\",\"-c\",\"echo 'Configure this image for your project' && exit 1\"]\n"
+        default: return "# Node.js production image; adjust the command to your real app entry point.\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\nFROM node:22-alpine AS runtime\nENV NODE_ENV=production\nWORKDIR /app\nCOPY --from=build /app/package*.json ./\nRUN npm ci --omit=dev && npm cache clean --force\nCOPY --from=build /app/dist ./dist\nUSER node\nEXPOSE 3000\nCMD [\"node\",\"dist/server.js\"]\n"
+        }
+    }
+
     private static func developerTemplate(_ op: String, input: String, secondary: String) throws -> String? {
         let lower = op.lowercased(); let subject = input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? secondary.trimmingCharacters(in: .whitespacesAndNewlines) : input.trimmingCharacters(in: .whitespacesAndNewlines)
         if lower.contains("gitignore") && lower.contains("generator") {
             let stack = subject.isEmpty ? "node" : subject.lowercased()
-            let specific = stack.contains("python") ? "__pycache__/\n*.py[cod]\n.venv/\n.pytest_cache/\n" : stack.contains("swift") ? ".build/\nDerivedData/\nxcuserdata/\n" : stack.contains("android") || stack.contains("kotlin") ? ".gradle/\nbuild/\nlocal.properties\n" : stack.contains("rust") ? "target/\n" : "node_modules/\ndist/\nbuild/\ncoverage/\n"
-            return "# OS/editor\n.DS_Store\nThumbs.db\n.idea/\n.vscode/\n\n# Secrets\n.env\n.env.*\n!.env.example\n*.pem\n*.key\n\n# Logs\n*.log\nlogs/\n\n# Stack: \(stack)\n\(specific)"
+            let specific: String
+            switch stack {
+            case "python", "flask", "django", "fastapi": specific = "__pycache__/\n*.py[cod]\n.venv/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n"
+            case "swift": specific = ".build/\nDerivedData/\nxcuserdata/\n*.xcuserstate\n"
+            case "android": specific = ".gradle/\nbuild/\nlocal.properties\n*.iml\n.cxx/\n.externalNativeBuild/\n"
+            case "kotlin": specific = ".gradle/\nbuild/\nlocal.properties\n*.class\n"
+            case "java": specific = ".gradle/\nbuild/\nout/\n*.class\n"
+            case "go", "golang": specific = "/bin/\n/vendor/\n*.test\n"
+            case "rust": specific = "target/\n"
+            case "static", "html", "nginx": specific = "dist/\nbuild/\n"
+            case "generic": specific = "dist/\nbuild/\ncoverage/\n"
+            default: specific = "node_modules/\ndist/\nbuild/\ncoverage/\n*.tsbuildinfo\n"
+            }
+            return "# OS/editor\n.DS_Store\nThumbs.db\n.idea/\n.vscode/\n*.swp\n\n# Secrets\n.env\n.env.*\n!.env.example\n*.pem\n*.key\n\n# Logs\n*.log\nlogs/\n\n# Stack: \(stack)\n\(specific)"
         }
         if lower.contains("docker-compose") && (lower.contains("generator") || lower.contains("builder")) { return "services:\n  app:\n    build: .\n    restart: unless-stopped\n    ports:\n      - \"3000:3000\"\n    environment:\n      NODE_ENV: production\n    # Supply secrets at deploy time; do not commit credentials.\n" }
         if (lower.contains("dockerfile") && (lower.contains("helper") || lower.contains("generator"))) || (lower.contains("docker") && lower.contains("generator")) { return "FROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\nFROM node:22-alpine AS runtime\nENV NODE_ENV=production\nWORKDIR /app\nCOPY --from=build /app/package*.json ./\nRUN npm ci --omit=dev\nCOPY --from=build /app/dist ./dist\nUSER node\nEXPOSE 3000\n# Verify the entry point matches your application.\nCMD [\"node\",\"dist/server.js\"]\n" }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeData, encodeData, uuidValid, HTTP_STATUS, MIME_TYPES } from "./developer-utils.ts";
+import { decodeData, encodeData, uuidValid, HTTP_STATUS, MIME_TYPES, detectDeveloperInputKind } from "./developer-utils.ts";
 
 test("developer data encoders round-trip unicode", () => {
   const input = "enV 🚀 — fast & reliable";
@@ -41,4 +41,16 @@ test("strict shared decoder preserves URI plus and rejects invalid UTF-8/unpaire
   assert.throws(() => decodeData("Zh==", "base64"), /non-canonical/);
   assert.throws(() => decodeData("\\ud800", "unicode"), /unpaired high surrogate/);
   assert.equal(decodeData("&#x1F680; &amp;lt; &quot;x&quot;", "html"), "🚀 &lt; \"x\"");
+});
+
+
+test("smart detect routes common developer inputs and all standard digest lengths", () => {
+  assert.equal(detectDeveloperInputKind("550e8400-e29b-61d4-a716-446655440000")?.kind, "uuid");
+  assert.equal(detectDeveloperInputKind("a".repeat(32))?.kind, "md5-hex");
+  assert.equal(detectDeveloperInputKind("a".repeat(40))?.kind, "sha1-hex");
+  assert.equal(detectDeveloperInputKind("a".repeat(64))?.kind, "sha256-hex");
+  assert.equal(detectDeveloperInputKind("a".repeat(96))?.kind, "sha384-hex");
+  assert.equal(detectDeveloperInputKind("a".repeat(128))?.kind, "sha512-hex");
+  assert.equal(detectDeveloperInputKind("https://example.com/a%20b")?.kind, "url");
+  assert.equal(detectDeveloperInputKind("plain text with 100% usage"), null);
 });

@@ -61,6 +61,20 @@ final class NativeDeveloperStudioTests: XCTestCase {
         XCTAssertTrue(try run("user-agent-parser", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36").contains("Windows"))
     }
 
+    func testDevopsDockerfilePresetsProduceDistinctStackTemplates() throws {
+        XCTAssertTrue(try run("developer-dockerfile-generator", "node").contains("FROM node:22-alpine"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "python").contains("FROM python:3.12-slim"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "go").contains("FROM golang:"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "java").contains("FROM maven:"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "rust").contains("FROM rust:"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "swift").contains("FROM swift:"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "static").contains("FROM nginx:"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "android").contains("Android is a mobile package"))
+        XCTAssertTrue(try run("developer-dockerfile-generator", "generic").contains("intentionally avoids guessing"))
+        XCTAssertTrue(try run("developer-gitignore-generator", "android").contains("local.properties"))
+        XCTAssertTrue(try run("developer-gitignore-generator", "swift").contains("DerivedData/"))
+    }
+
     func testUuidInspectionSupportsNilAndWebhookOutputIsValidJson() throws {
         XCTAssertTrue(try run("uuid-validator", "00000000-0000-0000-0000-000000000000").hasPrefix("Valid Nil UUID"))
         XCTAssertEqual(try run("uuid-encoder", "00000000-0000-0000-0000-000000000000"), Array(repeating: "00000000", count: 16).joined(separator: " "))
@@ -344,6 +358,33 @@ final class NativeDeveloperStudioTests: XCTestCase {
         let sorted = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: ["input": "z\nA\na\n🚀", "steps": [["op": "sort-lines"]]], options: [.fragmentsAllowed]), encoding: .utf8))
         let sortReport = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(NativeDeveloperRecipe.run(sorted).utf8)) as? [String: Any])
         XCTAssertEqual(sortReport["finalOutput"] as? String, "A\na\nz\n🚀")
+    }
+
+    func testNativeSmartDetectRoutesAllDigestLengthsAndAvoidsPercentFalsePositives() {
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect("550e8400-e29b-61d4-a716-446655440000")?.kind, "uuid")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect(String(repeating: "a", count: 32))?.kind, "md5-hex")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect(String(repeating: "a", count: 40))?.kind, "sha1-hex")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect(String(repeating: "a", count: 64))?.kind, "sha256-hex")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect(String(repeating: "a", count: 96))?.kind, "sha384-hex")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect(String(repeating: "a", count: 128))?.kind, "sha512-hex")
+        XCTAssertEqual(NativeDeveloperSmartDetect.detect("https://example.com/a%20b")?.kind, "url")
+        XCTAssertNil(NativeDeveloperSmartDetect.detect("usage is 100% today"))
+    }
+
+    func testNativeRegexHighlightHandlesUnicodeOffsetsAndNamedGroups() throws {
+        let raw = try NativeRegexHighlight.build(pattern: "(?<word>🚀|cat)", sample: "x🚀 cat", flags: "g")
+        let report = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
+        XCTAssertEqual(report["engine"] as? String, "NSRegularExpression (ICU)")
+        XCTAssertEqual(report["matchCount"] as? Int, 2)
+        let matches = try XCTUnwrap(report["matches"] as? [[String: Any]])
+        XCTAssertEqual(matches[0]["start"] as? Int, 1)
+        XCTAssertEqual(matches[0]["end"] as? Int, 3, "Emoji offsets must be UTF-16 offsets, not grapheme offsets.")
+        XCTAssertEqual(matches[0]["text"] as? String, "🚀")
+        let group = try XCTUnwrap((matches[0]["groups"] as? [[String: Any]])?.first)
+        XCTAssertEqual(group["groupName"] as? String, "word")
+        XCTAssertEqual(group["text"] as? String, "🚀")
+        let segments = try XCTUnwrap(report["segments"] as? [[String: Any]])
+        XCTAssertEqual(segments.compactMap { $0["text"] as? String }.joined(), "x🚀 cat")
     }
 
 }

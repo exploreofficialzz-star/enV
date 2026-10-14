@@ -85,3 +85,64 @@ export const MIME_TYPES: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", avif: "image/avif", svg: "image/svg+xml", ico: "image/x-icon",
   mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav", ogg: "audio/ogg", flac: "audio/flac", mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", avi: "video/x-msvideo",
 };
+
+
+/** Suggest the best Developer Studio/mode for clipboard or pasted text (DevToys-style smart detection). Client-side only. */
+export type DeveloperInputHint = {
+  kind: string;
+  confidence: "high" | "medium" | "low";
+  studioSlug: string;
+  modeKey: string;
+  reason: string;
+};
+
+export function detectDeveloperInputKind(raw: string): DeveloperInputHint | null {
+  const input = raw.trim();
+  if (!input) return null;
+  // JWT: three base64url segments
+  if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/.test(input) && input.split(".").length === 3) {
+    return { kind: "jwt", confidence: "high", studioSlug: "jwt-studio", modeKey: "decode", reason: "Looks like a JWT (three base64url segments)." };
+  }
+  // UUID
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input) || /^00000000-0000-0000-0000-000000000000$/i.test(input) || /^ffffffff-ffff-ffff-ffff-ffffffffffff$/i.test(input)) {
+    return { kind: "uuid", confidence: "high", studioSlug: "uuid-studio", modeKey: "validate", reason: "Looks like a canonical UUID." };
+  }
+  // Unix timestamp seconds or ms
+  if (/^\d{10}$/.test(input) || /^\d{13}$/.test(input)) {
+    return { kind: "timestamp", confidence: "medium", studioSlug: "time-cron-studio", modeKey: "timestamp", reason: "Looks like a Unix timestamp (seconds or milliseconds)." };
+  }
+  // Cron 5-field
+  if (/^(\S+\s+){4}\S+$/.test(input) && /[*\/,-]/.test(input) && input.length < 120) {
+    return { kind: "cron", confidence: "medium", studioSlug: "time-cron-studio", modeKey: "explain", reason: "Looks like a 5-field cron expression." };
+  }
+  // JSON
+  if ((input.startsWith("{") && input.endsWith("}")) || (input.startsWith("[") && input.endsWith("]"))) {
+    return { kind: "json", confidence: "high", studioSlug: "json-studio", modeKey: "format", reason: "Looks like JSON object or array text." };
+  }
+  // Hex digest
+  if (/^[0-9a-f]{32}$/i.test(input)) {
+    return { kind: "md5-hex", confidence: "medium", studioSlug: "hash-studio", modeKey: "compare", reason: "Looks like a 32-char hex digest (MD5-sized)." };
+  }
+  if (/^[0-9a-f]{40}$/i.test(input)) {
+    return { kind: "sha1-hex", confidence: "medium", studioSlug: "hash-studio", modeKey: "compare", reason: "Looks like a 40-char hex digest (SHA-1-sized)." };
+  }
+  if (/^[0-9a-f]{64}$/i.test(input)) {
+    return { kind: "sha256-hex", confidence: "medium", studioSlug: "hash-studio", modeKey: "compare", reason: "Looks like a 64-char hex digest (SHA-256-sized)." };
+  }
+  if (/^[0-9a-f]{96}$/i.test(input)) {
+    return { kind: "sha384-hex", confidence: "medium", studioSlug: "hash-studio", modeKey: "compare", reason: "Looks like a 96-char hex digest (SHA-384-sized)." };
+  }
+  if (/^[0-9a-f]{128}$/i.test(input)) {
+    return { kind: "sha512-hex", confidence: "medium", studioSlug: "hash-studio", modeKey: "compare", reason: "Looks like a 128-char hex digest (SHA-512-sized)." };
+  }
+  // Base64-ish
+  const compactBase64 = input.replace(/\s+/g, "");
+  if (/^[A-Za-z0-9+/]+=*$/.test(compactBase64) && compactBase64.length >= 16 && compactBase64.length % 4 === 0) {
+    return { kind: "base64", confidence: "medium", studioSlug: "encoding-studio", modeKey: "base64", reason: "Looks like Base64 text." };
+  }
+  // URL
+  if (/^https?:\/\//i.test(input) || /%[0-9A-Fa-f]{2}/.test(input)) {
+    return { kind: "url", confidence: "medium", studioSlug: "encoding-studio", modeKey: "url", reason: "Looks like a URL or percent-encoded text." };
+  }
+  return null;
+}

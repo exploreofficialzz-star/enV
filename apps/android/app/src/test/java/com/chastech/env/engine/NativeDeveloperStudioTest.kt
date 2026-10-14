@@ -65,6 +65,20 @@ class NativeDeveloperStudioTest {
         assertTrue(run("nginx-config-generator", "").contains("try_files \$uri \$uri/ =404;"))
     }
 
+    @Test fun devopsDockerfilePresetsProduceDistinctStackTemplates() {
+        assertTrue(run("developer-dockerfile-generator", "node").contains("FROM node:22-alpine"))
+        assertTrue(run("developer-dockerfile-generator", "python").contains("FROM python:3.12-slim"))
+        assertTrue(run("developer-dockerfile-generator", "go").contains("FROM golang:"))
+        assertTrue(run("developer-dockerfile-generator", "java").contains("FROM maven:"))
+        assertTrue(run("developer-dockerfile-generator", "rust").contains("FROM rust:"))
+        assertTrue(run("developer-dockerfile-generator", "swift").contains("FROM swift:"))
+        assertTrue(run("developer-dockerfile-generator", "static").contains("FROM nginx:"))
+        assertTrue(run("developer-dockerfile-generator", "android").contains("Android is a mobile package"))
+        assertTrue(run("developer-dockerfile-generator", "generic").contains("intentionally avoids guessing"))
+        assertTrue(run("developer-gitignore-generator", "android").contains("local.properties"))
+        assertTrue(run("developer-gitignore-generator", "swift").contains("DerivedData/"))
+    }
+
     @Test fun uuidInspectionSupportsNilAndWebhookOutputRemainsValidJson() {
         assertTrue(run("uuid-validator", "00000000-0000-0000-0000-000000000000").startsWith("Valid Nil UUID"))
         assertEquals(List(16) { "00000000" }.joinToString(" "), run("uuid-encoder", "00000000-0000-0000-0000-000000000000"))
@@ -330,6 +344,29 @@ class NativeDeveloperStudioTest {
         assertEquals("line\n", JSONObject(NativeDeveloperRecipe.run(add.toString())).getString("finalOutput"))
         val sorted = JSONObject().put("input", "z\nA\na\n🚀").put("steps", JSONArray().put(JSONObject().put("op", "sort-lines")))
         assertEquals("A\na\nz\n🚀", JSONObject(NativeDeveloperRecipe.run(sorted.toString())).getString("finalOutput"))
+    }
+
+    @Test fun nativeSmartDetectRoutesAllDigestLengthsAndAvoidsPercentFalsePositives() {
+        assertEquals("uuid", NativeDeveloperSmartDetect.detect("550e8400-e29b-61d4-a716-446655440000")?.kind)
+        assertEquals("md5-hex", NativeDeveloperSmartDetect.detect("a".repeat(32))?.kind)
+        assertEquals("sha1-hex", NativeDeveloperSmartDetect.detect("a".repeat(40))?.kind)
+        assertEquals("sha256-hex", NativeDeveloperSmartDetect.detect("a".repeat(64))?.kind)
+        assertEquals("sha384-hex", NativeDeveloperSmartDetect.detect("a".repeat(96))?.kind)
+        assertEquals("sha512-hex", NativeDeveloperSmartDetect.detect("a".repeat(128))?.kind)
+        assertEquals("url", NativeDeveloperSmartDetect.detect("https://example.com/a%20b")?.kind)
+        assertEquals(null, NativeDeveloperSmartDetect.detect("usage is 100% today"))
+    }
+
+    @Test fun nativeRegexLiveHighlightReturnsNamedGroupsAndBoundedSegments() {
+        val report = JSONObject(NativeRegexHighlight.build("(?<word>cat|dog)", "cat dog", "g"))
+        assertEquals("java.util.regex", report.getString("engine"))
+        assertEquals(2, report.getInt("matchCount"))
+        val first = report.getJSONArray("matches").getJSONObject(0)
+        assertEquals("cat", first.getString("text"))
+        val group = first.getJSONArray("groups").getJSONObject(0)
+        assertEquals("word", group.getString("groupName"))
+        assertEquals("cat", group.getString("text"))
+        assertTrue(report.getJSONArray("segments").length() >= 3)
     }
 
 }

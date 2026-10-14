@@ -864,10 +864,19 @@ private struct NativeDeveloperTextArea: View {
     }
 }
 
+private struct NativeDeveloperStackPreset: Identifiable {
+    let id: String
+    let label: String
+}
+
 private struct NativeDeveloperToolView: View {
+    @EnvironmentObject private var store: CatalogStore
     let tool:Tool
     @State private var studioModeKey = ""
+    @State private var detectedHint: DeveloperInputHint?
+    @State private var detectionMessage = ""
     @State private var encodingDirection = "encode"
+    @State private var devopsPreset = "node"
     @State private var input=""
     @State private var secondary=""
     @State private var recipeSource="  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
@@ -901,12 +910,16 @@ private struct NativeDeveloperToolView: View {
     private var isRecipeRunner:Bool { op == "developer-recipe-runner" }
     private var isRegexStudio:Bool { op.localizedCaseInsensitiveContains("regex") && !op.localizedCaseInsensitiveContains("regex-generator") }
     private var isSQLFormatter:Bool { op.localizedCaseInsensitiveContains("sql") && (op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier")) }
+    private var isDevopsPresetMode:Bool { studioSpec?.id == "devops-studio" && ["gitignore", "dockerfile"].contains(studioModeKey) }
 
     init(tool: Tool) {
         self.tool = tool
         let operation = tool.engine.op ?? tool.engine.id ?? tool.id
         _regexMode = State(initialValue: operation.localizedCaseInsensitiveContains("explainer") ? "flavors" : "test")
-        _studioModeKey = State(initialValue: nativeDeveloperStudioSpecs.first(where: { $0.id == tool.id || $0.slug == tool.slug })?.modes.first?.key ?? "")
+        let spec = nativeDeveloperStudioSpecs.first(where: { $0.id == tool.id || $0.slug == tool.slug })
+        let storedMode = spec.flatMap { UserDefaults.standard.string(forKey: "env.developer.mode.\($0.id)") }
+        let initialMode = spec?.modes.first(where: { $0.key == storedMode })?.key ?? spec?.modes.first?.key ?? ""
+        _studioModeKey = State(initialValue: initialMode)
     }
 
     var body:some View {
@@ -915,15 +928,68 @@ private struct NativeDeveloperToolView: View {
             if let studioSpec {
                 Text(studioSpec.name).font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
                 Text(studioSpec.description).font(.footnote).foregroundStyle(.secondary)
-                Picker("Studio mode", selection: $studioModeKey) {
-                    ForEach(studioSpec.modes) { mode in Text(mode.label).tag(mode.key) }
-                }.pickerStyle(.menu).accessibilityLabel("\(studioSpec.name) mode")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(studioSpec.modes) { mode in
+                            Button(mode.label) { studioModeKey = mode.key; encodingDirection = "encode"; output = ""; error = nil }
+                                .buttonStyle(.bordered).tint(studioModeKey == mode.key ? Color.envAccent : Color.envMuted)
+                                .frame(minHeight: 40)
+                        }
+                    }.padding(.vertical, 2)
+                }.accessibilityLabel("\(studioSpec.name) modes")
                 if selectedStudioMode?.decodeOp != nil {
                     Picker("Encoding direction", selection: $encodingDirection) {
                         Text("Encode").tag("encode")
                         Text("Decode").tag("decode")
                     }.pickerStyle(.segmented)
                 }
+            }
+            if isDevopsPresetMode {
+                Text("Stack preset").font(.subheadline.weight(.semibold))
+                let presets = [NativeDeveloperStackPreset(id:"node",label:"Node.js"), NativeDeveloperStackPreset(id:"python",label:"Python"), NativeDeveloperStackPreset(id:"go",label:"Go"), NativeDeveloperStackPreset(id:"java",label:"Java"), NativeDeveloperStackPreset(id:"rust",label:"Rust"), NativeDeveloperStackPreset(id:"swift",label:"Swift"), NativeDeveloperStackPreset(id:"android",label:"Android"), NativeDeveloperStackPreset(id:"static",label:"Static site"), NativeDeveloperStackPreset(id:"generic",label:"Generic")]
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(presets) { preset in
+                            Button(preset.label) { devopsPreset = preset.id; output = ""; error = nil }
+                                .buttonStyle(.bordered).tint(devopsPreset == preset.id ? Color.envAccent : Color.envMuted)
+                                .frame(minHeight: 40)
+                        }
+                    }
+                }
+                Text("Selects stack-specific ignore rules or a starter container build. Review paths, commands, base images, and runtime assumptions before deployment.").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 10) {
+                Button("Detect from clipboard") {
+                    // UIPasteboard is read only from this explicit, user-initiated action.
+                    detectedHint = NativeDeveloperClipboardSuggest.suggestFromPasteboard()
+                    if let clipboardText = UIPasteboard.general.string, !clipboardText.isEmpty {
+                        input = clipboardText
+                        detectionMessage = detectedHint == nil ? "Clipboard text copied into input; no confident Studio match found." : "Detected from clipboard locally. Nothing was uploaded."
+                    } else {
+                        detectedHint = nil
+                        detectionMessage = "Clipboard has no readable text."
+                    }
+                }.buttonStyle(.bordered)
+                Text("Reads clipboard only when tapped.").font(.caption).foregroundStyle(.secondary)
+            }
+            if !detectionMessage.isEmpty {
+                Text(detectionMessage).font(.caption).foregroundStyle(.secondary)
+            }
+            if let detectedHint, let targetStudio = store.catalog.developerStudio(for: detectedHint.studioSlug) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Suggested: \(targetStudio.name) · \(detectedHint.modeKey)").font(.subheadline.weight(.semibold))
+                    Text("\(detectedHint.reason) Confidence: \(detectedHint.confidence).").font(.caption).foregroundStyle(.secondary)
+                    NavigationLink(value: targetStudio) {
+                        Text("Open suggested Studio")
+                    }
+                    .buttonStyle(.bordered)
+                    .simultaneousGesture(TapGesture().onEnded {
+                        UserDefaults.standard.set(detectedHint.modeKey, forKey: "env.developer.mode.\(targetStudio.id)")
+                    })
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
             }
             HStack(spacing:10) {
                 Button("Load example") {
@@ -932,7 +998,8 @@ private struct NativeDeveloperToolView: View {
                         recipeSource="  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
                         recipeSteps=["normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim"]
                         recipeFind="<p>"; recipeReplacementText=""; recipePointer="/user/id"
-                    } else { input=sample.input; secondary=sample.secondary }
+                    } else if isDevopsPresetMode { input=""; secondary="" }
+                    else { input=sample.input; secondary=sample.secondary }
                     flags=op.contains("regex") ? "gi" : "g"; replacement=op.contains("replace") ? "dog" : ""; regexMode="test"; sqlDialect="postgresql"; output=""; error=nil
                 }.buttonStyle(.bordered)
                 Text("Text tools process locally on this device.").font(.caption).foregroundStyle(.secondary)
@@ -976,6 +1043,8 @@ private struct NativeDeveloperToolView: View {
                         catch let caughtError { error = caughtError.localizedDescription }
                     }.buttonStyle(.bordered)
                 }
+            } else if isDevopsPresetMode {
+                NativeDeveloperTextArea(title:"Optional stack override (blank uses \(devopsPreset))",text:$input,placeholder:"Leave blank to use the selected stack preset")
             } else {
                 NativeDeveloperTextArea(title:isRegexStudio && regexMode == "pipeline" ? "Default pattern (unused by layers)" : op.contains("regex") ? "Regular expression" : "Input",text:$input,placeholder:"Paste your code, data, token, URL, or text here…")
             }
@@ -992,8 +1061,50 @@ private struct NativeDeveloperToolView: View {
                 Picker("SQL dialect", selection:$sqlDialect) { Text("Generic SQL").tag("sql"); Text("PostgreSQL").tag("postgresql"); Text("MySQL").tag("mysql"); Text("MariaDB").tag("mariadb"); Text("SQLite").tag("sqlite"); Text("SQL Server / T-SQL").tag("transactsql"); Text("BigQuery").tag("bigquery"); Text("Snowflake").tag("snowflake"); Text("Oracle").tag("oracle"); Text("Redshift").tag("redshift"); Text("DuckDB").tag("duckdb") }.pickerStyle(.menu).accessibilityLabel("SQL dialect")
                 Text("Uses a local dialect-aware lexer, not a full SQL grammar parser or query validator.").font(.footnote).foregroundStyle(.secondary)
             }
-            if isRegexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op) { NativeInputField(title:"Regex flags (g/i/m/s/u; platform engine-specific)",text:$flags) }
+            if isRegexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op) {
+                Text("Regex flags").font(.subheadline.weight(.semibold))
+                HStack(spacing: 8) {
+                    ForEach(Array("gimsu"), id: \.self) { flag in
+                        Button(String(flag)) {
+                            if flags.contains(flag) { flags.removeAll(where: { $0 == flag }) }
+                            else { flags.append(flag) }
+                        }
+                        .buttonStyle(.bordered).tint(flags.contains(flag) ? Color.envAccent : Color.envMuted)
+                        .frame(minHeight: 40)
+                    }
+                }
+                NativeInputField(title:"Flags (editable; ICU regex semantics)",text:$flags)
+            }
             if (isRegexStudio && ["test", "benchmark"].contains(regexMode)) || (!isRegexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op)) { NativeInputField(title:"Replacement preview (optional)",text:$replacement) }
+            if isRegexStudio && regexMode == "test" && !secondary.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Live match preview").font(.subheadline.weight(.semibold))
+                    Text("Engine: NSRegularExpression (ICU) · bounded sample; engine behavior differs from JavaScript RegExp.").font(.caption).foregroundStyle(.secondary)
+                    if let result = regexPreviewResult, let data = result.data {
+                        Text(highlightedPreview(from: data))
+                            .font(.system(.body, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                        if let first = (data["matches"] as? [[String: Any]])?.first,
+                           let groups = first["groups"] as? [[String: Any]], !groups.isEmpty {
+                            Text("Capture groups").font(.subheadline.weight(.semibold))
+                            ForEach(Array(groups.prefix(12).enumerated()), id: \.offset) { entry in
+                                let group = entry.element
+                                let index = group["groupIndex"] as? Int ?? 0
+                                let name = (group["groupName"] as? String).map { " · \($0)" } ?? ""
+                                let value = group["text"] as? String ?? "(unmatched)"
+                                Text("group \(index)\(name): \(value)").font(.system(.caption, design: .monospaced))
+                            }
+                        }
+                        let matchCount = data["matchCount"] as? Int ?? 0
+                        let truncated = data["truncated"] as? Bool ?? false
+                        Text("\(matchCount) match(es)\(truncated ? " · preview capped at 100" : "")").font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text(regexPreviewResult?.error ?? "Enter a pattern and sample text to see highlighted matches.").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
             HStack(spacing:10) {
                 Button(isRecipeRunner ? "Run recipe" : isRegexStudio ? (regexMode == "test" ? "Run tests" : regexMode == "benchmark" ? "Benchmark" : regexMode == "pipeline" ? "Run pipeline" : regexMode == "format" ? "Format regex" : "Analyze flavors") : NativeDeveloperToolFormPolicy.actionLabel(op),action:run).buttonStyle(.borderedProminent)
                 Button("Reset",action:reset).buttonStyle(.bordered)
@@ -1005,6 +1116,13 @@ private struct NativeDeveloperToolView: View {
                 }
             }
             NativeOutputView(output:output,error:error)
+        }
+        .onChange(of: studioModeKey) { newValue in
+            if let studioSpec { UserDefaults.standard.set(newValue, forKey: "env.developer.mode.\(studioSpec.id)") }
+        }
+        .onChange(of: input) { newValue in
+            detectedHint = NativeDeveloperSmartDetect.detect(newValue)
+            detectionMessage = detectedHint == nil ? "" : "Detected a likely input type locally."
         }
         .fileImporter(isPresented:$isImporting,allowedContentTypes:[.data],allowsMultipleSelection:false) { result in
             do {
@@ -1023,6 +1141,32 @@ private struct NativeDeveloperToolView: View {
         .fileExporter(isPresented:$isExporting,document:NativePlainTextDocument(text:output),contentType:.plainText,defaultFilename:"env-\(op).txt") { result in
             if case let .failure(caughtError)=result { error=caughtError.localizedDescription }
         }
+    }
+
+    private var regexPreviewResult: (data: [String: Any]?, error: String?)? {
+        guard isRegexStudio, regexMode == "test", !input.isEmpty, !secondary.isEmpty else { return nil }
+        do {
+            let raw = try NativeRegexHighlight.build(pattern: input, sample: secondary, flags: flags)
+            guard let data = raw.data(using: .utf8), let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return (nil, "Could not decode the bounded regex preview.")
+            }
+            return (object, nil)
+        } catch { return (nil, error.localizedDescription) }
+    }
+
+    private func highlightedPreview(from data: [String: Any]) -> AttributedString {
+        let segments = data["segments"] as? [[String: Any]] ?? []
+        var combined = AttributedString()
+        for segment in segments {
+            var item = AttributedString(segment["text"] as? String ?? "")
+            if segment["isMatch"] as? Bool == true {
+                item.foregroundColor = Color.envInk
+                item.backgroundColor = Color.envAccent.opacity(0.25)
+                item.font = .system(.body, design: .monospaced).bold()
+            }
+            combined.append(item)
+        }
+        return combined
     }
 
     private func recipeConfiguration() throws -> String {
@@ -1051,7 +1195,7 @@ private struct NativeDeveloperToolView: View {
             }
             let data=try JSONSerialization.data(withJSONObject:options,options:[.sortedKeys])
             let raw=String(data:data,encoding:.utf8) ?? "{}"
-            let engineInput = isRecipeRunner ? try recipeConfiguration() : input
+            let engineInput = isRecipeRunner ? try recipeConfiguration() : (isDevopsPresetMode && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? devopsPreset : input)
             output=try NativeUtilityEngine.run(activeTool,input:engineInput,optionsJSON:raw).text; error=nil
         } catch let caughtError { output=""; error=caughtError.localizedDescription }
     }

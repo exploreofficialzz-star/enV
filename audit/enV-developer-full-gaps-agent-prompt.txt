@@ -1,0 +1,265 @@
+================================================================================
+enV DEVELOPER CATEGORY — FULL COMPETITIVE GAPS + SYSTEMATIC AGENT PROMPT
+Execute systematically and simultaneously across Web (TypeScript), Android (Kotlin),
+and iOS (Swift). Mirror Accessibility Studios UX. Do NOT remove any tool URLs.
+================================================================================
+
+# Mission
+
+Close every competitive gap between enV Developer (~474 tools, 12 Studios) and the
+full systems of: DevToys, CyberChef, regex101, jwt.io, crontab.guru, IT-Tools, and
+privacy-safe alternatives to CodeBeautify / JSONFormatter-class tools.
+
+Make Developer feel and behave like Accessibility Studios: named workspaces first,
+mode tabs, local-first privacy, mobile-fit, evidence-grade output — while keeping
+every existing `/tools/developer/*` slug live as a Studio mode deep-link.
+
+Success = daily developer tasks (JSON, JWT, Hash, Regex, Cron, Encode, Format, HTTP,
+DevOps generators) are equal or better than specialists on clarity, safety, privacy,
+and mobile UX — and the catalog is one coherent Studio system, not a wall of templates.
+
+--------------------------------------------------------------------------------
+# PART A — FULL COMPETITIVE GAP LIST (research-backed)
+--------------------------------------------------------------------------------
+
+Use this as the authoritative backlog. Implement until each gap is closed or
+honestly documented as out-of-scope with a user-visible reason.
+
+## A1. Product surface & navigation
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G01 | Category feels like a long catalog, not a toolkit | DevToys left-nav, IT-Tools search | Category index leads with 12 Studio cards (Accessibility parity). Live already has this — verify + harden mobile. |
+| G02 | No smart paste → tool routing | DevToys clipboard lightbulb | Smart detect on paste + user-initiated "Detect from clipboard" (Web + Kotlin + Swift). No background clipboard monitoring. |
+| G03 | Weak mobile / narrow-screen Studio UX | Most web tools weak; DevToys desktop-first | Mode chips horizontal scroll, min-h-10 touch targets, stacked panes, no horizontal editor trap. |
+| G04 | Deep links / shareable mode state | Browser tools | Every Studio mode bookmarkable via `?mode=` (and encoding `?action=`). |
+
+## A2. Specialist depth
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G05 | Regex live match highlighting | regex101 | Live highlight segments in Web UI; native segment builders for Android/iOS; group list; engine label (JS vs java.util.regex vs ICU). |
+| G06 | Regex replace preview + flags UX | regex101 / RegExr | Flags UI (g i m s u), replace preview, named + numbered groups. |
+| G07 | Multi-algo hash side-by-side | DevToys, IT-Tools | Hash Studio shows MD5 + SHA-1 + SHA-256 + SHA-384 + SHA-512 in one run; file hash; compare digests. |
+| G08 | JWT brand + builder depth | jwt.io | DECODE ONLY banner always; claims + human times; payload builder; optional sign only with user-supplied secret and clear labeling. |
+| G09 | Cron English + next runs | crontab.guru | English explanation + next N fire times (local + UTC); presets. |
+| G10 | JSON unsafe integer honesty | Silent JS tools fail | Lexical format + MAX_SAFE_INTEGER warning; never silent mutation without warning. |
+| G11 | HTTP status completeness | Reference tables | Full useful table including 418 teapot, 422, 429, 503. |
+| G12 | Recipe / multi-step transforms | CyberChef | Diff & Inspect Recipe Pipeline (deterministic allow-list ops only; no arbitrary code; no network). Expand only with safe ops. |
+
+## A3. Privacy & trust
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G13 | Server-side beautifier fear | CodeBeautify / random sites | Privacy strip on every Studio + tool: "Runs on this device. Nothing uploaded." Zero user-payload POST. |
+| G14 | Clipboard privacy | Some apps over-monitor | Clipboard read only on explicit user action. |
+
+## A4. Formatters & long-tail
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G15 | Empty / echo formatters | Curated suites | JS, SQL, HTML, CSS, YAML, XML produce real multi-line output on hard fixtures; honest limit notes. |
+| G16 | Template filler copy | SEO aggregators | Ban sole description "X utility for the enV toolkit". Every page: job statement + privacy + example + real engine. |
+| G17 | 474 slugs uneven depth | Thin catalogs | Map every slug → Studio + mode; engine-backed or deep-link; no deletions. |
+| G18 | DevOps generators weak | Dedicated starters | gitignore/Dockerfile/nginx/etc. emit copy-ready real content with stack presets. |
+
+## A5. Cross-platform parity
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G19 | Web-only logic | Native toolkits | Same Studio catalog + core ops in TypeScript, Kotlin, Swift (separate implementations, not web-wrappers). |
+| G20 | Golden tests drift | Mature products | Shared golden fixtures for Hash("hello"), JSON bigint, JWT decode-only, Cron, HTTP 418, Base64 unicode, UUID v4. |
+
+## A6. Positioning (not code-only)
+
+| ID | Gap | Who wins | Required close |
+|----|-----|----------|----------------|
+| G21 | Habit (users still open jwt.io) | Brand mindshare | Studio-first IA + smart detect so the default path is enV Studios. |
+| G22 | Claim "beats whole system" without proof | Marketing | Ship measurable golden + browser audits; do not claim CyberChef 300-op parity if not true. |
+
+--------------------------------------------------------------------------------
+# PART B — WHAT ALREADY EXISTS (do not regress)
+--------------------------------------------------------------------------------
+
+Preserve and extend — do not rewrite from scratch:
+
+1. 12 Developer Studios catalog (`developer-studios-catalog.ts` + Kotlin/Swift mirrors)
+2. Studio engine + UI shell (Accessibility-like header, privacy, mode tabs)
+3. Recipe Pipeline (~33 deterministic ops) TS / Kotlin / Swift
+4. Live hard-test PASSes historically: JSON bigint warning, JWT DECODE ONLY, SHA256/MD5,
+   Cron explain, HTTP 418, JS/SQL multi-line format, Base64 unicode, UUID v4
+5. Smart detect helpers (Web/Kotlin/Swift) and regex highlight APIs if present — complete wiring
+6. All ~474 public slugs and IDs
+
+--------------------------------------------------------------------------------
+# PART C — SYSTEMATIC IMPLEMENTATION PHASES (simultaneous tracks)
+--------------------------------------------------------------------------------
+
+Run Web, Android, and iOS tracks in parallel within each phase. Same behavior contracts.
+
+## Phase 0 — Audit lock (day 0)
+
+1. Inventory all developer routes / Studio modes / native coverage files.
+2. Diff live site vs repo for Studio index and core tools.
+3. Produce gap checklist G01–G22 with status: Done / Partial / Missing.
+4. Confirm zero tool URL removals.
+
+## Phase 1 — Studio UX parity with Accessibility (G01, G03, G04, G13)
+
+**Web**
+- Category page: Studio cards first (same visual language as Accessibility).
+- Studio layout: privacy strip, mode tabs, Load example, Copy/Download, related modes.
+- Mobile: horizontal mode scroll, min touch 40px, stacked results, Ctrl/Cmd+Enter runs.
+
+**Android / iOS**
+- Native Studio screens mirror mode list + privacy copy.
+- Touch-friendly mode selection; no desktop-only gestures required.
+
+## Phase 2 — Smart detect + clipboard (G02, G14)
+
+**All platforms**
+- Heuristics: JWT, JSON, UUID, Unix ts, cron, Base64, MD5/SHA256 hex, URL.
+- User-initiated clipboard detect only.
+- Jump to Studio + mode.
+
+**Tests:** golden strings for each kind.
+
+## Phase 3 — Hash Studio depth (G07)
+
+- Multi-hash side-by-side (MD5, SHA-1, SHA-256, SHA-384, SHA-512).
+- File hash (local file bytes only).
+- Compare two digests.
+- Golden: SHA256("hello"), MD5("hello").
+
+Wire all `sha*-hash`, `md5-hash`, `hash-*`, `file-hash-*` into Hash Studio modes.
+
+## Phase 4 — Regex Studio depth (G05, G06)
+
+**Web**
+- Live highlight segments while typing (bounded size).
+- Groups panel (named + numbered).
+- Flags UI; replace preview; "JavaScript RegExp" label.
+
+**Android:** java.util.regex + engine label + segment JSON for UI.
+**iOS:** NSRegularExpression (ICU) + engine label + segment JSON.
+
+Hard fixture: named groups + multi-line samples.
+
+## Phase 5 — Core correctness lock (G08–G11, G15)
+
+- JWT: DECODE ONLY always; claims; exp human time.
+- Cron: English + next runs.
+- JSON: unsafe int warning; validate with position.
+- HTTP: 418 / 422 / 429 / 503.
+- Formatters: JS/SQL/HTML/CSS/YAML never empty on hard fixtures.
+
+## Phase 6 — Recipe + Diff & Inspect (G12)
+
+- Keep allow-listed deterministic ops only.
+- No eval, no shell, no network in recipe steps.
+- Per-step status/preview; copy recipe JSON.
+- Parity script: same op set order on TS/Kotlin/Swift.
+
+## Phase 7 — Long-tail mapping (G16, G17, G18)
+
+For every remaining slug matching:
+`*-beautifier|converter|decoder|diff|encoder|explainer|generator|inspector|minifier|parser|preview|tester|validator`
+and `developer-*`:
+
+1. Map to parent Studio + mode.
+2. Attach real engine or deep-link with preselected mode.
+3. Replace filler descriptions.
+4. DevOps presets emit real file content.
+
+## Phase 8 — Golden QA + mobile pass (G19, G20)
+
+| Fixture | Expect |
+|---------|--------|
+| SHA256 hello | 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824 |
+| MD5 hello | 5d41402abc4b2a76b9719d911017c592 |
+| JSON id 9007199254740993 | Warning present; no silent fail without notice |
+| JWT sample | DECODE ONLY + claims |
+| Cron `*/15 9-17 * * 1-5` | English + next runs |
+| HTTP 418 | I'm a teapot |
+| Base64 unicode | Round-trip capable |
+| UUID generate | v4 shape batch |
+| Regex named groups | Matches + groups + highlight segments |
+
+Mobile: top 12 Studios usable one-handed.
+
+## Phase 9 — Docs & ship
+
+- Changelog by Studio and platform.
+- Competitive gap matrix G01–G22 updated to Done/Partial.
+- Agent must NOT claim CyberChef full recipe parity unless op count and UX match.
+
+--------------------------------------------------------------------------------
+# PART D — HARD RULES
+--------------------------------------------------------------------------------
+
+1. **No tool removal.** All ~474 URLs remain.
+2. **Client-side / on-device only** for user payloads.
+3. **Native languages:** Web TypeScript, Android Kotlin, iOS Swift — separate engines, shared contracts.
+4. **Accessibility Studio UX is the template** for Developer Studios.
+5. **Mobile first** for Studio chrome and primary flows.
+6. **Deterministic engines + golden tests.**
+7. **Honest limits** (formatting ≠ execution; hash ≠ encryption; decode ≠ verify).
+8. **No background clipboard surveillance.**
+
+--------------------------------------------------------------------------------
+# PART E — 12 STUDIOS (target architecture)
+--------------------------------------------------------------------------------
+
+1. JSON Studio
+2. JWT Studio
+3. Regex Studio
+4. Hash Studio
+5. Encoding Studio
+6. Time & Cron Studio
+7. UUID Studio
+8. SQL Studio
+9. Markup & Style Studio
+10. HTTP & API Studio
+11. DevOps Config Studio
+12. Diff & Inspect Studio
+
+Category page shows these first; long-tail listed under “See more tools” still mapped.
+
+--------------------------------------------------------------------------------
+# PART F — DELIVERABLES
+--------------------------------------------------------------------------------
+
+1. Code changes on Web + Android + iOS for Phases 1–8.
+2. Gap matrix G01–G22 with status.
+3. Mapping table: slug → Studio → mode.
+4. Golden test results (all platforms where runnable).
+5. Changelog.
+6. Zip of audited changed files only (or full package if requested).
+7. Short note: what still does not beat CyberChef/regex101 pixel-for-pixel and why.
+
+--------------------------------------------------------------------------------
+# PART G — START ORDER (simultaneous)
+--------------------------------------------------------------------------------
+
+**Track Web:** Phase 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+**Track Android:** same phases, Kotlin files under `apps/android/...`
+**Track iOS:** same phases, Swift files under `apps/ios/...`
+
+Do not finish Web and “leave native for later.” Native parity is part of Done.
+
+Prioritize if time-boxed: **G05 (regex highlight wiring), G07 (multi-hash UI), G03 (mobile), G17 (long-tail map), G20 (goldens).**
+
+--------------------------------------------------------------------------------
+# PART H — SUCCESS CRITERIA
+--------------------------------------------------------------------------------
+
+- Developer category UX matches Accessibility Studios quality.
+- G01–G20 closed or explicitly Partial with justification.
+- Hard fixtures above all PASS on Web; native goldens PASS where engines exist.
+- Privacy strip + no payload upload verified.
+- Zero slug removals.
+- User can complete JSON / JWT / Hash / Regex / Cron / Encode jobs without leaving enV and without trusting a third-party server.
+
+================================================================================
+END OF AGENT PROMPT
+================================================================================

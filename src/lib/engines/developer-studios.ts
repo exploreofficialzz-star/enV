@@ -547,10 +547,115 @@ function generateGitignore(stack: string): string {
 }
 function generateDockerfile(stack: string, appName: string): string {
   const key = stack.toLowerCase().trim();
-  if (["python", "flask", "django", "fastapi"].includes(key)) return `# Minimal Python container; pin dependencies in requirements.txt.\nFROM python:3.12-slim\nENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\nWORKDIR /app\nCOPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\n# Replace main:app with your ASGI module if needed.\nCMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]\n`;
-  if (["static", "nginx", "html"].includes(key)) return `FROM nginx:1.27-alpine\nCOPY ./dist/ /usr/share/nginx/html/\nEXPOSE 80\nHEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1\n`;
-  if (["go", "golang"].includes(key)) return `# Multi-stage Go build. Adjust the module path if needed.\nFROM golang:1.23-alpine AS build\nWORKDIR /src\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app/${toFilenamePart(appName)} ./...\nFROM alpine:3.20\nRUN adduser -D -H appuser\nWORKDIR /app\nCOPY --from=build /app/${toFilenamePart(appName)} ./app\nUSER appuser\nEXPOSE 8080\nENTRYPOINT ["./app"]\n`;
-  return `# Node.js production image. Pin the base image and lockfile in CI.\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:22-alpine AS runtime\nENV NODE_ENV=production\nWORKDIR /app\nCOPY --from=build /app/package*.json ./\nRUN npm ci --omit=dev && npm cache clean --force\nCOPY --from=build /app/dist ./dist\nUSER node\nEXPOSE 3000\n# Update this command to match the app's actual production server.\nCMD ["node", "dist/server.js"]\n`;
+  if (["python", "flask", "django", "fastapi"].includes(key)) return `# Minimal Python container; pin dependencies in requirements.txt.
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+# Replace main:app with your actual ASGI module if needed.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+`;
+  if (["static", "nginx", "html"].includes(key)) return `FROM nginx:1.27-alpine
+COPY ./dist/ /usr/share/nginx/html/
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
+`;
+  if (["go", "golang"].includes(key)) return `# Multi-stage Go build; update the module path and binary name if needed.
+FROM golang:1.23-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o /app/${toFilenamePart(appName)} ./...
+FROM alpine:3.20
+RUN adduser -D -H appuser
+WORKDIR /app
+COPY --from=build /app/${toFilenamePart(appName)} ./app
+USER appuser
+EXPOSE 8080
+ENTRYPOINT ["./app"]
+`;
+  if (["java", "kotlin"].includes(key)) return `# Maven/JVM service template; adapt if this repository uses Gradle or a different JDK.
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /workspace
+COPY pom.xml ./
+RUN mvn -B -q dependency:go-offline
+COPY src ./src
+RUN mvn -B -q package -DskipTests
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /workspace/target/*.jar /app/app.jar
+USER 10001
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+`;
+  if (["rust"].includes(key)) return `# Rust multi-stage build; set the executable name to your Cargo package name.
+FROM rust:1.82-alpine AS build
+RUN apk add --no-cache musl-dev
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo build --release
+FROM alpine:3.20
+RUN adduser -D -H appuser
+WORKDIR /app
+COPY --from=build /src/target/release/${toFilenamePart(appName)} ./app
+USER appuser
+EXPOSE 8080
+ENTRYPOINT ["./app"]
+`;
+  if (key === "swift") return `# Swift server/app container template; requires a Swift Package Manager executable target named "${toFilenamePart(appName)}".
+FROM swift:6.2-jammy AS build
+WORKDIR /src
+COPY Package.swift Package.resolved* ./
+RUN swift package resolve
+COPY Sources ./Sources
+RUN swift build -c release --product ${toFilenamePart(appName)}
+FROM swift:6.2-jammy
+WORKDIR /app
+COPY --from=build /src/.build/release/${toFilenamePart(appName)} ./app
+USER 10001
+EXPOSE 8080
+ENTRYPOINT ["./app"]
+`;
+  if (key === "android") return `# Android is a mobile package, not a long-running server container.
+# This image is a reproducible CI build environment; publish the generated APK/AAB separately.
+FROM gradle:8.10.2-jdk17
+WORKDIR /workspace
+COPY . .
+RUN chmod +x ./gradlew && ./gradlew --no-daemon assembleDebug
+CMD ["sh", "-c", "find . -path '*/build/outputs/apk/*/*.apk' -o -path '*/build/outputs/bundle/*/*.aab'"]
+`;
+  if (key === "generic") return `# Generic placeholder intentionally avoids guessing the runtime or build system.
+# Choose a stack preset or replace this file with your project's documented build steps.
+FROM alpine:3.20
+WORKDIR /app
+COPY . .
+# Add only the required runtime packages and an unprivileged runtime command.
+CMD ["sh", "-c", "echo 'Configure the runtime for this project' && exit 1"]
+`;
+  return `# Node.js production image. Pin the base image and lockfile in CI.
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+USER node
+EXPOSE 3000
+# Update this command to match the app's actual production server.
+CMD ["node", "dist/server.js"]
+`;
 }
 function generateOpenApi(title: string): string {
   const safeTitle = title.trim() || "Example API";

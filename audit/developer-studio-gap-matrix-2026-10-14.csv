@@ -1,0 +1,23 @@
+ID,Requirement,Status,Evidence / limitation
+G01,"Studio-first navigation, 12 cards first",Done,12 Studios remain; source/catalog checks pass.
+G02,Smart detect and explicit clipboard detect,Partial,Native UI wired; full native test execution blocked.
+G03,Narrow/mobile Studio controls,Partial,Touch-sized chips implemented; device/browser rendering not audited.
+G04,Shareable mode/action deep links,Done (Web),Web query-state and 474 route mappings verified; native mode persists locally.
+G05,"Regex highlights, groups, engine label",Partial,Web and native previews implemented; native app builds unverified.
+G06,Regex flags and replacement preview,Partial,Controls and replacement routing exist; cross-engine semantics differ.
+G07,"Five hashes, file hash and digest compare",Partial,Code present; native full regression and all-algorithm validation unrun.
+G08,"JWT decode-only, claims, human times",Partial,Implementation present; native suite unrun.
+G09,Cron explanation and next runs,Partial,Web tests pass; full local/UTC parity across devices unverified.
+G10,JSON unsafe integer warnings,Partial,Web tests pass; native suite unrun.
+G11,HTTP 418/422/429/503 table,Partial,Web tests pass; native suite unrun.
+G12,Allow-listed deterministic recipe pipeline,Done,33 operations match and parity/security checks pass.
+G13,Privacy strip / payload stays local,Partial,Static guard passes; live request capture not performed.
+G14,Clipboard reads only by explicit action,Done,No background polling/listener was added in source.
+G15,Real JS/SQL/HTML/CSS/YAML/XML formatters,Partial,JS/SQL Web fixtures pass; formatter dependencies block some route smoke tests.
+G16,No generic filler descriptions,Done,Route audit found zero generic placeholders.
+G17,Map every legacy slug; zero removals,Done,"474 mappings, zero mapping failures."
+G18,Copy-ready DevOps generators and presets,Partial,Nine Dockerfile stacks added; real repo builds/pre-release validation required.
+G19,Separate TS/Kotlin/Swift engines,Partial,Catalog/recipe parity checks pass; full platform builds unavailable.
+G20,Shared goldens and regression tests,Partial,Fixtures sync; Web tests pass; native suites unrun.
+G21,Studio habit/retention,Partial,UX foundation exists; retention requires usability data.
+G22,Evidence-backed competitive claims,Partial,No unsupported superiority claim; same-fixture competitor benchmark remains.

@@ -8,11 +8,120 @@
   "mappedLegacyRoutes": 474,
   "studioRoutes": 12,
   "virtualStudioRoutes": 12,
-  "passed": 447,
-  "environmentBlockedChecks": 0,
+  "passed": 429,
+  "environmentBlockedChecks": 18,
   "intentionalDomainErrors": 1,
   "mappingFailures": [],
-  "environmentBlocked": [],
+  "environmentBlocked": [
+    {
+      "id": "css-beautifier",
+      "slug": "css-beautifier",
+      "op": "css-beautifier",
+      "error": "CSS parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "css-preview",
+      "slug": "css-preview",
+      "op": "css-preview",
+      "error": "CSS parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "graphql-beautifier",
+      "slug": "graphql-beautifier",
+      "op": "graphql-beautifier",
+      "error": "GRAPHQL parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "graphql-formatter",
+      "slug": "graphql-formatter",
+      "op": "graphql-formatter",
+      "error": "GRAPHQL parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "html-beautifier",
+      "slug": "html-beautifier",
+      "op": "html-beautifier",
+      "error": "HTML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "html-preview",
+      "slug": "html-preview",
+      "op": "html-preview",
+      "error": "HTML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "markdown-beautifier",
+      "slug": "markdown-beautifier",
+      "op": "markdown-beautifier",
+      "error": "MARKDOWN parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "markdown-converter",
+      "slug": "markdown-converter",
+      "op": "markdown-converter",
+      "error": "MARKDOWN parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "markdown-formatter",
+      "slug": "markdown-formatter",
+      "op": "markdown-formatter",
+      "error": "MARKDOWN parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "svg-beautifier",
+      "slug": "svg-beautifier",
+      "op": "svg-beautifier",
+      "error": "XML structural preflight/HTML printer could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "svg-formatter",
+      "slug": "svg-formatter",
+      "op": "svg-formatter",
+      "error": "XML structural preflight/HTML printer could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "svg-preview",
+      "slug": "svg-preview",
+      "op": "svg-preview",
+      "error": "XML structural preflight/HTML printer could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "xml-beautifier",
+      "slug": "xml-beautifier",
+      "op": "xml-beautifier",
+      "error": "XML structural preflight/HTML printer could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "xml-preview",
+      "slug": "xml-preview",
+      "op": "xml-preview",
+      "error": "XML structural preflight/HTML printer could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "yaml-beautifier",
+      "slug": "yaml-beautifier",
+      "op": "yaml-beautifier",
+      "error": "YAML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "yaml-converter",
+      "slug": "yaml-converter",
+      "op": "yaml-converter",
+      "error": "YAML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "yaml-explainer",
+      "slug": "yaml-explainer",
+      "op": "yaml-explainer",
+      "error": "YAML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    },
+    {
+      "id": "yaml-preview",
+      "slug": "yaml-preview",
+      "op": "yaml-preview",
+      "error": "YAML parser could not format the input: Cannot find module '/mnt/data/env_audit_work/enV/node_modules/prettier/standalone' imported from /mnt/data/env_audit_work/enV/src/lib/engines/precise-formatters.ts. The input was not uploaded or executed."
+    }
+  ],
   "failures": [],
   "suspiciousGenericFallbacks": [],
   "intentionalDomainErrorDetails": [

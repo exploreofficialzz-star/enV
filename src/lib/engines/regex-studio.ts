@@ -227,3 +227,92 @@ export async function runRegexStudio(pattern: string, rawSamples: string, flags:
   if (looksRisky(pattern)) result.performanceRisk ??= "Pattern resembles a high-backtracking-risk regex. This is a heuristic only; inspect it with adversarial near-miss inputs before production use.";
   return JSON.stringify(result, null, 2);
 }
+
+
+/** Live-highlight segments for a single sample string (regex101-style ranges). Bounded and local-only. */
+export type RegexHighlightSegment = {
+  start: number;
+  end: number;
+  text: string;
+  groupIndex: number | null;
+  groupName: string | null;
+};
+
+export type RegexHighlightResult = {
+  engine: "JavaScript RegExp";
+  flags: string;
+  matchCount: number;
+  truncated: boolean;
+  /** Non-overlapping primary match spans for overlay rendering */
+  matches: Array<{ start: number; end: number; text: string; groups: RegexHighlightSegment[] }>;
+  /** Flat character spans alternating outside/inside match for simple renderers */
+  segments: Array<{ text: string; isMatch: boolean; matchIndex: number | null }>;
+};
+
+const LIVE_MAX_INPUT = 32_768;
+const LIVE_MAX_MATCHES = 100;
+
+/**
+ * Synchronous, bounded live preview for Regex Studio UI.
+ * Uses the same flag normalization as the full studio; does not use a Worker.
+ * Callers must keep input size modest for keystroke-driven previews.
+ */
+export function buildRegexHighlightSegments(pattern: string, sample: string, flags = "g"): RegexHighlightResult {
+  if (pattern.length > MAX_PATTERN) throw new Error(`Pattern exceeds ${MAX_PATTERN} characters.`);
+  if (sample.length > LIVE_MAX_INPUT) throw new Error(`Live highlight supports up to ${LIVE_MAX_INPUT} characters; shorten the sample or run full Match mode.`);
+  const normalized = normalizeFlags(flags);
+  let re: RegExp;
+  try { re = new RegExp(pattern, normalized.includes("g") ? normalized : normalized + "g"); }
+  catch (error) { throw new Error(`Invalid JavaScript RegExp: ${error instanceof Error ? error.message : String(error)}`); }
+
+  const matches: RegexHighlightResult["matches"] = [];
+  let found: RegExpExecArray | null;
+  let truncated = false;
+  let guard = 0;
+  while ((found = re.exec(sample)) !== null) {
+    if (matches.length >= LIVE_MAX_MATCHES) { truncated = true; break; }
+    if (found[0].length === 0) {
+      // Avoid zero-length infinite loops
+      if (re.lastIndex === found.index) re.lastIndex++;
+      continue;
+    }
+    const groups: RegexHighlightSegment[] = [];
+    for (let i = 1; i < found.length; i++) {
+      const g = found[i];
+      if (g === undefined) continue;
+      // Approximate group span via indexOf from match start (best-effort for highlight UI)
+      const rel = found[0].indexOf(g);
+      const start = rel >= 0 ? found.index + rel : found.index;
+      groups.push({
+        start,
+        end: start + g.length,
+        text: g,
+        groupIndex: i,
+        groupName: found.groups ? (Object.entries(found.groups).find(([, v]) => v === g)?.[0] ?? null) : null,
+      });
+    }
+    matches.push({ start: found.index, end: found.index + found[0].length, text: found[0], groups });
+    guard++;
+    if (guard > LIVE_MAX_MATCHES + 5) break;
+  }
+
+  // Build flat segments for simple renderers (text outside/inside matches)
+  const segments: RegexHighlightResult["segments"] = [];
+  let cursor = 0;
+  matches.forEach((m, matchIndex) => {
+    if (m.start > cursor) segments.push({ text: sample.slice(cursor, m.start), isMatch: false, matchIndex: null });
+    segments.push({ text: sample.slice(m.start, m.end), isMatch: true, matchIndex });
+    cursor = m.end;
+  });
+  if (cursor < sample.length) segments.push({ text: sample.slice(cursor), isMatch: false, matchIndex: null });
+  if (segments.length === 0 && sample.length) segments.push({ text: sample, isMatch: false, matchIndex: null });
+
+  return {
+    engine: "JavaScript RegExp",
+    flags: normalized,
+    matchCount: matches.length,
+    truncated,
+    matches,
+    segments,
+  };
+}

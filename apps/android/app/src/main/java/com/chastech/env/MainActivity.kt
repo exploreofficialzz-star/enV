@@ -97,6 +97,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -1002,7 +1005,7 @@ private fun ToolDetail(
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
                     when {
                         backend -> NativeBackendToolForm(tool, true)
-                        supported -> NativeToolForm(tool)
+                        supported -> NativeToolForm(tool, onRelatedTool)
                         tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             StatusPill("Coming soon")
                             Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1092,7 +1095,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NativeToolForm(tool: ToolRecord) {
+private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "ai" -> NativeAiToolForm(tool)
@@ -1112,7 +1115,7 @@ private fun NativeToolForm(tool: ToolRecord) {
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
-        "developer" -> NativeDeveloperToolForm(tool)
+        "developer" -> NativeDeveloperToolForm(tool, onRelatedTool)
     "custom" -> when {
         NativeProductivityEngine.supports(tool.id) -> NativeProductivityToolForm(tool.id)
         NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)
@@ -1761,12 +1764,31 @@ internal object NativeDeveloperToolFormPolicy {
 }
 
 @Composable
-private fun NativeDeveloperToolForm(tool: ToolRecord) {
+private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val studio = remember(tool.id) { NativeDeveloperStudios.forToolId(tool.id) }
-    var studioModeKey by rememberSaveable(tool.id) { mutableStateOf(studio?.modes?.firstOrNull()?.key.orEmpty()) }
+    val modePreferences = remember { context.getSharedPreferences("env.developer-studio-modes", android.content.Context.MODE_PRIVATE) }
+    var studioModeKey by rememberSaveable(tool.id) {
+        mutableStateOf(studio?.let { spec -> modePreferences.getString(spec.id, null)?.takeIf { key -> spec.modes.any { it.key == key } } } ?: studio?.modes?.firstOrNull()?.key.orEmpty())
+    }
+    var detectedHint by remember(tool.id) { mutableStateOf<com.chastech.env.engine.DeveloperInputHint?>(null) }
+    var detectionMessage by remember(tool.id) { mutableStateOf("") }
+    fun hintFromSuggestion(raw: String?): com.chastech.env.engine.DeveloperInputHint? {
+        val suggested = com.chastech.env.engine.NativeDeveloperClipboardSuggest.suggest(raw) ?: return null
+        val value = JSONObject(suggested)
+        return com.chastech.env.engine.DeveloperInputHint(
+            kind = value.getString("kind"), confidence = value.getString("confidence"),
+            studioSlug = value.getString("studioSlug"), modeKey = value.getString("modeKey"), reason = value.getString("reason")
+        )
+    }
+    fun openDetectedStudio(hint: com.chastech.env.engine.DeveloperInputHint) {
+        val target = NativeDeveloperStudios.forToolId(hint.studioSlug) ?: return
+        if (target.modes.any { it.key == hint.modeKey }) modePreferences.edit().putString(target.id, hint.modeKey).apply()
+        onRelatedTool(target.id)
+    }
     var encodingDirection by rememberSaveable(tool.id) { mutableStateOf("encode") }
+    var devopsPreset by rememberSaveable(tool.id) { mutableStateOf("node") }
     val selectedStudioMode = studio?.modes?.firstOrNull { it.key == studioModeKey } ?: studio?.modes?.firstOrNull()
     val op = when {
         selectedStudioMode == null -> tool.engine.extras["op"] ?: tool.engine.id
@@ -1788,6 +1810,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
     var replacement by rememberSaveable(tool.id) { mutableStateOf("") }
     var regexMode by rememberSaveable(tool.id) { mutableStateOf(if (op.contains("explainer", true)) "flavors" else "test") }
     var sqlDialect by rememberSaveable(tool.id) { mutableStateOf("postgresql") }
+    val devopsPresetMode = studio?.id == "devops-studio" && studioModeKey in setOf("gitignore", "dockerfile")
     val regexStudio = op.contains("regex", true) && !op.contains("regex-generator", true)
     val sqlFormatter = op.contains("sql", true) && (op.contains("formatter", true) || op.contains("beautifier", true))
     var selectedFileName by rememberSaveable(tool.id) { mutableStateOf("") }
@@ -1834,13 +1857,55 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
             Text(studio.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 studio.modes.forEach { mode ->
-                    FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = { studioModeKey = mode.key; encodingDirection = "encode"; output = ""; error = "" }, label = { Text(mode.label) })
+                    FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = { studioModeKey = mode.key; modePreferences.edit().putString(studio.id, mode.key).apply(); encodingDirection = "encode"; output = ""; error = "" }, label = { Text(mode.label) })
                 }
             }
             if (selectedStudioMode?.decodeOp != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = encodingDirection == "encode", onClick = { encodingDirection = "encode"; output = ""; error = "" }, label = { Text("Encode") })
                     FilterChip(selected = encodingDirection == "decode", onClick = { encodingDirection = "decode"; output = ""; error = "" }, label = { Text("Decode") })
+                }
+            }
+        }
+        if (devopsPresetMode) {
+            Text("Stack preset", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("node" to "Node.js", "python" to "Python", "go" to "Go", "java" to "Java", "rust" to "Rust", "swift" to "Swift", "android" to "Android", "static" to "Static site", "generic" to "Generic").forEach { (value, label) ->
+                    FilterChip(selected = devopsPreset == value, onClick = { devopsPreset = value; output = ""; error = "" }, label = { Text(label) })
+                }
+            }
+            Text("Review generated paths, base images, build commands, and runtime assumptions before deployment.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = {
+                // Explicit user action only: no clipboard listener or background clipboard polling.
+                val clipboardText = runCatching {
+                    context.getSystemService(ClipboardManager::class.java)?.primaryClip?.let { clip ->
+                        if (clip.itemCount > 0) clip.getItemAt(0).coerceToText(context).toString() else null
+                    }
+                }.getOrNull()
+                if (clipboardText.isNullOrBlank()) {
+                    detectedHint = null
+                    detectionMessage = "Clipboard has no readable text."
+                } else {
+                    input = clipboardText
+                    detectedHint = hintFromSuggestion(clipboardText)
+                    detectionMessage = if (detectedHint == null) "No confident Developer Studio match found; text was placed in the input." else "Detected from clipboard. Nothing was uploaded."
+                }
+            }) { Text("Detect from clipboard") }
+            Text("Detects locally only when tapped.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (detectionMessage.isNotBlank()) Text(detectionMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (detectedHint != null) {
+            val hint = detectedHint!!
+            val target = NativeDeveloperStudios.forToolId(hint.studioSlug)
+            if (target != null) {
+                Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Suggested: ${target.name} · ${hint.modeKey}", style = MaterialTheme.typography.titleSmall)
+                        Text("${hint.reason} Confidence: ${hint.confidence}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick = { openDetectedStudio(hint) }) { Text("Open suggested Studio") }
+                    }
                 }
             }
         }
@@ -1851,7 +1916,8 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                     recipeSource = "  <p>Hello   <strong>enV</strong> 🚀</p>\r\n"
                     recipeSteps.clear(); recipeSteps.addAll(listOf("normalize-newlines", "replace-literal", "replace-literal", "collapse-whitespace", "trim"))
                     recipeFind = "<p>"; recipeReplacementText = ""; recipePointer = "/user/id"
-                } else { input = sample; secondary = sampleSecondary }
+                } else if (devopsPresetMode) { input = ""; secondary = "" }
+                else { input = sample; secondary = sampleSecondary }
                 flags = if (op.contains("regex", true)) "gi" else "g"; replacement = if (op.contains("replace", true)) "dog" else ""; regexMode = "test"; sqlDialect = "postgresql"; output = ""; error = ""
             }) { Text("Load example") }
             Text("Ctrl/⌘+Enter support is available on Web; native uses the action button.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1896,7 +1962,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
             if (recipeSteps.contains("json-pointer-get")) InputField(recipePointer, { recipePointer = it }, "RFC 6901 JSON Pointer", placeholder = "/items/0/id", minLines = 1)
             OutlinedButton(onClick = { runCatching { copy(recipeConfiguration()) }.onFailure { error = it.message ?: "Could not serialize recipe." } }) { Text("Copy recipe JSON") }
         } else {
-            InputField(input, { input = it }, if (regexStudio && regexMode == "pipeline") "Default pattern (unused by layers)" else if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
+            InputField(input, { value -> input = value; detectedHint = com.chastech.env.engine.NativeDeveloperSmartDetect.detect(value); detectionMessage = if (detectedHint == null) "" else "Detected a likely input type locally." }, if (devopsPresetMode) "Optional stack override (blank uses $devopsPreset)" else if (regexStudio && regexMode == "pipeline") "Default pattern (unused by layers)" else if (op.contains("regex", true)) "Regular expression" else "Input", placeholder = if (devopsPresetMode) "Leave blank to use the selected preset" else "Paste your code, data, token, URL, or text here…", minLines = 5, tall = true)
         }
         if (regexStudio) {
             Text("Regex Studio mode", style = MaterialTheme.typography.labelLarge)
@@ -1924,10 +1990,55 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
             Text("Conservative dialect-aware formatter; not a full SQL grammar validator.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (regexStudio || NativeDeveloperToolFormPolicy.needsRegexFlags(op)) {
-            InputField(flags, { flags = it }, "Regex flags (g/i/m/s/u; platform engine-specific)", minLines = 1, singleLine = true)
+            Text("Regex flags", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("g", "i", "m", "s", "u").forEach { flag ->
+                    FilterChip(selected = flag in flags, onClick = { flags = if (flag in flags) flags.filterNot { it == flag } else flags + flag }, label = { Text(flag) })
+                }
+            }
+            InputField(flags, { flags = it.filter { character -> character in "gimsu" }.toList().distinct().joinToString("") }, "Flags (editable; Java regex semantics)", minLines = 1, singleLine = true)
         }
         if ((regexStudio && regexMode in setOf("test", "benchmark")) || (!regexStudio && NativeDeveloperToolFormPolicy.needsReplacement(op))) {
             InputField(replacement, { replacement = it }, "Replacement preview (optional)", minLines = 1, singleLine = true)
+        }
+        val regexPreviewState = remember(input, secondary, flags, regexStudio, regexMode) {
+            if (regexStudio && regexMode == "test" && input.isNotEmpty() && secondary.isNotEmpty()) {
+                runCatching { JSONObject(NativeRegexHighlight.build(input, secondary, flags)) to null }
+                    .getOrElse { null to (it.message ?: "Live preview unavailable.") }
+            } else null to null
+        }
+        if (regexStudio && regexMode == "test" && secondary.isNotEmpty()) {
+            val preview = regexPreviewState.first
+            val previewError = regexPreviewState.second
+            Text("Live match preview", style = MaterialTheme.typography.labelLarge)
+            Text("Engine: java.util.regex · bounded sample; preview is not JavaScript RegExp", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (preview != null) {
+                val segments = preview.optJSONArray("segments")
+                val highlighted = buildAnnotatedString {
+                    if (segments != null) for (index in 0 until segments.length()) {
+                        val segment = segments.optJSONObject(index) ?: continue
+                        val segmentText = segment.optString("text")
+                        if (segment.optBoolean("isMatch")) withStyle(SpanStyle(background = MaterialTheme.colorScheme.primaryContainer, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)) { append(segmentText) }
+                        else append(segmentText)
+                    }
+                }
+                Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+                    Text(highlighted, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(10.dp))
+                }
+                val matches = preview.optJSONArray("matches")
+                val firstMatch = matches?.optJSONObject(0)
+                val groups = firstMatch?.optJSONArray("groups")
+                if (groups != null && groups.length() > 0) {
+                    Text("Capture groups", style = MaterialTheme.typography.labelLarge)
+                    for (groupIndex in 0 until minOf(groups.length(), 12)) {
+                        val group = groups.optJSONObject(groupIndex) ?: continue
+                        val name = group.optString("groupName").takeUnless { it == "null" || it == "" }?.let { " · $it" }.orEmpty()
+                        val captured = group.opt("text")?.takeUnless { it == JSONObject.NULL }?.toString() ?: "(unmatched)"
+                        Text("group ${group.optInt("groupIndex")}$name: $captured", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                Text("${preview.optInt("matchCount")} match(es)${if (preview.optBoolean("truncated")) " · preview capped at 100" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else Text(previewError ?: "Enter a pattern and sample text to see highlighted matches.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
@@ -1948,12 +2059,12 @@ private fun NativeDeveloperToolForm(tool: ToolRecord) {
                                 if (regexStudio) put("mode", regexMode)
                                 if (sqlFormatter) put("dialect", sqlDialect)
                             }.toString()
-                            withContext(Dispatchers.Default) { NativeUtilityEngine.run(activeTool, if (recipeRunner) recipeConfiguration() else input, options).text }
+                            withContext(Dispatchers.Default) { NativeUtilityEngine.run(activeTool, if (recipeRunner) recipeConfiguration() else if (devopsPresetMode && input.isBlank()) devopsPreset else input, options).text }
                         }
                     }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Could not process this input." })
                 }
             }) { Text(if (regexStudio) when (regexMode) { "test" -> "Run tests"; "benchmark" -> "Benchmark"; "pipeline" -> "Run pipeline"; "format" -> "Format regex"; else -> "Analyze flavors" } else NativeDeveloperToolFormPolicy.actionLabel(op)) }
-            OutlinedButton(onClick = { input = ""; secondary = ""; recipeSource = ""; recipeSteps.clear(); recipeFind = ""; recipeReplacementText = ""; recipePointer = "/"; flags = "g"; replacement = ""; regexMode = "test"; sqlDialect = "postgresql"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = "" }) { Text("Reset") }
+            OutlinedButton(onClick = { input = ""; secondary = ""; recipeSource = ""; recipeSteps.clear(); recipeFind = ""; recipeReplacementText = ""; recipePointer = "/"; flags = "g"; replacement = ""; regexMode = "test"; sqlDialect = "postgresql"; selectedFileName = ""; selectedFileUri = ""; output = ""; error = ""; detectedHint = null; detectionMessage = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp))

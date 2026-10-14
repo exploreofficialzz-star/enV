@@ -89,6 +89,21 @@ test("DevOps generators return useful copy-ready templates", async () => {
   assert.match((await runDeveloperStudio("developer-environment-variable-generator", "APP_ENV\nAPI_BASE_URL"))!, /API_BASE_URL=/);
 });
 
+test("DevOps Dockerfile stack presets are meaningfully distinct and honest about mobile artifacts", async () => {
+  const cases: Array<[string, RegExp]> = [
+    ["node", /FROM node:22-alpine/], ["python", /FROM python:3\.12-slim/],
+    ["go", /FROM golang:/], ["java", /FROM maven:/], ["rust", /FROM rust:/],
+    ["swift", /FROM swift:/], ["static", /FROM nginx:/],
+    ["android", /Android is a mobile package/], ["generic", /intentionally avoids guessing/],
+  ];
+  for (const [stack, expected] of cases) {
+    const result = await runDeveloperStudio("developer-dockerfile-generator", stack);
+    assert.match(result ?? "", expected, `stack preset ${stack} should select its own template`);
+  }
+  assert.match((await runDeveloperStudio("developer-gitignore-generator", "swift"))!, /DerivedData\//);
+  assert.match((await runDeveloperStudio("developer-gitignore-generator", "android"))!, /local\.properties/);
+});
+
 test("suffix operations perform domain work instead of echoing generic input stats", async () => {
   const left = await runDeveloperStudio("yaml-validator", "app:\n  name: enV");
   assert.match(left!, /YAML shape check passed/);

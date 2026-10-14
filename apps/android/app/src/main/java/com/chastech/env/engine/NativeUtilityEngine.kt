@@ -1072,6 +1072,20 @@ object NativeUtilityEngine {
         return when (result) { is JSONObject -> result.toString(2); is JSONArray -> result.toString(2); else -> result.toString() }
     }
 
+    private fun developerDockerfile(stackRaw: String): String {
+        return when (stackRaw.trim().lowercase(Locale.US)) {
+            "python", "flask", "django", "fastapi" -> "# Python ASGI template; adapt the module and command to your app.\nFROM python:3.12-slim\nENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\nWORKDIR /app\nCOPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nUSER 10001\nEXPOSE 8000\nCMD [\"uvicorn\",\"main:app\",\"--host\",\"0.0.0.0\",\"--port\",\"8000\"]\n"
+            "go", "golang" -> "# Multi-stage Go build; adjust module path/binary name if needed.\nFROM golang:1.23-alpine AS build\nWORKDIR /src\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app/app ./...\nFROM alpine:3.20\nRUN adduser -D -H appuser\nWORKDIR /app\nCOPY --from=build /app/app ./app\nUSER appuser\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+            "java", "kotlin" -> "# Maven/JVM template; adapt for Gradle-based projects.\nFROM maven:3.9-eclipse-temurin-21 AS build\nWORKDIR /workspace\nCOPY pom.xml ./\nRUN mvn -B -q dependency:go-offline\nCOPY src ./src\nRUN mvn -B -q package -DskipTests\nFROM eclipse-temurin:21-jre\nWORKDIR /app\nCOPY --from=build /workspace/target/*.jar /app/app.jar\nUSER 10001\nEXPOSE 8080\nENTRYPOINT [\"java\",\"-jar\",\"/app/app.jar\"]\n"
+            "rust" -> "# Rust release build; set the executable name to your Cargo package name.\nFROM rust:1.82-alpine AS build\nRUN apk add --no-cache musl-dev\nWORKDIR /src\nCOPY Cargo.toml Cargo.lock ./\nCOPY src ./src\nRUN cargo build --release\nFROM alpine:3.20\nRUN adduser -D -H appuser\nWORKDIR /app\nCOPY --from=build /src/target/release/app ./app\nUSER appuser\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+            "swift" -> "# Swift Package Manager template; executable target defaults to 'App'.\nFROM swift:6.2-jammy AS build\nWORKDIR /src\nCOPY Package.swift ./\nCOPY Sources ./Sources\nRUN swift build -c release\nFROM swift:6.2-jammy\nWORKDIR /app\nCOPY --from=build /src/.build/release/App ./app\nUSER 10001\nEXPOSE 8080\nENTRYPOINT [\"./app\"]\n"
+            "static", "html", "nginx" -> "FROM nginx:1.27-alpine\nCOPY ./dist/ /usr/share/nginx/html/\nEXPOSE 80\nHEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1\n"
+            "android" -> "# Android is a mobile package, not a long-running server container.\n# This image creates a CI build environment; publish the generated APK/AAB separately.\nFROM gradle:8.10.2-jdk17\nWORKDIR /workspace\nCOPY . .\nRUN chmod +x ./gradlew && ./gradlew --no-daemon assembleDebug\nCMD [\"sh\",\"-c\",\"find . -path '*/build/outputs/apk/*/*.apk' -o -path '*/build/outputs/bundle/*/*.aab'\"]\n"
+            "generic" -> "# Generic template intentionally avoids guessing a stack/runtime.\nFROM alpine:3.20\nWORKDIR /app\nCOPY . .\n# Add reviewed runtime dependencies and an unprivileged command for your project.\nCMD [\"sh\",\"-c\",\"echo 'Configure this image for your project' && exit 1\"]\n"
+            else -> "# Node.js production image; update the command to your real app entry point.\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\nFROM node:22-alpine AS runtime\nENV NODE_ENV=production\nWORKDIR /app\nCOPY --from=build /app/package*.json ./\nRUN npm ci --omit=dev && npm cache clean --force\nCOPY --from=build /app/dist ./dist\nUSER node\nEXPOSE 3000\nCMD [\"node\",\"dist/server.js\"]\n"
+        }
+    }
+
     private fun developerTemplate(op: String, input: String, secondary: String): String? {
         val lower = op.lowercase(Locale.US); val subject = input.trim().ifBlank { secondary.trim() }
         return when {
@@ -1079,16 +1093,20 @@ object NativeUtilityEngine {
                 val stack = subject.ifBlank { "node" }.lowercase(Locale.US)
                 val specific = when (stack) {
                     "python" -> "__pycache__/\n*.py[cod]\n.venv/\nvenv/\n.pytest_cache/\n.mypy_cache/\n"
-                    "android","kotlin","java" -> ".gradle/\nbuild/\nlocal.properties\n*.class\n"
+                    "android" -> ".gradle/\nbuild/\nlocal.properties\n*.iml\n.cxx/\n.externalNativeBuild/\n"
+                    "kotlin" -> ".gradle/\nbuild/\nlocal.properties\n*.class\n"
+                    "java" -> ".gradle/\nbuild/\nout/\n*.class\n"
                     "swift" -> ".build/\nDerivedData/\nxcuserdata/\n*.xcuserstate\n"
                     "go","golang" -> "/bin/\n/vendor/\n*.test\n"
                     "rust" -> "target/\n"
+                    "static","html","nginx" -> "dist/\nbuild/\n"
+                    "generic" -> "dist/\nbuild/\ncoverage/\n"
                     else -> "node_modules/\ndist/\nbuild/\ncoverage/\n*.tsbuildinfo\n"
                 }
                 "# OS/editor\n.DS_Store\nThumbs.db\n.vscode/\n.idea/\n\n# Secrets\n.env\n.env.*\n!.env.example\n*.pem\n*.key\n\n# Logs\n*.log\nlogs/\n\n# Stack: $stack\n$specific"
             }
             (lower.contains("docker-compose") && (lower.contains("generator") || lower.contains("builder"))) -> "services:\n  app:\n    build:\n      context: .\n      dockerfile: Dockerfile\n    restart: unless-stopped\n    ports:\n      - \"3000:3000\"\n    environment:\n      NODE_ENV: production\n    # Inject secrets through your deployment environment; do not commit them.\n"
-            (lower.contains("dockerfile") && (lower.contains("generator") || lower.contains("helper"))) || (lower.contains("docker") && lower.contains("generator")) -> if (subject.equals("python",true)) "FROM python:3.12-slim\nENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\nWORKDIR /app\nCOPY requirements.txt ./\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD [\"uvicorn\",\"main:app\",\"--host\",\"0.0.0.0\",\"--port\",\"8000\"]\n" else "FROM node:22-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\nFROM node:22-alpine AS runtime\nENV NODE_ENV=production\nWORKDIR /app\nCOPY --from=build /app/package*.json ./\nRUN npm ci --omit=dev\nCOPY --from=build /app/dist ./dist\nUSER node\nEXPOSE 3000\n# Adjust CMD to your real application entry point.\nCMD [\"node\",\"dist/server.js\"]\n"
+            (lower.contains("dockerfile") && (lower.contains("generator") || lower.contains("helper"))) || (lower.contains("docker") && lower.contains("generator")) -> developerDockerfile(subject)
             lower.contains("editorconfig") && lower.contains("generator") -> "root = true\n\n[*]\ncharset = utf-8\nend_of_line = lf\ninsert_final_newline = true\ntrim_trailing_whitespace = true\n\n[*.{js,jsx,ts,tsx,json,css,html,yml,yaml,md}]\nindent_style = space\nindent_size = 2\n\n[*.{kt,kts,java,swift,py,go,rs}]\nindent_style = space\nindent_size = 4\n\n[Makefile]\nindent_style = tab\n"
             (lower.contains("environment-variable") || lower.contains("env-var")) && lower.contains("generator") -> "# Example only; never put actual credentials here.\n" + (subject.lines().filter { it.isNotBlank() }.map { it.trim().replace(Regex("[^A-Za-z0-9_]"),"_").uppercase(Locale.US) }.filter { it.matches(Regex("[A-Z_][A-Z0-9_]*")) }.distinct().ifEmpty { listOf("APP_ENV","API_BASE_URL","LOG_LEVEL") }.joinToString("\n") { "$it=" }) + "\n"
             lower.contains("openapi") && lower.contains("generator") -> "openapi: 3.1.0\ninfo:\n  title: ${subject.ifBlank { "Example API" }}\n  version: 1.0.0\n  description: Example contract; review paths and schemas before publishing.\nservers:\n  - url: https://api.example.com\npaths:\n  /health:\n    get:\n      operationId: getHealth\n      responses:\n        '200':\n          description: Service is healthy\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  status:\n                    type: string\n                    const: ok\n"
