@@ -607,13 +607,84 @@ object NativeUtilityEngine {
      * issue reports on JSON editors describe large documents freezing while thousands of collapsed
      * nodes are built. This traversal counts the structure but never mutates or uploads the document.
      */
+    /** Rename repeated object keys only in the temporary parse view; raw input and duplicate paths remain untouched. */
+    private fun inspectorJsonWithUniqueKeys(source: String): String {
+        var index = 0
+        fun whitespace() { while (index < source.length && source[index] in charArrayOf(' ', '\t', '\r', '\n')) index++ }
+        fun stringToken(): Pair<String, String> {
+            val start = index
+            require(index < source.length && source[index] == '"') { "Expected a JSON string while inspecting the document." }
+            index++
+            while (index < source.length) {
+                val char = source[index++]
+                if (char == '\\') { require(index < source.length) { "Unterminated JSON escape during inspection." }; index++ }
+                else if (char == '"') break
+            }
+            require(index <= source.length && source[index - 1] == '"') { "Unterminated JSON string during inspection." }
+            val raw = source.substring(start, index)
+            val decoded = JSONTokener(raw).nextValue() as? String ?: throw IllegalArgumentException("Invalid JSON string during inspection.")
+            return decoded to raw
+        }
+        fun value(depth: Int): String {
+            require(depth <= 128) { "JSON nesting exceeds the safety depth of 128; inspect a smaller structure." }
+            whitespace()
+            require(index < source.length) { "Expected a JSON value during inspection." }
+            return when (source[index]) {
+                '{' -> {
+                    index++; whitespace(); val out = StringBuilder("{"); val used = mutableSetOf<String>(); val counts = mutableMapOf<String, Int>()
+                    if (index < source.length && source[index] == '}') { index++; return out.append('}').toString() }
+                    while (true) {
+                        whitespace(); val (key, rawKey) = stringToken(); val ordinal = (counts[key] ?: 0) + 1; counts[key] = ordinal
+                        var unique = key
+                        if (!used.add(unique)) {
+                            do { unique = "${key}__inspector_duplicate_$ordinal" } while (!used.add(unique))
+                        }
+                        out.append(if (unique == key) rawKey else JSONObject.quote(unique)); whitespace()
+                        require(index < source.length && source[index] == ':') { "Expected ':' after a JSON key during inspection." }
+                        index++; out.append(':').append(value(depth + 1)); whitespace()
+                        require(index < source.length) { "Unterminated JSON object during inspection." }
+                        when (source[index++]) {
+                            '}' -> return out.append('}').toString()
+                            ',' -> out.append(',')
+                            else -> throw IllegalArgumentException("Expected ',' or '}' during JSON inspection.")
+                        }
+                    }
+                    ""
+                }
+                '[' -> {
+                    index++; whitespace(); val out = StringBuilder("[")
+                    if (index < source.length && source[index] == ']') { index++; return out.append(']').toString() }
+                    while (true) {
+                        out.append(value(depth + 1)); whitespace(); require(index < source.length) { "Unterminated JSON array during inspection." }
+                        when (source[index++]) {
+                            ']' -> return out.append(']').toString()
+                            ',' -> out.append(',')
+                            else -> throw IllegalArgumentException("Expected ',' or ']' during JSON inspection.")
+                        }
+                    }
+                    ""
+                }
+                '"' -> stringToken().second
+                else -> {
+                    val start = index
+                    while (index < source.length && source[index] !in charArrayOf(',', '}', ']', ' ', '\t', '\r', '\n')) index++
+                    require(index > start) { "Invalid JSON value during inspection." }
+                    source.substring(start, index)
+                }
+            }
+        }
+        val normalized = value(0); whitespace()
+        require(index == source.length) { "Unexpected content after the JSON value during inspection." }
+        return normalized
+    }
+
     private fun developerJsonInspector(raw: String, maxNodes: Int = 100_000): String {
         require(raw.toByteArray(StandardCharsets.UTF_8).size <= 50 * 1024 * 1024) {
             "JSON input exceeds the 50 MiB inspection safety limit; inspect smaller sections."
         }
         // The caller also performs the dispatcher’s strict JSON parse; use JSONTokener here to
         // avoid coupling this reusable class-level helper to a local dispatcher function.
-        val root = org.json.JSONTokener(raw).nextValue()
+        val root = org.json.JSONTokener(inspectorJsonWithUniqueKeys(raw)).nextValue()
         fun typeOf(value: Any?): String = when (value) {
             is JSONObject -> "object"; is JSONArray -> "array"; JSONObject.NULL -> "null"
             is String -> "string"; is Number -> "number"; is Boolean -> "boolean"; else -> "unknown"
@@ -784,7 +855,7 @@ object NativeUtilityEngine {
             305 -> "Use Proxy is deprecated; do not rely on it as a routine redirect instruction."
             306 -> "Unused in the current general HTTP registry; do not assign private semantics to it on public endpoints."
             418 -> "I'm a teapot is the historical RFC 2324 joke meaning. The current IANA HTTP Status Code Registry marks 418 as unused for general HTTP semantics; treat the teapot label as historical/application-specific and consult the service documentation."
-            422 -> "The server understood the request content type and syntax but could not process the contained instructions. Action: validate field-level and domain constraints."
+            422 -> "The server understood the request content type and syntax, but the instructions could not be processed. Action: validate field-level and domain constraints."
             429 -> "Too many requests in a time window. Action: respect Retry-After and use bounded backoff to avoid retry storms."
             500 -> "The server hit an unexpected condition. Action: inspect server logs with a correlation ID; do not expose internals to end users."
             502 -> "A gateway received an invalid upstream response. Action: inspect upstream health and gateway logs."
