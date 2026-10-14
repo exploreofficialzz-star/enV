@@ -66,6 +66,8 @@ class NativeDeveloperStudioTest {
 
     @Test fun uuidInspectionSupportsNilAndWebhookOutputRemainsValidJson() {
         assertTrue(run("uuid-validator", "00000000-0000-0000-0000-000000000000").startsWith("Valid Nil UUID"))
+        assertEquals(List(16) { "00000000" }.joinToString(" "), run("uuid-encoder", "00000000-0000-0000-0000-000000000000"))
+        assertEquals("00000000-0000-0000-0000-000000000000", run("uuid-decoder", "0".repeat(128)))
         val payload = JSONObject(run("webhook-payload-generator", "order.paid"))
         assertEquals("order.paid", payload.getString("type"))
         assertTrue(payload.getJSONObject("meta").getBoolean("generatedLocally"))
@@ -163,7 +165,7 @@ class NativeDeveloperStudioTest {
         assertTrue(formatted.contains("WARNING: JavaScript Number cannot safely represent this integer"))
         assertTrue(formatted.contains("9007199254740993"))
         assertTrue(formatted.contains("9223372036854775807"))
-        assertTrue(formatted.contains(""memo": "9007199254740993""))
+        assertTrue(formatted.contains("\"memo\": \"9007199254740993\""))
         val minified = run("json-minifier", raw)
         assertTrue(minified.contains("9007199254740993"))
         assertTrue(minified.contains("9223372036854775807"))
@@ -182,7 +184,7 @@ class NativeDeveloperStudioTest {
     @Test fun corsAndCspGeneratorsValidateSecuritySensitiveConfiguration() {
         val config = """{"origins":["https://app.example.com","https://admin.example.com"],"methods":["GET","POST"],"headers":["Content-Type","Authorization"],"credentials":true,"maxAge":300}"""
         val cors = run("developer-cors-generator", config)
-        assertTrue(cors.contains("allowedOrigins = ["https://app.example.com","https://admin.example.com"]"))
+        assertTrue(cors.contains("""allowedOrigins = ["https://app.example.com","https://admin.example.com"]"""))
         assertTrue(cors.contains("not directly executable middleware"))
         val unsafeCors = """{"origins":["*"],"credentials":true}"""
         assertTrue(runCatching { run("developer-cors-generator", unsafeCors) }.exceptionOrNull()?.message.orEmpty().contains("forbids Access-Control-Allow-Origin: *"))

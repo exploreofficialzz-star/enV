@@ -63,6 +63,8 @@ final class NativeDeveloperStudioTests: XCTestCase {
 
     func testUuidInspectionSupportsNilAndWebhookOutputIsValidJson() throws {
         XCTAssertTrue(try run("uuid-validator", "00000000-0000-0000-0000-000000000000").hasPrefix("Valid Nil UUID"))
+        XCTAssertEqual(try run("uuid-encoder", "00000000-0000-0000-0000-000000000000"), Array(repeating: "00000000", count: 16).joined(separator: " "))
+        XCTAssertEqual(try run("uuid-decoder", String(repeating: "0", count: 128)), "00000000-0000-0000-0000-000000000000")
         let payload = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(try run("webhook-payload-generator", "order.paid").utf8)) as? [String: Any])
         XCTAssertEqual(payload["type"] as? String, "order.paid")
         XCTAssertEqual((payload["meta"] as? [String: Any])?["generatedLocally"] as? Bool, true)

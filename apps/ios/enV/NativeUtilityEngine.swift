@@ -895,12 +895,12 @@ enum NativeUtilityEngine {
         if lower.contains("uuid") && suffix=="encoder" {
             let compact=input.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:"-",with:"")
             guard compact.range(of:#"^[0-9a-fA-F]{32}$"#,options:.regularExpression) != nil else { throw NativeSimpleError.message("Enter a canonical UUID in 8-4-4-4-12 hexadecimal form.") }
-            return stride(from:0,to:32,by:2).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:2);String(repeating:"0",count:max(0,8-String(Int(compact[start..<end],radix:16)!,radix:2).count))+String(Int(compact[start..<end],radix:16)!,radix:2) }.joined(separator:" ")
+            return stride(from:0,to:32,by:2).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:2);return String(repeating:"0",count:max(0,8-String(Int(compact[start..<end],radix:16)!,radix:2).count))+String(Int(compact[start..<end],radix:16)!,radix:2) }.joined(separator:" ")
         }
         if lower.contains("uuid") && suffix=="decoder" {
             let compact=input.trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:#"[\s,:-]"#,with:"",options:.regularExpression)
             let hex:String
-            if compact.range(of:#"^[01]{128}$"#,options:.regularExpression) != nil { hex=stride(from:0,to:128,by:8).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:8);String(repeating:"0",count:max(0,2-String(Int(compact[start..<end],radix:2)!,radix:16).count))+String(Int(compact[start..<end],radix:2)!,radix:16) }.joined() }
+            if compact.range(of:#"^[01]{128}$"#,options:.regularExpression) != nil { hex=stride(from:0,to:128,by:8).map { index in let start=compact.index(compact.startIndex,offsetBy:index),end=compact.index(start,offsetBy:8);return String(repeating:"0",count:max(0,2-String(Int(compact[start..<end],radix:2)!,radix:16).count))+String(Int(compact[start..<end],radix:2)!,radix:16) }.joined() }
             else if compact.range(of:#"^[0-9a-fA-F]{32}$"#,options:.regularExpression) != nil {hex=compact.lowercased()}
             else {throw NativeSimpleError.message("Enter exactly 128 binary digits or 32 hexadecimal digits to decode a UUID.")}
             return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
