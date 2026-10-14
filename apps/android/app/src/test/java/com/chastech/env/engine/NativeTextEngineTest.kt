@@ -71,7 +71,8 @@ class NativeTextEngineTest {
         assertTrue(sql.contains("WHERE u.active = 1"))
         assertTrue(sql.contains("'group by or order by'"))
         assertTrue(!sql.contains("'\ngroup by"))
-        assertTrue(NativeTextEngine.run("javascript-formatter", "").contains("Paste JavaScript"))
+        val emptyJsMessage = runCatching { NativeTextEngine.run("javascript-formatter", "") }.exceptionOrNull()?.message.orEmpty()
+        assertTrue(emptyJsMessage.contains("Paste JavaScript"))
     }
 
     @Test fun sharedGoldenSqlDialectProtectsDollarQuotedLiterals() {

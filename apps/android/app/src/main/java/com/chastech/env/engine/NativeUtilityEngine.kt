@@ -1023,7 +1023,7 @@ object NativeUtilityEngine {
             lower.contains("openapi") && lower.contains("generator") -> "openapi: 3.1.0\ninfo:\n  title: ${subject.ifBlank { "Example API" }}\n  version: 1.0.0\n  description: Example contract; review paths and schemas before publishing.\nservers:\n  - url: https://api.example.com\npaths:\n  /health:\n    get:\n      operationId: getHealth\n      responses:\n        '200':\n          description: Service is healthy\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  status:\n                    type: string\n                    const: ok\n"
             lower.contains("readme") && lower.contains("generator") -> "# ${subject.ifBlank { "Project Name" }}\n\nDescribe what this project does and who it is for.\n\n## Features\n- Main capability\n- Key constraints and privacy model\n\n## Requirements\n- Supported runtime and tool versions\n\n## Getting started\n\n```sh\n# Replace with the project's documented install command\nnpm ci\nnpm run dev\n```\n\n## Configuration\nCopy .env.example to your local environment and provide the required values. Never commit secrets.\n\n## Tests\n```sh\nnpm test\n```\n\n## License\nDocument the license applied to this repository.\n"
             lower.contains("license") && lower.contains("generator") -> "MIT License\n\nCopyright (c) ${java.time.Year.now().value} ${subject.ifBlank { "[Copyright holder]" }}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY.\n\nReview the license and replace the placeholder before use.\n"
-            lower.contains("nginx") && lower.contains("generator") -> "server {\n    listen 80;\n    server_name example.com; # replace before deployment\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files \$uri \$uri/ /index.html; }\n    location = /health { access_log off; add_header Content-Type text/plain; return 200 \"ok\\n\"; }\n}\n"
+            lower.contains("nginx") && lower.contains("generator") -> "server {\n    listen 80;\n    server_name example.com; # replace before deployment\n    root /usr/share/nginx/html;\n    index index.html;\n    location / { try_files \$uri \$uri/ =404; }\n    location = /health { access_log off; add_header Content-Type text/plain; return 200 \"ok\\n\"; }\n}\n"
             lower.contains("cors") && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCorsGenerator(subject)
             (lower.contains("csp") || lower.contains("content-security-policy")) && (lower.contains("generator") || lower.contains("builder") || lower.contains("helper")) -> developerCspGenerator(subject)
             lower.contains("graphql-query-builder") -> "query GetExample(\$id: ID!) {\n  node(id: \$id) {\n    id\n    __typename\n  }\n}\n\n# Replace node and fields with operations supported by your schema.\n"
@@ -1058,6 +1058,14 @@ object NativeUtilityEngine {
         // replacement, builder and explainer route uses the full native Regex Studio modes.
         if (lower.contains("regex") && !lower.contains("generator")) {
             return NativeRegexStudio.run(input, secondary, flags, opts["replacement"] ?: "", opts["mode"] ?: "test")
+        }
+        if (lower == "http-status-reference") return httpStatuses.joinToString("\n") { "${it.first}: ${it.second}" + if (it.first == 418) " (IANA registry: unused; teapot meaning is historical)" else "" }
+        if (lower.startsWith("cron-")) return when (lower) {
+            "cron-encoder" -> { val expression = input.trim(); developerCron(expression); java.util.Base64.getEncoder().encodeToString(expression.toByteArray(StandardCharsets.UTF_8)) }
+            "cron-decoder" -> { val expression = decodeBase64Text(input).trim(); "$expression\n\n${developerCron(expression)}" }
+            "cron-parser", "cron-explainer" -> developerCron(input.trim())
+            "cron-generator" -> developerCron(input.trim().ifBlank { "*/5 * * * *" })
+            else -> developerCron(input.trim())
         }
         fun b64UrlDecode(value: String): String {
             return decodeBase64Text(value, urlSafe = true)
@@ -1501,7 +1509,17 @@ object NativeUtilityEngine {
                 val exp = (payload.opt("exp") as? Number)?.toDouble()
                 val expiresAt = exp?.let { java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.ofEpochMilli((it * 1000).toLong())) } ?: "none"
                 val expired: Any = exp?.let { System.currentTimeMillis() / 1000.0 >= it } ?: JSONObject.NULL
-                fun claimTime(key: String): Any { val raw = payload.opt(key); val seconds = (raw as? Number)?.toDouble() ?: return JSONObject.NULL; val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull() ?: return JSONObject.NULL; val status = when(key) { "exp" -> if(System.currentTimeMillis()/1000.0 >= seconds) "expired" else "valid"; "nbf" -> if(System.currentTimeMillis()/1000.0 < seconds) "not-yet-valid" else "active"; else -> "informational" }; return JSONObject().put("unixSeconds",seconds).put("iso",DateTimeFormatter.ISO_INSTANT.format(instant)).put("status",status) }
+                fun claimTime(key: String): Any {
+                    val seconds = (payload.opt(key) as? Number)?.toDouble() ?: return JSONObject.NULL
+                    val now = System.currentTimeMillis() / 1000.0
+                    if (!seconds.isFinite() || kotlin.math.abs(seconds) >= 253_402_300_800.0) {
+                        return JSONObject().put("unixSeconds", if (seconds.isFinite()) seconds else JSONObject.NULL).put("iso", JSONObject.NULL).put("status", "out-of-range")
+                    }
+                    val instant = runCatching { Instant.ofEpochMilli((seconds * 1000).toLong()) }.getOrNull()
+                        ?: return JSONObject().put("unixSeconds", seconds).put("iso", JSONObject.NULL).put("status", "out-of-range")
+                    val status = when(key) { "exp" -> if (now >= seconds) "expired" else "valid"; "nbf" -> if (now < seconds) "not-yet-valid" else "active"; "iat" -> if (seconds > now) "issued-in-the-future" else "informational"; else -> "informational" }
+                    return JSONObject().put("unixSeconds", seconds).put("iso", DateTimeFormatter.ISO_INSTANT.format(instant)).put("status", status)
+                }
                 val claims=JSONObject().put("exp",claimTime("exp")).put("iat",claimTime("iat")).put("nbf",claimTime("nbf")).put("sub",payload.opt("sub")).put("iss",payload.opt("iss")).put("aud",payload.opt("aud"))
                 val headerUnsafe = scanUnsafeJsonIntegerTokens(headerRaw)
                 val payloadUnsafe = scanUnsafeJsonIntegerTokens(payloadRaw)
@@ -1517,7 +1535,7 @@ object NativeUtilityEngine {
                 val count = (secondary.toDoubleOrNull() ?: 10.0).toInt().coerceIn(1, 1000)
                 List(count) { UUID.randomUUID().toString() }.joinToString("\n")
             }
-            lower.contains("uuid") && (lower.contains("validator") || lower.contains("tester")) -> developerUuidValidation(input)
+            lower.contains("uuid") && (lower.contains("validator") || lower.contains("tester")) -> developerUuidValidation(input).replace(Regex("^Valid UUID version (\\d+) \\(RFC variant\\)\\.$"), "Valid UUID v$1")
             lower.contains("uuid") && suffix in setOf("formatter", "beautifier", "minifier", "converter", "parser", "inspector", "preview", "explainer") -> {
                 val compact = input.trim().replace("-", "").lowercase(Locale.US)
                 when (suffix) {
@@ -1671,7 +1689,7 @@ object NativeUtilityEngine {
                 lower.contains("sql") && suffix == "minifier" -> minifyText(input)
                 lower.contains("css") && suffix in setOf("format", "formatter", "beautifier") -> formatCss(input)
                 lower.contains("css") && suffix == "minifier" -> minifyText(input)
-                lower.contains("markdown") && suffix == "preview" -> markdownToHtml(input)
+                (lower == "markdown-to-html" || lower.contains("markdown") && suffix == "preview") -> markdownToHtml(input)
                 lower.contains("markdown") && suffix in setOf("formatter", "beautifier") -> input.replace("\r\n", "\n").lines().joinToString("\n") { it.trimEnd() }.trim() + "\n"
                 lower.contains("markdown") && suffix == "generator" -> "# Project title\n\nDescribe the purpose of this project.\n"
                 suffix == "validator" || suffix == "tester" || suffix == "explainer" || suffix == "inspector" || suffix == "parser" || suffix == "preview" || suffix == "generator" || suffix == "converter" || suffix == "formatter" || suffix == "beautifier" || suffix == "minifier" || suffix == "diff" -> localSuffixFallback(base)

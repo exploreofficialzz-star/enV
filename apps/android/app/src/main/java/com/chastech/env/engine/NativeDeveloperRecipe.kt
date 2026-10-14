@@ -1,6 +1,5 @@
 package com.chastech.env.engine
 
-import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -223,8 +222,9 @@ internal object NativeDeveloperRecipe {
         if (trailing && lines.isNotEmpty()) lines.removeAt(lines.lastIndex)
         return action(lines).joinToString("\n") + if (trailing) "\n" else ""
     }
-    private fun encodeBase64(input: String, urlSafe: Boolean = false): String = Base64.encodeToString(utf8(input), (Base64.NO_WRAP or Base64.NO_PADDING) + if (urlSafe) Base64.URL_SAFE else 0).let { raw ->
-        if (urlSafe) raw.replace('+', '-').replace('/', '_') else raw + "=".repeat((4 - raw.length % 4) % 4)
+    private fun encodeBase64(input: String, urlSafe: Boolean = false): String {
+        val encoder = if (urlSafe) java.util.Base64.getUrlEncoder() else java.util.Base64.getEncoder()
+        return if (urlSafe) encoder.withoutPadding().encodeToString(utf8(input)) else encoder.encodeToString(utf8(input))
     }
     private fun decodeBase64(input: String, urlSafe: Boolean = false): String {
         val source = input.trim()
@@ -233,8 +233,10 @@ internal object NativeDeveloperRecipe {
         val unpadded = source.trimEnd('=')
         val normalized = if (urlSafe) unpadded.replace('-', '+').replace('_', '/') else unpadded
         val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
-        val bytes = try { Base64.decode(padded, Base64.NO_WRAP) } catch (_: Exception) { throw IllegalArgumentException("Base64 input could not be decoded.") }
-        val canonical = Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.NO_PADDING)
+        val decoder = if (urlSafe) java.util.Base64.getUrlDecoder() else java.util.Base64.getDecoder()
+        val bytes = try { decoder.decode(padded) } catch (_: Exception) { throw IllegalArgumentException("Base64 input could not be decoded.") }
+        val encoder = if (urlSafe) java.util.Base64.getUrlEncoder() else java.util.Base64.getEncoder()
+        val canonical = encoder.withoutPadding().encodeToString(bytes)
         val canonicalStandard = if (urlSafe) canonical.replace('+', '-').replace('/', '_') else canonical
         require(canonicalStandard == unpadded) { "Base64 padding bits are not canonical; re-encode the value at its source." }
         return decodeUtf8(bytes)
@@ -485,7 +487,7 @@ internal object NativeDeveloperRecipe {
                     }
                     "url-encode-component" -> encodeUrl(current)
                     "url-decode-component" -> decodeUrl(current)
-                    "base64-encode" -> Base64.encodeToString(utf8(current), Base64.NO_WRAP)
+                    "base64-encode" -> java.util.Base64.getEncoder().encodeToString(utf8(current))
                     "base64-decode" -> decodeBase64(current)
                     "base64url-encode" -> encodeBase64(current, true)
                     "base64url-decode" -> decodeBase64(current, true)
