@@ -3002,6 +3002,61 @@ private struct NativeEventTextDocument: FileDocument {
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: Data(text.utf8)) }
 }
 
+/// Text-first native PDF export with page breaks and local-only rendering.
+private struct NativeBusinessPDFDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.pdf] }
+    let data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private enum NativeBusinessPDFRenderer {
+    static func render(_ text: String, title: String) -> Data {
+        let page = CGRect(x: 0, y: 0, width: 595, height: 842)
+        let renderer = UIGraphicsPDFRenderer(bounds: page)
+        return renderer.pdfData { context in
+            let body = UIFont.systemFont(ofSize: 10.5)
+            let heading = UIFont.systemFont(ofSize: 18, weight: .semibold)
+            let bodyColor = UIColor(red: 0.14, green: 0.18, blue: 0.21, alpha: 1)
+            let headingColor = UIColor(red: 0.08, green: 0.37, blue: 0.36, alpha: 1)
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byWordWrapping
+            let bodyAttrs: [NSAttributedString.Key: Any] = [.font: body, .foregroundColor: bodyColor, .paragraphStyle: paragraph]
+            let titleAttrs: [NSAttributedString.Key: Any] = [.font: heading, .foregroundColor: headingColor]
+            let margin: CGFloat = 48
+            let contentWidth = page.width - margin * 2
+            var y: CGFloat = 54
+            var pageNumber = 0
+            func startPage() {
+                pageNumber += 1
+                context.beginPage()
+                (title as NSString).draw(in: CGRect(x: margin, y: 34, width: contentWidth, height: 26), withAttributes: titleAttrs)
+                context.cgContext.setStrokeColor(UIColor.lightGray.cgColor)
+                context.cgContext.setLineWidth(0.6)
+                context.cgContext.move(to: CGPoint(x: margin, y: 72))
+                context.cgContext.addLine(to: CGPoint(x: page.width - margin, y: 72))
+                context.cgContext.strokePath()
+                y = 88
+            }
+            func footer() {
+                let footer = "Generated locally by enV · Page \(pageNumber)" as NSString
+                footer.draw(at: CGPoint(x: margin, y: page.height - 32), withAttributes: [.font: UIFont.systemFont(ofSize: 8), .foregroundColor: UIColor.gray])
+            }
+            startPage()
+            for line in text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
+                let value = line.isEmpty ? " " : line
+                let bounds = (value as NSString).boundingRect(with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: bodyAttrs, context: nil)
+                let height = max(12, ceil(bounds.height))
+                if y + height > page.height - 56 { footer(); startPage() }
+                (value as NSString).draw(in: CGRect(x: margin, y: y, width: contentWidth, height: height + 2), withAttributes: bodyAttrs)
+                y += height + (line.isEmpty ? 4 : 3)
+            }
+            footer()
+        }
+    }
+}
+
 private struct NativeEventToolView: View {
     let tool: Tool
     @State private var values: [String: String]
@@ -3060,28 +3115,101 @@ private struct NativeBusinessToolView: View {
     @State private var a = "1000"
     @State private var b = "600"
     @State private var c = "50"
-    @State private var d = "10"
+    @State private var d = "0"
     @State private var e = "12"
+    @State private var monthlyContribution = "0"
+    @State private var targetProfit = "0"
+    @State private var lineItems = "Professional service | 1 | 100"
+    @State private var businessName = "Your Business"
+    @State private var clientName = "Client"
+    @State private var documentNumber = "DOC-001"
+    @State private var documentDate = Date().formatted(date: .numeric, time: .omitted)
+    @State private var currency = "USD"
+    @State private var taxPercent = "0"
+    @State private var discountPercent = "0"
     @State private var seed = "technology"
     @State private var audience = "customers"
+    @State private var meetingTitle = "Weekly planning"
+    @State private var meetingDateTime = ""
+    @State private var meetingLocation = ""
+    @State private var meetingGoal = "Weekly planning"
+    @State private var attendees = "Team"
+    @State private var prepNotes = ""
+    @State private var discussionNotes = ""
+    @State private var decisions = ""
+    @State private var actionItems = ""
+    @State private var nextMeeting = ""
+    @State private var payPeriod = ""
     @State private var output = ""
     @State private var error: String?
-    private var options: [String:String] { ["a":a,"b":b,"c":c,"d":d,"e":e,"seed":seed,"audience":audience] }
+    @State private var exporting = false
+    @State private var exportingPDF = false
+    @State private var pdfData = Data()
+    private var options: [String:String] { ["a":a,"b":b,"c":c,"d":d,"e":e,"monthlyContribution":monthlyContribution,"targetProfit":targetProfit,"lineItems":lineItems,"company":businessName,"client":clientName,"documentNumber":documentNumber,"date":documentDate,"currency":currency,"taxPercent":taxPercent,"discountPercent":discountPercent,"seed":seed,"audience":audience,"meetingTitle":meetingTitle,"dateTime":meetingDateTime,"location":meetingLocation,"meetingGoal":meetingGoal,"attendees":attendees,"prepNotes":prepNotes,"discussionNotes":discussionNotes,"decisions":decisions,"actionItems":actionItems,"nextMeeting":nextMeeting,"employeeName":clientName,"payPeriod":payPeriod,"gross":a,"statutoryDeductions":b,"otherDeductions":c] }
+    private var op: String { tool.engine.op ?? tool.engine.id ?? tool.id }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             enVCharacterSpacedText("Native business engine · \(tool.engine.op ?? tool.engine.id ?? tool.id)").font(.subheadline.weight(.semibold))
-            NativeInputField(title: "Revenue / amount", text: $a)
-            NativeInputField(title: "Cost / rate / second value", text: $b)
-            NativeInputField(title: "Variable cost / third value", text: $c)
-            NativeInputField(title: "Fourth value", text: $d)
-            NativeInputField(title: "Fifth value", text: $e)
-            NativeInputField(title: "Seed / topic", text: $seed)
+            NativeInputField(title: op == "break-even" ? "Selling price per unit" : op == "customer-acquisition-cost" ? "Customer acquisition spend" : op == "customer-lifetime-value" ? "Average order value" : op == "commission" ? "Sales amount" : op == "cash-flow" ? "Cash inflows" : op == "roi" ? "Total value received (before subtracting investment)" : op == "payslip" ? "Gross pay" : "Primary amount / revenue", text: $a)
+            NativeInputField(title: op == "break-even" ? "Fixed costs" : op == "customer-acquisition-cost" ? "New customers acquired" : op == "customer-lifetime-value" ? "Purchases per customer / period" : op == "commission" ? "Commission rate (%)" : op == "cash-flow" ? "Cash outflows" : op == "roi" ? "Initial investment" : op == "payslip" ? "Tax / statutory deductions" : "Cost / rate / second value", text: $b)
+            NativeInputField(title: op == "break-even" ? "Variable cost per unit" : op == "customer-lifetime-value" ? "Customer lifespan (periods)" : op == "cash-flow" ? "Opening cash balance" : op == "payslip" ? "Other deductions" : "Third value / variable cost", text: $c)
+            if op == "customer-acquisition-cost" || op == "customer-lifetime-value" {
+                NativeInputField(title: op == "customer-acquisition-cost" ? "Customer lifetime value (optional)" : "Customer acquisition cost (optional)", text: $d)
+                NativeInputField(title: "Monthly contribution per customer (optional)", text: $monthlyContribution)
+            } else { NativeInputField(title: "Fourth value (optional)", text: $d) }
+            if op == "break-even" { NativeInputField(title: "Target profit (optional)", text: $targetProfit) }
+            if ["invoice", "receipt", "quotation", "estimate", "purchase-order"].contains(op) {
+                NativeInputField(title: "Business name", text: $businessName)
+                NativeInputField(title: "Client / recipient", text: $clientName)
+                NativeInputField(title: "Document number", text: $documentNumber)
+                NativeInputField(title: "Document date", text: $documentDate)
+                NativeInputField(title: "Currency code (e.g. USD, NGN, EUR)", text: $currency)
+                NativeInputField(title: "Tax rate (%)", text: $taxPercent)
+                NativeInputField(title: "Discount rate (%)", text: $discountPercent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Line items (one per line: description | quantity | unit price)").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $lineItems).frame(minHeight: 100).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envTeal.opacity(0.3)))
+                }
+            }
+            if ["agenda", "meeting-agenda", "minutes", "meeting-minutes"].contains(op) {
+                NativeInputField(title: "Meeting title", text: $meetingTitle)
+                NativeInputField(title: "Date and time", text: $meetingDateTime)
+                NativeInputField(title: "Location or meeting link", text: $meetingLocation)
+                NativeInputField(title: "Meeting goal", text: $meetingGoal)
+                NativeInputField(title: "Attendees", text: $attendees)
+                if ["agenda", "meeting-agenda"].contains(op) {
+                    VStack(alignment: .leading, spacing: 4) { Text("Preparation notes").font(.caption).foregroundStyle(.secondary); TextEditor(text: $prepNotes).frame(minHeight: 72).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envTeal.opacity(0.3))) }
+                }
+                if ["minutes", "meeting-minutes"].contains(op) {
+                    VStack(alignment: .leading, spacing: 4) { Text("Discussion notes").font(.caption).foregroundStyle(.secondary); TextEditor(text: $discussionNotes).frame(minHeight: 90).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envTeal.opacity(0.3))) }
+                    VStack(alignment: .leading, spacing: 4) { Text("Decisions").font(.caption).foregroundStyle(.secondary); TextEditor(text: $decisions).frame(minHeight: 72).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envTeal.opacity(0.3))) }
+                    VStack(alignment: .leading, spacing: 4) { Text("Action items (owner | task | due date)").font(.caption).foregroundStyle(.secondary); TextEditor(text: $actionItems).frame(minHeight: 90).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envTeal.opacity(0.3))) }
+                    NativeInputField(title: "Next meeting", text: $nextMeeting)
+                }
+            }
+            if op == "payslip" {
+                NativeInputField(title: "Employer / business name", text: $businessName)
+                NativeInputField(title: "Employee name", text: $clientName)
+                NativeInputField(title: "Pay period", text: $payPeriod)
+            }
+            if op != "customer-acquisition-cost" && op != "customer-lifetime-value" { NativeInputField(title: "Fifth value (optional)", text: $e) }
+            if !["agenda", "meeting-agenda", "minutes", "meeting-minutes"].contains(op) { NativeInputField(title: "Seed / topic", text: $seed) }
             NativeInputField(title: "Audience", text: $audience)
             NativeActionRow(output: output, run: {
                 do { output = try NativeBusinessEngine.run(tool, options: options); error = nil }
                 catch let caught { output = ""; error = caught.localizedDescription }
-            }, reset: { a="1000"; b="600"; c="50"; d="10"; e="12"; seed="technology"; audience="customers"; output=""; error=nil })
+            }, reset: { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItems="Professional service | 1 | 100"; businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=Date().formatted(date: .numeric, time: .omitted); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error=nil })
             NativeOutputView(output: output, error: error)
+            if !output.isEmpty {
+                Button("Download PDF") { pdfData = NativeBusinessPDFRenderer.render(output, title: tool.name); exportingPDF = true }.buttonStyle(.borderedProminent)
+                Button("Download output (.txt)") { exporting = true }.buttonStyle(.bordered)
+            }
+        }
+        .fileExporter(isPresented: $exporting, document: NativeEventTextDocument(text: output), contentType: .plainText, defaultFilename: "env-\(tool.id).txt") { result in
+            if case .failure(let failure) = result { error = failure.localizedDescription }
+        }
+        .fileExporter(isPresented: $exportingPDF, document: NativeBusinessPDFDocument(data: pdfData), contentType: .pdf, defaultFilename: "env-\(tool.id).pdf") { result in
+            if case .failure(let failure) = result { error = failure.localizedDescription }
         }
     }
 }

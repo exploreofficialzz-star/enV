@@ -9,21 +9,30 @@ import mathExpansion from "../../data/math-expansion.json" with { type: "json" }
 import { describeExpansion } from "../calc/expansion-rows.mjs";
 
 /**
- * Invariants over the WHOLE calculator category (every catalog tool, not a sample). They execute
- * the real registry, so they catch what text-scanning checks cannot: a catalog entry whose engine
- * key has no implementation, a solver that reads a value the form never asks for, output that
- * shows NaN or "Undefined", and a blank field that is silently read as 0.
+ * Invariants over the formula-engine entries in the WHOLE calculator category. They execute the
+ * real registry, so they catch what text-scanning checks cannot: a catalog entry whose engine key
+ * has no implementation, a solver that reads a value the form never asks for, output that shows
+ * NaN or "Undefined", and a blank field that is silently read as 0. The legacy break-even URL is
+ * intentionally categorized under calculators but dispatched through the Business engine.
  */
-const catalog = tools.filter((tool) => tool.category === "calculators");
+const categoryTools = tools.filter((tool) => tool.category === "calculators");
+const catalog = categoryTools.filter((tool) => tool.engine.type === "calculator");
 
 function definitionOf(tool: (typeof catalog)[number]): CalculatorDef | undefined {
   return tool.engine.type === "calculator" ? calculators[tool.engine.formula] : undefined;
 }
 
 test("the category is large and every tool id and slug is unique", () => {
-  assert.ok(catalog.length >= 6500, `only ${catalog.length} calculators`);
-  assert.equal(new Set(catalog.map((tool) => tool.id)).size, catalog.length, "duplicate ids");
-  assert.equal(new Set(catalog.map((tool) => tool.slug)).size, catalog.length, "duplicate slugs");
+  assert.ok(categoryTools.length >= 6500, `only ${categoryTools.length} calculators`);
+  assert.equal(new Set(categoryTools.map((tool) => tool.id)).size, categoryTools.length, "duplicate ids");
+  assert.equal(new Set(categoryTools.map((tool) => tool.slug)).size, categoryTools.length, "duplicate slugs");
+});
+
+test("legacy break-even route uses the business engine without changing its category", () => {
+  const tool = categoryTools.find((entry) => entry.id === "break-even-calculator");
+  assert.ok(tool, "legacy break-even route remains in the calculator category");
+  assert.equal(tool.engine.type, "business");
+  if (tool.engine.type === "business") assert.equal(tool.engine.op, "break-even");
 });
 
 test("every catalog calculator is backed by a definition with fields and compute", () => {

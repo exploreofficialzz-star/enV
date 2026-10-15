@@ -33,6 +33,16 @@ function Category() {
           <p className="mt-8 rounded-xl bg-surface p-6 text-sm text-muted shadow-[var(--shadow-border)]">No tools in this category yet.</p>
         ) : (
           <>
+            {category === "business" ? <div className="mt-7">
+              <div className="mb-3"><h2 className="text-xl font-semibold">Business Studios</h2><p className="mt-1 text-sm text-muted">Private, focused workspaces for documents, unit economics, naming, and everyday operations. Existing tool URLs remain available below.</p></div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <a className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2" href="/tools/business/invoice-generator"><h3 className="font-semibold">Document Studio</h3><p className="mt-1 text-sm text-muted">Invoices, receipts, quotations and estimates.</p></a>
+                <a className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2" href="/tools/business/break-even-estimator"><h3 className="font-semibold">Finance Metrics Studio</h3><p className="mt-1 text-sm text-muted">Break-even, cash flow, CAC, LTV and commission.</p></a>
+                <a className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2" href="/tools/business/business-name-generator"><h3 className="font-semibold">Naming Studio</h3><p className="mt-1 text-sm text-muted">Local ideas for names, slogans and SKUs.</p></a>
+                <a className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2" href="/tools/business/meeting-agenda-generator"><h3 className="font-semibold">Ops Studio</h3><p className="mt-1 text-sm text-muted">Agendas, minutes, signatures and payslip demos.</p></a>
+              </div>
+              <div className="mb-3 mt-8"><h2 className="text-xl font-semibold">All business tools</h2><p className="mt-1 text-sm text-muted">Legacy slugs are preserved for direct links and bookmarks.</p></div>
+            </div> : null}
             {category === "developer" ? <div className="mt-7">
               <div className="mb-3"><h2 className="text-xl font-semibold">Developer Studios</h2><p className="mt-1 text-sm text-muted">Grouped workspaces for common developer jobs. Processing is local-first, and every legacy tool route remains available below.</p></div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{developerStudios.map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>

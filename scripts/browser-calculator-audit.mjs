@@ -156,7 +156,11 @@ function visibleRows(form) {
 }
 
 const allTools = parseGeneratedCatalog(readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
-const activeTools = allTools.filter((tool) => tool.category === category && tool.status === "active");
+const activeCategoryTools = allTools.filter((tool) => tool.category === category && tool.status === "active");
+const activeTools = activeCategoryTools.filter((tool) => tool.engine?.type === "calculator");
+const nonCalculatorTools = activeCategoryTools.filter((tool) => tool.engine?.type !== "calculator");
+const isAllowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine?.type === "business" && tool.engine?.op === "break-even";
+const unexpectedNonCalculatorTools = nonCalculatorTools.filter((tool) => !isAllowedBusinessRoute(tool));
 const requestedTools = activeTools.filter((tool) => !onlyIds || onlyIds.includes(tool.id));
 const mustAuditInBrowser = new Set(["science-gas-law-calculator", "science-molar-mass-calculator", "finance-irr-calculator"]);
 let browserTools = requestedTools;
@@ -168,7 +172,12 @@ if (!onlyIds && Number.isFinite(sampleSize) && sampleSize < requestedTools.lengt
 }
 const tools = browserTools.slice(0, Number.isFinite(limit) ? limit : undefined);
 if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
+if (category === "calculators" && unexpectedNonCalculatorTools.length) {
+  throw new Error(`Unexpected non-calculator engines in the calculator category: ${unexpectedNonCalculatorTools.map((tool) => tool.id).join(", ")}`);
+}
 if (onlyIds) {
+  const crossEngineIds = onlyIds.filter((id) => activeCategoryTools.some((tool) => tool.id === id && tool.engine?.type !== "calculator"));
+  if (crossEngineIds.length) throw new Error(`These active routes use a non-calculator engine and are not part of this audit: ${crossEngineIds.join(", ")}`);
   const found = new Set(tools.map((tool) => tool.id));
   const missing = onlyIds.filter((id) => !found.has(id));
   if (missing.length) throw new Error(`Unknown active tool IDs for category "${category}": ${missing.join(", ")}`);
@@ -210,7 +219,7 @@ try {
       }
     }
   }
-  console.log(`Formula preflight: ${formulaCases} sample cases across ${activeTools.length} active routes; failures ${formulaFailures.length}.`);
+  console.log(`Formula preflight: ${formulaCases} sample cases across ${activeTools.length} calculator-engine routes; excluded ${nonCalculatorTools.length} non-calculator category routes; failures ${formulaFailures.length}.`);
   browser = await chromium.launch({
     headless: true,
     executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
@@ -395,7 +404,9 @@ try {
     baseUrl: base.origin,
     category,
     viewport: { width: viewportWidth, height: 844 },
-    totalActive: activeTools.length,
+    totalActive: activeCategoryTools.length,
+    calculatorEngineTools: activeTools.length,
+    nonCalculatorRoutesExcluded: nonCalculatorTools.map((tool) => tool.id),
     browserRoutesSelected: tools.length,
     formulaCases,
     formulaFailures,

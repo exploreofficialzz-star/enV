@@ -23,8 +23,11 @@ const { tools } = await import("../src/data/catalog.ts");
 
 const { BAD_VALUE, blankAllowed, computeExample } = await import("../src/lib/calc/audit-support.mjs");
 
-const catalog = tools.filter((tool) => tool.category === "calculators");
-const report = { total: catalog.length, unresolved: [], neverComputes: [], badValues: [], noPrimary: [], blankAccepted: [], results: {} };
+const categoryTools = tools.filter((tool) => tool.category === "calculators");
+const catalog = categoryTools.filter((tool) => tool.engine.type === "calculator");
+const isAllowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine.type === "business" && tool.engine.op === "break-even";
+const unsupportedRoutes = categoryTools.filter((tool) => tool.engine.type !== "calculator" && !isAllowedBusinessRoute(tool));
+const report = { total: categoryTools.length, calculatorEngines: catalog.length, intentionalBusinessRoutes: categoryTools.filter(isAllowedBusinessRoute).map((tool) => tool.id), unsupportedRoutes: unsupportedRoutes.map((tool) => tool.id), unresolved: [], neverComputes: [], badValues: [], noPrimary: [], blankAccepted: [], results: {} };
 
 for (const tool of catalog) {
   const formula = tool.engine.type === "calculator" ? tool.engine.formula : undefined;
@@ -68,7 +71,9 @@ if (option("--compare")) {
 }
 
 const show = (label, list) => console.log(`${label}: ${list.length}${flag("--verbose") && list.length ? "\n  " + list.slice(0, 25).map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join("\n  ") : ""}`);
-console.log(`Calculator registry audit: ${report.total} catalog calculators, ${Object.keys(calculators).length} registry definitions`);
+console.log(`Calculator registry audit: ${report.calculatorEngines} formula-engine tools across ${report.total} category entries, ${Object.keys(calculators).length} registry definitions`);
+show("Intentional business-engine routes", report.intentionalBusinessRoutes);
+show("Unsupported non-calculator category routes", report.unsupportedRoutes);
 show("Unresolved (no definition)", report.unresolved);
 show("Never computes on any example input", report.neverComputes);
 show("Results with NaN/Infinity/Undefined/blank label", report.badValues);
@@ -77,5 +82,5 @@ show("Blank required field accepted as a value", report.blankAccepted);
 if (option("--compare")) show("Outputs changed vs snapshot", changed);
 if (option("--json")) writeFileSync(option("--json"), JSON.stringify({ ...report, results: undefined, changed }, null, 1));
 
-const failed = report.unresolved.length || report.neverComputes.length || report.badValues.length || report.noPrimary.length || report.blankAccepted.length;
+const failed = report.unsupportedRoutes.length || report.unresolved.length || report.neverComputes.length || report.badValues.length || report.noPrimary.length || report.blankAccepted.length;
 process.exit(failed && flag("--strict") ? 1 : 0);

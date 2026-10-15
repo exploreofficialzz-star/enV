@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "6e40a2b5d21f",
+  "catalogVersion": "3b282a833efa",
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
@@ -35,21 +35,21 @@
     },
     {
       "family": "business",
-      "total": 104,
-      "active": 104,
+      "total": 105,
+      "active": 105,
       "planned": 0,
-      "androidImplemented": 104,
-      "iosImplemented": 104,
+      "androidImplemented": 105,
+      "iosImplemented": 105,
       "uniqueConfigurations": 29
     },
     {
       "family": "calculator",
-      "total": 6539,
-      "active": 6539,
+      "total": 6538,
+      "active": 6538,
       "planned": 0,
-      "androidImplemented": 6539,
-      "iosImplemented": 6539,
-      "uniqueConfigurations": 6537
+      "androidImplemented": 6538,
+      "iosImplemented": 6538,
+      "uniqueConfigurations": 6536
     },
     {
       "family": "codec",

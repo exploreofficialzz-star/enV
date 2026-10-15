@@ -2257,26 +2257,100 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
     var a by rememberSaveable(tool.id) { mutableStateOf("1000") }
     var b by rememberSaveable(tool.id) { mutableStateOf("600") }
     var c by rememberSaveable(tool.id) { mutableStateOf("50") }
-    var d by rememberSaveable(tool.id) { mutableStateOf("10") }
+    var d by rememberSaveable(tool.id) { mutableStateOf("0") }
     var e by rememberSaveable(tool.id) { mutableStateOf("12") }
+    var monthlyContribution by rememberSaveable(tool.id) { mutableStateOf("0") }
+    var targetProfit by rememberSaveable(tool.id) { mutableStateOf("0") }
+    var lineItems by rememberSaveable(tool.id) { mutableStateOf("Professional service | 1 | 100") }
+    var businessName by rememberSaveable(tool.id) { mutableStateOf("Your Business") }
+    var clientName by rememberSaveable(tool.id) { mutableStateOf("Client") }
+    var documentNumber by rememberSaveable(tool.id) { mutableStateOf("DOC-001") }
+    var documentDate by rememberSaveable(tool.id) { mutableStateOf(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())) }
+    var currency by rememberSaveable(tool.id) { mutableStateOf("USD") }
+    var taxPercent by rememberSaveable(tool.id) { mutableStateOf("0") }
+    var discountPercent by rememberSaveable(tool.id) { mutableStateOf("0") }
+    val op = tool.engine.extras["op"] ?: tool.engine.id
     var seed by rememberSaveable(tool.id) { mutableStateOf("technology") }
     var audience by rememberSaveable(tool.id) { mutableStateOf("customers") }
+    var meetingTitle by rememberSaveable(tool.id) { mutableStateOf("Weekly planning") }
+    var meetingDateTime by rememberSaveable(tool.id) { mutableStateOf("") }
+    var meetingLocation by rememberSaveable(tool.id) { mutableStateOf("") }
+    var meetingGoal by rememberSaveable(tool.id) { mutableStateOf("Weekly planning") }
+    var attendees by rememberSaveable(tool.id) { mutableStateOf("Team") }
+    var prepNotes by rememberSaveable(tool.id) { mutableStateOf("") }
+    var discussionNotes by rememberSaveable(tool.id) { mutableStateOf("") }
+    var decisions by rememberSaveable(tool.id) { mutableStateOf("") }
+    var actionItems by rememberSaveable(tool.id) { mutableStateOf("") }
+    var nextMeeting by rememberSaveable(tool.id) { mutableStateOf("") }
+    var payPeriod by rememberSaveable(tool.id) { mutableStateOf("") }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    val saveOutputLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(output.toByteArray(Charsets.UTF_8)) }
+                ?: throw IllegalStateException("Could not open the selected file.")
+        }.onFailure { error = it.message ?: "Unable to save business output." }
+    }
+    val savePdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) runCatching {
+            val bytes = NativeBusinessPdfExporter.create(output, tool.name)
+            context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("Could not open the selected PDF file.")
+        }.onFailure { error = it.message ?: "Unable to export business PDF." }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Native business engine · ${tool.engine.extras["op"] ?: tool.engine.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
-        InputField(a, { a = it }, "Revenue / amount", singleLine = true)
-        InputField(b, { b = it }, "Cost / rate / second value", singleLine = true)
-        InputField(c, { c = it }, "Variable cost / third value", singleLine = true)
-        InputField(d, { d = it }, "Fourth value", singleLine = true)
-        InputField(e, { e = it }, "Fifth value", singleLine = true)
-        InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
+        InputField(a, { a = it }, when (op) { "break-even" -> "Selling price per unit"; "customer-acquisition-cost" -> "Customer acquisition spend"; "customer-lifetime-value" -> "Average order value"; "commission" -> "Sales amount"; "cash-flow" -> "Cash inflows"; "roi" -> "Total value received (before subtracting investment)"; "invoice" -> "Unit price"; "payslip" -> "Gross pay"; else -> "Primary amount / revenue" }, singleLine = true)
+        InputField(b, { b = it }, when (op) { "break-even" -> "Fixed costs"; "customer-acquisition-cost" -> "New customers acquired"; "customer-lifetime-value" -> "Purchases per customer / period"; "commission" -> "Commission rate (%)"; "cash-flow" -> "Cash outflows"; "roi" -> "Initial investment"; "payslip" -> "Tax / statutory deductions"; else -> "Cost / rate / second value" }, singleLine = true)
+        InputField(c, { c = it }, when (op) { "break-even" -> "Variable cost per unit"; "customer-lifetime-value" -> "Customer lifespan (periods)"; "cash-flow" -> "Opening cash balance"; "payslip" -> "Other deductions"; else -> "Third value / variable cost" }, singleLine = true)
+        if (op in setOf("customer-acquisition-cost", "customer-lifetime-value")) {
+            InputField(d, { d = it }, if (op == "customer-acquisition-cost") "Customer lifetime value (optional)" else "Customer acquisition cost (optional)", singleLine = true)
+            InputField(monthlyContribution, { monthlyContribution = it }, "Monthly contribution per customer (optional)", singleLine = true)
+        } else {
+            InputField(d, { d = it }, "Fourth value (optional)", singleLine = true)
+        }
+        if (op == "break-even") InputField(targetProfit, { targetProfit = it }, "Target profit (optional)", singleLine = true)
+        if (op in setOf("invoice", "receipt", "quotation", "estimate", "purchase-order")) {
+            InputField(businessName, { businessName = it }, "Business name", singleLine = true)
+            InputField(clientName, { clientName = it }, "Client / recipient", singleLine = true)
+            InputField(documentNumber, { documentNumber = it }, "Document number", singleLine = true)
+            InputField(documentDate, { documentDate = it }, "Document date", singleLine = true)
+            InputField(currency, { currency = it }, "Currency code (e.g. USD, NGN, EUR)", singleLine = true)
+            InputField(taxPercent, { taxPercent = it }, "Tax rate (%)", singleLine = true)
+            InputField(discountPercent, { discountPercent = it }, "Discount rate (%)", singleLine = true)
+            InputField(lineItems, { lineItems = it }, "Line items (one per line: description | quantity | unit price)", minLines = 3, singleLine = false, tall = true)
+        }
+        if (op in setOf("agenda", "meeting-agenda", "minutes", "meeting-minutes")) {
+            InputField(meetingTitle, { meetingTitle = it }, "Meeting title", singleLine = true)
+            InputField(meetingDateTime, { meetingDateTime = it }, "Date and time", singleLine = true)
+            InputField(meetingLocation, { meetingLocation = it }, "Location or meeting link", singleLine = true)
+            InputField(meetingGoal, { meetingGoal = it }, "Meeting goal", singleLine = true)
+            InputField(attendees, { attendees = it }, "Attendees", singleLine = true)
+            if (op in setOf("agenda", "meeting-agenda")) InputField(prepNotes, { prepNotes = it }, "Preparation notes", minLines = 2, singleLine = false, tall = true)
+            if (op in setOf("minutes", "meeting-minutes")) {
+                InputField(discussionNotes, { discussionNotes = it }, "Discussion notes", minLines = 3, singleLine = false, tall = true)
+                InputField(decisions, { decisions = it }, "Decisions", minLines = 2, singleLine = false, tall = true)
+                InputField(actionItems, { actionItems = it }, "Action items (owner | task | due date)", minLines = 3, singleLine = false, tall = true)
+                InputField(nextMeeting, { nextMeeting = it }, "Next meeting", singleLine = true)
+            }
+        }
+        if (op == "payslip") {
+            InputField(businessName, { businessName = it }, "Employer / business name", singleLine = true)
+            InputField(clientName, { clientName = it }, "Employee name", singleLine = true)
+            InputField(payPeriod, { payPeriod = it }, "Pay period", singleLine = true)
+        }
+        if (op !in setOf("customer-acquisition-cost", "customer-lifetime-value")) InputField(e, { e = it }, "Fifth value (optional)", singleLine = true)
+        if (op !in setOf("agenda", "meeting-agenda", "minutes", "meeting-minutes")) InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
         InputField(audience, { audience = it }, "Audience", singleLine = true)
         ActionRow(
-            onRun = { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 10.0); put("e", e.toDoubleOrNull() ?: 12.0); put("seed", seed); put("audience", audience) }) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) },
-            onReset = { a="1000"; b="600"; c="50"; d="10"; e="12"; seed="technology"; audience="customers"; output=""; error="" }
+            onRun = { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 0.0); put("e", e.toDoubleOrNull() ?: 12.0); put("monthlyContribution", monthlyContribution.toDoubleOrNull() ?: 0.0); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("lineItems", lineItems); put("company", businessName); put("client", clientName); put("documentNumber", documentNumber); put("date", documentDate); put("currency", currency); put("taxPercent", taxPercent.toDoubleOrNull() ?: 0.0); put("discountPercent", discountPercent.toDoubleOrNull() ?: 0.0); put("seed", seed); put("audience", audience); put("meetingTitle", meetingTitle); put("dateTime", meetingDateTime); put("location", meetingLocation); put("meetingGoal", meetingGoal); put("attendees", attendees); put("prepNotes", prepNotes); put("discussionNotes", discussionNotes); put("decisions", decisions); put("actionItems", actionItems); put("nextMeeting", nextMeeting); put("employeeName", clientName); put("payPeriod", payPeriod); put("gross", a.toDoubleOrNull() ?: 1000.0); put("statutoryDeductions", b.toDoubleOrNull() ?: 0.0); put("otherDeductions", c.toDoubleOrNull() ?: 0.0) }) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) },
+            onReset = { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItems="Professional service | 1 | 100"; businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error="" }
         )
         ResultBox(output, error, ::copy)
+        if (output.isNotBlank()) {
+            Button(onClick = { savePdfLauncher.launch("env-${tool.id}.pdf") }, modifier = Modifier.fillMaxWidth()) { Text("Download PDF") }
+            OutlinedButton(onClick = { saveOutputLauncher.launch("env-${tool.id}.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Download output (.txt)") }
+        }
     }
 }

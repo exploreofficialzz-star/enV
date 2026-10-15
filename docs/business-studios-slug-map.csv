@@ -1,0 +1,106 @@
+legacy_slug,tool_name,studio,mode,category,engine_type,status
+brand-name-generator,Brand Name Generator,Naming Studio,brand-name,business,business,active
+break-even-estimator,Break-Even Estimator,Finance Metrics Studio,break-even,business,business,active
+break-even-generator,Break-Even Generator,Finance Metrics Studio,break-even,business,business,active
+break-even-planner,Break-Even Planner,Finance Metrics Studio,break-even,business,business,active
+break-even-template,Break-Even Template,Finance Metrics Studio,break-even,business,business,active
+business-name-generator,Business Name Generator,Naming Studio,business-name,business,business,active
+cash-flow-calculator,Cash Flow Calculator,Finance Metrics Studio,cash-flow,business,business,active
+cash-flow-estimator,Cash Flow Estimator,Finance Metrics Studio,cash-flow,business,business,active
+cash-flow-generator,Cash Flow Generator,Finance Metrics Studio,cash-flow,business,business,active
+cash-flow-planner,Cash Flow Planner,Finance Metrics Studio,cash-flow,business,business,active
+cash-flow-template,Cash Flow Template,Finance Metrics Studio,cash-flow,business,business,active
+commission-calculator,Commission Calculator,Finance Metrics Studio,commission,business,business,active
+commission-estimator,Commission Estimator,Finance Metrics Studio,commission,business,business,active
+commission-generator,Commission Generator,Finance Metrics Studio,commission,business,business,active
+commission-planner,Commission Planner,Finance Metrics Studio,commission,business,business,active
+commission-template,Commission Template,Finance Metrics Studio,commission,business,business,active
+company-name-generator,Company Name Generator,Naming Studio,company-name,business,business,active
+customer-acquisition-cost-calculator,Customer Acquisition Cost Calculator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
+customer-acquisition-cost-estimator,Customer Acquisition Cost Estimator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
+customer-acquisition-cost-generator,Customer Acquisition Cost Generator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
+customer-acquisition-cost-planner,Customer Acquisition Cost Planner,Finance Metrics Studio,customer-acquisition-cost,business,business,active
+customer-acquisition-cost-template,Customer Acquisition Cost Template,Finance Metrics Studio,customer-acquisition-cost,business,business,active
+customer-lifetime-value-calculator,Customer Lifetime Value Calculator,Finance Metrics Studio,customer-lifetime-value,business,business,active
+customer-lifetime-value-estimator,Customer Lifetime Value Estimator,Finance Metrics Studio,customer-lifetime-value,business,business,active
+customer-lifetime-value-generator,Customer Lifetime Value Generator,Finance Metrics Studio,customer-lifetime-value,business,business,active
+customer-lifetime-value-planner,Customer Lifetime Value Planner,Finance Metrics Studio,customer-lifetime-value,business,business,active
+customer-lifetime-value-template,Customer Lifetime Value Template,Finance Metrics Studio,customer-lifetime-value,business,business,active
+email-signature-generator,Email Signature Generator,Ops Studio,email-signature,business,business,active
+estimate-calculator,Estimate Calculator,Document Studio,estimate,business,business,active
+estimate-estimator,Estimate Estimator,Document Studio,estimate,business,business,active
+estimate-generator,Estimate Generator,Document Studio,estimate,business,business,active
+estimate-planner,Estimate Planner,Document Studio,estimate,business,business,active
+estimate-template,Estimate Template,Document Studio,estimate,business,business,active
+expense-calculator,Expense Calculator,Finance Metrics Studio,expense,business,business,active
+expense-estimator,Expense Estimator,Finance Metrics Studio,expense,business,business,active
+expense-generator,Expense Generator,Finance Metrics Studio,expense,business,business,active
+expense-planner,Expense Planner,Finance Metrics Studio,expense,business,business,active
+expense-template,Expense Template,Finance Metrics Studio,expense,business,business,active
+inventory-calculator,Inventory Calculator,Finance Metrics Studio,inventory,business,business,active
+inventory-estimator,Inventory Estimator,Finance Metrics Studio,inventory,business,business,active
+inventory-generator,Inventory Generator,Finance Metrics Studio,inventory,business,business,active
+inventory-planner,Inventory Planner,Finance Metrics Studio,inventory,business,business,active
+inventory-template,Inventory Template,Finance Metrics Studio,inventory,business,business,active
+invoice-calculator,Invoice Calculator,Document Studio,invoice,business,business,active
+invoice-estimator,Invoice Estimator,Document Studio,invoice,business,business,active
+invoice-generator,Invoice Generator,Document Studio,invoice,business,business,active
+invoice-planner,Invoice Planner,Document Studio,invoice,business,business,active
+invoice-template,Invoice Template,Document Studio,invoice,business,business,active
+margin-estimator,Margin Estimator,Finance Metrics Studio,margin,business,business,active
+margin-generator,Margin Generator,Finance Metrics Studio,margin,business,business,active
+margin-planner,Margin Planner,Finance Metrics Studio,margin,business,business,active
+margin-template,Margin Template,Finance Metrics Studio,margin,business,business,active
+markup-estimator,Markup Estimator,Finance Metrics Studio,markup,business,business,active
+markup-generator,Markup Generator,Finance Metrics Studio,markup,business,business,active
+markup-planner,Markup Planner,Finance Metrics Studio,markup,business,business,active
+markup-template,Markup Template,Finance Metrics Studio,markup,business,business,active
+meeting-agenda-generator,Meeting Agenda Generator,Ops Studio,meeting-agenda,business,business,active
+meeting-minutes-generator,Meeting Minutes Template,Ops Studio,meeting-minutes,business,business,active
+payslip-calculator,Payslip Calculator,Ops Studio,payslip,business,business,active
+payslip-estimator,Payslip Estimator,Ops Studio,payslip,business,business,active
+payslip-generator,Payslip Generator,Ops Studio,payslip,business,business,active
+payslip-planner,Payslip Planner,Ops Studio,payslip,business,business,active
+payslip-template,Payslip Template,Ops Studio,payslip,business,business,active
+pricing-calculator,Pricing Calculator,Finance Metrics Studio,pricing,business,business,active
+pricing-estimator,Pricing Estimator,Finance Metrics Studio,pricing,business,business,active
+pricing-generator,Pricing Generator,Finance Metrics Studio,pricing,business,business,active
+pricing-planner,Pricing Planner,Finance Metrics Studio,pricing,business,business,active
+pricing-template,Pricing Template,Finance Metrics Studio,pricing,business,business,active
+product-name-generator,Product Name Generator,Naming Studio,product-name,business,business,active
+profit-estimator,Profit Estimator,Finance Metrics Studio,profit,business,business,active
+profit-generator,Profit Generator,Finance Metrics Studio,profit,business,business,active
+profit-planner,Profit Planner,Finance Metrics Studio,profit,business,business,active
+profit-template,Profit Template,Finance Metrics Studio,profit,business,business,active
+purchase-order-calculator,Purchase Order Calculator,Document Studio,purchase-order,business,business,active
+purchase-order-estimator,Purchase Order Estimator,Document Studio,purchase-order,business,business,active
+purchase-order-generator,Purchase Order Generator,Document Studio,purchase-order,business,business,active
+purchase-order-planner,Purchase Order Planner,Document Studio,purchase-order,business,business,active
+purchase-order-template,Purchase Order Template,Document Studio,purchase-order,business,business,active
+quotation-calculator,Quotation Calculator,Document Studio,quotation,business,business,active
+quotation-estimator,Quotation Estimator,Document Studio,quotation,business,business,active
+quotation-generator,Quotation Generator,Document Studio,quotation,business,business,active
+quotation-planner,Quotation Planner,Document Studio,quotation,business,business,active
+quotation-template,Quotation Template,Document Studio,quotation,business,business,active
+receipt-calculator,Receipt Calculator,Document Studio,receipt,business,business,active
+receipt-estimator,Receipt Estimator,Document Studio,receipt,business,business,active
+receipt-generator,Receipt Generator,Document Studio,receipt,business,business,active
+receipt-planner,Receipt Planner,Document Studio,receipt,business,business,active
+receipt-template,Receipt Template,Document Studio,receipt,business,business,active
+recurring-revenue-calculator,Recurring Revenue Calculator,Finance Metrics Studio,recurring-revenue,business,business,active
+recurring-revenue-estimator,Recurring Revenue Estimator,Finance Metrics Studio,recurring-revenue,business,business,active
+recurring-revenue-generator,Recurring Revenue Generator,Finance Metrics Studio,recurring-revenue,business,business,active
+recurring-revenue-planner,Recurring Revenue Planner,Finance Metrics Studio,recurring-revenue,business,business,active
+recurring-revenue-template,Recurring Revenue Template,Finance Metrics Studio,recurring-revenue,business,business,active
+roi-estimator,ROI Estimator,Finance Metrics Studio,roi,business,business,active
+roi-generator,ROI Generator,Finance Metrics Studio,roi,business,business,active
+roi-planner,ROI Planner,Finance Metrics Studio,roi,business,business,active
+roi-template,ROI Template,Finance Metrics Studio,roi,business,business,active
+salary-calculator,Salary Calculator,Finance Metrics Studio,salary,business,business,active
+salary-estimator,Salary Estimator,Finance Metrics Studio,salary,business,business,active
+salary-generator,Salary Generator,Finance Metrics Studio,salary,business,business,active
+salary-planner,Salary Planner,Finance Metrics Studio,salary,business,business,active
+salary-template,Salary Template,Finance Metrics Studio,salary,business,business,active
+sku-generator,SKU Generator,Naming Studio,sku,business,business,active
+slogan-generator,Slogan Generator,Naming Studio,slogan,business,business,active
+break-even-calculator,Break-Even Calculator,Finance Metrics Studio,break-even,calculators,business,active
