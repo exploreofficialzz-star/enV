@@ -132,6 +132,7 @@ import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeBusinessEngine
+import com.chastech.env.engine.NativeBusinessPdfExporter
 import com.chastech.env.engine.NativeFileConverterEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
@@ -2515,7 +2516,7 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
                     Text("Subtotal: ${String.format(java.util.Locale.US, "%.2f", liveSubtotal)}")
                     Text("Discount: −${String.format(java.util.Locale.US, "%.2f", liveDiscount)}")
                     Text("Tax: ${String.format(java.util.Locale.US, "%.2f", liveTax)}")
-                    Text("Total: ${String.format(java.util.Locale.US, "%.2f", liveSubtotal - liveDiscount + liveTax)}", fontWeight = FontWeight.SemiBold)
+                    Text("Total: ${String.format(java.util.Locale.US, "%.2f", liveSubtotal - liveDiscount + liveTax)}")
                 }
             }
             Text("Line items · description, quantity and unit price", style = MaterialTheme.typography.labelLarge)
@@ -2610,6 +2611,7 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
         }
         if (op in setOf("business-name", "company-name", "brand-name", "product-name", "slogan", "sku")) InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
         if (op == "slogan") InputField(audience, { audience = it }, "Audience / context", singleLine = true)
+        fun runBusiness() { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 0.0); put("e", e.toDoubleOrNull() ?: 12.0); put("monthlyContribution", monthlyContribution.toDoubleOrNull() ?: 0.0); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("grossMarginPct", grossMarginPct.toDoubleOrNull() ?: 80.0); put("monthlyChurnPct", monthlyChurnPct.toDoubleOrNull() ?: 5.0); put("ltvModel", ltvModel); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("lineItems", lineItems); put("company", businessName); put("client", clientName); put("documentNumber", documentNumber); put("date", documentDate); put("currency", currency); put("taxPercent", taxPercent.toDoubleOrNull() ?: 0.0); put("discountPercent", discountPercent.toDoubleOrNull() ?: 0.0); put("seed", seed); put("audience", audience); put("agendaItems", agendaItems); put("name", signatureName); put("role", signatureRole); put("email", signatureEmail); put("phone", signaturePhone); put("website", signatureWebsite); put("socialLink", signatureSocialLink); put("namingStyle", namingStyle); put("maxNameLength", maxNameLength.toDoubleOrNull() ?: 32.0); put("nameBlacklist", nameBlacklist); put("generationOffset", generationOffset); put("meetingTitle", meetingTitle); put("dateTime", meetingDateTime); put("location", meetingLocation); put("meetingGoal", meetingGoal); put("attendees", attendees); put("prepNotes", prepNotes); put("discussionNotes", discussionNotes); put("decisions", decisions); put("actionItems", actionItems); put("nextMeeting", nextMeeting); put("employeeName", clientName); put("payPeriod", payPeriod); put("gross", a.toDoubleOrNull() ?: 1000.0); put("statutoryDeductions", b.toDoubleOrNull() ?: 0.0); put("otherDeductions", c.toDoubleOrNull() ?: 0.0) }, operationOverride = op) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) }
         if (isNaming) {
             Text("Naming style", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2637,7 +2639,6 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
                 OutlinedButton(onClick = { generationOffset += 1; runBusiness() }, modifier = Modifier.weight(1f)) { Text("More") }
             }
         }
-        fun runBusiness() { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 0.0); put("e", e.toDoubleOrNull() ?: 12.0); put("monthlyContribution", monthlyContribution.toDoubleOrNull() ?: 0.0); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("grossMarginPct", grossMarginPct.toDoubleOrNull() ?: 80.0); put("monthlyChurnPct", monthlyChurnPct.toDoubleOrNull() ?: 5.0); put("ltvModel", ltvModel); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("lineItems", lineItems); put("company", businessName); put("client", clientName); put("documentNumber", documentNumber); put("date", documentDate); put("currency", currency); put("taxPercent", taxPercent.toDoubleOrNull() ?: 0.0); put("discountPercent", discountPercent.toDoubleOrNull() ?: 0.0); put("seed", seed); put("audience", audience); put("agendaItems", agendaItems); put("name", signatureName); put("role", signatureRole); put("email", signatureEmail); put("phone", signaturePhone); put("website", signatureWebsite); put("socialLink", signatureSocialLink); put("namingStyle", namingStyle); put("maxNameLength", maxNameLength.toDoubleOrNull() ?: 32.0); put("nameBlacklist", nameBlacklist); put("generationOffset", generationOffset); put("meetingTitle", meetingTitle); put("dateTime", meetingDateTime); put("location", meetingLocation); put("meetingGoal", meetingGoal); put("attendees", attendees); put("prepNotes", prepNotes); put("discussionNotes", discussionNotes); put("decisions", decisions); put("actionItems", actionItems); put("nextMeeting", nextMeeting); put("employeeName", clientName); put("payPeriod", payPeriod); put("gross", a.toDoubleOrNull() ?: 1000.0); put("statutoryDeductions", b.toDoubleOrNull() ?: 0.0); put("otherDeductions", c.toDoubleOrNull() ?: 0.0) }, operationOverride = op) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) }
         OutlinedButton(onClick = { loadBusinessExample() }, modifier = Modifier.fillMaxWidth()) { Text("Load example") }
         ActionRow(
             onRun = { runBusiness() },
