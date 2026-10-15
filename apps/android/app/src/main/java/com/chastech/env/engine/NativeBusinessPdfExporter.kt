@@ -7,7 +7,7 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import java.io.ByteArrayOutputStream
 
-/** Creates a text-first, paginated PDF entirely on device; no network or WebView required. */
+/** Creates a text-first, paginated PDF locally using platform-native APIs. */
 object NativeBusinessPdfExporter {
     private const val PAGE_WIDTH = 595
     private const val PAGE_HEIGHT = 842
