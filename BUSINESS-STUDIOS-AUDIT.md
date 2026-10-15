@@ -89,3 +89,19 @@ Remaining release blockers: dependency-backed Web typecheck/build and browser/de
 - Native PDF styling remains text-first and does not yet match Web's richer branded PDF layout or logo support; dedicated native print/share and structured agenda row editing remain open.
 
 See `audit/BUSINESS-STUDIOS-ROUND5-IMPLEMENTATION-AND-VERIFICATION-2026-10-15.md` for the full status matrix.
+
+## Round 7 — cross-platform Business Studio acceptance work (2026-10-15)
+
+- Added Studio-specific mode tabs and example loading across the Web business engine views; the Business category index keeps the Studio cards first while leaving legacy slugs intact.
+- Added repeatable timed-agenda and owner/task/due-date action rows to Web, Android and iOS with a 20-item upper bound; engine input serialization remains compatible.
+- Expanded testable Web finance helpers and deterministic golden coverage, including LTV:CAC boundary bands, SaaS gross-profit LTV, churn guard, CAC payback, recurring-revenue/expense boundaries and document total edge cases.
+- Completed the four-style local naming engine with exclusions, max length, “More” batches, varied slogans, sequential SKU generation and honest external-domain/trademark limitations.
+- Generated `docs/business-studios-slug-map.csv` from the 104 Business catalog tools plus a compatibility redirect row for `/tools/calculators/break-even-calculator`; added the reproducible export script and audit command.
+- Fixed the Android line-item append type mismatch found by a Kotlin source probe and the Web mobile payslip summary displaying the wrong total variable; removed duplicate example controls discovered in native UI review.
+- Research and acceptance artifacts: see `audit/BUSINESS-STUDIOS-COMPETITIVE-RESEARCH-ROUND7-2026-10-15.md`, `audit/BUSINESS-STUDIOS-ROUND7-IMPLEMENTATION-AND-VERIFICATION-2026-10-15.md`, `audit/BUSINESS-STUDIOS-ROUND7-CHANGELOG-2026-10-15.md`, `audit/BUSINESS-STUDIOS-ROUND7-GOLDEN-RESULTS-2026-10-15.md`, and `audit/BUSINESS-STUDIOS-ROUND7-GAP-MATRIX-2026-10-15.csv`.
+
+### Round 7 verification summary
+
+- PASS: business source audit; catalog audit (10,000 tools / 42 categories); production catalog uniqueness audit (10,000 unique IDs, with pre-existing local-auth configuration warning); 138/138 script tests; 12/12 focused Business tests; Swift parser; Kotlin and Swift engine runtime fixtures using lightweight model stubs; changed TypeScript/TSX syntax transpilation; slug-map output count.
+- BLOCKED: whole-repository `npm test` (248 passed, 7 dependency-related failures because `sql-formatter`, `prettier` and `zustand` are unavailable); `npm run typecheck` (missing `@types/node` and `vite/client`) and `npm run build` (missing `vite` executable); full Android Gradle/JUnit (Gradle download previously failed DNS); Xcode/XCTest (no Xcode/Apple SDK on host); real browser/device screenshots and PDF layout checks.
+- Native PDF styling, dedicated native print/share parity, Gmail/Outlook rendering, native build/device verification and quantitative competitor benchmarks remain gaps. In-screen Kotlin/SwiftUI Studio mode chips are implemented and operation-override-tested, but the compiled app has not been verified. Do not describe this round as a production-readiness certificate or claim enV is objectively #1 without those checks.

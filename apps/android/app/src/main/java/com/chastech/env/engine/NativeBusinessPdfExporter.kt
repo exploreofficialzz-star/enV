@@ -1,11 +1,13 @@
 package com.chastech.env.engine
 
+import android.graphics.Bitmap
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import java.io.ByteArrayOutputStream
 
-/** Creates a text-first, paginated PDF locally on the device. */
+/** Creates a text-first, paginated PDF entirely on device; no network or WebView required. */
 object NativeBusinessPdfExporter {
     private const val PAGE_WIDTH = 595
     private const val PAGE_HEIGHT = 842
@@ -14,7 +16,7 @@ object NativeBusinessPdfExporter {
     private const val TOP = 54f
     private const val BOTTOM = 790f
 
-    fun create(content: String, title: String): ByteArray {
+    fun create(content: String, title: String, logo: Bitmap? = null): ByteArray {
         require(content.isNotBlank()) { "There is no output to export." }
         val pdf = PdfDocument()
         val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -52,7 +54,15 @@ object NativeBusinessPdfExporter {
             page = pdf.startPage(info)
             canvas = page!!.canvas
             y = TOP
-            canvas!!.drawText(title.take(72), LEFT, y, titlePaint)
+            var titleX = LEFT
+            if (pageNumber == 1 && logo != null && logo.width > 0 && logo.height > 0) {
+                val scale = minOf(72f / logo.width, 38f / logo.height)
+                val width = logo.width * scale
+                val height = logo.height * scale
+                canvas!!.drawBitmap(logo, null, RectF(LEFT, 20f, LEFT + width, 20f + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                titleX = LEFT + width + 12f
+            }
+            canvas!!.drawText(title.take(72), titleX, y, titlePaint)
             y += 28f
             canvas!!.drawLine(LEFT, y - 10f, RIGHT, y - 10f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.LTGRAY; strokeWidth = 0.8f })
         }

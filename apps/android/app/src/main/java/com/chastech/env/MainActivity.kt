@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -74,6 +75,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -130,7 +132,6 @@ import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeBusinessEngine
-import com.chastech.env.engine.NativeBusinessPdfExporter
 import com.chastech.env.engine.NativeFileConverterEngine
 import com.chastech.env.engine.NativeCodecEngine
 import com.chastech.env.engine.NativeColorEngine
@@ -2268,11 +2269,37 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
     var documentNumber by rememberSaveable(tool.id) { mutableStateOf("DOC-001") }
     var documentDate by rememberSaveable(tool.id) { mutableStateOf(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())) }
     var currency by rememberSaveable(tool.id) { mutableStateOf("USD") }
+    var currencyMenuExpanded by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var logoBitmap by remember(tool.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var taxPercent by rememberSaveable(tool.id) { mutableStateOf("0") }
     var discountPercent by rememberSaveable(tool.id) { mutableStateOf("0") }
-    val op = tool.engine.extras["op"] ?: tool.engine.id
+    val originalBusinessOp = tool.engine.extras["op"] ?: tool.engine.id
+    val businessStudioModes: List<Pair<String, String>> = when (originalBusinessOp) {
+        in setOf("invoice", "receipt", "quotation", "estimate", "purchase-order") -> listOf("Invoice" to "invoice", "Receipt" to "receipt", "Quotation" to "quotation", "Estimate" to "estimate", "Purchase order" to "purchase-order")
+        in setOf("business-name", "company-name", "brand-name", "product-name", "slogan", "sku") -> listOf("Business" to "business-name", "Company" to "company-name", "Brand" to "brand-name", "Product" to "product-name", "Slogan" to "slogan", "SKU" to "sku")
+        in setOf("agenda", "minutes", "meeting-agenda", "meeting-minutes", "email-signature", "payslip") -> listOf("Agenda" to "meeting-agenda", "Minutes" to "meeting-minutes", "Signature" to "email-signature", "Payslip demo" to "payslip")
+        else -> listOf("Break-even" to "break-even", "Cash flow" to "cash-flow", "Commission" to "commission", "CAC" to "customer-acquisition-cost", "LTV" to "customer-lifetime-value", "ROI" to "roi", "Pricing" to "pricing", "Markup" to "markup", "Recurring revenue" to "recurring-revenue", "Expense" to "expense", "Inventory" to "inventory", "Discount" to "discount", "Margin" to "margin", "Profit" to "profit", "Salary" to "salary")
+    }
+    var selectedBusinessStudioMode by rememberSaveable(tool.id) { mutableStateOf(if (originalBusinessOp == "agenda") "meeting-agenda" else if (originalBusinessOp == "minutes") "meeting-minutes" else originalBusinessOp) }
+    val op = selectedBusinessStudioMode.takeIf { selected -> businessStudioModes.any { it.second == selected } } ?: originalBusinessOp
+    val businessStudioModeTitle = businessStudioModes.firstOrNull { it.second == op }?.first ?: tool.name
+    val isNaming = op in setOf("business-name", "company-name", "brand-name", "product-name")
     var seed by rememberSaveable(tool.id) { mutableStateOf("technology") }
     var audience by rememberSaveable(tool.id) { mutableStateOf("customers") }
+    var agendaItems by rememberSaveable(tool.id) { mutableStateOf("Welcome and objectives | 5\nProgress updates | 10\nDecisions and blockers | 15\nActions and next steps | 5") }
+    var signatureName by rememberSaveable(tool.id) { mutableStateOf("Alex Morgan") }
+    var signatureRole by rememberSaveable(tool.id) { mutableStateOf("Founder") }
+    var signatureEmail by rememberSaveable(tool.id) { mutableStateOf("hello@example.com") }
+    var signaturePhone by rememberSaveable(tool.id) { mutableStateOf("") }
+    var signatureWebsite by rememberSaveable(tool.id) { mutableStateOf("") }
+    var signatureSocialLink by rememberSaveable(tool.id) { mutableStateOf("") }
+    var namingStyle by rememberSaveable(tool.id) { mutableStateOf("descriptive") }
+    var maxNameLength by rememberSaveable(tool.id) { mutableStateOf("32") }
+    var nameBlacklist by rememberSaveable(tool.id) { mutableStateOf("") }
+    var generationOffset by rememberSaveable(tool.id) { mutableIntStateOf(0) }
+    var ltvModel by rememberSaveable(tool.id) { mutableStateOf("simple") }
+    var grossMarginPct by rememberSaveable(tool.id) { mutableStateOf("80") }
+    var monthlyChurnPct by rememberSaveable(tool.id) { mutableStateOf("5") }
     var meetingTitle by rememberSaveable(tool.id) { mutableStateOf("Weekly planning") }
     var meetingDateTime by rememberSaveable(tool.id) { mutableStateOf("") }
     var meetingLocation by rememberSaveable(tool.id) { mutableStateOf("") }
@@ -2286,6 +2313,60 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
     var payPeriod by rememberSaveable(tool.id) { mutableStateOf("") }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun replaceLocalLogo(next: android.graphics.Bitmap?) {
+        val previous = logoBitmap
+        logoBitmap = next
+        if (previous != null && previous !== next && !previous.isRecycled) previous.recycle()
+    }
+    val currentLogoForLifecycle = logoBitmap
+    DisposableEffect(currentLogoForLifecycle) {
+        onDispose { currentLogoForLifecycle?.let { if (!it.isRecycled) it.recycle() } }
+    }
+    fun businessLineRows(): List<List<String>> = lineItems.split("\n").filter { it.isNotBlank() }.map { line ->
+        val parts = line.split("|").map { it.trim() }
+        listOf(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "1" }, parts.getOrElse(2) { "0" })
+    }.ifEmpty { listOf(listOf("", "1", "0")) }
+    fun persistBusinessLineRows(rows: List<List<String>>) {
+        lineItems = rows.joinToString("\n") { "${it.getOrElse(0) { "" }} | ${it.getOrElse(1) { "1" }} | ${it.getOrElse(2) { "0" }}" }
+    }
+    fun updateBusinessLineItem(index: Int, column: Int, value: String) {
+        val rows = businessLineRows().map { it.toMutableList() }.toMutableList()
+        while (rows.size <= index) rows.add(mutableListOf("", "1", "0"))
+        rows[index][column] = value
+        persistBusinessLineRows(rows)
+    }
+    fun addBusinessLineItem() { persistBusinessLineRows(businessLineRows() + listOf(listOf("New item", "1", "0"))) }
+    fun removeBusinessLineItem(index: Int) {
+        val rows = businessLineRows().toMutableList()
+        if (rows.size <= 1) rows[0] = listOf("", "1", "0") else rows.removeAt(index)
+        persistBusinessLineRows(rows)
+    }
+    fun loadBusinessExample() {
+        generationOffset = 0
+        when (op) {
+            "invoice", "receipt", "quotation", "estimate", "purchase-order" -> { businessName = "Acme Solar Co."; clientName = "Example Customer"; documentNumber = "INV-EXAMPLE-001"; documentDate = "2026-10-15"; currency = "USD"; taxPercent = "7.5"; discountPercent = "5"; lineItems = "Solar panel | 3 | 250\nInstallation | 1 | 100"; replaceLocalLogo(null) }
+            "business-name", "company-name", "brand-name", "product-name" -> { seed = "solar energy"; namingStyle = "descriptive"; maxNameLength = "32"; nameBlacklist = "" }
+            "slogan" -> { seed = "solar energy"; audience = "homeowners" }
+            "sku" -> seed = "TEC"
+            "agenda", "meeting-agenda", "minutes", "meeting-minutes" -> { meetingTitle = "Solar launch review"; meetingDateTime = "2026-10-20 10:00"; meetingLocation = "Video conference"; meetingGoal = "Decide launch readiness and owners"; attendees = "Product lead; Operations lead; Marketing lead"; prepNotes = "Review launch metrics and open blockers."; agendaItems = "Metrics review | 10\nDecision log | 20\nActions and owners | 10"; discussionNotes = "Launch readiness, support coverage, unresolved blockers."; decisions = "Approve launch after support checklist passes."; actionItems = "Operations lead | Finalize support checklist | 2026-10-19\nMarketing lead | Confirm launch copy | 2026-10-19"; nextMeeting = "2026-10-21 10:00" }
+            "email-signature" -> { signatureName = "Jordan Example"; signatureRole = "Operations Lead"; signatureEmail = "jordan@example.com"; businessName = "Acme Solar Co."; signaturePhone = "+1 555 0100"; signatureWebsite = "https://example.com"; signatureSocialLink = "https://www.linkedin.com/" }
+            "payslip" -> { businessName = "Example Company"; clientName = "Example Employee"; payPeriod = "Example pay period"; a = "5000"; b = "500"; c = "100" }
+            "break-even" -> { a = "50"; b = "10000"; c = "30"; targetProfit = "5000" }
+            "commission" -> { a = "50000"; b = "8" }
+            "customer-acquisition-cost" -> { a = "5000"; b = "100"; d = "250"; monthlyContribution = "10" }
+            "customer-lifetime-value" -> { ltvModel = "saas"; a = "50"; b = "12"; c = "24"; d = "100"; grossMarginPct = "80"; monthlyChurnPct = "5"; monthlyContribution = "0" }
+            "cash-flow" -> { a = "800"; b = "900"; c = "1000" }
+            "roi" -> { a = "150"; b = "100" }
+            "salary" -> a = "52000"
+            "pricing", "markup" -> { a = "100"; b = "25" }
+            "margin", "profit" -> { a = "100"; b = "70" }
+            "discount" -> { a = "100"; b = "15" }
+            "recurring-revenue" -> { a = "10000"; b = "20" }
+            "expense" -> { a = "100"; b = "200"; c = "300"; d = "40"; e = "20" }
+            "inventory" -> { a = "12"; b = "25"; c = "5" }
+        }
+        output = ""; error = ""
+    }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     val saveOutputLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) runCatching {
@@ -2293,34 +2374,166 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
                 ?: throw IllegalStateException("Could not open the selected file.")
         }.onFailure { error = it.message ?: "Unable to save business output." }
     }
+    val chooseLogoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) runCatching {
+            val resolver = context.contentResolver
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            val boundsStream = resolver.openInputStream(uri) ?: throw IllegalStateException("Could not read the selected logo.")
+            boundsStream.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The selected file is not a readable image." }
+            var sample = 1
+            while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) sample *= 2
+            val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+            }
+            replaceLocalLogo(resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, decodeOptions) }
+                ?: throw IllegalStateException("Could not decode the selected logo."))
+        }.onFailure { error = it.message ?: "Unable to load local logo." }
+    }
     val savePdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) runCatching {
-            val bytes = NativeBusinessPdfExporter.create(output, tool.name)
+            val bytes = NativeBusinessPdfExporter.create(output, businessStudioModeTitle, logoBitmap)
             context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
                 ?: throw IllegalStateException("Could not open the selected PDF file.")
         }.onFailure { error = it.message ?: "Unable to export business PDF." }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Native business engine · ${tool.engine.extras["op"] ?: tool.engine.id}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
-        InputField(a, { a = it }, when (op) { "break-even" -> "Selling price per unit"; "customer-acquisition-cost" -> "Customer acquisition spend"; "customer-lifetime-value" -> "Average order value"; "commission" -> "Sales amount"; "cash-flow" -> "Cash inflows"; "roi" -> "Total value received (before subtracting investment)"; "invoice" -> "Unit price"; "payslip" -> "Gross pay"; else -> "Primary amount / revenue" }, singleLine = true)
-        InputField(b, { b = it }, when (op) { "break-even" -> "Fixed costs"; "customer-acquisition-cost" -> "New customers acquired"; "customer-lifetime-value" -> "Purchases per customer / period"; "commission" -> "Commission rate (%)"; "cash-flow" -> "Cash outflows"; "roi" -> "Initial investment"; "payslip" -> "Tax / statutory deductions"; else -> "Cost / rate / second value" }, singleLine = true)
-        InputField(c, { c = it }, when (op) { "break-even" -> "Variable cost per unit"; "customer-lifetime-value" -> "Customer lifespan (periods)"; "cash-flow" -> "Opening cash balance"; "payslip" -> "Other deductions"; else -> "Third value / variable cost" }, singleLine = true)
-        if (op in setOf("customer-acquisition-cost", "customer-lifetime-value")) {
-            InputField(d, { d = it }, if (op == "customer-acquisition-cost") "Customer lifetime value (optional)" else "Customer acquisition cost (optional)", singleLine = true)
-            InputField(monthlyContribution, { monthlyContribution = it }, "Monthly contribution per customer (optional)", singleLine = true)
-        } else {
-            InputField(d, { d = it }, "Fourth value (optional)", singleLine = true)
+        Text("Native business engine · $businessStudioModeTitle", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
+        Text("Privacy-first: inputs stay on this device unless you explicitly export or share output. Finance results are illustrative, not tax, legal, or investment advice.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Studio modes", style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            businessStudioModes.forEach { (label, mode) ->
+                FilterChip(selected = op == mode, onClick = { selectedBusinessStudioMode = mode; output = ""; error = ""; generationOffset = 0 }, label = { Text(label) }, modifier = Modifier.heightIn(min = 40.dp))
+            }
         }
-        if (op == "break-even") InputField(targetProfit, { targetProfit = it }, "Target profit (optional)", singleLine = true)
+        val financeOperations = setOf("roi", "break-even", "commission", "pricing", "markup", "cash-flow", "salary", "customer-lifetime-value", "customer-acquisition-cost", "recurring-revenue", "expense", "inventory", "discount", "margin", "profit", "payslip")
+        if (op in financeOperations) {
+            if (op == "customer-lifetime-value") {
+                Text("LTV model", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (ltvModel == "simple") Button(onClick = { ltvModel = "simple" }, modifier = Modifier.weight(1f)) { Text("Simple / commerce") }
+                    else OutlinedButton(onClick = { ltvModel = "simple" }, modifier = Modifier.weight(1f)) { Text("Simple / commerce") }
+                    if (ltvModel == "saas") Button(onClick = { ltvModel = "saas" }, modifier = Modifier.weight(1f)) { Text("SaaS / subscription") }
+                    else OutlinedButton(onClick = { ltvModel = "saas" }, modifier = Modifier.weight(1f)) { Text("SaaS / subscription") }
+                }
+            }
+            if (op == "customer-lifetime-value" && ltvModel == "saas") {
+                InputField(a, { a = it }, "Monthly ARPU (average revenue per account)", singleLine = true)
+                InputField(grossMarginPct, { grossMarginPct = it }, "Gross margin (%)", singleLine = true)
+                InputField(monthlyChurnPct, { monthlyChurnPct = it }, "Monthly customer churn (%)", singleLine = true)
+            } else {
+                InputField(a, { a = it }, when (op) {
+                    "roi" -> "Total value received (before subtracting investment)"
+                    "break-even" -> "Selling price per unit"
+                    "commission" -> "Sales amount"
+                    "pricing", "markup" -> "Unit cost before markup"
+                    "cash-flow" -> "Cash inflows during period"
+                    "salary" -> "Gross annual salary"
+                    "customer-lifetime-value" -> "Average order value"
+                    "customer-acquisition-cost" -> "Customer acquisition spend"
+                    "recurring-revenue" -> "Monthly recurring revenue (MRR)"
+                    "expense" -> "Rent / workspace expense"
+                    "inventory" -> "Unit cost"
+                    "discount" -> "Original price before discount"
+                    "margin", "profit" -> "Revenue / sales"
+                    "payslip" -> "Gross pay (demo only)"
+                    else -> "Amount"
+                }, singleLine = true)
+                if (op !in setOf("salary")) {
+                    InputField(b, { b = it }, when (op) {
+                        "roi" -> "Initial investment"
+                        "break-even" -> "Fixed costs"
+                        "commission" -> "Commission rate (%)"
+                        "pricing", "markup" -> "Markup percentage (%)"
+                        "cash-flow" -> "Cash outflows during period"
+                        "customer-lifetime-value" -> "Purchases per customer / period"
+                        "customer-acquisition-cost" -> "New customers acquired"
+                        "recurring-revenue" -> "Annual revenue growth (%)"
+                        "expense" -> "Payroll / contractor expense"
+                        "inventory" -> "Units in stock"
+                        "discount" -> "Discount rate (%)"
+                        "margin", "profit" -> "Total cost of sales"
+                        "payslip" -> "Tax / statutory deductions"
+                        else -> "Second value"
+                    }, singleLine = true)
+                }
+                if (op in setOf("break-even", "customer-lifetime-value", "cash-flow", "expense", "inventory", "payslip")) {
+                    InputField(c, { c = it }, when (op) {
+                        "break-even" -> "Variable cost per unit"
+                        "customer-lifetime-value" -> "Customer lifespan (periods)"
+                        "cash-flow" -> "Opening cash balance"
+                        "expense" -> "Software / subscription expense"
+                        "inventory" -> "Reorder quantity target"
+                        "payslip" -> "Other deductions"
+                        else -> "Third value"
+                    }, singleLine = true)
+                }
+                if (op == "expense") {
+                    InputField(d, { d = it }, "Transport / operating expense", singleLine = true)
+                    InputField(e, { e = it }, "Other expenses", singleLine = true)
+                }
+            }
+            if (op in setOf("customer-acquisition-cost", "customer-lifetime-value")) {
+                InputField(d, { d = it }, if (op == "customer-acquisition-cost") "Customer lifetime value (optional)" else "Customer acquisition cost (optional)", singleLine = true)
+                InputField(monthlyContribution, { monthlyContribution = it }, if (op == "customer-lifetime-value" && ltvModel == "saas") "Monthly contribution override (optional)" else "Monthly contribution per customer (optional)", singleLine = true)
+            }
+            if (op == "break-even") InputField(targetProfit, { targetProfit = it }, "Target profit (optional)", singleLine = true)
+        }
         if (op in setOf("invoice", "receipt", "quotation", "estimate", "purchase-order")) {
             InputField(businessName, { businessName = it }, "Business name", singleLine = true)
-            InputField(clientName, { clientName = it }, "Client / recipient", singleLine = true)
+            OutlinedButton(onClick = { chooseLogoLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (logoBitmap == null) "Choose local logo (stays on this device)" else "Change local logo")
+            }
+            logoBitmap?.let { logo -> Image(bitmap = logo.asImageBitmap(), contentDescription = "Local business logo preview", modifier = Modifier.size(width = 120.dp, height = 64.dp)) }
+            InputField(clientName, { clientName = it }, when (op) { "receipt" -> "Received from"; "quotation", "estimate" -> "Prepared for"; "purchase-order" -> "Supplier"; else -> "Bill to / recipient" }, singleLine = true)
             InputField(documentNumber, { documentNumber = it }, "Document number", singleLine = true)
             InputField(documentDate, { documentDate = it }, "Document date", singleLine = true)
-            InputField(currency, { currency = it }, "Currency code (e.g. USD, NGN, EUR)", singleLine = true)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { currencyMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Currency: $currency · choose currency") }
+                DropdownMenu(expanded = currencyMenuExpanded, onDismissRequest = { currencyMenuExpanded = false }) {
+                    listOf("USD", "EUR", "GBP", "NGN", "CAD", "AUD", "INR", "GHS", "KES", "ZAR", "JPY").forEach { code ->
+                        DropdownMenuItem(text = { Text(code) }, onClick = { currency = code; currencyMenuExpanded = false })
+                    }
+                }
+            }
             InputField(taxPercent, { taxPercent = it }, "Tax rate (%)", singleLine = true)
             InputField(discountPercent, { discountPercent = it }, "Discount rate (%)", singleLine = true)
-            InputField(lineItems, { lineItems = it }, "Line items (one per line: description | quantity | unit price)", minLines = 3, singleLine = false, tall = true)
+            val liveSubtotal = businessLineRows().sumOf { row ->
+                val quantity = row.getOrElse(1) { "0" }.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: 0.0
+                val price = row.getOrElse(2) { "0" }.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: 0.0
+                val lineTotal = quantity * price
+                if (lineTotal.isFinite()) lineTotal else 0.0
+            }
+            val liveDiscountRate = (discountPercent.toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0).coerceIn(0.0, 100.0)
+            val liveTaxRate = (taxPercent.toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0).coerceAtLeast(0.0)
+            val liveDiscount = liveSubtotal * liveDiscountRate / 100.0
+            val liveTax = (liveSubtotal - liveDiscount) * liveTaxRate / 100.0
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Live document total · $currency", style = MaterialTheme.typography.titleSmall)
+                    Text("Subtotal: ${String.format(java.util.Locale.US, "%.2f", liveSubtotal)}")
+                    Text("Discount: −${String.format(java.util.Locale.US, "%.2f", liveDiscount)}")
+                    Text("Tax: ${String.format(java.util.Locale.US, "%.2f", liveTax)}")
+                    Text("Total: ${String.format(java.util.Locale.US, "%.2f", liveSubtotal - liveDiscount + liveTax)}", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Text("Line items · description, quantity and unit price", style = MaterialTheme.typography.labelLarge)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                businessLineRows().forEachIndexed { index, row ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            InputField(row[0], { updateBusinessLineItem(index, 0, it) }, "Item ${index + 1} description", singleLine = true)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(modifier = Modifier.weight(1f)) { InputField(row[1], { updateBusinessLineItem(index, 1, it) }, "Quantity", singleLine = true) }
+                                Box(modifier = Modifier.weight(1f)) { InputField(row[2], { updateBusinessLineItem(index, 2, it) }, "Unit price", singleLine = true) }
+                            }
+                            OutlinedButton(onClick = { removeBusinessLineItem(index) }, modifier = Modifier.fillMaxWidth()) { Text("Remove item") }
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { addBusinessLineItem() }, modifier = Modifier.fillMaxWidth()) { Text("Add line item") }
+            }
         }
         if (op in setOf("agenda", "meeting-agenda", "minutes", "meeting-minutes")) {
             InputField(meetingTitle, { meetingTitle = it }, "Meeting title", singleLine = true)
@@ -2328,11 +2541,56 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
             InputField(meetingLocation, { meetingLocation = it }, "Location or meeting link", singleLine = true)
             InputField(meetingGoal, { meetingGoal = it }, "Meeting goal", singleLine = true)
             InputField(attendees, { attendees = it }, "Attendees", singleLine = true)
-            if (op in setOf("agenda", "meeting-agenda")) InputField(prepNotes, { prepNotes = it }, "Preparation notes", minLines = 2, singleLine = false, tall = true)
+            if (op in setOf("agenda", "meeting-agenda")) {
+                InputField(prepNotes, { prepNotes = it }, "Preparation notes", minLines = 2, singleLine = false, tall = true)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Timed agenda items", style = MaterialTheme.typography.labelLarge)
+                    val agendaRows = agendaItems.split("\n")
+                    agendaRows.forEachIndexed { index, row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                InputField(row, { value ->
+                                    val updated = agendaItems.split("\n").toMutableList()
+                                    if (index in updated.indices) updated[index] = value
+                                    agendaItems = updated.joinToString("\n")
+                                }, "Item ${index + 1} (topic | minutes)", singleLine = true)
+                            }
+                            OutlinedButton(onClick = {
+                                val updated = agendaItems.split("\n").toMutableList()
+                                if (updated.size > 1) updated.removeAt(index) else updated[0] = ""
+                                agendaItems = updated.joinToString("\n")
+                            }, enabled = agendaRows.size > 1, modifier = Modifier.heightIn(min = 40.dp)) { Text("Remove") }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { if (agendaItems.lines().size < 20) agendaItems = agendaItems.trimEnd() + (if (agendaItems.isBlank()) "" else "\n") + "New agenda item | 5" }, enabled = agendaItems.lines().size < 20, modifier = Modifier.heightIn(min = 40.dp)) { Text("Add timed item") }
+                    }
+                }
+            }
             if (op in setOf("minutes", "meeting-minutes")) {
                 InputField(discussionNotes, { discussionNotes = it }, "Discussion notes", minLines = 3, singleLine = false, tall = true)
                 InputField(decisions, { decisions = it }, "Decisions", minLines = 2, singleLine = false, tall = true)
-                InputField(actionItems, { actionItems = it }, "Action items (owner | task | due date)", minLines = 3, singleLine = false, tall = true)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Action items (owner | task | due date)", style = MaterialTheme.typography.labelLarge)
+                    val actionRows = actionItems.split("\n").filterIndexed { index, row -> index < 20 && (row.isNotBlank() || actionItems.isNotBlank()) }
+                    actionRows.forEachIndexed { index, row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                InputField(row, { value ->
+                                    val updated = actionItems.split("\n").toMutableList()
+                                    if (index in updated.indices) updated[index] = value
+                                    actionItems = updated.joinToString("\n")
+                                }, "Action ${index + 1} (owner | task | due date)", singleLine = true)
+                            }
+                            OutlinedButton(onClick = {
+                                val updated = actionItems.split("\n").toMutableList()
+                                if (updated.size > 1) updated.removeAt(index) else updated[0] = ""
+                                actionItems = updated.joinToString("\n")
+                            }, enabled = actionRows.size > 1, modifier = Modifier.heightIn(min = 40.dp)) { Text("Remove") }
+                        }
+                    }
+                    OutlinedButton(onClick = { if (actionItems.lines().size < 20) actionItems = actionItems.trimEnd() + (if (actionItems.isBlank()) "" else "\n") + " |  | " }, enabled = actionItems.lines().size < 20, modifier = Modifier.heightIn(min = 40.dp)) { Text("Add action item") }
+                }
                 InputField(nextMeeting, { nextMeeting = it }, "Next meeting", singleLine = true)
             }
         }
@@ -2341,17 +2599,66 @@ private fun NativeBusinessToolForm(tool: ToolRecord) {
             InputField(clientName, { clientName = it }, "Employee name", singleLine = true)
             InputField(payPeriod, { payPeriod = it }, "Pay period", singleLine = true)
         }
-        if (op !in setOf("customer-acquisition-cost", "customer-lifetime-value")) InputField(e, { e = it }, "Fifth value (optional)", singleLine = true)
-        if (op !in setOf("agenda", "meeting-agenda", "minutes", "meeting-minutes")) InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
-        InputField(audience, { audience = it }, "Audience", singleLine = true)
+        if (op == "email-signature") {
+            InputField(signatureName, { signatureName = it }, "Name", singleLine = true)
+            InputField(signatureRole, { signatureRole = it }, "Role / title", singleLine = true)
+            InputField(signatureEmail, { signatureEmail = it }, "Email", singleLine = true)
+            InputField(businessName, { businessName = it }, "Company", singleLine = true)
+            InputField(signaturePhone, { signaturePhone = it }, "Phone (optional)", singleLine = true)
+            InputField(signatureWebsite, { signatureWebsite = it }, "Website URL (optional)", singleLine = true)
+            InputField(signatureSocialLink, { signatureSocialLink = it }, "Social / profile URL (optional)", singleLine = true)
+        }
+        if (op in setOf("business-name", "company-name", "brand-name", "product-name", "slogan", "sku")) InputField(seed, { seed = it }, "Seed / topic", singleLine = true)
+        if (op == "slogan") InputField(audience, { audience = it }, "Audience / context", singleLine = true)
+        if (isNaming) {
+            Text("Naming style", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("descriptive" to "Descriptive", "compound" to "Compound", "prefix-suffix" to "Prefix / suffix", "short-brandable" to "Short brandable").forEach { (value, label) ->
+                    if (value == namingStyle) Button(onClick = { namingStyle = value }, modifier = Modifier.weight(1f)) { Text(label, maxLines = 2) }
+                    else OutlinedButton(onClick = { namingStyle = value }, modifier = Modifier.weight(1f)) { Text(label, maxLines = 2) }
+                }
+            }
+            InputField(maxNameLength, { maxNameLength = it }, "Maximum name length (8–60)", singleLine = true)
+            InputField(nameBlacklist, { nameBlacklist = it }, "Exclude words (comma-separated, optional)", singleLine = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { generationOffset = 0; runBusiness() }, modifier = Modifier.weight(1f)) { Text("Generate") }
+                OutlinedButton(onClick = { generationOffset += 1; runBusiness() }, modifier = Modifier.weight(1f)) { Text("More names") }
+            }
+            Text("Locally generated ideas only. No trademark, domain, social-handle, or cultural clearance is performed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(
+                onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.namecheap.com/domains/"))) }.onFailure { error = "Could not open registrar. Check that a browser is installed." } },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+            ) { Text("Check finalists at a registrar ↗") }
+            Text("This external link does not verify availability or premium pricing.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (op in setOf("slogan", "sku")) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { generationOffset = 0; runBusiness() }, modifier = Modifier.weight(1f)) { Text("Generate") }
+                OutlinedButton(onClick = { generationOffset += 1; runBusiness() }, modifier = Modifier.weight(1f)) { Text("More") }
+            }
+        }
+        fun runBusiness() { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 0.0); put("e", e.toDoubleOrNull() ?: 12.0); put("monthlyContribution", monthlyContribution.toDoubleOrNull() ?: 0.0); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("grossMarginPct", grossMarginPct.toDoubleOrNull() ?: 80.0); put("monthlyChurnPct", monthlyChurnPct.toDoubleOrNull() ?: 5.0); put("ltvModel", ltvModel); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("lineItems", lineItems); put("company", businessName); put("client", clientName); put("documentNumber", documentNumber); put("date", documentDate); put("currency", currency); put("taxPercent", taxPercent.toDoubleOrNull() ?: 0.0); put("discountPercent", discountPercent.toDoubleOrNull() ?: 0.0); put("seed", seed); put("audience", audience); put("agendaItems", agendaItems); put("name", signatureName); put("role", signatureRole); put("email", signatureEmail); put("phone", signaturePhone); put("website", signatureWebsite); put("socialLink", signatureSocialLink); put("namingStyle", namingStyle); put("maxNameLength", maxNameLength.toDoubleOrNull() ?: 32.0); put("nameBlacklist", nameBlacklist); put("generationOffset", generationOffset); put("meetingTitle", meetingTitle); put("dateTime", meetingDateTime); put("location", meetingLocation); put("meetingGoal", meetingGoal); put("attendees", attendees); put("prepNotes", prepNotes); put("discussionNotes", discussionNotes); put("decisions", decisions); put("actionItems", actionItems); put("nextMeeting", nextMeeting); put("employeeName", clientName); put("payPeriod", payPeriod); put("gross", a.toDoubleOrNull() ?: 1000.0); put("statutoryDeductions", b.toDoubleOrNull() ?: 0.0); put("otherDeductions", c.toDoubleOrNull() ?: 0.0) }, operationOverride = op) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) }
+        OutlinedButton(onClick = { loadBusinessExample() }, modifier = Modifier.fillMaxWidth()) { Text("Load example") }
         ActionRow(
-            onRun = { runCatching { NativeBusinessEngine.run(tool, JSONObject().apply { put("a", a.toDoubleOrNull() ?: 1000.0); put("b", b.toDoubleOrNull() ?: 600.0); put("c", c.toDoubleOrNull() ?: 50.0); put("d", d.toDoubleOrNull() ?: 0.0); put("e", e.toDoubleOrNull() ?: 12.0); put("monthlyContribution", monthlyContribution.toDoubleOrNull() ?: 0.0); put("targetProfit", targetProfit.toDoubleOrNull() ?: 0.0); put("lineItems", lineItems); put("company", businessName); put("client", clientName); put("documentNumber", documentNumber); put("date", documentDate); put("currency", currency); put("taxPercent", taxPercent.toDoubleOrNull() ?: 0.0); put("discountPercent", discountPercent.toDoubleOrNull() ?: 0.0); put("seed", seed); put("audience", audience); put("meetingTitle", meetingTitle); put("dateTime", meetingDateTime); put("location", meetingLocation); put("meetingGoal", meetingGoal); put("attendees", attendees); put("prepNotes", prepNotes); put("discussionNotes", discussionNotes); put("decisions", decisions); put("actionItems", actionItems); put("nextMeeting", nextMeeting); put("employeeName", clientName); put("payPeriod", payPeriod); put("gross", a.toDoubleOrNull() ?: 1000.0); put("statutoryDeductions", b.toDoubleOrNull() ?: 0.0); put("otherDeductions", c.toDoubleOrNull() ?: 0.0) }) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run business tool" }) },
-            onReset = { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItems="Professional service | 1 | 100"; businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error="" }
+            onRun = { runBusiness() },
+            onReset = { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItems="Professional service | 1 | 100"; replaceLocalLogo(null); businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; agendaItems="Welcome and objectives | 5\nProgress updates | 10\nDecisions and blockers | 15\nActions and next steps | 5"; signatureName="Alex Morgan"; signatureRole="Founder"; signatureEmail="hello@example.com"; signaturePhone=""; signatureWebsite=""; signatureSocialLink=""; namingStyle="descriptive"; maxNameLength="32"; nameBlacklist=""; generationOffset=0; ltvModel="simple"; grossMarginPct="80"; monthlyChurnPct="5"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error="" }
         )
         ResultBox(output, error, ::copy)
+        if (isNaming && output.isNotBlank()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = { copy(output) }, modifier = Modifier.fillMaxWidth()) { Text("Copy all names") }
+                Text("Copy an individual name", style = MaterialTheme.typography.labelLarge)
+                output.lineSequence().filter { it.isNotBlank() }.take(48).forEach { generatedName ->
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(generatedName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = { copy(generatedName) }) { Text("Copy") }
+                    }
+                }
+            }
+        }
         if (output.isNotBlank()) {
-            Button(onClick = { savePdfLauncher.launch("env-${tool.id}.pdf") }, modifier = Modifier.fillMaxWidth()) { Text("Download PDF") }
-            OutlinedButton(onClick = { saveOutputLauncher.launch("env-${tool.id}.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Download output (.txt)") }
+            Button(onClick = { savePdfLauncher.launch("env-${op}.pdf") }, modifier = Modifier.fillMaxWidth()) { Text("Download PDF") }
+            OutlinedButton(onClick = { saveOutputLauncher.launch("env-${op}.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Download output (.txt)") }
         }
     }
 }

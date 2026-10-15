@@ -1,106 +1,106 @@
-legacy_slug,tool_name,studio,mode,category,engine_type,status
-brand-name-generator,Brand Name Generator,Naming Studio,brand-name,business,business,active
-break-even-estimator,Break-Even Estimator,Finance Metrics Studio,break-even,business,business,active
-break-even-generator,Break-Even Generator,Finance Metrics Studio,break-even,business,business,active
-break-even-planner,Break-Even Planner,Finance Metrics Studio,break-even,business,business,active
-break-even-template,Break-Even Template,Finance Metrics Studio,break-even,business,business,active
-business-name-generator,Business Name Generator,Naming Studio,business-name,business,business,active
-cash-flow-calculator,Cash Flow Calculator,Finance Metrics Studio,cash-flow,business,business,active
-cash-flow-estimator,Cash Flow Estimator,Finance Metrics Studio,cash-flow,business,business,active
-cash-flow-generator,Cash Flow Generator,Finance Metrics Studio,cash-flow,business,business,active
-cash-flow-planner,Cash Flow Planner,Finance Metrics Studio,cash-flow,business,business,active
-cash-flow-template,Cash Flow Template,Finance Metrics Studio,cash-flow,business,business,active
-commission-calculator,Commission Calculator,Finance Metrics Studio,commission,business,business,active
-commission-estimator,Commission Estimator,Finance Metrics Studio,commission,business,business,active
-commission-generator,Commission Generator,Finance Metrics Studio,commission,business,business,active
-commission-planner,Commission Planner,Finance Metrics Studio,commission,business,business,active
-commission-template,Commission Template,Finance Metrics Studio,commission,business,business,active
-company-name-generator,Company Name Generator,Naming Studio,company-name,business,business,active
-customer-acquisition-cost-calculator,Customer Acquisition Cost Calculator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
-customer-acquisition-cost-estimator,Customer Acquisition Cost Estimator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
-customer-acquisition-cost-generator,Customer Acquisition Cost Generator,Finance Metrics Studio,customer-acquisition-cost,business,business,active
-customer-acquisition-cost-planner,Customer Acquisition Cost Planner,Finance Metrics Studio,customer-acquisition-cost,business,business,active
-customer-acquisition-cost-template,Customer Acquisition Cost Template,Finance Metrics Studio,customer-acquisition-cost,business,business,active
-customer-lifetime-value-calculator,Customer Lifetime Value Calculator,Finance Metrics Studio,customer-lifetime-value,business,business,active
-customer-lifetime-value-estimator,Customer Lifetime Value Estimator,Finance Metrics Studio,customer-lifetime-value,business,business,active
-customer-lifetime-value-generator,Customer Lifetime Value Generator,Finance Metrics Studio,customer-lifetime-value,business,business,active
-customer-lifetime-value-planner,Customer Lifetime Value Planner,Finance Metrics Studio,customer-lifetime-value,business,business,active
-customer-lifetime-value-template,Customer Lifetime Value Template,Finance Metrics Studio,customer-lifetime-value,business,business,active
-email-signature-generator,Email Signature Generator,Ops Studio,email-signature,business,business,active
-estimate-calculator,Estimate Calculator,Document Studio,estimate,business,business,active
-estimate-estimator,Estimate Estimator,Document Studio,estimate,business,business,active
-estimate-generator,Estimate Generator,Document Studio,estimate,business,business,active
-estimate-planner,Estimate Planner,Document Studio,estimate,business,business,active
-estimate-template,Estimate Template,Document Studio,estimate,business,business,active
-expense-calculator,Expense Calculator,Finance Metrics Studio,expense,business,business,active
-expense-estimator,Expense Estimator,Finance Metrics Studio,expense,business,business,active
-expense-generator,Expense Generator,Finance Metrics Studio,expense,business,business,active
-expense-planner,Expense Planner,Finance Metrics Studio,expense,business,business,active
-expense-template,Expense Template,Finance Metrics Studio,expense,business,business,active
-inventory-calculator,Inventory Calculator,Finance Metrics Studio,inventory,business,business,active
-inventory-estimator,Inventory Estimator,Finance Metrics Studio,inventory,business,business,active
-inventory-generator,Inventory Generator,Finance Metrics Studio,inventory,business,business,active
-inventory-planner,Inventory Planner,Finance Metrics Studio,inventory,business,business,active
-inventory-template,Inventory Template,Finance Metrics Studio,inventory,business,business,active
-invoice-calculator,Invoice Calculator,Document Studio,invoice,business,business,active
-invoice-estimator,Invoice Estimator,Document Studio,invoice,business,business,active
-invoice-generator,Invoice Generator,Document Studio,invoice,business,business,active
-invoice-planner,Invoice Planner,Document Studio,invoice,business,business,active
-invoice-template,Invoice Template,Document Studio,invoice,business,business,active
-margin-estimator,Margin Estimator,Finance Metrics Studio,margin,business,business,active
-margin-generator,Margin Generator,Finance Metrics Studio,margin,business,business,active
-margin-planner,Margin Planner,Finance Metrics Studio,margin,business,business,active
-margin-template,Margin Template,Finance Metrics Studio,margin,business,business,active
-markup-estimator,Markup Estimator,Finance Metrics Studio,markup,business,business,active
-markup-generator,Markup Generator,Finance Metrics Studio,markup,business,business,active
-markup-planner,Markup Planner,Finance Metrics Studio,markup,business,business,active
-markup-template,Markup Template,Finance Metrics Studio,markup,business,business,active
-meeting-agenda-generator,Meeting Agenda Generator,Ops Studio,meeting-agenda,business,business,active
-meeting-minutes-generator,Meeting Minutes Template,Ops Studio,meeting-minutes,business,business,active
-payslip-calculator,Payslip Calculator,Ops Studio,payslip,business,business,active
-payslip-estimator,Payslip Estimator,Ops Studio,payslip,business,business,active
-payslip-generator,Payslip Generator,Ops Studio,payslip,business,business,active
-payslip-planner,Payslip Planner,Ops Studio,payslip,business,business,active
-payslip-template,Payslip Template,Ops Studio,payslip,business,business,active
-pricing-calculator,Pricing Calculator,Finance Metrics Studio,pricing,business,business,active
-pricing-estimator,Pricing Estimator,Finance Metrics Studio,pricing,business,business,active
-pricing-generator,Pricing Generator,Finance Metrics Studio,pricing,business,business,active
-pricing-planner,Pricing Planner,Finance Metrics Studio,pricing,business,business,active
-pricing-template,Pricing Template,Finance Metrics Studio,pricing,business,business,active
-product-name-generator,Product Name Generator,Naming Studio,product-name,business,business,active
-profit-estimator,Profit Estimator,Finance Metrics Studio,profit,business,business,active
-profit-generator,Profit Generator,Finance Metrics Studio,profit,business,business,active
-profit-planner,Profit Planner,Finance Metrics Studio,profit,business,business,active
-profit-template,Profit Template,Finance Metrics Studio,profit,business,business,active
-purchase-order-calculator,Purchase Order Calculator,Document Studio,purchase-order,business,business,active
-purchase-order-estimator,Purchase Order Estimator,Document Studio,purchase-order,business,business,active
-purchase-order-generator,Purchase Order Generator,Document Studio,purchase-order,business,business,active
-purchase-order-planner,Purchase Order Planner,Document Studio,purchase-order,business,business,active
-purchase-order-template,Purchase Order Template,Document Studio,purchase-order,business,business,active
-quotation-calculator,Quotation Calculator,Document Studio,quotation,business,business,active
-quotation-estimator,Quotation Estimator,Document Studio,quotation,business,business,active
-quotation-generator,Quotation Generator,Document Studio,quotation,business,business,active
-quotation-planner,Quotation Planner,Document Studio,quotation,business,business,active
-quotation-template,Quotation Template,Document Studio,quotation,business,business,active
-receipt-calculator,Receipt Calculator,Document Studio,receipt,business,business,active
-receipt-estimator,Receipt Estimator,Document Studio,receipt,business,business,active
-receipt-generator,Receipt Generator,Document Studio,receipt,business,business,active
-receipt-planner,Receipt Planner,Document Studio,receipt,business,business,active
-receipt-template,Receipt Template,Document Studio,receipt,business,business,active
-recurring-revenue-calculator,Recurring Revenue Calculator,Finance Metrics Studio,recurring-revenue,business,business,active
-recurring-revenue-estimator,Recurring Revenue Estimator,Finance Metrics Studio,recurring-revenue,business,business,active
-recurring-revenue-generator,Recurring Revenue Generator,Finance Metrics Studio,recurring-revenue,business,business,active
-recurring-revenue-planner,Recurring Revenue Planner,Finance Metrics Studio,recurring-revenue,business,business,active
-recurring-revenue-template,Recurring Revenue Template,Finance Metrics Studio,recurring-revenue,business,business,active
-roi-estimator,ROI Estimator,Finance Metrics Studio,roi,business,business,active
-roi-generator,ROI Generator,Finance Metrics Studio,roi,business,business,active
-roi-planner,ROI Planner,Finance Metrics Studio,roi,business,business,active
-roi-template,ROI Template,Finance Metrics Studio,roi,business,business,active
-salary-calculator,Salary Calculator,Finance Metrics Studio,salary,business,business,active
-salary-estimator,Salary Estimator,Finance Metrics Studio,salary,business,business,active
-salary-generator,Salary Generator,Finance Metrics Studio,salary,business,business,active
-salary-planner,Salary Planner,Finance Metrics Studio,salary,business,business,active
-salary-template,Salary Template,Finance Metrics Studio,salary,business,business,active
-sku-generator,SKU Generator,Naming Studio,sku,business,business,active
-slogan-generator,Slogan Generator,Naming Studio,slogan,business,business,active
-break-even-calculator,Break-Even Calculator,Finance Metrics Studio,break-even,calculators,business,active
+legacy_slug,legacy_category,legacy_path,engine_operation,studio,studio_title,studio_entry,mode,status
+"brand-name-generator","business","/tools/business/brand-name-generator","brand-name","naming","Naming Studio","/tools/business/naming-studio?mode=brand-name","brand-name","legacy-link-preserved"
+"break-even-estimator","business","/tools/business/break-even-estimator","break-even","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=break-even","break-even","legacy-link-preserved"
+"break-even-generator","business","/tools/business/break-even-generator","break-even","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=break-even","break-even","legacy-link-preserved"
+"break-even-planner","business","/tools/business/break-even-planner","break-even","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=break-even","break-even","legacy-link-preserved"
+"break-even-template","business","/tools/business/break-even-template","break-even","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=break-even","break-even","legacy-link-preserved"
+"business-name-generator","business","/tools/business/business-name-generator","business-name","naming","Naming Studio","/tools/business/naming-studio?mode=business-name","business-name","legacy-link-preserved"
+"cash-flow-calculator","business","/tools/business/cash-flow-calculator","cash-flow","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=cash-flow","cash-flow","legacy-link-preserved"
+"cash-flow-estimator","business","/tools/business/cash-flow-estimator","cash-flow","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=cash-flow","cash-flow","legacy-link-preserved"
+"cash-flow-generator","business","/tools/business/cash-flow-generator","cash-flow","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=cash-flow","cash-flow","legacy-link-preserved"
+"cash-flow-planner","business","/tools/business/cash-flow-planner","cash-flow","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=cash-flow","cash-flow","legacy-link-preserved"
+"cash-flow-template","business","/tools/business/cash-flow-template","cash-flow","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=cash-flow","cash-flow","legacy-link-preserved"
+"commission-calculator","business","/tools/business/commission-calculator","commission","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=commission","commission","legacy-link-preserved"
+"commission-estimator","business","/tools/business/commission-estimator","commission","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=commission","commission","legacy-link-preserved"
+"commission-generator","business","/tools/business/commission-generator","commission","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=commission","commission","legacy-link-preserved"
+"commission-planner","business","/tools/business/commission-planner","commission","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=commission","commission","legacy-link-preserved"
+"commission-template","business","/tools/business/commission-template","commission","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=commission","commission","legacy-link-preserved"
+"company-name-generator","business","/tools/business/company-name-generator","company-name","naming","Naming Studio","/tools/business/naming-studio?mode=company-name","company-name","legacy-link-preserved"
+"customer-acquisition-cost-calculator","business","/tools/business/customer-acquisition-cost-calculator","customer-acquisition-cost","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-acquisition-cost","customer-acquisition-cost","legacy-link-preserved"
+"customer-acquisition-cost-estimator","business","/tools/business/customer-acquisition-cost-estimator","customer-acquisition-cost","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-acquisition-cost","customer-acquisition-cost","legacy-link-preserved"
+"customer-acquisition-cost-generator","business","/tools/business/customer-acquisition-cost-generator","customer-acquisition-cost","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-acquisition-cost","customer-acquisition-cost","legacy-link-preserved"
+"customer-acquisition-cost-planner","business","/tools/business/customer-acquisition-cost-planner","customer-acquisition-cost","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-acquisition-cost","customer-acquisition-cost","legacy-link-preserved"
+"customer-acquisition-cost-template","business","/tools/business/customer-acquisition-cost-template","customer-acquisition-cost","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-acquisition-cost","customer-acquisition-cost","legacy-link-preserved"
+"customer-lifetime-value-calculator","business","/tools/business/customer-lifetime-value-calculator","customer-lifetime-value","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-lifetime-value","customer-lifetime-value","legacy-link-preserved"
+"customer-lifetime-value-estimator","business","/tools/business/customer-lifetime-value-estimator","customer-lifetime-value","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-lifetime-value","customer-lifetime-value","legacy-link-preserved"
+"customer-lifetime-value-generator","business","/tools/business/customer-lifetime-value-generator","customer-lifetime-value","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-lifetime-value","customer-lifetime-value","legacy-link-preserved"
+"customer-lifetime-value-planner","business","/tools/business/customer-lifetime-value-planner","customer-lifetime-value","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-lifetime-value","customer-lifetime-value","legacy-link-preserved"
+"customer-lifetime-value-template","business","/tools/business/customer-lifetime-value-template","customer-lifetime-value","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=customer-lifetime-value","customer-lifetime-value","legacy-link-preserved"
+"email-signature-generator","business","/tools/business/email-signature-generator","email-signature","ops","Ops Studio","/tools/business/ops-studio?mode=email-signature","email-signature","legacy-link-preserved"
+"estimate-calculator","business","/tools/business/estimate-calculator","estimate","document","Document Studio","/tools/business/document-studio?mode=estimate","estimate","legacy-link-preserved"
+"estimate-estimator","business","/tools/business/estimate-estimator","estimate","document","Document Studio","/tools/business/document-studio?mode=estimate","estimate","legacy-link-preserved"
+"estimate-generator","business","/tools/business/estimate-generator","estimate","document","Document Studio","/tools/business/document-studio?mode=estimate","estimate","legacy-link-preserved"
+"estimate-planner","business","/tools/business/estimate-planner","estimate","document","Document Studio","/tools/business/document-studio?mode=estimate","estimate","legacy-link-preserved"
+"estimate-template","business","/tools/business/estimate-template","estimate","document","Document Studio","/tools/business/document-studio?mode=estimate","estimate","legacy-link-preserved"
+"expense-calculator","business","/tools/business/expense-calculator","expense","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=expense","expense","legacy-link-preserved"
+"expense-estimator","business","/tools/business/expense-estimator","expense","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=expense","expense","legacy-link-preserved"
+"expense-generator","business","/tools/business/expense-generator","expense","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=expense","expense","legacy-link-preserved"
+"expense-planner","business","/tools/business/expense-planner","expense","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=expense","expense","legacy-link-preserved"
+"expense-template","business","/tools/business/expense-template","expense","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=expense","expense","legacy-link-preserved"
+"inventory-calculator","business","/tools/business/inventory-calculator","inventory","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=inventory","inventory","legacy-link-preserved"
+"inventory-estimator","business","/tools/business/inventory-estimator","inventory","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=inventory","inventory","legacy-link-preserved"
+"inventory-generator","business","/tools/business/inventory-generator","inventory","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=inventory","inventory","legacy-link-preserved"
+"inventory-planner","business","/tools/business/inventory-planner","inventory","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=inventory","inventory","legacy-link-preserved"
+"inventory-template","business","/tools/business/inventory-template","inventory","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=inventory","inventory","legacy-link-preserved"
+"invoice-calculator","business","/tools/business/invoice-calculator","invoice","document","Document Studio","/tools/business/document-studio?mode=invoice","invoice","legacy-link-preserved"
+"invoice-estimator","business","/tools/business/invoice-estimator","invoice","document","Document Studio","/tools/business/document-studio?mode=invoice","invoice","legacy-link-preserved"
+"invoice-generator","business","/tools/business/invoice-generator","invoice","document","Document Studio","/tools/business/document-studio?mode=invoice","invoice","legacy-link-preserved"
+"invoice-planner","business","/tools/business/invoice-planner","invoice","document","Document Studio","/tools/business/document-studio?mode=invoice","invoice","legacy-link-preserved"
+"invoice-template","business","/tools/business/invoice-template","invoice","document","Document Studio","/tools/business/document-studio?mode=invoice","invoice","legacy-link-preserved"
+"margin-estimator","business","/tools/business/margin-estimator","margin","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=margin","margin","legacy-link-preserved"
+"margin-generator","business","/tools/business/margin-generator","margin","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=margin","margin","legacy-link-preserved"
+"margin-planner","business","/tools/business/margin-planner","margin","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=margin","margin","legacy-link-preserved"
+"margin-template","business","/tools/business/margin-template","margin","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=margin","margin","legacy-link-preserved"
+"markup-estimator","business","/tools/business/markup-estimator","markup","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=markup","markup","legacy-link-preserved"
+"markup-generator","business","/tools/business/markup-generator","markup","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=markup","markup","legacy-link-preserved"
+"markup-planner","business","/tools/business/markup-planner","markup","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=markup","markup","legacy-link-preserved"
+"markup-template","business","/tools/business/markup-template","markup","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=markup","markup","legacy-link-preserved"
+"meeting-agenda-generator","business","/tools/business/meeting-agenda-generator","meeting-agenda","ops","Ops Studio","/tools/business/ops-studio?mode=meeting-agenda","meeting-agenda","legacy-link-preserved"
+"meeting-minutes-generator","business","/tools/business/meeting-minutes-generator","meeting-minutes","ops","Ops Studio","/tools/business/ops-studio?mode=meeting-minutes","meeting-minutes","legacy-link-preserved"
+"payslip-calculator","business","/tools/business/payslip-calculator","payslip","ops","Ops Studio","/tools/business/ops-studio?mode=payslip","payslip","legacy-link-preserved"
+"payslip-estimator","business","/tools/business/payslip-estimator","payslip","ops","Ops Studio","/tools/business/ops-studio?mode=payslip","payslip","legacy-link-preserved"
+"payslip-generator","business","/tools/business/payslip-generator","payslip","ops","Ops Studio","/tools/business/ops-studio?mode=payslip","payslip","legacy-link-preserved"
+"payslip-planner","business","/tools/business/payslip-planner","payslip","ops","Ops Studio","/tools/business/ops-studio?mode=payslip","payslip","legacy-link-preserved"
+"payslip-template","business","/tools/business/payslip-template","payslip","ops","Ops Studio","/tools/business/ops-studio?mode=payslip","payslip","legacy-link-preserved"
+"pricing-calculator","business","/tools/business/pricing-calculator","pricing","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=pricing","pricing","legacy-link-preserved"
+"pricing-estimator","business","/tools/business/pricing-estimator","pricing","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=pricing","pricing","legacy-link-preserved"
+"pricing-generator","business","/tools/business/pricing-generator","pricing","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=pricing","pricing","legacy-link-preserved"
+"pricing-planner","business","/tools/business/pricing-planner","pricing","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=pricing","pricing","legacy-link-preserved"
+"pricing-template","business","/tools/business/pricing-template","pricing","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=pricing","pricing","legacy-link-preserved"
+"product-name-generator","business","/tools/business/product-name-generator","product-name","naming","Naming Studio","/tools/business/naming-studio?mode=product-name","product-name","legacy-link-preserved"
+"profit-estimator","business","/tools/business/profit-estimator","profit","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=profit","profit","legacy-link-preserved"
+"profit-generator","business","/tools/business/profit-generator","profit","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=profit","profit","legacy-link-preserved"
+"profit-planner","business","/tools/business/profit-planner","profit","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=profit","profit","legacy-link-preserved"
+"profit-template","business","/tools/business/profit-template","profit","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=profit","profit","legacy-link-preserved"
+"purchase-order-calculator","business","/tools/business/purchase-order-calculator","purchase-order","document","Document Studio","/tools/business/document-studio?mode=purchase-order","purchase-order","legacy-link-preserved"
+"purchase-order-estimator","business","/tools/business/purchase-order-estimator","purchase-order","document","Document Studio","/tools/business/document-studio?mode=purchase-order","purchase-order","legacy-link-preserved"
+"purchase-order-generator","business","/tools/business/purchase-order-generator","purchase-order","document","Document Studio","/tools/business/document-studio?mode=purchase-order","purchase-order","legacy-link-preserved"
+"purchase-order-planner","business","/tools/business/purchase-order-planner","purchase-order","document","Document Studio","/tools/business/document-studio?mode=purchase-order","purchase-order","legacy-link-preserved"
+"purchase-order-template","business","/tools/business/purchase-order-template","purchase-order","document","Document Studio","/tools/business/document-studio?mode=purchase-order","purchase-order","legacy-link-preserved"
+"quotation-calculator","business","/tools/business/quotation-calculator","quotation","document","Document Studio","/tools/business/document-studio?mode=quotation","quotation","legacy-link-preserved"
+"quotation-estimator","business","/tools/business/quotation-estimator","quotation","document","Document Studio","/tools/business/document-studio?mode=quotation","quotation","legacy-link-preserved"
+"quotation-generator","business","/tools/business/quotation-generator","quotation","document","Document Studio","/tools/business/document-studio?mode=quotation","quotation","legacy-link-preserved"
+"quotation-planner","business","/tools/business/quotation-planner","quotation","document","Document Studio","/tools/business/document-studio?mode=quotation","quotation","legacy-link-preserved"
+"quotation-template","business","/tools/business/quotation-template","quotation","document","Document Studio","/tools/business/document-studio?mode=quotation","quotation","legacy-link-preserved"
+"receipt-calculator","business","/tools/business/receipt-calculator","receipt","document","Document Studio","/tools/business/document-studio?mode=receipt","receipt","legacy-link-preserved"
+"receipt-estimator","business","/tools/business/receipt-estimator","receipt","document","Document Studio","/tools/business/document-studio?mode=receipt","receipt","legacy-link-preserved"
+"receipt-generator","business","/tools/business/receipt-generator","receipt","document","Document Studio","/tools/business/document-studio?mode=receipt","receipt","legacy-link-preserved"
+"receipt-planner","business","/tools/business/receipt-planner","receipt","document","Document Studio","/tools/business/document-studio?mode=receipt","receipt","legacy-link-preserved"
+"receipt-template","business","/tools/business/receipt-template","receipt","document","Document Studio","/tools/business/document-studio?mode=receipt","receipt","legacy-link-preserved"
+"recurring-revenue-calculator","business","/tools/business/recurring-revenue-calculator","recurring-revenue","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=recurring-revenue","recurring-revenue","legacy-link-preserved"
+"recurring-revenue-estimator","business","/tools/business/recurring-revenue-estimator","recurring-revenue","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=recurring-revenue","recurring-revenue","legacy-link-preserved"
+"recurring-revenue-generator","business","/tools/business/recurring-revenue-generator","recurring-revenue","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=recurring-revenue","recurring-revenue","legacy-link-preserved"
+"recurring-revenue-planner","business","/tools/business/recurring-revenue-planner","recurring-revenue","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=recurring-revenue","recurring-revenue","legacy-link-preserved"
+"recurring-revenue-template","business","/tools/business/recurring-revenue-template","recurring-revenue","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=recurring-revenue","recurring-revenue","legacy-link-preserved"
+"roi-estimator","business","/tools/business/roi-estimator","roi","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=roi","roi","legacy-link-preserved"
+"roi-generator","business","/tools/business/roi-generator","roi","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=roi","roi","legacy-link-preserved"
+"roi-planner","business","/tools/business/roi-planner","roi","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=roi","roi","legacy-link-preserved"
+"roi-template","business","/tools/business/roi-template","roi","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=roi","roi","legacy-link-preserved"
+"salary-calculator","business","/tools/business/salary-calculator","salary","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=salary","salary","legacy-link-preserved"
+"salary-estimator","business","/tools/business/salary-estimator","salary","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=salary","salary","legacy-link-preserved"
+"salary-generator","business","/tools/business/salary-generator","salary","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=salary","salary","legacy-link-preserved"
+"salary-planner","business","/tools/business/salary-planner","salary","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=salary","salary","legacy-link-preserved"
+"salary-template","business","/tools/business/salary-template","salary","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=salary","salary","legacy-link-preserved"
+"sku-generator","business","/tools/business/sku-generator","sku","naming","Naming Studio","/tools/business/naming-studio?mode=sku","sku","legacy-link-preserved"
+"slogan-generator","business","/tools/business/slogan-generator","slogan","naming","Naming Studio","/tools/business/naming-studio?mode=slogan","slogan","legacy-link-preserved"
+"break-even-calculator","calculators","/tools/calculators/break-even-calculator","break-even","finance","Finance Metrics Studio","/tools/business/finance-studio?mode=break-even","break-even","redirect-to-studio"

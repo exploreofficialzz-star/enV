@@ -114,7 +114,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "creator":
       return <CreatorEngine op={tool.engine.op} />;
     case "business":
-      return <BusinessEngine tool={tool} />;
+      return <BusinessEngine tool={tool} initialMode={initialMode} />;
     case "audio":
       return <AudioEngine op={tool.engine.op} toolId={tool.id} />;
     case "network":

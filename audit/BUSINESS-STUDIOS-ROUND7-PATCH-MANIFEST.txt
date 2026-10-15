@@ -1,0 +1,41 @@
+enV Business Studios — Round 7 changed-files patch manifest
+Date: 2026-10-15
+Baseline package: enV-business-studios-competitive-round5-2026-10-15.zip
+Patch archive root: enV/
+Apply by extracting over the matching baseline project; no file removals are required.
+Excluded by package policy: node_modules, .git, build/DerivedData, Gradle/build caches and real environment secrets.
+
+Changed files before including this manifest: 11 added, 15 modified, 0 removed.
+This manifest is itself included as an added file and is not listed below to avoid self-reference.
+
+ADDED FILES
+  + audit/BUSINESS-STUDIOS-COMPETITIVE-RESEARCH-ROUND7-2026-10-15.md  sha256=8b44e3ee0858bc05afebb1de39aa5f12a8147280538ab1705fc1edbbd3146f2f
+  + audit/BUSINESS-STUDIOS-ROUND7-CHANGELOG-2026-10-15.md  sha256=e4332b92cb0b661383a1d27a550d7087d50cc0bb4a9e510ae49d8f7a00c4321c
+  + audit/BUSINESS-STUDIOS-ROUND7-GAP-MATRIX-2026-10-15.csv  sha256=8d10c1c47bc5e9e9dfcbc70515a7d40f71b42b1f48d7b87b40aad302fff302f2
+  + audit/BUSINESS-STUDIOS-ROUND7-GOLDEN-RESULTS-2026-10-15.md  sha256=a5d98f8a426ea21d696acb04f5e4094b081272d2335894715f9c495f526d7018
+  + audit/BUSINESS-STUDIOS-ROUND7-IMPLEMENTATION-AND-VERIFICATION-2026-10-15.md  sha256=b9bd13ab5a8b18e0f1c73e1c2d56893406d94e06ec5838347ef49a5449a8dde9
+  + audit/enV-business-enhance-agent-prompt.txt  sha256=9d322271e17581b712af5d05bcb1b5cdb63e087dd405bfe430a3714452fbbae0
+  + scripts/export-business-studios-map.mjs  sha256=c337f4af105df45852c55f3c018b0e58094d6c9edf4df47daee5395f44b264c7
+  + src/lib/business-studios-catalog.test.ts  sha256=501ce1fd006498ae0808fd20f044c5cf8f8397d81c0ecd7e078f8e83612b80d7
+  + src/lib/business-studios-catalog.ts  sha256=4c18ba006e68362b73a87f290d5b36d0e418868d91bfa2a9b54fe4e5ca6ffc73
+  + src/lib/engines/business-studios.test.ts  sha256=5f73b7221da54e1de7830e5a13b8f8b49070ae640a679ae71df8ec257de3496b
+  + src/lib/engines/business-studios.ts  sha256=d453652af15ea60bcd3227a03d9e3fc83496e6b4b5b8f794d32457ff420c4d18
+
+MODIFIED FILES
+  * BUSINESS-STUDIOS-AUDIT.md  sha256=60cb63820330a4e7149224884169cdc569d1cd5fe85376b4a7eac12106c3b4db
+  * apps/android/app/src/main/java/com/chastech/env/MainActivity.kt  sha256=6c1fd4a41c4fce083e60582ecf685bb198032044aed71daa8c9af7dc1e97ad04
+  * apps/android/app/src/main/java/com/chastech/env/engine/NativeBusinessEngine.kt  sha256=51134c2e12ec68edb4467e4e228d021fc35d50d06f1ea437a1e334b9de0c221f
+  * apps/android/app/src/main/java/com/chastech/env/engine/NativeBusinessPdfExporter.kt  sha256=f12bf991f618e03eccf404442baf109c3e9464499c45eec81b378a9b5650188d
+  * apps/android/app/src/test/java/com/chastech/env/engine/NativeBusinessEngineTest.kt  sha256=6f7b098fd877fe329479925e1f6ecef7c1a039ea7946138577aae9575aaec54e
+  * apps/ios/enV/NativeBusinessEngine.swift  sha256=a1d4e6443fa1c44f2f0d6e49d92a40728228be2d1008e11885a0bc6cae7c4f18
+  * apps/ios/enV/ToolViews.swift  sha256=8bd0aa1851b9c1b3e2e307a8a359bb7932a2f2d8bfc89c2c321c209e3822ca16
+  * apps/ios/enVTests/NativeBusinessEngineTests.swift  sha256=6a285fbb7c649b2e22423c51c74d82affc8f3a1abadb9b9a65e29ed24d707ae6
+  * docs/business-studios-slug-map.csv  sha256=524ec1a0ed3799073a06a81b0d01c8b6bed575c59c9dbfcb2e8e5ba3720ae4e5
+  * package.json  sha256=c3966fb74da86cf078cfe644f140e5640358f3eaaa5260c307abb0be3e404075
+  * scripts/check-business-studios.mjs  sha256=beaa58274a4a3139285529bf2e3da1ee7fb2cbc86161693c777c386025975f9f
+  * src/components/engines/business-engine.tsx  sha256=577a30c288c3b0c162fe3f008444758b69eb66b77ecb7316f83fc47b1190171a
+  * src/components/tools/tool-engine.tsx  sha256=6b4add88e76700410d04ab67f320b6ecc1abb9674c591f7f9d94685d4868e896
+  * src/routes/tools/$category/$slug.tsx  sha256=a57ad92759eb7916c0668e996001e1f28a7e1a50158e5ea230c6c2dd05a59ece
+  * src/routes/tools/$category/index.tsx  sha256=a9d3b0741dbeaeb638ba4bdb1b30b4c4d0c2301e2d768ebc69eb8c9e6ae88934
+
+Removed files: none.
