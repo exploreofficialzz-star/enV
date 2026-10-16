@@ -1,5 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.chastech.env
 
 import android.Manifest
@@ -193,6 +191,7 @@ private fun limitedRead(input: java.io.InputStream, maxBytes: Int): ByteArray {
 }
 
 /** Native CameraX capture plus on-device Media3 composition. Source media never leaves the device. */
+@androidx.media3.common.util.UnstableApi
 @Composable
 fun NativeMusicLiveVideoStudio() {
     val context = LocalContext.current
