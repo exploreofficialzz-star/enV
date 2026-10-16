@@ -1,5 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.chastech.env
 
 import androidx.media3.common.C
@@ -21,6 +19,7 @@ import kotlin.math.tanh
  * so they do not intentionally change the backing track. This is an offline render
  * chain, not real-time mic monitoring or a substitute for a true look-ahead limiter.
  */
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 class NativeVocalPresetAudioProcessor(
     private val presetId: String,
     private val eqBandsDb: List<Float> = List(10) { 0f },
