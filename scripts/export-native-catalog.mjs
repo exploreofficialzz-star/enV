@@ -2,22 +2,16 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseGeneratedCatalog } from "./catalog-reader.mjs";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const categorySource = readFileSync(new URL("../src/data/categories.ts", import.meta.url), "utf8");
-const tools = parseGeneratedCatalog(catalogSource);
-const decodeTsString = (value) => JSON.parse(`"${value}"`);
-const categoryPattern =
-  /\{\s*id:\s*"((?:\\.|[^"\\])*)"\s*,\s*name:\s*"((?:\\.|[^"\\])*)"\s*,\s*description:\s*"((?:\\.|[^"\\])*)"\s*,\s*blurb:\s*"((?:\\.|[^"\\])*)"\s*,\s*icon:\s*"((?:\\.|[^"\\])*)"\s*,?\s*\}/gs;
-const categories = [...categorySource.matchAll(categoryPattern)].map((match) => ({
-  id: decodeTsString(match[1]),
-  name: decodeTsString(match[2]),
-  description: decodeTsString(match[3]),
-  blurb: decodeTsString(match[4]),
-  icon: decodeTsString(match[5]),
-}));
+const [{ tools }, { CATEGORIES: categories }] = await Promise.all([
+  import("../src/data/catalog.ts"),
+  import("../src/data/categories.ts"),
+]);
+// Import the public runtime catalog rather than parsing only catalogJson. Studios
+// appended to the generated base catalog must also reach Android/iOS offline assets.
+
 const categoryIds = new Set(categories.map((category) => category.id));
 if (categoryIds.size !== categories.length) {
   throw new Error("Category IDs in src/data/categories.ts must be unique.");

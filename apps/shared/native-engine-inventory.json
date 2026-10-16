@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "3b282a833efa",
+  "catalogVersion": "2342e3054da8",
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
@@ -17,12 +17,12 @@
     },
     {
       "family": "audio",
-      "total": 84,
-      "active": 84,
+      "total": 108,
+      "active": 108,
       "planned": 0,
       "androidImplemented": 0,
       "iosImplemented": 0,
-      "uniqueConfigurations": 84
+      "uniqueConfigurations": 103
     },
     {
       "family": "barcode",
@@ -15759,8 +15759,8 @@
     "z-score-calculator"
   ],
   "summary": {
-    "totalTools": 10000,
-    "activeTools": 10000,
+    "totalTools": 10024,
+    "activeTools": 10024,
     "plannedTools": 0,
     "engineFamilies": 27,
     "androidImplemented": 7752,

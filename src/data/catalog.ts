@@ -453,4 +453,792 @@ const catalogJson = [
 "ubnet-calculator\",\"port-reference\",\"ipv4-broadcast-address\",\"ipv4-host-range\",\"ipv6-address-type\"],\"engine\":{\"type\":\"network\",\"op\":\"header-parser\"}},{\"id\":\"http-method-reference\",\"name\":\"HTTP Method Reference\",\"slug\":\"http-method-reference\",\"description\":\"Reference standard HTTP request methods and purposes.\",\"category\":\"network\",\"keywords\":[\"http\",\"methods\",\"rest\"],\"tags\":[\"http\",\"methods\",\"rest\"],\"icon\":\"Globe\",\"popularity\":84,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"cidr-calculator\",\"url-encode\",\"url-decode\",\"subnet-calculator\",\"ipv6-expand\",\"ipv6-compress\"],\"engine\":{\"type\":\"network\",\"op\":\"http-method-reference\"}},{\"id\":\"http-status-reference\",\"name\":\"HTTP Status Code Reference\",\"slug\":\"http-status-reference\",\"description\":\"Reference common HTTP response status codes.\",\"category\":\"network\",\"keywords\":[\"http\",\"status\",\"codes\"],\"tags\":[\"http\",\"status\",\"codes\"],\"icon\":\"Globe\",\"popularity\":88,\"featured\":true,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-calculator\",\"subnet-calculator\",\"cidr-calculator\",\"url-encode\",\"url-decode\",\"http-method-reference\"],\"engine\":{\"type\":\"network\",\"op\":\"http-status-reference\"}},{\"id\":\"ipv4-binary\",\"name\":\"IPv4 Binary Converter\",\"slug\":\"ipv4-binary\",\"description\":\"Convert an IPv4 address and mask to binary.\",\"category\":\"network\",\"keywords\":[\"ipv4\",\"binary\",\"bits\"],\"tags\":[\"ipv4\",\"binary\",\"bits\"],\"icon\":\"Globe\",\"popularity\":72,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-mask-from-prefix\",\"ipv4-prefix-from-mask\",\"websocket-url-builder\",\"ipv4-decimal\",\"ipv4-wildcard-mask\",\"ipv4-host-count\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-binary\"}},{\"id\":\"ipv4-broadcast-address\",\"name\":\"IPv4 Broadcast Address Calculator\",\"slug\":\"ipv4-broadcast-address\",\"description\":\"Find the IPv4 broadcast address.\",\"category\":\"network\",\"keywords\":[\"broadcast\",\"address\",\"cidr\"],\"tags\":[\"broadcast\",\"address\",\"cidr\"],\"icon\":\"Globe\",\"popularity\":76,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-host-range\",\"ipv6-address-type\",\"basic-auth-header\",\"bearer-header\",\"content-type-reference\",\"ipv4-network-address\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-broadcast-address\"}},{\"id\":\"ipv4-calculator\",\"name\":\"IPv4 Calculator\",\"slug\":\"ipv4-calculator\",\"description\":\"Network, broadcast, host range, mask, and host count from IPv4/CIDR.\",\"category\":\"network\",\"keywords\":[\"ipv4\",\"ip\",\"subnet\",\"cidr\"],\"tags\":[\"ipv4\",\"ip\",\"subnet\",\"cidr\"],\"icon\":\"Globe\",\"popularity\":88,\"featured\":true,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"http-status-reference\",\"subnet-calculator\",\"cidr-calculator\",\"url-encode\",\"url-decode\",\"http-method-reference\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-calculator\"}},{\"id\":\"ipv4-decimal\",\"name\":\"IPv4 Decimal Converter\",\"slug\":\"ipv4-decimal\",\"description\":\"Convert an IPv4 address to its unsigned 32-bit integer.\",\"category\":\"network\",\"keywords\":[\"ipv4\",\"decimal\",\"integer\"],\"tags\":[\"ipv4\",\"decimal\",\"integer\"],\"icon\":\"Globe\",\"popularity\":70,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-split-subnets\",\"localhost-url-builder\",\"ipv4-binary\",\"ipv4-mask-from-prefix\",\"ipv4-prefix-from-mask\",\"ipv4-subnet-count\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-decimal\"}},{\"id\":\"ipv4-host-count\",\"name\":\"IPv4 Host Count Calculator\",\"slug\":\"ipv4-host-count\",\"description\":\"Calculate total and usable IPv4 addresses in a prefix.\",\"category\":\"network\",\"keywords\":[\"hosts\",\"addresses\",\"subnet\"],\"tags\":[\"hosts\",\"addresses\",\"subnet\"],\"icon\":\"Globe\",\"popularity\":74,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-wildcard-mask\",\"connection-info\",\"ipv4-binary\",\"ipv4-broadcast-address\",\"ipv4-host-range\",\"ipv4-mask-from-prefix\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-host-count\"}},{\"id\":\"ipv4-host-range\",\"name\":\"IPv4 Host Range Calculator\",\"slug\":\"ipv4-host-range\",\"description\":\"Find the first and last usable IPv4 hosts.\",\"category\":\"network\",\"keywords\":[\"host\",\"range\",\"subnet\"],\"tags\":[\"host\",\"range\",\"subnet\"],\"icon\":\"Globe\",\"popularity\":76,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-broadcast-address\",\"ipv6-address-type\",\"basic-auth-header\",\"bearer-header\",\"content-type-reference\",\"ipv4-network-address\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-host-range\"}},{\"id\":\"ipv4-mask-from-prefix\",\"name\":\"IPv4 Mask from Prefix\",\"slug\":\"ipv4-mask-from-prefix\",\"description\":\"Convert a CIDR prefix such as /24 into a dotted mask.\",\"category\":\"network\",\"keywords\":[\"subnet\",\"mask\",\"prefix\"],\"tags\":[\"subnet\",\"mask\",\"prefix\"],\"icon\":\"Globe\",\"popularity\":72,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-binary\",\"ipv4-prefix-from-mask\",\"websocket-url-builder\",\"ipv4-decimal\",\"ipv4-wildcard-mask\",\"ipv4-host-count\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-mask-from-prefix\"}},{\"id\":\"ipv4-network-address\",\"name\":\"IPv4 Network Address Calculator\",\"slug\":\"ipv4-network-address\",\"description\":\"Find the network address for an IPv4/CIDR pair.\",\"category\":\"network\",\"keywords\":[\"network\",\"address\",\"cidr\"],\"tags\":[\"network\",\"address\",\"cidr\"],\"icon\":\"Globe\",\"popularity\":78,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-subnet-calculator\",\"port-reference\",\"header-parser\",\"ipv4-broadcast-address\",\"ipv4-host-range\",\"ipv6-address-type\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-network-address\"}},{\"id\":\"ipv4-prefix-from-mask\",\"name\":\"IPv4 Prefix from Mask\",\"slug\":\"ipv4-prefix-from-mask\",\"description\":\"Convert a contiguous IPv4 subnet mask into CIDR notation.\",\"category\":\"network\",\"keywords\":[\"subnet\",\"mask\",\"cidr\"],\"tags\":[\"subnet\",\"mask\",\"cidr\"],\"icon\":\"Globe\",\"popularity\":72,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-binary\",\"ipv4-mask-from-prefix\",\"websocket-url-builder\",\"ipv4-decimal\",\"ipv4-wildcard-mask\",\"ipv4-host-count\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-prefix-from-mask\"}},{\"id\":\"ipv4-subnet-count\",\"name\":\"IPv4 Subnet Capacity Calculator\",\"slug\":\"ipv4-subnet-count\",\"description\":\"Show address capacity for an IPv4 prefix.\",\"category\":\"network\",\"keywords\":[\"subnet\",\"capacity\"],\"tags\":[\"subnet\",\"capacity\"],\"icon\":\"Globe\",\"popularity\":68,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-binary\",\"url-origin\",\"ipv4-decimal\",\"ipv4-split-subnets\",\"url-path-analyzer\",\"localhost-url-builder\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-subnet-count\"}},{\"id\":\"ipv4-split-subnets\",\"name\":\"IPv4 Subnet Split Helper\",\"slug\":\"ipv4-split-subnets\",\"description\":\"Compare address capacity when choosing a smaller IPv4 prefix.\",\"category\":\"network\",\"keywords\":[\"split\",\"subnet\",\"cidr\"],\"tags\":[\"split\",\"subnet\",\"cidr\"],\"icon\":\"Globe\",\"popularity\":70,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-decimal\",\"localhost-url-builder\",\"ipv4-binary\",\"ipv4-mask-from-prefix\",\"ipv4-prefix-from-mask\",\"ipv4-subnet-count\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-split-subnets\"}},{\"id\":\"ipv4-wildcard-mask\",\"name\":\"IPv4 Wildcard Mask Calculator\",\"slug\":\"ipv4-wildcard-mask\",\"description\":\"Calculate the inverse/wildcard mask for an IPv4 prefix.\",\"category\":\"network\",\"keywords\":[\"wildcard\",\"mask\",\"acl\"],\"tags\":[\"wildcard\",\"mask\",\"acl\"],\"icon\":\"Globe\",\"popularity\":74,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-host-count\",\"connection-info\",\"ipv4-binary\",\"ipv4-broadcast-address\",\"ipv4-host-range\",\"ipv4-mask-from-prefix\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv4-wildcard-mask\"}},{\"id\":\"ipv6-address-type\",\"name\":\"IPv6 Address Type Checker\",\"slug\":\"ipv6-address-type\",\"description\":\"Identify common IPv6 address classes locally.\",\"category\":\"network\",\"keywords\":[\"ipv6\",\"multicast\",\"loopback\",\"private\"],\"tags\":[\"ipv6\",\"multicast\",\"loopback\",\"private\"],\"icon\":\"Globe\",\"popularity\":76,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-broadcast-address\",\"ipv4-host-range\",\"basic-auth-header\",\"bearer-header\",\"content-type-reference\",\"ipv4-network-address\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv6-address-type\"}},{\"id\":\"ipv6-binary\",\"name\":\"IPv6 Binary Converter\",\"slug\":\"ipv6-binary\",\"description\":\"Convert IPv6 into its 128-bit binary representation.\",\"category\":\"network\",\"keywords\":[\"ipv6\",\"binary\"],\"tags\":[\"ipv6\",\"binary\"],\"icon\":\"Globe\",\"popularity\":68,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-subnet-count\",\"url-origin\",\"ipv4-decimal\",\"ipv4-split-subnets\",\"url-path-analyzer\",\"localhost-url-builder\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv6-binary\"}},{\"id\":\"ipv6-compress\",\"name\":\"IPv6 Compression Tool\",\"slug\":\"ipv6-compress\",\"description\":\"Compress an IPv6 address using canonical zero-run compression.\",\"category\":\"network\",\"keywords\":[\"ipv6\",\"compress\"],\"tags\":[\"ipv6\",\"compress\"],\"icon\":\"Globe\",\"popularity\":82,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-expand\",\"url-query-parser\",\"url-query-builder\",\"cidr-calculator\",\"url-encode\",\"url-decode\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv6-compress\"}},{\"id\":\"ipv6-expand\",\"name\":\"IPv6 Expansion Tool\",\"slug\":\"ipv6-expand\",\"description\":\"Expand compressed IPv6 notation into eight groups.\",\"category\":\"network\",\"keywords\":[\"ipv6\",\"expand\"],\"tags\":[\"ipv6\",\"expand\"],\"icon\":\"Globe\",\"popularity\":82,\"featured\":true,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-compress\",\"url-query-parser\",\"url-query-builder\",\"cidr-calculator\",\"url-encode\",\"url-decode\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv6-expand\"}},{\"id\":\"ipv6-subnet-calculator\",\"name\":\"IPv6 Subnet Calculator\",\"slug\":\"ipv6-subnet-calculator\",\"description\":\"Calculate an IPv6 network and address capacity from a prefix.\",\"category\":\"network\",\"keywords\":[\"ipv6\",\"cidr\",\"subnet\"],\"tags\":[\"ipv6\",\"cidr\",\"subnet\"],\"icon\":\"Globe\",\"popularity\":78,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-network-address\",\"port-reference\",\"header-parser\",\"ipv4-broadcast-address\",\"ipv4-host-range\",\"ipv6-address-type\"],\"engine\":{\"type\":\"network\",\"op\":\"ipv6-subnet-calculator\"}},{\"id\":\"localhost-url-builder\",\"name\":\"Localhost URL Builder\",\"slug\":\"localhost-url-builder\",\"description\":\"Build localhost development URLs from host, port, and path.\",\"category\":\"network\",\"keywords\":[\"localhost\",\"dev\",\"url\"],\"tags\":[\"localhost\",\"dev\",\"url\"],\"icon\":\"Globe\",\"popularity\":70,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-decimal\",\"ipv4-split-subnets\",\"ipv4-binary\",\"ipv4-mask-from-prefix\",\"ipv4-prefix-from-mask\",\"ipv4-subnet-count\"],\"engine\":{\"type\":\"network\",\"op\":\"localhost-url-builder\"}},{\"id\":\"port-lookup\",\"name\":\"Port Lookup\",\"slug\":\"port-lookup\",\"description\":\"Look up a common TCP/UDP port and its service.\",\"category\":\"network\",\"keywords\":[\"port\",\"tcp\",\"udp\"],\"tags\":[\"port\",\"tcp\",\"udp\"],\"icon\":\"Globe\",\"popularity\":80,\"featured\":true,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"header-format\",\"ipv4-network-address\",\"ipv6-expand\",\"ipv6-compress\",\"ipv6-subnet-calculator\",\"url-query-parser\"],\"engine\":{\"type\":\"network\",\"op\":\"port-lookup\"}},{\"id\":\"subnet-calculator\",\"name\":\"Subnet Calculator\",\"slug\":\"subnet-calculator\",\"description\":\"Calculate IPv4 subnet boundaries and usable host ranges.\",\"category\":\"network\",\"keywords\":[\"subnet\",\"mask\",\"cidr\",\"ipv4\"],\"tags\":[\"subnet\",\"mask\",\"cidr\",\"ipv4\"],\"icon\":\"Globe\",\"popularity\":86,\"featured\":true,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-calculator\",\"cidr-calculator\",\"url-encode\",\"url-decode\",\"http-status-reference\",\"http-method-reference\"],\"engine\":{\"type\":\"network\",\"op\":\"subnet-calculator\"}},{\"id\":\"url-decode\",\"name\":\"URL Component Decoder\",\"slug\":\"url-decode\",\"description\":\"Decode percent-encoded URL component text.\",\"category\":\"network\",\"keywords\":[\"url\",\"decode\",\"percent\"],\"tags\":[\"url\",\"decode\",\"percent\"],\"icon\":\"Globe\",\"popularity\":84,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"cidr-calculator\",\"url-encode\",\"http-method-reference\",\"subnet-calculator\",\"ipv6-expand\",\"ipv6-compress\"],\"engine\":{\"type\":\"network\",\"op\":\"url-decode\"}},{\"id\":\"url-encode\",\"name\":\"URL Component Encoder\",\"slug\":\"url-encode\",\"description\":\"Percent-encode URL component text.\",\"category\":\"network\",\"keywords\":[\"url\",\"encode\",\"percent\"],\"tags\":[\"url\",\"encode\",\"percent\"],\"icon\":\"Globe\",\"popularity\":84,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"cidr-calculator\",\"url-decode\",\"http-method-reference\",\"subnet-calculator\",\"ipv6-expand\",\"ipv6-compress\"],\"engine\":{\"type\":\"network\",\"op\":\"url-encode\"}},{\"id\":\"url-origin\",\"name\":\"URL Origin Extractor\",\"slug\":\"url-origin\",\"description\":\"Extract the origin from a URL.\",\"category\":\"network\",\"keywords\":[\"origin\",\"protocol\",\"host\"],\"tags\":[\"origin\",\"protocol\",\"host\"],\"icon\":\"Globe\",\"popularity\":68,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-subnet-count\",\"ipv6-binary\",\"ipv4-decimal\",\"ipv4-split-subnets\",\"url-path-analyzer\",\"localhost-url-builder\"],\"engine\":{\"type\":\"network\",\"op\":\"url-origin\"}},{\"id\":\"url-path-analyzer\",\"name\":\"URL Path Analyzer\",\"slug\":\"url-path-analyzer\",\"description\":\"Inspect URL path segments and the final path component.\",\"category\":\"network\",\"keywords\":[\"url\",\"path\"],\"tags\":[\"url\",\"path\"],\"icon\":\"Globe\",\"popularity\":66,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-subnet-count\",\"ipv6-binary\",\"url-origin\",\"ipv4-decimal\",\"ipv4-split-subnets\",\"localhost-url-builder\"],\"engine\":{\"type\":\"network\",\"op\":\"url-path-analyzer\"}},{\"id\":\"url-query-builder\",\"name\":\"URL Query Builder\",\"slug\":\"url-query-builder\",\"description\":\"Add or replace a query parameter in a URL.\",\"category\":\"network\",\"keywords\":[\"query\",\"builder\",\"url\"],\"tags\":[\"query\",\"builder\",\"url\"],\"icon\":\"Globe\",\"popularity\":82,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-expand\",\"ipv6-compress\",\"url-query-parser\",\"cidr-calculator\",\"url-encode\",\"url-decode\"],\"engine\":{\"type\":\"network\",\"op\":\"url-query-builder\"}},{\"id\":\"url-query-parser\",\"name\":\"URL Query Parser\",\"slug\":\"url-query-parser\",\"description\":\"List URL query parameters as key/value pairs.\",\"category\":\"network\",\"keywords\":[\"query\",\"params\",\"url\"],\"tags\":[\"query\",\"params\",\"url\"],\"icon\":\"Globe\",\"popularity\":82,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv6-expand\",\"ipv6-compress\",\"url-query-builder\",\"cidr-calculator\",\"url-encode\",\"url-decode\"],\"engine\":{\"type\":\"network\",\"op\":\"url-query-parser\"}},{\"id\":\"website-screenshot\",\"name\":\"Website Screenshot\",\"slug\":\"website-screenshot\",\"description\":\"Requires a headless browser on a server.\",\"category\":\"network\",\"keywords\":[\"website\",\"screenshot\"],\"tags\":[\"website\",\"screenshot\"],\"icon\":\"Globe\",\"popularity\":35,\"featured\":false,\"clientSide\":false,\"requiresBackend\":true,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"url-path-analyzer\",\"ipv4-subnet-count\",\"ipv6-binary\",\"url-origin\",\"ipv4-decimal\",\"ipv4-split-subnets\"],\"engine\":{\"type\":\"custom\",\"id\":\"website-screenshot\"}},{\"id\":\"websocket-url-builder\",\"name\":\"WebSocket URL Builder\",\"slug\":\"websocket-url-builder\",\"description\":\"Build ws:// or wss:// endpoint URLs.\",\"category\":\"network\",\"keywords\":[\"websocket\",\"ws\",\"wss\"],\"tags\":[\"websocket\",\"ws\",\"wss\"],\"icon\":\"Globe\",\"popularity\":72,\"featured\":false,\"clientSide\":true,\"requiresBackend\":false,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"ipv4-binary\",\"ipv4-mask-from-prefix\",\"ipv4-prefix-from-mask\",\"ipv4-decimal\",\"ipv4-wildcard-mask\",\"ipv4-host-count\"],\"engine\":{\"type\":\"network\",\"op\":\"websocket-url-builder\"}},{\"id\":\"whois-lookup\",\"name\":\"WHOIS Lookup\",\"slug\":\"whois-lookup\",\"description\":\"Requires a server-side WHOIS gateway.\",\"category\":\"network\",\"keywords\":[\"whois\",\"domain\"],\"tags\":[\"whois\",\"domain\"],\"icon\":\"Globe\",\"popularity\":36,\"featured\":false,\"clientSide\":false,\"requiresBackend\":true,\"requiresAuth\":false,\"status\":\"active\",\"related\":[\"url-path-analyzer\",\"ipv4-subnet-count\",\"ipv6-binary\",\"url-origin\",\"ipv4-decimal\",\"ipv4-split-subnets\"],\"engine\":{\"type\":\"custom\",\"id\":\"whois-lookup\"}}]"
 ].join("");
 
-export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
+const originalTools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
+const audioStudioTools: ToolMeta[] = [
+  {
+    "id": "music-studio",
+    "name": "Music Studio",
+    "slug": "music-studio",
+    "description": "A private local-first workspace to separate stems, mix, practice, record a duet and export karaoke audio.",
+    "category": "audio",
+    "keywords": [
+      "Music",
+      "separation",
+      "karaoke",
+      "duet"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 100,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "music-separator",
+    "name": "Music Separator",
+    "slug": "music-separator",
+    "description": "Separate a rights-cleared local track into drums, bass, other and vocals in the browser.",
+    "category": "audio",
+    "keywords": [
+      "music",
+      "stems",
+      "vocals",
+      "instrumental"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "music-duet",
+    "name": "Music Duet",
+    "slug": "music-duet",
+    "description": "Record local microphone takes and mix them with a stem or instrumental track.",
+    "category": "audio",
+    "keywords": [
+      "duet",
+      "record",
+      "vocals"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "music-karaoke",
+    "name": "Music Karaoke",
+    "slug": "music-karaoke",
+    "description": "Make an instrumental practice mix and keep pasted lyrics visible while playing.",
+    "category": "audio",
+    "keywords": [
+      "karaoke",
+      "lyrics",
+      "instrumental"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "music-stem-mixer",
+    "name": "Music Stem Mixer",
+    "slug": "music-stem-mixer",
+    "description": "Mute, solo, set the level of stems, A/B the original and export a custom mix.",
+    "category": "audio",
+    "keywords": [
+      "mixer",
+      "stems",
+      "volume"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "music-practice",
+    "name": "Music Practice",
+    "slug": "music-practice",
+    "description": "Loop passages, adjust playback rate and pitch, add count-in and metronome clicks.",
+    "category": "audio",
+    "keywords": [
+      "practice",
+      "loop",
+      "tempo",
+      "pitch"
+    ],
+    "tags": [
+      "audio-studio",
+      "music-studio"
+    ],
+    "icon": "Music",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "music-studio"
+    }
+  },
+  {
+    "id": "audio-convert-studio",
+    "name": "Audio Convert Studio",
+    "slug": "audio-convert-studio",
+    "description": "Convert to WAV locally and open configured server-only conversion routes when needed.",
+    "category": "audio",
+    "keywords": [
+      "convert",
+      "wav",
+      "sample rate",
+      "channels"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 100,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-convert"
+    }
+  },
+  {
+    "id": "audio-edit-studio",
+    "name": "Audio Edit Studio",
+    "slug": "audio-edit-studio",
+    "description": "Trim, fade, normalize, reverse, gate noise and edit audio locally.",
+    "category": "audio",
+    "keywords": [
+      "edit",
+      "trim",
+      "fade",
+      "noise"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 100,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-edit"
+    }
+  },
+  {
+    "id": "audio-analyze-studio",
+    "name": "Audio Analyze Studio",
+    "slug": "audio-analyze-studio",
+    "description": "Inspect audio, measure peaks and RMS, create waveforms and approximate spectrogram/loudness views.",
+    "category": "audio",
+    "keywords": [
+      "analyze",
+      "waveform",
+      "lufs",
+      "spectrogram"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 100,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-analyze"
+    }
+  },
+  {
+    "id": "audio-calc-studio",
+    "name": "Audio Calc Studio",
+    "slug": "audio-calc-studio",
+    "description": "Estimate bitrate, size and duration with transparent math.",
+    "category": "audio",
+    "keywords": [
+      "calculator",
+      "bitrate",
+      "file size"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-calc"
+    }
+  },
+  {
+    "id": "audio-transcribe-studio",
+    "name": "Audio Transcribe Studio",
+    "slug": "audio-transcribe-studio",
+    "description": "Use audio transcription/subtitles when the configured speech-to-text endpoint is available.",
+    "category": "audio",
+    "keywords": [
+      "transcribe",
+      "subtitles",
+      "speech to text"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-transcribe"
+    }
+  },
+  {
+    "id": "audio-import-studio",
+    "name": "Audio Import Studio",
+    "slug": "audio-import-studio",
+    "description": "Import local audio and use the browser recorder or tone generator.",
+    "category": "audio",
+    "keywords": [
+      "import",
+      "recorder",
+      "microphone"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-import"
+    }
+  },
+  {
+    "id": "audio-platform-guide-studio",
+    "name": "Audio Platform Guide Studio",
+    "slug": "audio-platform-guide-studio",
+    "description": "Browse platform audio format and loudness guidance, with no acceptance guarantee.",
+    "category": "audio",
+    "keywords": [
+      "platform",
+      "podcast",
+      "spotify",
+      "discord"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "studio-platform"
+    }
+  },
+  {
+    "id": "audio-lufs-meter",
+    "name": "Audio Loudness Estimate",
+    "slug": "audio-lufs-meter",
+    "description": "Estimate RMS-based loudness and sample peak, clearly labeled as not standards-compliant LUFS.",
+    "category": "audio",
+    "keywords": [
+      "lufs",
+      "loudness",
+      "rms"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-lufs-meter"
+    }
+  },
+  {
+    "id": "audio-spectrogram",
+    "name": "Audio Spectrogram",
+    "slug": "audio-spectrogram",
+    "description": "Render a log-frequency spectrogram PNG from decoded audio in the browser.",
+    "category": "audio",
+    "keywords": [
+      "spectrogram",
+      "fft",
+      "frequency"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-spectrogram"
+    }
+  },
+  {
+    "id": "audio-trim-silence",
+    "name": "Audio Silence Trimmer",
+    "slug": "audio-trim-silence",
+    "description": "Remove leading and trailing silence locally using a configurable threshold.",
+    "category": "audio",
+    "keywords": [
+      "silence",
+      "trim",
+      "remove"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-trim-silence"
+    }
+  },
+  {
+    "id": "audio-pitch-shift",
+    "name": "Audio Pitch Shift",
+    "slug": "audio-pitch-shift",
+    "description": "Change pitch by semitones with a simple local resampling approach; duration changes too.",
+    "category": "audio",
+    "keywords": [
+      "pitch",
+      "semitones"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-pitch-shift"
+    }
+  },
+  {
+    "id": "audio-tempo-change",
+    "name": "Audio Tempo Change",
+    "slug": "audio-tempo-change",
+    "description": "Change playback rate locally; this simple path changes pitch along with tempo.",
+    "category": "audio",
+    "keywords": [
+      "tempo",
+      "speed"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-tempo-change"
+    }
+  },
+  {
+    "id": "audio-compressor",
+    "name": "Audio Compressor",
+    "slug": "audio-compressor",
+    "description": "Apply a simple fixed dynamics compressor to local audio and export a WAV.",
+    "category": "audio",
+    "keywords": [
+      "compressor",
+      "dynamics"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-compressor"
+    }
+  },
+  {
+    "id": "audio-eq-simple",
+    "name": "Simple Audio EQ",
+    "slug": "audio-eq-simple",
+    "description": "Adjust a local three-band low, mid and high equalizer before exporting WAV.",
+    "category": "audio",
+    "keywords": [
+      "eq",
+      "equalizer",
+      "filter"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-eq-simple"
+    }
+  },
+  {
+    "id": "audio-recorder",
+    "name": "Audio Recorder",
+    "slug": "audio-recorder",
+    "description": "Record microphone audio locally, watch peak level and export a WAV when supported.",
+    "category": "audio",
+    "keywords": [
+      "record",
+      "microphone",
+      "wav"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-recorder"
+    }
+  },
+  {
+    "id": "audio-tone-generator",
+    "name": "Audio Tone Generator",
+    "slug": "audio-tone-generator",
+    "description": "Generate sine, square, sawtooth or white-noise approximation WAV files.",
+    "category": "audio",
+    "keywords": [
+      "tone",
+      "test",
+      "frequency"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-tone-generator"
+    }
+  },
+  {
+    "id": "audio-metronome",
+    "name": "Audio Metronome",
+    "slug": "audio-metronome",
+    "description": "Create an adjustable BPM metronome click track and export it as WAV.",
+    "category": "audio",
+    "keywords": [
+      "bpm",
+      "click",
+      "practice"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "audio-metronome"
+    }
+  },
+  {
+    "id": "audio-joiner-local",
+    "name": "Local Audio Joiner",
+    "slug": "audio-joiner-local",
+    "description": "Concatenate multiple local audio files in their selected order and export WAV.",
+    "category": "audio",
+    "keywords": [
+      "join",
+      "merge",
+      "wav"
+    ],
+    "tags": [
+      "audio-studio"
+    ],
+    "icon": "AudioLines",
+    "popularity": 82,
+    "featured": false,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": [
+      "music-studio",
+      "audio-convert-studio",
+      "audio-edit-studio",
+      "audio-analyze-studio"
+    ],
+    "engine": {
+      "type": "audio",
+      "op": "joiner"
+    }
+  }
+];
+
+// Studios are additive: preserve every legacy slug and route as a compatibility entry.
+export const tools: ToolMeta[] = originalTools.map((tool): ToolMeta => {
+  if (tool.id === "audio-sample-rate-converter") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "resample-local" } };
+  if (tool.id === "audio-channel-converter") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "channels-local" } };
+  if (tool.id === "audio-volume-control") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "volume-local" } };
+  return tool;
+}).concat(audioStudioTools.filter((studioTool) => !originalTools.some((tool) => tool.id === studioTool.id)));

@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10000,
-    "active": 10000,
+    "total": 10024,
+    "active": 10024,
     "planned": 0,
-    "offlineNative": 7752,
-    "backendNative": 1619,
+    "offlineNative": 7782,
+    "backendNative": 1613,
     "webOnly": 629,
     "missingActive": 629,
     "divergentActive": 0,
-    "fullyExecutable": 9371
+    "fullyExecutable": 9395
   },
   "tools": [
     {
@@ -865,8 +865,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-dc-offset-checker",
@@ -874,8 +874,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-duration-tool",
@@ -883,8 +883,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-fade-in",
@@ -892,8 +892,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-fade-out",
@@ -901,8 +901,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-file-inspector",
@@ -910,8 +910,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-file-size-calculator",
@@ -928,8 +928,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-joiner",
@@ -955,8 +955,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-normalizer",
@@ -964,8 +964,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-reverser",
@@ -973,8 +973,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-rms-meter",
@@ -982,8 +982,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-sample-rate-converter",
@@ -991,8 +991,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-silence-detector",
@@ -1000,8 +1000,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-to-flac-server",
@@ -1018,8 +1018,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-to-mp3-server",
@@ -1045,8 +1045,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-to-subtitles",
@@ -1081,8 +1081,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-trimmer",
@@ -1090,8 +1090,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-volume-control",
@@ -1099,8 +1099,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "audio-waveform-generator",
@@ -1486,8 +1486,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "voice-noise-reducer",
@@ -1495,8 +1495,8 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
-      "android": "backend-native",
-      "ios": "backend-native"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "webcodecs-audio-checker",
@@ -90012,6 +90012,222 @@
       "engine": "custom",
       "android": "backend-native",
       "ios": "backend-native"
+    },
+    {
+      "id": "music-studio",
+      "name": "Music Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-separator",
+      "name": "Music Separator",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-duet",
+      "name": "Music Duet",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-karaoke",
+      "name": "Music Karaoke",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-stem-mixer",
+      "name": "Music Stem Mixer",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-practice",
+      "name": "Music Practice",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-convert-studio",
+      "name": "Audio Convert Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-edit-studio",
+      "name": "Audio Edit Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-analyze-studio",
+      "name": "Audio Analyze Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-calc-studio",
+      "name": "Audio Calc Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-transcribe-studio",
+      "name": "Audio Transcribe Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-import-studio",
+      "name": "Audio Import Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-platform-guide-studio",
+      "name": "Audio Platform Guide Studio",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-lufs-meter",
+      "name": "Audio Loudness Estimate",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-spectrogram",
+      "name": "Audio Spectrogram",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "audio-trim-silence",
+      "name": "Audio Silence Trimmer",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-pitch-shift",
+      "name": "Audio Pitch Shift",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-tempo-change",
+      "name": "Audio Tempo Change",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-compressor",
+      "name": "Audio Compressor",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-eq-simple",
+      "name": "Simple Audio EQ",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-recorder",
+      "name": "Audio Recorder",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-tone-generator",
+      "name": "Audio Tone Generator",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-metronome",
+      "name": "Audio Metronome",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "audio-joiner-local",
+      "name": "Local Audio Joiner",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
     }
   ]
 }

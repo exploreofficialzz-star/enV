@@ -30,6 +30,9 @@ object NativeBackendEngine {
         if (tool.engine.type == "datetime" && NativeDateTimeEngine.operationForTool(tool.id) != null) return false
         if (NativeBarcodeEngine.supports(tool)) return false
         if (NativeFileConverterEngine.supports(tool)) return false
+        // Audio has operation-specific backend endpoints on the web. Do not funnel these
+        // native entries into a generic media route that may not support the operation.
+        if (tool.engine.type == "audio") return false
         return tool.id in explicit || tool.category in categoryBackend || tool.engine.type in setOf("developer","image","audio","video","mockup","post","pdf","document-backend")
     }
 

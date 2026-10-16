@@ -1,0 +1,140 @@
+================================================================================
+enV MUSIC STUDIO — COMPLETE SPEC (MUST HAVE EVERYTHING)
+Addendum to enV-audio-studios-full-agent-prompt.txt
+Build one full Music Studio, not thin separate pages
+================================================================================
+
+# Goal
+
+Ship a **complete private Music Studio** competitive with Moises-class practice
+apps for users who import their own files — stems, mixer, practice, duet,
+karaoke, detect, export — without accounts or illegal stream downloaders.
+
+--------------------------------------------------------------------------------
+# Studio entry
+--------------------------------------------------------------------------------
+
+Primary route: /tools/audio/music-studio
+Deep-links (same Studio, mode query or tab):
+- /tools/audio/music-separator
+- /tools/audio/music-duet
+- /tools/audio/music-karaoke
+- /tools/audio/music-stem-mixer
+- /tools/audio/music-practice
+
+Category card: **Music Studio** — Separate stems, practice, duet, karaoke.
+
+--------------------------------------------------------------------------------
+# Feature checklist (ALL required)
+--------------------------------------------------------------------------------
+
+## A. Import
+[ ] Local audio file picker (mp3, wav, m4a, ogg, flac when decodable)
+[ ] Optional mic capture into studio
+[ ] Example short track for demo
+[ ] Banner: “Use files you own or have rights to. No Spotify/Apple Music DRM download.”
+
+## B. Separation
+[ ] 2-stem: Vocals | Instrumental
+[ ] 4-stem: Vocals | Drums | Bass | Other
+[ ] Optional extra stems if model supports (guitar, piano)
+[ ] Browser ONNX/WebGPU primary; server GPU fallback only if configured + labeled
+[ ] Progress % / cancel
+[ ] Document max length on WASM (e.g. ~8–10 min)
+[ ] Cache model after first download
+
+## C. Stem mixer
+[ ] Mute per stem
+[ ] Solo per stem
+[ ] Volume fader per stem
+[ ] Master volume
+[ ] A/B original vs current mix
+[ ] Live Web Audio preview
+
+## D. Practice
+[ ] Pitch shift ±12 semitones (prefer ±24)
+[ ] Tempo 0.5× – 1.5× (preserve pitch when algorithm allows; document behavior)
+[ ] Waveform with selectable loop A–B
+[ ] Count-in (1–2 bars)
+[ ] Metronome click overlay (manual or detected BPM)
+[ ] Transport: play / pause / stop / return to loop start
+
+## E. Duet / vocal replace
+[ ] Record mic while instrumental plays
+[ ] Input level meter + clipping warning
+[ ] Multiple local takes (IndexedDB or memory)
+[ ] Mix take over instrumental
+[ ] Mute/remove original vocal stem
+[ ] Export duet mix
+
+## F. Karaoke
+[ ] One-click “Instrumental only”
+[ ] Lyric text area (paste)
+[ ] Simple scroll or line highlight (no fake perfect sync claim unless built)
+[ ] Export instrumental WAV/MP3
+
+## G. Detect (label accuracy)
+[ ] BPM detection
+[ ] Key detection
+[ ] Chord suggestions when available — label “approximate”
+[ ] Optional capo fret helper for common keys
+
+## H. Export
+[ ] Download each stem
+[ ] Download custom mix (current mute/solo/levels)
+[ ] Download karaoke instrumental
+[ ] Download duet mix
+[ ] Format: WAV default; MP3 when encoder exists
+
+## I. UX / quality
+[ ] Desktop + mobile layouts
+[ ] Large touch targets on transport
+[ ] Privacy strip for local separation
+[ ] Upload strip only if server path used
+[ ] Empty states with guidance
+[ ] No dead buttons
+
+--------------------------------------------------------------------------------
+# Engine notes
+--------------------------------------------------------------------------------
+
+- Separation: UVR-MDX / Demucs-class via onnxruntime-web or equivalent port
+- Mixing / pitch / tempo: Web Audio API + OfflineAudioContext for export
+- BPM/key: lightweight client heuristics or small models; never overclaim
+- Storage: stems in memory; optional IndexedDB for takes (never enV servers)
+
+--------------------------------------------------------------------------------
+# Explicitly NOT in Music Studio
+--------------------------------------------------------------------------------
+
+- Downloading tracks from Spotify, Apple Music, Amazon, Tidal, etc.
+- Circumventing DRM
+- Cloud user libraries requiring accounts (local-only drafts OK)
+- Full DAW piano-roll composition suite (out of scope for v1)
+
+--------------------------------------------------------------------------------
+# Golden tests
+--------------------------------------------------------------------------------
+
+1. Import file → separate → get vocals + instrumental files
+2. Mute vocals → play → hear instrumental only
+3. Set loop 10s–20s → loops correctly
+4. Pitch +2 → playback higher
+5. Tempo 0.75× → slower
+6. Record mic → export mix containing voice + instrumental
+7. Karaoke export = instrumental stem
+8. Unconfigured server fallback shows clear message (if local model fails)
+9. Mobile: mixer usable without horizontal trap
+10. No UI offering “paste Spotify URL to download”
+
+--------------------------------------------------------------------------------
+# Success
+--------------------------------------------------------------------------------
+
+A musician can: upload a song they have rights to → split stems → mute vocal →
+slow + change key → loop a hard bar → record a take → export a practice mix —
+all in one Music Studio, privately.
+
+================================================================================
+END MUSIC STUDIO COMPLETE SPEC
+================================================================================

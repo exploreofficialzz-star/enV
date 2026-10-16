@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AudioMusicStudio, AudioStudioGuide } from "@/components/engines/audio-music-studio";
+import { AudioExtraTool } from "@/components/engines/audio-extra-tools";
+import { approximateLufs, amplitudeDbfs, estimateBitrateKbpsFromSize, estimateCompressedAudioBytes, estimatePcmAudioBytes, humReduceSamples, noiseGateSamples, reduceVoiceNoiseSamples, spectrogramData, trimSilenceBounds } from "@/lib/engines/audio-studio";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { ResultPanel } from "@/components/engines/result-panel";
 import { downloadBlob } from "@/lib/utils";
-import { createServerMediaAdapter } from "@/lib/media/media-backends";
+import { createServerMediaAdapter, getServerMediaConfig } from "@/lib/media/media-backends";
 import { MediaJobController } from "@/lib/media/media-runtime";
+import { apiUrl } from "@/lib/api/base";
 
-type Props = { op: string; toolId?: string };
+type Props = { op: string; toolId?: string; initialMode?: string };
 
 const PLATFORM_PRESETS: Record<string, { bitrate: string; sample: string; channels: string; format: string; notes: string }> = {
   spotify: { bitrate: "Lossless delivery; no bitrate conversion required", sample: "44.1 kHz or higher", channels: "Stereo (2)", format: "FLAC preferred; WAV accepted", notes: "Deliver the native master; don't downsample just for delivery." },
@@ -29,13 +33,45 @@ function fmtBytes(bytes: number) {
   while (x >= 1024 && i < units.length - 1) { x /= 1024; i++; }
   return `${x.toFixed(i ? 2 : 0)} ${units[i]}`;
 }
+function decimalMegabytes(bytes: number) { return `${(bytes / 1_000_000).toFixed(2)} MB`; }
 
 
 const SERVER_AUDIO_OPS = new Set(["server-mp3", "server-wav", "server-ogg", "server-flac", "server-volume", "server-bitrate", "server-sample-rate", "server-channels", "server-merge"]);
 
 const serverAudioMediaController = new MediaJobController([createServerMediaAdapter()]);
 
-const LOCAL_AUDIO_OPS = new Set(["inspector", "duration", "waveform", "to-wav", "trim", "reverse", "normalize", "fade-in", "fade-out", "mono", "stereo", "peak", "rms", "silence", "channel-balance", "dc-offset"]);
+type AudioProcessorStatus = "checking" | "configured" | "not-configured" | "direct-configured" | "unavailable";
+function AudioMediaProcessorStatus() {
+  const [state, setState] = useState<AudioProcessorStatus>("checking");
+  useEffect(() => {
+    const controller = new AbortController();
+    const healthUrl = apiUrl("/api/backend/health");
+    const directEndpoint = (() => {
+      try { return new URL(getServerMediaConfig().endpoint, window.location.origin).href !== new URL(apiUrl("/api/backend/media"), window.location.origin).href; }
+      catch { return false; }
+    })();
+    if (directEndpoint) { setState("direct-configured"); return () => controller.abort(); }
+    fetch(healthUrl, { signal: controller.signal, headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json() as { ok?: boolean; processors?: { media?: boolean } };
+      })
+      .then((body) => setState(body.ok && body.processors?.media ? "configured" : "not-configured"))
+      .catch((error: unknown) => { if (!(error instanceof Error && error.name === "AbortError")) setState("unavailable"); });
+    return () => controller.abort();
+  }, []);
+  const copy: Record<AudioProcessorStatus, { title: string; description: string; style: string }> = {
+    checking: { title: "Checking media processor configuration…", description: "The browser is checking the server-side setup without uploading your audio.", style: "border-border bg-surface-2" },
+    configured: { title: "Media processor configured", description: "The gateway reports a configured processor. This is a configuration check, not a guarantee that the next job will succeed; job errors are shown directly.", style: "border-emerald-600/40 bg-emerald-50/50 dark:bg-emerald-950/15" },
+    "not-configured": { title: "Media processor not configured", description: "Set MEDIA_PROCESSOR_URL and PROCESSOR_SHARED_SECRET on the server. This tool cannot convert files until the processor is configured.", style: "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/15" },
+    "direct-configured": { title: "Direct media endpoint configured", description: "This tool uploads the selected audio to the configured media endpoint. Reachability is checked when the job runs; do not choose this path for private audio unless you trust that endpoint.", style: "border-border bg-surface-2" },
+    unavailable: { title: "Cannot verify media processor setup", description: "The health check failed. The converter will surface the server's response if you run it; your selected file is uploaded only when you start conversion.", style: "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/15" },
+  };
+  const item = copy[state];
+  return <div className={`rounded-xl border p-4 text-sm ${item.style}`} role="status" aria-live="polite"><strong>{item.title}</strong><p className="mt-1 text-muted-foreground">{item.description}</p><p className="mt-1 text-xs text-muted-foreground">The same-origin gateway has a 4 MB aggregate upload limit. Configure a trusted direct MEDIA_PROCESSOR_URL for larger files.</p></div>;
+}
+
+const LOCAL_AUDIO_OPS = new Set(["inspector", "duration", "waveform", "to-wav", "trim", "reverse", "normalize", "fade-in", "fade-out", "mono", "stereo", "peak", "rms", "silence", "channel-balance", "dc-offset", "voice-noise-reducer", "voice-noise-gate", "audio-hum-reducer", "audio-trim-silence", "audio-lufs-meter", "audio-spectrogram", "audio-compressor", "audio-eq-simple", "audio-pitch-shift", "audio-tempo-change", "volume-local", "resample-local", "channels-local", "webcodecs-audio"]);
 
 function audioContextCtor() {
   return window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -106,7 +142,18 @@ async function waveformPng(buffer: AudioBuffer): Promise<Blob> {
   return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not create waveform image.")), "image/png"));
 }
 
-async function runLocalAudioOperation(op: string, file: File, startSeconds: number, endSeconds: number) {
+async function spectrogramPng(buffer: AudioBuffer): Promise<Blob> {
+  const width = 1000, height = 320;
+  const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
+  const context = canvas.getContext("2d"); if (!context) throw new Error("Canvas is unavailable in this browser.");
+  const pixels = spectrogramData(buffer.getChannelData(0), width, height);
+  const imageData = context.createImageData(width, height);
+  imageData.data.set(pixels);
+  context.putImageData(imageData, 0, 0);
+  return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not create the spectrogram image.")), "image/png"));
+}
+
+async function runLocalAudioOperation(op: string, file: File, startSeconds: number, endSeconds: number, options: { fadeSeconds?: number; noiseStrength?: number; gateDb?: number; humHz?: number; silenceDb?: number; eqLow?: number; eqMid?: number; eqHigh?: number; rate?: number; channels?: number; gainPercent?: number; lufsTarget?: number } = {}) {
   const buffer = await decodeAudioFile(file);
   const duration = buffer.duration;
   if (op === "inspector" || op === "duration") {
@@ -119,6 +166,7 @@ async function runLocalAudioOperation(op: string, file: File, startSeconds: numb
     ] };
   }
   if (op === "waveform") return { kind: "blob" as const, blob: await waveformPng(buffer), name: `${file.name.replace(/\.[^.]+$/, "")}-waveform.png`, label: "Waveform image" };
+  if (op === "audio-spectrogram") return { kind: "blob" as const, blob: await spectrogramPng(buffer), name: `${file.name.replace(/\.[^.]+$/, "")}-spectrogram.png`, label: "Spectrogram PNG" };
   if (op === "peak" || op === "rms" || op === "silence" || op === "channel-balance" || op === "dc-offset") {
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
     let peak = 0, sumSquares = 0, sum = 0, count = 0;
@@ -138,6 +186,90 @@ async function runLocalAudioOperation(op: string, file: File, startSeconds: numb
     let silentFrames = 0;
     for (let i=0;i<buffer.length;i++) { let framePeak=0; for (const data of channels) framePeak=Math.max(framePeak,Math.abs(data[i])); if(framePeak<threshold) silentFrames++; }
     return { kind: "info" as const, items: [{ label: "Estimated silent duration", value: `${(silentFrames / buffer.sampleRate).toFixed(3)} seconds`, primary: true }, { label: "Threshold", value: "-60 dBFS amplitude approximation" }, { label: "Total duration", value: `${duration.toFixed(3)} seconds` }] };
+  }
+  if (op === "audio-lufs-meter") {
+    const mono = new Float32Array(buffer.length);
+    for (let i = 0; i < buffer.length; i++) { let sample = 0; for (let c = 0; c < buffer.numberOfChannels; c++) sample += buffer.getChannelData(c)[i]; mono[i] = sample / buffer.numberOfChannels; }
+    let truePeak = 0; for (let c = 0; c < buffer.numberOfChannels; c++) for (const sample of buffer.getChannelData(c)) truePeak = Math.max(truePeak, Math.abs(sample));
+    const estimated = approximateLufs(mono);
+    return { kind: "info" as const, items: [
+      { label: "RMS-based loudness estimate", value: Number.isFinite(estimated) ? `${estimated.toFixed(2)} LUFS-like` : "−∞", primary: true, hint: "Not a standards-compliant BS.1770 integrated LUFS result; K-weighting and gating are not implemented." },
+      { label: "Selected reference", value: `${options.lufsTarget ?? -16} LUFS`, hint: "Podcast common target −16 stereo / −19 mono; streaming normalization reference −14; EBU programme reference −23. Use the preset control to compare." },
+      { label: "Difference from selected reference", value: Number.isFinite(estimated) ? `${(estimated - (options.lufsTarget ?? -16)).toFixed(2)} LUFS-like` : "Unavailable", hint: "An RMS proxy comparison only; not loudness compliance." },
+      { label: "Sample peak", value: `${amplitudeDbfs(truePeak).toFixed(2)} dBFS` },
+      { label: "Podcast reference", value: "−16 LUFS stereo / −19 LUFS mono are common targets, not guarantees" },
+      { label: "Streaming reference", value: "−14 LUFS is a normalization reference used by some services, not a universal mastering requirement" },
+    ] };
+  }
+  if (op === "voice-noise-reducer" || op === "voice-noise-gate" || op === "audio-hum-reducer") {
+    const out = makeBufferLike(buffer, buffer.numberOfChannels);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      const processed = op === "voice-noise-reducer" ? reduceVoiceNoiseSamples(data, buffer.sampleRate, options.noiseStrength ?? 0.8)
+        : op === "voice-noise-gate" ? noiseGateSamples(data, buffer.sampleRate, options.gateDb ?? -42)
+        : humReduceSamples(data, buffer.sampleRate, options.humHz === 60 ? 60 : 50);
+      out.getChannelData(c).set(processed);
+    }
+    const label = op === "voice-noise-reducer" ? "Noise-reduced audio" : op === "voice-noise-gate" ? "Noise-gated audio" : `Hum-reduced audio (${options.humHz ?? 50} Hz)`;
+    return { kind: "blob" as const, blob: bufferToWav(out), name: `${file.name.replace(/\.[^.]+$/, "")}-${op}.wav`, label };
+  }
+  if (op === "audio-trim-silence") {
+    const mono = new Float32Array(buffer.length);
+    for (let i = 0; i < buffer.length; i++) { let peak = 0; for (let c = 0; c < buffer.numberOfChannels; c++) peak = Math.max(peak, Math.abs(buffer.getChannelData(c)[i])); mono[i] = peak; }
+    const bounds = trimSilenceBounds(mono, options.silenceDb ?? -50, buffer.sampleRate, 30);
+    if (bounds.end <= bounds.start) throw new Error("No active audio was found above the selected threshold; the file may be silent.");
+    const out = copyMapped(buffer, (sample) => sample, buffer.numberOfChannels, bounds.start, bounds.end);
+    return { kind: "blob" as const, blob: bufferToWav(out), name: `${file.name.replace(/\.[^.]+$/, "")}-trimmed-silence.wav`, label: `Trimmed ${bounds.removedStartSeconds.toFixed(2)}s leading + ${bounds.removedEndSeconds.toFixed(2)}s trailing silence` };
+  }
+  if (op === "volume-local") {
+    const gainPercent = options.gainPercent ?? 100;
+    if (!Number.isFinite(gainPercent) || gainPercent < 0 || gainPercent > 500) throw new Error("Volume must be between 0% and 500%.");
+    const offline = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const source = offline.createBufferSource(); source.buffer = buffer;
+    const gain = offline.createGain(); gain.gain.value = gainPercent / 100;
+    source.connect(gain).connect(offline.destination); source.start();
+    const rendered = await offline.startRendering();
+    return { kind: "blob" as const, blob: bufferToWav(rendered), name: `${file.name.replace(/\.[^.]+$/, "")}-volume-${gainPercent}.wav`, label: `Applied ${gainPercent}% gain locally${gainPercent > 100 ? " (peaks may clip; listen before use)" : ""}` };
+  }
+  if (op === "audio-compressor" || op === "audio-eq-simple") {
+    const offline = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const source = offline.createBufferSource(); source.buffer = buffer;
+    if (op === "audio-compressor") {
+      const compressor = offline.createDynamicsCompressor(); compressor.threshold.value = -20; compressor.knee.value = 20; compressor.ratio.value = 3; compressor.attack.value = 0.01; compressor.release.value = 0.22;
+      source.connect(compressor).connect(offline.destination);
+    } else {
+      const low = offline.createBiquadFilter(); low.type = "lowshelf"; low.frequency.value = 200; low.gain.value = options.eqLow ?? 0;
+      const mid = offline.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.8; mid.gain.value = options.eqMid ?? 0;
+      const high = offline.createBiquadFilter(); high.type = "highshelf"; high.frequency.value = 4000; high.gain.value = options.eqHigh ?? 0;
+      source.connect(low).connect(mid).connect(high).connect(offline.destination);
+    }
+    source.start(); const rendered = await offline.startRendering();
+    return { kind: "blob" as const, blob: bufferToWav(rendered), name: `${file.name.replace(/\.[^.]+$/, "")}-${op}.wav`, label: op === "audio-compressor" ? "Compressed audio (3:1, fixed gentle preset)" : "Three-band EQ audio" };
+  }
+  if (op === "audio-pitch-shift" || op === "audio-tempo-change") {
+    const speed = op === "audio-pitch-shift" ? 2 ** ((options.rate ?? 2) / 12) : Math.max(0.5, Math.min(1.5, options.rate ?? 1));
+    const outputLength = Math.max(1, Math.ceil(buffer.length / speed));
+    const offline = new OfflineAudioContext(buffer.numberOfChannels, outputLength, buffer.sampleRate);
+    const source = offline.createBufferSource(); source.buffer = buffer; source.playbackRate.value = speed; source.connect(offline.destination); source.start();
+    const rendered = await offline.startRendering();
+    return { kind: "blob" as const, blob: bufferToWav(rendered), name: `${file.name.replace(/\.[^.]+$/, "")}-${op}.wav`, label: op === "audio-pitch-shift" ? `Pitch shifted ${options.rate ?? 2} semitones; duration also changes` : `Tempo ${speed.toFixed(2)}×; pitch also changes` };
+  }
+  if (op === "channels-local") {
+    const outputChannels = options.channels === 1 ? 1 : 2;
+    const out = makeBufferLike(buffer, outputChannels);
+    if (outputChannels === 1) {
+      for (let i = 0; i < buffer.length; i++) { let value = 0; for (let c = 0; c < buffer.numberOfChannels; c++) value += buffer.getChannelData(c)[i]; out.getChannelData(0)[i] = value / buffer.numberOfChannels; }
+    } else {
+      for (let c = 0; c < 2; c++) out.getChannelData(c).set(buffer.getChannelData(Math.min(c, buffer.numberOfChannels - 1)));
+    }
+    return { kind: "blob" as const, blob: bufferToWav(out), name: `${file.name.replace(/\.[^.]+$/, "")}-${outputChannels === 1 ? "mono" : "stereo"}.wav`, label: `Converted locally to ${outputChannels === 1 ? "mono" : "stereo"}` };
+  }
+  if (op === "resample-local") {
+    const targetRate = Math.max(8000, Math.min(192000, Math.round(options.rate ?? 44100)));
+    const offline = new OfflineAudioContext(buffer.numberOfChannels, Math.ceil(buffer.duration * targetRate), targetRate);
+    const source = offline.createBufferSource(); source.buffer = buffer; source.connect(offline.destination); source.start();
+    const rendered = await offline.startRendering();
+    return { kind: "blob" as const, blob: bufferToWav(rendered), name: `${file.name.replace(/\.[^.]+$/, "")}-${targetRate}hz.wav`, label: `Resampled to ${targetRate.toLocaleString()} Hz locally` };
   }
   if (op === "to-wav") return { kind: "blob" as const, blob: bufferToWav(buffer), name: `${file.name.replace(/\.[^.]+$/, "")}.wav`, label: "WAV conversion" };
 
@@ -161,7 +293,7 @@ async function runLocalAudioOperation(op: string, file: File, startSeconds: numb
     return { kind: "blob" as const, blob: bufferToWav(out), name: `${file.name.replace(/\.[^.]+$/, "")}-normalized.wav`, label: `Peak normalized · gain ${gain.toFixed(3)}×` };
   }
   if (op === "fade-in" || op === "fade-out") {
-    const fadeSeconds = Math.min(10, duration / 2);
+    const fadeSeconds = Math.max(0.01, Math.min(options.fadeSeconds ?? 1, duration / 2));
     const fadeFrames = Math.max(1, Math.floor(fadeSeconds * buffer.sampleRate));
     const out = copyMapped(buffer, (sample, index) => {
       const gain = op === "fade-in" ? Math.min(1, index / fadeFrames) : Math.min(1, (buffer.length - index) / fadeFrames);
@@ -187,16 +319,32 @@ async function runLocalAudioOperation(op: string, file: File, startSeconds: numb
   throw new Error("Unsupported local audio operation.");
 }
 
-export function AudioEngine({ op }: Props) {
+export function AudioEngine({ op, toolId = "", initialMode }: Props) {
+  // Keep conditional routing in a hook-free shell. Moving between audio routes must
+  // never change the number/order of hooks called by a single mounted component.
+  if (toolId === "music-studio" || toolId.startsWith("music-") || op === "music-studio") return <AudioMusicStudio mode={initialMode ?? (toolId.replace("music-", "") || "separate")} />;
+  if (op.startsWith("studio-")) return <AudioStudioGuide studio={op.slice("studio-".length)} />;
+  const guidePlatform = platformFromOp(op);
+  if (guidePlatform && new RegExp(`^${guidePlatform}:(format-guide|loudness|sample-rate|metadata|export-preset)$`).test(op)) return <AudioStudioGuide studio="platform" initialPlatform={guidePlatform} />;
+  if (["audio-joiner", "audio-joiner-local"].includes(toolId) || ["join", "join-local"].includes(op)) return <AudioExtraTool mode="audio-joiner-local" />;
+  if (["audio-recorder", "audio-tone-generator", "audio-metronome"].includes(toolId) || ["audio-recorder", "audio-tone-generator", "audio-metronome"].includes(op)) return <AudioExtraTool mode={toolId || op} />;
+  return <AudioEngineBody op={op} toolId={toolId} />;
+}
+
+function AudioEngineBody({ op, toolId = "" }: Props) {
   const platform = platformFromOp(op);
   const [duration, setDuration] = useState("180");
   const [bitrate, setBitrate] = useState("320");
+  const [targetSizeMb, setTargetSizeMb] = useState("0.96");
+  const [bitrateMode, setBitrateMode] = useState<"size" | "bitrate">("size");
+  const [sizeCalcMode, setSizeCalcMode] = useState<"compressed" | "pcm">("compressed");
   const [sampleRate, setSampleRate] = useState("44100");
   const [channels, setChannels] = useState("2");
   const [bits, setBits] = useState("24");
   const [bpm, setBpm] = useState("120");
   const [bars, setBars] = useState("4");
   const [lufs, setLufs] = useState("-14");
+  const [lufsTarget, setLufsTarget] = useState("-16");
   const [format, setFormat] = useState("FLAC");
   const [artist, setArtist] = useState("");
   const [title, setTitle] = useState("");
@@ -210,6 +358,17 @@ export function AudioEngine({ op }: Props) {
   const [startSeconds, setStartSeconds] = useState("0");
   const [endSeconds, setEndSeconds] = useState("30");
   const [volume, setVolume] = useState("100");
+  const [fadeSeconds, setFadeSeconds] = useState("1");
+  const [noiseStrength, setNoiseStrength] = useState("80");
+  const [gateDb, setGateDb] = useState("-42");
+  const [humHz, setHumHz] = useState("50");
+  const [silenceDb, setSilenceDb] = useState("-50");
+  const [eqLow, setEqLow] = useState("0");
+  const [eqMid, setEqMid] = useState("0");
+  const [eqHigh, setEqHigh] = useState("0");
+  const [localRate, setLocalRate] = useState("2");
+  const [tempoRate, setTempoRate] = useState("1");
+  const [resampleRate, setResampleRate] = useState("44100");
 
   const runServerAudio = async () => {
     try {
@@ -251,7 +410,7 @@ export function AudioEngine({ op }: Props) {
         return;
       }
       if (!localFile) throw new Error("Choose an audio file first.");
-      const result = await runLocalAudioOperation(op, localFile, Number(startSeconds), Number(endSeconds));
+      const result = await runLocalAudioOperation(op, localFile, Number(startSeconds), Number(endSeconds), { fadeSeconds: Number(fadeSeconds), noiseStrength: Number(noiseStrength) / 100, gateDb: Number(gateDb), humHz: Number(humHz) === 60 ? 60 : 50, silenceDb: Number(silenceDb), eqLow: Number(eqLow), eqMid: Number(eqMid), eqHigh: Number(eqHigh), rate: op === "resample-local" ? Number(resampleRate) : op === "audio-tempo-change" ? Number(tempoRate) : Number(localRate), channels: Number(channels), gainPercent: Number(volume), lufsTarget: Number(lufsTarget) });
       if (result.kind === "info") setResults(result.items);
       else { downloadBlob(result.blob, result.name); setResults([{ label: result.label, value: fmtBytes(result.blob.size), primary: true, hint: "Processed locally and exported as WAV/PNG." }]); }
     } catch (e) { setResults([]); setError(e instanceof Error ? e.message : "The audio operation failed."); }
@@ -261,30 +420,48 @@ export function AudioEngine({ op }: Props) {
     try {
       setError(null);
       const d = Number(duration), br = Number(bitrate), sr = Number(sampleRate), ch = Number(channels), bd = Number(bits);
-      if (![d, br, sr, ch, bd].every(Number.isFinite) || d <= 0 || br <= 0 || sr <= 0 || ch <= 0 || bd <= 0) throw new Error("Enter valid positive audio values.");
+      if (!Number.isFinite(d) || d <= 0) throw new Error("Duration must be a positive number of seconds.");
       const items: typeof results = [];
       if (op.includes("bitrate")) {
-        const bytes = d * br * 1000 / 8;
-        items.push({ label: "Estimated file size", value: fmtBytes(bytes), primary: true, hint: `${d}s at ${br} kbps` });
-        items.push({ label: "Bytes", value: Math.round(bytes).toLocaleString() });
+        if (bitrateMode === "bitrate") {
+          const targetMb = Number(targetSizeMb);
+          const inferredKbps = estimateBitrateKbpsFromSize(d, targetMb);
+          items.push({ label: "Required average bitrate", value: `${inferredKbps.toFixed(2)} kbps`, primary: true, hint: `${targetMb.toFixed(2)} decimal MB over ${d}s; actual container overhead varies.` });
+          items.push({ label: "Target file size", value: decimalMegabytes(targetMb * 1_000_000) });
+          items.push({ label: "Formula", value: "target bytes × 8 ÷ duration ÷ 1,000" });
+        } else {
+          const bytes = estimateCompressedAudioBytes(d, br);
+          items.push({ label: "Estimated compressed file size", value: decimalMegabytes(bytes), primary: true, hint: `${d}s at ${br} kbps; container overhead excluded.` });
+          items.push({ label: "Bytes (decimal)", value: Math.round(bytes).toLocaleString() });
+          items.push({ label: "Formula", value: "duration × bitrate × 1,000 ÷ 8" });
+        }
       } else if (op.includes("file-size")) {
-        const bytes = d * sr * ch * bd / 8;
-        items.push({ label: "Estimated uncompressed PCM size", value: fmtBytes(bytes), primary: true, hint: `${d}s · ${sr.toLocaleString()} Hz · ${ch} channels · ${bd}-bit` });
-        items.push({ label: "Decimal megabytes", value: (bytes / 1_000_000).toFixed(2) });
+        if (sizeCalcMode === "pcm") {
+          const bytes = estimatePcmAudioBytes(d, sr, ch, bd);
+          items.push({ label: "Estimated uncompressed PCM size", value: decimalMegabytes(bytes), primary: true, hint: `${d}s · ${sr.toLocaleString()} Hz · ${ch} channels · ${bd}-bit; headers excluded.` });
+          items.push({ label: "Bytes (decimal)", value: Math.round(bytes).toLocaleString() });
+        } else {
+          const bytes = estimateCompressedAudioBytes(d, br);
+          items.push({ label: "Estimated compressed file size", value: decimalMegabytes(bytes), primary: true, hint: `${d}s at ${br} kbps; overhead excluded.` });
+          items.push({ label: "Bytes (decimal)", value: Math.round(bytes).toLocaleString() });
+        }
       } else if (op.includes("sample-rate")) {
+        if (!Number.isFinite(sr) || sr <= 0) throw new Error("Sample rate must be a positive number.");
         const samples = Math.max(1, Math.round(d * sr));
         items.push({ label: "Samples", value: samples.toLocaleString(), primary: true });
         items.push({ label: "Duration from samples", value: `${(samples / sr).toFixed(3)} s`, hint: `${sr.toLocaleString()} Hz` });
       } else if (op.includes("bpm")) {
-        const beatSeconds = 60 / Number(bpm);
-        const barSeconds = beatSeconds * Math.max(1, Number(bars));
+        const rate = Number(bpm), barCount = Number(bars);
+        if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(barCount) || barCount <= 0) throw new Error("BPM and bars must be positive values.");
+        const beatSeconds = 60 / rate;
+        const barSeconds = beatSeconds * 4 * barCount;
         items.push({ label: "Beat length", value: `${beatSeconds.toFixed(3)} s`, primary: true });
-        items.push({ label: `${bars} bars`, value: `${barSeconds.toFixed(3)} s` });
+        items.push({ label: `${barCount} bars in 4/4`, value: `${barSeconds.toFixed(3)} s` });
       } else if (op.includes("loudness")) {
         const target = Number(lufs);
         if (!Number.isFinite(target) || target > 0 || target < -60) throw new Error("Enter LUFS between -60 and 0.");
         items.push({ label: "Target integrated loudness", value: `${target.toFixed(1)} LUFS`, primary: true });
-        items.push({ label: "True-peak safety reference", value: "-1.0 dBTP", hint: "Spotify delivery guidance; not a universal mastering rule." });
+        items.push({ label: "True-peak safety reference", value: "-1.0 dBTP", hint: "A common streaming delivery reference; not a universal mastering rule." });
       } else if (op.includes("metadata")) {
         items.push({ label: "Metadata JSON", value: JSON.stringify({ artist, title, album, format }, null, 2), primary: true });
       } else if (op.includes("export-preset") || op.includes("format-guide")) {
@@ -299,7 +476,7 @@ export function AudioEngine({ op }: Props) {
         items.push({ label: "Format reference", value: p.format, primary: true });
         items.push({ label: "Sample rate", value: p.sample });
         items.push({ label: "Bitrate", value: p.bitrate });
-        items.push({ label: "Loudness reference", value: platform === "spotify" ? "-14 LUFS normalization reference" : "No single universal target; check the current platform workflow." });
+        items.push({ label: "Loudness reference", value: platform === "spotify" ? "−14 LUFS normalization reference" : "No single universal target; check the current platform workflow." });
       }
       setResults(items);
     } catch (e) { setResults([]); setError(e instanceof Error ? e.message : "Could not calculate."); }
@@ -337,7 +514,8 @@ export function AudioEngine({ op }: Props) {
 
   if (SERVER_AUDIO_OPS.has(op)) return <div className="space-y-5">
     <div><h2 className="text-lg font-semibold">{{"server-mp3":"Audio to MP3","server-wav":"Audio to WAV","server-ogg":"Audio to OGG","server-flac":"Audio to FLAC","server-volume":"Audio Volume Control","server-bitrate":"Audio Bitrate Converter","server-sample-rate":"Audio Sample Rate Converter","server-channels":"Audio Channel Converter","server-merge":"Audio Merger"}[op] ?? "Audio Converter"}</h2><p className="mt-1 text-sm text-subtle">Convert the selected audio using the enV FFmpeg media processor.</p></div>
-    <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm"><strong>FFmpeg media processor required</strong><p className="mt-1 text-subtle">Your audio file is uploaded to the configured media-processing endpoint for conversion.</p></div>
+    <AudioMediaProcessorStatus />
+    <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm"><strong>Upload disclosure</strong><p className="mt-1 text-subtle">When you start conversion, the selected audio file is uploaded to the configured media endpoint for processing. Do not use this server route for sensitive audio unless you trust the endpoint. Local-only tools are clearly labeled separately.</p></div>
     {op === "server-merge" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" multiple accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setFiles(Array.from(e.target.files ?? []))}/> : <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setLocalFile(e.target.files?.[0] ?? null)}/>}
     {op === "server-volume" ? <label className="block text-sm">Volume (%)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" max="500" value={volume} onChange={(e)=>setVolume(e.target.value)} /></label> : null}
     {op === "server-bitrate" ? <label className="block text-sm">MP3 bitrate (kbps)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="32" max="512" value={bitrate} onChange={(e)=>setBitrate(e.target.value)} /></label> : null}
@@ -351,7 +529,17 @@ export function AudioEngine({ op }: Props) {
     <div><h2 className="text-lg font-semibold">{op === "inspector" ? "Audio File Inspector" : op === "duration" ? "Audio Duration Tool" : op === "waveform" ? "Audio Waveform Generator" : `Audio ${op.replaceAll("-", " ")}`}</h2><p className="mt-1 text-sm text-subtle">Process the selected audio locally in your browser. Files are not uploaded by this tool.</p></div>
     {op !== "webcodecs-audio" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setLocalFile(e.target.files?.[0] ?? null)}/> : null}
     {op === "trim" ? <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Start (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" step="0.01" value={startSeconds} onChange={e => setStartSeconds(e.target.value)}/></label><label className="text-sm">End (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" step="0.01" value={endSeconds} onChange={e => setEndSeconds(e.target.value)}/></label></div> : null}
-    <div className="flex gap-2"><Button type="button" onClick={() => void runLocal()}>Run tool</Button><Button type="button" variant="ghost" onClick={() => { setLocalFile(null); setResults([]); setError(null); }}>Reset</Button></div>
+    {op === "fade-in" || op === "fade-out" ? <label className="block text-sm">Fade length (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" max="10" step="0.1" value={fadeSeconds} onChange={(e) => setFadeSeconds(e.target.value)} /></label> : null}
+    {op === "voice-noise-reducer" ? <label className="block text-sm">Noise reduction strength: {noiseStrength}%<input className="mt-1 block w-full" type="range" min="0" max="100" step="5" value={noiseStrength} onChange={(e) => setNoiseStrength(e.target.value)} /><span className="text-xs text-muted">Local adaptive high-pass + soft gate; may affect quiet speech.</span></label> : null}
+    {op === "voice-noise-gate" ? <label className="block text-sm">Gate threshold (dBFS)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="-100" max="0" value={gateDb} onChange={(e) => setGateDb(e.target.value)} /></label> : null}
+    {op === "audio-hum-reducer" ? <label className="block text-sm">Power-line hum frequency<select className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" value={humHz} onChange={(e) => setHumHz(e.target.value)}><option value="50">50 Hz</option><option value="60">60 Hz</option></select></label> : null}
+    {op === "audio-trim-silence" ? <label className="block text-sm">Silence threshold (dBFS)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="-120" max="0" value={silenceDb} onChange={(e) => setSilenceDb(e.target.value)} /></label> : null}
+    {op === "audio-eq-simple" ? <div className="grid gap-3 sm:grid-cols-3">{[["Low shelf (dB)",eqLow,setEqLow],["Mid bell (dB)",eqMid,setEqMid],["High shelf (dB)",eqHigh,setEqHigh]].map(([label,value,setValue]) => <label key={String(label)} className="text-sm">{label as string}<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="-18" max="18" step="1" value={value as string} onChange={(e) => (setValue as (v:string)=>void)(e.target.value)} /></label>)}</div> : null}
+    {op === "audio-pitch-shift" ? <label className="block text-sm">Pitch semitones (tempo changes too)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="-12" max="12" value={localRate} onChange={(e) => setLocalRate(e.target.value)} /></label> : null}
+    {op === "audio-tempo-change" ? <label className="block text-sm">Playback rate (pitch changes too)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.5" max="1.5" step="0.05" value={tempoRate} onChange={(e) => setTempoRate(e.target.value)} /></label> : null}
+    {op === "resample-local" ? <label className="block text-sm">Output sample rate (Hz)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="8000" max="192000" step="1000" value={resampleRate} onChange={(e) => setResampleRate(e.target.value)} /></label> : null}
+    {op === "channels-local" ? <label className="block text-sm">Output channels<select className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" value={channels} onChange={(e) => setChannels(e.target.value)}><option value="1">Mono</option><option value="2">Stereo</option></select></label> : null}
+    <div className="flex gap-2"><Button type="button" onClick={() => void runLocal()}>{["inspector","duration","peak","rms","silence","channel-balance","dc-offset","audio-lufs-meter","webcodecs-audio"].includes(op) ? "Analyze audio" : "Process & download"}</Button><Button type="button" variant="ghost" onClick={() => { setLocalFile(null); setResults([]); setError(null); }}>Reset</Button></div>
     <ErrorBanner message={error}/>{results.length ? <ResultPanel items={results} filename={`env-${op}.txt`}/> : null}
   </div>;
 
@@ -371,15 +559,14 @@ export function AudioEngine({ op }: Props) {
       <input className="rounded-lg border border-border bg-surface px-3 py-2" placeholder="Album" value={album} onChange={e=>setAlbum(e.target.value)}/>
       <input className="rounded-lg border border-border bg-surface px-3 py-2" placeholder="Format" value={format} onChange={e=>setFormat(e.target.value)}/>
     </div> : null}
-    {op.includes("bitrate") ? <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">Duration (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" step="0.01" value={duration} onChange={e=>setDuration(e.target.value)}/></label>
-      <label className="text-sm">Bitrate (kbps)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" value={bitrate} onChange={e=>setBitrate(e.target.value)}/></label>
+    {op.includes("bitrate") ? <div className="space-y-3 rounded-xl border border-border p-3">
+      <label className="block text-sm">Calculation mode<select className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2" value={bitrateMode} onChange={e=>setBitrateMode(e.target.value as "size" | "bitrate")}><option value="size">Estimate file size from duration + bitrate</option><option value="bitrate">Estimate bitrate from duration + target size</option></select></label>
+      <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Duration (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" step="0.01" value={duration} onChange={e=>setDuration(e.target.value)}/></label>
+      {bitrateMode === "size" ? <label className="text-sm">Bitrate (kbps)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" value={bitrate} onChange={e=>setBitrate(e.target.value)}/></label> : <label className="text-sm">Target size (decimal MB)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.001" step="0.01" value={targetSizeMb} onChange={e=>setTargetSizeMb(e.target.value)}/></label>}</div>
     </div> : null}
-    {op.includes("file-size") ? <div className="grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">Duration (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" step="0.01" value={duration} onChange={e=>setDuration(e.target.value)}/></label>
-      <label className="text-sm">Sample rate (Hz)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" value={sampleRate} onChange={e=>setSampleRate(e.target.value)}/></label>
-      <label className="text-sm">Channels<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" max="32" value={channels} onChange={e=>setChannels(e.target.value)}/></label>
-      <label className="text-sm">Bit depth<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="8" max="64" step="8" value={bits} onChange={e=>setBits(e.target.value)}/></label>
+    {op.includes("file-size") ? <div className="space-y-3 rounded-xl border border-border p-3"><label className="block text-sm">File type<select className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2" value={sizeCalcMode} onChange={e=>setSizeCalcMode(e.target.value as "compressed" | "pcm")}><option value="compressed">Compressed (bitrate-based MP3/AAC estimate)</option><option value="pcm">Uncompressed PCM/WAV</option></select></label>
+      <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Duration (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" step="0.01" value={duration} onChange={e=>setDuration(e.target.value)}/></label>
+      {sizeCalcMode === "compressed" ? <label className="text-sm">Bitrate (kbps)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" value={bitrate} onChange={e=>setBitrate(e.target.value)}/></label> : <><label className="text-sm">Sample rate (Hz)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" value={sampleRate} onChange={e=>setSampleRate(e.target.value)}/></label><label className="text-sm">Channels<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="1" max="32" value={channels} onChange={e=>setChannels(e.target.value)}/></label><label className="text-sm">Bit depth<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="8" max="64" step="8" value={bits} onChange={e=>setBits(e.target.value)}/></label></>}</div>
     </div> : null}
     {op.includes("sample-rate") ? <div className="grid gap-3 sm:grid-cols-2">
       <label className="text-sm">Duration (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.001" step="0.001" value={duration} onChange={e=>setDuration(e.target.value)}/></label>

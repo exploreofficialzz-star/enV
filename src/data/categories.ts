@@ -12,8 +12,8 @@ export const CATEGORIES: CategoryMeta[] = [
   {
     id: "audio",
     name: "Audio",
-    description: "Bitrate, file size, sample rate, and waveform helpers.",
-    blurb: "Audio math and simple browser processing.",
+    description: "Private audio studios for converting, editing, analyzing, separating stems, and practice.",
+    blurb: "Local-first browser audio tools, with server routes clearly labeled when needed.",
     icon: "AudioLines",
   },
   {

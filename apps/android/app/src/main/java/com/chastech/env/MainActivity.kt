@@ -7,9 +7,14 @@ package com.chastech.env
 
 import com.chastech.env.ui.CharacterSpacedText as Text
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -114,6 +119,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import androidx.core.content.ContextCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.NativeDeveloperStudios
 import com.chastech.env.data.developerStudioTools
@@ -130,6 +136,8 @@ import com.chastech.env.data.nativeDisclaimerText
 import com.chastech.env.data.relatedTools
 import com.chastech.env.data.fromJson
 import com.chastech.env.data.search
+import com.chastech.env.engine.NativeAudioEngine
+import com.chastech.env.engine.NativeAudioWavProcessor
 import com.chastech.env.engine.NativeCalculatorEngine
 import com.chastech.env.engine.NativeBusinessEngine
 import com.chastech.env.engine.NativeBusinessPdfExporter
@@ -150,6 +158,8 @@ import com.chastech.env.ui.EnVIcon
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -910,7 +920,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1102,6 +1112,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
+        "audio" -> NativeAudioToolForm(tool)
         "ai" -> NativeAiToolForm(tool)
         "file-converter", "document-backend" -> NativeFileConverterToolForm(tool)
         "text" -> NativeTextToolForm(tool.id)
@@ -1113,6 +1124,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
         "mime" -> NativeMimeToolForm(tool.id)
         "converter" -> NativeConverterToolForm(tool)
         "calculator" -> when {
+            NativeAudioEngine.supports(tool) -> NativeAudioToolForm(tool)
             NativeCalculatorEngine.operationForTool(tool.id) != null -> NativeCalculatorToolForm(tool)
             NativeExpansionCalculatorEngine.operationForTool(tool.id) != null -> NativeExpansionCalculatorToolForm(tool.id)
             NativeMathExerciseEngine.operationForTool(tool.id) != null -> NativeMathExerciseToolForm(tool.id)
@@ -1302,6 +1314,470 @@ private fun NativeConverterToolForm(tool: ToolRecord) {
         ActionRow(
             onRun = { runCatching { NativeConverterEngine.run(operation, value, from, to) }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to run converter" }) },
             onReset = { value = "1"; from = units.firstOrNull()?.id.orEmpty(); to = units.getOrNull(1)?.id ?: units.firstOrNull()?.id.orEmpty(); output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+private data class NativeAudioJoinInput(val name: String, val bytes: ByteArray)
+
+@Composable
+private fun NativeAudioWavJoinerForm(toolName: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var files by remember { mutableStateOf<List<NativeAudioJoinInput>>(emptyList()) }
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    var output by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val maxBytes = 100 * 1024 * 1024
+                    var total = 0
+                    uris.map { uri ->
+                        val input = context.contentResolver.openInputStream(uri) ?: kotlin.error("Unable to read one of the selected files.")
+                        val remaining = maxBytes - total
+                        val bytes = input.use { stream ->
+                            val outputStream = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val read = stream.read(buffer)
+                                if (read < 0) break
+                                total += read
+                                require(total <= maxBytes && read <= remaining) { "Combined input size must not exceed 100 MB." }
+                                outputStream.write(buffer, 0, read)
+                            }
+                            outputStream.toByteArray()
+                        }
+                        NativeAudioWavProcessor.process(bytes, "inspector")
+                        NativeAudioJoinInput(uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "audio.wav", bytes)
+                    }
+                }
+            }.fold({ selected ->
+                if (selected.size < 2) { files = selected; output = ""; error = "Select at least two WAV files to join." }
+                else { files = selected; output = "Selected ${selected.size} WAV files. Use the arrows to set playback order."; error = "" }
+            }, { caught -> files = emptyList(); output = ""; error = caught.message ?: "Unable to open selected WAV files." })
+        }
+    }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
+        val payload = pendingExport
+        if (uri != null && payload != null) scope.launch {
+            runCatching { withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(payload) } ?: kotlin.error("Unable to open the destination for writing.") } }
+                .fold({ output += "\nJoined WAV saved to the selected location."; error = "" }, { error = it.message ?: "Unable to save joined WAV." })
+            pendingExport = null
+        } else pendingExport = null
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(toolName, style = MaterialTheme.typography.titleMedium)
+        Text("Join 2–32 local PCM WAV files in the order shown. Files must share sample rate and channel count. Combined source size is capped at 100 MB; output is 16-bit PCM WAV and stays on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) { Text("Choose WAV files") }
+        files.forEachIndexed { index, file ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                Text("${index + 1}. ${file.name}", modifier = Modifier.weight(1f), maxLines = 2)
+                TextButton(onClick = { if (index > 0) { val changed = files.toMutableList(); val item = changed.removeAt(index); changed.add(index - 1, item); files = changed } }, enabled = index > 0) { Text("↑") }
+                TextButton(onClick = { if (index < files.lastIndex) { val changed = files.toMutableList(); val item = changed.removeAt(index); changed.add(index + 1, item); files = changed } }, enabled = index < files.lastIndex) { Text("↓") }
+                TextButton(onClick = { files = files.filterIndexed { i, _ -> i != index }; output = "" }) { Text("Remove") }
+            }
+        }
+        ActionRow(onRun = {
+            if (files.size < 2) { error = "Choose at least two compatible WAV files."; output = "" }
+            else scope.launch {
+                runCatching { withContext(Dispatchers.Default) { NativeAudioWavProcessor.join(files.map { it.bytes }) } }
+                    .fold({ result -> output = result.report; error = ""; pendingExport = result.outputWav; saveLauncher.launch("env-joined-audio.wav") }, { caught -> output = ""; error = caught.message ?: "Unable to join WAV files." })
+            }
+        }, onReset = { files = emptyList(); output = ""; error = ""; pendingExport = null })
+        ResultBox(output, error, { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", it)) })
+    }
+}
+
+@Composable
+private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var selectedBytes by remember(operation) { mutableStateOf<ByteArray?>(null) }
+    var selectedName by remember(operation) { mutableStateOf("") }
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    var output by remember(operation) { mutableStateOf("") }
+    var error by remember(operation) { mutableStateOf("") }
+    var startSeconds by rememberSaveable(operation) { mutableStateOf("0") }
+    var endSeconds by rememberSaveable(operation) { mutableStateOf("5") }
+    var gainPercent by rememberSaveable(operation) { mutableStateOf("100") }
+    var semitones by rememberSaveable(operation) { mutableStateOf("2") }
+    var playbackRate by rememberSaveable(operation) { mutableStateOf("0.8") }
+    var targetSampleRate by rememberSaveable(operation) { mutableStateOf("48000") }
+    var noiseStrength by rememberSaveable(operation) { mutableStateOf("0.8") }
+    var gateThreshold by rememberSaveable(operation) { mutableStateOf("-42") }
+    var humFrequency by rememberSaveable(operation) { mutableStateOf("50") }
+    var silenceThreshold by rememberSaveable(operation) { mutableStateOf("-50") }
+    var fadeMs by rememberSaveable(operation) { mutableStateOf("1000") }
+    var eqLow by rememberSaveable(operation) { mutableStateOf("0") }
+    var eqMid by rememberSaveable(operation) { mutableStateOf("0") }
+    var eqHigh by rememberSaveable(operation) { mutableStateOf("0") }
+    var compressorThreshold by rememberSaveable(operation) { mutableStateOf("-18") }
+    var compressorRatio by rememberSaveable(operation) { mutableStateOf("4") }
+    var targetChannels by rememberSaveable(operation) { mutableStateOf("2") }
+
+    val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                val bytes = withContext(Dispatchers.IO) {
+                    val maxBytes = 250 * 1024 * 1024
+                    val input = context.contentResolver.openInputStream(uri) ?: kotlin.error("Unable to read the selected file.")
+                    input.use { stream ->
+                        val outputStream = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(64 * 1024)
+                        var total = 0
+                        while (true) {
+                            val read = stream.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            require(total <= maxBytes) { "Choose a WAV file no larger than 250 MB." }
+                            outputStream.write(buffer, 0, read)
+                        }
+                        outputStream.toByteArray()
+                    }
+                }
+                val info = NativeAudioWavProcessor.process(bytes, "inspector")
+                selectedBytes = bytes
+                selectedName = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "selected.wav"
+                endSeconds = info.durationSeconds?.let { String.format(Locale.US, "%.3f", it) } ?: "5"
+                output = info.report
+                error = ""
+            }.onFailure { selectedBytes = null; selectedName = ""; output = ""; error = it.message ?: "Unable to open WAV." }
+        }
+    }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
+        val payload = pendingExport
+        if (uri != null && payload != null) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(payload) } ?: kotlin.error("Unable to open the destination for writing.") }
+            }.fold({ output += "\nSaved processed WAV to the selected location."; error = "" }, { error = it.message ?: "Unable to save WAV." })
+            pendingExport = null
+        } else pendingExport = null
+    }
+
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
+    val analyzer = operation in setOf("inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(toolName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text("Native offline WAV tool. Processing happens on this device. This native path supports uncompressed PCM WAV (8/16/24/32-bit) and 32-bit float WAV; use the browser-local tool for compressed input such as MP3, M4A or OGG.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) { Text(if (selectedName.isBlank()) "Choose WAV file" else "Choose another WAV · $selectedName") }
+        if (!analyzer) {
+            when (operation) {
+                "trim" -> { InputField(startSeconds, { startSeconds = it }, "Start (seconds)", singleLine = true); InputField(endSeconds, { endSeconds = it }, "End (seconds)", singleLine = true) }
+                "volume-local" -> InputField(gainPercent, { gainPercent = it }, "Gain (percent, 0–500)", singleLine = true)
+                "audio-pitch-shift" -> InputField(semitones, { semitones = it }, "Pitch change (semitones, −12 to +12; changes duration)", singleLine = true)
+                "audio-tempo-change" -> InputField(playbackRate, { playbackRate = it }, "Playback speed (0.5–1.5; pitch changes too)", singleLine = true)
+                "resample-local" -> InputField(targetSampleRate, { targetSampleRate = it }, "Target sample rate (8000–192000 Hz)", singleLine = true)
+                "voice-noise-reducer" -> { InputField(noiseStrength, { noiseStrength = it }, "Noise reduction strength (0–1)", singleLine = true); InputField(gateThreshold, { gateThreshold = it }, "Soft-gate threshold (dBFS)", singleLine = true) }
+                "voice-noise-gate" -> InputField(gateThreshold, { gateThreshold = it }, "Gate threshold (dBFS)", singleLine = true)
+                "audio-hum-reducer" -> InputField(humFrequency, { humFrequency = it }, "Power-line frequency (50 or 60 Hz)", singleLine = true)
+                "audio-trim-silence" -> InputField(silenceThreshold, { silenceThreshold = it }, "Silence threshold (dBFS)", singleLine = true)
+                "fade-in", "fade-out" -> InputField(fadeMs, { fadeMs = it }, "Fade duration (milliseconds)", singleLine = true)
+                "audio-compressor" -> { InputField(compressorThreshold, { compressorThreshold = it }, "Threshold (dBFS)", singleLine = true); InputField(compressorRatio, { compressorRatio = it }, "Ratio (1–20)", singleLine = true) }
+                "audio-eq-simple" -> { InputField(eqLow, { eqLow = it }, "Low gain (dB)", singleLine = true); InputField(eqMid, { eqMid = it }, "Mid gain (dB)", singleLine = true); InputField(eqHigh, { eqHigh = it }, "High gain (dB)", singleLine = true) }
+                "channels-local" -> InputField(targetChannels, { targetChannels = it }, "Output channels (1 mono or 2 stereo)", singleLine = true)
+            }
+        }
+        ActionRow(
+            onRun = {
+                val data = selectedBytes
+                if (data == null) { error = "Choose a WAV file first."; output = "" }
+                else scope.launch {
+                    runCatching {
+                        withContext(Dispatchers.Default) {
+                            NativeAudioWavProcessor.process(
+                                bytes = data, operation = operation,
+                                startSeconds = startSeconds.toDoubleOrNull() ?: 0.0,
+                                endSeconds = endSeconds.toDoubleOrNull(),
+                                gainPercent = gainPercent.toDoubleOrNull() ?: 100.0,
+                                semitones = semitones.toDoubleOrNull() ?: 2.0,
+                                playbackRate = playbackRate.toDoubleOrNull() ?: 1.0,
+                                targetSampleRateHz = targetSampleRate.toIntOrNull() ?: 44100,
+                                noiseStrength = noiseStrength.toDoubleOrNull() ?: 0.8,
+                                gateThresholdDb = gateThreshold.toDoubleOrNull() ?: -42.0,
+                                humFrequencyHz = humFrequency.toIntOrNull() ?: 50,
+                                silenceThresholdDb = silenceThreshold.toDoubleOrNull() ?: -50.0,
+                                fadeDurationMs = fadeMs.toDoubleOrNull() ?: 1000.0,
+                                eqLowDb = eqLow.toDoubleOrNull() ?: 0.0, eqMidDb = eqMid.toDoubleOrNull() ?: 0.0, eqHighDb = eqHigh.toDoubleOrNull() ?: 0.0,
+                                compressorThresholdDb = compressorThreshold.toDoubleOrNull() ?: -18.0,
+                                compressorRatio = compressorRatio.toDoubleOrNull() ?: 4.0,
+                                targetChannels = targetChannels.toIntOrNull() ?: 2,
+                            )
+                        }
+                    }.fold({ result ->
+                        output = result.report; error = ""
+                        result.outputWav?.let { wav -> pendingExport = wav; saveLauncher.launch("${selectedName.substringBeforeLast('.', selectedName)}-enV.wav") }
+                    }, { caught -> output = ""; error = caught.message ?: "Unable to process WAV." })
+                }
+            },
+            onReset = { startSeconds = "0"; endSeconds = "5"; gainPercent = "100"; semitones = "2"; playbackRate = "0.8"; targetSampleRate = "48000"; noiseStrength = "0.8"; gateThreshold = "-42"; humFrequency = "50"; silenceThreshold = "-50"; fadeMs = "1000"; eqLow = "0"; eqMid = "0"; eqHigh = "0"; compressorThreshold = "-18"; compressorRatio = "4"; targetChannels = "2"; output = ""; error = "" }
+        )
+        ResultBox(output, error, ::copy)
+    }
+}
+
+@Composable
+private fun NativeAudioGeneratorToolForm(operation: String, toolName: String) {
+    val context = LocalContext.current
+    var frequency by rememberSaveable(operation) { mutableStateOf("440") }
+    var duration by rememberSaveable(operation) { mutableStateOf("2") }
+    var waveform by rememberSaveable(operation) { mutableStateOf("sine") }
+    var level by rememberSaveable(operation) { mutableStateOf("-12") }
+    var sampleRate by rememberSaveable(operation) { mutableStateOf("44100") }
+    var bpm by rememberSaveable(operation) { mutableStateOf("120") }
+    var beatsPerBar by rememberSaveable(operation) { mutableStateOf("4") }
+    var denominator by rememberSaveable(operation) { mutableStateOf("4") }
+    var bars by rememberSaveable(operation) { mutableStateOf("4") }
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    var output by remember(operation) { mutableStateOf("") }
+    var error by remember(operation) { mutableStateOf("") }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
+        val payload = pendingExport
+        if (uri != null && payload != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(payload) } ?: kotlin.error("Unable to open the destination for writing.") }
+                .fold({ output += "\nSaved WAV to the selected location."; error = "" }, { error = it.message ?: "Unable to save generated audio." })
+        }
+        pendingExport = null
+    }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(toolName, style = MaterialTheme.typography.titleMedium)
+        Text("Generated audio is rendered locally and exported as 16-bit PCM WAV. No upload or account required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InputField(sampleRate, { sampleRate = it }, "Sample rate (8000–192000 Hz)", singleLine = true)
+        if (operation == "generate-tone") {
+            InputField(waveform, { waveform = it.trim().lowercase() }, "Waveform: sine, square, saw or noise", singleLine = true)
+            InputField(frequency, { frequency = it }, "Frequency (Hz, below Nyquist)", singleLine = true)
+            InputField(duration, { duration = it }, "Duration (0.05–300 seconds)", singleLine = true)
+            InputField(level, { level = it }, "Level (−60 to 0 dBFS)", singleLine = true)
+        } else {
+            InputField(bpm, { bpm = it }, "Quarter-note BPM (40–240)", singleLine = true)
+            InputField(beatsPerBar, { beatsPerBar = it }, "Beats per bar (1–12)", singleLine = true)
+            InputField(denominator, { denominator = it }, "Time-signature denominator: 2, 4 or 8", singleLine = true)
+            InputField(bars, { bars = it }, "Bars (1–100)", singleLine = true)
+        }
+        ActionRow(onRun = {
+            runCatching {
+                if (operation == "generate-tone") NativeAudioWavProcessor.generateTone(sampleRate.toIntOrNull() ?: 44100, duration.toDoubleOrNull() ?: 2.0, frequency.toDoubleOrNull() ?: 440.0, waveform, level.toDoubleOrNull() ?: -12.0)
+                else NativeAudioWavProcessor.generateMetronome(sampleRate.toIntOrNull() ?: 44100, bpm.toDoubleOrNull() ?: 120.0, beatsPerBar.toIntOrNull() ?: 4, bars.toIntOrNull() ?: 4, denominator.toIntOrNull() ?: 4)
+            }.fold({ result -> output = result.report; error = ""; pendingExport = result.outputWav; saveLauncher.launch(if (operation == "generate-tone") "env-generated-tone.wav" else "env-metronome.wav") }, { caught -> output = ""; error = caught.message ?: "Unable to generate local audio." })
+        }, onReset = { frequency = "440"; duration = "2"; waveform = "sine"; level = "-12"; sampleRate = "44100"; bpm = "120"; beatsPerBar = "4"; denominator = "4"; bars = "4"; output = ""; error = ""; pendingExport = null })
+        ResultBox(output, error, ::copy)
+    }
+}
+
+private const val NATIVE_AUDIO_RECORD_SAMPLE_RATE = 44_100
+private const val NATIVE_AUDIO_RECORD_MAX_SECONDS = 300
+private const val NATIVE_AUDIO_RECORD_MAX_BYTES = NATIVE_AUDIO_RECORD_SAMPLE_RATE * 2 * NATIVE_AUDIO_RECORD_MAX_SECONDS
+
+@Composable
+private fun NativeAudioRecorderToolForm(toolName: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var audioRecord by remember { mutableStateOf<AudioRecord?>(null) }
+    var recordingJob by remember { mutableStateOf<Job?>(null) }
+    var stopRequested by remember { mutableStateOf<java.util.concurrent.atomic.AtomicBoolean?>(null) }
+    var isRecording by rememberSaveable { mutableStateOf(false) }
+    var levelPercent by rememberSaveable { mutableIntStateOf(0) }
+    var elapsedSeconds by rememberSaveable { mutableIntStateOf(0) }
+    var output by rememberSaveable { mutableStateOf("") }
+    var error by rememberSaveable { mutableStateOf("") }
+    var status by rememberSaveable { mutableStateOf("Ready. Recording starts only after microphone permission is granted.") }
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
+        val payload = pendingExport
+        if (uri != null && payload != null) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(payload) }
+                        ?: kotlin.error("Unable to open the destination for writing.")
+                }
+            }.fold({ status = "Saved local microphone recording as 16-bit PCM WAV. No audio was uploaded."; output = "Duration: ${elapsedSeconds}s\nSample rate: 44,100 Hz\nChannels: mono\nFormat: 16-bit PCM WAV\nPrivacy: recorded and exported on this device."; error = "" }, { error = it.message ?: "Unable to save the recording." })
+            pendingExport = null
+        } else pendingExport = null
+    }
+
+    fun startCapture() {
+        if (isRecording || recordingJob?.isActive == true) return
+        error = ""
+        output = ""
+        elapsedSeconds = 0
+        levelPercent = 0
+        val sampleRate = NATIVE_AUDIO_RECORD_SAMPLE_RATE
+        val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        if (minBuffer <= 0) { error = "This device does not provide a supported 44.1 kHz mono microphone input."; return }
+        val recorder = runCatching {
+            AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuffer * 2, 8192))
+        }.getOrElse { error = it.message ?: "Unable to initialize microphone capture."; return }
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            recorder.release(); error = "The microphone recorder could not be initialized. Check that another app is not holding the microphone."; return
+        }
+        val stopFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+        stopRequested = stopFlag
+        recordingJob = scope.launch(Dispatchers.IO) {
+            val raw = java.io.ByteArrayOutputStream(minBuffer.coerceAtLeast(8192))
+            try {
+                recorder.startRecording()
+                withContext(Dispatchers.Main.immediate) { audioRecord = recorder; isRecording = true; status = "Recording locally. Maximum duration: 5 minutes." }
+                val shorts = ShortArray(2048)
+                var lastUiUpdate = 0L
+                val startedAt = android.os.SystemClock.elapsedRealtime()
+                while (isActive && !stopFlag.get() && raw.size() < NATIVE_AUDIO_RECORD_MAX_BYTES) {
+                    val read = recorder.read(shorts, 0, shorts.size, AudioRecord.READ_BLOCKING)
+                    if (read < 0) {
+                        if (stopFlag.get()) break
+                        throw IllegalStateException("Microphone read failed (code $read). Stop and retry; no server upload was attempted.")
+                    }
+                    if (read == 0) continue
+                    val writable = minOf(read, (NATIVE_AUDIO_RECORD_MAX_BYTES - raw.size()) / 2)
+                    if (writable <= 0) break
+                    var peak = 0.0
+                    var sumSquares = 0.0
+                    val block = ByteArray(writable * 2)
+                    for (index in 0 until writable) {
+                        val sample = shorts[index].toInt()
+                        block[index * 2] = (sample and 0xff).toByte()
+                        block[index * 2 + 1] = ((sample shr 8) and 0xff).toByte()
+                        val normalized = sample / 32768.0
+                        peak = maxOf(peak, kotlin.math.abs(normalized))
+                        sumSquares += normalized * normalized
+                    }
+                    raw.write(block)
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastUiUpdate >= 180) {
+                        val seconds = raw.size() / (sampleRate * 2)
+                        val rms = kotlin.math.sqrt(sumSquares / writable.coerceAtLeast(1))
+                        val percent = (20 * kotlin.math.log10(maxOf(rms, 0.000001)) + 60).coerceIn(0.0, 60.0) / 60.0 * 100
+                        withContext(Dispatchers.Main.immediate) {
+                            elapsedSeconds = seconds
+                            levelPercent = percent.toInt()
+                            status = if (peak >= 0.999) "Recording — clipping risk detected. Reduce input level or move farther from the microphone." else "Recording locally · ${seconds}s elapsed · ${(NATIVE_AUDIO_RECORD_MAX_SECONDS - seconds).coerceAtLeast(0)}s remaining."
+                        }
+                        lastUiUpdate = now
+                    }
+                }
+                runCatching { if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop() }
+                val captured = raw.toByteArray()
+                withContext(Dispatchers.Main.immediate) {
+                    if (captured.isNotEmpty()) {
+                        pendingExport = com.chastech.env.engine.NativePcmWavEncoder.encodeMonoPcm16Wav(captured, sampleRate, NATIVE_AUDIO_RECORD_MAX_SECONDS)
+                        elapsedSeconds = captured.size / (sampleRate * 2)
+                        status = if (stopFlag.get()) "Recording stopped and ready to export." else "Five-minute limit reached; recording is ready to export."
+                        output = "Captured ${(captured.size / 1_000_000.0).let { String.format(Locale.US, "%.2f", it) }} MB of raw PCM\nDuration: ${elapsedSeconds}s\nFormat: 44.1 kHz mono, 16-bit PCM WAV\nNo upload: audio remains on this device until you choose to export it."
+                    } else status = "No audio samples were captured. Check microphone access and try again."
+                    audioRecord = null
+                    isRecording = false
+                    recordingJob = null
+                    stopRequested = null
+                }
+            } catch (caught: Throwable) {
+                withContext(Dispatchers.Main.immediate) { error = caught.message ?: "Microphone recording failed."; status = "Recording failed. Check permission and microphone availability."; audioRecord = null; isRecording = false; recordingJob = null; stopRequested = null }
+            } finally {
+                runCatching { if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop() }
+                recorder.release()
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startCapture() else { error = "Microphone permission was denied. Allow microphone access in Android settings to record audio."; status = "No recording started." }
+    }
+    fun requestStart() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startCapture()
+        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    fun stopCapture() {
+        stopRequested?.set(true)
+        status = "Stopping and finalizing the local WAV…"
+        runCatching { audioRecord?.stop() }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            stopRequested?.set(true)
+            runCatching { audioRecord?.stop() }
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(toolName, style = MaterialTheme.typography.titleMedium)
+        Text("Native microphone recording · 44.1 kHz mono · 16-bit PCM WAV · maximum 5 minutes per take. Audio stays on device; export is initiated by you. Microphone permission is requested only when you press Start.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(shape = CircleShape, color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(12.dp)) {}
+            Text(if (isRecording) "Recording" else "Stopped")
+            Spacer(Modifier.weight(1f))
+            Text("${elapsedSeconds}s / ${NATIVE_AUDIO_RECORD_MAX_SECONDS}s", style = MaterialTheme.typography.bodySmall)
+        }
+        androidx.compose.material3.LinearProgressIndicator(progress = { levelPercent / 100f }, modifier = Modifier.fillMaxWidth(), color = if (levelPercent >= 95) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        Text("Input level (approximate RMS)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { requestStart() }, enabled = !isRecording && recordingJob?.isActive != true, modifier = Modifier.weight(1f)) { Text("Start recording") }
+            OutlinedButton(onClick = { stopCapture() }, enabled = isRecording, modifier = Modifier.weight(1f)) { Text("Stop") }
+        }
+        Button(onClick = { pendingExport?.let { saveLauncher.launch("env-microphone-recording.wav") } }, enabled = pendingExport != null, modifier = Modifier.fillMaxWidth()) { Text("Export WAV") }
+        Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (output.isNotBlank() || error.isNotBlank()) ResultBox(output, error, { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV recording output", it)) })
+    }
+}
+
+@Composable
+private fun NativeAudioToolForm(tool: ToolRecord) {
+    val context = LocalContext.current
+    val operation = NativeAudioEngine.operationFor(tool) ?: return
+    if (operation == "record-mic") {
+        NativeAudioRecorderToolForm(tool.name)
+        return
+    }
+    if (operation == "generate-tone" || operation == "generate-metronome") {
+        NativeAudioGeneratorToolForm(operation, tool.name)
+        return
+    }
+    if (operation == "file:joiner") {
+        NativeAudioWavJoinerForm(tool.name)
+        return
+    }
+    if (operation.startsWith("file:")) {
+        NativeAudioWaveFileToolForm(operation.removePrefix("file:"), tool.name)
+        return
+    }
+    val inferredPlatform = remember(tool.id) { listOf("podcast", "discord", "spotify", "instagram", "apple-music", "youtube", "tiktok", "twitch").firstOrNull { tool.id.startsWith("$it-") } ?: "podcast" }
+    var platform by rememberSaveable(tool.id) { mutableStateOf(inferredPlatform) }
+    var duration by rememberSaveable(tool.id) { mutableStateOf("180") }
+    var bitrate by rememberSaveable(tool.id) { mutableStateOf("128") }
+    var sampleRate by rememberSaveable(tool.id) { mutableStateOf("44100") }
+    var channels by rememberSaveable(tool.id) { mutableStateOf("2") }
+    var bits by rememberSaveable(tool.id) { mutableStateOf("16") }
+    var bpm by rememberSaveable(tool.id) { mutableStateOf("120") }
+    var bars by rememberSaveable(tool.id) { mutableStateOf("4") }
+    var targetSizeMb by rememberSaveable(tool.id) { mutableStateOf("0.96") }
+    var calcMode by rememberSaveable(tool.id) { mutableStateOf(if (tool.id == "audio-file-size-calculator") "file-size" else "bitrate") }
+    var output by rememberSaveable(tool.id) { mutableStateOf("") }
+    var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("This native tool runs offline. Audio files and microphone access are not requested by these calculation/reference modes.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        InputField(platform, { platform = it.trim().lowercase() }, "Platform (podcast, discord, spotify, instagram, apple-music, youtube, tiktok, twitch)", singleLine = true)
+        if (operation == "calc") InputField(calcMode, { calcMode = it.trim().lowercase() }, "Calculation mode: bitrate, bitrate-from-size, file-size, pcm-size, BPM, sample-rate", singleLine = true)
+        if (operation in setOf("bitrate", "file-size", "pcm-size", "duration") || (operation == "calc" && calcMode in setOf("bitrate", "file-size", "pcm-size", "duration", "bitrate-from-size"))) {
+            InputField(duration, { duration = it }, "Duration (seconds)", singleLine = true)
+            if (!(operation == "calc" && calcMode == "bitrate-from-size")) InputField(bitrate, { bitrate = it }, "Bitrate (kbps)", singleLine = true)
+        }
+        if (operation == "calc" && calcMode == "bitrate-from-size") InputField(targetSizeMb, { targetSizeMb = it }, "Target size (decimal MB)", singleLine = true)
+        if (operation == "pcm-size" || (operation == "calc" && calcMode == "pcm-size")) {
+            InputField(sampleRate, { sampleRate = it }, "Sample rate (Hz)", singleLine = true)
+            InputField(channels, { channels = it }, "Channels", singleLine = true)
+            InputField(bits, { bits = it }, "Bit depth", singleLine = true)
+        }
+        if (operation == "sample-rate" || (operation == "calc" && calcMode == "sample-rate")) InputField(sampleRate, { sampleRate = it }, "Sample rate (Hz)", singleLine = true)
+        if (operation == "bpm" || (operation == "calc" && calcMode == "bpm")) {
+            InputField(bpm, { bpm = it }, "BPM", singleLine = true)
+            InputField(bars, { bars = it }, "Bars in 4/4", singleLine = true)
+        }
+        ActionRow(
+            onRun = { runCatching {
+                NativeAudioEngine.calculate(if (operation == "calc") calcMode else operation, platform, duration.toDouble(), bitrate.toDouble(), sampleRate.toDouble(), channels.toInt(), bits.toInt(), bpm.toDouble(), bars.toInt(), targetSizeMb.toDouble())
+            }.fold({ output = it; error = "" }, { output = ""; error = it.message ?: "Unable to calculate audio values." }) },
+            onReset = { duration = "180"; bitrate = "128"; sampleRate = "44100"; channels = "2"; bits = "16"; bpm = "120"; bars = "4"; targetSizeMb = "0.96"; calcMode = if (tool.id == "audio-file-size-calculator") "file-size" else "bitrate"; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)
     }

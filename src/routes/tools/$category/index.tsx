@@ -14,7 +14,8 @@ function Category() {
   const { category } = Route.useParams();
   const tools = useMemo(() => getToolsByCategory(category as CategoryId).sort((a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name)), [category]);
   const developerStudios = category === "developer" ? tools.filter((tool) => tool.tags.includes("developer-studio")) : [];
-  const legacyTools = category === "developer" ? tools.filter((tool) => !tool.tags.includes("developer-studio")) : tools;
+  const audioStudios = category === "audio" ? tools.filter((tool) => tool.tags.includes("audio-studio")) : [];
+  const legacyTools = category === "developer" ? tools.filter((tool) => !tool.tags.includes("developer-studio")) : category === "audio" ? tools.filter((tool) => !tool.tags.includes("audio-studio")) : tools;
   const [visibleCount, setVisibleCount] = useState(6);
   const meta = CATEGORY_MAP[category as CategoryId];
   const Icon = meta ? toolIcon(meta.icon) : Folder;
@@ -54,6 +55,11 @@ function Category() {
                 </div>
               </div>
               <div className="mb-3 mt-8"><h2 className="text-xl font-semibold">All business tools</h2><p className="mt-1 text-sm text-muted">Legacy slugs are preserved for direct links and bookmarks.</p></div>
+            </div> : null}
+            {category === "audio" ? <div className="mt-7">
+              <div className="mb-3"><h2 className="text-xl font-semibold">Audio Studios</h2><p className="mt-1 text-sm text-muted">Start in one focused workspace; legacy audio and platform-specific URLs remain available below. Local tools process in this browser. Server conversion/transcription routes are clearly identified.</p></div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{audioStudios.filter((tool) => ["music-studio", "audio-convert-studio", "audio-edit-studio", "audio-analyze-studio", "audio-calc-studio", "audio-transcribe-studio", "audio-import-studio", "audio-platform-guide-studio"].includes(tool.id)).map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
+              <div className="mb-3 mt-9"><h2 className="text-xl font-semibold">Individual tools and compatibility routes</h2><p className="mt-1 text-sm text-muted">Existing slugs are retained for bookmarks and direct links; use the Studios for the grouped workflows.</p></div>
             </div> : null}
             {category === "developer" ? <div className="mt-7">
               <div className="mb-3"><h2 className="text-xl font-semibold">Developer Studios</h2><p className="mt-1 text-sm text-muted">Grouped workspaces for common developer jobs. Processing is local-first, and every legacy tool route remains available below.</p></div>

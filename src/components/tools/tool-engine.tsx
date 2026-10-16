@@ -71,6 +71,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   // contrast-checker was historically a generic color tool).
   if (tool.category === "accessibility") return <AccessibilityEngine toolId={tool.id} />;
   if (tool.category === "developer" && tool.tags.includes("developer-studio")) return <DeveloperStudioEngine tool={tool} initialMode={initialMode} initialAction={initialAction} initialOp={initialOp} />;
+  if (tool.category === "audio" && ["audio-bitrate-calculator", "audio-file-size-calculator"].includes(tool.id)) return <AudioEngine op={tool.id} toolId={tool.id} initialMode={initialMode} />;
 
   switch (tool.engine.type) {
     case "calculator":
@@ -116,7 +117,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "business":
       return <BusinessEngine tool={tool} initialMode={initialMode} />;
     case "audio":
-      return <AudioEngine op={tool.engine.op} toolId={tool.id} />;
+      return <AudioEngine op={tool.engine.op} toolId={tool.id} initialMode={initialMode} />;
     case "network":
       return <NetworkEngine op={tool.engine.op} />;
     case "ai":

@@ -1,8 +1,7 @@
 import fs from "node:fs";
-import { parseGeneratedCatalog } from "./catalog-reader.mjs";
 
 const root = new URL("../", import.meta.url);
-const catalog = parseGeneratedCatalog(fs.readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
+const { tools: catalog } = await import("../src/data/catalog.ts");
 const readIds = (platform, kind) => {
   const files = kind === "local"
     ? [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url)]

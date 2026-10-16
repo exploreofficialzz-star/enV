@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import AudioToolbox
 import UIKit
 import WebKit
 import CoreImage
@@ -310,6 +312,7 @@ enum NativeCoverage {
         if usesBackend(tool) || tool.isPlanned { return false }
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
+        case "audio": return NativeAudioEngine.supports(tool)
         case "ai": return NativeAiEngine.supports(tool.id) || NativeAiMicroEngine.supports(tool.id)
         case "file-converter", "document-backend": return NativeFileConverterEngine.supports(tool)
         case "text": return NativeTextEngine.operation(forToolID: tool.id) != nil
@@ -320,7 +323,7 @@ enum NativeCoverage {
         case "image": return NativeImageEngine.supports(tool)
         case "mime": return NativeMimeEngine.operation(forToolID: tool.id) != nil
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
-        case "calculator": return NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
+        case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
         case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id)
         default: return false
@@ -342,6 +345,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "audio": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -352,7 +356,7 @@ struct NativeFamilyToolView: View {
             case "image": if NativeImageEngine.supports(tool) { NativeImageToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "calculator": if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1235,6 +1239,1005 @@ private struct NativeConverterToolView: View {
     }
 }
 
+/// Pure PCM contracts for local native audio analysis/edit operations.
+/// Native file-import and recording views can call these helpers directly.
+enum NativeAudioDsp {
+    static func peakAmplitude(_ samples: [Float]) -> Double {
+        samples.reduce(0.0) { max($0, abs(Double($1))) }
+    }
+
+    static func rmsAmplitude(_ samples: [Float]) -> Double {
+        guard !samples.isEmpty else { return 0 }
+        return sqrt(samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count))
+    }
+
+    static func dcOffset(_ samples: [Float]) -> Double {
+        guard !samples.isEmpty else { return 0 }
+        return samples.reduce(0.0) { $0 + Double($1) } / Double(samples.count)
+    }
+
+    static func amplitudeDbfs(_ amplitude: Double) -> Double {
+        guard amplitude > 0, amplitude.isFinite else { return -.infinity }
+        return 20 * log10(amplitude)
+    }
+
+    /// Soft gate only: this primitive is not a neural noise suppressor.
+    static func noiseGate(_ samples: [Float], thresholdDB: Double = -42, attenuation: Double = 0) -> [Float] {
+        let threshold = pow(10.0, thresholdDB / 20.0)
+        return samples.map { sample in
+            let value = Double(sample)
+            let gain = abs(value) >= threshold ? 1.0 : attenuation + (1.0 - attenuation) * min(1.0, max(0.0, abs(value) / threshold))
+            return Float(value * gain)
+        }
+    }
+
+    static func reverse(_ samples: [Float]) -> [Float] { Array(samples.reversed()) }
+
+    /// Leaves headroom before integer PCM export.
+    static func normalizePeak(_ samples: [Float], targetPeak: Double = 0.98) -> [Float] {
+        let peak = peakAmplitude(samples)
+        guard peak > 0 else { return samples }
+        let gain = targetPeak / peak
+        return samples.map { Float(Double($0) * gain) }
+    }
+
+    static func toMono(_ channels: [[Float]]) throws -> [Float] {
+        guard let first = channels.first else { throw NativeSimpleError.message("At least one channel is required.") }
+        guard channels.allSatisfy({ $0.count == first.count }) else { throw NativeSimpleError.message("All channels must have the same frame count.") }
+        return first.indices.map { frame in (channels.reduce(0.0) { $0 + Double($1[frame]) } / Double(channels.count)).asFloat }
+    }
+
+    static func totalSilentDurationSeconds(channels: [[Float]], sampleRateHz: Int, thresholdDB: Double = -60) throws -> Double {
+        guard sampleRateHz > 0 else { throw NativeSimpleError.message("Sample rate must be positive.") }
+        guard let first = channels.first else { throw NativeSimpleError.message("At least one channel is required.") }
+        guard channels.allSatisfy({ $0.count == first.count }) else { throw NativeSimpleError.message("All channels must have the same frame count.") }
+        let threshold = pow(10.0, thresholdDB / 20.0)
+        let silentFrames = first.indices.reduce(0) { count, frame in
+            count + (channels.allSatisfy { abs(Double($0[frame])) < threshold } ? 1 : 0)
+        }
+        return Double(silentFrames) / Double(sampleRateHz)
+    }
+
+    static func trim(_ samples: [Float], sampleRateHz: Int, startSeconds: Double, endSeconds: Double) throws -> [Float] {
+        guard sampleRateHz > 0, startSeconds.isFinite, endSeconds.isFinite, startSeconds >= 0, endSeconds > startSeconds else {
+            throw NativeSimpleError.message("Trim range must have a non-negative start and a larger end.")
+        }
+        let start = Int((startSeconds * Double(sampleRateHz)).rounded(.down))
+        let end = Int((endSeconds * Double(sampleRateHz)).rounded(.down))
+        guard start < samples.count, end <= samples.count else { throw NativeSimpleError.message("Trim range exceeds the decoded audio duration.") }
+        return Array(samples[start..<end])
+    }
+
+    static func fade(_ samples: [Float], sampleRateHz: Int, durationMs: Double, fadeIn: Bool) throws -> [Float] {
+        guard sampleRateHz > 0, durationMs.isFinite, durationMs > 0 else { throw NativeSimpleError.message("Sample rate and fade duration must be positive.") }
+        guard !samples.isEmpty else { return samples }
+        let fadeFrames = min(samples.count, max(1, Int(durationMs * Double(sampleRateHz) / 1000)))
+        var output = samples
+        for i in 0..<fadeFrames {
+            let fraction = fadeFrames <= 1 ? 1.0 : Double(i) / Double(fadeFrames - 1)
+            let index = fadeIn ? i : samples.count - fadeFrames + i
+            output[index] = Float(Double(samples[index]) * (fadeIn ? fraction : 1 - fraction))
+        }
+        return output
+    }
+
+    /// One-pole high-pass cleanup suitable for rumble reduction, not a neural denoiser.
+    static func highPass(_ samples: [Float], sampleRateHz: Int, cutoffHz: Double = 80) throws -> [Float] {
+        guard sampleRateHz > 0, cutoffHz.isFinite, cutoffHz >= 1, cutoffHz <= Double(sampleRateHz) / 2 else {
+            throw NativeSimpleError.message("High-pass cutoff must be within the Nyquist range.")
+        }
+        let rc = 1.0 / (2 * Double.pi * cutoffHz)
+        let alpha = rc / (rc + 1.0 / Double(sampleRateHz))
+        var previousInput = 0.0, previousOutput = 0.0
+        return samples.map { sample in
+            let input = Double(sample)
+            let output = alpha * (previousOutput + input - previousInput)
+            previousInput = input; previousOutput = output
+            return Float(output)
+        }
+    }
+
+    static func noiseReduce(_ samples: [Float], sampleRateHz: Int, cutoffHz: Double = 80, thresholdDB: Double = -48, attenuation: Double = 0.12) throws -> [Float] {
+        guard thresholdDB.isFinite, (-100...0).contains(thresholdDB), attenuation.isFinite, (0...1).contains(attenuation) else {
+            throw NativeSimpleError.message("Noise-reduction controls are out of range.")
+        }
+        return noiseGate(try highPass(samples, sampleRateHz: sampleRateHz, cutoffHz: cutoffHz), thresholdDB: thresholdDB, attenuation: attenuation)
+    }
+
+    /// Cascaded mains-frequency notch filters; choose the local 50/60 Hz power frequency.
+    static func humReduce(_ samples: [Float], sampleRateHz: Int, mainsFrequency: Int = 50) throws -> [Float] {
+        guard sampleRateHz > 0, [50, 60].contains(mainsFrequency) else { throw NativeSimpleError.message("Choose 50 or 60 Hz and a positive sample rate.") }
+        var current = samples
+        for frequency in [mainsFrequency, mainsFrequency * 2].filter({ Double($0) < Double(sampleRateHz) / 2 }) {
+            let w0 = 2 * Double.pi * Double(frequency) / Double(sampleRateHz)
+            let alpha = sin(w0) / 24.0
+            let a0 = 1 + alpha
+            let b0 = 1 / a0, b1 = -2 * cos(w0) / a0, b2 = b0
+            let a1 = -2 * cos(w0) / a0, a2 = (1 - alpha) / a0
+            var x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0
+            current = current.map { sample in
+                let x = Double(sample)
+                let y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+                x2 = x1; x1 = x; y2 = y1; y1 = y
+                return Float(y)
+            }
+        }
+        return current
+    }
+
+    /// Three-band low/mid/high split EQ. This is a light offline primitive, not a mastering EQ.
+    static func threeBandEQ(_ samples: [Float], sampleRateHz: Int, lowGainDB: Double = 0, midGainDB: Double = 0, highGainDB: Double = 0) throws -> [Float] {
+        let gains = [lowGainDB, midGainDB, highGainDB]
+        guard sampleRateHz > 0, gains.allSatisfy({ $0.isFinite && (-24...24).contains($0) }) else { throw NativeSimpleError.message("EQ gains must be between -24 and +24 dB.") }
+        let lowA = min(1.0, max(0.0, 1 - exp(-2 * Double.pi * min(200, Double(sampleRateHz) * 0.2) / Double(sampleRateHz))))
+        let midA = min(1.0, max(0.0, 1 - exp(-2 * Double.pi * min(2500, Double(sampleRateHz) * 0.4) / Double(sampleRateHz))))
+        let gain = gains.map { pow(10.0, $0 / 20.0) }
+        var lowState = 0.0, midState = 0.0
+        return samples.map { sample in
+            let input = Double(sample)
+            lowState += lowA * (input - lowState); midState += midA * (input - midState)
+            let low = lowState, mid = midState - lowState, high = input - midState
+            return Float(low * gain[0] + mid * gain[1] + high * gain[2])
+        }
+    }
+
+    /// Static-ratio compressor proxy. It has no attack/release envelope.
+    static func compress(_ samples: [Float], thresholdDB: Double = -18, ratio: Double = 4, makeupDB: Double = 0) throws -> [Float] {
+        guard thresholdDB.isFinite, (-60...0).contains(thresholdDB), ratio.isFinite, (1...20).contains(ratio), makeupDB.isFinite, (-24...24).contains(makeupDB) else {
+            throw NativeSimpleError.message("Compressor settings are out of range.")
+        }
+        let threshold = pow(10.0, thresholdDB / 20), makeup = pow(10.0, makeupDB / 20)
+        return samples.map { sample in
+            let value = Double(sample), amplitude = abs(value)
+            let compressed = amplitude <= threshold ? amplitude : threshold + (amplitude - threshold) / ratio
+            return Float((value < 0 ? -compressed : compressed) * makeup)
+        }
+    }
+
+    /// Resampling changes pitch and duration together; it is not pitch-locked time stretching.
+    static func resampleAtPlaybackRate(_ samples: [Float], playbackRate: Double) throws -> [Float] {
+        guard playbackRate.isFinite, (0.25...3).contains(playbackRate) else { throw NativeSimpleError.message("Playback rate must be between 0.25× and 3×.") }
+        guard !samples.isEmpty else { return samples }
+        let count = max(1, Int(Double(samples.count) / playbackRate))
+        return (0..<count).map { i in
+            let position = Double(i) * playbackRate
+            let left = min(samples.count - 1, max(0, Int(position)))
+            let right = min(samples.count - 1, left + 1)
+            let fraction = position - Double(left)
+            return Float(Double(samples[left]) * (1 - fraction) + Double(samples[right]) * fraction)
+        }
+    }
+
+    /// RMS-derived proxy only; it is not an EBU R128 / BS.1770 integrated LUFS measurement.
+    static func approximateLUFS(_ samples: [Float]) -> Double {
+        let amplitude = rmsAmplitude(samples)
+        return amplitude <= 0 ? -.infinity : -0.691 + 20 * log10(amplitude)
+    }
+}
+
+private extension Double {
+    var asFloat: Float { Float(self) }
+}
+
+/// Offline native audio estimates and platform guidance. Heavy stem AI and browser-only formats remain web-first.
+enum NativeAudioEngine {
+    private static let nativeWavOperations: [String: String] = [
+        "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
+        "audio-peak-meter": "peak", "audio-rms-meter": "rms", "audio-silence-detector": "silence", "audio-dc-offset-checker": "dc-offset",
+        "audio-to-mono": "mono", "audio-to-stereo": "stereo", "audio-reverser": "reverse", "audio-normalizer": "normalize",
+        "voice-noise-reducer": "voice-noise-reducer", "voice-noise-gate": "voice-noise-gate", "audio-hum-reducer": "audio-hum-reducer",
+        "audio-trim-silence": "audio-trim-silence", "audio-fade-in": "fade-in", "audio-fade-out": "fade-out", "audio-lufs-meter": "audio-lufs-meter",
+        "audio-compressor": "audio-compressor", "audio-eq-simple": "audio-eq-simple", "audio-pitch-shift": "audio-pitch-shift", "audio-tempo-change": "audio-tempo-change",
+        "audio-volume-control": "volume-local", "audio-sample-rate-converter": "resample-local", "audio-channel-converter": "channels-local", "audio-joiner-local": "joiner",
+        "audio-tone-generator": "generate-tone", "audio-metronome": "generate-metronome"
+    ]
+
+    static func operation(for tool: Tool) -> String? {
+        if tool.id == "audio-recorder" { return "record-mic" }
+        if let fileOp = nativeWavOperations[tool.id] { return "file:\(fileOp)" }
+        if tool.id == "audio-calc-studio" { return "calc" }
+        if tool.id == "audio-platform-guide-studio" { return "guide" }
+        if tool.id == "audio-bitrate-calculator" { return "calc" }
+        if tool.id == "audio-file-size-calculator" { return "calc" }
+        if tool.id == "audio-duration-tool" { return "duration" }
+        let op = tool.engine.op?.split(separator: ":").last.map(String.init) ?? ""
+        if ["bitrate", "file-size", "bpm", "loudness", "sample-rate", "format-guide", "export-preset"].contains(op) { return op == "export-preset" ? "format-guide" : op }
+        let id = tool.id
+        if id.contains("bitrate-calculator") { return "bitrate" }
+        if id.contains("file-size-calculator") { return "file-size" }
+        if id.contains("bpm-helper") { return "bpm" }
+        if id.contains("loudness-helper") { return "loudness" }
+        if id.contains("sample-rate-helper") { return "sample-rate" }
+        if id.contains("format-guide") || id.contains("export-preset") { return "format-guide" }
+        return nil
+    }
+
+    static func supports(_ tool: Tool) -> Bool {
+        (tool.engine.type == "audio" || ["audio-bitrate-calculator", "audio-file-size-calculator"].contains(tool.id)) && operation(for: tool) != nil
+    }
+
+    static func calculate(operation: String, platform: String, duration: Double, bitrate: Double, sampleRate: Double, channels: Int, bits: Int, bpm: Double, bars: Int, targetSizeMegabytes: Double = 0.96) throws -> String {
+        guard duration.isFinite, duration > 0 else { throw NativeSimpleError.message("Duration must be positive.") }
+        guard bitrate.isFinite, bitrate > 0 else { throw NativeSimpleError.message("Bitrate must be positive.") }
+        guard sampleRate.isFinite, sampleRate > 0, (1...32).contains(channels), (8...64).contains(bits) else { throw NativeSimpleError.message("Sample rate, channel count or bit depth is invalid.") }
+        let compressed = duration * bitrate * 1000 / 8
+        let pcm = duration * sampleRate * Double(channels * bits) / 8
+        let selected = platform.lowercased()
+        switch operation {
+        case "duration": return "Duration: \(String(format: "%.3f", duration)) seconds\nEstimated compressed size at selected bitrate: \(bytes(compressed))"
+        case "bitrate": return "Estimated compressed file size: \(decimalMegabytes(compressed))\nBytes (decimal): \(String(format: "%.0f", compressed))\nFormula: duration × bitrate × 1,000 ÷ 8; container overhead is excluded."
+        case "bitrate-from-size":
+            guard targetSizeMegabytes.isFinite, targetSizeMegabytes > 0 else { throw NativeSimpleError.message("Target size must be a positive decimal MB value.") }
+            let targetBytes = targetSizeMegabytes * 1_000_000
+            let inferredKbps = targetBytes * 8 / duration / 1000
+            return "Required average bitrate: \(String(format: "%.2f", inferredKbps)) kbps\nTarget size: \(decimalMegabytes(targetBytes))\nFormula: target bytes × 8 ÷ duration ÷ 1,000; container overhead is excluded."
+        case "pcm-size": return "Estimated uncompressed PCM size: \(decimalMegabytes(pcm))\nFormula: duration × sample rate × channels × bit depth ÷ 8."
+        case "file-size": return "Estimated compressed size at selected bitrate: \(decimalMegabytes(compressed))\nBytes (decimal): \(String(format: "%.0f", compressed))\nFormula: duration × bitrate × 1,000 ÷ 8; container overhead is excluded."
+        case "bpm":
+            guard bpm > 0, bars > 0 else { throw NativeSimpleError.message("BPM and bars must be positive.") }
+            return "Beat duration: \(String(format: "%.3f", 60 / bpm)) seconds\n\(bars) bars in 4/4: \(String(format: "%.3f", 60 / bpm * 4 * Double(bars))) seconds"
+        case "loudness":
+            let note = selected == "spotify" ? "−14 LUFS is a playback-normalization reference, not a required mastering target." : selected == "podcast" ? "−16 LUFS stereo / −19 LUFS mono are common podcast targets." : "There is no universal loudness target for every delivery workflow."
+            return "\(label(platform)) loudness guidance\n\(note)\nGuidance only — not an acceptance guarantee."
+        case "sample-rate": return "Sample rate: \(String(format: "%.0f", sampleRate)) Hz\nSamples for selected duration: \(String(format: "%.0f", duration * sampleRate))\nPreserve the original master resolution unless the delivery workflow requires conversion."
+        case "format-guide", "guide", "calc":
+            let note: String
+            switch selected {
+            case "podcast": note = "44.1 or 48 kHz; MP3/AAC for distribution; WAV masters; 128–192 kbps stereo is common."
+            case "discord": note = "Call/channel configuration affects voice quality; 44.1/48 kHz sources are common; Opus is used in voice paths."
+            case "spotify": note = "Keep a lossless master (WAV/FLAC when requested); −14 LUFS is playback normalization, not a mastering requirement."
+            case "instagram": note = "Keep a high-quality source; AAC is common in video delivery paths and services may transcode."
+            case "apple-music", "apple music": note = "Follow the distributor's requested lossless delivery format and supported master resolution."
+            default: note = "Keep a high-quality source and confirm the destination's current published delivery specifications."
+            }
+            return "\(label(platform)) audio guidance\n\(note)\nGuidance only — not an acceptance guarantee."
+        default: throw NativeSimpleError.message("This native audio mode is not implemented offline.")
+        }
+    }
+
+    private static func label(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
+    private static func decimalMegabytes(_ value: Double) -> String { String(format: "%.2f MB", value / 1_000_000) }
+    private static func bytes(_ value: Double) -> String {
+        var amount = value; let units = ["B", "KB", "MB", "GB", "TB"]; var index = 0
+        while amount >= 1024 && index < units.count - 1 { amount /= 1024; index += 1 }
+        return String(format: index == 0 ? "%.0f %@" : "%.2f %@", amount, units[index])
+    }
+}
+
+struct NativeDecodedWav {
+    let sampleRateHz: Int
+    let channels: [[Float]]
+    let sourceBits: Int
+    let sourceEncoding: Int
+    var frames: Int { channels.first?.count ?? 0 }
+    var durationSeconds: Double { sampleRateHz > 0 ? Double(frames) / Double(sampleRateHz) : 0 }
+}
+
+struct NativeAudioWavResult {
+    let report: String
+    let outputWav: Data?
+    let durationSeconds: Double?
+}
+
+/// Conservative, offline RIFF/WAVE PCM processor. Compressed media and neural stem separation remain web-first.
+enum NativeAudioWavProcessor {
+    private static let maxSourceBytes = 250 * 1024 * 1024
+    private static let maxFloatSamples = 30_000_000
+
+    static func decode(_ data: Data) throws -> NativeDecodedWav {
+        guard data.count >= 44, data.count <= maxSourceBytes else { throw NativeSimpleError.message("Choose a WAV file between 44 bytes and 250 MB.") }
+        let bytes = [UInt8](data)
+        guard ascii(bytes, 0, 4) == "RIFF", ascii(bytes, 8, 4) == "WAVE" else {
+            throw NativeSimpleError.message("This native offline tool currently accepts RIFF/WAVE audio. Use the browser-local tool for MP3, M4A or OGG.")
+        }
+        var offset = 12, format: Int?, channelCount: Int?, sampleRate: Int?, bits: Int?, blockAlign: Int?, dataStart: Int?, dataLength = 0
+        while offset + 8 <= bytes.count {
+            let id = ascii(bytes, offset, 4)
+            let size = u32(bytes, offset + 4)
+            guard Int(size) <= bytes.count - offset - 8 else { throw NativeSimpleError.message("The WAV contains a truncated or oversized chunk.") }
+            let count = Int(size), start = offset + 8
+            if id == "fmt " {
+                guard count >= 16 else { throw NativeSimpleError.message("The WAV format chunk is incomplete.") }
+                format = Int(u16(bytes, start)); channelCount = Int(u16(bytes, start + 2)); sampleRate = Int(u32(bytes, start + 4)); blockAlign = Int(u16(bytes, start + 12)); bits = Int(u16(bytes, start + 14))
+            } else if id == "data", dataStart == nil { dataStart = start; dataLength = count }
+            offset = start + count + (count & 1)
+        }
+        guard let encoding = format, let count = channelCount, let rate = sampleRate, let bitDepth = bits, let align = blockAlign, let start = dataStart else {
+            throw NativeSimpleError.message("WAV format or data chunk is missing.")
+        }
+        guard (1...8).contains(count), (8_000...192_000).contains(rate) else { throw NativeSimpleError.message("Native WAV processing supports 1–8 channels and 8,000–192,000 Hz.") }
+        guard encoding == 1 || encoding == 3, ((encoding == 1 && [8,16,24,32].contains(bitDepth)) || (encoding == 3 && bitDepth == 32)) else {
+            throw NativeSimpleError.message("Supported samples are 8/16/24/32-bit PCM or 32-bit float WAV.")
+        }
+        let bytesPerSample = bitDepth / 8
+        guard align >= count * bytesPerSample, align > 0, dataLength > 0, dataLength % align == 0 else { throw NativeSimpleError.message("WAV data chunk or block alignment is invalid.") }
+        let frames = dataLength / align
+        guard frames > 0, frames <= maxFloatSamples / count else { throw NativeSimpleError.message("This WAV exceeds the native memory safety limit. Choose a shorter excerpt.") }
+        var channels = Array(repeating: [Float](repeating: 0, count: frames), count: count)
+        for frame in 0..<frames {
+            let base = start + frame * align
+            for channel in 0..<count {
+                let at = base + channel * bytesPerSample
+                let value: Float
+                if encoding == 3 { value = Float(bitPattern: u32(bytes, at)).isFinite ? Float(bitPattern: u32(bytes, at)) : 0 }
+                else if bitDepth == 8 { value = Float(Int(bytes[at]) - 128) / 128 }
+                else if bitDepth == 16 { value = Float(Int16(bitPattern: u16(bytes, at))) / 32768 }
+                else if bitDepth == 24 {
+                    var raw = Int32(bytes[at]) | (Int32(bytes[at + 1]) << 8) | (Int32(bytes[at + 2]) << 16)
+                    if (raw & 0x800000) != 0 { raw |= ~0xFFFFFF }
+                    value = Float(raw) / 8_388_608
+                } else { value = Float(Double(Int32(bitPattern: u32(bytes, at))) / 2_147_483_648) }
+                channels[channel][frame] = min(1, max(-1, value.isFinite ? value : 0))
+            }
+        }
+        return NativeDecodedWav(sampleRateHz: rate, channels: channels, sourceBits: bitDepth, sourceEncoding: encoding)
+    }
+
+    static func generateTone(sampleRateHz: Int = 44_100, durationSeconds: Double = 2, frequencyHz: Double = 440, waveform: String = "sine", levelDBFS: Double = -12) throws -> NativeAudioWavResult {
+        guard (8_000...192_000).contains(sampleRateHz) else { throw NativeSimpleError.message("Sample rate must be 8,000–192,000 Hz.") }
+        guard durationSeconds.isFinite, (0.05...300).contains(durationSeconds) else { throw NativeSimpleError.message("Tone duration must be 0.05–300 seconds.") }
+        guard frequencyHz.isFinite, frequencyHz >= 1, frequencyHz < Double(sampleRateHz) / 2 else { throw NativeSimpleError.message("Frequency must be positive and below Nyquist (\(sampleRateHz / 2) Hz).") }
+        guard ["sine", "square", "saw", "noise"].contains(waveform) else { throw NativeSimpleError.message("Choose sine, square, saw or noise.") }
+        guard levelDBFS.isFinite, (-60...0).contains(levelDBFS) else { throw NativeSimpleError.message("Level must be −60 to 0 dBFS.") }
+        let frames = Int(durationSeconds * Double(sampleRateHz))
+        guard frames > 0, frames <= maxFloatSamples else { throw NativeSimpleError.message("Generated tone exceeds the native sample limit.") }
+        let amplitude = pow(10, levelDBFS / 20), fadeFrames = min(frames / 2, max(1, sampleRateHz / 100))
+        let samples = (0..<frames).map { index -> Float in
+            let phase = (frequencyHz * Double(index) / Double(sampleRateHz)).truncatingRemainder(dividingBy: 1)
+            let sine = sin(2 * Double.pi * phase)
+            let raw: Double
+            switch waveform { case "sine": raw = sine; case "square": raw = sine >= 0 ? 1 : -1; case "saw": raw = 2 * phase - 1; default: raw = Double.random(in: -1...1) }
+            let edge = min(1, max(0, min(Double(index + 1) / Double(fadeFrames), Double(frames - index) / Double(fadeFrames))))
+            return Float(raw * amplitude * edge)
+        }
+        let encoded = try encodePCM16(sampleRateHz: sampleRateHz, channels: [samples])
+        return NativeAudioWavResult(report: "Generated \(waveform) tone\nFrequency: \(String(format: "%.3f", frequencyHz)) Hz\nDuration: \(String(format: "%.3f", durationSeconds)) s\nLevel: \(levelDBFS) dBFS\nOutput: 16-bit PCM WAV with short edge fades.", outputWav: encoded, durationSeconds: durationSeconds)
+    }
+
+    static func generateMetronome(sampleRateHz: Int = 44_100, bpm: Double = 120, beatsPerBar: Int = 4, bars: Int = 4, denominator: Int = 4) throws -> NativeAudioWavResult {
+        guard (8_000...192_000).contains(sampleRateHz), bpm.isFinite, (40...240).contains(bpm) else { throw NativeSimpleError.message("Sample rate must be 8,000–192,000 Hz and BPM must be 40–240.") }
+        guard (1...12).contains(beatsPerBar), (1...100).contains(bars), [2,4,8].contains(denominator) else { throw NativeSimpleError.message("Use 1–12 beats per bar, 1–100 bars and a denominator of 2, 4 or 8.") }
+        let beatSeconds = 60 / bpm * 4 / Double(denominator), beats = beatsPerBar * bars
+        let frames = Int(beatSeconds * Double(beats) * Double(sampleRateHz))
+        guard frames > 0, frames <= maxFloatSamples else { throw NativeSimpleError.message("Metronome export exceeds the native sample limit.") }
+        var samples = [Float](repeating: 0, count: frames)
+        let clickFrames = max(1, Int(Double(sampleRateHz) * 0.025))
+        for beat in 0..<beats {
+            let start = Int(Double(beat) * beatSeconds * Double(sampleRateHz)), accent = beat % beatsPerBar == 0
+            let frequency = accent ? 1_600.0 : 1_000.0, amplitude = accent ? 0.85 : 0.45
+            for i in 0..<min(clickFrames, frames - start) {
+                let edge = min(1, max(0, min(Double(i + 1) / (Double(sampleRateHz) * 0.002), Double(clickFrames - i) / (Double(sampleRateHz) * 0.004))))
+                let decay = exp(-Double(i) / (Double(sampleRateHz) * 0.007))
+                samples[start + i] = Float(min(1, max(-1, Double(samples[start + i]) + amplitude * edge * decay * sin(2 * Double.pi * frequency * Double(i) / Double(sampleRateHz)))))
+            }
+        }
+        let encoded = try encodePCM16(sampleRateHz: sampleRateHz, channels: [samples]), duration = Double(frames) / Double(sampleRateHz)
+        return NativeAudioWavResult(report: "Generated metronome click track\nTempo: \(String(format: "%.3f", bpm)) quarter-note BPM\nTime signature: \(beatsPerBar)/\(denominator)\nBars: \(bars) · Total beats: \(beats)\nBeat interval: \(String(format: "%.3f", beatSeconds)) s\nDuration: \(String(format: "%.3f", duration)) s\nDownbeats accented.", outputWav: encoded, durationSeconds: duration)
+    }
+
+    static func join(_ files: [Data]) throws -> NativeAudioWavResult {
+        guard (2...32).contains(files.count) else { throw NativeSimpleError.message("Choose 2–32 WAV files to join.") }
+        guard files.reduce(0, { $0 + $1.count }) <= 100 * 1024 * 1024 else { throw NativeSimpleError.message("Combined WAV input size must not exceed 100 MB for safe local joining.") }
+        let decoded = try files.map { try decode($0) }
+        guard let first = decoded.first else { throw NativeSimpleError.message("Choose at least two WAV files.") }
+        guard decoded.allSatisfy({ $0.sampleRateHz == first.sampleRateHz && $0.channels.count == first.channels.count }) else {
+            throw NativeSimpleError.message("To keep joining predictable, all WAV files must have the same sample rate and channel count. Convert them first if necessary.")
+        }
+        let totalFrames = decoded.reduce(0) { $0 + $1.frames }
+        guard totalFrames <= maxFloatSamples / first.channels.count else { throw NativeSimpleError.message("The joined audio exceeds the native memory safety limit. Join shorter excerpts.") }
+        let joinedChannels = first.channels.indices.map { channel in decoded.flatMap { $0.channels[channel] } }
+        let output = try encodePCM16(sampleRateHz: first.sampleRateHz, channels: joinedChannels)
+        let duration = Double(totalFrames) / Double(first.sampleRateHz)
+        return NativeAudioWavResult(report: "Joined \(files.count) WAV files in selected order\nSample rate: \(first.sampleRateHz) Hz\nChannels: \(first.channels.count)\nDuration: \(String(format: "%.3f", duration)) s\nOutput: 16-bit PCM WAV\nProcessed on this device; no upload performed.", outputWav: output, durationSeconds: duration)
+    }
+
+    static func process(_ data: Data, operation: String, startSeconds: Double = 0, endSeconds: Double? = nil,
+                        gainPercent: Double = 100, semitones: Double = 2, playbackRate: Double = 1,
+                        targetSampleRateHz: Int = 44_100, noiseStrength: Double = 0.8, gateThresholdDB: Double = -42,
+                        humFrequencyHz: Int = 50, silenceThresholdDB: Double = -50, fadeDurationMs: Double = 1000,
+                        eqLowDB: Double = 0, eqMidDB: Double = 0, eqHighDB: Double = 0,
+                        compressorThresholdDB: Double = -18, compressorRatio: Double = 4, targetChannels: Int = 2) throws -> NativeAudioWavResult {
+        let input = try decode(data), duration = input.durationSeconds
+        let peak = input.channels.map { NativeAudioDsp.peakAmplitude($0) }.max() ?? 0
+        let rms = sqrt(input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) * Double($1) } } / max(1, Double(input.frames * input.channels.count)))
+        let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
+        func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
+        switch operation {
+        case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
+        case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
+        case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
+        case "rms": return NativeAudioWavResult(report: "RMS amplitude: \(number(rms))\nRMS level: \(number(NativeAudioDsp.amplitudeDbfs(rms))) dBFS", outputWav: nil, durationSeconds: duration)
+        case "silence": return NativeAudioWavResult(report: "Estimated silent duration: \(number(try NativeAudioDsp.totalSilentDurationSeconds(channels: input.channels, sampleRateHz: input.sampleRateHz, thresholdDB: silenceThresholdDB))) s\nThreshold: \(silenceThresholdDB) dBFS. Quiet material near the threshold may be counted as silent.", outputWav: nil, durationSeconds: duration)
+        case "dc-offset": return NativeAudioWavResult(report: "Mean sample offset: \(number(dc))\nInterpretation: \(abs(dc) < 0.001 ? "very small" : "noticeable; inspect the source")", outputWav: nil, durationSeconds: duration)
+        case "audio-lufs-meter": return NativeAudioWavResult(report: "RMS-based loudness estimate: \(number(NativeAudioDsp.approximateLUFS(try NativeAudioDsp.toMono(input.channels)))) LUFS-like\nSample peak: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nNot standards-compliant BS.1770 LUFS: K-weighting and gating are not implemented.", outputWav: nil, durationSeconds: duration)
+        default: break
+        }
+        var rate = input.sampleRateHz, channels = input.channels, detail = ""
+        switch operation {
+        case "to-wav": detail = "Converted PCM WAV to 16-bit PCM WAV"
+        case "trim":
+            guard startSeconds.isFinite, startSeconds >= 0 else { throw NativeSimpleError.message("Trim start must be non-negative.") }
+            let start = min(duration, startSeconds), end = min(duration, endSeconds ?? duration)
+            guard end.isFinite, end > start else { throw NativeSimpleError.message("Trim end must exceed start and fit within the file duration.") }
+            channels = try channels.map { try NativeAudioDsp.trim($0, sampleRateHz: rate, startSeconds: start, endSeconds: end) }; detail = "Trimmed \(number(start))–\(number(end)) s"
+        case "reverse": channels = channels.map { NativeAudioDsp.reverse($0) }; detail = "Reversed audio"
+        case "normalize": guard peak > 0 else { throw NativeSimpleError.message("The selected audio is silent.") }; channels = channels.map { NativeAudioDsp.normalizePeak($0, targetPeak: 0.98) }; detail = "Peak-normalized to approximately 98% amplitude"
+        case "fade-in", "fade-out": channels = try channels.map { try NativeAudioDsp.fade($0, sampleRateHz: rate, durationMs: min(fadeDurationMs, duration * 1000), fadeIn: operation == "fade-in") }; detail = "Applied \(number(min(fadeDurationMs, duration * 1000))) ms fade"
+        case "mono": channels = [try NativeAudioDsp.toMono(channels)]; detail = "Downmixed to mono"
+        case "stereo": channels = channels.count == 1 ? [channels[0], channels[0]] : Array(channels.prefix(2)); detail = "Exported stereo using the first two channels or duplicated the mono channel"
+        case "channels-local":
+            guard (1...2).contains(targetChannels) else { throw NativeSimpleError.message("Choose mono (1) or stereo (2) output.") }
+            channels = targetChannels == 1 ? [try NativeAudioDsp.toMono(channels)] : (channels.count == 1 ? [channels[0], channels[0]] : Array(channels.prefix(2)))
+            detail = "Converted to \(targetChannels == 1 ? "mono" : "stereo")"
+        case "voice-noise-reducer":
+            guard noiseStrength.isFinite, (0...1).contains(noiseStrength) else { throw NativeSimpleError.message("Noise strength must be 0–1.") }
+            channels = try channels.map { try NativeAudioDsp.noiseReduce($0, sampleRateHz: rate, thresholdDB: gateThresholdDB, attenuation: min(1, max(0.05, 1 - noiseStrength * 0.9))) }; detail = "Applied high-pass and soft-gate cleanup; not AI noise separation"
+        case "voice-noise-gate": channels = channels.map { NativeAudioDsp.noiseGate($0, thresholdDB: gateThresholdDB, attenuation: 0.03) }; detail = "Applied soft noise gate"
+        case "audio-hum-reducer": channels = try channels.map { try NativeAudioDsp.humReduce($0, sampleRateHz: rate, mainsFrequency: humFrequencyHz) }; detail = "Applied \(humFrequencyHz) Hz and harmonic notch filters"
+        case "audio-trim-silence":
+            let bounds = trimSilenceBounds(channels, thresholdDB: silenceThresholdDB, sampleRateHz: rate)
+            guard bounds.1 > bounds.0 else { throw NativeSimpleError.message("No active audio was detected; adjust the silence threshold or check the file.") }
+            channels = channels.map { Array($0[bounds.0..<bounds.1]) }; detail = "Removed leading/trailing silence"
+        case "volume-local":
+            guard gainPercent.isFinite, (0...500).contains(gainPercent) else { throw NativeSimpleError.message("Volume must be 0–500%.") }
+            channels = channels.map { $0.map { Float(Double($0) * gainPercent / 100) } }; detail = "Applied \(number(gainPercent))% gain; values may clip"
+        case "audio-pitch-shift":
+            guard semitones.isFinite, (-12...12).contains(semitones) else { throw NativeSimpleError.message("Pitch shift must be −12 to +12 semitones.") }
+            let speed = pow(2, semitones / 12); channels = try channels.map { try NativeAudioDsp.resampleAtPlaybackRate($0, playbackRate: speed) }; detail = "Pitch shifted with coupled duration change; no pitch-locked time stretching"
+        case "audio-tempo-change":
+            guard playbackRate.isFinite, (0.5...1.5).contains(playbackRate) else { throw NativeSimpleError.message("Speed must be 0.5×–1.5×.") }
+            channels = try channels.map { try NativeAudioDsp.resampleAtPlaybackRate($0, playbackRate: playbackRate) }; detail = "Speed changed with coupled pitch; no pitch-locked time stretching"
+        case "audio-compressor": channels = try channels.map { try NativeAudioDsp.compress($0, thresholdDB: compressorThresholdDB, ratio: compressorRatio) }; detail = "Applied static compressor approximation without attack/release envelope"
+        case "audio-eq-simple": channels = try channels.map { try NativeAudioDsp.threeBandEQ($0, sampleRateHz: rate, lowGainDB: eqLowDB, midGainDB: eqMidDB, highGainDB: eqHighDB) }; detail = "Applied three-band EQ"
+        case "resample-local":
+            guard (8_000...192_000).contains(targetSampleRateHz) else { throw NativeSimpleError.message("Target sample rate must be 8,000–192,000 Hz.") }
+            channels = try channels.map { try resample($0, from: rate, to: targetSampleRateHz) }; detail = "Resampled from \(rate) Hz to \(targetSampleRateHz) Hz"; rate = targetSampleRateHz
+        default: throw NativeSimpleError.message("This native offline audio operation is not implemented; use the browser version for this tool.")
+        }
+        let output = try encodePCM16(sampleRateHz: rate, channels: channels)
+        let outDuration = Double(channels.first?.count ?? 0) / Double(rate)
+        return NativeAudioWavResult(report: "\(detail)\nOutput: 16-bit PCM WAV\nSample rate: \(rate) Hz\nChannels: \(channels.count)\nDuration: \(number(outDuration)) s\nOutput size: \(output.count) bytes\nProcessed on this device; no upload performed.", outputWav: output, durationSeconds: outDuration)
+    }
+
+    private static func trimSilenceBounds(_ channels: [[Float]], thresholdDB: Double, sampleRateHz: Int) -> (Int, Int) {
+        guard let frames = channels.first?.count, frames > 0 else { return (0, 0) }
+        let threshold = pow(10, thresholdDB / 20), window = max(1, sampleRateHz / 100)
+        var first = -1, end = -1, start = 0
+        while start < frames {
+            let stop = min(frames, start + window)
+            var sum = 0.0, count = 0
+            for channel in channels { for i in start..<stop { let v = Double(channel[i]); sum += v * v; count += 1 } }
+            if sqrt(sum / max(1, Double(count))) >= threshold { if first < 0 { first = start }; end = stop }
+            start = stop
+        }
+        return first >= 0 && end > first ? (first, end) : (0, 0)
+    }
+
+    private static func resample(_ samples: [Float], from source: Int, to target: Int) throws -> [Float] {
+        guard source > 0, target > 0 else { throw NativeSimpleError.message("Sample rates must be positive.") }
+        guard source != target, !samples.isEmpty else { return samples }
+        let count = max(1, Int((Double(samples.count) * Double(target) / Double(source)).rounded()))
+        return (0..<count).map { index in
+            let p = Double(index) * Double(source) / Double(target), left = min(samples.count - 1, Int(p)), right = min(samples.count - 1, left + 1), f = p - Double(left)
+            return Float(Double(samples[left]) * (1 - f) + Double(samples[right]) * f)
+        }
+    }
+
+    static func encodePCM16(sampleRateHz: Int, channels: [[Float]]) throws -> Data {
+        guard (8_000...192_000).contains(sampleRateHz), (1...8).contains(channels.count), let frames = channels.first?.count, channels.allSatisfy({ $0.count == frames }) else { throw NativeSimpleError.message("Invalid WAV output dimensions or sample rate.") }
+        let dataBytes = frames * channels.count * 2
+        guard dataBytes <= 512 * 1024 * 1024 - 44 else { throw NativeSimpleError.message("Output WAV exceeds the native export limit.") }
+        var data = Data(); data.reserveCapacity(44 + dataBytes)
+        func append16(_ value: UInt16) { data.append(UInt8(value & 0xff)); data.append(UInt8((value >> 8) & 0xff)) }
+        func append32(_ value: UInt32) { append16(UInt16(value & 0xffff)); append16(UInt16((value >> 16) & 0xffff)) }
+        func appendASCII(_ value: String) { data.append(contentsOf: value.utf8) }
+        appendASCII("RIFF"); append32(UInt32(36 + dataBytes)); appendASCII("WAVEfmt "); append32(16); append16(1); append16(UInt16(channels.count)); append32(UInt32(sampleRateHz)); append32(UInt32(sampleRateHz * channels.count * 2)); append16(UInt16(channels.count * 2)); append16(16); appendASCII("data"); append32(UInt32(dataBytes))
+        for frame in 0..<frames { for channel in channels {
+            let raw = channel[frame].isFinite ? min(1, max(-1, channel[frame])) : 0
+            let scaled = raw < 0 ? Int((Double(raw) * 32768).rounded()) : Int((Double(raw) * 32767).rounded())
+            append16(UInt16(bitPattern: Int16(min(32767, max(-32768, scaled)))))
+        } }
+        return data
+    }
+
+    private static func ascii(_ bytes: [UInt8], _ offset: Int, _ count: Int) -> String { String(bytes: bytes[offset..<(offset + count)], encoding: .ascii) ?? "" }
+    private static func u16(_ bytes: [UInt8], _ offset: Int) -> UInt16 { UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8) }
+    private static func u32(_ bytes: [UInt8], _ offset: Int) -> UInt32 { UInt32(bytes[offset]) | (UInt32(bytes[offset + 1]) << 8) | (UInt32(bytes[offset + 2]) << 16) | (UInt32(bytes[offset + 3]) << 24) }
+}
+
+private struct NativeAudioWavDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.wav] }
+    let data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private struct NativeAudioRecorderToolView: View {
+    let title: String
+    @State private var recorder: AVAudioRecorder?
+    @State private var isRecording = false
+    @State private var levelDBFS = -60.0
+    @State private var elapsedSeconds = 0
+    @State private var status = "Ready. Recording starts only after microphone permission is granted."
+    @State private var output = ""
+    @State private var error: String?
+    @State private var pendingExport: Data?
+    @State private var showExporter = false
+    @State private var meterTask: Task<Void, Never>?
+    private let maximumDuration = 300
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            Text("Native microphone recording · 44.1 kHz mono · 16-bit PCM WAV · maximum 5 minutes per take. The recording is written to this device's temporary directory and only exported when you choose.")
+                .font(.footnote).foregroundStyle(.secondary)
+            HStack {
+                Circle().fill(isRecording ? Color.red : Color.gray.opacity(0.55)).frame(width: 10, height: 10)
+                Text(isRecording ? "Recording" : "Stopped").fontWeight(.medium)
+                Spacer()
+                Text("\(elapsedSeconds)s / \(maximumDuration)s").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            ProgressView(value: min(1, max(0, (levelDBFS + 60) / 60)))
+                .tint(levelDBFS > -3 ? .red : .accentColor)
+            Text("Input level: \(String(format: "%.1f", levelDBFS)) dBFS (approximate)").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                Button("Start recording") { requestAndStart() }
+                    .buttonStyle(.borderedProminent).disabled(isRecording)
+                Button("Stop") { stopAndPrepareExport() }.buttonStyle(.bordered).disabled(!isRecording)
+            }
+            Button("Export WAV") { showExporter = pendingExport != nil }
+                .buttonStyle(.borderedProminent).disabled(pendingExport == nil)
+            Text(status).font(.footnote).foregroundStyle(.secondary)
+            if !output.isEmpty || error != nil { NativeOutputView(output: output, error: error) }
+        }
+        .fileExporter(isPresented: $showExporter, document: NativeAudioWavDocument(data: pendingExport ?? Data()), contentType: .wav, defaultFilename: "env-microphone-recording.wav") { result in
+            switch result {
+            case .success:
+                status = "Saved local microphone recording as a WAV file. No audio was uploaded."
+                error = nil
+            case .failure(let caught): error = caught.localizedDescription
+            }
+            pendingExport = nil
+        }
+        .onDisappear { cleanup() }
+    }
+
+    private func requestAndStart() {
+        error = nil
+        output = ""
+        guard AVAudioSession.sharedInstance().recordPermission != .denied else {
+            error = "Microphone permission is denied. Allow it in Settings to record audio."
+            status = "No recording started."
+            return
+        }
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            DispatchQueue.main.async {
+                guard granted else {
+                    error = "Microphone permission was denied. Allow microphone access in Settings to record audio."
+                    status = "No recording started."
+                    return
+                }
+                beginRecording()
+            }
+        }
+    }
+
+    private func beginRecording() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-mic-\(UUID().uuidString).wav")
+            let settings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVAudioFileTypeKey: kAudioFileWAVEType,
+                AVSampleRateKey: 44_100,
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsFloatKey: false
+            ]
+            let activeRecorder = try AVAudioRecorder(url: url, settings: settings)
+            activeRecorder.isMeteringEnabled = true
+            guard activeRecorder.prepareToRecord(), activeRecorder.record(forDuration: TimeInterval(maximumDuration)) else {
+                throw NativeSimpleError.message("The microphone could not start a WAV recording on this device.")
+            }
+            recorder = activeRecorder
+            isRecording = true
+            elapsedSeconds = 0
+            status = "Recording locally. Maximum duration is 5 minutes."
+            meterTask?.cancel()
+            meterTask = Task { @MainActor in
+                let started = Date()
+                while !Task.isCancelled, activeRecorder.isRecording {
+                    activeRecorder.updateMeters()
+                    levelDBFS = Double(activeRecorder.averagePower(forChannel: 0))
+                    elapsedSeconds = min(maximumDuration, Int(Date().timeIntervalSince(started)))
+                    if elapsedSeconds >= maximumDuration {
+                        activeRecorder.stop()
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+                if activeRecorder.isRecording == false && isRecording { finishStoppedRecording(activeRecorder) }
+            }
+        } catch {
+            isRecording = false
+            recorder = nil
+            self.error = error.localizedDescription
+            status = "Recording failed. Check microphone permissions and device availability."
+        }
+    }
+
+    private func stopAndPrepareExport() {
+        guard let activeRecorder = recorder else { isRecording = false; return }
+        activeRecorder.stop()
+        finishStoppedRecording(activeRecorder)
+    }
+
+    private func finishStoppedRecording(_ activeRecorder: AVAudioRecorder) {
+        guard isRecording || recorder != nil else { return }
+        meterTask?.cancel()
+        meterTask = nil
+        activeRecorder.updateMeters()
+        elapsedSeconds = min(maximumDuration, max(elapsedSeconds, Int(activeRecorder.currentTime)))
+        activeRecorder.stop()
+        isRecording = false
+        recorder = nil
+        defer { try? FileManager.default.removeItem(at: activeRecorder.url) }
+        do {
+            let data = try Data(contentsOf: activeRecorder.url)
+            guard data.count >= 44, String(data: data.prefix(4), encoding: .ascii) == "RIFF", String(data: data[8..<12], encoding: .ascii) == "WAVE" else {
+                throw NativeSimpleError.message("The device did not produce a valid RIFF/WAVE file with the requested PCM settings. Export is unavailable for this recording.")
+            }
+            pendingExport = data
+            output = "Captured \(String(format: "%.2f", Double(data.count) / 1_000_000)) MB\nDuration: \(elapsedSeconds)s\nFormat: 44.1 kHz mono, 16-bit PCM WAV\nPrivacy: recorded locally; no upload performed."
+            status = "Recording stopped and ready to export."
+        } catch {
+            self.error = error.localizedDescription
+            status = "Recording could not be prepared for export."
+        }
+    }
+
+    private func cleanup() {
+        meterTask?.cancel()
+        meterTask = nil
+        if let currentRecorder = recorder {
+            currentRecorder.stop()
+            try? FileManager.default.removeItem(at: currentRecorder.url)
+        }
+        recorder = nil
+        isRecording = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+}
+
+private struct NativeAudioGeneratorToolView: View {
+    let operation: String
+    let title: String
+    @State private var frequency = "440"
+    @State private var duration = "2"
+    @State private var waveform = "sine"
+    @State private var level = "-12"
+    @State private var sampleRate = "44100"
+    @State private var bpm = "120"
+    @State private var beatsPerBar = "4"
+    @State private var denominator = "4"
+    @State private var bars = "4"
+    @State private var output = ""
+    @State private var error: String?
+    @State private var selectedExport: Data?
+    @State private var showExport = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            Text("Audio is generated on this device and exported as 16-bit PCM WAV. No server or account is required.").font(.footnote).foregroundStyle(.secondary)
+            NativeInputField(title: "Sample rate (8,000–192,000 Hz)", text: $sampleRate)
+            if operation == "generate-tone" {
+                NativeInputField(title: "Waveform: sine, square, saw or noise", text: $waveform)
+                NativeInputField(title: "Frequency (Hz, below Nyquist)", text: $frequency)
+                NativeInputField(title: "Duration (0.05–300 seconds)", text: $duration)
+                NativeInputField(title: "Level (−60 to 0 dBFS)", text: $level)
+            } else {
+                NativeInputField(title: "Quarter-note BPM (40–240)", text: $bpm)
+                NativeInputField(title: "Beats per bar (1–12)", text: $beatsPerBar)
+                NativeInputField(title: "Time-signature denominator: 2, 4 or 8", text: $denominator)
+                NativeInputField(title: "Bars (1–100)", text: $bars)
+            }
+            HStack(spacing: 10) {
+                Button("Generate and export WAV") { generate() }.buttonStyle(.borderedProminent)
+                Button("Reset") { frequency = "440"; duration = "2"; waveform = "sine"; level = "-12"; sampleRate = "44100"; bpm = "120"; beatsPerBar = "4"; denominator = "4"; bars = "4"; output = ""; error = nil; selectedExport = nil }.buttonStyle(.bordered)
+            }
+            if !output.isEmpty || error != nil { NativeOutputView(output: output, error: error) }
+        }
+        .fileExporter(isPresented: $showExport, document: NativeAudioWavDocument(data: selectedExport ?? Data()), contentType: .wav, defaultFilename: operation == "generate-tone" ? "env-generated-tone.wav" : "env-metronome.wav") { result in
+            switch result { case .success: output += "\nSaved WAV to the selected location."; error = nil; case .failure(let caught): error = caught.localizedDescription }
+            selectedExport = nil
+        }
+    }
+
+    private func generate() {
+        do {
+            let result: NativeAudioWavResult
+            if operation == "generate-tone" {
+                result = try NativeAudioWavProcessor.generateTone(sampleRateHz: Int(sampleRate) ?? 44_100, durationSeconds: Double(duration) ?? 2, frequencyHz: Double(frequency) ?? 440, waveform: waveform.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), levelDBFS: Double(level) ?? -12)
+            } else {
+                result = try NativeAudioWavProcessor.generateMetronome(sampleRateHz: Int(sampleRate) ?? 44_100, bpm: Double(bpm) ?? 120, beatsPerBar: Int(beatsPerBar) ?? 4, bars: Int(bars) ?? 4, denominator: Int(denominator) ?? 4)
+            }
+            output = result.report; error = nil; selectedExport = result.outputWav; showExport = true
+        } catch { output = ""; error = error.localizedDescription }
+    }
+}
+
+private struct NativeWavJoinInput: Identifiable, Sendable {
+    let id = UUID()
+    let name: String
+    let data: Data
+}
+
+private struct NativeAudioWavJoinerToolView: View {
+    let title: String
+    @State private var files: [NativeWavJoinInput] = []
+    @State private var selectedExport: Data?
+    @State private var output = ""
+    @State private var error: String?
+    @State private var showImporter = false
+    @State private var showExporter = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            Text("Join 2–32 local PCM WAV files in the order shown. All inputs must have the same sample rate and channel count. Combined source size is capped at 100 MB; output is a 16-bit PCM WAV created on this device.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Button("Choose WAV files") { showImporter = true }.buttonStyle(.borderedProminent)
+            ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                HStack(spacing: 8) {
+                    Text("\(index + 1). \(file.name)").lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                    Button("↑") { if index > 0 { let item = files.remove(at: index); files.insert(item, at: index - 1) } }.disabled(index == 0).buttonStyle(.bordered)
+                    Button("↓") { if index < files.count - 1 { let item = files.remove(at: index); files.insert(item, at: index + 1) } }.disabled(index == files.count - 1).buttonStyle(.bordered)
+                    Button("Remove") { files.remove(at: index); output = "" }.buttonStyle(.bordered)
+                }
+            }
+            HStack(spacing: 10) {
+                Button("Join and export WAV") { runJoin() }.buttonStyle(.borderedProminent).disabled(files.count < 2)
+                Button("Reset") { files = []; output = ""; error = nil; selectedExport = nil }.buttonStyle(.bordered)
+            }
+            if !output.isEmpty || error != nil { NativeOutputView(output: output, error: error) }
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.wav], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                Task {
+                    do {
+                        let imported = try await Task.detached(priority: .userInitiated) { () throws -> [NativeWavJoinInput] in
+                            var total = 0
+                            return try urls.map { url in
+                                let access = url.startAccessingSecurityScopedResource()
+                                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                                let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+                                if let size, size > 100 * 1024 * 1024 { throw NativeSimpleError.message("Combined WAV input size must not exceed 100 MB.") }
+                                let data = try Data(contentsOf: url, options: .uncached)
+                                total += data.count
+                                guard total <= 100 * 1024 * 1024 else { throw NativeSimpleError.message("Combined WAV input size must not exceed 100 MB.") }
+                                _ = try NativeAudioWavProcessor.process(data, operation: "inspector")
+                                return NativeWavJoinInput(name: url.lastPathComponent, data: data)
+                            }
+                        }.value
+                        await MainActor.run {
+                            if imported.count < 2 { self.files = imported; self.error = "Select at least two WAV files to join."; self.output = "" }
+                            else { self.files = imported; self.error = nil; self.output = "Selected \(imported.count) WAV files. Reorder them before joining." }
+                        }
+                    } catch let caughtError { await MainActor.run { self.error = caughtError.localizedDescription; self.output = "" } }
+                }
+            case .failure(let caught): error = caught.localizedDescription
+            }
+        }
+        .fileExporter(isPresented: $showExporter, document: NativeAudioWavDocument(data: selectedExport ?? Data()), contentType: .wav, defaultFilename: "env-joined-audio.wav") { result in
+            switch result {
+            case .success: output += "\nJoined WAV saved to the selected location."; error = nil
+            case .failure(let caught): error = caught.localizedDescription
+            }
+            selectedExport = nil
+        }
+    }
+
+    private func runJoin() {
+        do {
+            let result = try NativeAudioWavProcessor.join(files.map(\.data))
+            output = result.report; error = nil; selectedExport = result.outputWav; showExporter = true
+        } catch { output = ""; error = error.localizedDescription }
+    }
+}
+
+private struct NativeAudioWaveFileToolView: View {
+    let operation: String
+    let title: String
+    @State private var selectedData: Data?
+    @State private var selectedName = ""
+    @State private var pendingData: Data?
+    @State private var output = ""
+    @State private var error: String?
+    @State private var showImporter = false
+    @State private var showExporter = false
+    @State private var values: [String: String] = [
+        "start": "0", "end": "5", "gain": "100", "semitones": "2", "speed": "0.8", "rate": "48000",
+        "noise": "0.8", "gate": "-42", "hum": "50", "silence": "-50", "fade": "1000", "low": "0", "mid": "0", "high": "0",
+        "threshold": "-18", "ratio": "4", "channels": "2"
+    ]
+
+    private var isAnalyzer: Bool { ["inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter"].contains(operation) }
+    private var exportFilename: String { "\(selectedName.isEmpty ? "env-audio" : selectedName)-enV.wav" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            Text("Native offline WAV tool. The selected file stays on this device. This native route supports uncompressed PCM WAV (8/16/24/32-bit) and 32-bit float WAV; use the browser-local version for MP3, M4A, OGG, FLAC or larger files beyond the native memory limit.")
+                .font(.footnote).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                Button(selectedName.isEmpty ? "Choose WAV file" : "Choose another WAV") { showImporter = true }.buttonStyle(.borderedProminent)
+                if !selectedName.isEmpty { Text(selectedName).font(.caption).lineLimit(1) }
+            }
+            if !isAnalyzer { controls }
+            HStack(spacing: 10) {
+                Button("Run tool") { runTool() }.buttonStyle(.borderedProminent).disabled(selectedData == nil)
+                Button("Reset") { values = ["start":"0","end":"5","gain":"100","semitones":"2","speed":"0.8","rate":"48000","noise":"0.8","gate":"-42","hum":"50","silence":"-50","fade":"1000","low":"0","mid":"0","high":"0","threshold":"-18","ratio":"4","channels":"2"]; output = ""; error = nil }
+                    .buttonStyle(.bordered)
+                if !output.isEmpty { Button("Copy result") { UIPasteboard.general.string = output }.buttonStyle(.bordered) }
+            }
+            if !output.isEmpty || error != nil { NativeOutputView(output: output, error: error) }
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.wav], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let resource = try url.resourceValues(forKeys: [.fileSizeKey])
+                    if let fileSize = resource.fileSize, fileSize > 250 * 1024 * 1024 {
+                        throw NativeSimpleError.message("Choose a WAV file no larger than 250 MB.")
+                    }
+                    let data = try Data(contentsOf: url, options: .uncached)
+                    guard data.count <= 250 * 1024 * 1024 else { throw NativeSimpleError.message("Choose a WAV file no larger than 250 MB.") }
+                    let inspection = try NativeAudioWavProcessor.process(data, operation: "inspector")
+                    selectedData = data; selectedName = url.deletingPathExtension().lastPathComponent
+                    if let duration = inspection.durationSeconds { values["end"] = String(format: "%.3f", duration) }
+                    output = inspection.report; error = nil
+                } catch { selectedData = nil; selectedName = ""; output = ""; self.error = error.localizedDescription }
+            case .failure(let caught): error = caught.localizedDescription
+            }
+        }
+        .fileExporter(isPresented: $showExporter, document: NativeAudioWavDocument(data: pendingData ?? Data()), contentType: .wav, defaultFilename: exportFilename) { result in
+            switch result {
+            case .success: output += "\nSaved the processed WAV to the selected location."; error = nil
+            case .failure(let caught): error = caught.localizedDescription
+            }
+            pendingData = nil
+        }
+    }
+
+    @ViewBuilder private var controls: some View {
+        switch operation {
+        case "trim": pair("Start (seconds)", "start", "End (seconds)", "end")
+        case "volume-local": field("Gain percent (0–500)", "gain")
+        case "audio-pitch-shift": field("Pitch semitones (−12 to +12; duration changes)", "semitones")
+        case "audio-tempo-change": field("Speed (0.5×–1.5×; pitch changes too)", "speed")
+        case "resample-local": field("Target sample rate (8,000–192,000 Hz)", "rate")
+        case "voice-noise-reducer": pair("Noise strength (0–1)", "noise", "Soft gate threshold (dBFS)", "gate")
+        case "voice-noise-gate": field("Gate threshold (dBFS)", "gate")
+        case "audio-hum-reducer": field("Power-line frequency (50 or 60 Hz)", "hum")
+        case "audio-trim-silence": field("Silence threshold (dBFS)", "silence")
+        case "fade-in", "fade-out": field("Fade duration (milliseconds)", "fade")
+        case "audio-compressor": pair("Threshold (dBFS)", "threshold", "Ratio (1–20)", "ratio")
+        case "audio-eq-simple": pair("Low gain (dB)", "low", "Mid gain (dB)", "mid", thirdLabel: "High gain (dB)", thirdKey: "high")
+        case "channels-local": field("Output channels: 1 mono or 2 stereo", "channels")
+        default: EmptyView()
+        }
+    }
+
+    private func field(_ label: String, _ key: String) -> some View { NativeInputField(title: label, text: binding(key)) }
+    private func pair(_ firstLabel: String, _ firstKey: String, _ secondLabel: String, _ secondKey: String, thirdLabel: String? = nil, thirdKey: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NativeInputField(title: firstLabel, text: binding(firstKey))
+            NativeInputField(title: secondLabel, text: binding(secondKey))
+            if let thirdLabel, let thirdKey { NativeInputField(title: thirdLabel, text: binding(thirdKey)) }
+        }
+    }
+    private func binding(_ key: String) -> Binding<String> { Binding(get: { values[key] ?? "" }, set: { values[key] = $0 }) }
+
+    private func runTool() {
+        guard let data = selectedData else { error = "Choose a WAV file first."; return }
+        do {
+            let result = try NativeAudioWavProcessor.process(
+                data, operation: operation,
+                startSeconds: Double(values["start"] ?? "0") ?? 0,
+                endSeconds: Double(values["end"] ?? "5"),
+                gainPercent: Double(values["gain"] ?? "100") ?? 100,
+                semitones: Double(values["semitones"] ?? "2") ?? 2,
+                playbackRate: Double(values["speed"] ?? "1") ?? 1,
+                targetSampleRateHz: Int(values["rate"] ?? "48000") ?? 48000,
+                noiseStrength: Double(values["noise"] ?? "0.8") ?? 0.8,
+                gateThresholdDB: Double(values["gate"] ?? "-42") ?? -42,
+                humFrequencyHz: Int(values["hum"] ?? "50") ?? 50,
+                silenceThresholdDB: Double(values["silence"] ?? "-50") ?? -50,
+                fadeDurationMs: Double(values["fade"] ?? "1000") ?? 1000,
+                eqLowDB: Double(values["low"] ?? "0") ?? 0,
+                eqMidDB: Double(values["mid"] ?? "0") ?? 0,
+                eqHighDB: Double(values["high"] ?? "0") ?? 0,
+                compressorThresholdDB: Double(values["threshold"] ?? "-18") ?? -18,
+                compressorRatio: Double(values["ratio"] ?? "4") ?? 4,
+                targetChannels: Int(values["channels"] ?? "2") ?? 2
+            )
+            output = result.report; error = nil
+            if let wav = result.outputWav { pendingData = wav; showExporter = true }
+        } catch { output = ""; self.error = error.localizedDescription }
+    }
+}
+
+private struct NativeAudioToolView: View {
+    let tool: Tool
+    @State private var platform: String
+    @State private var duration = "180"
+    @State private var bitrate = "128"
+    @State private var sampleRate = "44100"
+    @State private var channels = "2"
+    @State private var bits = "16"
+    @State private var bpm = "120"
+    @State private var bars = "4"
+    @State private var calculationMode = "bitrate"
+    @State private var targetSizeMegabytes = "0.96"
+    @State private var output = ""
+    @State private var error: String?
+
+    init(tool: Tool) {
+        self.tool = tool
+        let prefixes = ["podcast", "discord", "spotify", "instagram", "apple-music", "youtube", "tiktok", "twitch"]
+        _platform = State(initialValue: prefixes.first(where: { tool.id.hasPrefix($0 + "-") }) ?? "podcast")
+        _calculationMode = State(initialValue: tool.id == "audio-file-size-calculator" ? "file-size" : "bitrate")
+    }
+
+    var body: some View {
+        let operation = NativeAudioEngine.operation(for: tool) ?? "guide"
+        if operation == "record-mic" {
+            NativeAudioRecorderToolView(title: tool.name)
+        } else if operation == "generate-tone" || operation == "generate-metronome" {
+            NativeAudioGeneratorToolView(operation: operation, title: tool.name)
+        } else if operation == "file:joiner" {
+            NativeAudioWavJoinerToolView(title: tool.name)
+        } else if operation.hasPrefix("file:") {
+            NativeAudioWaveFileToolView(operation: String(operation.dropFirst(5)), title: tool.name)
+        } else {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Native offline mode. These calculator and reference operations do not upload audio files or use the website.").font(.footnote).foregroundStyle(.secondary)
+            NativeInputField(title: "Platform (podcast, spotify, discord, instagram, apple-music)", text: $platform)
+            if operation == "calc" { NativeInputField(title: "Mode: bitrate, bitrate-from-size, file-size, pcm-size, duration, BPM, sample-rate", text: $calculationMode) }
+            if ["bitrate", "file-size", "pcm-size", "duration"].contains(operation) || (operation == "calc" && ["bitrate", "file-size", "pcm-size", "duration", "bitrate-from-size"].contains(calculationMode)) {
+                NativeInputField(title: "Duration (seconds)", text: $duration)
+                if !(operation == "calc" && calculationMode == "bitrate-from-size") { NativeInputField(title: "Bitrate (kbps)", text: $bitrate) }
+            }
+            if operation == "calc" && calculationMode == "bitrate-from-size" { NativeInputField(title: "Target size (decimal MB)", text: $targetSizeMegabytes) }
+            if operation == "pcm-size" || (operation == "calc" && calculationMode == "pcm-size") {
+                NativeInputField(title: "Sample rate (Hz)", text: $sampleRate)
+                NativeInputField(title: "Channels", text: $channels)
+                NativeInputField(title: "Bit depth", text: $bits)
+            }
+            if operation == "sample-rate" || (operation == "calc" && calculationMode == "sample-rate") { NativeInputField(title: "Sample rate (Hz)", text: $sampleRate) }
+            if operation == "bpm" || (operation == "calc" && calculationMode == "bpm") {
+                NativeInputField(title: "BPM", text: $bpm)
+                NativeInputField(title: "Bars in 4/4", text: $bars)
+            }
+            NativeActionRow(output: output, run: {
+                do { output = try NativeAudioEngine.calculate(operation: operation == "calc" ? calculationMode : operation, platform: platform, duration: Double(duration) ?? 0, bitrate: Double(bitrate) ?? 0, sampleRate: Double(sampleRate) ?? 0, channels: Int(channels) ?? 0, bits: Int(bits) ?? 0, bpm: Double(bpm) ?? 0, bars: Int(bars) ?? 0, targetSizeMegabytes: Double(targetSizeMegabytes) ?? 0); error = nil }
+                catch { output = ""; self.error = error.localizedDescription }
+            }, reset: { duration = "180"; bitrate = "128"; sampleRate = "44100"; channels = "2"; bits = "16"; bpm = "120"; bars = "4"; targetSizeMegabytes = "0.96"; calculationMode = tool.id == "audio-file-size-calculator" ? "file-size" : "bitrate"; output = ""; error = nil })
+            NativeOutputView(output: output, error: error)
+        }
+        }
+    }
+}
+
 private struct NativeCalculatorToolView: View {
     let tool: Tool
     @State private var values: [String: String]
@@ -2017,6 +3020,9 @@ enum NativeBackendEngine {
     // Unsupported tools must not appear executable in the native app.
     static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
     static func supports(_ tool:Tool)->Bool {
+        // Audio routes have local engines or specific server adapters on the web;
+        // don't falsely advertise generic /api/backend/media as a universal native fallback.
+        if tool.engine.type == "audio" { return false }
         if NativeAccessibilityEngine.supports(tool) { return false }
         if NativeImageEngine.supports(tool) { return false }
         if tool.engine.type=="developer" && NativeUtilityEngine.supports(tool) { return false }

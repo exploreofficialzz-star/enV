@@ -2,7 +2,16 @@ import fs from 'node:fs';
 import { parseGeneratedCatalog } from './catalog-reader.mjs';
 
 const root = new URL('../', import.meta.url);
-const catalog = parseGeneratedCatalog(fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8'));
+const catalogSource = fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8');
+const catalog = parseGeneratedCatalog(catalogSource);
+// The generated JSON contains the 10,000-tool legacy base; additive Audio Studios live in a separate typed array.
+// Include those runtime additions when validating native coverage so implemented new tools can be classified locally.
+const audioStudioBlock = catalogSource.match(/const audioStudioTools: ToolMeta\[\] = \[([\s\S]*?)\n\];\n\n\/\/ Studios are additive/);
+if (audioStudioBlock) {
+  for (const match of audioStudioBlock[1].matchAll(/\"id\"\s*:\s*\"([^\"]+)\"[\s\S]*?\"status\"\s*:\s*\"([^\"]+)\"/g)) {
+    if (!catalog.some((tool) => tool.id === match[1])) catalog.push({ id: match[1], status: match[2], category: 'audio', engine: { type: 'audio' } });
+  }
+}
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));
 const readIds = (platform) => {
