@@ -1,0 +1,323 @@
+================================================================================
+enV AUDIO CATEGORY — FULL STUDIOS + NEW TOOLS + CONFIGURE-ALL AGENT PROMPT
+Make every Audio tool work · Add Music Separator / Duet · Add high-value tools
+Collapse template spam · Studios architecture · Web + Android + iOS
+NO tool URL removals · Privacy-first · NO DRM stream-ripping product
+================================================================================
+
+# Mission
+
+1. Restructure Audio into **Audio Studios** (like Accessibility / Business).
+2. **Configure every existing tool** so it actually works (or shows an honest
+   configured/disabled state — never a blank broken shell).
+3. **Add** Music Separator, Music Duet, and a curated set of high-value tools.
+4. Collapse ~30 thin platform helpers into one Platform Guide Studio.
+5. Ship local-first DSP; label server paths clearly; never market illegal
+   Spotify/Apple Music downloaders.
+
+--------------------------------------------------------------------------------
+# HARD RULES
+--------------------------------------------------------------------------------
+
+1. No removal of existing `/tools/audio/*` URLs — map each to a Studio mode.
+2. User audio files: prefer **in-browser** processing. If upload required
+   (FFmpeg/STT), show explicit banner: “File is uploaded to the configured
+   media endpoint for processing.”
+3. **Do not build** Spotify / Apple Music / Amazon / Tidal DRM downloaders.
+4. YouTube extract: only if media service already exists; require disclaimer.
+5. Music Separator primary path = **browser model** (ONNX/WebGPU) when feasible;
+   optional server fallback clearly labeled.
+6. All new tools named with **audio-** or **music-** prefix for consistency.
+7. Desktop + mobile usable; file inputs and primary buttons touch-friendly.
+8. Web TypeScript primary; mirror calculators / simple DSP contracts on
+   Android Kotlin + iOS Swift where practical (full stem AI may be Web-first).
+9. Empty / unconfigured services must show **setup guidance**, not dead UI.
+
+--------------------------------------------------------------------------------
+# PART 1 — AUDIO STUDIOS MAP
+--------------------------------------------------------------------------------
+
+### 1. Audio Convert Studio
+Modes: to-WAV · to-MP3 · to-OGG · to-FLAC · sample-rate · channels · bitrate convert  
+Slugs: audio-to-wav, audio-to-wav-server, audio-to-mp3-server, audio-to-ogg-server,
+audio-to-flac-server, audio-sample-rate-converter, audio-channel-converter,
+audio-bitrate-converter, audio-to-mono, audio-to-stereo
+
+### 2. Audio Edit Studio
+Modes: Audio Trimmer · fade-in · fade-out · volume · reverse · normalizer ·
+noise reducer · noise gate · hum reducer · silence trim  
+Slugs: audio-trimmer, audio-volume-control, audio-reverser, audio-normalizer,
+voice-noise-reducer, voice-noise-gate, audio-hum-reducer, (+ new fade/silence)
+
+### 3. Audio Analyze Studio
+Modes: File Inspector · peak meter · RMS · silence detector · DC offset ·
+waveform · WebCodecs check · **LUFS meter** (new) · spectrogram (new)  
+Slugs: audio-file-inspector, audio-peak-meter, audio-rms-meter,
+audio-silence-detector, audio-dc-offset-checker, audio-waveform-generator,
+webcodecs-audio-checker, (+ new)
+
+### 4. Audio Calc Studio
+Modes: bitrate ↔ size ↔ duration · platform size presets  
+Slugs: audio-bitrate-calculator, audio-duration-tool,
+*-audio-file-size-calculator (collapsed)
+
+### 5. Music Studio  ★ FLAGSHIP — MUST HAVE EVERYTHING
+Complete private practice / karaoke / remix workspace (Moises-class depth, local-first).
+
+**Modes / features (all required in one Studio UI):**
+
+| Area | Features |
+|------|----------|
+| **Separate** | 2-stem (Vocals / Instrumental) · 4-stem (Vocals / Drums / Bass / Other) · optional guitar/piano when model supports · progress + cancel |
+| **Mixer** | Per-stem mute / solo / volume · master volume · A/B original vs mix |
+| **Practice** | Pitch ±12 (or ±24) semitones · tempo 0.5×–1.5× (pitch-lock when possible) · loop region A–B · count-in · metronome click overlay |
+| **Duet / Replace** | Mic record over instrumental · mix user vocal · optional mute original vocal · export mix |
+| **Karaoke** | Instrumental playback · optional lyric paste (scroll/display) · no false claim of perfect auto-sync unless built |
+| **Detect** | BPM detect · key detect (best-effort) · chord grid when model/heuristic available |
+| **Export** | Each stem WAV/MP3 · custom mix · karaoke instrumental only |
+| **Import** | Local file only (user rights) · mic · no Spotify/Apple DRM download |
+
+**Slugs (deep-links into Music Studio modes):**  
+music-separator · music-duet · music-karaoke · music-stem-mixer · music-practice  
+(and related audio-* redirects where useful)
+
+**Privacy:** Browser ONNX/WebGPU separation preferred; server GPU only if configured and labeled.  
+**Legal copy:** “Use files you own or have rights to. enV does not download DRM-protected streams.”
+
+### 6. Audio Transcribe Studio
+Modes: Audio to Text · Audio to Subtitles  
+Slugs: audio-to-text, audio-to-subtitles  
+(Only active when STT configured)
+
+### 7. Audio Import Studio
+Modes: local file · mic recorder · optional YouTube URL (if service configured)  
+Slugs: youtube-audio-extractor (conditional), audio-recorder (new)
+
+### 8. Audio Platform Guide Studio
+Modes: Podcast · Discord · Spotify · Instagram · Apple Music  
+Collapse all thin `podcast-*`, `discord-*`, `spotify-*`, `instagram-*`,
+`apple-music-*` into one Studio with platform chips + real reference tables
+(bitrate, loudness targets, format). URLs remain as deep-links.
+
+Category page `/tools/audio` must show **Audio Studios** first (Business parity).
+
+--------------------------------------------------------------------------------
+# PART 2 — CONFIGURE EVERY EXISTING TOOL (MUST WORK)
+--------------------------------------------------------------------------------
+
+### A. Local DSP tools (must be fully functional)
+
+| Tool | Required behavior |
+|------|-------------------|
+| audio-file-inspector | Decode file → duration, sample rate, channels, frames, size |
+| audio-trimmer | Start/end seconds → export WAV |
+| audio-to-wav | Decode browser-supported formats → 16-bit PCM WAV download |
+| audio-waveform-generator | Render waveform PNG download |
+| audio-peak-meter | Max digital peak (dBFS) |
+| audio-rms-meter | Average RMS |
+| audio-silence-detector | Estimate silent regions / total silent time |
+| audio-dc-offset-checker | Measure DC offset |
+| audio-to-mono / audio-to-stereo | Channel convert + export |
+| audio-reverser | Reverse + export WAV |
+| audio-normalizer | Peak normalize without clipping |
+| voice-noise-reducer | **Must have file input**; adaptive high-pass + soft gate; export |
+| voice-noise-gate | File input; gate threshold; export |
+| audio-hum-reducer | Target 50/60 Hz hum reduction; export |
+| audio-duration-tool | Duration only |
+| audio-bitrate-calculator | Size = bitrate×duration/8; inverse modes |
+| webcodecs-audio-checker | Feature detect WebCodecs AudioEncoder/Decoder |
+
+Fix any tool that currently shows empty “reference” UI without a file picker
+when it claims local processing.
+
+### B. Server / FFmpeg tools (must work when configured)
+
+| Tool | Required behavior |
+|------|-------------------|
+| audio-to-mp3-server | Upload → FFmpeg → MP3 download **or** clear “processor not configured” |
+| audio-to-wav-server | Same |
+| audio-to-ogg-server | Same |
+| audio-to-flac-server | Same |
+| audio-merger | Multi-file order → merge **or** not-configured state |
+| audio-volume-control | If server path: same; prefer local GainNode path |
+| audio-sample-rate-converter | Server or local OfflineAudioContext resample |
+| audio-channel-converter | Prefer local |
+| audio-bitrate-converter | Server FFmpeg when configured |
+
+**UI contract for server tools:**
+- Green path when endpoint configured and healthy  
+- Amber “Media processor not configured” with admin setup hint  
+- Never silent fail / empty Run button with no feedback  
+
+### C. STT / YouTube
+
+| Tool | Required behavior |
+|------|-------------------|
+| audio-to-text | File → transcript when STT configured; else setup message |
+| audio-to-subtitles | Timed SRT/VTT when configured |
+| youtube-audio-extractor | URL → audio when service configured + **disclaimer** (ToS risk) |
+
+### D. Platform template tools
+
+Rewrite each thin “An Discord audio utility” page as a **redirect or mode** of
+Platform Guide Studio with real content:
+- Recommended bitrate / sample rate  
+- Loudness targets (e.g. podcast −16 LUFS, streaming −14 LUFS)  
+- Format notes  
+- “Guidance only — not platform acceptance guarantee”
+
+--------------------------------------------------------------------------------
+# PART 3 — NEW TOOLS TO ADD (ALL MUST WORK)
+--------------------------------------------------------------------------------
+
+### Music Studio (flagship)
+
+#### music-separator
+- Input: local audio file (user-owned)
+- Output stems:
+  - **2-stem:** Vocals · Instrumental  
+  - **4-stem (optional):** Vocals · Drums · Bass · Other  
+- Engine priority:
+  1. Browser ONNX Runtime Web / WebGPU (UVR-MDX or Demucs-class port)
+  2. Optional server GPU job if configured  
+- First model download ~30–70 MB; cache in browser  
+- Progress UI; max duration limit documented (e.g. 8–10 min on WASM)  
+- Download each stem WAV; privacy strip: “Separation runs on this device when using browser model”
+
+#### music-duet
+- Depends on separator (or accept pre-split instrumental)
+- Features:
+  - Play instrumental
+  - Record mic (getUserMedia)
+  - Mix user vocal over instrumental (GainNodes)
+  - Optional: mute original vocal stem
+  - Optional pitch ±12 semitones, tempo 0.75×–1.25× (best-effort Web Audio)
+  - Export mix WAV/MP3
+- Use cases: karaoke, practice, duet, vocal replace for **files the user has rights to**
+
+#### music-karaoke
+- Shortcut mode: separator → instrumental only → optional lyric paste (display only, no claim of auto-sync accuracy unless implemented)
+
+### Analyze additions
+
+| Slug | Behavior |
+|------|----------|
+| audio-lufs-meter | Integrated / short-term / momentary LUFS (BS.1770-style approximation or verified lib), true peak, targets chips (Podcast −16, Spotify −14, EBU −23) |
+| audio-spectrogram | Canvas spectrogram from AnalyserNode / offline FFT; PNG export |
+
+### Edit additions
+
+| Slug | Behavior |
+|------|----------|
+| audio-fade-in | Fade length ms → export |
+| audio-fade-out | Same |
+| audio-trim-silence | Auto strip leading/trailing silence below threshold |
+| audio-pitch-shift | ± semitones, preserve duration best-effort |
+| audio-tempo-change | Speed without pitch or with pitch (document which) |
+| audio-compressor | Simple DynamicsCompressorNode offline render |
+| audio-eq-simple | 3-band (low/mid/high) gain |
+
+### Utility additions
+
+| Slug | Behavior |
+|------|----------|
+| audio-recorder | Mic → WAV download; level meter |
+| audio-tone-generator | Sine/square/saw/noise; frequency; duration; download |
+| audio-metronome | BPM, time signature, tap tempo; optional click export |
+| audio-joiner-local | Concat multiple local files in order → WAV (client-side) |
+
+### Import policy (not a pirate downloader)
+
+| Feature | Ship? |
+|---------|--------|
+| Local file | Yes |
+| Mic record | Yes |
+| YouTube URL | Only if existing service; disclaimer |
+| Spotify / Apple / etc. DRM download | **No** |
+
+--------------------------------------------------------------------------------
+# PART 4 — IMPLEMENTATION PHASES
+--------------------------------------------------------------------------------
+
+## Phase 0 — Inventory & wiring
+- Catalog every audio slug → Studio → mode  
+- Fix broken local tools (noise reducer file input, empty shells)  
+- Server tools: configured vs not-configured UI  
+- Category page: Audio Studios grid  
+
+## Phase 1 — Configure-all local + calc
+- Every local DSP tool passes golden file test  
+- Bitrate calculator inverse modes  
+- Platform Guide Studio content (not empty)  
+
+## Phase 2 — Music Separator
+- Integrate browser separation model  
+- 2-stem MVP → 4-stem  
+- Progress, cancel, stem download  
+
+## Phase 3 — Music Duet + Karaoke
+- Mic + mix + export  
+- Pitch/tempo best-effort  
+
+## Phase 4 — New analyze/edit utilities
+- LUFS, spectrogram, fades, silence trim, pitch, tempo, compressor, EQ, recorder, tone, metronome, local joiner  
+
+## Phase 5 — Server/STT reliability
+- FFmpeg endpoint health check  
+- STT configured path + empty state  
+- YouTube extractor disclaimer  
+
+## Phase 6 — Mobile + native
+- Mobile file UX, no overflow  
+- Kotlin/Swift: calculators, simple meters, recorder contracts  
+- Stem AI may remain Web-first  
+
+--------------------------------------------------------------------------------
+# PART 5 — GOLDEN TESTS
+--------------------------------------------------------------------------------
+
+1. Inspector: known WAV → correct duration & sample rate  
+2. Trimmer: 0–5s slice exports shorter file  
+3. Bitrate calc: 60s × 128 kbps → ~0.94–0.96 MB  
+4. Noise reducer: file in → quieter noise floor out  
+5. MP3 server: configured → MP3 download; unconfigured → amber message  
+6. Separator: short song → vocals + instrumental downloadable  
+7. Duet: instrumental + mic → mix export  
+8. LUFS: file produces integrated LUFS number + target comparison  
+9. Recorder: mic permission → WAV  
+10. Platform Guide: Podcast mode shows −16 LUFS guidance  
+11. No Spotify “download track” feature exists  
+12. Privacy banners present on local and upload tools  
+
+--------------------------------------------------------------------------------
+# PART 6 — SUCCESS CRITERIA
+--------------------------------------------------------------------------------
+
+- Every listed tool either **works** or **clearly explains how to configure**  
+- Music Separator + Duet ship as real features  
+- Template spam collapsed into Platform Guide  
+- Studios-first category page  
+- No DRM streaming downloader  
+- Honest privacy labeling  
+- Competitive with privacy-first browser audio kits (not with full Descript cloud)  
+
+--------------------------------------------------------------------------------
+# DELIVERABLES
+--------------------------------------------------------------------------------
+
+1. Full implementation through Phase 6 (prioritize 0→3 for user value)  
+2. Slug → Studio → mode map  
+3. List of new slugs added  
+4. Golden test results  
+5. Changelog  
+6. Audited zip of changed files  
+
+Start Phase 0 + Phase 1 immediately (configure everything that already exists),
+then Phase 2 Music Separator without waiting for perfect polish elsewhere.
+
+**Positioning line:**  
+enV Audio — private browser audio studio: convert, edit, analyze, separate stems, and duet. Your files stay on your device.
+
+================================================================================
+END OF AGENT PROMPT
+================================================================================

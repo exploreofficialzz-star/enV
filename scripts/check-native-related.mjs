@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { tools as webTools } from "../src/data/catalog.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
-// Import the runtime registry consumed by the web application, including additive studio entries.
+// Load the actual serialized registry consumed by the web application, not a hand-copied subset.
+const webModule = read("src/data/catalog.ts");
+const webMatch = webModule.match(/const catalogJson\s*=\s*(\[[\s\S]*?\])\.join\(["']{2}\);/);
+assert.ok(webMatch, "Could not locate the embedded web catalog literal.");
+const webChunks = vm.runInNewContext(webMatch[1], Object.create(null));
+const webTools = JSON.parse(webChunks.join(""));
 const sharedTools = JSON.parse(read("apps/shared/catalog.json")).tools;
 assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
 for (let index = 0; index < webTools.length; index += 1) {

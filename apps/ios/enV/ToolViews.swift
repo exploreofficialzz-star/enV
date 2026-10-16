@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AVKit
 import AudioToolbox
 import UIKit
 import WebKit
@@ -345,7 +346,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "audio": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1433,6 +1434,7 @@ enum NativeAudioEngine {
     ]
 
     static func operation(for tool: Tool) -> String? {
+        if tool.id == "music-live-video-studio" { return "live-video-studio" }
         if tool.id == "audio-recorder" { return "record-mic" }
         if let fileOp = nativeWavOperations[tool.id] { return "file:\(fileOp)" }
         if tool.id == "audio-calc-studio" { return "calc" }
@@ -1745,6 +1747,72 @@ enum NativeAudioWavProcessor {
     private static func u32(_ bytes: [UInt8], _ offset: Int) -> UInt32 { UInt32(bytes[offset]) | (UInt32(bytes[offset + 1]) << 8) | (UInt32(bytes[offset + 2]) << 16) | (UInt32(bytes[offset + 3]) << 24) }
 }
 
+/// App-private, short-lived handoff for the last source selected by a native WAV tool.
+/// The saved bytes never leave Application Support; the cache expires after seven days
+/// and is not a permanent or synced backup.
+enum NativeAudioSessionStore {
+    struct Source {
+        let name: String
+        let data: Data
+    }
+
+    private static let nameKey = "env.audio.session.name"
+    private static let savedAtKey = "env.audio.session.savedAt"
+    private static let fileName = "env-recent-audio-source.wav"
+    private static let maxBytes = 250 * 1024 * 1024
+    private static let ttl: TimeInterval = 7 * 24 * 60 * 60
+
+    private static var directory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("enVAudioSessions", isDirectory: true)
+    }
+    private static var sourceURL: URL { directory.appendingPathComponent(fileName) }
+
+    static var hasAvailable: Bool {
+        let defaults = UserDefaults.standard
+        let savedAt = defaults.double(forKey: savedAtKey)
+        guard savedAt > 0, Date().timeIntervalSince1970 - savedAt < ttl,
+              FileManager.default.fileExists(atPath: sourceURL.path),
+              defaults.string(forKey: nameKey) != nil else {
+            if savedAt > 0 { clear() }
+            return false
+        }
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path),
+              let size = attributes[.size] as? NSNumber, size.intValue >= 44, size.intValue <= maxBytes else {
+            clear()
+            return false
+        }
+        return true
+    }
+
+    static func save(data: Data, name: String) throws {
+        guard data.count >= 44, data.count <= maxBytes else {
+            throw NativeSimpleError.message("Only WAV files up to 250 MB can be kept for native handoff.")
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try data.write(to: sourceURL, options: .atomic)
+        UserDefaults.standard.set(name, forKey: nameKey)
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: savedAtKey)
+    }
+
+    static func load() throws -> Source? {
+        guard hasAvailable else { return nil }
+        let data = try Data(contentsOf: sourceURL, options: .uncached)
+        guard data.count >= 44, data.count <= maxBytes,
+              let name = UserDefaults.standard.string(forKey: nameKey) else {
+            clear()
+            return nil
+        }
+        return Source(name: name, data: data)
+    }
+
+    static func clear() {
+        try? FileManager.default.removeItem(at: sourceURL)
+        UserDefaults.standard.removeObject(forKey: nameKey)
+        UserDefaults.standard.removeObject(forKey: savedAtKey)
+    }
+}
+
 private struct NativeAudioWavDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.wav] }
     let data: Data
@@ -1967,7 +2035,7 @@ private struct NativeAudioGeneratorToolView: View {
                 result = try NativeAudioWavProcessor.generateMetronome(sampleRateHz: Int(sampleRate) ?? 44_100, bpm: Double(bpm) ?? 120, beatsPerBar: Int(beatsPerBar) ?? 4, bars: Int(bars) ?? 4, denominator: Int(denominator) ?? 4)
             }
             output = result.report; error = nil; selectedExport = result.outputWav; showExport = true
-        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
+        } catch { output = ""; error = error.localizedDescription }
     }
 }
 
@@ -2047,7 +2115,7 @@ private struct NativeAudioWavJoinerToolView: View {
         do {
             let result = try NativeAudioWavProcessor.join(files.map(\.data))
             output = result.report; error = nil; selectedExport = result.outputWav; showExporter = true
-        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
+        } catch { output = ""; error = error.localizedDescription }
     }
 }
 
@@ -2059,6 +2127,7 @@ private struct NativeAudioWaveFileToolView: View {
     @State private var pendingData: Data?
     @State private var output = ""
     @State private var error: String?
+    @State private var sessionNotice = ""
     @State private var showImporter = false
     @State private var showExporter = false
     @State private var values: [String: String] = [
@@ -2078,6 +2147,16 @@ private struct NativeAudioWaveFileToolView: View {
             HStack(spacing: 10) {
                 Button(selectedName.isEmpty ? "Choose WAV file" : "Choose another WAV") { showImporter = true }.buttonStyle(.borderedProminent)
                 if !selectedName.isEmpty { Text(selectedName).font(.caption).lineLimit(1) }
+            }
+            if !sessionNotice.isEmpty { Text(sessionNotice).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("audio-session-notice") }
+            if selectedData == nil && NativeAudioSessionStore.hasAvailable {
+                Button("Restore previous local source") { restoreLastSource() }.buttonStyle(.borderedProminent).accessibilityIdentifier("restore-audio-session")
+            }
+            if NativeAudioSessionStore.hasAvailable {
+                Button("Forget saved source") {
+                    NativeAudioSessionStore.clear()
+                    sessionNotice = "Saved source removed from this device. Current in-memory selection is unchanged."
+                }.buttonStyle(.bordered)
             }
             if !isAnalyzer { controls }
             HStack(spacing: 10) {
@@ -2103,6 +2182,12 @@ private struct NativeAudioWaveFileToolView: View {
                     guard data.count <= 250 * 1024 * 1024 else { throw NativeSimpleError.message("Choose a WAV file no larger than 250 MB.") }
                     let inspection = try NativeAudioWavProcessor.process(data, operation: "inspector")
                     selectedData = data; selectedName = url.deletingPathExtension().lastPathComponent
+                    do {
+                        try NativeAudioSessionStore.save(data: data, name: selectedName)
+                        sessionNotice = "Source saved in this app's private storage for up to 7 days. It stays on this device."
+                    } catch {
+                        sessionNotice = "Source is ready in this tool, but the app could not save a reusable local handoff."
+                    }
                     if let duration = inspection.durationSeconds { values["end"] = String(format: "%.3f", duration) }
                     output = inspection.report; error = nil
                 } catch { selectedData = nil; selectedName = ""; output = ""; self.error = error.localizedDescription }
@@ -2115,6 +2200,29 @@ private struct NativeAudioWaveFileToolView: View {
             case .failure(let caught): error = caught.localizedDescription
             }
             pendingData = nil
+        }
+    }
+
+    private func restoreLastSource() {
+        Task {
+            do {
+                let restored = try await Task.detached(priority: .userInitiated) { () throws -> (NativeAudioSessionStore.Source, NativeAudioWavResult) in
+                    guard let source = try NativeAudioSessionStore.load() else {
+                        throw NSError(domain: "enV.AudioSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "There is no reusable local audio source. Choose a WAV file first."])
+                    }
+                    let inspection = try NativeAudioWavProcessor.process(source.data, operation: "inspector")
+                    return (source, inspection)
+                }.value
+                selectedData = restored.0.data
+                selectedName = restored.0.name
+                if let duration = restored.1.durationSeconds { values["end"] = String(format: "%.3f", duration) }
+                output = restored.1.report
+                error = nil
+                sessionNotice = "Restored \(restored.0.name) from this device's private local session. Nothing was uploaded."
+            } catch {
+                self.error = error.localizedDescription
+                sessionNotice = "Choose the source file again if the local handoff is unavailable."
+            }
         }
     }
 
@@ -2173,6 +2281,1003 @@ private struct NativeAudioWaveFileToolView: View {
             output = result.report; error = nil
             if let wav = result.outputWav { pendingData = wav; showExporter = true }
         } catch { output = ""; self.error = error.localizedDescription }
+    }
+}
+
+private struct NativeLiveCameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        let preview = AVCaptureVideoPreviewLayer(session: session)
+        preview.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(preview)
+        preview.frame = view.bounds
+        view.accessibilityLabel = "Live camera preview"
+        return view
+    }
+    func updateUIView(_ uiView: UIView, context: Context) {
+        uiView.layer.sublayers?.compactMap { $0 as? AVCaptureVideoPreviewLayer }.first?.frame = uiView.bounds
+    }
+}
+
+private final class NativeLiveVideoCapture: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate {
+    let session = AVCaptureSession()
+    @Published var recording = false
+    @Published var previewReady = false
+    @Published var capturedURL: URL?
+    @Published var error: String?
+    var onRecordingStarted: (() -> Void)?
+    private let queue = DispatchQueue(label: "com.chastech.env.live-video.capture")
+    private let movieOutput = AVCaptureMovieFileOutput()
+    private var videoInput: AVCaptureDeviceInput?
+    private var audioInput: AVCaptureDeviceInput?
+    private var configured = false
+    private var frontCamera = true
+
+    func startPreview() {
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] videoOK in
+            guard let self else { return }
+            AVAudioSession.sharedInstance().requestRecordPermission { audioOK in
+                guard videoOK && audioOK else {
+                    DispatchQueue.main.async { self.error = "Allow camera and microphone access in Settings to record a live performance." }
+                    return
+                }
+                self.queue.async {
+                    do {
+                        try self.configureIfNeeded()
+                        if !self.session.isRunning { self.session.startRunning() }
+                        DispatchQueue.main.async { self.previewReady = true; self.error = nil }
+                    } catch {
+                        DispatchQueue.main.async { self.error = error.localizedDescription }
+                    }
+                }
+            }
+        }
+    }
+
+    private func configureIfNeeded() throws {
+        guard !configured else { return }
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        session.sessionPreset = .hd1280x720
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) ?? AVCaptureDevice.default(for: .video) else {
+            throw NativeSimpleError.message("No compatible camera was found on this device.")
+        }
+        let video = try AVCaptureDeviceInput(device: camera)
+        guard session.canAddInput(video) else { throw NativeSimpleError.message("The camera input could not be added to the recording session.") }
+        session.addInput(video); videoInput = video
+        guard let microphone = AVCaptureDevice.default(for: .audio) else { throw NativeSimpleError.message("No microphone was found on this device.") }
+        let audio = try AVCaptureDeviceInput(device: microphone)
+        guard session.canAddInput(audio) else { throw NativeSimpleError.message("The microphone input could not be added to the recording session.") }
+        session.addInput(audio); audioInput = audio
+        guard session.canAddOutput(movieOutput) else { throw NativeSimpleError.message("The camera output could not be configured.") }
+        session.addOutput(movieOutput)
+        configured = true
+    }
+
+    func toggleCamera() {
+        guard !recording else { return }
+        queue.async {
+            do {
+                try self.configureIfNeeded()
+                guard let oldInput = self.videoInput else { return }
+                let nextPosition: AVCaptureDevice.Position = self.frontCamera ? .back : .front
+                guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) else {
+                    DispatchQueue.main.async { self.error = "The selected front/rear camera is unavailable." }; return
+                }
+                let newInput = try AVCaptureDeviceInput(device: device)
+                self.session.beginConfiguration()
+                self.session.removeInput(oldInput)
+                if self.session.canAddInput(newInput) {
+                    self.session.addInput(newInput); self.videoInput = newInput; self.frontCamera = nextPosition == .front
+                } else { self.session.addInput(oldInput) }
+                self.session.commitConfiguration()
+            } catch { DispatchQueue.main.async { self.error = error.localizedDescription } }
+        }
+    }
+
+    func beginRecording() {
+        queue.async {
+            guard self.session.isRunning, !self.movieOutput.isRecording else { return }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-live-capture-\(UUID().uuidString).mov")
+            try? FileManager.default.removeItem(at: url)
+            self.movieOutput.startRecording(to: url, recordingDelegate: self)
+            DispatchQueue.main.async { self.capturedURL = nil; self.recording = true; self.error = nil }
+        }
+    }
+
+    func stopRecording() {
+        queue.async { if self.movieOutput.isRecording { self.movieOutput.stopRecording() } }
+    }
+
+    func stopPreview() {
+        queue.async {
+            if self.movieOutput.isRecording { self.movieOutput.stopRecording() }
+            if self.session.isRunning { self.session.stopRunning() }
+            DispatchQueue.main.async { self.previewReady = false; self.recording = false }
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        DispatchQueue.main.async { self.onRecordingStarted?() }
+        // Guard long takes even if the view's controls are obscured or the app is busy.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in
+            guard let self, self.movieOutput.isRecording else { return }
+            self.movieOutput.stopRecording()
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        DispatchQueue.main.async {
+            self.recording = false
+            if let error {
+                self.error = "The camera could not finalize the recording: \(error.localizedDescription)"
+                self.capturedURL = nil
+            } else {
+                self.capturedURL = outputFileURL
+                self.error = nil
+            }
+        }
+    }
+}
+
+
+private struct NativeVocalEffectParameters {
+    let highPassHz: Double
+    let lowPassHz: Double
+    let compressionRatio: Double
+    let outputGain: Double
+    let delayMs: Double
+    let wet: Double
+    let feedback: Double
+    let chorusRateHz: Double
+    let chorusDepthMs: Double
+    let distortion: Double
+
+    static func preset(_ id: String) -> NativeVocalEffectParameters {
+        switch id {
+        case "warm": return .init(highPassHz: 75, lowPassHz: 20000, compressionRatio: 2.8, outputGain: 1.05, delayMs: 72, wet: 0.10, feedback: 0.12, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "pop": return .init(highPassHz: 90, lowPassHz: 20000, compressionRatio: 3.2, outputGain: 1.08, delayMs: 65, wet: 0.16, feedback: 0.16, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "rap": return .init(highPassHz: 100, lowPassHz: 20000, compressionRatio: 4.5, outputGain: 1.06, delayMs: 92, wet: 0.08, feedback: 0.1, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "dream-hall": return .init(highPassHz: 80, lowPassHz: 20000, compressionRatio: 2.2, outputGain: 1.02, delayMs: 145, wet: 0.30, feedback: 0.32, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "slapback": return .init(highPassHz: 85, lowPassHz: 20000, compressionRatio: 2.8, outputGain: 1, delayMs: 105, wet: 0.20, feedback: 0.06, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "lofi": return .init(highPassHz: 180, lowPassHz: 5200, compressionRatio: 4, outputGain: 1, delayMs: 0, wet: 0, feedback: 0, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0.12)
+        case "telephone": return .init(highPassHz: 340, lowPassHz: 3400, compressionRatio: 3.8, outputGain: 1.04, delayMs: 0, wet: 0, feedback: 0, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "wide-chorus": return .init(highPassHz: 85, lowPassHz: 20000, compressionRatio: 2.4, outputGain: 1, delayMs: 25, wet: 0.20, feedback: 0.08, chorusRateHz: 0.28, chorusDepthMs: 6, distortion: 0)
+        case "studio-room": return .init(highPassHz: 75, lowPassHz: 20000, compressionRatio: 2.4, outputGain: 1, delayMs: 45, wet: 0.12, feedback: 0.04, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "ambient": return .init(highPassHz: 80, lowPassHz: 20000, compressionRatio: 2.4, outputGain: 1, delayMs: 180, wet: 0.22, feedback: 0.22, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "megaphone": return .init(highPassHz: 500, lowPassHz: 2600, compressionRatio: 4.5, outputGain: 1, delayMs: 0, wet: 0, feedback: 0, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0.16)
+        case "vocal-double": return .init(highPassHz: 85, lowPassHz: 20000, compressionRatio: 2.5, outputGain: 1, delayMs: 22, wet: 0.24, feedback: 0.04, chorusRateHz: 0.12, chorusDepthMs: 3, distortion: 0)
+        case "podcast": return .init(highPassHz: 95, lowPassHz: 20000, compressionRatio: 3.4, outputGain: 1.02, delayMs: 0, wet: 0, feedback: 0, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "acoustic": return .init(highPassHz: 70, lowPassHz: 20000, compressionRatio: 2.2, outputGain: 1.02, delayMs: 65, wet: 0.08, feedback: 0.08, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "rnb": return .init(highPassHz: 80, lowPassHz: 20000, compressionRatio: 2.8, outputGain: 1.01, delayMs: 160, wet: 0.14, feedback: 0.08, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        case "arena": return .init(highPassHz: 90, lowPassHz: 20000, compressionRatio: 3, outputGain: 1, delayMs: 235, wet: 0.24, feedback: 0.20, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        default: return .init(highPassHz: 70, lowPassHz: 20000, compressionRatio: 2, outputGain: 1, delayMs: 0, wet: 0, feedback: 0, chorusRateHz: 0, chorusDepthMs: 0, distortion: 0)
+        }
+    }
+}
+
+private struct NativeEQCoefficients {
+    let b0: Double
+    let b1: Double
+    let b2: Double
+    let a1: Double
+    let a2: Double
+}
+
+private struct NativeEQState {
+    var x1 = 0.0
+    var x2 = 0.0
+    var y1 = 0.0
+    var y2 = 0.0
+}
+
+private let nativeEQFrequencies = [60.0, 120.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0, 12_000.0, 16_000.0]
+private let nativeEQProfiles: [(String, [Double])] = [
+    ("Flat EQ", Array(repeating: 0.0, count: 10)),
+    ("Vocal clarity", [-3, -2, -1, 0, 1, 2, 2.5, 1.5, 1, 0]),
+    ("Warm", [1.5, 1.5, 1, 0.5, 0, -0.5, -1, -1, -0.5, -0.5]),
+    ("Bright", [-1, -1, -0.5, 0, 0.5, 1.5, 2, 2, 1.5, 1]),
+    ("Soft top", [0, 0, 0.5, 0.5, 0, -0.5, -1, -2, -2.5, -3]),
+    ("Radio tone", [-4, -3, -1, 1.5, 2, 2, 1, -1, -3, -4]),
+    ("Podcast speech", [-3, -2, -0.5, 0, 1, 1.5, 1.5, 0.8, 0, 0]),
+    ("Air & openness", [-0.5, -0.5, 0, 0, 0.3, 0.6, 1, 1.5, 2, 1.5]),
+    ("Sibilance soften", [0, 0, 0, 0, 0, -0.5, -1.5, -2.5, -2.5, -1.5]),
+    ("Intimate vocal", [0, 0, 0.5, 1, 1.2, 0.8, 0.3, 0, -0.5, -1]),
+    ("Lead vocal", [-2, -1, 0, 0.5, 1, 1.5, 2, 1.5, 1, 0.5]),
+    ("Rumble reduction", [-5, -3, -1.5, -0.5, 0, 0, 0, 0, 0, 0]),
+]
+
+private let nativeLiveVideoVocalPresets: [(String, String)] = [
+    ("clean", "Clean Studio"), ("warm", "Warm Vocal"), ("pop", "Pop Shine"), ("rap", "Rap Punch"),
+    ("dream-hall", "Dream Hall / Reverb"), ("slapback", "Slapback Echo"), ("lofi", "Lo-Fi / Radio"),
+    ("telephone", "Telephone / Broadcast"), ("wide-chorus", "Wide Chorus"), ("studio-room", "Studio Room"),
+    ("ambient", "Ambient Dream"), ("megaphone", "Megaphone"), ("vocal-double", "Vocal Double (approximation)"),
+    ("podcast", "Podcast Clarity"), ("acoustic", "Acoustic Warmth"), ("rnb", "R&B Silk"), ("arena", "Arena Vocal"),
+]
+
+private let nativeAmpCharacters: [(String, String, String)] = [
+    ("clean", "Clean preamp", "No added saturation"),
+    ("tube", "Warm tube", "Rounded soft clipping"),
+    ("crunch", "Crunch", "More bite and density"),
+    ("fuzz", "Fuzz", "Harder, rougher clipping"),
+]
+
+private func nativePeakingEQ(frequency: Double, gainDB: Double, sampleRate: Double, q: Double = 1.05) -> NativeEQCoefficients {
+    let safeFrequency = min(max(1, frequency), sampleRate * 0.45)
+    let safeGain = max(-9, min(9, gainDB))
+    let amplitude = pow(10, safeGain / 40)
+    let omega = 2 * Double.pi * safeFrequency / sampleRate
+    let cosine = cos(omega)
+    let alpha = sin(omega) / (2 * min(2, max(0.5, q)))
+    let a0 = 1 + alpha / amplitude
+    return NativeEQCoefficients(
+        b0: (1 + alpha * amplitude) / a0,
+        b1: (-2 * cosine) / a0,
+        b2: (1 - alpha * amplitude) / a0,
+        a1: (-2 * cosine) / a0,
+        a2: (1 - alpha / amplitude) / a0
+    )
+}
+
+private func nativeShelfEQ(frequency: Double, gainDB: Double, sampleRate: Double, highShelf: Bool) -> NativeEQCoefficients {
+    let safeFrequency = min(max(1, frequency), sampleRate * 0.45)
+    let amplitude = pow(10, max(-6, min(6, gainDB)) / 40)
+    let omega = 2 * Double.pi * safeFrequency / sampleRate
+    let cosine = cos(omega)
+    let alpha = sin(omega) * 0.5 * sqrt(2)
+    let beta = 2 * sqrt(amplitude) * alpha
+    let b0: Double
+    let b1: Double
+    let b2: Double
+    let a0: Double
+    let a1: Double
+    let a2: Double
+    if highShelf {
+        b0 = amplitude * ((amplitude + 1) + (amplitude - 1) * cosine + beta)
+        b1 = -2 * amplitude * ((amplitude - 1) + (amplitude + 1) * cosine)
+        b2 = amplitude * ((amplitude + 1) + (amplitude - 1) * cosine - beta)
+        a0 = (amplitude + 1) - (amplitude - 1) * cosine + beta
+        a1 = 2 * ((amplitude - 1) - (amplitude + 1) * cosine)
+        a2 = (amplitude + 1) - (amplitude - 1) * cosine - beta
+    } else {
+        b0 = amplitude * ((amplitude + 1) - (amplitude - 1) * cosine + beta)
+        b1 = 2 * amplitude * ((amplitude - 1) - (amplitude + 1) * cosine)
+        b2 = amplitude * ((amplitude + 1) - (amplitude - 1) * cosine - beta)
+        a0 = (amplitude + 1) + (amplitude - 1) * cosine + beta
+        a1 = -2 * ((amplitude - 1) + (amplitude + 1) * cosine)
+        a2 = (amplitude + 1) + (amplitude - 1) * cosine - beta
+    }
+    return NativeEQCoefficients(b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0)
+}
+
+private func appendUInt16LE(_ value: UInt16, to data: inout Data) {
+    var little = value.littleEndian
+    Swift.withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
+}
+
+private func appendUInt32LE(_ value: UInt32, to data: inout Data) {
+    var little = value.littleEndian
+    Swift.withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
+}
+
+/// Reads only the camera capture's microphone track, applies a small native offline vocal chain,
+/// and writes PCM WAV. The backing instrumental is mixed afterward as a separate track.
+private func createNativeProcessedVoiceWav(
+    captureURL: URL,
+    presetID: String,
+    eqBandsDb: [Double],
+    compressorThresholdDb: Double,
+    compressorRatioOverride: Double,
+    outputGainDb: Double,
+    voiceRenderGain: Double,
+    effectAmount: Double,
+    ampCharacter: String,
+    ampDrive: Double,
+    ampBassDb: Double,
+    ampMidDb: Double,
+    ampTrebleDb: Double,
+    highPassHzOverride: Double?,
+    lowPassHzOverride: Double?
+) throws -> URL {
+    let sampleRate = 44_100
+    let channels = 2
+    let sourceAsset = AVURLAsset(url: captureURL)
+    guard let sourceTrack = sourceAsset.tracks(withMediaType: .audio).first else {
+        throw NativeSimpleError.message("The camera recording has no microphone audio track.")
+    }
+    let reader = try AVAssetReader(asset: sourceAsset)
+    let outputSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVSampleRateKey: sampleRate,
+        AVNumberOfChannelsKey: channels,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsBigEndianKey: false,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsNonInterleaved: false
+    ]
+    let trackOutput = AVAssetReaderTrackOutput(track: sourceTrack, outputSettings: outputSettings)
+    guard reader.canAdd(trackOutput) else { throw NativeSimpleError.message("Could not decode the microphone audio for local effects.") }
+    reader.add(trackOutput)
+    guard reader.startReading() else { throw reader.error ?? NativeSimpleError.message("Could not start decoding the microphone audio.") }
+
+    var pcmBytes = Data()
+    while let sample = trackOutput.copyNextSampleBuffer() {
+        guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+        let byteCount = CMBlockBufferGetDataLength(block)
+        var chunk = Data(count: byteCount)
+        let copyStatus = chunk.withUnsafeMutableBytes { rawBuffer -> OSStatus in
+            guard let base = rawBuffer.baseAddress else { return kCMBlockBufferBadCustomBlockSourceErr }
+            return CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: byteCount, destination: base)
+        }
+        guard copyStatus == kCMBlockBufferNoErr else { throw NativeSimpleError.message("Could not read a microphone PCM block for effects.") }
+        pcmBytes.append(chunk)
+        CMSampleBufferInvalidate(sample)
+    }
+    guard reader.status == .completed else { throw reader.error ?? NativeSimpleError.message("Microphone decoding did not finish successfully.") }
+    let usableBytes = pcmBytes.count - (pcmBytes.count % 2)
+    guard usableBytes >= channels * 2 else { throw NativeSimpleError.message("The decoded microphone recording is empty.") }
+    var samples: [Int16] = pcmBytes.withUnsafeBytes { raw in
+        let count = usableBytes / 2
+        return (0..<count).map { index in Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self)) }
+    }
+
+    let p = NativeVocalEffectParameters.preset(presetID)
+    let frameCount = samples.count / channels
+    let eqCoefficients = nativeEQFrequencies.enumerated().map { index, frequency in
+        nativePeakingEQ(frequency: frequency, gainDB: index < eqBandsDb.count ? eqBandsDb[index] : 0, sampleRate: Double(sampleRate))
+    }
+    let ampToneCoefficients = [
+        nativeShelfEQ(frequency: 140, gainDB: ampBassDb, sampleRate: Double(sampleRate), highShelf: false),
+        nativePeakingEQ(frequency: 850, gainDB: max(-6, min(6, ampMidDb)), sampleRate: Double(sampleRate), q: 0.85),
+        nativeShelfEQ(frequency: 4_200, gainDB: ampTrebleDb, sampleRate: Double(sampleRate), highShelf: true),
+    ]
+    var eqStates = Array(repeating: Array(repeating: NativeEQState(), count: nativeEQFrequencies.count), count: channels)
+    var ampToneStates = Array(repeating: Array(repeating: NativeEQState(), count: ampToneCoefficients.count), count: channels)
+    let threshold = pow(10, max(-36, min(-8, compressorThresholdDb)) / 20)
+    let compressionRatio = max(1, min(8, compressorRatioOverride))
+    let renderGain = max(0, min(1.5, voiceRenderGain))
+    let outputGain = p.outputGain * pow(10, max(-12, min(6, outputGainDb)) / 20)
+    let wetAmount = max(0, min(0.65, p.wet * max(0, min(1.5, effectAmount))))
+    let delayCapacity = max(2, Int(Double(sampleRate) * 0.24))
+    var delayBuffers = Array(repeating: [Float](repeating: 0, count: delayCapacity), count: channels)
+    var previousInput = [Double](repeating: 0, count: channels)
+    var previousHighPass = [Double](repeating: 0, count: channels)
+    var lowPassState = [Double](repeating: 0, count: channels)
+    let dt = 1.0 / Double(sampleRate)
+    let resolvedHighPassHz = max(20, min(1_000, highPassHzOverride ?? p.highPassHz))
+    let resolvedLowPassHz = max(1_000, min(20_000, lowPassHzOverride ?? p.lowPassHz))
+    let hpAlpha = exp(-2 * Double.pi * resolvedHighPassHz * dt)
+    let lpAlpha = resolvedLowPassHz >= 19_999 || resolvedLowPassHz >= Double(sampleRate) * 0.48 ? 1.0 : 1 - exp(-2 * Double.pi * resolvedLowPassHz * dt)
+    let delayFrames = max(1, Int(p.delayMs * Double(sampleRate) / 1000))
+
+    for frame in 0..<frameCount {
+        let writeIndex = frame % delayCapacity
+        for channel in 0..<channels {
+            let sampleIndex = frame * channels + channel
+            let input = (Double(samples[sampleIndex]) / 32768.0) * renderGain
+            let highPass = hpAlpha * (previousHighPass[channel] + input - previousInput[channel])
+            previousInput[channel] = input
+            previousHighPass[channel] = highPass
+            lowPassState[channel] += lpAlpha * (highPass - lowPassState[channel])
+            var value = lowPassState[channel]
+            for band in eqCoefficients.indices {
+                let coefficient = eqCoefficients[band]
+                var state = eqStates[channel][band]
+                let filtered = coefficient.b0 * value + coefficient.b1 * state.x1 + coefficient.b2 * state.x2 - coefficient.a1 * state.y1 - coefficient.a2 * state.y2
+                state.x2 = state.x1; state.x1 = value; state.y2 = state.y1; state.y1 = filtered
+                eqStates[channel][band] = state
+                value = filtered
+            }
+            for band in ampToneCoefficients.indices {
+                let coefficient = ampToneCoefficients[band]
+                var state = ampToneStates[channel][band]
+                let filtered = coefficient.b0 * value + coefficient.b1 * state.x1 + coefficient.b2 * state.x2 - coefficient.a1 * state.y1 - coefficient.a2 * state.y2
+                state.x2 = state.x1; state.x1 = value; state.y2 = state.y1; state.y1 = filtered
+                ampToneStates[channel][band] = state
+                value = filtered
+            }
+            value *= outputGain
+            let magnitude = abs(value)
+            if magnitude > threshold { value = (value < 0 ? -1 : 1) * (threshold + (magnitude - threshold) / compressionRatio) }
+            if p.distortion > 0 {
+                let drive = 1 + p.distortion * 5
+                value = tanh(value * drive) / tanh(drive) * (1 - p.distortion * 0.25)
+            }
+            let normalizedAmpDrive = max(0, min(100, ampDrive)) / 100
+            if ampCharacter != "clean" && normalizedAmpDrive > 0 {
+                let drive = 1 + normalizedAmpDrive * 11
+                switch ampCharacter {
+                case "tube": value = tanh(value * drive) / tanh(drive)
+                case "crunch": value = atan(value * drive) / atan(drive)
+                case "fuzz": value = max(-1, min(1, value * drive))
+                default: break
+                }
+            }
+            if wetAmount > 0 && p.delayMs > 0 {
+                let modulation = p.chorusRateHz > 0 ? sin(Double(frame) / Double(sampleRate) * 2 * Double.pi * p.chorusRateHz) * p.chorusDepthMs : 0
+                let delay = min(delayCapacity - 1, max(1, Int((p.delayMs + modulation) * Double(sampleRate) / 1000)))
+                let readIndex = (frame - delay + delayCapacity) % delayCapacity
+                let delayed = Double(delayBuffers[channel][readIndex])
+                delayBuffers[channel][writeIndex] = Float(max(-1.5, min(1.5, value + delayed * p.feedback)))
+                value = value * (1 - wetAmount * 0.35) + delayed * wetAmount
+            } else {
+                delayBuffers[channel][writeIndex] = Float(value)
+            }
+            let bounded = max(-0.98, min(0.98, value))
+            samples[sampleIndex] = Int16(max(-32768, min(32767, Int((bounded * 32767).rounded()))))
+        }
+    }
+
+    var wav = Data()
+    let payloadBytes = samples.count * MemoryLayout<Int16>.size
+    wav.reserveCapacity(44 + payloadBytes)
+    wav.append(contentsOf: Array("RIFF".utf8)); appendUInt32LE(UInt32(36 + payloadBytes), to: &wav)
+    wav.append(contentsOf: Array("WAVEfmt ".utf8)); appendUInt32LE(16, to: &wav)
+    appendUInt16LE(1, to: &wav); appendUInt16LE(UInt16(channels), to: &wav)
+    appendUInt32LE(UInt32(sampleRate), to: &wav); appendUInt32LE(UInt32(sampleRate * channels * 2), to: &wav)
+    appendUInt16LE(UInt16(channels * 2), to: &wav); appendUInt16LE(16, to: &wav)
+    wav.append(contentsOf: Array("data".utf8)); appendUInt32LE(UInt32(payloadBytes), to: &wav)
+    for sample in samples { appendUInt16LE(UInt16(bitPattern: sample), to: &wav) }
+    let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("env-voice-effects-\(UUID().uuidString).wav")
+    try wav.write(to: outputURL, options: .atomic)
+    return outputURL
+}
+
+private struct NativeSavedVocalSetup: Codable, Identifiable {
+    var id: String
+    var name: String
+    var presetID: String
+    var eqBandsDb: [Double]
+    var compressorThresholdDb: Double
+    var compressorRatio: Double
+    var outputGainDb: Double
+    var voiceRenderGain: Double
+    var effectAmount: Double
+    var ampCharacter: String
+    var ampDrive: Double
+    var ampBassDb: Double
+    var ampMidDb: Double
+    var ampTrebleDb: Double
+    var highPassHzOverride: Double?
+    var lowPassHzOverride: Double?
+    var micVolume: Double
+    var backingVolume: Double
+}
+
+private struct PortableAudioStudioSettings: Codable {
+    var presetId: String
+    var micGain: Double
+    var backingGain: Double
+    var eqBandsDb: [Double]
+    var eqProfile: String
+    var highPassHz: Double?
+    var lowPassHz: Double?
+    var compressorThresholdDb: Double
+    var compressorRatio: Double
+    var outputGainDb: Double
+    var reverbAmount: Double
+    var delayAmount: Double
+    var effectAmount: Double
+    var ampCharacter: String
+    var ampDrive: Double
+    var ampBassDb: Double
+    var ampMidDb: Double
+    var ampTrebleDb: Double
+}
+
+private struct PortableAudioStudioPreset: Codable {
+    var format: String
+    var version: Int
+    var name: String
+    var exportedAt: String
+    var settings: PortableAudioStudioSettings
+}
+
+private let portableAudioStudioPresetFormat = "env-audio-studio-preset"
+private let portableAudioStudioPresetVersion = 1
+private let portableAudioStudioPresetMaximumBytes = 256 * 1024
+
+private func portablePreset(from setup: NativeSavedVocalSetup) -> PortableAudioStudioPreset {
+    let settings = PortableAudioStudioSettings(
+        presetId: setup.presetID, micGain: setup.voiceRenderGain * 100, backingGain: setup.backingVolume * 100,
+        eqBandsDb: setup.eqBandsDb.map { max(-9, min(9, $0.isFinite ? $0 : 0)) }, eqProfile: "custom",
+        highPassHz: setup.highPassHzOverride, lowPassHz: setup.lowPassHzOverride,
+        compressorThresholdDb: setup.compressorThresholdDb, compressorRatio: setup.compressorRatio,
+        outputGainDb: setup.outputGainDb, reverbAmount: setup.effectAmount * 100, delayAmount: setup.effectAmount * 100,
+        effectAmount: setup.effectAmount * 100, ampCharacter: setup.ampCharacter, ampDrive: setup.ampDrive,
+        ampBassDb: setup.ampBassDb, ampMidDb: setup.ampMidDb, ampTrebleDb: setup.ampTrebleDb
+    )
+    return PortableAudioStudioPreset(format: portableAudioStudioPresetFormat, version: portableAudioStudioPresetVersion,
+                                      name: String(setup.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48)),
+                                      exportedAt: ISO8601DateFormatter().string(from: Date()), settings: settings)
+}
+
+private func nativeSetup(fromPortable preset: PortableAudioStudioPreset, currentMicVolume: Double, currentBackingVolume: Double) -> NativeSavedVocalSetup? {
+    guard preset.format == portableAudioStudioPresetFormat, preset.version == portableAudioStudioPresetVersion,
+          !preset.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, preset.settings.eqBandsDb.count == 10 else { return nil }
+    let settings = preset.settings
+    let validPreset = nativeLiveVideoVocalPresets.contains(where: { $0.0 == settings.presetId }) ? settings.presetId : "clean"
+    let amp = ["clean", "tube", "crunch", "fuzz"].contains(settings.ampCharacter) ? settings.ampCharacter : "clean"
+    func bounded(_ value: Double, _ minimum: Double, _ maximum: Double, fallback: Double) -> Double {
+        max(minimum, min(maximum, value.isFinite ? value : fallback))
+    }
+    let effect = bounded(settings.effectAmount, 0, 150, fallback: max(settings.reverbAmount, settings.delayAmount)) / 100
+    return NativeSavedVocalSetup(
+        id: UUID().uuidString, name: String(preset.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48)), presetID: validPreset,
+        eqBandsDb: settings.eqBandsDb.map { bounded($0, -9, 9, fallback: 0) },
+        compressorThresholdDb: bounded(settings.compressorThresholdDb, -36, -8, fallback: -20),
+        compressorRatio: bounded(settings.compressorRatio, 1, 8, fallback: 3),
+        outputGainDb: bounded(settings.outputGainDb, -12, 6, fallback: 0),
+        voiceRenderGain: bounded(settings.micGain / 100, 0, 1.5, fallback: 1), effectAmount: effect,
+        ampCharacter: amp, ampDrive: bounded(settings.ampDrive, 0, 100, fallback: 25),
+        ampBassDb: bounded(settings.ampBassDb, -6, 6, fallback: 0), ampMidDb: bounded(settings.ampMidDb, -6, 6, fallback: 0),
+        ampTrebleDb: bounded(settings.ampTrebleDb, -6, 6, fallback: 0),
+        highPassHzOverride: settings.highPassHz.map { bounded($0, 20, 1_000, fallback: 70) },
+        lowPassHzOverride: settings.lowPassHz.map { bounded($0, 1_000, 20_000, fallback: 20_000) },
+        micVolume: currentMicVolume, backingVolume: bounded(settings.backingGain / 100, 0, 1, fallback: currentBackingVolume)
+    )
+}
+
+private func readNativeSavedVocalSetups() -> [NativeSavedVocalSetup] {
+    guard let data = UserDefaults.standard.data(forKey: "env.live-video-studio.saved-vocal-setups.v1"),
+          let saved = try? JSONDecoder().decode([NativeSavedVocalSetup].self, from: data) else { return [] }
+    return saved.prefix(30).compactMap { item in
+        guard !item.id.isEmpty, !item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              nativeLiveVideoVocalPresets.contains(where: { $0.0 == item.presetID }), item.eqBandsDb.count == 10 else { return nil }
+        var clean = item
+        clean.name = String(item.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48))
+        clean.eqBandsDb = item.eqBandsDb.map { max(-9, min(9, $0.isFinite ? $0 : 0)) }
+        clean.compressorThresholdDb = max(-36, min(-8, item.compressorThresholdDb))
+        clean.compressorRatio = max(1, min(8, item.compressorRatio))
+        clean.outputGainDb = max(-12, min(6, item.outputGainDb))
+        clean.voiceRenderGain = max(0, min(1.5, item.voiceRenderGain))
+        clean.effectAmount = max(0, min(1.5, item.effectAmount))
+        clean.ampCharacter = ["clean", "tube", "crunch", "fuzz"].contains(item.ampCharacter) ? item.ampCharacter : "clean"
+        clean.ampDrive = max(0, min(100, item.ampDrive))
+        clean.ampBassDb = max(-6, min(6, item.ampBassDb)); clean.ampMidDb = max(-6, min(6, item.ampMidDb)); clean.ampTrebleDb = max(-6, min(6, item.ampTrebleDb))
+        if let highPass = item.highPassHzOverride { clean.highPassHzOverride = max(20, min(1_000, highPass.isFinite ? highPass : 70)) }
+        if let lowPass = item.lowPassHzOverride { clean.lowPassHzOverride = max(1_000, min(20_000, lowPass.isFinite ? lowPass : 20_000)) }
+        clean.micVolume = max(0, min(1, item.micVolume)); clean.backingVolume = max(0, min(1, item.backingVolume))
+        return clean
+    }
+}
+
+private struct NativeMusicLiveVideoStudioView: View {
+    @StateObject private var capture = NativeLiveVideoCapture()
+    @State private var backingURL: URL?
+    @State private var backingName = ""
+    @State private var backingDurationSeconds = 0.0
+    @State private var backingCueSeconds = 0.0
+    @State private var vocalPresetID = "pop"
+    @State private var player: AVQueuePlayer?
+    @State private var playerLooper: AVPlayerLooper?
+    @State private var mixing = false
+    @State private var finalURL: URL?
+    @State private var micVolume = 0.95
+    @State private var backingVolume = 0.55
+    @State private var showAdvancedSound = false
+    @State private var eqBandsDb = Array(repeating: 0.0, count: 10)
+    @State private var compressorThresholdDb = -20.0
+    @State private var compressorRatio = 3.0
+    @State private var outputGainDb = 0.0
+    @State private var voiceRenderGain = 1.0
+    @State private var effectAmount = 1.0
+    @State private var ampCharacter = "clean"
+    @State private var ampDrive = 25.0
+    @State private var ampBassDb = 0.0
+    @State private var ampMidDb = 0.0
+    @State private var ampTrebleDb = 0.0
+    @State private var highPassHzOverride: Double? = nil
+    @State private var lowPassHzOverride: Double? = nil
+    @State private var savedVocalSetups: [NativeSavedVocalSetup] = []
+    @State private var savedSetupName = ""
+    @State private var selectedSavedSetupID: String?
+    @State private var abSnapshotA: NativeSavedVocalSetup?
+    @State private var abSnapshotB: NativeSavedVocalSetup?
+    @State private var activeAbSlot: String?
+    @State private var showImporter = false
+    @State private var showPresetImporter = false
+    @State private var presetExportURL: URL?
+    @State private var status = "Import a local backing track to begin."
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Live Video Singing Studio").font(.title2.weight(.semibold))
+            Text("Record a native camera take over your backing track, then mix the recorded microphone and instrumental into one MP4 on this device.").font(.subheadline).foregroundStyle(.secondary)
+            GroupBox("Rights & privacy") {
+                Text("Use audio you own or have permission to perform. Source audio and recordings stay on device. Wired headphones reduce bleed and latency; Bluetooth may be too delayed for performance monitoring.").font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            GroupBox("Quick start") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(backingURL == nil ? "1 · Add a backing track" : "Backing track ready", systemImage: backingURL == nil ? "1.circle" : "checkmark.circle.fill")
+                    Label("2 · Choose a vocal sound · \(nativeLiveVideoVocalPresets.first(where: { $0.0 == vocalPresetID })?.1 ?? "Clean Studio")", systemImage: "2.circle")
+                    Label(capture.previewReady ? "Camera & mic ready" : "3 · Enable camera & mic, then record", systemImage: capture.previewReady ? "checkmark.circle.fill" : "3.circle")
+                    Text("After your take, mix voice + backing, review the video, then export. Keep advanced controls closed until you need them.").font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if capture.previewReady {
+                NativeLiveCameraPreview(session: capture.session).frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.9)).frame(height: 180).overlay(Text("Camera preview starts after permission").font(.subheadline).foregroundStyle(.white))
+            }
+            VStack(spacing: 8) {
+                Button(capture.previewReady ? "Camera & mic ready" : "Enable camera & mic") { capture.startPreview() }.buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
+                Button("Flip front / rear camera") { capture.toggleCamera() }.buttonStyle(.bordered).disabled(capture.recording || !capture.previewReady).frame(maxWidth: .infinity)
+            }
+            Button(backingURL == nil ? "Choose backing / instrumental" : "Change backing · \(backingName)") { showImporter = true }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+            if let backingURL {
+                Text(backingURL.lastPathComponent).font(.footnote).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Backing cue · \(backingCueSeconds, specifier: "%.1f") sec").font(.footnote)
+                    Slider(value: $backingCueSeconds, in: 0...max(0.1, backingDurationSeconds), step: 0.1).disabled(capture.recording || mixing)
+                    Text("Performance starts at the selected cue; the source loops from there when composing the final video.").font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button("Preview backing") { startBackingAtCue() }.buttonStyle(.bordered)
+                    Button("Pause") { player?.pause() }.buttonStyle(.bordered)
+                }
+                TextField("Search vocal presets", text: $presetSearch).textFieldStyle(.roundedBorder).disabled(capture.recording || mixing).accessibilityLabel("Search vocal presets")
+                let matchingPresets = nativeLiveVideoVocalPresets.filter { preset in
+                    presetSearch.isEmpty || preset.0.localizedCaseInsensitiveContains(presetSearch) || preset.1.localizedCaseInsensitiveContains(presetSearch)
+                }
+                if matchingPresets.isEmpty {
+                    Text("No vocal presets match this search.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Picker("Vocal render preset", selection: $vocalPresetID) {
+                        ForEach(matchingPresets, id: \.0) { preset in Text(preset.1).tag(preset.0) }
+                    }.pickerStyle(.menu).disabled(capture.recording || mixing)
+                }
+                Text("Selected effect is rendered locally on the microphone track before mixing the backing track. Live mic monitoring remains dry. Natural AutoPitch / Hard Tune require a real key-aware pitch engine and are not enabled in this build.").font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Voice level · \(Int(micVolume * 100))%")
+                    Slider(value: $micVolume, in: 0...1)
+                    Text("Backing mix level · \(Int(backingVolume * 100))%")
+                    Slider(value: $backingVolume, in: 0...1)
+                }.font(.footnote)
+                DisclosureGroup(isExpanded: $showAdvancedSound) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Ten-band graphic EQ · ±9 dB").font(.subheadline.weight(.semibold))
+                        Text("Start with small cuts when a sound is muddy or harsh; boosts use more headroom.").font(.caption).foregroundStyle(.secondary)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+                            ForEach(Array(nativeEQProfiles.enumerated()), id: \.offset) { _, profile in
+                                Button(profile.0) { eqBandsDb = profile.1 }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                            }
+                        }
+                        GeometryReader { geometry in
+                            ZStack {
+                                ForEach([-9.0, -6, -3, 0, 3, 6, 9], id: \.self) { gain in
+                                    Path { path in
+                                        let y = CGFloat((9 - gain) / 18) * geometry.size.height
+                                        path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: geometry.size.width, y: y))
+                                    }.stroke(Color.primary.opacity(gain == 0 ? 0.35 : 0.12), style: StrokeStyle(lineWidth: 1, dash: gain == 0 ? [] : [3, 5]))
+                                }
+                                Path { path in
+                                    for index in eqBandsDb.indices {
+                                        let x = CGFloat(index) / CGFloat(max(1, eqBandsDb.count - 1)) * geometry.size.width
+                                        let y = CGFloat((9 - max(-9, min(9, eqBandsDb[index]))) / 18) * geometry.size.height
+                                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+                                    }
+                                }.stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                                ForEach(eqBandsDb.indices, id: \.self) { index in
+                                    Circle().fill(Color.accentColor).frame(width: 7, height: 7)
+                                        .position(x: CGFloat(index) / CGFloat(max(1, eqBandsDb.count - 1)) * geometry.size.width,
+                                                  y: CGFloat((9 - max(-9, min(9, eqBandsDb[index]))) / 18) * geometry.size.height)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                                guard geometry.size.width > 0, geometry.size.height > 0, !capture.recording, !mixing else { return }
+                                let scaledX = value.location.x / geometry.size.width * CGFloat(max(1, eqBandsDb.count - 1))
+                                let index = max(0, min(eqBandsDb.count - 1, Int(scaledX.rounded())))
+                                let gain = max(-9, min(9, 9 - Double(value.location.y / geometry.size.height) * 18))
+                                eqBandsDb[index] = (gain * 2).rounded() / 2
+                            })
+                        }.frame(height: 112).accessibilityElement(children: .ignore).accessibilityLabel("Interactive ten-band EQ response preview. Drag vertically to change the nearest band; use the labelled sliders for precise keyboard or VoiceOver adjustment. Control response, not a measured spectrum.").accessibilityHint("Drag vertically to change gain for the nearest frequency band.")
+                        Text("Drag the curve to adjust a band, or use the labelled sliders below for precise values.").font(.caption).foregroundStyle(.secondary)
+                        ForEach(Array(nativeEQFrequencies.enumerated()), id: \.offset) { index, frequency in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("\(Int(frequency)) Hz · \(eqBandsDb[index], specifier: "%+.0f") dB").font(.caption)
+                                Slider(value: $eqBandsDb[index], in: -9...9, step: 1).disabled(capture.recording || mixing)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 10) {
+                            let presetFilterDefaults = NativeVocalEffectParameters.preset(vocalPresetID)
+                        HStack {
+                            Text("Filter / cleanup").font(.subheadline.weight(.semibold))
+                            Spacer(minLength: 8)
+                            Button("Use preset defaults") { highPassHzOverride = nil; lowPassHzOverride = nil }
+                                .font(.caption).disabled(capture.recording || mixing || (highPassHzOverride == nil && lowPassHzOverride == nil))
+                        }
+                        Text("High-pass / low cut · \((highPassHzOverride ?? presetFilterDefaults.highPassHz), specifier: "%.0f") Hz\(highPassHzOverride == nil ? " · preset" : " · custom")").font(.caption)
+                        Slider(value: Binding(get: { highPassHzOverride ?? presetFilterDefaults.highPassHz }, set: { highPassHzOverride = $0 }), in: 20...1_000, step: 5).disabled(capture.recording || mixing)
+                        let shownLowPassHz = lowPassHzOverride ?? presetFilterDefaults.lowPassHz
+                        Text("Low-pass / high cut · \(shownLowPassHz >= 19_999 ? "Off" : String(format: "%.0f Hz", shownLowPassHz))\(lowPassHzOverride == nil ? " · preset" : " · custom")").font(.caption)
+                        Slider(value: Binding(get: { lowPassHzOverride ?? presetFilterDefaults.lowPassHz }, set: { lowPassHzOverride = $0 }), in: 1_000...20_000, step: 100).disabled(capture.recording || mixing)
+                        Text("Raise the low-cut to reduce rumble; lower the high-cut to darken the vocal. A 20 kHz high-cut bypasses the manual filter.").font(.caption).foregroundStyle(.secondary)
+                        Text("Preamp / amplifier colour").font(.subheadline.weight(.semibold))
+                            Text("Creative saturation and a three-control tone stack; not a physical amplifier or speaker-cabinet simulation.").font(.caption).foregroundStyle(.secondary)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 136), spacing: 8)], spacing: 8) {
+                                ForEach(nativeAmpCharacters, id: \.0) { amp in
+                                    Button { ampCharacter = amp.0 } label: {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(ampCharacter == amp.0 ? "✓ \(amp.1)" : amp.1).font(.subheadline.weight(.medium))
+                                            Text(amp.2).font(.caption).foregroundStyle(.secondary)
+                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                                }
+                            }
+                            Text("Drive / saturation · \(ampDrive, specifier: "%.0f")%").font(.caption)
+                            Slider(value: $ampDrive, in: 0...100, step: 1).disabled(capture.recording || mixing || ampCharacter == "clean")
+                            Text("Bass tone · \(ampBassDb, specifier: "%+.1f") dB").font(.caption)
+                            Slider(value: $ampBassDb, in: -6...6, step: 0.5).disabled(capture.recording || mixing)
+                            Text("Mid tone · \(ampMidDb, specifier: "%+.1f") dB").font(.caption)
+                            Slider(value: $ampMidDb, in: -6...6, step: 0.5).disabled(capture.recording || mixing)
+                            Text("Treble tone · \(ampTrebleDb, specifier: "%+.1f") dB").font(.caption)
+                            Slider(value: $ampTrebleDb, in: -6...6, step: 0.5).disabled(capture.recording || mixing)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Compressor threshold · \(compressorThresholdDb, specifier: "%.0f") dB").font(.caption)
+                            Slider(value: $compressorThresholdDb, in: -36 ... -8, step: 1).disabled(capture.recording || mixing)
+                            Text("Compression ratio · \(compressorRatio, specifier: "%.1f"):1").font(.caption)
+                            Slider(value: $compressorRatio, in: 1...8, step: 0.5).disabled(capture.recording || mixing)
+                            Text("Voice render gain · \(voiceRenderGain * 100, specifier: "%.0f")%").font(.caption)
+                            Slider(value: $voiceRenderGain, in: 0...1.5, step: 0.05).disabled(capture.recording || mixing)
+                            Text("Output trim · \(outputGainDb, specifier: "%+.0f") dB").font(.caption)
+                            Slider(value: $outputGainDb, in: -12...6, step: 1).disabled(capture.recording || mixing)
+                            Text("Preset ambience / echo send · \(effectAmount * 100, specifier: "%.0f")%").font(.caption)
+                            Slider(value: $effectAmount, in: 0...1.5, step: 0.05).disabled(capture.recording || mixing)
+                        }
+                        Text("My saved sound setups · this device").font(.subheadline.weight(.semibold))
+                        Text("Only sound values are stored locally. Backing files, microphone audio and recordings are not saved in these setups.").font(.caption).foregroundStyle(.secondary)
+                        Text("A/B quick compare · temporary snapshots").font(.subheadline.weight(.semibold))
+                        Text("Save A, change the sound, save B, then recall either snapshot to compare by ear. Snapshots stay in memory only.").font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Button(abSnapshotA == nil ? "Save current to A" : "Replace A") { abSnapshotA = currentVocalSetup(name: "Snapshot A", id: "ab-A"); activeAbSlot = "A" }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                            Button(abSnapshotB == nil ? "Save current to B" : "Replace B") { abSnapshotB = currentVocalSetup(name: "Snapshot B", id: "ab-B"); activeAbSlot = "B" }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                        }
+                        HStack(spacing: 8) {
+                            Button(activeAbSlot == "A" ? "✓ Recall A" : "Recall A") { if let snapshot = abSnapshotA { applySavedVocalSetup(snapshot); selectedSavedSetupID = nil; activeAbSlot = "A" } }.buttonStyle(.bordered).disabled(abSnapshotA == nil || capture.recording || mixing)
+                            Button(activeAbSlot == "B" ? "✓ Recall B" : "Recall B") { if let snapshot = abSnapshotB { applySavedVocalSetup(snapshot); selectedSavedSetupID = nil; activeAbSlot = "B" } }.buttonStyle(.bordered).disabled(abSnapshotB == nil || capture.recording || mixing)
+                        }
+                        HStack(spacing: 8) {
+                            Button("Import preset JSON") { showPresetImporter = true }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                            Button("Prepare preset export") {
+                                let setup = currentVocalSetup(name: savedSetupName.isEmpty ? "Current sound" : savedSetupName)
+                                let preset = portablePreset(from: setup)
+                                do {
+                                    let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                                    let data = try encoder.encode(preset)
+                                    guard data.count <= portableAudioStudioPresetMaximumBytes else { throw NativeSimpleError.message("Preset exceeded the 256 KB safety limit.") }
+                                    let safeName = setup.name.lowercased().replacingOccurrences(of: "[^a-z0-9_-]+", with: "-", options: .regularExpression)
+                                    let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-\(safeName.isEmpty ? "sound-setup" : safeName).env-audio-preset.json")
+                                    try data.write(to: url, options: .atomic); presetExportURL = url; error = nil
+                                    status = "Preset JSON is ready to share or save. It contains sound settings only."
+                                } catch { self.error = error.localizedDescription }
+                            }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                            if let presetExportURL { ShareLink(item: presetExportURL) { Label("Share JSON", systemImage: "square.and.arrow.up") }.buttonStyle(.borderedProminent) }
+                        }
+                        Text("Portable versioned JSON contains sound controls only (max 256 KB); unsupported pitch presets fall back to Clean Studio on the receiving device.").font(.caption).foregroundStyle(.secondary)
+                        TextField("Setup name", text: $savedSetupName).textFieldStyle(.roundedBorder).disabled(capture.recording || mixing)
+                        HStack {
+                            Button("Save setup") { saveCurrentVocalSetup() }.buttonStyle(.borderedProminent).disabled(capture.recording || mixing || savedSetupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            Menu {
+                                ForEach(savedVocalSetups) { setup in
+                                    Button(setup.name) { applySavedVocalSetup(setup) }
+                                }
+                            } label: {
+                                Label("Load saved setup", systemImage: "folder")
+                            }.buttonStyle(.bordered).disabled(capture.recording || mixing || savedVocalSetups.isEmpty)
+                        }
+                        if let selectedName = selectedSavedSetupID.flatMap({ id in savedVocalSetups.first(where: { $0.id == id })?.name }) {
+                            HStack {
+                                Text("Selected: \(selectedName)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 4)
+                                Button("Delete") { deleteSelectedVocalSetup() }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                            }
+                        }
+                        Button("Reset advanced sound") {
+                            eqBandsDb = Array(repeating: 0, count: 10); compressorThresholdDb = -20; compressorRatio = 3; outputGainDb = 0; voiceRenderGain = 1; effectAmount = 1; ampCharacter = "clean"; ampDrive = 25; ampBassDb = 0; ampMidDb = 0; ampTrebleDb = 0; highPassHzOverride = nil; lowPassHzOverride = nil
+                        }.buttonStyle(.bordered).disabled(capture.recording || mixing)
+                    }.padding(.top, 8)
+                } label: {
+                    Label("Advanced EQ & dynamics", systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold))
+                }.disabled(capture.recording || mixing)
+                HStack {
+                    Button(capture.recording ? "Recording…" : "Start performance") {
+                        finalURL = nil
+                        capture.onRecordingStarted = { startBackingAtCue() }
+                        capture.beginRecording()
+                    }.buttonStyle(.borderedProminent).disabled(!capture.previewReady || capture.recording || mixing)
+                    Button("Stop") { capture.stopRecording(); player?.pause() }.buttonStyle(.bordered).disabled(!capture.recording)
+                }
+                if let captured = capture.capturedURL {
+                    Button(mixing ? "Mixing…" : "Mix voice + backing") { Task { await renderMix(captureURL: captured, backingURL: backingURL, presetID: vocalPresetID) } }.buttonStyle(.borderedProminent).disabled(mixing || capture.recording)
+                }
+            }
+            if mixing { ProgressView("Rendering local MP4…") }
+            if let finalURL {
+                VideoPlayer(player: AVPlayer(url: finalURL)).frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 12))
+                ShareLink(item: finalURL) { Label("Export / share MP4", systemImage: "square.and.arrow.up") }.buttonStyle(.borderedProminent)
+            }
+            if let captureError = capture.error { Text(captureError).font(.footnote).foregroundStyle(.red) }
+            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            Text(status).font(.footnote).foregroundStyle(.secondary)
+        }
+        .onAppear { savedVocalSetups = readNativeSavedVocalSetups() }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+            do {
+                guard let selected = try result.get().first else { return }
+                let accessing = selected.startAccessingSecurityScopedResource()
+                defer { if accessing { selected.stopAccessingSecurityScopedResource() } }
+                let ext = selected.pathExtension.isEmpty ? "audio" : selected.pathExtension
+                let destination = FileManager.default.temporaryDirectory.appendingPathComponent("env-backing-\(UUID().uuidString).\(ext)")
+                try FileManager.default.copyItem(at: selected, to: destination)
+                backingURL = destination; backingName = destination.lastPathComponent
+                let backingAsset = AVURLAsset(url: destination)
+                let measuredDuration = CMTimeGetSeconds(backingAsset.duration)
+                backingDurationSeconds = measuredDuration.isFinite ? max(0, measuredDuration) : 0
+                backingCueSeconds = 0
+                let queue = AVQueuePlayer()
+                let item = AVPlayerItem(url: destination)
+                playerLooper = AVPlayerLooper(player: queue, templateItem: item)
+                player = queue
+                status = "Backing track ready; playback is looped for practice."
+                error = nil
+            } catch { self.error = "Could not import the selected audio: \(error.localizedDescription)" }
+        }
+        .fileImporter(isPresented: $showPresetImporter, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            do {
+                guard let selected = try result.get().first else { return }
+                let accessing = selected.startAccessingSecurityScopedResource()
+                defer { if accessing { selected.stopAccessingSecurityScopedResource() } }
+                let attributes = try FileManager.default.attributesOfItem(atPath: selected.path)
+                if let size = attributes[.size] as? NSNumber, size.intValue > portableAudioStudioPresetMaximumBytes { throw NativeSimpleError.message("Preset files must be 256 KB or smaller.") }
+                try importPortablePreset(Data(contentsOf: selected, options: .mappedIfSafe))
+                error = nil
+            } catch { self.error = error.localizedDescription }
+        }
+        .onDisappear { capture.stopPreview(); player?.pause() }
+    }
+
+    private func startBackingAtCue() {
+        guard let backingURL else { return }
+        let queue = AVQueuePlayer()
+        let item = AVPlayerItem(url: backingURL)
+        let duration = CMTime(seconds: backingDurationSeconds, preferredTimescale: 600)
+        let start = CMTime(seconds: min(max(0, backingCueSeconds), max(0, backingDurationSeconds - 0.05)), preferredTimescale: 600)
+        let remaining = CMTimeSubtract(duration, start)
+        playerLooper = AVPlayerLooper(player: queue, templateItem: item, timeRange: CMTimeRange(start: start, duration: remaining))
+        player = queue
+        queue.play()
+    }
+
+    private func currentVocalSetup(name: String, id: String = UUID().uuidString) -> NativeSavedVocalSetup {
+        NativeSavedVocalSetup(
+            id: id, name: String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48)), presetID: vocalPresetID,
+            eqBandsDb: eqBandsDb.map { max(-9, min(9, $0.isFinite ? $0 : 0)) }, compressorThresholdDb: compressorThresholdDb,
+            compressorRatio: compressorRatio, outputGainDb: outputGainDb, voiceRenderGain: voiceRenderGain, effectAmount: effectAmount,
+            ampCharacter: ampCharacter, ampDrive: ampDrive, ampBassDb: ampBassDb, ampMidDb: ampMidDb, ampTrebleDb: ampTrebleDb,
+            highPassHzOverride: highPassHzOverride, lowPassHzOverride: lowPassHzOverride, micVolume: micVolume, backingVolume: backingVolume
+        )
+    }
+
+    private func importPortablePreset(_ data: Data) throws {
+        guard data.count <= portableAudioStudioPresetMaximumBytes else { throw NativeSimpleError.message("Preset files must be 256 KB or smaller.") }
+        let preset = try JSONDecoder().decode(PortableAudioStudioPreset.self, from: data)
+        guard let setup = nativeSetup(fromPortable: preset, currentMicVolume: micVolume, currentBackingVolume: backingVolume) else {
+            throw NativeSimpleError.message("Unsupported or invalid enV Audio Studio preset. Only version 1 files are supported.")
+        }
+        let duplicate = savedVocalSetups.first(where: { $0.name.localizedCaseInsensitiveCompare(setup.name) == .orderedSame })
+        var imported = setup
+        if let duplicate { imported.id = duplicate.id }
+        savedVocalSetups = ([imported] + savedVocalSetups.filter { $0.id != imported.id }).prefix(30).map { $0 }
+        if let encoded = try? JSONEncoder().encode(savedVocalSetups) { UserDefaults.standard.set(encoded, forKey: "env.live-video-studio.saved-vocal-setups.v1") }
+        applySavedVocalSetup(imported)
+        status = "Imported \(imported.name) and applied the settings locally. Unsupported pitch presets fall back to Clean Studio on this device."
+    }
+
+    @MainActor
+    private func saveCurrentVocalSetup() {
+        let name = String(savedSetupName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48))
+        guard !name.isEmpty else { error = "Enter a name for this sound setup before saving."; return }
+        let existing = savedVocalSetups.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame })
+        let setup = currentVocalSetup(name: name, id: existing?.id ?? UUID().uuidString)
+        savedVocalSetups = ([setup] + savedVocalSetups.filter { $0.id != setup.id }).prefix(30).map { $0 }
+        selectedSavedSetupID = setup.id; savedSetupName = setup.name; error = nil
+        if let data = try? JSONEncoder().encode(savedVocalSetups) {
+            UserDefaults.standard.set(data, forKey: "env.live-video-studio.saved-vocal-setups.v1")
+            status = "Saved “\(setup.name)” on this device. Only sound-control values were stored; no audio or video was saved in the setup."
+        } else {
+            error = "Could not save this sound setup to device storage. Your current controls remain unchanged."
+        }
+    }
+
+    private func applySavedVocalSetup(_ setup: NativeSavedVocalSetup) {
+        vocalPresetID = setup.presetID; eqBandsDb = setup.eqBandsDb; compressorThresholdDb = setup.compressorThresholdDb
+        compressorRatio = setup.compressorRatio; outputGainDb = setup.outputGainDb; voiceRenderGain = setup.voiceRenderGain; effectAmount = setup.effectAmount
+        ampCharacter = setup.ampCharacter; ampDrive = setup.ampDrive; ampBassDb = setup.ampBassDb; ampMidDb = setup.ampMidDb; ampTrebleDb = setup.ampTrebleDb
+        highPassHzOverride = setup.highPassHzOverride; lowPassHzOverride = setup.lowPassHzOverride; micVolume = setup.micVolume; backingVolume = setup.backingVolume
+        selectedSavedSetupID = setup.id; savedSetupName = setup.name; error = nil
+        status = "Loaded “\(setup.name)”. Make a short test take and adjust by ear before a full performance."
+    }
+
+    private func deleteSelectedVocalSetup() {
+        guard let id = selectedSavedSetupID, let setup = savedVocalSetups.first(where: { $0.id == id }) else { return }
+        savedVocalSetups.removeAll { $0.id == id }; selectedSavedSetupID = nil; savedSetupName = ""
+        if let data = try? JSONEncoder().encode(savedVocalSetups) { UserDefaults.standard.set(data, forKey: "env.live-video-studio.saved-vocal-setups.v1") }
+        status = "Deleted “\(setup.name)” from this device. Existing recordings were not changed."
+    }
+
+    private func renderMix(captureURL: URL, backingURL: URL, presetID: String) async {
+        mixing = true; error = nil; status = "Mixing camera and backing audio locally…"
+        defer { mixing = false }
+        do {
+            let cameraAsset = AVURLAsset(url: captureURL)
+            let backingAsset = AVURLAsset(url: backingURL)
+            guard let sourceVideo = cameraAsset.tracks(withMediaType: .video).first else { throw NativeSimpleError.message("The camera recording has no video track.") }
+            guard cameraAsset.tracks(withMediaType: .audio).first != nil else { throw NativeSimpleError.message("The camera recording has no microphone audio track.") }
+            guard let sourceBacking = backingAsset.tracks(withMediaType: .audio).first else { throw NativeSimpleError.message("The selected backing track has no decodable audio.") }
+            let eqBands = eqBandsDb
+            let thresholdDB = compressorThresholdDb
+            let ratio = compressorRatio
+            let outputTrim = outputGainDb
+            let voiceGain = voiceRenderGain
+            let effectsSend = effectAmount
+            let selectedAmpCharacter = ampCharacter
+            let selectedAmpDrive = ampDrive
+            let selectedAmpBass = ampBassDb
+            let selectedAmpMid = ampMidDb
+            let selectedAmpTreble = ampTrebleDb
+            let selectedHighPassHzOverride = highPassHzOverride
+            let selectedLowPassHzOverride = lowPassHzOverride
+            let processedVoiceURL = try await Task.detached(priority: .userInitiated) {
+                try createNativeProcessedVoiceWav(captureURL: captureURL, presetID: presetID, eqBandsDb: eqBands, compressorThresholdDb: thresholdDB, compressorRatioOverride: ratio, outputGainDb: outputTrim, voiceRenderGain: voiceGain, effectAmount: effectsSend, ampCharacter: selectedAmpCharacter, ampDrive: selectedAmpDrive, ampBassDb: selectedAmpBass, ampMidDb: selectedAmpMid, ampTrebleDb: selectedAmpTreble, highPassHzOverride: selectedHighPassHzOverride, lowPassHzOverride: selectedLowPassHzOverride)
+            }.value
+            defer { try? FileManager.default.removeItem(at: processedVoiceURL) }
+            let processedVoiceAsset = AVURLAsset(url: processedVoiceURL)
+            guard let sourceMic = processedVoiceAsset.tracks(withMediaType: .audio).first else { throw NativeSimpleError.message("The processed microphone track could not be reopened for composition.") }
+            let duration = cameraAsset.duration
+            guard duration.isNumeric, CMTimeGetSeconds(duration) > 0 else { throw NativeSimpleError.message("The captured recording duration is invalid.") }
+            let composition = AVMutableComposition()
+            guard let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+                  let micTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid),
+                  let backingTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw NativeSimpleError.message("Could not allocate export tracks.")
+            }
+            try videoTrack.insertTimeRange(CMTimeRange(start: sourceVideo.timeRange.start, duration: duration), of: sourceVideo, at: .zero)
+            let voiceDuration = CMTimeCompare(sourceMic.timeRange.duration, duration) < 0 ? sourceMic.timeRange.duration : duration
+            guard voiceDuration.isNumeric, CMTimeGetSeconds(voiceDuration) > 0 else { throw NativeSimpleError.message("The processed microphone track has no usable duration.") }
+            try micTrack.insertTimeRange(CMTimeRange(start: sourceMic.timeRange.start, duration: voiceDuration), of: sourceMic, at: .zero)
+            let requestedCue = CMTime(seconds: max(0, backingCueSeconds), preferredTimescale: 600)
+            let trackStart = CMTimeAdd(sourceBacking.timeRange.start, requestedCue)
+            let sourceEnd = sourceBacking.timeRange.end
+            let sourceDuration = CMTimeSubtract(sourceEnd, trackStart)
+            guard sourceDuration.isNumeric, CMTimeGetSeconds(sourceDuration) > 0 else { throw NativeSimpleError.message("The selected backing cue is beyond the end of the track.") }
+            var cursor = CMTime.zero
+            while CMTimeCompare(cursor, duration) < 0 {
+                let remaining = CMTimeSubtract(duration, cursor)
+                let chunk = CMTimeCompare(sourceDuration, remaining) < 0 ? sourceDuration : remaining
+                try backingTrack.insertTimeRange(CMTimeRange(start: trackStart, duration: chunk), of: sourceBacking, at: cursor)
+                cursor = CMTimeAdd(cursor, chunk)
+            }
+            let mix = AVMutableAudioMix()
+            let voiceParams = AVMutableAudioMixInputParameters(track: micTrack)
+            voiceParams.setVolume(Float(micVolume), at: .zero)
+            let backingParams = AVMutableAudioMixInputParameters(track: backingTrack)
+            backingParams.setVolume(Float(backingVolume), at: .zero)
+            mix.inputParameters = [voiceParams, backingParams]
+            let output = FileManager.default.temporaryDirectory.appendingPathComponent("env-live-mix-\(UUID().uuidString).mp4")
+            guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else { throw NativeSimpleError.message("This device cannot export the selected composition.") }
+            exporter.outputURL = output; exporter.outputFileType = .mp4; exporter.audioMix = mix
+            await withCheckedContinuation { continuation in exporter.exportAsynchronously { continuation.resume() } }
+            guard exporter.status == .completed else {
+                try? FileManager.default.removeItem(at: output)
+                throw NativeSimpleError.message(exporter.error?.localizedDescription ?? "The MP4 export did not complete.")
+            }
+            finalURL = output; status = "Final MP4 ready. The selected \(presetID) preset was rendered on the microphone track before the backing mix. Review voice/backing balance before sharing."
+        } catch { self.error = error.localizedDescription; status = "Mix failed; original camera recording remains available for another attempt." }
     }
 }
 

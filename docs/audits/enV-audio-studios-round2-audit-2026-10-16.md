@@ -2,9 +2,9 @@
 
 # enV Audio Studios — Round 2 Enhancement & Verification Audit
 
-**Audit date:** 16 October 2026
-**Baseline:** enV full project source from the previous Audio Studios audit package plus the two supplied source prompts.
-**Platforms reviewed:** TypeScript web, Kotlin Android, Swift iOS, shared catalog.
+**Audit date:** 16 October 2026  
+**Baseline:** enV full project source from the previous Audio Studios audit package plus the two supplied source prompts.  
+**Platforms reviewed:** TypeScript web, Kotlin Android, Swift iOS, shared catalog.  
 **Scope rule:** Preserve existing tool URLs and the project's separate native/web architecture; never imply a processor or external service is available if it is not configured or was not tested.
 
 ## Executive result

@@ -5,12 +5,14 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { createMediaJobAdmission } from "./media/processor-admission.mjs";
 
 const HOST = process.env.MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.MEDIA_PORT || 8787);
 const MAX_BYTES = Number(process.env.MEDIA_MAX_BYTES || 250 * 1024 * 1024);
 const FFMPEG_BIN = process.env.FFMPEG_BIN || "ffmpeg";
 const ALLOWED_ORIGIN = process.env.MEDIA_ALLOWED_ORIGIN || "*";
+const MEDIA_ADMISSION = createMediaJobAdmission(process.env.MEDIA_MAX_CONCURRENT_JOBS ?? 1);
 
 const OPERATIONS = {
   "video-to-mp4": { ext: "mp4", mime: "video/mp4", args: (i, o) => ["-i", i, "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", o] },
@@ -153,9 +155,24 @@ async function handleMedia(req, res) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "POST,GET,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
-  if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV FFmpeg media processor", ffmpeg: FFMPEG_BIN, operations: Object.keys(OPERATIONS) });
+  if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV FFmpeg media processor", ffmpeg: FFMPEG_BIN, operations: Object.keys(OPERATIONS), capacity: { activeJobs: MEDIA_ADMISSION.activeJobs, maxConcurrentJobs: MEDIA_ADMISSION.maxConcurrentJobs, scope: "per-process; use a shared queue for distributed capacity control" } });
   if (req.method === "POST" && req.url === "/media") {
+    const release = MEDIA_ADMISSION.tryEnter();
+    if (!release) {
+      // Refuse before parsing/buffering another large multipart body. The caller can retry.
+      req.resume();
+      res.setHeader("retry-after", "3");
+      return json(res, 429, { error: "The media processor is at its configured concurrency limit. Retry shortly.", retryable: true, maxConcurrentJobs: MEDIA_ADMISSION.maxConcurrentJobs });
+    }
+    // Hold capacity until the response has flushed so another large output is not admitted
+    // while this response still retains its result buffer. Release is idempotent for all exits.
+    res.once("finish", release);
+    res.once("close", release);
     try { await handleMedia(req, res); } catch (error) { console.error(error); if (!res.headersSent) json(res, 500, { error: error instanceof Error ? error.message : "Media processing failed." }); }
+    finally {
+      if (res.writableFinished || res.destroyed || !res.headersSent) release();
+      else { res.once("finish", release); res.once("close", release); }
+    }
     return;
   }
   json(res, 404, { error: "Not found." });

@@ -94,6 +94,19 @@ final class NativeAudioEngineTests: XCTestCase {
         XCTAssertLessThan(NativeAudioDsp.approximateLUFS([1, -1]), 0)
     }
 
+    func testNativeAudioSessionStoreRoundTripsPrivateSource() throws {
+        NativeAudioSessionStore.clear()
+        defer { NativeAudioSessionStore.clear() }
+        let source = Data(repeating: 0, count: 44)
+        try NativeAudioSessionStore.save(data: source, name: "round-trip.wav")
+        XCTAssertTrue(NativeAudioSessionStore.hasAvailable)
+        let restored = try XCTUnwrap(NativeAudioSessionStore.load())
+        XCTAssertEqual(restored.name, "round-trip.wav")
+        XCTAssertEqual(restored.data, source)
+        NativeAudioSessionStore.clear()
+        XCTAssertFalse(NativeAudioSessionStore.hasAvailable)
+    }
+
     func testNativeWavProcessorRoundTripsInspectsTrimsAndRejectsInvalidInput() throws {
         let tone: [Float] = (0..<8_000).map { index in
             if index < 800 || index > 7_200 { return 0 }

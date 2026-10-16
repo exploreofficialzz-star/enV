@@ -1,8 +1,8 @@
 # enV Audio Studios — Round 4 Implementation & Verification Audit
 
-**Date:** 16 October 2026
-**Baseline:** `enV-audio-studios-round3-2026-10-16.zip`
-**Specification sources:** `docs/audits/source-prompts/enV-audio-studios-full-agent-prompt.txt` and `docs/audits/source-prompts/enV-audio-music-studio-complete-spec.txt`
+**Date:** 16 October 2026  
+**Baseline:** `enV-audio-studios-round3-2026-10-16.zip`  
+**Specification sources:** `docs/audits/source-prompts/enV-audio-studios-full-agent-prompt.txt` and `docs/audits/source-prompts/enV-audio-music-studio-complete-spec.txt`  
 **Platforms:** Web TypeScript, Android Kotlin/Jetpack Compose, iOS Swift/SwiftUI, shared tool catalog.
 
 ## Executive result
@@ -90,7 +90,7 @@ ONNX Runtime's current documentation says WebGPU requires its browser-specific p
 - [ONNX Runtime WebGPU guide](https://onnxruntime.ai/docs/tutorials/web/ep-webgpu.html)
 - [ONNX Runtime Web setup/support matrix](https://onnxruntime.ai/docs/get-started/with-javascript/web.html)
 
-Recent public Moises reviews include mixed reports about separation quality, performance, input-channel selection, clarity of export flows, and crashes/slow sessions. The Google Play review page also includes user feedback asking for clearer multi-stem export and destination handling. These are self-selected reports, not representative market statistics; we used them as failure-mode prompts for progress/error feedback and export clarity rather than claiming they describe all customers.
+Recent public Moises reviews include mixed reports about separation quality, performance, input-channel selection, clarity of export flows, and crashes/slow sessions. The Google Play review page also includes user feedback asking for clearer multi-stem export and destination handling. These are self-selected reports, not representative market statistics; we used them as failure-mode prompts for progress/error feedback and export clarity rather than claiming they describe all customers. 
 
 - [Moises user reviews](https://www.trustpilot.com/review/moises.ai)
 - [Moises Google Play reviews](https://play.google.com/store/apps/details?id=ai.moises)

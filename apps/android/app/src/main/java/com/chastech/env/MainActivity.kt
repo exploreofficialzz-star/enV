@@ -1112,7 +1112,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
-        "audio" -> NativeAudioToolForm(tool)
+        "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)
         "ai" -> NativeAiToolForm(tool)
         "file-converter", "document-backend" -> NativeFileConverterToolForm(tool)
         "text" -> NativeTextToolForm(tool.id)
@@ -1391,6 +1391,61 @@ private fun NativeAudioWavJoinerForm(toolName: String) {
     }
 }
 
+/**
+ * App-private, short-lived handoff for the last source selected by a native WAV tool.
+ * The file never leaves the app sandbox. It is a convenience cache, not a backup;
+ * it expires after seven days and can be cleared explicitly by the user.
+ */
+private object NativeAudioSessionStore {
+    data class Source(val name: String, val bytes: ByteArray)
+    private const val PREFS = "env_audio_local_session"
+    private const val KEY_NAME = "name"
+    private const val KEY_SAVED_AT = "saved_at"
+    private const val FILE_NAME = "env-recent-audio-source.wav"
+    private const val MAX_BYTES = 250L * 1024 * 1024
+    private const val TTL_MILLIS = 7L * 24 * 60 * 60 * 1000
+
+    private fun file(context: android.content.Context) = java.io.File(context.filesDir, FILE_NAME)
+    private fun prefs(context: android.content.Context) = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+
+    fun hasAvailable(context: android.content.Context): Boolean {
+        val savedAt = prefs(context).getLong(KEY_SAVED_AT, 0L)
+        if (savedAt <= 0L || System.currentTimeMillis() - savedAt >= TTL_MILLIS || !file(context).isFile) {
+            if (savedAt > 0L) clear(context)
+            return false
+        }
+        val usable = file(context).length() in 44L..MAX_BYTES && prefs(context).getString(KEY_NAME, null) != null
+        if (!usable) clear(context)
+        return usable
+    }
+
+    fun save(context: android.content.Context, name: String, bytes: ByteArray): Boolean = runCatching {
+        require(bytes.size in 44..MAX_BYTES.toInt()) { "Only WAV files up to 250 MB can be kept for native handoff." }
+        val target = file(context)
+        val temp = java.io.File(context.filesDir, "$FILE_NAME.tmp")
+        java.io.FileOutputStream(temp).use { output -> output.write(bytes); output.fd.sync() }
+        if (!temp.renameTo(target)) {
+            temp.copyTo(target, overwrite = true)
+            temp.delete()
+        }
+        prefs(context).edit().putString(KEY_NAME, name).putLong(KEY_SAVED_AT, System.currentTimeMillis()).apply()
+    }.isSuccess
+
+    fun load(context: android.content.Context): Source? {
+        if (!hasAvailable(context)) return null
+        val bytes = file(context).readBytes()
+        val name = prefs(context).getString(KEY_NAME, null) ?: return null
+        if (bytes.size !in 44..MAX_BYTES.toInt()) { clear(context); return null }
+        return Source(name, bytes)
+    }
+
+    fun clear(context: android.content.Context) {
+        file(context).delete()
+        java.io.File(context.filesDir, "$FILE_NAME.tmp").delete()
+        prefs(context).edit().remove(KEY_NAME).remove(KEY_SAVED_AT).apply()
+    }
+}
+
 @Composable
 private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
     val context = LocalContext.current
@@ -1400,6 +1455,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
     var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
     var output by remember(operation) { mutableStateOf("") }
     var error by remember(operation) { mutableStateOf("") }
+    var sessionNotice by remember(operation) { mutableStateOf("") }
     var startSeconds by rememberSaveable(operation) { mutableStateOf("0") }
     var endSeconds by rememberSaveable(operation) { mutableStateOf("5") }
     var gainPercent by rememberSaveable(operation) { mutableStateOf("100") }
@@ -1441,6 +1497,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
                 val info = NativeAudioWavProcessor.process(bytes, "inspector")
                 selectedBytes = bytes
                 selectedName = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "selected.wav"
+                sessionNotice = if (NativeAudioSessionStore.save(context, selectedName, bytes)) "Source saved in this app's private storage for up to 7 days. It stays on this device." else "Source is ready in this tool, but the app could not save a reusable local handoff."
                 endSeconds = info.durationSeconds?.let { String.format(Locale.US, "%.3f", it) } ?: "5"
                 output = info.report
                 error = ""
@@ -1457,12 +1514,30 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
         } else pendingExport = null
     }
 
+    fun restoreLastSource() {
+        scope.launch {
+            try {
+                val stored = withContext(Dispatchers.IO) { NativeAudioSessionStore.load(context) } ?: error("There is no reusable local audio source. Select a WAV file first.")
+                val info = withContext(Dispatchers.Default) { NativeAudioWavProcessor.process(stored.bytes, "inspector") }
+                selectedBytes = stored.bytes; selectedName = stored.name
+                endSeconds = info.durationSeconds?.let { String.format(Locale.US, "%.3f", it) } ?: "5"
+                output = info.report; error = ""
+                sessionNotice = "Restored ${stored.name} from this device's private local session. Nothing was uploaded."
+            } catch (cause: Throwable) {
+                error = cause.message ?: "Could not restore the saved local audio source."
+                sessionNotice = "Choose the source file again if the local handoff is unavailable."
+            }
+        }
+    }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
     val analyzer = operation in setOf("inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Text(toolName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Text("Native offline WAV tool. Processing happens on this device. This native path supports uncompressed PCM WAV (8/16/24/32-bit) and 32-bit float WAV; use the browser-local tool for compressed input such as MP3, M4A or OGG.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) { Text(if (selectedName.isBlank()) "Choose WAV file" else "Choose another WAV · $selectedName") }
+        if (sessionNotice.isNotBlank()) Text(sessionNotice, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        if (selectedBytes == null && NativeAudioSessionStore.hasAvailable(context)) OutlinedButton(onClick = { restoreLastSource() }, modifier = Modifier.fillMaxWidth()) { Text("Restore previous local source") }
+        if (NativeAudioSessionStore.hasAvailable(context)) TextButton(onClick = { NativeAudioSessionStore.clear(context); sessionNotice = "Saved source removed from this device. Current in-memory selection is unchanged." }, modifier = Modifier.fillMaxWidth()) { Text("Forget saved source") }
         if (!analyzer) {
             when (operation) {
                 "trim" -> { InputField(startSeconds, { startSeconds = it }, "Start (seconds)", singleLine = true); InputField(endSeconds, { endSeconds = it }, "End (seconds)", singleLine = true) }
@@ -1724,6 +1799,7 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
 private fun NativeAudioToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val operation = NativeAudioEngine.operationFor(tool) ?: return
+    if (operation == "live-video-studio") { NativeMusicLiveVideoStudio(); return }
     if (operation == "record-mic") {
         NativeAudioRecorderToolForm(tool.name)
         return

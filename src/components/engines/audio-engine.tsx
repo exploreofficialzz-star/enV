@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AudioMusicStudio, AudioStudioGuide } from "@/components/engines/audio-music-studio";
+import { MusicLiveVideoStudio } from "@/components/engines/music-live-video-studio";
 import { AudioExtraTool } from "@/components/engines/audio-extra-tools";
 import { approximateLufs, amplitudeDbfs, estimateBitrateKbpsFromSize, estimateCompressedAudioBytes, estimatePcmAudioBytes, humReduceSamples, noiseGateSamples, reduceVoiceNoiseSamples, spectrogramData, trimSilenceBounds } from "@/lib/engines/audio-studio";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { downloadBlob } from "@/lib/utils";
 import { createServerMediaAdapter, getServerMediaConfig } from "@/lib/media/media-backends";
 import { MediaJobController } from "@/lib/media/media-runtime";
 import { apiUrl } from "@/lib/api/base";
+import { deleteAudioSession, loadAudioSessionFile } from "@/lib/engines/audio-session-storage";
 
 type Props = { op: string; toolId?: string; initialMode?: string };
 
@@ -147,9 +149,9 @@ async function spectrogramPng(buffer: AudioBuffer): Promise<Blob> {
   const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
   const context = canvas.getContext("2d"); if (!context) throw new Error("Canvas is unavailable in this browser.");
   const pixels = spectrogramData(buffer.getChannelData(0), width, height);
-  const imageData = context.createImageData(width, height);
-  imageData.data.set(pixels);
-  context.putImageData(imageData, 0, 0);
+  const imagePixels = new Uint8ClampedArray(pixels.length);
+  imagePixels.set(pixels);
+  context.putImageData(new ImageData(imagePixels, width, height), 0, 0);
   return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not create the spectrogram image.")), "image/png"));
 }
 
@@ -322,6 +324,7 @@ async function runLocalAudioOperation(op: string, file: File, startSeconds: numb
 export function AudioEngine({ op, toolId = "", initialMode }: Props) {
   // Keep conditional routing in a hook-free shell. Moving between audio routes must
   // never change the number/order of hooks called by a single mounted component.
+  if (toolId === "music-live-video-studio") return <MusicLiveVideoStudio />;
   if (toolId === "music-studio" || toolId.startsWith("music-") || op === "music-studio") return <AudioMusicStudio mode={initialMode ?? (toolId.replace("music-", "") || "separate")} />;
   if (op.startsWith("studio-")) return <AudioStudioGuide studio={op.slice("studio-".length)} />;
   const guidePlatform = platformFromOp(op);
@@ -355,6 +358,9 @@ function AudioEngineBody({ op, toolId = "" }: Props) {
   const isJoiner = op === "joiner";
   const isLocalFileTool = LOCAL_AUDIO_OPS.has(op);
   const [localFile, setLocalFile] = useState<File | null>(null);
+  const [sessionLoadStatus, setSessionLoadStatus] = useState("");
+  const [sourceSessionId, setSourceSessionId] = useState<string | null>(null);
+  const didChooseFileRef = useRef(false);
   const [startSeconds, setStartSeconds] = useState("0");
   const [endSeconds, setEndSeconds] = useState("30");
   const [volume, setVolume] = useState("100");
@@ -369,6 +375,40 @@ function AudioEngineBody({ op, toolId = "" }: Props) {
   const [localRate, setLocalRate] = useState("2");
   const [tempoRate, setTempoRate] = useState("1");
   const [resampleRate, setResampleRate] = useState("44100");
+
+  useEffect(() => {
+    const sessionId = new URLSearchParams(window.location.search).get("audioSessionId");
+    if (!sessionId) return;
+    setSourceSessionId(sessionId);
+    let active = true;
+    void loadAudioSessionFile(sessionId).then((restored) => {
+      if (!active || didChooseFileRef.current) return;
+      if (restored) {
+        setLocalFile(restored);
+        setSessionLoadStatus(`Restored “${restored.name}” from the local Audio Studio session. Nothing has been uploaded.`);
+      } else {
+        setSourceSessionId(null);
+        setSessionLoadStatus("The linked local audio session is unavailable or expired. Select the source file again.");
+      }
+    }).catch(() => {
+      if (active) setSessionLoadStatus("Could not restore the local audio session. Select the source file again.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  const forgetStoredAudioSession = async () => {
+    if (!sourceSessionId) return;
+    try {
+      await deleteAudioSession(sourceSessionId);
+      setSourceSessionId(null);
+      const current = new URL(window.location.href);
+      current.searchParams.delete("audioSessionId");
+      window.history.replaceState(null, "", `${current.pathname}${current.search}${current.hash}`);
+      setSessionLoadStatus("Stored local handoff removed. The selected file remains in this tool's memory until you reset or leave.");
+    } catch (cause) {
+      setSessionLoadStatus(cause instanceof Error ? `Could not remove the stored local handoff: ${cause.message}` : "Could not remove the stored local handoff.");
+    }
+  };
 
   const runServerAudio = async () => {
     try {
@@ -516,18 +556,22 @@ function AudioEngineBody({ op, toolId = "" }: Props) {
     <div><h2 className="text-lg font-semibold">{{"server-mp3":"Audio to MP3","server-wav":"Audio to WAV","server-ogg":"Audio to OGG","server-flac":"Audio to FLAC","server-volume":"Audio Volume Control","server-bitrate":"Audio Bitrate Converter","server-sample-rate":"Audio Sample Rate Converter","server-channels":"Audio Channel Converter","server-merge":"Audio Merger"}[op] ?? "Audio Converter"}</h2><p className="mt-1 text-sm text-subtle">Convert the selected audio using the enV FFmpeg media processor.</p></div>
     <AudioMediaProcessorStatus />
     <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm"><strong>Upload disclosure</strong><p className="mt-1 text-subtle">When you start conversion, the selected audio file is uploaded to the configured media endpoint for processing. Do not use this server route for sensitive audio unless you trust the endpoint. Local-only tools are clearly labeled separately.</p></div>
-    {op === "server-merge" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" multiple accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setFiles(Array.from(e.target.files ?? []))}/> : <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setLocalFile(e.target.files?.[0] ?? null)}/>}
+    {sessionLoadStatus ? <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-subtle" role="status">{sessionLoadStatus}</p> : null}
+    {sourceSessionId ? <button type="button" className="min-h-9 rounded-md border border-border px-3 py-2 text-xs hover:bg-surface-2" onClick={() => void forgetStoredAudioSession()}>Forget saved local handoff</button> : null}
+    {op === "server-merge" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" multiple accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => { const selected = Array.from(e.target.files ?? []); if (selected.length) { didChooseFileRef.current = true; setFiles(selected); } e.currentTarget.value = ""; }}/> : <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => { const selected = e.target.files?.[0]; if (selected) { didChooseFileRef.current = true; setLocalFile(selected); setSessionLoadStatus("Using the file selected in this tool; the previous handoff was not changed."); } e.currentTarget.value = ""; }}/>} 
     {op === "server-volume" ? <label className="block text-sm">Volume (%)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" max="500" value={volume} onChange={(e)=>setVolume(e.target.value)} /></label> : null}
     {op === "server-bitrate" ? <label className="block text-sm">MP3 bitrate (kbps)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="32" max="512" value={bitrate} onChange={(e)=>setBitrate(e.target.value)} /></label> : null}
     {op === "server-sample-rate" ? <label className="block text-sm">Sample rate (Hz)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="8000" max="192000" value={sampleRate} onChange={(e)=>setSampleRate(e.target.value)} /></label> : null}
     {op === "server-channels" ? <label className="block text-sm">Channels<select className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" value={channels} onChange={(e)=>setChannels(e.target.value)}><option value="1">Mono</option><option value="2">Stereo</option></select></label> : null}
-    <div className="flex gap-2"><Button type="button" onClick={() => void runServerAudio()}>Convert & download</Button><Button type="button" variant="ghost" onClick={() => { setLocalFile(null); setResults([]); setError(null); }}>Reset</Button></div>
+    <div className="flex gap-2"><Button type="button" onClick={() => void runServerAudio()}>Convert & download</Button><Button type="button" variant="ghost" onClick={() => { didChooseFileRef.current = true; setLocalFile(null); setResults([]); setError(null); setSessionLoadStatus("Source cleared from this tool. The stored dashboard session remains until it expires or is cleared there."); }}>Reset</Button></div>
     <ErrorBanner message={error}/>{results.length ? <ResultPanel items={results} filename={`env-${op}.txt`}/> : null}
   </div>;
 
   if (isLocalFileTool) return <div className="space-y-5">
     <div><h2 className="text-lg font-semibold">{op === "inspector" ? "Audio File Inspector" : op === "duration" ? "Audio Duration Tool" : op === "waveform" ? "Audio Waveform Generator" : `Audio ${op.replaceAll("-", " ")}`}</h2><p className="mt-1 text-sm text-subtle">Process the selected audio locally in your browser. Files are not uploaded by this tool.</p></div>
-    {op !== "webcodecs-audio" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => setLocalFile(e.target.files?.[0] ?? null)}/> : null}
+    {sessionLoadStatus ? <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-subtle" role="status">{sessionLoadStatus}</p> : null}
+    {sourceSessionId ? <button type="button" className="min-h-9 rounded-md border border-border px-3 py-2 text-xs hover:bg-surface-2" onClick={() => void forgetStoredAudioSession()}>Forget saved local handoff</button> : null}
+    {op !== "webcodecs-audio" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e => { const selected = e.target.files?.[0]; if (selected) { didChooseFileRef.current = true; setLocalFile(selected); setSessionLoadStatus("Using the file selected in this tool; the previous handoff was not changed."); } e.currentTarget.value = ""; }}/> : null}
     {op === "trim" ? <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Start (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" step="0.01" value={startSeconds} onChange={e => setStartSeconds(e.target.value)}/></label><label className="text-sm">End (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" step="0.01" value={endSeconds} onChange={e => setEndSeconds(e.target.value)}/></label></div> : null}
     {op === "fade-in" || op === "fade-out" ? <label className="block text-sm">Fade length (seconds)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.01" max="10" step="0.1" value={fadeSeconds} onChange={(e) => setFadeSeconds(e.target.value)} /></label> : null}
     {op === "voice-noise-reducer" ? <label className="block text-sm">Noise reduction strength: {noiseStrength}%<input className="mt-1 block w-full" type="range" min="0" max="100" step="5" value={noiseStrength} onChange={(e) => setNoiseStrength(e.target.value)} /><span className="text-xs text-muted">Local adaptive high-pass + soft gate; may affect quiet speech.</span></label> : null}
@@ -539,7 +583,7 @@ function AudioEngineBody({ op, toolId = "" }: Props) {
     {op === "audio-tempo-change" ? <label className="block text-sm">Playback rate (pitch changes too)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0.5" max="1.5" step="0.05" value={tempoRate} onChange={(e) => setTempoRate(e.target.value)} /></label> : null}
     {op === "resample-local" ? <label className="block text-sm">Output sample rate (Hz)<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="8000" max="192000" step="1000" value={resampleRate} onChange={(e) => setResampleRate(e.target.value)} /></label> : null}
     {op === "channels-local" ? <label className="block text-sm">Output channels<select className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" value={channels} onChange={(e) => setChannels(e.target.value)}><option value="1">Mono</option><option value="2">Stereo</option></select></label> : null}
-    <div className="flex gap-2"><Button type="button" onClick={() => void runLocal()}>{["inspector","duration","peak","rms","silence","channel-balance","dc-offset","audio-lufs-meter","webcodecs-audio"].includes(op) ? "Analyze audio" : "Process & download"}</Button><Button type="button" variant="ghost" onClick={() => { setLocalFile(null); setResults([]); setError(null); }}>Reset</Button></div>
+    <div className="flex gap-2"><Button type="button" onClick={() => void runLocal()}>{["inspector","duration","peak","rms","silence","channel-balance","dc-offset","audio-lufs-meter","webcodecs-audio"].includes(op) ? "Analyze audio" : "Process & download"}</Button><Button type="button" variant="ghost" onClick={() => { didChooseFileRef.current = true; setLocalFile(null); setResults([]); setError(null); setSessionLoadStatus("Source cleared from this tool. The stored dashboard session remains until it expires or is cleared there."); }}>Reset</Button></div>
     <ErrorBanner message={error}/>{results.length ? <ResultPanel items={results} filename={`env-${op}.txt`}/> : null}
   </div>;
 

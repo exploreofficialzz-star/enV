@@ -1,7 +1,7 @@
 # enV Audio Studios — Round 3 Enhancement & Verification Audit
 
-**Date:** 16 October 2026
-**Baseline:** The full enV project previously audited in Audio Studios rounds 1 and 2, plus the supplied `enV-audio-studios-full-agent-prompt.txt` and `enV-audio-music-studio-complete-spec.txt`.
+**Date:** 16 October 2026  
+**Baseline:** The full enV project previously audited in Audio Studios rounds 1 and 2, plus the supplied `enV-audio-studios-full-agent-prompt.txt` and `enV-audio-music-studio-complete-spec.txt`.  
 **Platforms:** Web TypeScript, Android Kotlin/Compose, iOS Swift/SwiftUI and the shared catalog.
 
 ## Executive result

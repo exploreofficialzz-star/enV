@@ -1,12 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Activity, ArrowRight, AudioLines, Captions, CheckCircle2, ChevronRight, FileAudio, Gauge, Headphones, Mic, Music2, Radio, Scissors, SlidersHorizontal, Sparkles, Upload, Waves, Zap } from "lucide-react";
 import { strToU8, zipSync } from "fflate";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { downloadBlob } from "@/lib/utils";
 import { browserSeparationLimitSeconds, estimateBpm, estimateBrowserSeparationWorkingSetBytes, estimateKey, isSupportedDemucsStemTensorDims, suggestCapoShapes, suggestDiatonicChords } from "@/lib/engines/audio-studio";
 import { deleteStoredMusicTake, deleteStoredMusicTakes, listStoredMusicTakes, musicSourceKey, saveStoredMusicTake, type StoredMusicTake } from "@/lib/engines/audio-music-storage";
+import { deleteAudioSession, loadAudioSessionFile, saveAudioSessionFile } from "@/lib/engines/audio-session-storage";
+import { connectVocalPreset, VOCAL_PRESETS, type VocalPresetId } from "@/lib/engines/vocal-presets";
 
 type StudioMode = "separate" | "mixer" | "practice" | "duet" | "karaoke";
+const MUSIC_STUDIO_TABS = [
+  { label: "Separate", slug: "music-separator", key: "separate", Icon: Scissors },
+  { label: "Stem mixer", slug: "music-stem-mixer", key: "mixer", Icon: SlidersHorizontal },
+  { label: "Practice", slug: "music-practice", key: "practice", Icon: Headphones },
+  { label: "Duet / record", slug: "music-duet", key: "duet", Icon: Mic },
+  { label: "Karaoke", slug: "music-karaoke", key: "karaoke", Icon: Music2 },
+] as const;
 type StemTrack = { id: string; name: string; buffer: AudioBuffer; volume: number; muted: boolean; solo: boolean };
 type VocalTake = { id: string; name: string; blob: Blob; startAt: number; url: string; sourceKey: string; savedLocally: boolean };
 type LiveMixerState = { context: AudioContext; sources: AudioBufferSourceNode[]; gains: Map<string, GainNode>; masterGain: GainNode; startOffset: number; startedAt: number; playbackRate: number; loopStart: number; loopEnd: number; looping: boolean };
@@ -232,6 +242,15 @@ async function separateWithDemucs(
 
 function makeId() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 
+function updateAudioSessionQuery(sessionId: string | null) {
+  if (typeof window === "undefined") return;
+  const current = new URL(window.location.href);
+  if (sessionId) current.searchParams.set("audioSessionId", sessionId);
+  else current.searchParams.delete("audioSessionId");
+  window.history.replaceState(null, "", `${current.pathname}${current.search}${current.hash}`);
+}
+
+
 function currentLiveMixerPosition(live: LiveMixerState | null): number | null {
   if (!live) return null;
   const elapsed = Math.max(0, live.context.currentTime - live.startedAt) * live.playbackRate;
@@ -241,6 +260,17 @@ function currentLiveMixerPosition(live: LiveMixerState | null): number | null {
   }
   return position;
 }
+
+const AUDIO_FILE_HANDOFF_SLUGS = new Set([
+  "audio-to-wav", "audio-to-wav-server", "audio-to-mp3-server", "audio-to-ogg-server", "audio-to-flac-server",
+  "audio-sample-rate-converter", "audio-channel-converter", "audio-bitrate-converter", "audio-to-mono", "audio-to-stereo",
+  "audio-trimmer", "audio-fade-in", "audio-fade-out", "audio-volume-control", "audio-reverser", "audio-normalizer",
+  "voice-noise-reducer", "voice-noise-gate", "audio-hum-reducer", "audio-trim-silence", "audio-pitch-shift", "audio-tempo-change",
+  "audio-compressor", "audio-eq-simple", "audio-file-inspector", "audio-peak-meter", "audio-rms-meter", "audio-silence-detector",
+  "audio-dc-offset-checker", "audio-waveform-generator", "audio-lufs-meter", "audio-spectrogram", "webcodecs-audio-checker",
+  "audio-to-text", "audio-to-subtitles", "audio-joiner-local", "audio-joiner", "audio-merger", "music-studio", "music-separator",
+  "music-duet", "music-karaoke", "music-stem-mixer", "music-practice",
+]);
 
 const STUDIO_LINKS: Array<{ title: string; href: string; text: string }> = [
   { title: "Audio Convert Studio", href: "/tools/audio/audio-convert-studio", text: "WAV conversion, channels, rate and format workflows." },
@@ -253,56 +283,164 @@ const STUDIO_LINKS: Array<{ title: string; href: string; text: string }> = [
 ];
 
 export function AudioStudioGuide({ studio = "platform", initialPlatform }: { studio?: string; initialPlatform?: string }) {
-  const headings: Record<string, { title: string; summary: string }> = {
-    convert: { title: "Audio Convert Studio", summary: "Choose a reliable local WAV path or a clearly labeled server conversion when FFmpeg is configured." },
-    edit: { title: "Audio Edit Studio", summary: "Make non-destructive choices on the original file, preview results, then export a new WAV." },
-    analyze: { title: "Audio Analyze Studio", summary: "Inspect real decoded audio; loudness is marked approximate unless a verified BS.1770 engine is configured." },
-    calc: { title: "Audio Calc Studio", summary: "Use transparent math for file size, bitrate and timing without uploading media." },
-    transcribe: { title: "Audio Transcribe Studio", summary: "Speech recognition depends on the configured transcription endpoint; setup and connectivity errors are shown by the transcription tool." },
-    import: { title: "Audio Import Studio", summary: "Select local files or record with microphone permission. No DRM streaming downloaders are offered." },
-    platform: { title: "Audio Platform Guide Studio", summary: "Guidance only, not a guarantee of platform acceptance; confirm delivery specs with the destination service." },
-  };
-  const info = headings[studio] ?? headings.platform;
   const [platform, setPlatform] = useState(initialPlatform ?? "podcast");
-  const presets: Record<string, { sample: string; format: string; loudness: string; bitrate: string; note: string }> = {
-    podcast: { sample: "44.1 or 48 kHz", format: "MP3/AAC for distribution; WAV for master", loudness: "−16 LUFS stereo / −19 LUFS mono are common podcast targets", bitrate: "128–192 kbps stereo is common", note: "Podcast hosting requirements vary. Keep a high-quality master and check the host's published requirements." },
-    discord: { sample: "44.1 or 48 kHz source", format: "Opus is used in voice paths", loudness: "No universal upload LUFS target", bitrate: "Voice bitrate depends on server/channel configuration", note: "Call quality is primarily controlled by the call and channel configuration." },
-    spotify: { sample: "Preserve the production master; 44.1 kHz is common", format: "Lossless delivery master (WAV/FLAC) where requested", loudness: "−14 LUFS is a playback-normalization reference, not a mastering requirement", bitrate: "Keep a lossless master", note: "Streaming services transcode for playback; normalization does not mean every master should be forced to one loudness." },
-    instagram: { sample: "44.1 or 48 kHz source", format: "AAC in typical video workflows", loudness: "No universal creator-side LUFS acceptance target", bitrate: "Keep the highest-quality source supported by your editor", note: "Audio normally arrives as part of video; the platform may re-encode it." },
-    "apple-music": { sample: "Use the native master resolution supported by the distributor", format: "WAV/PCM or the distributor's requested lossless format", loudness: "No universal delivery LUFS target", bitrate: "Do not convert to a lower bitrate unless your workflow requires it", note: "Delivery specifications depend on distributor and asset type; this guide is not an acceptance guarantee." },
-    youtube: { sample: "48 kHz is a practical video-workflow target", format: "AAC, Opus or PCM depending on the video pipeline", loudness: "Playback normalization varies; avoid clipping", bitrate: "Keep high-quality source audio; the video encoder controls final output", note: "The uploaded video is commonly transcoded. These are workflow hints, not a universal platform acceptance guarantee." },
-    tiktok: { sample: "44.1 or 48 kHz source", format: "AAC audio embedded in the video workflow is common", loudness: "No universal creator-side LUFS acceptance target", bitrate: "Keep a high-quality audio source; export settings depend on the video editor", note: "TikTok may transcode uploaded video/audio; review the final upload on-device." },
-    twitch: { sample: "44.1 or 48 kHz source", format: "AAC in common streaming pipelines", loudness: "Avoid clipping; use a consistent broadcast mix", bitrate: "Encoder, stream profile and channel configuration control delivery", note: "Tune your streaming encoder and monitoring chain; this guide cannot guarantee platform acceptance." },
+  const [file, setFile] = useState<File | null>(null);
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [fileMeta, setFileMeta] = useState<{ duration: string; rate: string; channels: string } | null>(null);
+  const [waveform, setWaveform] = useState<number[]>([]);
+  const [metaError, setMetaError] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [persistenceNotice, setPersistenceNotice] = useState("");
+  const sourceLoadSequenceRef = useRef(0);
+  const pickerRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
+  const workspaces: Record<string, { title: string; eyebrow: string; subtitle: string; icon: typeof AudioLines; accent: string; actions: Array<{ title: string; slug: string; detail: string; icon: typeof AudioLines; badge?: string }> }> = {
+    convert: { title: "Convert Studio", eyebrow: "AUDIO WORKSPACE / 01", subtitle: "Convert formats, sample rates and channel layouts from one focused workspace.", icon: AudioLines, accent: "from-sky-500/15 via-cyan-500/5 to-transparent", actions: [
+      { title: "Convert to WAV", slug: "audio-to-wav", detail: "Local PCM export", icon: FileAudio, badge: "LOCAL" }, { title: "Convert format", slug: "audio-to-mp3-server", detail: "MP3, OGG or FLAC via configured media processor", icon: ArrowRight, badge: "SERVER" }, { title: "Sample rate", slug: "audio-sample-rate-converter", detail: "Resample for your delivery workflow", icon: Activity }, { title: "Channels", slug: "audio-channel-converter", detail: "Mono and stereo conversion", icon: SlidersHorizontal }, { title: "Bitrate", slug: "audio-bitrate-converter", detail: "Adjust compressed output bitrate", icon: Gauge },
+    ] },
+    edit: { title: "Edit Studio", eyebrow: "AUDIO WORKSPACE / 02", subtitle: "Shape a recording with practical edits and cleanup tools. Keep the original untouched.", icon: Scissors, accent: "from-violet-500/15 via-fuchsia-500/5 to-transparent", actions: [
+      { title: "Trim & cut", slug: "audio-trimmer", detail: "Choose a precise start and end", icon: Scissors, badge: "START HERE" }, { title: "Fade in / out", slug: "audio-fade-in", detail: "Smooth the beginning or ending", icon: Waves }, { title: "Clean voice", slug: "voice-noise-reducer", detail: "Reduce steady background noise", icon: Activity }, { title: "Remove hum", slug: "audio-hum-reducer", detail: "Target 50 Hz or 60 Hz hum", icon: Radio }, { title: "EQ & compression", slug: "audio-eq-simple", detail: "Tone shaping and dynamics", icon: SlidersHorizontal }, { title: "Normalize", slug: "audio-normalizer", detail: "Set a safer peak level", icon: Gauge },
+    ] },
+    analyze: { title: "Analyze Studio", eyebrow: "AUDIO WORKSPACE / 03", subtitle: "Inspect levels, structure and spectral content before making changes.", icon: Activity, accent: "from-emerald-500/15 via-teal-500/5 to-transparent", actions: [
+      { title: "File inspector", slug: "audio-file-inspector", detail: "Duration, channels, frames and sample rate", icon: FileAudio, badge: "OVERVIEW" }, { title: "Peak & RMS", slug: "audio-peak-meter", detail: "Measure signal level and headroom", icon: Gauge }, { title: "Silence detector", slug: "audio-silence-detector", detail: "Find quiet regions and gaps", icon: Waves }, { title: "Waveform image", slug: "audio-waveform-generator", detail: "Export a visual waveform", icon: AudioLines }, { title: "Spectrogram", slug: "audio-spectrogram", detail: "Inspect frequency energy over time", icon: Activity }, { title: "Loudness estimate", slug: "audio-lufs-meter", detail: "RMS-based estimate, not LUFS certification", icon: Radio },
+    ] },
+    calc: { title: "Audio Calculator", eyebrow: "AUDIO WORKSPACE / 04", subtitle: "Plan delivery size, bitrate and duration with fast, transparent calculations.", icon: Gauge, accent: "from-amber-500/15 via-orange-500/5 to-transparent", actions: [
+      { title: "Bitrate ↔ size", slug: "audio-bitrate-calculator", detail: "Solve for bitrate or estimated file size", icon: Gauge, badge: "POPULAR" }, { title: "File size", slug: "audio-file-size-calculator", detail: "Compare compressed and PCM estimates", icon: FileAudio }, { title: "Duration", slug: "audio-duration-tool", detail: "Calculate audio runtime", icon: Activity },
+    ] },
+    transcribe: { title: "Transcription Studio", eyebrow: "AUDIO WORKSPACE / 05", subtitle: "Turn speech into text or subtitle files when the transcription service is configured.", icon: Captions, accent: "from-blue-500/15 via-indigo-500/5 to-transparent", actions: [
+      { title: "Audio to text", slug: "audio-to-text", detail: "Generate an editable transcript", icon: Captions, badge: "STT SERVICE" }, { title: "Audio to subtitles", slug: "audio-to-subtitles", detail: "Create timed subtitle output", icon: FileAudio, badge: "STT SERVICE" },
+    ] },
+    import: { title: "Record & Import", eyebrow: "AUDIO WORKSPACE / 06", subtitle: "Bring in a local recording, capture a take, or generate utility audio.", icon: Mic, accent: "from-rose-500/15 via-pink-500/5 to-transparent", actions: [
+      { title: "Record audio", slug: "audio-recorder", detail: "Capture microphone audio to WAV", icon: Mic, badge: "LOCAL" }, { title: "Join recordings", slug: "audio-joiner-local", detail: "Arrange files and export one WAV", icon: AudioLines }, { title: "Tone generator", slug: "audio-tone-generator", detail: "Create a test tone or noise", icon: Radio }, { title: "Metronome", slug: "audio-metronome", detail: "Set tempo and generate click tracks", icon: Activity }, { title: "Music Studio", slug: "music-studio", detail: "Separate stems, practice and record a duet", icon: Music2, badge: "FLAGSHIP" },
+    ] },
+    platform: { title: "Delivery Guide", eyebrow: "AUDIO WORKSPACE / 07", subtitle: "Pick a destination to view practical export references, then open the relevant tool.", icon: Headphones, accent: "from-cyan-500/15 via-blue-500/5 to-transparent", actions: [
+      { title: "Prepare a master", slug: "audio-file-inspector", detail: "Check your source before delivery", icon: FileAudio }, { title: "Measure levels", slug: "audio-lufs-meter", detail: "Compare an approximate loudness reading", icon: Gauge }, { title: "Convert format", slug: "audio-to-wav", detail: "Create a local WAV master", icon: AudioLines },
+    ] },
   };
-  const p = presets[platform];
-  const links: Record<string, Array<[string, string]>> = {
-    convert: [["Audio to WAV", "audio-to-wav"], ["Audio to MP3 (server)", "audio-to-mp3-server"], ["Audio Channel Converter", "audio-channel-converter"], ["Sample-rate Converter", "audio-sample-rate-converter"], ["Bitrate Converter", "audio-bitrate-converter"]],
-    edit: [["Audio Trimmer", "audio-trimmer"], ["Fade In", "audio-fade-in"], ["Fade Out", "audio-fade-out"], ["Peak Normalizer", "audio-normalizer"], ["Reverse Audio", "audio-reverser"], ["Noise Reducer", "voice-noise-reducer"], ["Noise Gate", "voice-noise-gate"], ["Hum Reducer", "audio-hum-reducer"], ["Silence Trim", "audio-trim-silence"], ["Pitch / Speed", "audio-pitch-shift"], ["Tempo Change", "audio-tempo-change"], ["Compressor", "audio-compressor"], ["3-band EQ", "audio-eq-simple"]],
-    analyze: [["File Inspector", "audio-file-inspector"], ["Peak Meter", "audio-peak-meter"], ["RMS Meter", "audio-rms-meter"], ["Silence Detector", "audio-silence-detector"], ["DC Offset", "audio-dc-offset-checker"], ["Waveform PNG", "audio-waveform-generator"], ["LUFS Estimate", "audio-lufs-meter"], ["Spectrogram", "audio-spectrogram"]],
-    calc: [["Bitrate Calculator", "audio-bitrate-calculator"], ["File Size Calculator", "audio-file-size-calculator"], ["Duration Tool", "audio-duration-tool"]],
-    transcribe: [["Audio to Text", "audio-to-text"], ["Audio to Subtitles", "audio-to-subtitles"]],
-    import: [["Audio Recorder", "audio-recorder"], ["Tone Generator", "audio-tone-generator"], ["Metronome", "audio-metronome"], ["Local Audio Joiner", "audio-joiner-local"]],
-    platform: [],
+  const w = workspaces[studio] ?? workspaces.platform;
+  const Icon = w.icon;
+  const presets: Record<string, { format: string; sample: string; loudness: string; bitrate: string; note: string }> = {
+    podcast: { format: "MP3/AAC for publishing · WAV master", sample: "44.1 or 48 kHz", loudness: "−16 LUFS stereo / −19 LUFS mono are common targets", bitrate: "128–192 kbps stereo is common", note: "Check your hosting provider's current requirements." },
+    discord: { format: "Opus in voice workflows", sample: "44.1 or 48 kHz source", loudness: "No universal upload target", bitrate: "Depends on channel and call settings", note: "Call quality is also controlled by codec and network conditions." },
+    spotify: { format: "Lossless delivery master when requested", sample: "Preserve the production master; 44.1 kHz is common", loudness: "−14 LUFS is a playback-normalization reference, not a mastering mandate", bitrate: "Keep a lossless master", note: "Confirm distributor delivery requirements." },
+    instagram: { format: "AAC in common video workflows", sample: "44.1 or 48 kHz source", loudness: "No universal creator-side target", bitrate: "Keep a high-quality source", note: "The platform may re-encode video and audio." },
+    "apple-music": { format: "WAV/PCM or distributor-requested lossless format", sample: "Preserve the native master resolution where supported", loudness: "No universal delivery LUFS target", bitrate: "Avoid unnecessary lossy conversion", note: "Requirements depend on distributor and asset type." },
+    youtube: { format: "AAC, Opus or PCM depending on video pipeline", sample: "48 kHz is practical for video workflows", loudness: "Playback normalization varies; avoid clipping", bitrate: "Keep high-quality source audio", note: "These are workflow hints, not acceptance guarantees." },
+    tiktok: { format: "AAC commonly embedded in video", sample: "44.1 or 48 kHz source", loudness: "No universal creator-side target", bitrate: "Keep a high-quality source", note: "Review the final upload on-device." },
+    twitch: { format: "AAC in common streaming pipelines", sample: "44.1 or 48 kHz source", loudness: "Avoid clipping; use a consistent mix", bitrate: "Set by streaming encoder/profile", note: "Monitor the actual stream output." },
   };
-  return <section className="space-y-5">
-    <div><h2 className="text-xl font-semibold">{info.title}</h2><p className="mt-1 text-sm text-muted-foreground">{info.summary}</p></div>
-    {studio === "platform" ? <div className="space-y-4 rounded-xl border border-border p-4">
-      <div><p className="mb-2 text-sm font-medium">Choose a platform</p><div className="flex flex-wrap gap-2" role="group" aria-label="Audio platform guide">{[["Podcast", "podcast"], ["Discord", "discord"], ["Spotify", "spotify"], ["Instagram", "instagram"], ["Apple Music", "apple-music"], ["YouTube", "youtube"], ["TikTok", "tiktok"], ["Twitch", "twitch"]].map(([label, value]) => <button key={value} type="button" aria-pressed={platform === value} onClick={() => setPlatform(value)} className={`min-h-10 rounded-full border px-4 py-2 text-sm ${platform === value ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-surface-2"}`}>{label}</button>)}</div></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[440px] border-collapse text-left text-sm"><thead><tr className="border-b border-border"><th scope="col" className="px-3 py-2 font-semibold">Setting</th><th scope="col" className="px-3 py-2 font-semibold">Practical guidance</th></tr></thead><tbody>{[["Sample rate", p.sample], ["Format", p.format], ["Loudness", p.loudness], ["Bitrate", p.bitrate]].map(([label, value]) => <tr key={label} className="border-b border-border last:border-0"><th scope="row" className="w-32 px-3 py-3 align-top font-medium">{label}</th><td className="px-3 py-3">{value}</td></tr>)}</tbody></table></div>
-      <p className="text-sm text-muted-foreground">{p.note}</p>
-      <p className="text-xs text-muted-foreground">Guidance only — not a platform acceptance guarantee. Check the destination's current specifications before delivery.</p>
-    </div> : null}
-    {studio === "transcribe" ? <div className="rounded-xl border border-amber-400/50 bg-amber-50/50 p-4 text-sm dark:bg-amber-950/15"><strong>Transcription depends on server configuration.</strong><p className="mt-1 text-muted-foreground">Choose Audio to Text or Audio to Subtitles below. If the STT service is not configured or reachable, enV reports that state rather than fabricating a transcript. Uploaded audio is sent to the configured transcription endpoint.</p></div> : null}
-    {studio === "import" ? <p className="rounded-xl border border-border p-4 text-sm">Use files you own or have rights to. enV does not download DRM-protected Spotify, Apple Music, Amazon Music or Tidal streams.</p> : null}
-    {studio === "analyze" ? <p className="rounded-xl border border-border p-4 text-sm">Peak and RMS are measured from decoded PCM. The LUFS tool is explicitly an RMS-based approximation; do not treat it as EBU R128/BS.1770 compliance certification.</p> : null}
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(links[studio] ?? []).map(([label, slug]) => <a key={slug} href={`/tools/audio/${slug}`} className="rounded-xl border border-border p-4 transition hover:bg-surface-2"><span className="font-medium">{label}</span><span className="mt-1 block text-xs text-muted-foreground">Open tool</span></a>)}</div>
-    {studio !== "platform" ? <div className="pt-1"><h3 className="mb-3 text-base font-semibold">All Audio Studios</h3><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{STUDIO_LINKS.map((item) => <a href={item.href} key={item.href} className="rounded-xl border border-border p-4 transition hover:bg-surface-2"><span className="font-medium">{item.title}</span><span className="mt-1 block text-sm text-muted-foreground">{item.text}</span></a>)}</div></div> : null}
+  const preset = presets[platform] ?? presets.podcast;
+  const onPickFile = useCallback(async (picked?: File, existingSessionId?: string) => {
+    const sequence = ++sourceLoadSequenceRef.current;
+    const next = picked ?? null;
+    const routeSessionId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("audioSessionId") : null;
+    const previousSessionId = sessionId ?? (!existingSessionId ? routeSessionId : null);
+    setFile(next); setFileMeta(null); setWaveform([]); setMetaError(""); setSessionId(null); setPersistenceNotice("");
+    if (previousSessionId && previousSessionId !== existingSessionId) {
+      try { await deleteAudioSession(previousSessionId); }
+      catch { if (sequence === sourceLoadSequenceRef.current) setPersistenceNotice("The previous saved handoff could not be removed from local browser storage."); }
+      if (sequence !== sourceLoadSequenceRef.current) return;
+    }
+    if (!existingSessionId && routeSessionId) updateAudioSessionQuery(null);
+    setAudioUrl(next ? URL.createObjectURL(next) : "");
+    if (!next) return;
+    if (next.size > 250 * 1024 * 1024) {
+      setMetaError("This dashboard preview and cross-tool handoff support files up to 250 MB. Select a shorter file for the browser workflow.");
+      setPersistenceNotice("The file was not copied into browser storage.");
+      return;
+    }
+    if (existingSessionId) {
+      setSessionId(existingSessionId);
+      setPersistenceNotice("Restored from the existing local browser session. Storage can still be cleared or evicted.");
+    } else {
+      try {
+        const saved = await saveAudioSessionFile(next);
+        if (sequence !== sourceLoadSequenceRef.current) { void deleteAudioSession(saved.id).catch(() => undefined); return; }
+        setSessionId(saved.id);
+        updateAudioSessionQuery(saved.id);
+        setPersistenceNotice("Saved locally for up to 7 days for cross-tool handoff. The source ID only works in this browser. Browser storage can still be cleared or evicted.");
+      } catch (cause) {
+        if (sequence !== sourceLoadSequenceRef.current) return;
+        setPersistenceNotice(`Preview is available, but cross-tool handoff could not be saved locally: ${cause instanceof Error ? cause.message : "browser storage unavailable"}. You can still select the file directly inside a tool.`);
+      }
+    }
+    try {
+      const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) throw new Error("Audio preview is not supported in this browser.");
+      const ctx = new Ctx();
+      try {
+        const decoded = await ctx.decodeAudioData(await next.arrayBuffer());
+        if (sequence !== sourceLoadSequenceRef.current) return;
+        setFileMeta({ duration: `${Math.floor(decoded.duration / 60)}:${String(Math.floor(decoded.duration % 60)).padStart(2, "0")}`, rate: `${(decoded.sampleRate / 1000).toFixed(1)} kHz`, channels: decoded.numberOfChannels === 1 ? "Mono" : `${decoded.numberOfChannels} channels` });
+        const samples = decoded.getChannelData(0); const bars = 96; const peaks: number[] = [];
+        for (let b = 0; b < bars; b++) { const from = Math.floor(b * samples.length / bars); const to = Math.max(from + 1, Math.floor((b + 1) * samples.length / bars)); let peak = 0; for (let i = from; i < Math.min(to, samples.length); i++) peak = Math.max(peak, Math.abs(samples[i])); peaks.push(Math.max(0.035, peak)); }
+        setWaveform(peaks);
+      } finally { await ctx.close().catch(() => undefined); }
+    } catch (e) {
+      if (sequence === sourceLoadSequenceRef.current) setMetaError(e instanceof Error ? e.message : "Could not inspect this file in the browser.");
+    }
+  }, [sessionId]);
+  const toolUrl = (slug: string) => {
+    const base = `/tools/audio/${slug}`;
+    return sessionId && file && AUDIO_FILE_HANDOFF_SLUGS.has(slug) ? `${base}?audioSessionId=${encodeURIComponent(sessionId)}` : base;
+  };
+  const onPickFileRef = useRef(onPickFile);
+  onPickFileRef.current = onPickFile;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("audioSessionId");
+    if (!id) return;
+    let active = true;
+    const initialSequence = sourceLoadSequenceRef.current;
+    void loadAudioSessionFile(id).then(async (savedFile) => {
+      if (!active || initialSequence !== sourceLoadSequenceRef.current) return;
+      if (savedFile) await onPickFileRef.current(savedFile, id);
+      else setPersistenceNotice("The previous local audio session is unavailable or expired. Import the file again to continue.");
+    }).catch(() => {
+      if (active && initialSequence === sourceLoadSequenceRef.current) setPersistenceNotice("Could not restore the local audio session. Import the file again to continue.");
+    });
+    return () => { active = false; };
+  }, []);
+  const isPlatform = studio === "platform";
+  return <section className="overflow-hidden rounded-2xl border border-border bg-background">
+    <div className={`relative overflow-hidden border-b border-border bg-gradient-to-br ${w.accent} px-5 py-6 sm:px-7 sm:py-8`}>
+      <div className="absolute right-4 top-3 opacity-[0.07] sm:right-8 sm:top-5"><Icon size={132} strokeWidth={1}/></div>
+      <div className="relative flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl"><div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary"/>{w.eyebrow}</div><h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{w.title}</h2><p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">{w.subtitle}</p></div>
+        <div className="flex flex-wrap gap-2"><a href={toolUrl("music-live-video-studio")} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-4 text-sm font-medium transition hover:bg-primary/10"><Music2 size={16}/> Live Video Studio <ArrowRight size={15}/></a><a href={toolUrl("music-studio")} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background/80 px-4 text-sm font-medium transition hover:bg-surface-2"><Music2 size={16}/> Music Studio <ArrowRight size={15}/></a></div>
+      </div>
+      <div className="relative mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <div className="rounded-xl border border-border/70 bg-background/75 px-3 py-2"><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Processing</span><strong className="text-sm">{studio === "transcribe" ? "Configured service" : studio === "convert" ? "Local + server" : "Browser-first"}</strong></div>
+        <div className="rounded-xl border border-border/70 bg-background/75 px-3 py-2"><span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Workspace</span><strong className="text-sm">{studio === "edit" ? "Non-destructive source" : studio === "analyze" ? "Inspect before export" : studio === "platform" ? "Delivery references" : "Ready for a file"}</strong></div>
+      </div>
+    </div>
+    <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="min-w-0 space-y-5">
+        {isPlatform ? <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="mb-3 flex items-center justify-between gap-2"><h3 className="font-semibold">Destination</h3><span className="text-xs text-muted-foreground">Delivery reference</span></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["Podcast","podcast"],["Spotify","spotify"],["Apple Music","apple-music"],["YouTube","youtube"],["Instagram","instagram"],["TikTok","tiktok"],["Twitch","twitch"],["Discord","discord"]].map(([label,value])=><button key={value} type="button" aria-pressed={platform===value} onClick={()=>setPlatform(value)} className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm transition ${platform===value?"border-primary bg-primary/10 font-semibold":"border-border bg-background hover:bg-surface-2"}`}>{label}</button>)}</div><div className="mt-4 grid gap-2 sm:grid-cols-2">{[["Format",preset.format],["Sample rate",preset.sample],["Loudness",preset.loudness],["Bitrate",preset.bitrate]].map(([label,value])=><div key={label} className="rounded-lg border border-border bg-background p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-sm font-medium">{value}</div></div>)}</div><p className="mt-3 text-xs text-muted-foreground">{preset.note} Guidance only — not a platform acceptance guarantee.</p></div> : <div className="rounded-xl border border-dashed border-border bg-surface-2/40 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">Session source</h3><p className="mt-1 text-xs text-muted-foreground">Import once, then carry the same local source into supported tools without selecting it again.</p></div><button type="button" onClick={()=>pickerRef.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"><Upload size={16}/> Import audio</button></div>
+          <input ref={pickerRef} className="sr-only" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" onChange={e=>{const picked=e.target.files?.[0]; if(picked) void onPickFile(picked); e.currentTarget.value="";}}/>
+          {!file ? <button type="button" onClick={()=>pickerRef.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();void onPickFile(e.dataTransfer.files?.[0]);}} className="mt-4 flex min-h-28 w-full flex-col items-center justify-center rounded-xl border border-border bg-background px-4 py-5 text-center transition hover:border-primary/60 hover:bg-surface-2"><FileAudio size={27} className="mb-2 text-muted-foreground"/><span className="text-sm font-medium">Drop an audio file here or browse</span><span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC (browser-supported formats)</span></button> : <div className="mt-4 rounded-xl border border-border bg-background p-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><AudioLines size={22}/></div><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{file.name}</div><div className="mt-1 text-xs text-muted-foreground">{fileMeta ? `${fileMeta.duration} · ${fileMeta.rate} · ${fileMeta.channels} · ${(file.size/1048576).toFixed(2)} MB` : metaError || "Reading audio metadata…"}</div></div><button type="button" onClick={()=>void onPickFile(undefined)} className="rounded-md border border-border px-3 py-2 text-xs hover:bg-surface-2">Clear</button></div>{waveform.length ? <div className="mt-4 rounded-lg bg-surface-2 px-2 py-3" aria-label="Audio waveform preview"><div className="flex h-16 items-center gap-[2px] overflow-hidden">{waveform.map((peak,index)=><span key={index} className="min-w-0 flex-1 rounded-full bg-primary/75" style={{height:`${Math.max(7,peak*100)}%`}}/>)}</div><div className="mt-2 flex justify-between text-[10px] text-muted-foreground"><span>0:00</span><span>Waveform preview</span><span>{fileMeta?.duration ?? "—"}</span></div></div> : null}{audioUrl ? <audio className="mt-3 w-full" controls preload="metadata" src={audioUrl}/> : null}<p className="mt-2 text-[11px] text-muted-foreground">{persistenceNotice || "Select a supported workflow to hand this source to its tool."} {sessionId ? "Tools restore it from local browser storage; server tools upload only when you explicitly start conversion." : "If local storage is unavailable, the destination tool will ask you to select the file again."}</p></div>}
+        </div>}
+        <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">{isPlatform ? "Recommended actions" : "Choose a workflow"}</h3><p className="mt-1 text-xs text-muted-foreground">Open a focused tool with its own controls and export action.</p></div><span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">{w.actions.length} tools</span></div>
+        <div className="grid gap-3 sm:grid-cols-2">{w.actions.map((action,index)=>{const ActionIcon=action.icon;return <a key={action.slug+action.title} href={toolUrl(action.slug)} className="group flex min-h-[112px] gap-3 rounded-xl border border-border bg-background p-4 transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary"><ActionIcon size={21}/></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{action.title}</strong>{action.badge?<span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-bold tracking-wide text-muted-foreground">{action.badge}</span>:null}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{action.detail}</span><span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary">Open tool <ArrowRight size={13} className="transition group-hover:translate-x-0.5"/></span></span></a>})}</div>
+      </div>
+      <aside className="space-y-4">
+        <div className="rounded-xl border border-border p-4"><div className="flex items-center gap-2"><Sparkles size={17} className="text-primary"/><h3 className="font-semibold">Studio shortcuts</h3></div><div className="mt-3 space-y-2">{STUDIO_LINKS.filter(x=>!x.href.endsWith(`audio-${studio}-studio`)).map(item=><a key={item.href} href={sessionId && file ? `${item.href}?audioSessionId=${encodeURIComponent(sessionId)}` : item.href} className="flex min-h-10 items-center justify-between gap-2 rounded-lg px-2 text-sm transition hover:bg-surface-2"><span>{item.title.replace(" Studio","")}</span><ArrowRight size={14} className="text-muted-foreground"/></a>)}</div></div>
+        <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="flex items-center gap-2"><Zap size={17}/><h3 className="font-semibold">Session notes</h3></div>{studio === "transcribe" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Transcription uploads audio to the configured media endpoint. If the service is unavailable, the tool reports setup or connection status.</p> : studio === "platform" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Delivery requirements change by distributor, asset type and workflow. Verify official specifications before final export.</p> : studio === "analyze" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Peak and RMS are measured from decoded samples. The loudness tool is an estimate, not BS.1770/EBU R128 certification.</p> : studio === "import" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Use audio you own or have permission to process. enV does not download DRM-protected streaming tracks.</p> : <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Local tools process supported audio in your browser. Server conversion is labeled before upload. Export creates a separate output file.</p>}</div>
+      </aside>
+    </div>
   </section>;
 }
 
 export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
   const normalizedMode: StudioMode = mode.includes("duet") ? "duet" : mode.includes("karaoke") ? "karaoke" : mode.includes("stem-mixer") || mode.includes("mixer") ? "mixer" : mode.includes("practice") ? "practice" : "separate";
+  const [activeMode, setActiveMode] = useState<StudioMode>(normalizedMode);
   const [file, setFile] = useState<File | null>(null);
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [handoffSessionId, setHandoffSessionId] = useState<string | null>(null);
+  const handoffSessionIdRef = useRef<string | null>(null);
+  const updateHandoffSessionId = (id: string | null) => { handoffSessionIdRef.current = id; setHandoffSessionId(id); };
   const [liveMixerPlaying, setLiveMixerPlaying] = useState(false);
   const [separationMode, setSeparationMode] = useState<"2" | "4">("4");
   const [sourceBuffer, setSourceBuffer] = useState<AudioBuffer | null>(null);
@@ -329,18 +467,23 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
   const [takes, setTakes] = useState<VocalTake[]>([]);
   const [recording, setRecording] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [duetPresetId, setDuetPresetId] = useState<VocalPresetId>("pop");
+  const [duetMonitorMic, setDuetMonitorMic] = useState(false);
   const [analysis, setAnalysis] = useState<{ bpm: number | null; key: string | null } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderStreamRef = useRef<MediaStream | null>(null);
+  const recordingContextRef = useRef<AudioContext | null>(null);
+  const stopRecordingEffectsRef = useRef<(() => void) | null>(null);
   const meterFrameRef = useRef<number | null>(null);
   const takeStartRef = useRef(0);
   const takesRef = useRef<VocalTake[]>([]);
   const sourceKeyRef = useRef("");
   const recordingSourceKeyRef = useRef("");
   const fileLoadSequenceRef = useRef(0);
+  const chooseFileRef = useRef<(selected: File | undefined, existingSessionId?: string) => Promise<void>>(async () => undefined);
   const liveMixerRef = useRef<LiveMixerState | null>(null);
 
   useEffect(() => { takesRef.current = takes; }, [takes]);
@@ -377,6 +520,9 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     abortRef.current?.abort();
     if (meterFrameRef.current !== null) cancelAnimationFrame(meterFrameRef.current);
     recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    stopRecordingEffectsRef.current?.(); stopRecordingEffectsRef.current = null;
+    const recordingContext = recordingContextRef.current; recordingContextRef.current = null;
+    if (recordingContext) void recordingContext.close().catch(() => undefined);
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
     if (mixUrlRef.current) URL.revokeObjectURL(mixUrlRef.current);
     for (const take of takesRef.current) URL.revokeObjectURL(take.url);
@@ -408,7 +554,7 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     return () => { window.clearInterval(timer); void context.close().catch(() => undefined); };
   }, [metronomeOn, metronomeBpm]);
 
-  async function chooseFile(selected: File | undefined) {
+  async function chooseFile(selected: File | undefined, existingSessionId?: string) {
     if (!selected) return;
     if (recording) { setError("Stop the current vocal take before changing the source file."); return; }
     const loadSequence = ++fileLoadSequenceRef.current;
@@ -423,11 +569,35 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       const buffer = await decodeAudio(selected);
       if (loadSequence !== fileLoadSequenceRef.current) return;
       if (buffer.duration < 0.05) throw new Error("The selected audio is too short to process.");
+      let handoffNote = "";
+      if (existingSessionId) {
+        updateHandoffSessionId(existingSessionId);
+        handoffNote = " · Source is available through a short-lived local handoff";
+      } else {
+        const previousHandoffId = handoffSessionIdRef.current;
+        try {
+          if (previousHandoffId) {
+            await deleteAudioSession(previousHandoffId).catch(() => undefined);
+            if (loadSequence !== fileLoadSequenceRef.current) return;
+          }
+          updateHandoffSessionId(null);
+          updateAudioSessionQuery(null);
+          const saved = await saveAudioSessionFile(selected);
+          if (loadSequence !== fileLoadSequenceRef.current) { void deleteAudioSession(saved.id).catch(() => undefined); return; }
+          updateHandoffSessionId(saved.id);
+          updateAudioSessionQuery(saved.id);
+          handoffNote = " · Source saved locally for up to 7 days for cross-mode handoff; browser storage may be cleared or evicted";
+        } catch (cause) {
+          if (loadSequence !== fileLoadSequenceRef.current) return;
+          handoffNote = ` · Cross-mode handoff unavailable: ${cause instanceof Error ? cause.message : "local browser storage unavailable"}`;
+        }
+      }
+      if (loadSequence !== fileLoadSequenceRef.current) return;
       const url = URL.createObjectURL(selected);
       const sourceKey = musicSourceKey(selected);
       sourceKeyRef.current = sourceKey;
       setFile(selected); setSourceBuffer(buffer); setSourceUrl(url); sourceUrlRef.current = url;
-      let baseStatus = `Ready · ${buffer.duration.toFixed(2)} seconds · ${buffer.sampleRate.toLocaleString()} Hz · ${buffer.numberOfChannels} channel(s)`;
+      let baseStatus = `Ready · ${buffer.duration.toFixed(2)} seconds · ${buffer.sampleRate.toLocaleString()} Hz · ${buffer.numberOfChannels} channel(s)${handoffNote}`;
       try {
         const stored = await listStoredMusicTakes(sourceKey);
         if (loadSequence !== fileLoadSequenceRef.current) { URL.revokeObjectURL(url); return; }
@@ -441,6 +611,25 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       if (loadSequence === fileLoadSequenceRef.current) setStatus(baseStatus);
     } catch (cause) { if (loadSequence === fileLoadSequenceRef.current) { setFile(null); setSourceBuffer(null); setSourceUrl(""); sourceUrlRef.current = ""; setStatus(""); setError(cause instanceof Error ? cause.message : "Could not decode this audio file in the current browser."); } }
   }
+
+  chooseFileRef.current = chooseFile;
+
+  useEffect(() => {
+    const sessionId = new URLSearchParams(window.location.search).get("audioSessionId");
+    if (!sessionId) return;
+    updateHandoffSessionId(sessionId);
+    const initialSequence = fileLoadSequenceRef.current;
+    let active = true;
+    void loadAudioSessionFile(sessionId).then(async (restored) => {
+      if (!active || initialSequence !== fileLoadSequenceRef.current) return;
+      if (!restored) { setError("The linked local audio session is unavailable or expired. Import the source file again."); return; }
+      await chooseFileRef.current(restored, sessionId);
+      if (active) setStatus((current) => current.startsWith("Ready") ? `${current} · Restored from Audio Studio local handoff` : current);
+    }).catch((cause) => {
+      if (active && initialSequence === fileLoadSequenceRef.current) setError(cause instanceof Error ? `Could not restore the Audio Studio source: ${cause.message}` : "Could not restore the Audio Studio source.");
+    });
+    return () => { active = false; };
+  }, []);
 
   async function loadDemoTrack() {
     const Ctx = contextConstructor();
@@ -585,6 +774,18 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not package all stems into a ZIP."); setStatus("ZIP export did not complete; the individual WAV export path is still available."); }
   }
 
+  async function sendStemToLiveVideo(track: StemTrack) {
+    try {
+      setError(null); setStatus(`Preparing ${track.name} for Live Video Studio locally…`);
+      const fileName = `env-${track.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-stem.wav`;
+      const stemFile = new File([audioBufferToWav(track.buffer)], fileName, { type: "audio/wav" });
+      const saved = await saveAudioSessionFile(stemFile);
+      window.location.href = `/tools/audio/music-live-video-studio?audioSessionId=${encodeURIComponent(saved.id)}`;
+    } catch (cause) {
+      setError(cause instanceof Error ? `Could not hand off this stem locally: ${cause.message}` : "Could not hand off this stem locally.");
+    }
+  }
+
   async function removeTake(take: VocalTake) {
     URL.revokeObjectURL(take.url);
     setTakes((current) => { const updated = current.filter((item) => item.id !== take.id); takesRef.current = updated; return updated; });
@@ -598,6 +799,12 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     fileLoadSequenceRef.current += 1;
     cancelRef.current = true; abortRef.current?.abort();
     stopLiveMixer();
+    const handoffId = handoffSessionIdRef.current;
+    if (handoffId) {
+      try { await deleteAudioSession(handoffId); updateHandoffSessionId(null); }
+      catch (cause) { setError(cause instanceof Error ? `Session cleared, but the local source handoff could not be removed: ${cause.message}` : "Session cleared, but the local source handoff could not be removed."); }
+    }
+    updateAudioSessionQuery(null);
     if (sourceKeyRef.current) {
       try { await deleteStoredMusicTakes(sourceKeyRef.current); }
       catch (cause) { setError(cause instanceof Error ? `Session cleared, but saved takes could not all be removed: ${cause.message}` : "Session cleared, but saved takes could not all be removed."); }
@@ -664,9 +871,20 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       setError(null);
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") throw new Error("Microphone recording is not supported by this browser. Use a current browser over HTTPS or localhost.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-      const recorder = new MediaRecorder(stream);
+      const Ctx = contextConstructor();
+      if (!Ctx) { stream.getTracks().forEach((track) => track.stop()); throw new Error("This browser does not support the local vocal-effects chain required for a processed take."); }
+      const context = new Ctx(); await context.resume();
+      const micInput = context.createMediaStreamSource(stream);
+      const recordDestination = context.createMediaStreamDestination();
+      const voiceBus = context.createGain();
+      const preset = VOCAL_PRESETS.find((item) => item.id === duetPresetId) ?? VOCAL_PRESETS[0];
+      const stopEffects = connectVocalPreset(context, micInput, voiceBus, preset.available ? duetPresetId : "clean");
+      voiceBus.connect(recordDestination);
+      if (duetMonitorMic) voiceBus.connect(context.destination);
+      const recorder = new MediaRecorder(recordDestination.stream);
       const chunks: BlobPart[] = [];
       recorderStreamRef.current = stream; recorderRef.current = recorder;
+      recordingContextRef.current = context; stopRecordingEffectsRef.current = stopEffects;
       takeStartRef.current = currentLiveMixerPosition(liveMixerRef.current) ?? audioRef.current?.currentTime ?? 0;
       recordingSourceKeyRef.current = sourceKeyRef.current;
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
@@ -674,6 +892,9 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         stream.getTracks().forEach((track) => track.stop());
+        stopRecordingEffectsRef.current?.(); stopRecordingEffectsRef.current = null;
+        const closingContext = recordingContextRef.current; recordingContextRef.current = null;
+        if (closingContext) void closingContext.close().catch(() => undefined);
         if (meterFrameRef.current !== null) cancelAnimationFrame(meterFrameRef.current);
         setMicLevel(0); setRecording(false);
         if (!blob.size) { setError("The microphone produced an empty take. Check microphone permissions and try again."); return; }
@@ -696,13 +917,12 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
         }
       };
       recorder.start(250); setRecording(true); setStatus("Recording microphone take…");
-      const Ctx = contextConstructor();
-      if (Ctx) {
-        const monitor = new Ctx(); const input = monitor.createMediaStreamSource(stream); const analyser = monitor.createAnalyser(); analyser.fftSize = 1024; input.connect(analyser);
+      {
+        const context = recordingContextRef.current!;
+        const input = context.createMediaStreamSource(stream); const analyser = context.createAnalyser(); analyser.fftSize = 1024; input.connect(analyser);
         const samples = new Uint8Array(analyser.fftSize);
         const measure = () => { analyser.getByteTimeDomainData(samples); let peak = 0; for (const value of samples) peak = Math.max(peak, Math.abs(value - 128) / 128); setMicLevel(peak); meterFrameRef.current = requestAnimationFrame(measure); };
         measure();
-        recorder.addEventListener("stop", () => { void monitor.close().catch(() => undefined); }, { once: true });
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not start microphone recording."); setRecording(false); }
   }
@@ -748,33 +968,71 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
   const loopEndNumber = Math.max(0, Number(loopEnd) || 0);
   const currentSrc = abOriginal ? sourceUrl : mixUrl || sourceUrl;
   const showTracks = tracks.length > 0;
+  const workflowIsReady = Boolean(sourceBuffer);
+  const workflowHasOutput = tracks.length > 0 || takes.length > 0 || Boolean(mixUrl);
+  const activeWorkspace = MUSIC_STUDIO_TABS.find((tab) => tab.key === activeMode) ?? MUSIC_STUDIO_TABS[0];
+  const chooseWorkspace = (nextMode: StudioMode) => {
+    setActiveMode(nextMode);
+    const nextTab = MUSIC_STUDIO_TABS.find((tab) => tab.key === nextMode);
+    if (nextTab && typeof window !== "undefined") {
+      const next = new URL(window.location.href);
+      next.pathname = `/tools/audio/${nextTab.slug}`;
+      if (handoffSessionId) next.searchParams.set("audioSessionId", handoffSessionId);
+      else next.searchParams.delete("audioSessionId");
+      window.history.replaceState(null, "", `${next.pathname}${next.search}${next.hash}`);
+    }
+  };
+  const quickWorkflows: Array<{ key: StudioMode; title: string; detail: string; Icon: typeof Scissors }> = [
+    { key: "separate", title: "Remove vocals or split stems", detail: "Create vocal and instrumental tracks.", Icon: Scissors },
+    { key: "practice", title: "Practice a song", detail: "Loop a section or slow playback.", Icon: Headphones },
+    { key: "mixer", title: "Mix and export stems", detail: "Balance tracks, then export WAV.", Icon: SlidersHorizontal },
+    { key: "duet", title: "Record a vocal take", detail: "Sing over a backing track.", Icon: Mic },
+    { key: "karaoke", title: "Make a karaoke version", detail: "Preview and export the instrumental.", Icon: Music2 },
+  ];
 
   return <section className="space-y-5">
     <div className="space-y-2"><div><h2 className="text-xl font-semibold">Music Studio</h2><p className="mt-1 text-sm text-muted-foreground">A private practice and karaoke workspace for files you own or have rights to. Audio is processed locally in your browser; the separation model is downloaded on the first use.</p></div>
       <div className="rounded-xl border border-border bg-surface-2 p-3 text-sm">Use files you own or have rights to. enV does not download DRM-protected Spotify, Apple Music, Amazon Music or Tidal streams.</div>
-      <nav className="flex flex-wrap gap-2" aria-label="Music Studio modes">{[["Separate", "music-separator", "separate"], ["Stem mixer", "music-stem-mixer", "mixer"], ["Practice", "music-practice", "practice"], ["Duet / record", "music-duet", "duet"], ["Karaoke", "music-karaoke", "karaoke"]].map(([label, slug, selected]) => <a key={slug} href={`/tools/audio/${slug}`} aria-current={normalizedMode === selected ? "page" : undefined} className={`inline-flex min-h-10 items-center rounded-lg border px-3 py-2 text-sm ${normalizedMode === selected ? "border-primary bg-primary/10 font-semibold" : "border-border hover:bg-surface-2"}`}>{label}</a>)}</nav>
     </div>
 
-    <div className="space-y-3 rounded-xl border border-border p-4">
-      <h3 className="font-semibold">1. Import audio</h3>
-      <input className="block min-h-12 w-full rounded-lg border border-border bg-surface p-3 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" onChange={(event) => void chooseFile(event.target.files?.[0])} aria-label="Choose a local audio file" />
-      <Button type="button" variant="outline" onClick={() => void loadDemoTrack()}>Load synthesized demo groove</Button>
-      <label className="mt-3 block text-sm">Separation output<select value={separationMode} onChange={(event) => setSeparationMode(event.target.value as "2" | "4")} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"><option value="2">2 stems · vocals + instrumental</option><option value="4">4 stems · vocals, drums, bass, other</option></select><span className="mt-1 block text-xs text-muted-foreground">The browser model calculates four stems; 2-stem mode combines drums, bass and other locally into one instrumental mix.</span></label>
-      <p className="text-xs text-muted-foreground">MP3, WAV, M4A, OGG, FLAC or WebM when your browser can decode it. Source audio never leaves this device on the local path.</p>
-      {file && sourceBuffer ? <div className="rounded-lg bg-surface-2 p-3 text-sm"><strong>{file.name}</strong><p className="mt-1 text-muted-foreground">{sourceBuffer.duration.toFixed(2)} sec · {sourceBuffer.sampleRate.toLocaleString()} Hz · {sourceBuffer.numberOfChannels} channel(s) · {(file.size / 1_000_000).toFixed(2)} MB</p></div> : <p className="text-sm text-muted-foreground">Choose a short music file to unlock local playback, practice and the separator.</p>}
+    {!workflowIsReady ? <section aria-labelledby="music-quick-start-title" className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={19} aria-hidden="true"/></div><div><h3 id="music-quick-start-title" className="font-semibold">What would you like to do?</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Choose a goal first. enV will open the right workspace; you can change it any time.</p></div></div>
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">{quickWorkflows.map(({ key, title, detail, Icon }) => <button key={key} type="button" onClick={() => { chooseWorkspace(key); window.requestAnimationFrame(() => document.getElementById("music-studio-import")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} aria-pressed={activeMode === key} className={`group flex min-h-[76px] min-w-0 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeMode === key ? "border-primary bg-primary/10" : "border-border bg-background hover:bg-surface-2"}`}><span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${activeMode === key ? "bg-primary/15 text-primary" : "bg-surface-2 text-foreground"}`}><Icon size={18} aria-hidden="true"/></span><span className="min-w-0 flex-1"><strong className="block text-sm leading-snug">{title}</strong><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span><ChevronRight size={16} className="mt-1 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" aria-hidden="true"/></button>)}</div>
+    </section> : null}
+
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="font-semibold">Choose a workspace</h3><p className="mt-1 text-xs text-muted-foreground">Your current workspace is <strong className="text-foreground">{activeWorkspace.label}</strong>.</p></div><span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs"><CheckCircle2 size={13} className={workflowIsReady ? "text-primary" : "text-muted-foreground"} aria-hidden="true"/>{workflowIsReady ? "Audio ready" : "Waiting for audio"}</span></div>
+      <nav className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" role="tablist" aria-label="Music Studio workspace">
+        {MUSIC_STUDIO_TABS.map(({ label, slug, key, Icon }) => <button key={slug} id={`music-tab-${key}`} type="button" role="tab" aria-selected={activeMode === key} aria-controls="music-studio-workspace" onClick={() => chooseWorkspace(key)} onKeyDown={(event) => { if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return; event.preventDefault(); const currentIndex = MUSIC_STUDIO_TABS.findIndex((tab) => tab.key === key); const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? MUSIC_STUDIO_TABS.length - 1 : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + MUSIC_STUDIO_TABS.length) % MUSIC_STUDIO_TABS.length; const nextTab = MUSIC_STUDIO_TABS[nextIndex]; if (nextTab) { chooseWorkspace(nextTab.key); document.getElementById(`music-tab-${nextTab.key}`)?.focus(); } }} className={`inline-flex min-h-12 shrink-0 snap-start items-center gap-2 rounded-lg border px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeMode === key ? "border-primary bg-primary/10 font-semibold" : "border-border bg-background hover:bg-surface-2"}`}><Icon size={16} aria-hidden="true"/>{label}{activeMode === key ? <CheckCircle2 size={14} aria-hidden="true"/> : null}</button>)}
+      </nav>
+      <div className="grid grid-cols-3 gap-2 text-xs sm:gap-3" aria-label="Workflow progress">
+        <div className={`rounded-lg border p-2 sm:p-3 ${workflowIsReady ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}><span className="flex items-center gap-1.5 font-semibold">{workflowIsReady ? <CheckCircle2 size={14}/> : <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px]">1</span>} Add audio</span><span className="mt-1 hidden leading-relaxed text-muted-foreground sm:block">Import a file or try the demo.</span></div>
+        <div className={`rounded-lg border p-2 sm:p-3 ${workflowIsReady ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}><span className="flex items-center gap-1.5 font-semibold">{workflowHasOutput ? <CheckCircle2 size={14} aria-hidden="true"/> : <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px]">2</span>} {workflowHasOutput ? "Work complete" : "Work on it"}</span><span className="mt-1 hidden leading-relaxed text-muted-foreground sm:block">Use the selected workspace.</span></div>
+        <div className={`rounded-lg border p-2 sm:p-3 ${workflowHasOutput ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}><span className="flex items-center gap-1.5 font-semibold">{workflowHasOutput ? <CheckCircle2 size={14}/> : <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px]">3</span>} Review / export</span><span className="mt-1 hidden leading-relaxed text-muted-foreground sm:block">Listen before saving your result.</span></div>
+      </div>
+    </div>
+
+    <div id="music-studio-import" className={`space-y-3 rounded-xl border p-4 transition-colors ${isFileDragOver ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border"}`} onDragOver={(event) => { event.preventDefault(); setIsFileDragOver(true); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsFileDragOver(false); }} onDrop={(event) => { event.preventDefault(); setIsFileDragOver(false); void chooseFile(event.dataTransfer.files?.[0]); }}>
+      <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2"><FileAudio size={18} aria-hidden="true"/></div><div className="min-w-0 flex-1"><h3 className="font-semibold">1. Add your audio</h3><p className="mt-1 text-sm text-muted-foreground">{isFileDragOver ? "Release to import your audio file." : "Drop a file here or browse your device. Audio is decoded locally in your browser."}</p></div>{file && sourceBuffer ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary"><CheckCircle2 size={13}/> Ready</span> : null}</div>
+      <input className="block min-h-12 w-full rounded-lg border border-border bg-surface p-3 text-sm" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" onChange={(event) => void chooseFile(event.target.files?.[0])} aria-label="Choose a local audio file" aria-describedby="music-import-formats" />
+      <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" className="min-h-12" onClick={() => void loadDemoTrack()}><AudioLines size={16} className="mr-2" aria-hidden="true"/>Try a demo groove</Button><span className="text-xs text-muted-foreground">Useful for testing controls before using your own audio.</span></div>
+      {activeMode === "separate" ? <label className="mt-3 block text-sm">Separation output<select value={separationMode} onChange={(event) => setSeparationMode(event.target.value as "2" | "4")} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"><option value="2">2 stems · vocals + instrumental</option><option value="4">4 stems · vocals, drums, bass, other</option></select><span className="mt-1 block text-xs text-muted-foreground">The browser model calculates four stems; 2-stem mode combines drums, bass and other locally into one instrumental mix.</span></label> : null}
+      <p id="music-import-formats" className="text-xs text-muted-foreground">MP3, WAV, M4A, OGG, FLAC or WebM when your browser can decode it. Source audio never leaves this device on the local path.</p>
+      {file && sourceBuffer ? <div className="flex items-start gap-3 rounded-lg bg-surface-2 p-3 text-sm" role="status" aria-live="polite"><CheckCircle2 size={18} className="mt-0.5 shrink-0 text-primary" aria-hidden="true"/><div className="min-w-0"><strong className="block break-words">{file.name}</strong><p className="mt-1 text-muted-foreground">{sourceBuffer.duration.toFixed(2)} sec · {sourceBuffer.sampleRate.toLocaleString()} Hz · {sourceBuffer.numberOfChannels} channel(s) · {(file.size / 1_000_000).toFixed(2)} MB</p><p className="mt-1 text-xs text-muted-foreground">Next: use <strong>{activeWorkspace.label}</strong> below to continue.</p></div></div> : <p className="text-sm text-muted-foreground">Choose a short music file to unlock playback, practice and processing. On phones, start with a short clip to keep memory use manageable.</p>}
       <div className="flex flex-wrap gap-2"><Button type="button" onClick={() => void analyzeTrack()} disabled={!sourceBuffer}>Estimate BPM / key</Button><Button type="button" variant="outline" disabled={recording || working} onClick={() => void clearMusicSession()}>Clear session & saved takes</Button></div>
       {analysis ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2">{[["Tempo estimate", analysis.bpm ? `${analysis.bpm} BPM` : "Not confident enough"], ["Key estimate", analysis.key ?? "Not confident enough"]].map(([label, value]) => <div className="rounded-lg border border-border p-3" key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">Best effort — verify by ear.</p></div>)}</div>{analysis.key ? <div className="rounded-lg border border-border p-3"><h4 className="text-sm font-semibold">Diatonic chord suggestions</h4><p className="mt-1 text-xs text-muted-foreground">Theory suggestions derived from the estimated key, not audio chord recognition.</p><div className="mt-2 flex flex-wrap gap-2">{suggestDiatonicChords(analysis.key).map((chord) => <span key={chord.degree} className="rounded-md bg-surface-2 px-3 py-2 text-sm"><strong>{chord.chord}</strong><span className="ml-1 text-xs text-muted-foreground">{chord.degree}</span></span>)}</div><h4 className="mt-4 text-sm font-semibold">Capo / open-shape helper</h4><div className="mt-2 flex flex-wrap gap-2">{suggestCapoShapes(analysis.key).slice(0, 4).map((suggestion) => <span key={`${suggestion.shape}-${suggestion.fret}`} className="rounded-md border border-border px-3 py-2 text-sm">{suggestion.shape} shape · {suggestion.fret === 0 ? "no capo" : `capo ${suggestion.fret}`}</span>)}</div><p className="mt-2 text-xs text-muted-foreground">These are convenient guitar shapes only; tune, voicing and chord spelling may vary.</p></div> : null}</div> : null}
     </div>
 
-    <div className="space-y-3 rounded-xl border border-border p-4">
+    <div id="music-studio-workspace" role="tabpanel" aria-labelledby={`music-tab-${activeMode}`} className="space-y-5">
+    {activeMode === "separate" ? <div className="space-y-3 rounded-xl border border-border p-4">
       <div><h3 className="font-semibold">2. Separate stems</h3><p className="mt-1 text-sm text-muted-foreground">Local ONNX model · WebGPU when available, WASM fallback · overlap-blended chunks to reduce edge discontinuities.</p></div>
       <p className="text-sm text-muted-foreground">The first model download is approximately 166 MB and may be cached by your browser. Memory-aware duration limits are conservative: around 45–75 seconds on lower-memory phones, 1–2 minutes on many devices, and up to 4 minutes on higher-memory desktops. The approximate working-set estimate excludes extra model runtime/GPU allocations and cannot guarantee that memory pressure will not occur. The synthesized demo is only for testing practice/mixing controls, not separation quality.</p>
       <div className="flex flex-wrap gap-2"><Button type="button" onClick={() => void runSeparation()} disabled={!sourceBuffer || working}>{working ? "Separating…" : tracks.length ? "Separate again" : separationMode === "2" ? "Separate into 2 stems" : "Separate into 4 stems"}</Button>{working ? <Button type="button" variant="outline" onClick={cancelSeparation}>Cancel</Button> : null}</div>
       {working || progress > 0 ? <div><div className="mb-1 flex justify-between text-xs"><span>{status || "Preparing…"}</span><span>{progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} /></div></div> : null}
       {tracks.length ? <p className="text-sm">{tracks.length === 2 ? "Two stems created: vocals and instrumental." : "Four broad stems created: drums, bass, other and vocals."} These are broad source groups, not isolated kick, snare, cymbals, guitar or piano tracks. Listen for artifacts, missing transients and bleed before using in a final release.</p> : null}
-    </div>
+    </div> : null}
 
-    <div className="space-y-4 rounded-xl border border-border p-4">
+    {activeMode === "practice" ? <div className="space-y-4 rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">3. Practice & playback</h3><p className="mt-1 text-sm text-muted-foreground">Loop a difficult passage, change playback speed and A/B the source against the rendered mix.</p></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={loopEnabled} onChange={(event) => setLoopEnabled(event.target.checked)} /> Loop A–B</label></div>
       <audio ref={audioRef} controls preload="metadata" src={currentSrc || undefined} onTimeUpdate={() => { const audio = audioRef.current; if (loopEnabled && audio && loopEndNumber > loopStartNumber && audio.currentTime >= loopEndNumber) audio.currentTime = loopStartNumber; }} className="w-full" aria-label="Music Studio playback" />
       <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Loop start (seconds)<input type="number" min="0" step="0.1" value={loopStart} onChange={(event) => setLoopStart(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2" /></label><label className="text-sm">Loop end (seconds)<input type="number" min="0" step="0.1" value={loopEnd} onChange={(event) => setLoopEnd(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2" /></label></div>
@@ -782,29 +1040,33 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       <p className="text-xs text-muted-foreground">Preview note: this built-in player combines pitch and speed change (pitch is not locked). WAV export preserves the selected stem levels but does not bake browser playback-rate controls into a time-stretched render.</p>
       <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Count-in bars<select value={countInBars} onChange={(event) => setCountInBars(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2"><option value="1">1 bar</option><option value="2">2 bars</option></select></label><label className="text-sm">Metronome BPM<input type="number" min="40" max="240" step="1" value={metronomeBpm} onChange={(event) => setMetronomeBpm(Number(event.target.value) || 120)} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2" /></label></div>
       <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" disabled={!sourceBuffer} onClick={() => void startWithCountIn()}>Play with count-in</Button><Button type="button" variant={metronomeOn ? "default" : "outline"} onClick={() => setMetronomeOn((current) => !current)}>{metronomeOn ? "Turn metronome off" : "Metronome on"}</Button><Button type="button" variant="outline" onClick={() => { if (abOriginal) void previewMix(); else setAbOriginal(true); }} disabled={!sourceBuffer || !tracks.length}>{abOriginal ? "A/B: original → render current mix" : "A/B: current mix → original"}</Button><Button type="button" variant="outline" onClick={() => void previewMix()} disabled={!sourceBuffer}>Render mix preview</Button></div>
-    </div>
+    </div> : null}
 
-    <div className="space-y-4 rounded-xl border border-border p-4">
+    {activeMode === "mixer" ? <div className="space-y-4 rounded-xl border border-border p-4">
       <div><h3 className="font-semibold">4. Stem mixer</h3><p className="mt-1 text-sm text-muted-foreground">Live Web Audio playback applies mute, solo, faders and master level immediately. Offline export renders the selected levels to WAV.</p></div>
-      {showTracks ? <div className="space-y-3">{tracks.map((track) => <div key={track.id} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{track.name}</strong><span className="text-xs text-muted-foreground">{track.buffer.duration.toFixed(2)} sec</span></div><label className="mt-2 block text-xs">Volume {track.volume}%<input className="mt-1 block w-full" type="range" min="0" max="150" step="1" value={track.volume} onChange={(event) => updateTrack(track.id, { volume: Number(event.target.value) })} /></label></div><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={track.muted} onChange={(event) => updateTrack(track.id, { muted: event.target.checked })} /> Mute</label><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={track.solo} onChange={(event) => updateTrack(track.id, { solo: event.target.checked })} /> Solo</label></div>)}</div> : <p className="rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground">Separate the imported track to unlock individual drum, bass, other and vocal controls. The original track remains available for A/B playback.</p>}
+      {showTracks ? <div className="space-y-3">{tracks.map((track) => <div key={track.id} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{track.name}</strong><span className="text-xs text-muted-foreground">{track.buffer.duration.toFixed(2)} sec</span></div><label className="mt-2 block text-xs">Volume {track.volume}%<input className="mt-1 block w-full" type="range" min="0" max="150" step="1" value={track.volume} onChange={(event) => updateTrack(track.id, { volume: Number(event.target.value) })} /></label></div><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={track.muted} onChange={(event) => updateTrack(track.id, { muted: event.target.checked })} /> Mute</label><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={track.solo} onChange={(event) => updateTrack(track.id, { solo: event.target.checked })} /> Solo</label><Button type="button" size="sm" variant="outline" onClick={() => void sendStemToLiveVideo(track)} title={`Open ${track.name} in Live Video Studio`}>Send to Live Video</Button></div>)}</div> : <p className="rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground">Separate the imported track to unlock individual drum, bass, other and vocal controls. The original track remains available for A/B playback.</p>}
       <label className="block text-sm">Master volume: {masterVolume}%<input className="mt-2 block w-full" type="range" min="0" max="125" step="1" value={masterVolume} onChange={(event) => setMasterVolume(Number(event.target.value))} /></label>
       <div className="flex flex-wrap gap-2"><Button type="button" variant={liveMixerPlaying ? "default" : "outline"} disabled={!sourceBuffer} onClick={() => liveMixerPlaying ? stopLiveMixer() : void startLiveMixer()}>{liveMixerPlaying ? "Stop live mixer" : "Play live mixer"}</Button><Button type="button" variant="outline" disabled={!sourceBuffer} onClick={() => void previewMix()}>Render mix preview</Button><Button type="button" disabled={!sourceBuffer} onClick={() => void exportMix(false, false)}>Export custom mix WAV</Button>{tracks.length ? <><Button type="button" variant="outline" onClick={() => void exportAllStemsZip()}>Download all stems (ZIP)</Button><Button type="button" variant="ghost" onClick={() => { for (const track of tracks) downloadBlob(audioBufferToWav(track.buffer), `env-${track.name.toLowerCase()}.wav`); }}>Export stems individually</Button></> : null}</div>
-    </div>
+    </div> : null}
 
-    <div className="space-y-4 rounded-xl border border-border p-4">
-      <div><h3 className="font-semibold">5. Duet / vocal replace</h3><p className="mt-1 text-sm text-muted-foreground">Record multiple local takes while the track plays, then export the chosen instrumental/mix plus takes as a WAV.</p></div>
+    {activeMode === "duet" ? <div className="space-y-4 rounded-xl border border-border p-4">
+      <div><h3 className="font-semibold">5. Duet / vocal replace</h3><p className="mt-1 text-sm text-muted-foreground">Record multiple local takes while the track plays, then export the chosen instrumental/mix plus takes as a WAV. The selected local effects chain is printed into each new take.</p></div>
       <div className="rounded-lg bg-surface-2 p-3 text-sm">Microphone audio is kept locally. Takes are saved in this browser when IndexedDB storage is available and are restored when you select the same source file again. Browser data can be cleared or evicted, so download important takes as a backup. For best alignment, seek to the desired song position before recording.</div>
+      <div className="grid gap-3 sm:grid-cols-2">{VOCAL_PRESETS.map((preset) => <button key={preset.id} type="button" disabled={!preset.available || recording} onClick={() => setDuetPresetId(preset.id)} aria-pressed={duetPresetId === preset.id} className={`min-h-11 rounded-lg border p-3 text-left ${duetPresetId === preset.id ? "border-primary bg-primary/10" : "border-border hover:bg-surface-2"} ${!preset.available ? "cursor-not-allowed opacity-60" : ""}`}><strong className="block text-sm">{preset.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{preset.description}</span></button>)}</div>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={duetMonitorMic} disabled={recording} onChange={(event) => setDuetMonitorMic(event.target.checked)} /><span>Monitor processed microphone live <span className="block text-xs text-muted-foreground">Wired headphones recommended to avoid feedback. Monitoring can have device-dependent latency.</span></span></label>
+      {!(VOCAL_PRESETS.find((preset) => preset.id === duetPresetId)?.available ?? false) ? <p className="text-xs text-muted-foreground">AutoPitch is not applied until a key-aware pitch-correction engine is configured; recording falls back to Clean Studio.</p> : null}
       <div className="flex flex-wrap gap-2"><Button type="button" disabled={!sourceBuffer || recording} onClick={() => void startRecording()}>Record vocal take</Button><Button type="button" variant="outline" disabled={!recording} onClick={stopRecording}>Stop recording</Button></div>
       <div><div className="mb-1 flex justify-between text-xs"><span>Microphone peak</span><span>{Math.round(micLevel * 100)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className={`h-full transition-all ${micLevel > 0.92 ? "bg-red-500" : "bg-primary"}`} style={{ width: `${Math.min(100, micLevel * 100)}%` }} /></div>{micLevel > 0.92 ? <p className="mt-1 text-xs text-red-600">Clipping risk — reduce the microphone input level if your device allows it.</p> : null}</div>
       {takes.length ? <div className="space-y-2">{takes.map((take) => <div key={take.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"><div><strong className="text-sm">{take.name}</strong><p className="text-xs text-muted-foreground">Starts at {take.startAt.toFixed(2)} sec · {take.savedLocally ? "saved in this browser" : "session-only; download before leaving"}</p></div><div className="flex gap-2"><audio src={take.url} controls className="max-w-[180px]" aria-label={`Playback for ${take.name}`} /><Button size="sm" variant="outline" onClick={() => downloadBlob(take.blob, `${take.name.toLowerCase().replaceAll(" ", "-")}.${take.blob.type.includes("ogg") ? "ogg" : "webm"}`)}>Save take</Button><Button size="sm" variant="ghost" onClick={() => void removeTake(take)}>Remove</Button></div></div>)}</div> : <p className="text-sm text-muted-foreground">No takes recorded yet.</p>}
       <Button type="button" disabled={!sourceBuffer} onClick={() => void exportMix(false)}>Export duet mix WAV</Button>
-    </div>
+    </div> : null}
 
-    <div className="space-y-3 rounded-xl border border-border p-4">
+    {activeMode === "karaoke" ? <div className="space-y-3 rounded-xl border border-border p-4">
       <div><h3 className="font-semibold">6. Karaoke</h3><p className="mt-1 text-sm text-muted-foreground">Use the instrumental stem, add lyrics for display and export a WAV. Lyrics are not automatically time-synced.</p></div>
       <textarea value={lyrics} onChange={(event) => setLyrics(event.target.value)} rows={5} className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm" placeholder="Paste lyrics here (display only; no claim of perfect automatic sync)" aria-label="Karaoke lyrics" />
       {lyrics.trim() ? <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-sm">{lyrics}</pre> : null}
-      <div className="flex flex-wrap gap-2"><Button type="button" disabled={!tracks.length} onClick={() => void previewMix(true)}>Preview instrumental only</Button><Button type="button" disabled={!tracks.length} onClick={() => void exportMix(true, false)}>Export karaoke instrumental WAV</Button><a href="/tools/audio/music-separator" className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-2">Open separator</a></div>
+      <div className="flex flex-wrap gap-2"><Button type="button" disabled={!tracks.length} onClick={() => void previewMix(true)}>Preview instrumental only</Button><Button type="button" disabled={!tracks.length} onClick={() => void exportMix(true, false)}>Export karaoke instrumental WAV</Button><button type="button" onClick={() => setActiveMode("separate")} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-2">Open separator</button></div>
+    </div> : null}
     </div>
     <ErrorBanner message={error} />
     {status ? <p role="status" aria-live="polite" className="rounded-lg bg-surface-2 p-3 text-sm text-muted-foreground">{status}</p> : null}

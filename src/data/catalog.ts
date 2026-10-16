@@ -657,6 +657,24 @@ const audioStudioTools: ToolMeta[] = [
     }
   },
   {
+    "id": "music-live-video-studio",
+    "name": "Live Video Singing Studio",
+    "slug": "music-live-video-studio",
+    "description": "Record a camera performance over a local backing track, select a cue, process the microphone track with studio presets, and export one merged video. Mobile capture and mixing use native media APIs.",
+    "category": "audio",
+    "keywords": ["live video", "singing", "performance", "camera", "vocal effects", "karaoke", "duet"],
+    "tags": ["audio-studio", "music-studio", "video-studio"],
+    "icon": "Video",
+    "popularity": 95,
+    "featured": true,
+    "clientSide": true,
+    "requiresBackend": false,
+    "requiresAuth": false,
+    "status": "active",
+    "related": ["music-studio", "music-separator", "music-stem-mixer", "music-duet", "music-karaoke", "audio-recorder", "video-compress", "video-trim"],
+    "engine": { "type": "audio", "op": "music-live-video-studio" }
+  },
+  {
     "id": "audio-convert-studio",
     "name": "Audio Convert Studio",
     "slug": "audio-convert-studio",
@@ -1236,7 +1254,7 @@ const audioStudioTools: ToolMeta[] = [
 ];
 
 // Studios are additive: preserve every legacy slug and route as a compatibility entry.
-export const tools: ToolMeta[] = originalTools.map((tool): ToolMeta => {
+export const tools: ToolMeta[] = originalTools.map((tool) => {
   if (tool.id === "audio-sample-rate-converter") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "resample-local" } };
   if (tool.id === "audio-channel-converter") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "channels-local" } };
   if (tool.id === "audio-volume-control") return { ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "volume-local" } };

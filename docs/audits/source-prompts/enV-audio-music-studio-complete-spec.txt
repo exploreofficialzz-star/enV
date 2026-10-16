@@ -14,7 +14,7 @@ karaoke, detect, export — without accounts or illegal stream downloaders.
 # Studio entry
 --------------------------------------------------------------------------------
 
-Primary route: /tools/audio/music-studio
+Primary route: /tools/audio/music-studio  
 Deep-links (same Studio, mode query or tab):
 - /tools/audio/music-separator
 - /tools/audio/music-duet

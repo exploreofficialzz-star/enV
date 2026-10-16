@@ -38,26 +38,26 @@ NO tool URL removals · Privacy-first · NO DRM stream-ripping product
 --------------------------------------------------------------------------------
 
 ### 1. Audio Convert Studio
-Modes: to-WAV · to-MP3 · to-OGG · to-FLAC · sample-rate · channels · bitrate convert
+Modes: to-WAV · to-MP3 · to-OGG · to-FLAC · sample-rate · channels · bitrate convert  
 Slugs: audio-to-wav, audio-to-wav-server, audio-to-mp3-server, audio-to-ogg-server,
 audio-to-flac-server, audio-sample-rate-converter, audio-channel-converter,
 audio-bitrate-converter, audio-to-mono, audio-to-stereo
 
 ### 2. Audio Edit Studio
 Modes: Audio Trimmer · fade-in · fade-out · volume · reverse · normalizer ·
-noise reducer · noise gate · hum reducer · silence trim
+noise reducer · noise gate · hum reducer · silence trim  
 Slugs: audio-trimmer, audio-volume-control, audio-reverser, audio-normalizer,
 voice-noise-reducer, voice-noise-gate, audio-hum-reducer, (+ new fade/silence)
 
 ### 3. Audio Analyze Studio
 Modes: File Inspector · peak meter · RMS · silence detector · DC offset ·
-waveform · WebCodecs check · **LUFS meter** (new) · spectrogram (new)
+waveform · WebCodecs check · **LUFS meter** (new) · spectrogram (new)  
 Slugs: audio-file-inspector, audio-peak-meter, audio-rms-meter,
 audio-silence-detector, audio-dc-offset-checker, audio-waveform-generator,
 webcodecs-audio-checker, (+ new)
 
 ### 4. Audio Calc Studio
-Modes: bitrate ↔ size ↔ duration · platform size presets
+Modes: bitrate ↔ size ↔ duration · platform size presets  
 Slugs: audio-bitrate-calculator, audio-duration-tool,
 *-audio-file-size-calculator (collapsed)
 
@@ -77,24 +77,24 @@ Complete private practice / karaoke / remix workspace (Moises-class depth, local
 | **Export** | Each stem WAV/MP3 · custom mix · karaoke instrumental only |
 | **Import** | Local file only (user rights) · mic · no Spotify/Apple DRM download |
 
-**Slugs (deep-links into Music Studio modes):**
-music-separator · music-duet · music-karaoke · music-stem-mixer · music-practice
+**Slugs (deep-links into Music Studio modes):**  
+music-separator · music-duet · music-karaoke · music-stem-mixer · music-practice  
 (and related audio-* redirects where useful)
 
-**Privacy:** Browser ONNX/WebGPU separation preferred; server GPU only if configured and labeled.
+**Privacy:** Browser ONNX/WebGPU separation preferred; server GPU only if configured and labeled.  
 **Legal copy:** “Use files you own or have rights to. enV does not download DRM-protected streams.”
 
 ### 6. Audio Transcribe Studio
-Modes: Audio to Text · Audio to Subtitles
-Slugs: audio-to-text, audio-to-subtitles
+Modes: Audio to Text · Audio to Subtitles  
+Slugs: audio-to-text, audio-to-subtitles  
 (Only active when STT configured)
 
 ### 7. Audio Import Studio
-Modes: local file · mic recorder · optional YouTube URL (if service configured)
+Modes: local file · mic recorder · optional YouTube URL (if service configured)  
 Slugs: youtube-audio-extractor (conditional), audio-recorder (new)
 
 ### 8. Audio Platform Guide Studio
-Modes: Podcast · Discord · Spotify · Instagram · Apple Music
+Modes: Podcast · Discord · Spotify · Instagram · Apple Music  
 Collapse all thin `podcast-*`, `discord-*`, `spotify-*`, `instagram-*`,
 `apple-music-*` into one Studio with platform chips + real reference tables
 (bitrate, loudness targets, format). URLs remain as deep-links.
@@ -145,9 +145,9 @@ when it claims local processing.
 | audio-bitrate-converter | Server FFmpeg when configured |
 
 **UI contract for server tools:**
-- Green path when endpoint configured and healthy
-- Amber “Media processor not configured” with admin setup hint
-- Never silent fail / empty Run button with no feedback
+- Green path when endpoint configured and healthy  
+- Amber “Media processor not configured” with admin setup hint  
+- Never silent fail / empty Run button with no feedback  
 
 ### C. STT / YouTube
 
@@ -161,9 +161,9 @@ when it claims local processing.
 
 Rewrite each thin “An Discord audio utility” page as a **redirect or mode** of
 Platform Guide Studio with real content:
-- Recommended bitrate / sample rate
-- Loudness targets (e.g. podcast −16 LUFS, streaming −14 LUFS)
-- Format notes
+- Recommended bitrate / sample rate  
+- Loudness targets (e.g. podcast −16 LUFS, streaming −14 LUFS)  
+- Format notes  
 - “Guidance only — not platform acceptance guarantee”
 
 --------------------------------------------------------------------------------
@@ -175,13 +175,13 @@ Platform Guide Studio with real content:
 #### music-separator
 - Input: local audio file (user-owned)
 - Output stems:
-  - **2-stem:** Vocals · Instrumental
-  - **4-stem (optional):** Vocals · Drums · Bass · Other
+  - **2-stem:** Vocals · Instrumental  
+  - **4-stem (optional):** Vocals · Drums · Bass · Other  
 - Engine priority:
   1. Browser ONNX Runtime Web / WebGPU (UVR-MDX or Demucs-class port)
-  2. Optional server GPU job if configured
-- First model download ~30–70 MB; cache in browser
-- Progress UI; max duration limit documented (e.g. 8–10 min on WASM)
+  2. Optional server GPU job if configured  
+- First model download ~30–70 MB; cache in browser  
+- Progress UI; max duration limit documented (e.g. 8–10 min on WASM)  
 - Download each stem WAV; privacy strip: “Separation runs on this device when using browser model”
 
 #### music-duet
@@ -240,82 +240,82 @@ Platform Guide Studio with real content:
 --------------------------------------------------------------------------------
 
 ## Phase 0 — Inventory & wiring
-- Catalog every audio slug → Studio → mode
-- Fix broken local tools (noise reducer file input, empty shells)
-- Server tools: configured vs not-configured UI
-- Category page: Audio Studios grid
+- Catalog every audio slug → Studio → mode  
+- Fix broken local tools (noise reducer file input, empty shells)  
+- Server tools: configured vs not-configured UI  
+- Category page: Audio Studios grid  
 
 ## Phase 1 — Configure-all local + calc
-- Every local DSP tool passes golden file test
-- Bitrate calculator inverse modes
-- Platform Guide Studio content (not empty)
+- Every local DSP tool passes golden file test  
+- Bitrate calculator inverse modes  
+- Platform Guide Studio content (not empty)  
 
 ## Phase 2 — Music Separator
-- Integrate browser separation model
-- 2-stem MVP → 4-stem
-- Progress, cancel, stem download
+- Integrate browser separation model  
+- 2-stem MVP → 4-stem  
+- Progress, cancel, stem download  
 
 ## Phase 3 — Music Duet + Karaoke
-- Mic + mix + export
-- Pitch/tempo best-effort
+- Mic + mix + export  
+- Pitch/tempo best-effort  
 
 ## Phase 4 — New analyze/edit utilities
-- LUFS, spectrogram, fades, silence trim, pitch, tempo, compressor, EQ, recorder, tone, metronome, local joiner
+- LUFS, spectrogram, fades, silence trim, pitch, tempo, compressor, EQ, recorder, tone, metronome, local joiner  
 
 ## Phase 5 — Server/STT reliability
-- FFmpeg endpoint health check
-- STT configured path + empty state
-- YouTube extractor disclaimer
+- FFmpeg endpoint health check  
+- STT configured path + empty state  
+- YouTube extractor disclaimer  
 
 ## Phase 6 — Mobile + native
-- Mobile file UX, no overflow
-- Kotlin/Swift: calculators, simple meters, recorder contracts
-- Stem AI may remain Web-first
+- Mobile file UX, no overflow  
+- Kotlin/Swift: calculators, simple meters, recorder contracts  
+- Stem AI may remain Web-first  
 
 --------------------------------------------------------------------------------
 # PART 5 — GOLDEN TESTS
 --------------------------------------------------------------------------------
 
-1. Inspector: known WAV → correct duration & sample rate
-2. Trimmer: 0–5s slice exports shorter file
-3. Bitrate calc: 60s × 128 kbps → ~0.94–0.96 MB
-4. Noise reducer: file in → quieter noise floor out
-5. MP3 server: configured → MP3 download; unconfigured → amber message
-6. Separator: short song → vocals + instrumental downloadable
-7. Duet: instrumental + mic → mix export
-8. LUFS: file produces integrated LUFS number + target comparison
-9. Recorder: mic permission → WAV
-10. Platform Guide: Podcast mode shows −16 LUFS guidance
-11. No Spotify “download track” feature exists
-12. Privacy banners present on local and upload tools
+1. Inspector: known WAV → correct duration & sample rate  
+2. Trimmer: 0–5s slice exports shorter file  
+3. Bitrate calc: 60s × 128 kbps → ~0.94–0.96 MB  
+4. Noise reducer: file in → quieter noise floor out  
+5. MP3 server: configured → MP3 download; unconfigured → amber message  
+6. Separator: short song → vocals + instrumental downloadable  
+7. Duet: instrumental + mic → mix export  
+8. LUFS: file produces integrated LUFS number + target comparison  
+9. Recorder: mic permission → WAV  
+10. Platform Guide: Podcast mode shows −16 LUFS guidance  
+11. No Spotify “download track” feature exists  
+12. Privacy banners present on local and upload tools  
 
 --------------------------------------------------------------------------------
 # PART 6 — SUCCESS CRITERIA
 --------------------------------------------------------------------------------
 
-- Every listed tool either **works** or **clearly explains how to configure**
-- Music Separator + Duet ship as real features
-- Template spam collapsed into Platform Guide
-- Studios-first category page
-- No DRM streaming downloader
-- Honest privacy labeling
-- Competitive with privacy-first browser audio kits (not with full Descript cloud)
+- Every listed tool either **works** or **clearly explains how to configure**  
+- Music Separator + Duet ship as real features  
+- Template spam collapsed into Platform Guide  
+- Studios-first category page  
+- No DRM streaming downloader  
+- Honest privacy labeling  
+- Competitive with privacy-first browser audio kits (not with full Descript cloud)  
 
 --------------------------------------------------------------------------------
 # DELIVERABLES
 --------------------------------------------------------------------------------
 
-1. Full implementation through Phase 6 (prioritize 0→3 for user value)
-2. Slug → Studio → mode map
-3. List of new slugs added
-4. Golden test results
-5. Changelog
-6. Audited zip of changed files
+1. Full implementation through Phase 6 (prioritize 0→3 for user value)  
+2. Slug → Studio → mode map  
+3. List of new slugs added  
+4. Golden test results  
+5. Changelog  
+6. Audited zip of changed files  
 
 Start Phase 0 + Phase 1 immediately (configure everything that already exists),
 then Phase 2 Music Separator without waiting for perfect polish elsewhere.
 
-**Positioning line:**
+**Positioning line:**  
 enV Audio — private browser audio studio: convert, edit, analyze, separate stems, and duet. Your files stay on your device.
 
 ================================================================================
