@@ -15,7 +15,7 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.camera.core.CameraSelector
-import androidx.camera.video.AudioConfig
+import androidx.camera.view.video.AudioConfig
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
@@ -58,10 +58,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Effects
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.Effects
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.ExportException
@@ -391,7 +391,7 @@ fun NativeMusicLiveVideoStudio() {
         } }
         AndroidView(
             modifier = Modifier.fillMaxWidth().height(248.dp),
-            factory = { viewContext -> PreviewView(viewContext).apply { controller = this@NativeMusicLiveVideoStudio.controller; scaleType = PreviewView.ScaleType.FILL_CENTER } },
+            factory = { viewContext -> PreviewView(viewContext).also { previewView -> previewView.controller = controller; previewView.scaleType = PreviewView.ScaleType.FILL_CENTER } },
             update = { view -> view.controller = controller },
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -479,7 +479,7 @@ fun NativeMusicLiveVideoStudio() {
                                 }
                                 detectDragGestures(
                                     onDragStart = { offset ->
-                                        activeBandIndex = ((offset.x / size.width.coerceAtLeast(1f)) * (eqBandsDb.size - 1)).toInt().coerceIn(eqBandsDb.indices)
+                                        activeBandIndex = ((offset.x / size.width.coerceAtLeast(1).toFloat()) * (eqBandsDb.size - 1)).toInt().coerceIn(eqBandsDb.indices)
                                         setBandFromY(offset.y)
                                     },
                                     onDrag = { change, _ -> change.consume(); setBandFromY(change.position.y) },
@@ -612,8 +612,8 @@ fun NativeMusicLiveVideoStudio() {
                     val cueMs = (backingCueSeconds * 1000).toLong().coerceAtLeast(0L)
                     val backingMediaItem = MediaItem.Builder().setUri(song).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(cueMs).build()).build()
                     val backingItem = EditedMediaItem.Builder(backingMediaItem).build()
-                    val cameraSequence = EditedMediaItemSequence.withAudioAndVideoFrom(listOf(cameraItem))
-                    val backingSequence = EditedMediaItemSequence.withAudioFrom(listOf(backingItem)).buildUpon().setIsLooping(true).build()
+                    val cameraSequence = EditedMediaItemSequence.Builder(listOf(cameraItem)).build()
+                    val backingSequence = EditedMediaItemSequence.Builder(listOf(backingItem)).setIsLooping(true).build()
                     val composition = Composition.Builder(listOf(cameraSequence, backingSequence)).build()
                     val completion = kotlinx.coroutines.CompletableDeferred<Result<Unit>>()
                     val transformer = Transformer.Builder(context).addListener(object : Transformer.Listener {
