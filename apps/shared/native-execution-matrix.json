@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10024,
-    "active": 10024,
+    "total": 10025,
+    "active": 10025,
     "planned": 0,
     "offlineNative": 7782,
-    "backendNative": 1613,
+    "backendNative": 1614,
     "webOnly": 629,
     "missingActive": 629,
     "divergentActive": 0,
-    "fullyExecutable": 9395
+    "fullyExecutable": 9396
   },
   "tools": [
     {
@@ -90061,6 +90061,15 @@
     {
       "id": "music-practice",
       "name": "Music Practice",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "backend-native",
+      "ios": "backend-native"
+    },
+    {
+      "id": "music-live-video-studio",
+      "name": "Live Video Singing Studio",
       "status": "active",
       "category": "audio",
       "engine": "audio",
