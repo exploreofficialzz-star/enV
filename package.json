@@ -53,7 +53,7 @@
     "check:native-no-web": "node scripts/check-native-no-web-runtime.mjs",
     "check:ai": "node --experimental-strip-types scripts/check-ai.mjs",
     "check:native-ai": "node scripts/check-native-ai.mjs",
-    "check:native-related": "node scripts/check-native-related.mjs",
+    "check:native-related": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-native-related.mjs",
     "check:native-backend-dispatch": "node scripts/check-native-backend-dispatch.mjs",
     "check:native-backend-forms": "node scripts/check-native-backend-forms.mjs",
     "check:native-ui-parity": "node scripts/check-native-ui-parity.mjs",
