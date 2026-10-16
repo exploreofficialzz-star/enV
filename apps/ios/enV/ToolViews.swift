@@ -1967,7 +1967,7 @@ private struct NativeAudioGeneratorToolView: View {
                 result = try NativeAudioWavProcessor.generateMetronome(sampleRateHz: Int(sampleRate) ?? 44_100, bpm: Double(bpm) ?? 120, beatsPerBar: Int(beatsPerBar) ?? 4, bars: Int(bars) ?? 4, denominator: Int(denominator) ?? 4)
             }
             output = result.report; error = nil; selectedExport = result.outputWav; showExport = true
-        } catch { output = ""; error = error.localizedDescription }
+        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
     }
 }
 
@@ -2047,7 +2047,7 @@ private struct NativeAudioWavJoinerToolView: View {
         do {
             let result = try NativeAudioWavProcessor.join(files.map(\.data))
             output = result.report; error = nil; selectedExport = result.outputWav; showExporter = true
-        } catch { output = ""; error = error.localizedDescription }
+        } catch let caughtError { output = ""; error = caughtError.localizedDescription }
     }
 }
 
