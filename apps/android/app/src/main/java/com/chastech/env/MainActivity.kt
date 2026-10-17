@@ -13,6 +13,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
@@ -1669,9 +1670,8 @@ private fun NativeAudioGeneratorToolForm(operation: String, toolName: String) {
     }
 }
 
-private const val NATIVE_AUDIO_RECORD_SAMPLE_RATE = 44_100
+private const val NATIVE_AUDIO_RECORD_FALLBACK_SAMPLE_RATE = 44_100
 private const val NATIVE_AUDIO_RECORD_MAX_SECONDS = 300
-private const val NATIVE_AUDIO_RECORD_MAX_BYTES = NATIVE_AUDIO_RECORD_SAMPLE_RATE * 2 * NATIVE_AUDIO_RECORD_MAX_SECONDS
 
 @Composable
 private fun NativeAudioRecorderToolForm(toolName: String) {
@@ -1687,6 +1687,13 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
     var error by rememberSaveable { mutableStateOf("") }
     var status by rememberSaveable { mutableStateOf("Ready. Recording starts only after microphone permission is granted.") }
     var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    val preferredSampleRate = remember {
+        context.getSystemService(AudioManager::class.java)
+            ?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+            ?.toIntOrNull()
+            ?.takeIf { it in 8_000..192_000 }
+            ?: NATIVE_AUDIO_RECORD_FALLBACK_SAMPLE_RATE
+    }
 
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
         val payload = pendingExport
@@ -1696,7 +1703,7 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(payload) }
                         ?: kotlin.error("Unable to open the destination for writing.")
                 }
-            }.fold({ status = "Saved local microphone recording as 16-bit PCM WAV. No audio was uploaded."; output = "Duration: ${elapsedSeconds}s\nSample rate: 44,100 Hz\nChannels: mono\nFormat: 16-bit PCM WAV\nPrivacy: recorded and exported on this device."; error = "" }, { error = it.message ?: "Unable to save the recording." })
+            }.fold({ status = "Saved local microphone recording as 16-bit PCM WAV. No audio was uploaded."; output = "Duration: ${elapsedSeconds}s\nSample rate: ${preferredSampleRate.toString().replace(Regex("(?<=\\d)(?=(\\d{3})+$)"), ",")} Hz\nChannels: mono\nFormat: 16-bit PCM WAV\nPrivacy: recorded and exported on this device."; error = "" }, { error = it.message ?: "Unable to save the recording." })
             pendingExport = null
         } else pendingExport = null
     }
@@ -1707,9 +1714,10 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
         output = ""
         elapsedSeconds = 0
         levelPercent = 0
-        val sampleRate = NATIVE_AUDIO_RECORD_SAMPLE_RATE
+        val sampleRate = preferredSampleRate
+        val maxBytes = sampleRate * 2 * NATIVE_AUDIO_RECORD_MAX_SECONDS
         val minBuffer = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minBuffer <= 0) { error = "This device does not provide a supported 44.1 kHz mono microphone input."; return }
+        if (minBuffer <= 0) { error = "This device does not provide a supported ${sampleRate} Hz mono microphone input."; return }
         val recorder = runCatching {
             AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuffer * 2, 8192))
         }.getOrElse { error = it.message ?: "Unable to initialize microphone capture."; return }
@@ -1726,14 +1734,14 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
                 val shorts = ShortArray(2048)
                 var lastUiUpdate = 0L
                 val startedAt = android.os.SystemClock.elapsedRealtime()
-                while (isActive && !stopFlag.get() && raw.size() < NATIVE_AUDIO_RECORD_MAX_BYTES) {
+                while (isActive && !stopFlag.get() && raw.size() < maxBytes) {
                     val read = recorder.read(shorts, 0, shorts.size, AudioRecord.READ_BLOCKING)
                     if (read < 0) {
                         if (stopFlag.get()) break
                         throw IllegalStateException("Microphone read failed (code $read). Stop and retry; no server upload was attempted.")
                     }
                     if (read == 0) continue
-                    val writable = minOf(read, (NATIVE_AUDIO_RECORD_MAX_BYTES - raw.size()) / 2)
+                    val writable = minOf(read, (maxBytes - raw.size()) / 2)
                     if (writable <= 0) break
                     var peak = 0.0
                     var sumSquares = 0.0
@@ -1767,7 +1775,7 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
                         pendingExport = com.chastech.env.engine.NativePcmWavEncoder.encodeMonoPcm16Wav(captured, sampleRate, NATIVE_AUDIO_RECORD_MAX_SECONDS)
                         elapsedSeconds = captured.size / (sampleRate * 2)
                         status = if (stopFlag.get()) "Recording stopped and ready to export." else "Five-minute limit reached; recording is ready to export."
-                        output = "Captured ${(captured.size / 1_000_000.0).let { String.format(Locale.US, "%.2f", it) }} MB of raw PCM\nDuration: ${elapsedSeconds}s\nFormat: 44.1 kHz mono, 16-bit PCM WAV\nNo upload: audio remains on this device until you choose to export it."
+                        output = "Captured ${(captured.size / 1_000_000.0).let { String.format(Locale.US, "%.2f", it) }} MB of raw PCM\nDuration: ${elapsedSeconds}s\nFormat: ${sampleRate} Hz mono, 16-bit PCM WAV\nNo upload: audio remains on this device until you choose to export it."
                     } else status = "No audio samples were captured. Check microphone access and try again."
                     audioRecord = null
                     isRecording = false
@@ -1788,7 +1796,10 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
     }
     fun requestStart() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startCapture()
-        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        else {
+            status = "Microphone access is requested only for recording. Android will show a permission prompt; import and offline tools remain available if you deny it."
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
     fun stopCapture() {
         stopRequested?.set(true)
@@ -1803,7 +1814,7 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Text(toolName, style = MaterialTheme.typography.titleMedium)
-        Text("Native microphone recording · 44.1 kHz mono · 16-bit PCM WAV · maximum 5 minutes per take. Audio stays on device; export is initiated by you. Microphone permission is requested only when you press Start.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Native microphone recording · device-rate mono · 16-bit PCM WAV · maximum 5 minutes per take. Audio stays on device; export is initiated by you. Microphone permission is requested only when you press Start; wired headphones are recommended for monitoring.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = CircleShape, color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(12.dp)) {}
             Text(if (isRecording) "Recording" else "Stopped")
@@ -1811,7 +1822,7 @@ private fun NativeAudioRecorderToolForm(toolName: String) {
             Text("${elapsedSeconds}s / ${NATIVE_AUDIO_RECORD_MAX_SECONDS}s", style = MaterialTheme.typography.bodySmall)
         }
         androidx.compose.material3.LinearProgressIndicator(progress = { levelPercent / 100f }, modifier = Modifier.fillMaxWidth(), color = if (levelPercent >= 95) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-        Text("Input level (approximate RMS)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Input level (approximate RMS; clipping is shown in red)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(onClick = { requestStart() }, enabled = !isRecording && recordingJob?.isActive != true, modifier = Modifier.weight(1f)) { Text("Start recording") }
             OutlinedButton(onClick = { stopCapture() }, enabled = isRecording, modifier = Modifier.weight(1f)) { Text("Stop") }

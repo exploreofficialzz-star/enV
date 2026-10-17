@@ -1834,6 +1834,7 @@ private struct NativeAudioRecorderToolView: View {
     @State private var showExporter = false
     @State private var meterTask: Task<Void, Never>?
     @State private var showRecorderNotes = false
+    @State private var routeStatus = "Route: system default"
     private let maximumDuration = 300
 
     var body: some View {
@@ -1848,7 +1849,7 @@ private struct NativeAudioRecorderToolView: View {
                 Spacer(minLength: 0)
             }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
             Button { withAnimation(.easeInOut(duration: 0.18)) { showRecorderNotes.toggle() } } label: { Label(showRecorderNotes ? "Hide recording details" : "Recording details", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
-            if showRecorderNotes { Text("44.1 kHz mono · 16-bit PCM WAV · up to five minutes. The recording stays in this device's temporary directory and is exported only when you choose.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
+            if showRecorderNotes { Text("44.1 kHz mono · 16-bit PCM WAV · up to five minutes. Monitoring is off by default; wired headphones reduce bleed and latency. The recording stays in this device's temporary directory and is exported only when you choose.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
             HStack {
                 Circle().fill(isRecording ? Color.red : Color.gray.opacity(0.55)).frame(width: 10, height: 10)
                 Text(isRecording ? "Recording" : "Stopped").fontWeight(.medium)
@@ -1857,14 +1858,15 @@ private struct NativeAudioRecorderToolView: View {
             }
             ProgressView(value: min(1, max(0, (levelDBFS + 60) / 60)))
                 .tint(levelDBFS > -3 ? .red : .accentColor)
-            Text("Input level: \(String(format: "%.1f", levelDBFS)) dBFS (approximate)").font(.caption).foregroundStyle(.secondary)
+            Text("Input level: \(String(format: "%.1f", levelDBFS)) dBFS (approximate)").font(.caption).foregroundStyle(.secondary).accessibilityLabel("Input level \(String(format: "%.1f", levelDBFS)) decibels full scale, approximate")
+            Text(routeStatus).font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 Button("Start recording") { requestAndStart() }
-                    .buttonStyle(.borderedProminent).disabled(isRecording)
-                Button("Stop") { stopAndPrepareExport() }.buttonStyle(.bordered).disabled(!isRecording)
+                    .buttonStyle(.borderedProminent).frame(minHeight: 44).accessibilityHint("Requests microphone permission only when recording starts.").disabled(isRecording)
+                Button("Stop") { stopAndPrepareExport() }.buttonStyle(.bordered).frame(minHeight: 44).accessibilityLabel("Stop and prepare recording export").disabled(!isRecording)
             }
             Button("Export WAV") { showExporter = pendingExport != nil }
-                .buttonStyle(.borderedProminent).disabled(pendingExport == nil)
+                .buttonStyle(.borderedProminent).frame(minHeight: 44).accessibilityHint("Shares a local 16-bit PCM WAV copy; no upload occurs automatically.").disabled(pendingExport == nil)
             Text(status).font(.footnote).foregroundStyle(.secondary)
             if !output.isEmpty || error != nil { NativeOutputView(output: output, error: error) }
         }
@@ -1876,6 +1878,13 @@ private struct NativeAudioRecorderToolView: View {
             case .failure(let caught): error = caught.localizedDescription
             }
             pendingExport = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { _ in
+            let output = AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName ?? "system default"
+            routeStatus = "Route: \(output)"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in
+            if isRecording { status = "Audio was interrupted. Stop and review the take before exporting." }
         }
         .onDisappear { cleanup() }
     }
