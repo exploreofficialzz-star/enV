@@ -6460,7 +6460,7 @@ struct NativeMusicStudioView: View {
         VStack(spacing: 7) {
             Slider(value: Binding(get: { progress }, set: { newValue in position = duration * newValue; player?.currentTime = position }), in: 0...1).tint(.cyan).disabled(player == nil)
             HStack { Button(isPlaying ? "Pause" : "Play") { togglePlay() }.buttonStyle(.borderedProminent).tint(.red); Button("Return to start") { player?.currentTime = 0; position = 0; isPlaying = false }.buttonStyle(.bordered); Spacer(); Text("\(formatTime(position)) / \(formatTime(duration))").font(.caption.monospaced()).foregroundStyle(.secondary) }
-            HStack { Text("Volume").font(.caption).foregroundStyle(.secondary); Slider(value: $volume, in: 0...1).onChange(of: volume) { _, value in player?.volume = Float(value) } }
+            HStack { Text("Volume").font(.caption).foregroundStyle(.secondary); Slider(value: $volume, in: 0...1).onChange(of: volume) { value in player?.volume = Float(value) } }
             Text(status).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
