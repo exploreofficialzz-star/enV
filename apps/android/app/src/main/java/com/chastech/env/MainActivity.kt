@@ -1329,6 +1329,7 @@ private fun NativeAudioWavJoinerForm(toolName: String) {
     var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
     var output by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
+    var showJoinerNotes by rememberSaveable { mutableStateOf(false) }
     val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) scope.launch {
             runCatching {
@@ -1368,10 +1369,18 @@ private fun NativeAudioWavJoinerForm(toolName: String) {
             pendingExport = null
         } else pendingExport = null
     }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(toolName, style = MaterialTheme.typography.titleMedium)
-        Text("Join 2–32 local PCM WAV files in the order shown. Files must share sample rate and channel count. Combined source size is capped at 100 MB; output is 16-bit PCM WAV and stays on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) { Text("Choose WAV files") }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("⇄", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("enV · AUDIO TOOLS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9))
+                Text(toolName, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text("Arrange · Join · Export WAV", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+            }
+        } }
+        TextButton(onClick = { showJoinerNotes = !showJoinerNotes }, modifier = Modifier.height(40.dp)) { Text(if (showJoinerNotes) "Hide file requirements" else "File requirements") }
+        if (showJoinerNotes) Text("Join 2–32 local PCM WAV files. Inputs must share the same sample rate and channel count. Combined source size is capped at 100 MB; output is 16-bit PCM WAV and stays on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Choose WAV files") }
         files.forEachIndexed { index, file ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 Text("${index + 1}. ${file.name}", modifier = Modifier.weight(1f), maxLines = 2)
@@ -1456,6 +1465,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
     var output by remember(operation) { mutableStateOf("") }
     var error by remember(operation) { mutableStateOf("") }
     var sessionNotice by remember(operation) { mutableStateOf("") }
+    var showFormatNotes by rememberSaveable(operation) { mutableStateOf(false) }
     var startSeconds by rememberSaveable(operation) { mutableStateOf("0") }
     var endSeconds by rememberSaveable(operation) { mutableStateOf("5") }
     var gainPercent by rememberSaveable(operation) { mutableStateOf("100") }
@@ -1531,10 +1541,18 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
     val analyzer = operation in setOf("inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(toolName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        Text("Native offline WAV tool. Processing happens on this device. This native path supports uncompressed PCM WAV (8/16/24/32-bit) and 32-bit float WAV; use the browser-local tool for compressed input such as MP3, M4A or OGG.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth()) { Text(if (selectedName.isBlank()) "Choose WAV file" else "Choose another WAV · $selectedName") }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("∿", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("enV · AUDIO WORKSPACE", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9))
+                Text(toolName, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text(if (analyzer) "Inspect · Measure · Review" else "Edit · Process · Export WAV", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+            }
+        } }
+        TextButton(onClick = { showFormatNotes = !showFormatNotes }, modifier = Modifier.height(40.dp)) { Text(if (showFormatNotes) "Hide file requirements" else "File requirements") }
+        if (showFormatNotes) Text("Runs locally. Native editing supports PCM WAV (8/16/24/32-bit) and 32-bit float WAV. Use the browser-local tool for compressed inputs such as MP3, M4A, OGG or FLAC.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { openLauncher.launch(arrayOf("audio/wav", "audio/x-wav", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (selectedName.isBlank()) "Choose WAV file" else "Choose another WAV · $selectedName") }
         if (sessionNotice.isNotBlank()) Text(sessionNotice, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         if (selectedBytes == null && NativeAudioSessionStore.hasAvailable(context)) OutlinedButton(onClick = { restoreLastSource() }, modifier = Modifier.fillMaxWidth()) { Text("Restore previous local source") }
         if (NativeAudioSessionStore.hasAvailable(context)) TextButton(onClick = { NativeAudioSessionStore.clear(context); sessionNotice = "Saved source removed from this device. Current in-memory selection is unchanged." }, modifier = Modifier.fillMaxWidth()) { Text("Forget saved source") }
@@ -1608,6 +1626,7 @@ private fun NativeAudioGeneratorToolForm(operation: String, toolName: String) {
     var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
     var output by remember(operation) { mutableStateOf("") }
     var error by remember(operation) { mutableStateOf("") }
+    var showToolNotes by rememberSaveable(operation) { mutableStateOf(false) }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
         val payload = pendingExport
         if (uri != null && payload != null) {
@@ -1617,9 +1636,17 @@ private fun NativeAudioGeneratorToolForm(operation: String, toolName: String) {
         pendingExport = null
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(toolName, style = MaterialTheme.typography.titleMedium)
-        Text("Generated audio is rendered locally and exported as 16-bit PCM WAV. No upload or account required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(if (operation == "generate-tone") "∿" else "♩", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("enV · AUDIO TOOLS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9))
+                Text(toolName, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text(if (operation == "generate-tone") "Shape · Frequency · Duration" else "Tempo · Meter · Click track", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+            }
+        } }
+        TextButton(onClick = { showToolNotes = !showToolNotes }, modifier = Modifier.height(40.dp)) { Text(if (showToolNotes) "Hide format details" else "Format details") }
+        if (showToolNotes) Text("Generated on this device as 16-bit PCM WAV. No upload or account is required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InputField(sampleRate, { sampleRate = it }, "Sample rate (8000–192000 Hz)", singleLine = true)
         if (operation == "generate-tone") {
             InputField(waveform, { waveform = it.trim().lowercase() }, "Waveform: sine, square, saw or noise", singleLine = true)

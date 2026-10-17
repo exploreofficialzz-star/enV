@@ -1833,13 +1833,22 @@ private struct NativeAudioRecorderToolView: View {
     @State private var pendingExport: Data?
     @State private var showExporter = false
     @State private var meterTask: Task<Void, Never>?
+    @State private var showRecorderNotes = false
     private let maximumDuration = 300
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            Text("Native microphone recording · 44.1 kHz mono · 16-bit PCM WAV · maximum 5 minutes per take. The recording is written to this device's temporary directory and only exported when you choose.")
-                .font(.footnote).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "record.circle").font(.system(size: 27, weight: .semibold)).foregroundStyle(Color.red.opacity(0.9)).frame(width: 48, height: 48).background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("enV · AUDIO TOOLS").font(.caption2.weight(.semibold)).tracking(1.1).foregroundStyle(Color.cyan)
+                    Text(title).font(.title3.weight(.semibold))
+                    Text("Record · Monitor · Export WAV").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showRecorderNotes.toggle() } } label: { Label(showRecorderNotes ? "Hide recording details" : "Recording details", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
+            if showRecorderNotes { Text("44.1 kHz mono · 16-bit PCM WAV · up to five minutes. The recording stays in this device's temporary directory and is exported only when you choose.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
             HStack {
                 Circle().fill(isRecording ? Color.red : Color.gray.opacity(0.55)).frame(width: 10, height: 10)
                 Text(isRecording ? "Recording" : "Stopped").fontWeight(.medium)
@@ -1997,11 +2006,21 @@ private struct NativeAudioGeneratorToolView: View {
     @State private var error: String?
     @State private var selectedExport: Data?
     @State private var showExport = false
+    @State private var showToolNotes = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            Text("Audio is generated on this device and exported as 16-bit PCM WAV. No server or account is required.").font(.footnote).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: operation == "generate-tone" ? "waveform" : "metronome").font(.system(size: 25, weight: .semibold)).foregroundStyle(Color.cyan).frame(width: 48, height: 48).background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("enV · AUDIO TOOLS").font(.caption2.weight(.semibold)).tracking(1.1).foregroundStyle(Color.cyan)
+                    Text(title).font(.title3.weight(.semibold))
+                    Text(operation == "generate-tone" ? "Shape · Frequency · Duration" : "Tempo · Meter · Click track").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showToolNotes.toggle() } } label: { Label(showToolNotes ? "Hide format details" : "Format details", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
+            if showToolNotes { Text("Generated on this device as 16-bit PCM WAV. No server or account is required.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
             NativeInputField(title: "Sample rate (8,000–192,000 Hz)", text: $sampleRate)
             if operation == "generate-tone" {
                 NativeInputField(title: "Waveform: sine, square, saw or noise", text: $waveform)
@@ -2053,13 +2072,22 @@ private struct NativeAudioWavJoinerToolView: View {
     @State private var error: String?
     @State private var showImporter = false
     @State private var showExporter = false
+    @State private var showJoinerNotes = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            Text("Join 2–32 local PCM WAV files in the order shown. All inputs must have the same sample rate and channel count. Combined source size is capped at 100 MB; output is a 16-bit PCM WAV created on this device.")
-                .font(.footnote).foregroundStyle(.secondary)
-            Button("Choose WAV files") { showImporter = true }.buttonStyle(.borderedProminent)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.left.arrow.right").font(.system(size: 25, weight: .semibold)).foregroundStyle(Color.cyan).frame(width: 48, height: 48).background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("enV · AUDIO TOOLS").font(.caption2.weight(.semibold)).tracking(1.1).foregroundStyle(Color.cyan)
+                    Text(title).font(.title3.weight(.semibold))
+                    Text("Arrange · Join · Export WAV").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showJoinerNotes.toggle() } } label: { Label(showJoinerNotes ? "Hide file requirements" : "File requirements", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
+            if showJoinerNotes { Text("Join 2–32 local PCM WAV files. Inputs must share the same sample rate and channel count. Combined source size is capped at 100 MB; output is 16-bit PCM WAV created on this device.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
+            Button("Choose WAV files") { showImporter = true }.buttonStyle(.borderedProminent).frame(maxWidth: .infinity, alignment: .leading)
             ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
                 HStack(spacing: 8) {
                     Text("\(index + 1). \(file.name)").lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
@@ -2130,6 +2158,7 @@ private struct NativeAudioWaveFileToolView: View {
     @State private var sessionNotice = ""
     @State private var showImporter = false
     @State private var showExporter = false
+    @State private var showFileNotes = false
     @State private var values: [String: String] = [
         "start": "0", "end": "5", "gain": "100", "semitones": "2", "speed": "0.8", "rate": "48000",
         "noise": "0.8", "gate": "-42", "hum": "50", "silence": "-50", "fade": "1000", "low": "0", "mid": "0", "high": "0",
@@ -2140,10 +2169,18 @@ private struct NativeAudioWaveFileToolView: View {
     private var exportFilename: String { "\(selectedName.isEmpty ? "env-audio" : selectedName)-enV.wav" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            Text("Native offline WAV tool. The selected file stays on this device. This native route supports uncompressed PCM WAV (8/16/24/32-bit) and 32-bit float WAV; use the browser-local version for MP3, M4A, OGG, FLAC or larger files beyond the native memory limit.")
-                .font(.footnote).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: isAnalyzer ? "waveform.path.ecg" : "slider.horizontal.3").font(.system(size: 25, weight: .semibold)).foregroundStyle(Color.cyan).frame(width: 48, height: 48).background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("enV · AUDIO WORKSPACE").font(.caption2.weight(.semibold)).tracking(1.1).foregroundStyle(Color.cyan)
+                    Text(title).font(.title3.weight(.semibold))
+                    Text(isAnalyzer ? "Inspect · Measure · Review" : "Edit · Process · Export WAV").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showFileNotes.toggle() } } label: { Label(showFileNotes ? "Hide file requirements" : "File requirements", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
+            if showFileNotes { Text("Runs locally and stays on this device. Native editing supports PCM WAV (8/16/24/32-bit) and 32-bit float WAV. Use browser-local tools for compressed MP3, M4A, OGG or FLAC files.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12)) }
             HStack(spacing: 10) {
                 Button(selectedName.isEmpty ? "Choose WAV file" : "Choose another WAV") { showImporter = true }.buttonStyle(.borderedProminent)
                 if !selectedName.isEmpty { Text(selectedName).font(.caption).lineLimit(1) }
@@ -2882,24 +2919,52 @@ private struct NativeMusicLiveVideoStudioView: View {
     @State private var presetExportURL: URL?
     @State private var status = "Import a local backing track to begin."
     @State private var error: String?
+    @State private var showRightsPrivacy = false
+    @State private var showRecorderNotes = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Live Video Singing Studio").font(.title2.weight(.semibold))
-            Text("Record a native camera take over your backing track, then mix the recorded microphone and instrumental into one MP4 on this device.").font(.subheadline).foregroundStyle(.secondary)
-            GroupBox("Rights & privacy") {
-                Text("Use audio you own or have permission to perform. Source audio and recordings stay on device. Wired headphones reduce bleed and latency; Bluetooth may be too delayed for performance monitoring.").font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "waveform").font(.system(size: 27, weight: .semibold)).foregroundStyle(Color.cyan).frame(width: 48, height: 48).background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("enV · PERFORMANCE").font(.caption2.weight(.semibold)).tracking(1.2).foregroundStyle(Color.cyan.opacity(0.9))
+                        Text("Live Video Studio").font(.title2.weight(.semibold)).foregroundStyle(.white)
+                        Text("Choose sound · Capture · Export").font(.caption).foregroundStyle(Color.white.opacity(0.72))
+                    }
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 8) {
+                    Label("On device", systemImage: "checkmark.circle.fill").font(.caption.weight(.medium)).foregroundStyle(Color.mint).padding(.horizontal, 10).padding(.vertical, 6).background(Color.mint.opacity(0.12), in: Capsule())
+                    Label(backingURL == nil ? "Waiting for audio" : "Backing ready", systemImage: backingURL == nil ? "waveform" : "checkmark.circle.fill").font(.caption.weight(.medium)).foregroundStyle(Color.white.opacity(0.9)).padding(.horizontal, 10).padding(.vertical, 6).background(Color.white.opacity(0.08), in: Capsule())
+                }
+            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(LinearGradient(colors: [Color(red: 0.035, green: 0.06, blue: 0.1), Color(red: 0.08, green: 0.12, blue: 0.18)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
+            Button { withAnimation(.easeInOut(duration: 0.18)) { showRightsPrivacy.toggle() } } label: { Label(showRightsPrivacy ? "Hide rights & privacy" : "Rights & privacy · details", systemImage: "info.circle").font(.caption.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).frame(minHeight: 36, alignment: .leading)
+            if showRightsPrivacy {
+                Text("Use audio you own or have permission to perform. Source audio and recordings stay on device. Wired headphones reduce bleed and monitoring delay.").font(.footnote).foregroundStyle(.secondary).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
             }
             GroupBox("Quick start") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(backingURL == nil ? "1 · Add a backing track" : "Backing track ready", systemImage: backingURL == nil ? "1.circle" : "checkmark.circle.fill")
-                    Label("2 · Choose a vocal sound · \(nativeLiveVideoVocalPresets.first(where: { $0.0 == vocalPresetID })?.1 ?? "Clean Studio")", systemImage: "2.circle")
-                    Label(capture.previewReady ? "Camera & mic ready" : "3 · Enable camera & mic, then record", systemImage: capture.previewReady ? "checkmark.circle.fill" : "3.circle")
-                    Text("After your take, mix voice + backing, review the video, then export. Keep advanced controls closed until you need them.").font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Image(systemName: backingURL == nil ? "1.circle" : "checkmark.circle.fill").foregroundStyle(backingURL == nil ? Color.secondary : Color.mint)
+                        Text(backingURL == nil ? "Add a backing track" : "Backing ready").font(.caption.weight(.medium))
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Image(systemName: "2.circle").foregroundStyle(Color.cyan)
+                        Text("Choose a vocal sound").font(.caption.weight(.medium))
+                        Text(nativeLiveVideoVocalPresets.first(where: { $0.0 == vocalPresetID })?.1 ?? "Clean Studio").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Image(systemName: capture.previewReady ? "checkmark.circle.fill" : "3.circle").foregroundStyle(capture.previewReady ? Color.mint : Color.secondary)
+                        Text(capture.previewReady ? "Camera ready" : "Enable camera & mic").font(.caption.weight(.medium))
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
             if capture.previewReady {
-                NativeLiveCameraPreview(session: capture.session).frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 12))
+                NativeLiveCameraPreview(session: capture.session).frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.secondary.opacity(0.15), lineWidth: 1))
             } else {
                 RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.9)).frame(height: 180).overlay(Text("Camera preview starts after permission").font(.subheadline).foregroundStyle(.white))
             }

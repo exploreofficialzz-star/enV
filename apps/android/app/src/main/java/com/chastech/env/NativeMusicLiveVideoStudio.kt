@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -222,6 +224,7 @@ fun NativeMusicLiveVideoStudio() {
     var presetMenuOpen by remember { mutableStateOf(false) }
     var presetSearch by remember { mutableStateOf("") }
     var showAdvancedSound by remember { mutableStateOf(false) }
+    var showRightsPrivacy by remember { mutableStateOf(false) }
     var eqBandsDb by remember { mutableStateOf(List(10) { 0f }) }
     var compressorThresholdDb by remember { mutableFloatStateOf(-20f) }
     var compressorRatio by remember { mutableFloatStateOf(3f) }
@@ -374,19 +377,41 @@ fun NativeMusicLiveVideoStudio() {
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Text("Live Video Singing Studio", style = MaterialTheme.typography.headlineSmall)
-        Text("Capture video and microphone natively, then overlay your local backing track with Media3. Files stay on this device; exporting is an explicit user action.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Rights & privacy", style = MaterialTheme.typography.titleSmall)
-            Text("Use tracks you own or have permission to perform. enV does not download DRM-protected streams. Wired headphones are strongly recommended: Bluetooth monitoring may introduce noticeable latency.", style = MaterialTheme.typography.bodySmall)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("♫", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("enV · PERFORMANCE", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9))
+                        Text("Live Video Studio", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                        Text("Choose sound · Capture · Export", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCBD5E1))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(50), color = Color(0xFF16382F)) { Text("● On device", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFA7F3D0)) }
+                    Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(50), color = Color(0xFF273444)) { Text(if (backingUri != null) "Backing ready" else "Waiting for audio", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFE2E8F0)) }
+                }
+            }
+        }
+        TextButton(onClick = { showRightsPrivacy = !showRightsPrivacy }, modifier = Modifier.height(40.dp)) { Text(if (showRightsPrivacy) "Hide rights & privacy" else "Rights & privacy · details") }
+        if (showRightsPrivacy) Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Use tracks you own or have permission to perform. enV does not download DRM-protected streams. Wired headphones help reduce backing bleed and monitoring delay. Audio and recordings stay on this device until you explicitly export.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }
-        Card { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Quick start", style = MaterialTheme.typography.titleSmall)
-            Text("${if (backingUri != null) "✓" else "1"} · Add a backing track${if (backingUri != null) " — ready" else " — choose a local audio file below"}", style = MaterialTheme.typography.bodyMedium)
-            Text("2 · Choose a vocal sound — currently ${nativeVocalPresetLabel(vocalPreset)}", style = MaterialTheme.typography.bodyMedium)
-            Text("${if (permissionGranted) "✓" else "3"} · Enable camera & mic, then record", style = MaterialTheme.typography.bodyMedium)
-            Text("After recording, choose Mix voice + backing, review the result, then export. You can keep advanced EQ and dynamics closed until you need them.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(if (backingUri != null) "✓ Backing ready" else "1 · Add a backing track", style = MaterialTheme.typography.labelSmall, color = if (backingUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("2 · Choose a vocal sound", style = MaterialTheme.typography.labelSmall)
+                    Text(nativeVocalPresetLabel(vocalPreset), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(if (permissionGranted) "✓ Camera ready" else "3 · Enable camera & mic", style = MaterialTheme.typography.labelSmall, color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                }
+            }
         } }
         AndroidView(
             modifier = Modifier.fillMaxWidth().height(248.dp),

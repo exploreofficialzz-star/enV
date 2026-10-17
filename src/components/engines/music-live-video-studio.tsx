@@ -576,26 +576,30 @@ export function MusicLiveVideoStudio() {
     setCompressorThresholdDb(-20); setCompressorRatio(3); setOutputGainDb(0); setReverbAmount(100); setDelayAmount(100); setMicGain(100); setMonitorMic(false);
     setAmpCharacter("clean"); setAmpDrive(25); setAmpBassDb(0); setAmpMidDb(0); setAmpTrebleDb(0); setPresetSearch(""); setPresetFilter("natural");
   };
-  return <section className="space-y-5 rounded-2xl border border-border bg-card p-4 sm:p-6" aria-labelledby="live-video-title">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="max-w-2xl"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"><Video size={15}/> MUSIC STUDIO · PERFORMANCE</div><h2 id="live-video-title" className="text-2xl font-semibold sm:text-3xl">Live Video Singing Studio</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Choose a backing track, pick a vocal sound, then record and download your performance. Your microphone and backing are mixed locally into one video file.</p></div>
-      <a href="/tools/audio/music-studio" className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-surface-2"><Music2 size={16}/> Full Music Studio</a>
-    </div>
-    <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-sm"><strong>Rights & privacy:</strong> Use audio you own or have permission to perform. enV does not download DRM-protected streams. Camera, microphone and backing audio stay on this device for this workflow; this studio does not upload them. Use wired headphones to minimize backing bleed and feedback.</div>
-    <div className="rounded-xl border border-border bg-surface-2/40 p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommended order</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+  return <section className="space-y-4 sm:space-y-5" aria-labelledby="live-video-title">
+    <header className="relative isolate overflow-hidden rounded-2xl border border-slate-700/70 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 text-white shadow-sm sm:p-6">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 hidden items-center gap-[3px] pr-6 opacity-25 sm:flex">{[18,32,46,25,62,38,78,43,24,54,85,36,48,27,67,41,22,57,72,31,45,64,28,52,82,35,20,49,68,39,26,58,76,33,44,61,28,52].map((height,index)=><span key={index} className="w-[3px] rounded-full bg-cyan-300" style={{height:`${height}%`}}/>)}</div>
+      <div className="relative flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200"><Video size={24}/></span><div className="min-w-0"><div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200/80"><AudioLines size={13}/> enV · Performance</div><h2 id="live-video-title" className="text-2xl font-semibold tracking-tight sm:text-3xl">Live Video Studio</h2><p className="mt-1 text-sm text-slate-300">Choose a sound. Capture a take. Export the mix.</p></div></div>
+        <div className="flex flex-wrap gap-2"><span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 text-xs text-emerald-100"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300"/> On-device capture</span><a href="/tools/audio/music-studio" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10"><Music2 size={16}/> Full Music Studio</a></div>
+      </div>
+      <details className="relative mt-4 border-t border-white/10 pt-3 text-xs text-slate-300"><summary className="min-h-8 w-fit cursor-pointer select-none py-1 pr-2 font-medium text-slate-200 outline-none hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-300">Rights & privacy: local capture</summary><p className="mt-2 max-w-3xl leading-relaxed">Use audio you own or have permission to perform. enV does not download DRM-protected streams. Camera, microphone and backing audio stay on this device for this workflow; this studio does not upload them. Wired headphones help minimize backing bleed, feedback and monitoring delay.</p></details>
+    </header>
+    <p className="sr-only">Mobile workflow: choose a goal, add a short audio file, then use the selected workspace. Processed tracks and takes appear here when ready to review or export.</p>
+    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recommended order</p>
+      <div className="grid grid-cols-3 gap-2">
         <div className={`flex min-w-0 items-start gap-2 rounded-lg border p-2.5 ${sourceBuffer ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-xs font-semibold">{sourceBuffer ? "✓" : "1"}</span><span className="min-w-0"><strong className="block text-sm">Add backing track</strong><span className="mt-0.5 block text-xs text-muted-foreground">Import audio you can use.</span></span></div>
         <div className="flex min-w-0 items-start gap-2 rounded-lg border border-border bg-background p-2.5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-xs font-semibold">2</span><span className="min-w-0"><strong className="block text-sm">Choose vocal sound</strong><span className="mt-0.5 block text-xs text-muted-foreground">Start with a preset; tune later.</span></span></div>
         <div className={`flex min-w-0 items-start gap-2 rounded-lg border p-2.5 ${cameraStream ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-xs font-semibold">{cameraStream ? "✓" : "3"}</span><span className="min-w-0"><strong className="block text-sm">Record & download</strong><span className="mt-0.5 block text-xs text-muted-foreground">Review your take before exporting.</span></span></div>
       </div>
     </div>
-    <nav aria-label="Studio sections" className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-      <a href="#live-backing-panel" className="inline-flex min-h-12 shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-surface-2"><Music2 size={16} aria-hidden="true"/> Backing track</a>
-      <a href="#live-sound-panel" className="inline-flex min-h-12 shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-surface-2"><SlidersHorizontal size={16} aria-hidden="true"/> Vocal sound</a>
-      <a href="#live-capture-panel" className="inline-flex min-h-12 shrink-0 snap-start items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-surface-2"><Video size={16} aria-hidden="true"/> Capture & review</a>
+    <nav aria-label="Studio sections" className="grid grid-cols-3 gap-2">
+      <a href="#live-backing-panel" className="flex min-h-12 min-w-0 items-center justify-start gap-2 rounded-xl border border-border bg-background px-2.5 py-2 text-left text-xs transition hover:border-primary/40 hover:bg-surface-2 sm:px-3 sm:text-sm"><Music2 size={16} aria-hidden="true"/> Backing track</a>
+      <a href="#live-sound-panel" className="flex min-h-12 min-w-0 items-center justify-start gap-2 rounded-xl border border-border bg-background px-2.5 py-2 text-left text-xs transition hover:border-primary/40 hover:bg-surface-2 sm:px-3 sm:text-sm"><SlidersHorizontal size={16} aria-hidden="true"/> Vocal sound</a>
+      <a href="#live-capture-panel" className="flex min-h-12 min-w-0 items-center justify-start gap-2 rounded-xl border border-border bg-background px-2.5 py-2 text-left text-xs transition hover:border-primary/40 hover:bg-surface-2 sm:px-3 sm:text-sm"><Video size={16} aria-hidden="true"/> Capture & review</a>
     </nav>
-    <p className="text-xs leading-relaxed text-muted-foreground lg:hidden">Mobile workflow: choose a goal, add a short audio file, then use the selected workspace. Processed tracks and takes appear here when ready to review or export.</p>
+
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(270px,0.75fr)]">
       <div id="live-capture-panel" className="order-2 min-w-0 space-y-3 lg:order-1">
         <div className="overflow-hidden rounded-2xl border border-border bg-black">

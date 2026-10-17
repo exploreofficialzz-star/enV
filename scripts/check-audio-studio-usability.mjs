@@ -9,18 +9,18 @@ const ios = read('apps/ios/enV/ToolViews.swift');
 
 const checks = [
   ['Music Studio provides goal-first quick start', () => {
-    for (const token of ['What would you like to do?', 'Remove vocals or split stems', 'Practice a song', 'Mix and export stems', 'Record a vocal take', 'Make a karaoke version']) assert.ok(music.includes(token), `Missing quick-start task: ${token}`);
+    for (const token of ['Choose your task', 'Split stems', 'Practice', 'Mix stems', 'Record vocals', 'Karaoke']) assert.ok(music.includes(token), `Missing quick-start task: ${token}`);
     assert.ok(music.includes('chooseWorkspace(key)') || music.includes('chooseWorkspace(nextMode)'), 'Task selection does not route to the selected workspace.');
   }],
   ['Import zone supports browse and drag/drop', () => {
     for (const token of ['music-studio-import', 'onDragOver=', 'onDrop=', 'Release to import your audio file.', 'aria-describedby="music-import-formats"']) assert.ok(music.includes(token), `Missing import affordance: ${token}`);
   }],
   ['Workspace and task progress have visible and semantic status', () => {
-    for (const token of ['Choose a workspace', 'aria-label="Workflow progress"', 'aria-selected={activeMode === key}', 'CheckCircle2', 'Review / export']) assert.ok(music.includes(token), `Missing orientation/status feature: ${token}`);
+    for (const token of ['Choose a workspace', 'aria-label="Workflow progress"', 'aria-selected={activeMode === key}', 'CheckCircle2', 'Add audio', 'Export']) assert.ok(music.includes(token), `Missing orientation/status feature: ${token}`);
   }],
   ['Touch navigation and primary controls meet the 48px web target', () => {
-    assert.ok(music.includes('min-h-12 shrink-0 snap-start'), 'Music workspace tabs should use 48px minimum height.');
-    assert.ok(liveWeb.includes('min-h-12 shrink-0 snap-start'), 'Live video navigation should use 48px minimum height.');
+    assert.ok(music.includes('grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5') && music.includes('min-h-12 min-w-0'), 'Music workspace navigation should be a full-width responsive grid with at least 48px target height.');
+    assert.ok(liveWeb.includes('className="grid grid-cols-3 gap-2"') && liveWeb.includes('min-h-12'), 'Live video navigation should use a compact responsive grid with touch-sized controls.');
     assert.ok(liveWeb.includes('min-h-12 w-full justify-center'), 'Live video primary actions should be large on mobile.');
   }],
   ['Live web capture explains the next action before permissions', () => {
@@ -31,6 +31,13 @@ const checks = [
   }],
   ['iOS native screen includes quick-start and full-width camera controls', () => {
     for (const token of ['GroupBox("Quick start")', 'Add a backing track', 'Choose a vocal sound', 'Enable camera & mic', '.frame(maxWidth: .infinity)']) assert.ok(ios.includes(token), `Missing iOS usability feature: ${token}`);
+  }],
+  ['Visual round uses compact instrument-console headers and optional help', () => {
+    for (const token of ['bg-gradient-to-br from-slate-950', 'text-cyan-200', 'Safety & processing', 'rounded-2xl', 'studioWave']) assert.ok(music.includes(token), `Missing Music Studio visual treatment: ${token}`);
+    for (const token of ['bg-gradient-to-br from-slate-950', 'Rights & privacy: local capture', 'grid grid-cols-3 gap-2']) assert.ok(liveWeb.includes(token), `Missing live studio visual treatment: ${token}`);
+    for (const token of ['ToolIcon', 'Tool notes & format', 'max-w-5xl']) assert.ok(read('src/components/engines/audio-extra-tools.tsx').includes(token), `Missing utility studio visual treatment: ${token}`);
+    for (const token of ['enV · PERFORMANCE', 'showRightsPrivacy', 'Live Video Studio']) assert.ok(android.includes(token), `Missing Android performance-console treatment: ${token}`);
+    for (const token of ['enV · PERFORMANCE', 'showRightsPrivacy', 'Record · Monitor · Export WAV']) assert.ok(ios.includes(token), `Missing iOS performance-console treatment: ${token}`);
   }],
   ['Advanced controls remain available instead of being removed', () => {
     for (const token of ['Ten-band graphic EQ', 'Dynamics & output controls', 'My saved sound setups', 'A/B quick compare', 'Open advanced EQ & dynamics', 'Advanced EQ & dynamics']) {
