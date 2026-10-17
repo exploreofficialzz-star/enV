@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +58,11 @@ private enum class NativeMusicMode(val label: String) { ARRANGEMENT("Arrangement
 @Composable
 fun NativeMusicStudio() {
     val context = LocalContext.current
+    val dark = isSystemInDarkTheme()
+    val ink = if (dark) Color.White else Color.Black
+    val canvas = if (dark) Color.Black else Color.White
+    val chrome = if (dark) Color(0xFF0A0C10) else Color(0xFFF4F4F5)
+    val muted = if (dark) Color(0xFF94A3B8) else Color(0xFF64748B)
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var sourceName by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf(NativeMusicMode.ARRANGEMENT) }
@@ -84,22 +90,22 @@ fun NativeMusicStudio() {
         while (true) { positionMs = player.currentPosition.coerceAtLeast(0L); delay(120) }
     }
     DisposableEffect(player) { onDispose { player.release() } }
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text("↩", color = Color.White, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { mode = NativeMusicMode.ARRANGEMENT })
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f).background(Color(0xFF1B2029), RoundedCornerShape(24.dp)).padding(4.dp)) {
+    Column(Modifier.fillMaxSize().background(canvas)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(chrome).padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text("↩", color = ink, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { mode = NativeMusicMode.ARRANGEMENT })
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f).background(if (dark) Color(0xFF1B2029) else Color(0xFFE4E4E7), RoundedCornerShape(24.dp)).padding(4.dp)) {
                 NativeToolButton("▥", mode == NativeMusicMode.ARRANGEMENT) { mode = NativeMusicMode.ARRANGEMENT }
                 NativeToolButton("♩", mode == NativeMusicMode.EDITOR) { mode = NativeMusicMode.EDITOR }
                 NativeToolButton("⚙", mode == NativeMusicMode.PADS) { mode = NativeMusicMode.PADS }
             }
-            Text("☁", color = Color.White, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { status = "Project state remains local on this device." })
+            Text("☁", color = ink, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { status = "Project state remains local on this device." })
         }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-            Text("${formatNativeTime(positionMs)}", color = Color(0xFF94A3B8), fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text("${formatNativeTime(durationMs)}", color = Color(0xFF94A3B8), fontSize = 11.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(chrome).padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Text("${formatNativeTime(positionMs)}", color = muted, fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text("${formatNativeTime(durationMs)}", color = muted, fontSize = 11.sp)
         }
-        Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
+        Box(Modifier.weight(1f).fillMaxWidth().background(canvas)) {
             Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                Row(Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("TRACKS", color = Color(0xFF64748B), fontSize = 10.sp); Text("TIMELINE / BARS", color = Color(0xFF64748B), fontSize = 10.sp) }
+                Row(Modifier.fillMaxWidth().background(chrome).padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("TRACKS", color = Color(0xFF64748B), fontSize = 10.sp); Text("TIMELINE / BARS", color = Color(0xFF64748B), fontSize = 10.sp) }
                 if (mode == NativeMusicMode.ARRANGEMENT) {
                     val names = listOf("Lead Vox", "Background Vox", "Track 3", "Keys", "Lead", "Drums", "Strings")
                     val colors = listOf(Color(0xFF10B981), Color(0xFFEF4444), Color(0xFFA855F7), Color(0xFF3B82F6), Color(0xFFEC4899), Color(0xFFF97316), Color(0xFF22D3EE))
@@ -112,14 +118,14 @@ fun NativeMusicStudio() {
                 }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 9.dp)) {
-            Text("＋", color = Color.White, fontSize = 28.sp, modifier = Modifier.clickable { picker.launch(arrayOf("audio/*", "video/*")) })
-            Text("↶", color = Color.White, fontSize = 24.sp); Text("|◀", color = Color.White, fontSize = 20.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().background(chrome).padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text("＋", color = ink, fontSize = 28.sp, modifier = Modifier.clickable { picker.launch(arrayOf("audio/*", "video/*")) })
+            Text("↶", color = ink, fontSize = 24.sp); Text("|◀", color = ink, fontSize = 20.sp)
             Button(onClick = { if (isPlaying) player.pause() else { if (sourceUri == null) status = "Import audio before starting transport." else player.play() } }, modifier = Modifier.size(58.dp), shape = androidx.compose.foundation.shape.CircleShape, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFEF2D1A))) { Text(if (isPlaying) "Ⅱ" else "●", fontSize = 20.sp) }
-            Text("▶", color = Color.White, fontSize = 24.sp); Text("↷", color = Color.White, fontSize = 24.sp); Spacer(Modifier.weight(1f)); Text("☷", color = Color.White, fontSize = 22.sp); Text("♩", color = Color.White, fontSize = 22.sp)
+            Text("▶", color = ink, fontSize = 24.sp); Text("↷", color = ink, fontSize = 24.sp); Spacer(Modifier.weight(1f)); Text("☷", color = ink, fontSize = 22.sp); Text("♩", color = ink, fontSize = 22.sp)
         }
-        Slider(value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f, onValueChange = { value -> if (durationMs > 0) player.seekTo((durationMs * value).toLong()) }, enabled = durationMs > 0, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(10.dp)) { Text(sourceName.ifBlank { "No source loaded" }, color = Color(0xFF94A3B8), fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text(status, color = Color(0xFF94A3B8), fontSize = 11.sp) }
+        Slider(value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f, onValueChange = { value -> if (durationMs > 0) player.seekTo((durationMs * value).toLong()) }, enabled = durationMs > 0, modifier = Modifier.fillMaxWidth().background(chrome).padding(horizontal = 10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(chrome).padding(10.dp)) { Text(sourceName.ifBlank { "No source loaded" }, color = muted, fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text(status, color = muted, fontSize = 11.sp) }
     }
 }
 

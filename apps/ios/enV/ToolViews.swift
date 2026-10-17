@@ -6383,30 +6383,35 @@ struct NativeMusicStudioView: View {
     @State private var volume = 1.0
     @State private var status = "Import a local audio source to begin."
     @State private var timer: Timer?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let dark = colorScheme == .dark
+        let ink = dark ? Color.white : Color.black
+        let canvas = dark ? Color.black : Color.white
+        let chrome = dark ? Color(red: 0.04, green: 0.05, blue: 0.06) : Color(red: 0.96, green: 0.96, blue: 0.97)
         ZStack {
-            Color.black.ignoresSafeArea()
+            canvas.ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    Button("↩") { mode = .arrangement }.font(.title2).foregroundStyle(.white)
+                    Button("↩") { mode = .arrangement }.font(.title2).foregroundStyle(ink)
                     HStack(spacing: 2) {
                         NativeIOSToolButton(label: "▥", selected: mode == .arrangement) { mode = .arrangement }
                         NativeIOSToolButton(label: "♩", selected: mode == .editor) { mode = .editor }
                         NativeIOSToolButton(label: "⚙", selected: mode == .pads) { mode = .pads }
                     }.padding(4).background(Color(red: 0.1, green: 0.12, blue: 0.16), in: Capsule())
                     Spacer()
-                    Button("＋") { isImporterPresented = true }.font(.title2).foregroundStyle(.white)
-                    Button("☁") { status = "Project state remains local on this device." }.font(.title2).foregroundStyle(.white)
-                }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
-                HStack { Text(formatTime(position)).font(.caption.monospaced()).foregroundStyle(.secondary); Spacer(); Text(formatTime(duration)).font(.caption.monospaced()).foregroundStyle(.secondary) }.padding(.horizontal, 14).padding(.vertical, 6).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                    Button("＋") { isImporterPresented = true }.font(.title2).foregroundStyle(ink)
+                    Button("☁") { status = "Project state remains local on this device." }.font(.title2).foregroundStyle(ink)
+                }.padding(.horizontal, 14).padding(.vertical, 10).background(chrome)
+                HStack { Text(formatTime(position)).font(.caption.monospaced()).foregroundStyle(.secondary); Spacer(); Text(formatTime(duration)).font(.caption.monospaced()).foregroundStyle(.secondary) }.padding(.horizontal, 14).padding(.vertical, 6).background(chrome)
                 ScrollView {
                     VStack(spacing: 0) {
-                        HStack { Text("TRACKS"); Spacer(); Text("TIMELINE / BARS") }.font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(.secondary).padding(10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                        HStack { Text("TRACKS"); Spacer(); Text("TIMELINE / BARS") }.font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(.secondary).padding(10).background(chrome)
                         Group { switch mode { case .arrangement: arrangement; case .editor: editor; case .pads: pads } }
                     }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black)
-                transport.padding(.horizontal, 12).padding(.vertical, 10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(canvas)
+                transport.padding(.horizontal, 12).padding(.vertical, 10).background(chrome)
             }
         }
 
@@ -6420,6 +6425,8 @@ struct NativeMusicStudioView: View {
     }
 
     private var arrangement: some View {
+        let canvas = colorScheme == .dark ? Color.black : Color.white
+        let rule = colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.08)
         let names = ["Lead Vox", "Background Vox", "Track 3", "Keys", "Lead", "Drums", "Strings"]
         let colors: [Color] = [.green, .red, .purple, .blue, .pink, .orange, .cyan]
         return VStack(spacing: 0) {
@@ -6428,37 +6435,40 @@ struct NativeMusicStudioView: View {
                     HStack(spacing: 8) { Text(index == 0 ? "♩" : index == 5 ? "▥" : "•").foregroundStyle(colors[index]); Text(name).font(.caption.bold()).foregroundStyle(colors[index]).lineLimit(1) }.frame(width: 125, alignment: .leading).padding(.horizontal, 10)
                     ZStack(alignment: .leading) { RoundedRectangle(cornerRadius: 6).fill(colors[index].opacity(sourceURL == nil ? 0.08 : 0.28)).frame(height: 48); if sourceURL != nil { HStack(spacing: 4) { ForEach(0..<18, id: \.self) { tick in Capsule().fill(colors[index].opacity(0.75)).frame(width: 3, height: CGFloat(8 + ((tick * 17 + index * 11) % 30))) } }.padding(.horizontal, 12) } }
                     .frame(maxWidth: .infinity).padding(.horizontal, 8)
-                }.frame(minHeight: 64).background(Color.black).overlay(alignment: .bottom) { Divider().overlay(Color.white.opacity(0.06)) }
+                }.frame(minHeight: 64).background(canvas).overlay(alignment: .bottom) { Divider().overlay(rule) }
             }
         }
     }
 
     private var editor: some View {
+        let canvas = colorScheme == .dark ? Color.black : Color.white
+        let ink = colorScheme == .dark ? Color.white : Color.black
         VStack(alignment: .leading, spacing: 12) {
             label("TRACK EDITOR")
-            Text(sourceName.isEmpty ? "No audio track selected" : sourceName).font(.headline).foregroundStyle(.white)
+            Text(sourceName.isEmpty ? "No audio track selected" : sourceName).font(.headline).foregroundStyle(ink)
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 10).fill(Color.black).frame(height: 170)
+                RoundedRectangle(cornerRadius: 10).fill(canvas).frame(height: 170)
                 if sourceURL == nil { Text("Import audio to inspect the track").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity) }
                 else { RoundedRectangle(cornerRadius: 2).fill(.cyan).frame(width: 2, height: 170).offset(x: 8 + 300 * progress) }
             }
             Text("The native editor follows the real player position. Sample-level waveform analysis is kept in the browser engine where decoded PCM is available.").font(.caption).foregroundStyle(.secondary)
-        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        }.padding().background(canvas.opacity(colorScheme == .dark ? 0.06 : 0.96), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var pads: some View {
+        let canvas = colorScheme == .dark ? Color.black : Color.white
         VStack(alignment: .leading, spacing: 12) {
             HStack { label("PERFORMANCE PADS"); Spacer(); Button("Stop") { player?.stop(); isPlaying = false } .buttonStyle(.bordered) }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0..<8, id: \.self) { index in
                     Button { triggerPad(index) } label: {
                         VStack(alignment: .leading) { Text(String(format: "%02d", index + 1)).font(.title2.bold()); Spacer(); Text(sourceURL == nil ? "Load source" : "Slice \(index + 1) / 8").font(.caption) }
-                            .foregroundStyle(.white).padding(12).frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading).background([Color.green, .cyan, .purple, .orange][index % 4].opacity(sourceURL == nil ? 0.12 : 0.28), in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke([Color.green, .cyan, .purple, .orange][index % 4].opacity(0.7)))
+                            .foregroundStyle(colorScheme == .dark ? .white : .black).padding(12).frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading).background([Color.green, .cyan, .purple, .orange][index % 4].opacity(sourceURL == nil ? 0.12 : 0.28), in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke([Color.green, .cyan, .purple, .orange][index % 4].opacity(0.7)))
                     }.disabled(sourceURL == nil)
                 }
             }
             Text("Pads retrigger real source slices with predictable seeking; quantized MIDI launching is not claimed by this native path.").font(.caption).foregroundStyle(.secondary)
-        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        }.padding().background(canvas.opacity(colorScheme == .dark ? 0.06 : 0.96), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var transport: some View {
