@@ -346,7 +346,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if ["music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet"].contains(tool.id) { NativeMusicStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -6359,4 +6359,134 @@ extension NativeBarcodeEngine {
 
 private extension String {
     func leftPadded(to length:Int,with character:Character)->String { String(repeating:String(character),count:max(0,length-count))+self }
+}
+import SwiftUI
+import AVFoundation
+import UniformTypeIdentifiers
+
+private enum NativeMusicStudioMode: String, CaseIterable, Identifiable {
+    case arrangement = "Arrangement"
+    case editor = "Waveform editor"
+    case pads = "Performance pads"
+    var id: String { rawValue }
+}
+
+struct NativeMusicStudioView: View {
+    @State private var sourceURL: URL?
+    @State private var sourceName = ""
+    @State private var mode: NativeMusicStudioMode = .arrangement
+    @State private var player: AVAudioPlayer?
+    @State private var isImporterPresented = false
+    @State private var isPlaying = false
+    @State private var position: Double = 0
+    @State private var duration: Double = 0
+    @State private var volume = 1.0
+    @State private var status = "Import a local audio source to begin."
+    @State private var timer: Timer?
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.03, green: 0.04, blue: 0.055).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("enV / AUDIO CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.cyan)
+                        Text("Music Studio").font(.largeTitle.bold()).foregroundStyle(.white)
+                        Text(sourceName.isEmpty ? "Arrangement, waveform and performance workspace" : sourceName).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Import") { isImporterPresented = true }.buttonStyle(.borderedProminent).tint(.cyan)
+                }
+                Picker("Workspace", selection: $mode) { ForEach(NativeMusicStudioMode.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
+                Group {
+                    switch mode {
+                    case .arrangement: arrangement
+                    case .editor: editor
+                    case .pads: pads
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                transport
+            }
+            .padding()
+        }
+        .fileImporter(isPresented: $isImporterPresented, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls): if let url = urls.first { load(url) }
+            case .failure(let error): status = "Could not import audio: \(error.localizedDescription)"
+            }
+        }
+        .onDisappear { timer?.invalidate(); player?.stop() }
+    }
+
+    private var arrangement: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            label("ARRANGEMENT / TIMELINE")
+            NativeIOSTrackRow(title: "Original source", enabled: sourceURL != nil, color: .green, progress: progress)
+            NativeIOSTrackRow(title: "Audio regions", enabled: sourceURL != nil, color: .cyan, progress: progress)
+            Text("Native arrangement transport uses the imported source. Additional track editing and stem separation remain available in the Web Music Studio.").font(.caption).foregroundStyle(.secondary)
+        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            label("TRACK EDITOR")
+            Text(sourceName.isEmpty ? "No audio track selected" : sourceName).font(.headline).foregroundStyle(.white)
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 10).fill(Color.black).frame(height: 170)
+                if sourceURL == nil { Text("Import audio to inspect the track").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity) }
+                else { RoundedRectangle(cornerRadius: 2).fill(.cyan).frame(width: 2, height: 170).offset(x: 8 + 300 * progress) }
+            }
+            Text("The native editor follows the real player position. Sample-level waveform analysis is kept in the browser engine where decoded PCM is available.").font(.caption).foregroundStyle(.secondary)
+        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var pads: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack { label("PERFORMANCE PADS"); Spacer(); Button("Stop") { player?.stop(); isPlaying = false } .buttonStyle(.bordered) }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                ForEach(0..<8, id: \.self) { index in
+                    Button { triggerPad(index) } label: {
+                        VStack(alignment: .leading) { Text(String(format: "%02d", index + 1)).font(.title2.bold()); Spacer(); Text(sourceURL == nil ? "Load source" : "Slice \(index + 1) / 8").font(.caption) }
+                            .foregroundStyle(.white).padding(12).frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading).background([Color.green, .cyan, .purple, .orange][index % 4].opacity(sourceURL == nil ? 0.12 : 0.28), in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke([Color.green, .cyan, .purple, .orange][index % 4].opacity(0.7)))
+                    }.disabled(sourceURL == nil)
+                }
+            }
+            Text("Pads retrigger real source slices with predictable seeking; quantized MIDI launching is not claimed by this native path.").font(.caption).foregroundStyle(.secondary)
+        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var transport: some View {
+        VStack(spacing: 7) {
+            Slider(value: Binding(get: { progress }, set: { newValue in progress = newValue; player?.currentTime = duration * newValue }), in: 0...1).tint(.cyan).disabled(player == nil)
+            HStack { Button(isPlaying ? "Pause" : "Play") { togglePlay() }.buttonStyle(.borderedProminent).tint(.red); Button("Return to start") { player?.currentTime = 0; position = 0; isPlaying = false }.buttonStyle(.bordered); Spacer(); Text("\(formatTime(position)) / \(formatTime(duration))").font(.caption.monospaced()).foregroundStyle(.secondary) }
+            HStack { Text("Volume").font(.caption).foregroundStyle(.secondary); Slider(value: $volume, in: 0...1).onChange(of: volume) { _, value in player?.volume = Float(value) } }
+            Text(status).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var progress: Double { duration > 0 ? min(1, max(0, position / duration)) : 0 }
+    private func label(_ text: String) -> some View { Text(text).font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(1.5).foregroundStyle(.cyan) }
+    private func load(_ url: URL) {
+        guard url.startAccessingSecurityScopedResource() else { status = "The selected audio file could not be opened."; return }
+        sourceURL = url; sourceName = url.lastPathComponent
+        do { player = try AVAudioPlayer(contentsOf: url); player?.prepareToPlay(); player?.volume = Float(volume); duration = player?.duration ?? 0; status = "Local source loaded. Playback and pad slices stay on this device."; startTimer() } catch { status = "Could not decode this audio file: \(error.localizedDescription)" }
+    }
+    private func startTimer() { timer?.invalidate(); timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in position = player?.currentTime ?? 0; isPlaying = player?.isPlaying ?? false } }
+    private func togglePlay() { guard let player else { status = "Import audio before starting transport."; return }; if player.isPlaying { player.pause() } else { player.play() }; isPlaying = player.isPlaying }
+    private func triggerPad(_ index: Int) { guard let player, duration > 0 else { status = "Import audio before triggering pads."; return }; player.currentTime = duration * Double(index) / 8; player.play(); isPlaying = true; status = "Pad \(index + 1) playing source slice \(index + 1) of 8." }
+    private func formatTime(_ value: Double) -> String { String(format: "%d:%02d", Int(value) / 60, Int(value) % 60) }
+}
+
+private struct NativeIOSTrackRow: View {
+    let title: String
+    let enabled: Bool
+    let color: Color
+    let progress: Double
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack { Text(title).font(.subheadline.bold()); Spacer(); Text(enabled ? "AUDIO" : "EMPTY").font(.caption2.bold()).foregroundStyle(color) }
+            GeometryReader { geometry in ZStack(alignment: .leading) { RoundedRectangle(cornerRadius: 5).fill(color.opacity(0.16)); RoundedRectangle(cornerRadius: 5).fill(color.opacity(0.35)).frame(width: geometry.size.width * (enabled ? progress : 0)) } }.frame(height: 42)
+        }.padding(10).foregroundStyle(enabled ? .white : .secondary).overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(enabled ? 0.6 : 0.25)))
+    }
 }

@@ -1838,6 +1838,7 @@ private fun NativeAudioToolForm(tool: ToolRecord) {
     val context = LocalContext.current
     val operation = NativeAudioEngine.operationFor(tool) ?: return
     if (operation == "live-video-studio") { NativeMusicLiveVideoStudio(); return }
+    if (operation == "music-studio") { NativeMusicStudio(); return }
     if (operation == "record-mic") {
         NativeAudioRecorderToolForm(tool.name)
         return

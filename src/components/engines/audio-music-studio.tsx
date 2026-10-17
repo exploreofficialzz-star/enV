@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowRight, AudioLines, Captions, CheckCircle2, FileAudio, Gauge, Headphones, Mic, Music2, Radio, Scissors, SlidersHorizontal, Sparkles, Upload, Waves, Zap } from "lucide-react";
 import { strToU8, zipSync } from "fflate";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,11 @@ import { deleteStoredMusicTake, deleteStoredMusicTakes, listStoredMusicTakes, mu
 import { deleteAudioSession, loadAudioSessionFile, saveAudioSessionFile } from "@/lib/engines/audio-session-storage";
 import { connectVocalPreset, VOCAL_PRESETS, type VocalPresetId } from "@/lib/engines/vocal-presets";
 
-type StudioMode = "separate" | "mixer" | "practice" | "duet" | "karaoke";
+type StudioMode = "arrangement" | "edit" | "pads" | "separate" | "mixer" | "practice" | "duet" | "karaoke";
 const MUSIC_STUDIO_TABS = [
+  { label: "Arrangement", slug: "music-studio", key: "arrangement", Icon: Waves },
+  { label: "Waveform editor", slug: "audio-edit-studio", key: "edit", Icon: AudioLines },
+  { label: "Performance pads", slug: "music-practice", key: "pads", Icon: Radio },
   { label: "Split stems", slug: "music-separator", key: "separate", Icon: Scissors },
   { label: "Mix stems", slug: "music-stem-mixer", key: "mixer", Icon: SlidersHorizontal },
   { label: "Practice", slug: "music-practice", key: "practice", Icon: Headphones },
@@ -432,8 +435,31 @@ export function AudioStudioGuide({ studio = "platform", initialPlatform }: { stu
   </section>;
 }
 
+function waveformPeaks(buffer: AudioBuffer | null, bars = 96): number[] {
+  if (!buffer || !buffer.length) return [];
+  const channel = buffer.getChannelData(0);
+  const peaks: number[] = [];
+  const bucket = Math.max(1, Math.floor(channel.length / bars));
+  for (let start = 0; start < channel.length; start += bucket) {
+    let peak = 0;
+    for (let index = start; index < Math.min(channel.length, start + bucket); index++) peak = Math.max(peak, Math.abs(channel[index]));
+    peaks.push(peak);
+  }
+  const max = Math.max(...peaks, 1e-6);
+  return peaks.map((peak) => peak / max);
+}
+
+function trackTone(name: string): { border: string; fill: string; text: string } {
+  const value = name.toLowerCase();
+  if (value.includes("vocal")) return { border: "border-emerald-400/60", fill: "bg-emerald-400/20", text: "text-emerald-200" };
+  if (value.includes("drum")) return { border: "border-amber-400/60", fill: "bg-amber-400/20", text: "text-amber-200" };
+  if (value.includes("bass")) return { border: "border-violet-400/60", fill: "bg-violet-400/20", text: "text-violet-200" };
+  if (value.includes("instrument")) return { border: "border-cyan-400/60", fill: "bg-cyan-400/20", text: "text-cyan-200" };
+  return { border: "border-sky-400/60", fill: "bg-sky-400/20", text: "text-sky-200" };
+}
+
 export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
-  const normalizedMode: StudioMode = mode.includes("duet") ? "duet" : mode.includes("karaoke") ? "karaoke" : mode.includes("stem-mixer") || mode.includes("mixer") ? "mixer" : mode.includes("practice") ? "practice" : "separate";
+  const normalizedMode: StudioMode = mode.includes("audio-edit") ? "edit" : mode.includes("music-studio") && !mode.includes("separator") && !mode.includes("mixer") ? "arrangement" : mode.includes("practice") ? (mode.includes("pads") ? "pads" : "practice") : mode.includes("duet") ? "duet" : mode.includes("karaoke") ? "karaoke" : mode.includes("stem-mixer") || mode.includes("mixer") ? "mixer" : "separate";
   const [activeMode, setActiveMode] = useState<StudioMode>(normalizedMode);
   const [file, setFile] = useState<File | null>(null);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
@@ -469,6 +495,12 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
   const [duetPresetId, setDuetPresetId] = useState<VocalPresetId>("pop");
   const [duetMonitorMic, setDuetMonitorMic] = useState(false);
   const [analysis, setAnalysis] = useState<{ bpm: number | null; key: string | null } | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState("original");
+  const [timelineZoom, setTimelineZoom] = useState(1);
+  const [playheadSeconds, setPlayheadSeconds] = useState(0);
+  const [trackHistory, setTrackHistory] = useState<StemTrack[][]>([]);
+  const [trackFuture, setTrackFuture] = useState<StemTrack[][]>([]);
+  const [activePad, setActivePad] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -484,6 +516,8 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
   const fileLoadSequenceRef = useRef(0);
   const chooseFileRef = useRef<(selected: File | undefined, existingSessionId?: string) => Promise<void>>(async () => undefined);
   const liveMixerRef = useRef<LiveMixerState | null>(null);
+  const padSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const addTrackRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { takesRef.current = takes; }, [takes]);
   useEffect(() => {
@@ -687,7 +721,55 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     } finally { setWorking(false); abortRef.current = null; }
   }
 
-  function updateTrack(id: string, patch: Partial<StemTrack>) { setTracks((current) => current.map((track) => track.id === id ? { ...track, ...patch } : track)); }
+  function updateTrack(id: string, patch: Partial<StemTrack>) {
+    setTracks((current) => {
+      setTrackHistory((history) => [...history, current].slice(-20));
+      setTrackFuture([]);
+      return current.map((track) => track.id === id ? { ...track, ...patch } : track);
+    });
+  }
+  function undoTrackMix() {
+    setTrackHistory((history) => {
+      const previous = history.at(-1);
+      if (!previous) return history;
+      setTracks((current) => { setTrackFuture((future) => [current, ...future].slice(0, 20)); return previous; });
+      return history.slice(0, -1);
+    });
+  }
+  function redoTrackMix() {
+    setTrackFuture((future) => {
+      const next = future[0];
+      if (!next) return future;
+      setTracks((current) => { setTrackHistory((history) => [...history, current].slice(-20)); return next; });
+      return future.slice(1);
+    });
+  }
+  async function addArrangementTrack(selected: File | undefined) {
+    if (!selected) return;
+    try {
+      const buffer = await decodeAudio(selected);
+      setTracks((current) => {
+        const added = { id: makeId(), name: selected.name.replace(/\.[^.]+$/, "") || "Audio track", buffer, volume: 100, muted: false, solo: false };
+        if (current.length || !sourceBuffer) return [...current, added];
+        return [{ id: "original", name: "Original source", buffer: sourceBuffer, volume: 100, muted: false, solo: false }, added];
+      });
+      setStatus(`Added ${selected.name} as a local arrangement track.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not decode the added track."); }
+  }
+  async function triggerPad(index: number) {
+    if (!sourceBuffer) { setError("Choose an audio source before triggering performance pads."); return; }
+    const Ctx = contextConstructor();
+    if (!Ctx) { setError("This browser does not support Web Audio performance pads."); return; }
+    padSourceRef.current?.stop();
+    const context = new Ctx();
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    const start = sourceBuffer.duration * index / 8;
+    const duration = Math.max(0.05, sourceBuffer.duration / 8);
+    source.buffer = sourceBuffer; source.connect(gain).connect(context.destination); source.start(0, start, duration);
+    padSourceRef.current = source; setActivePad(index); setStatus(`Pad ${index + 1} playing from ${start.toFixed(2)}s.`);
+    source.onended = () => { if (padSourceRef.current === source) { padSourceRef.current = null; setActivePad(null); void context.close(); } };
+  }
 
   function stopLiveMixer(updateState = true) {
     const live = liveMixerRef.current;
@@ -813,7 +895,7 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
     if (mixUrlRef.current) URL.revokeObjectURL(mixUrlRef.current);
     sourceUrlRef.current = ""; mixUrlRef.current = ""; sourceKeyRef.current = "";
-    setFile(null); setSourceBuffer(null); setSourceUrl(""); setMixUrl(""); setTracks([]); setAnalysis(null); setStatus("Cleared this Music Studio session and saved takes for its source file."); setProgress(0);
+    setFile(null); setSourceBuffer(null); setSourceUrl(""); setMixUrl(""); setTracks([]); setTrackHistory([]); setTrackFuture([]); setAnalysis(null); setSelectedTrackId("original"); setPlayheadSeconds(0); setStatus("Cleared this Music Studio session and saved takes for its source file."); setProgress(0);
   }
 
   async function renderMix(includeTakes = false, instrumentalsOnly = false): Promise<Blob> {
@@ -981,7 +1063,11 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
       window.history.replaceState(null, "", `${next.pathname}${next.search}${next.hash}`);
     }
   };
-  const studioWave = [18, 31, 23, 48, 37, 59, 26, 40, 72, 35, 24, 54, 83, 44, 29, 63, 38, 24, 50, 70, 32, 19, 42, 61, 34, 49, 76, 30, 22, 46, 64, 28, 39, 56, 24, 43, 68, 33, 20, 50, 72, 36, 25, 45, 60, 30, 41, 55];
+  const sourceWave = useMemo(() => waveformPeaks(sourceBuffer, 96), [sourceBuffer]);
+  const arrangementTracks = useMemo(() => tracks.length ? tracks : sourceBuffer ? [{ id: "original", name: "Original source", buffer: sourceBuffer, volume: 100, muted: false, solo: false }] : [], [tracks, sourceBuffer]);
+  const selectedTrack = arrangementTracks.find((track) => track.id === selectedTrackId) ?? arrangementTracks[0] ?? null;
+  const selectedWave = useMemo(() => waveformPeaks(selectedTrack?.buffer ?? null, 128), [selectedTrack]);
+  const studioWave = sourceWave.length ? sourceWave.map((value) => Math.round(16 + value * 78)) : [18, 31, 23, 48, 37, 59, 26, 40, 72, 35, 24, 54, 83, 44, 29, 63, 38, 24, 50, 70, 32, 19, 42, 61, 34, 49, 76, 30, 22, 46, 64, 28, 39, 56, 24, 43, 68, 33, 20, 50, 72, 36, 25, 45, 60, 30, 41, 55];
 
   return <section className="space-y-5 sm:space-y-6">
     <header className="relative isolate overflow-hidden rounded-[1.75rem] border border-slate-700/80 bg-gradient-to-br from-slate-950 via-[#0b1016] to-slate-900 px-4 py-5 text-white shadow-[0_20px_60px_-30px_rgba(34,211,238,0.5)] sm:px-7 sm:py-7">
@@ -1033,6 +1119,21 @@ export function AudioMusicStudio({ mode = "separate" }: { mode?: string }) {
     </div>
 
     <div id="music-studio-workspace" role="tabpanel" aria-labelledby={`music-tab-${activeMode}`} className="space-y-5">
+    {activeMode === "arrangement" ? <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-100 shadow-xl">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900 px-3 py-2"><span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">Arrangement / timeline</span><span className="text-xs text-slate-400">{selectedTrack ? `${selectedTrack.name} selected` : "Import a source to begin"}</span><span className="ml-auto flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" className="min-h-9 border-slate-700 bg-slate-900 text-slate-100" onClick={() => addTrackRef.current?.click()}>+ Add audio track</Button><Button type="button" size="sm" variant="outline" className="min-h-9 border-slate-700 bg-slate-900 text-slate-100" onClick={undoTrackMix} disabled={!trackHistory.length}>Undo</Button><Button type="button" size="sm" variant="outline" className="min-h-9 border-slate-700 bg-slate-900 text-slate-100" onClick={redoTrackMix} disabled={!trackFuture.length}>Redo</Button></span></div>
+      <input ref={addTrackRef} className="sr-only" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" onChange={(event) => { void addArrangementTrack(event.target.files?.[0]); event.currentTarget.value = ""; }} aria-label="Add audio arrangement track" />
+      <div className="flex items-center gap-3 border-b border-slate-800 px-3 py-2 text-xs text-slate-400"><span className="w-40 shrink-0">TRACKS</span><div className="flex min-w-0 flex-1 items-center justify-between"><span>0:00</span><span>Bars / seconds · {sourceBuffer ? `${sourceBuffer.duration.toFixed(1)}s source` : "no source"}</span><span>{sourceBuffer ? `${sourceBuffer.duration.toFixed(1)}s` : "—"}</span></div></div>
+      <div className="max-h-[28rem] overflow-auto"><div className="min-w-[44rem]">{arrangementTracks.length ? arrangementTracks.map((track) => { const tone = trackTone(track.name); const peaks = waveformPeaks(track.buffer, 72); const selected = selectedTrack?.id === track.id; return <div key={track.id} className={`grid min-h-24 grid-cols-[10rem_minmax(0,1fr)] border-b border-slate-800 ${selected ? "bg-white/[0.05]" : ""}`}><div className="border-r border-slate-800 p-3"><button type="button" onClick={() => setSelectedTrackId(track.id)} className={`w-full rounded-lg border px-2 py-2 text-left ${selected ? `${tone.border} ${tone.fill}` : "border-slate-800 bg-slate-900"}`} aria-pressed={selected}><span className={`block truncate text-sm font-semibold ${tone.text}`}>{track.name}</span><span className="mt-1 block text-[10px] uppercase tracking-wide text-slate-500">{track.id === "original" ? "Audio source" : "Audio region"}</span></button><div className="mt-2 flex gap-1"><button type="button" onClick={() => updateTrack(track.id, { muted: !track.muted })} className={`min-h-8 flex-1 rounded border text-[10px] ${track.muted ? "border-red-400/60 bg-red-400/15 text-red-200" : "border-slate-700 text-slate-400"}`} aria-pressed={track.muted}>M {track.muted ? "on" : "off"}</button><button type="button" onClick={() => updateTrack(track.id, { solo: !track.solo })} className={`min-h-8 flex-1 rounded border text-[10px] ${track.solo ? "border-amber-400/60 bg-amber-400/15 text-amber-200" : "border-slate-700 text-slate-400"}`} aria-pressed={track.solo}>S {track.solo ? "on" : "off"}</button></div></div><button type="button" onClick={() => setSelectedTrackId(track.id)} className={`relative overflow-hidden p-3 text-left ${selected ? "ring-1 ring-inset ring-cyan-400/60" : ""}`} aria-label={`Select ${track.name} audio region`}><div className="absolute inset-y-0 left-0 border-l border-cyan-300/70" style={{ left: `${Math.min(100, playheadSeconds / Math.max(track.buffer.duration, 0.01) * 100)}%` }} /><div className={`flex h-16 items-center gap-[2px] rounded-lg border px-2 ${tone.border} ${tone.fill}`}>{peaks.map((peak, index) => <span key={index} className={`min-w-0 flex-1 rounded-full ${tone.text.replace("text-", "bg-")}`} style={{ height: `${Math.max(8, peak * 100)}%`, opacity: track.muted ? 0.25 : 0.9 }} />)}</div><div className="mt-1 flex justify-between text-[10px] text-slate-500"><span>0:00</span><span>{track.buffer.duration.toFixed(2)} sec · {track.volume}%</span></div></button></div>; }) : <div className="p-10 text-center text-sm text-slate-400">Import an audio source to create the first arrangement region.</div>}</div></div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 bg-slate-900 px-3 py-3"><Button type="button" className="min-h-11 rounded-full bg-red-600 px-5 hover:bg-red-500" onClick={() => { const audio = audioRef.current; if (!audio || !currentSrc) { setError("Import audio before starting transport."); return; } if (audio.paused) void audio.play(); else audio.pause(); }}>{audioRef.current && !audioRef.current.paused ? "Pause" : "Play"}</Button><Button type="button" variant="outline" className="min-h-11 border-slate-700 bg-slate-900 text-slate-100" onClick={() => { if (audioRef.current) { audioRef.current.currentTime = 0; setPlayheadSeconds(0); } }}>Return to start</Button><label className="ml-auto flex items-center gap-2 text-xs text-slate-400">Timeline zoom <input type="range" min="0.5" max="3" step="0.1" value={timelineZoom} onChange={(event) => setTimelineZoom(Number(event.target.value))} aria-label="Timeline zoom" /></label><span className="text-xs text-slate-400">{playheadSeconds.toFixed(2)}s</span><audio ref={audioRef} src={currentSrc || undefined} preload="metadata" onTimeUpdate={(event) => setPlayheadSeconds(event.currentTarget.currentTime)} className="sr-only" aria-label="Arrangement transport audio" /></div>
+    </div> : null}
+
+    {activeMode === "edit" ? <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-100 shadow-xl">
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-800 bg-slate-900 px-3 py-3"><Button type="button" variant="ghost" className="min-h-10 text-slate-200" onClick={() => chooseWorkspace("arrangement")}>← Arrangement</Button><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-300">Track editor</p><h3 className="truncate font-semibold">{selectedTrack?.name ?? "No audio track selected"}</h3></div><span className="ml-auto text-xs text-slate-400">{selectedTrack ? `${selectedTrack.buffer.sampleRate.toLocaleString()} Hz · ${selectedTrack.buffer.numberOfChannels} ch` : "Import a source first"}</span></div>
+      <div className="p-3 sm:p-5"><div className="relative overflow-x-auto rounded-lg border border-slate-800 bg-black px-2 py-6" aria-label="Actual decoded audio waveform"><div className="flex h-44 min-w-[42rem] items-center gap-[2px]">{selectedWave.length ? selectedWave.map((peak, index) => <span key={index} className="min-w-0 flex-1 rounded-full bg-gradient-to-t from-emerald-500/60 to-cyan-300" style={{ height: `${Math.max(4, peak * 100)}%` }} />) : <span className="w-full text-center text-sm text-slate-500">Select an audio source or arrangement region to inspect its waveform.</span>}</div><div className="pointer-events-none absolute inset-y-0 border-l-2 border-cyan-300" style={{ left: `${selectedTrack ? Math.min(100, playheadSeconds / Math.max(selectedTrack.buffer.duration, 0.01) * 100) : 0}%` }} /><div className="mt-3 flex min-w-[42rem] justify-between text-[10px] text-slate-500"><span>0:00</span><span>Decoded sample peaks · not decorative placeholder data</span><span>{selectedTrack?.buffer.duration.toFixed(2) ?? "—"}s</span></div></div><div className="mt-4 flex flex-wrap gap-2"><Button type="button" className="min-h-11 bg-red-600 hover:bg-red-500" onClick={() => { if (audioRef.current && currentSrc) void audioRef.current.play(); }}>Play selection</Button><Button type="button" variant="outline" className="min-h-11 border-slate-700 bg-slate-900 text-slate-100" onClick={() => { if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; setPlayheadSeconds(0); } }}>Stop</Button><Button type="button" variant="outline" className="min-h-11 border-slate-700 bg-slate-900 text-slate-100" onClick={() => chooseWorkspace("mixer")}>Open mixer</Button><span className="self-center text-xs text-slate-400">Effects and pitch correction remain available only where a real processor is connected.</span></div></div><audio ref={audioRef} src={currentSrc || undefined} preload="metadata" onTimeUpdate={(event) => setPlayheadSeconds(event.currentTarget.currentTime)} className="sr-only" aria-label="Waveform editor playback" /></div> : null}
+
+    {activeMode === "pads" ? <div className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl sm:p-5">
+      <div className="flex flex-wrap items-center gap-3"><div><p className="text-[10px] uppercase tracking-[0.18em] text-cyan-300">Performance mode</p><h3 className="font-semibold">Eight source pads</h3></div><span className="text-xs text-slate-400">Each pad triggers an actual time slice of the imported source.</span><Button type="button" variant="outline" className="ml-auto min-h-10 border-slate-700 bg-slate-900 text-slate-100" onClick={() => { padSourceRef.current?.stop(); setActivePad(null); }}>Stop pad</Button></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <button key={index} type="button" onClick={() => void triggerPad(index)} className={`relative aspect-square min-h-28 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${activePad === index ? "border-white bg-cyan-300/30 shadow-[0_0_28px_rgba(34,211,238,.35)]" : index % 4 === 0 ? "border-emerald-400/60 bg-emerald-400/15" : index % 4 === 1 ? "border-cyan-400/60 bg-cyan-400/15" : index % 4 === 2 ? "border-violet-400/60 bg-violet-400/15" : "border-orange-400/60 bg-orange-400/15"}`} aria-pressed={activePad === index}><span className="block text-lg font-semibold">{String(index + 1).padStart(2, "0")}</span><span className="mt-2 block text-xs text-slate-300">{sourceBuffer ? `${(sourceBuffer.duration * index / 8).toFixed(1)}s → ${(sourceBuffer.duration * (index + 1) / 8).toFixed(1)}s` : "Load source"}</span><span className="absolute bottom-3 left-3 right-3 flex h-6 items-end gap-[2px] opacity-60">{sourceWave.slice(index * 12, index * 12 + 12).map((peak, peakIndex) => <i key={peakIndex} className="flex-1 rounded-full bg-white" style={{ height: `${Math.max(15, peak * 100)}%` }} />)}</span></button>)}</div><p className="mt-4 text-xs text-slate-400">This mode uses source slices for safe, predictable retriggering. Quantized loop sync and MIDI note launching are not claimed because the current browser engine does not expose a clock-synchronized sampler.</p></div> : null}
+
     {activeMode === "separate" ? <div className="space-y-3 rounded-xl border border-border p-4">
       <div><h3 className="font-semibold">2. Separate stems</h3><p className="mt-1 text-sm text-muted-foreground">Local ONNX model · WebGPU when available, WASM fallback · overlap-blended chunks to reduce edge discontinuities.</p></div>
       <p className="text-sm text-muted-foreground">The first model download is approximately 166 MB and may be cached by your browser. Memory-aware duration limits are conservative: around 45–75 seconds on lower-memory phones, 1–2 minutes on many devices, and up to 4 minutes on higher-memory desktops. The approximate working-set estimate excludes extra model runtime/GPU allocations and cannot guarantee that memory pressure will not occur. The synthesized demo is only for testing practice/mixing controls, not separation quality.</p>
