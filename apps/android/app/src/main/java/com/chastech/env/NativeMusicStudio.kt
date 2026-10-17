@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -83,61 +84,48 @@ fun NativeMusicStudio() {
         while (true) { positionMs = player.currentPosition.coerceAtLeast(0L); delay(120) }
     }
     DisposableEffect(player) { onDispose { player.release() } }
-    Column(Modifier.fillMaxSize().background(Color(0xFF080B0F)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text("enV / AUDIO CONTROL ROOM", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Music Studio", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(if (sourceName.isBlank()) "Arrangement, waveform and performance workspace" else sourceName, color = Color(0xFF94A3B8), fontSize = 12.sp)
+    Column(Modifier.fillMaxSize().background(Color.Black)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text("↩", color = Color.White, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { mode = NativeMusicMode.ARRANGEMENT })
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f).background(Color(0xFF1B2029), RoundedCornerShape(24.dp)).padding(4.dp)) {
+                NativeToolButton("▥", mode == NativeMusicMode.ARRANGEMENT) { mode = NativeMusicMode.ARRANGEMENT }
+                NativeToolButton("♩", mode == NativeMusicMode.EDITOR) { mode = NativeMusicMode.EDITOR }
+                NativeToolButton("⚙", mode == NativeMusicMode.PADS) { mode = NativeMusicMode.PADS }
             }
-            OutlinedButton(onClick = { picker.launch(arrayOf("audio/*", "video/*")) }) { Text("Import") }
+            Text("☁", color = Color.White, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 8.dp).clickable { status = "Project state remains local on this device." })
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            items(NativeMusicMode.entries) { item ->
-                FilterChip(selected = mode == item, onClick = { mode = item }, label = { Text(item.label) })
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Text("${formatNativeTime(positionMs)}", color = Color(0xFF94A3B8), fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text("${formatNativeTime(durationMs)}", color = Color(0xFF94A3B8), fontSize = 11.sp)
         }
-        Surface(color = Color(0xFF111820), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                when (mode) {
-                    NativeMusicMode.ARRANGEMENT -> {
-                        Text("ARRANGEMENT / TIMELINE", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        NativeTrackRow("Original source", sourceUri != null, Color(0xFF34D399), positionMs, durationMs)
-                        NativeTrackRow("Audio regions", sourceUri != null, Color(0xFF22D3EE), positionMs, durationMs)
-                        Text("Native arrangement transport uses the imported source. Additional track editing and stem separation remain available in the Web Music Studio.", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                    }
-                    NativeMusicMode.EDITOR -> {
-                        Text("TRACK EDITOR", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text(sourceName.ifBlank { "No audio track selected" }, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        NativeWaveformPlaceholder(hasSource = sourceUri != null, playhead = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f)
-                        Text("The native editor follows the real player position. Sample-level waveform analysis is kept in the browser engine where decoded PCM is available.", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                    }
-                    NativeMusicMode.PADS -> {
-                        Text("PERFORMANCE PADS", color = Color(0xFF67E8F9), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        NativePadGrid(enabled = sourceUri != null, onPad = { index ->
-                            if (durationMs <= 0) { status = "Import an audio source before triggering pads."; return@NativePadGrid }
-                            val slice = durationMs / 8
-                            player.seekTo(slice * index); player.play(); status = "Pad ${index + 1} playing source slice ${index + 1} of 8."
-                        })
-                        Text("Pads retrigger real source slices with predictable seeking; quantized MIDI launching is not claimed by this native path.", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                    }
+        Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
+            Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Row(Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("TRACKS", color = Color(0xFF64748B), fontSize = 10.sp); Text("TIMELINE / BARS", color = Color(0xFF64748B), fontSize = 10.sp) }
+                if (mode == NativeMusicMode.ARRANGEMENT) {
+                    val names = listOf("Lead Vox", "Background Vox", "Track 3", "Keys", "Lead", "Drums", "Strings")
+                    val colors = listOf(Color(0xFF10B981), Color(0xFFEF4444), Color(0xFFA855F7), Color(0xFF3B82F6), Color(0xFFEC4899), Color(0xFFF97316), Color(0xFF22D3EE))
+                    names.forEachIndexed { index, name -> NativeTrackRow(name, sourceUri != null, colors[index], positionMs, durationMs) }
+                } else if (mode == NativeMusicMode.EDITOR) {
+                    Text("VOICE / AUDIO", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
+                    NativeWaveformPlaceholder(hasSource = sourceUri != null, playhead = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f)
+                } else {
+                    NativePadGrid(enabled = sourceUri != null, onPad = { index -> if (durationMs <= 0) status = "Import an audio source before triggering pads." else { player.seekTo((durationMs / 8) * index); player.play(); status = "Pad ${index + 1} playing source slice ${index + 1} of 8." } })
                 }
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Slider(value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f, onValueChange = { value -> if (durationMs > 0) player.seekTo((durationMs * value).toLong()) }, enabled = durationMs > 0, modifier = Modifier.fillMaxWidth())
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = { if (isPlaying) player.pause() else { if (sourceUri == null) status = "Import audio before starting transport." else player.play() } }, modifier = Modifier.height(48.dp)) { Text(if (isPlaying) "Pause" else "Play") }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { player.seekTo(0); player.pause() }, modifier = Modifier.height(48.dp)) { Text("Return to start") }
-                Spacer(Modifier.weight(1f))
-                Text("${formatNativeTime(positionMs)} / ${formatNativeTime(durationMs)}", color = Color(0xFFCBD5E1), fontSize = 12.sp)
-            }
-            Text("Volume", color = Color(0xFF94A3B8), fontSize = 11.sp)
-            Slider(value = volume, onValueChange = { volume = it; player.volume = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
-            Text(status, color = Color(0xFF94A3B8), fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text("＋", color = Color.White, fontSize = 28.sp, modifier = Modifier.clickable { picker.launch(arrayOf("audio/*", "video/*")) })
+            Text("↶", color = Color.White, fontSize = 24.sp); Text("|◀", color = Color.White, fontSize = 20.sp)
+            Button(onClick = { if (isPlaying) player.pause() else { if (sourceUri == null) status = "Import audio before starting transport." else player.play() } }, modifier = Modifier.size(58.dp), shape = androidx.compose.foundation.shape.CircleShape, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFFEF2D1A))) { Text(if (isPlaying) "Ⅱ" else "●", fontSize = 20.sp) }
+            Text("▶", color = Color.White, fontSize = 24.sp); Text("↷", color = Color.White, fontSize = 24.sp); Spacer(Modifier.weight(1f)); Text("☷", color = Color.White, fontSize = 22.sp); Text("♩", color = Color.White, fontSize = 22.sp)
         }
+        Slider(value = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f, onValueChange = { value -> if (durationMs > 0) player.seekTo((durationMs * value).toLong()) }, enabled = durationMs > 0, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(horizontal = 10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0C10)).padding(10.dp)) { Text(sourceName.ifBlank { "No source loaded" }, color = Color(0xFF94A3B8), fontSize = 11.sp); Spacer(Modifier.weight(1f)); Text(status, color = Color(0xFF94A3B8), fontSize = 11.sp) }
     }
+}
+
+@Composable
+private fun NativeToolButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(36.dp).background(if (selected) Color.White else Color.Transparent, RoundedCornerShape(18.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) { Text(label, color = if (selected) Color.Black else Color.White, fontSize = 16.sp) }
 }
 
 @Composable

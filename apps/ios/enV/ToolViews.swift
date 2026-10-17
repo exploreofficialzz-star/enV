@@ -6386,30 +6386,30 @@ struct NativeMusicStudioView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.03, green: 0.04, blue: 0.055).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("enV / AUDIO CONTROL ROOM").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.cyan)
-                        Text("Music Studio").font(.largeTitle.bold()).foregroundStyle(.white)
-                        Text(sourceName.isEmpty ? "Arrangement, waveform and performance workspace" : sourceName).font(.caption).foregroundStyle(.secondary)
-                    }
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Button("↩") { mode = .arrangement }.font(.title2).foregroundStyle(.white)
+                    HStack(spacing: 2) {
+                        NativeIOSToolButton(label: "▥", selected: mode == .arrangement) { mode = .arrangement }
+                        NativeIOSToolButton(label: "♩", selected: mode == .editor) { mode = .editor }
+                        NativeIOSToolButton(label: "⚙", selected: mode == .pads) { mode = .pads }
+                    }.padding(4).background(Color(red: 0.1, green: 0.12, blue: 0.16), in: Capsule())
                     Spacer()
-                    Button("Import") { isImporterPresented = true }.buttonStyle(.borderedProminent).tint(.cyan)
-                }
-                Picker("Workspace", selection: $mode) { ForEach(NativeMusicStudioMode.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
-                Group {
-                    switch mode {
-                    case .arrangement: arrangement
-                    case .editor: editor
-                    case .pads: pads
+                    Button("＋") { isImporterPresented = true }.font(.title2).foregroundStyle(.white)
+                    Button("☁") { status = "Project state remains local on this device." }.font(.title2).foregroundStyle(.white)
+                }.padding(.horizontal, 14).padding(.vertical, 10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                HStack { Text(formatTime(position)).font(.caption.monospaced()).foregroundStyle(.secondary); Spacer(); Text(formatTime(duration)).font(.caption.monospaced()).foregroundStyle(.secondary) }.padding(.horizontal, 14).padding(.vertical, 6).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                ScrollView {
+                    VStack(spacing: 0) {
+                        HStack { Text("TRACKS"); Spacer(); Text("TIMELINE / BARS") }.font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(.secondary).padding(10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
+                        Group { switch mode { case .arrangement: arrangement; case .editor: editor; case .pads: pads } }
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                transport
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.black)
+                transport.padding(.horizontal, 12).padding(.vertical, 10).background(Color(red: 0.04, green: 0.05, blue: 0.06))
             }
-            .padding()
         }
+
         .fileImporter(isPresented: $isImporterPresented, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls): if let url = urls.first { load(url) }
@@ -6420,12 +6420,17 @@ struct NativeMusicStudioView: View {
     }
 
     private var arrangement: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            label("ARRANGEMENT / TIMELINE")
-            NativeIOSTrackRow(title: "Original source", enabled: sourceURL != nil, color: .green, progress: progress)
-            NativeIOSTrackRow(title: "Audio regions", enabled: sourceURL != nil, color: .cyan, progress: progress)
-            Text("Native arrangement transport uses the imported source. Additional track editing and stem separation remain available in the Web Music Studio.").font(.caption).foregroundStyle(.secondary)
-        }.padding().background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        let names = ["Lead Vox", "Background Vox", "Track 3", "Keys", "Lead", "Drums", "Strings"]
+        let colors: [Color] = [.green, .red, .purple, .blue, .pink, .orange, .cyan]
+        return VStack(spacing: 0) {
+            ForEach(Array(names.enumerated()), id: \.offset) { index, name in
+                HStack(spacing: 0) {
+                    HStack(spacing: 8) { Text(index == 0 ? "♩" : index == 5 ? "▥" : "•").foregroundStyle(colors[index]); Text(name).font(.caption.bold()).foregroundStyle(colors[index]).lineLimit(1) }.frame(width: 125, alignment: .leading).padding(.horizontal, 10)
+                    ZStack(alignment: .leading) { RoundedRectangle(cornerRadius: 6).fill(colors[index].opacity(sourceURL == nil ? 0.08 : 0.28)).frame(height: 48); if sourceURL != nil { HStack(spacing: 4) { ForEach(0..<18, id: \.self) { tick in Capsule().fill(colors[index].opacity(0.75)).frame(width: 3, height: CGFloat(8 + ((tick * 17 + index * 11) % 30))) } }.padding(.horizontal, 12) } }
+                    .frame(maxWidth: .infinity).padding(.horizontal, 8)
+                }.frame(minHeight: 64).background(Color.black).overlay(alignment: .bottom) { Divider().overlay(Color.white.opacity(0.06)) }
+            }
+        }
     }
 
     private var editor: some View {
@@ -6476,6 +6481,13 @@ struct NativeMusicStudioView: View {
     private func togglePlay() { guard let player else { status = "Import audio before starting transport."; return }; if player.isPlaying { player.pause() } else { player.play() }; isPlaying = player.isPlaying }
     private func triggerPad(_ index: Int) { guard let player, duration > 0 else { status = "Import audio before triggering pads."; return }; player.currentTime = duration * Double(index) / 8; player.play(); isPlaying = true; status = "Pad \(index + 1) playing source slice \(index + 1) of 8." }
     private func formatTime(_ value: Double) -> String { String(format: "%d:%02d", Int(value) / 60, Int(value) % 60) }
+}
+
+private struct NativeIOSToolButton: View {
+    let label: String
+    let selected: Bool
+    let action: () -> Void
+    var body: some View { Button(label, action: action).font(.body).foregroundStyle(selected ? .black : .white).frame(width: 36, height: 32).background(selected ? Color.white : Color.clear, in: Capsule()) }
 }
 
 private struct NativeIOSTrackRow: View {
