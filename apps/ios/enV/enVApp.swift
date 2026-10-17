@@ -191,6 +191,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                         Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
                         Button("Account") { selectedTab = NativeTab.account.rawValue }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
+                            .accessibilityIdentifier("Search tools")
                         Button("Pricing") { informationRouter.open("pricing") }
                     } label: {
                         VStack(spacing: 3) {
