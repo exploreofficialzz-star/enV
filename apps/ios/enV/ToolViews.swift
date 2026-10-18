@@ -6520,7 +6520,7 @@ struct NativeMusicStudioView: View {
     private var editor: some View {
         let canvas = colorScheme == .dark ? Color.black : Color.white
         let ink = colorScheme == .dark ? Color.white : Color.black
-        VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 12) {
             label("TRACK EDITOR")
             Text(sourceName.isEmpty ? "No audio track selected" : sourceName).font(.headline).foregroundStyle(ink)
             ZStack(alignment: .leading) {
@@ -6534,7 +6534,7 @@ struct NativeMusicStudioView: View {
 
     private var pads: some View {
         let canvas = colorScheme == .dark ? Color.black : Color.white
-        VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack { label("PERFORMANCE PADS"); Spacer(); Button("Stop") { player?.stop(); isPlaying = false } .buttonStyle(.bordered) }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0..<8, id: \.self) { index in
