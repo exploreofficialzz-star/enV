@@ -31,6 +31,12 @@ export function ToolTokenEstimate({ toolId }: { toolId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     setState({ status: "loading" });
+    // Vite's dev server does not mount Nitro API routes. Avoid a noisy 404 in
+    // development/browser audits; the production server still requests quotes.
+    if (import.meta.env.DEV) {
+      setState({ status: "unavailable" });
+      return () => controller.abort();
+    }
     void fetch("/api/billing/quote", {
       method: "POST",
       credentials: "same-origin",
