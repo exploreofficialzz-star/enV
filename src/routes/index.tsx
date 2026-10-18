@@ -7,6 +7,8 @@ import { Logo } from "@/components/brand/logo";
 import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
+import { UnderProductionDialog } from "@/components/tools/under-production";
+import { isToolUnderProduction } from "@/lib/production-notice";
 import { getPopularTools, getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
@@ -79,38 +81,64 @@ function Home() {
 }
 
 function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
+  const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   return (
-    <section
-      aria-label="Your most-used tools"
-      className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
-    >
-      {tools.length ? (
-        <div className="personal-tools-scroll snap-x snap-mandatory">
-          <div className="personal-tools-track">
-            {tools.map((tool) => {
-              const Icon = toolIcon(tool.icon);
-              return (
-                <Link
-                  key={tool.id}
-                  to={toolPath(tool)}
-                  aria-label={`Open ${tool.name}`}
-                  className="group flex min-w-0 snap-start flex-col items-center justify-center gap-2 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
-                >
-                  <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft md:size-11">
-                    <Icon className="size-5 text-fg" aria-hidden="true" />
-                  </span>
-                  <span className="w-full truncate text-[11.1px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
-                </Link>
-              );
-            })}
+    <>
+      <section
+        aria-label="Your most-used tools"
+        className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
+      >
+        {tools.length ? (
+          <div className="personal-tools-scroll snap-x snap-mandatory">
+            <div className="personal-tools-track">
+              {tools.map((tool) => {
+                const Icon = toolIcon(tool.icon);
+                const restricted = isToolUnderProduction(tool);
+                const content = (
+                  <>
+                    <span className="flex size-10 items-center justify-center rounded-full bg-surface-2 transition group-hover:bg-accent-soft md:size-11">
+                      <Icon className="size-5 text-fg" aria-hidden="true" />
+                    </span>
+                    <span className="w-full truncate text-[11.1px] font-medium text-muted group-hover:text-fg">{tool.name}</span>
+                    {restricted ? <span className="w-full truncate text-[9px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : null}
+                  </>
+                );
+                return restricted ? (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => setProductionTool(tool)}
+                    aria-haspopup="dialog"
+                    aria-label={`${tool.name}, under production`}
+                    className="group flex min-w-0 snap-start flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <Link
+                    key={tool.id}
+                    to={toolPath(tool)}
+                    aria-label={`Open ${tool.name}`}
+                    className="group flex min-w-0 snap-start flex-col items-center justify-center gap-2 rounded-xl px-1 py-2 text-center transition hover:bg-surface-2 focus-visible:outline-offset-2"
+                  >
+                    {content}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex h-full items-center justify-center px-6 text-center text-xs text-muted">
-          Open tools to build your personal shortcuts.
-        </div>
-      )}
-    </section>
+        ) : (
+          <div className="flex h-full items-center justify-center px-6 text-center text-xs text-muted">
+            Open tools to build your personal shortcuts.
+          </div>
+        )}
+      </section>
+      <UnderProductionDialog
+        open={productionTool !== null}
+        toolName={productionTool?.name ?? "This tool"}
+        onClose={() => setProductionTool(null)}
+      />
+    </>
   );
 }
 

@@ -199,6 +199,9 @@ struct AssistantChatView: View {
                                                                     EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
                                                                     VStack(alignment: .leading, spacing: 3) {
                                                                         enVCharacterSpacedText(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                                                        if tool.isUnderProduction {
+                                                                            enVCharacterSpacedText("Under production").font(.caption2.weight(.semibold)).foregroundStyle(Color.envSubtle)
+                                                                        }
                                                                         enVCharacterSpacedText(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
                                                                     }
                                                                     Spacer(minLength: 4)
@@ -299,7 +302,7 @@ struct AssistantChatView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .onDisappear {

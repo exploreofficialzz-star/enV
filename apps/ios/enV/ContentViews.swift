@@ -164,7 +164,7 @@ struct HomeView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .id(homeNavigationReset)
@@ -217,54 +217,92 @@ private struct ResponsiveGridWidthKey: PreferenceKey {
 }
 
 private struct DiscoveryToolCard: View {
+    @State private var showProductionNotice = false
     let tool: Tool
+
     var body: some View {
-        NavigationLink(value: tool) {
-            VStack(alignment: .leading, spacing: 0) {
-                iconTile(tool.icon)
-                enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
-                enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
-                if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("WEB ONLY").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                else if tool.clientSide { enVCharacterSpacedText("IN-BROWSER").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10) }
-                HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
+        Group {
+            if tool.isUnderProduction {
+                Button { showProductionNotice = true } label: { cardLabel }
+                    .accessibilityLabel("\(tool.name), under production")
+            } else {
+                NavigationLink(value: tool) { cardLabel }
+                    .accessibilityLabel("Open \(tool.name)")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open \(tool.name)")
         .padding(16)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder.opacity(0.35), lineWidth: 1))
         .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
-        .opacity(tool.isPlanned ? 0.7 : 1)
+        .opacity(tool.isPlanned || tool.isUnderProduction ? 0.82 : 1)
+        .alert("Under production", isPresented: $showProductionNotice) {
+            Button("Close", role: .cancel) { }
+        } message: {
+            Text("\(tool.name) is under production and is not available yet. You can keep browsing enV while it is being developed.")
+        }
+    }
+
+    private var cardLabel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            iconTile(tool.icon)
+            enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
+            enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+            if tool.isUnderProduction {
+                enVCharacterSpacedText("Under production").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
+            } else if tool.isPlanned {
+                enVCharacterSpacedText("Coming soon").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
+            } else if NativeCopy.isWebRuntimeOnly(tool.id) {
+                enVCharacterSpacedText("WEB ONLY").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+            } else if tool.clientSide {
+                enVCharacterSpacedText("IN-BROWSER").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+            }
+            HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
 private struct WebHomeSearchSuggestion: View {
+    @State private var showProductionNotice = false
     let tool: Tool
+
     var body: some View {
-        NavigationLink(value: tool) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
-                    if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
-                    else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
-                }
-                enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
-                HStack {
-                    Spacer()
-                    EnVIcon(name: "ArrowRight", size: 16, tint: .envInk)
-                        .accessibilityHidden(true)
-                }
-                .padding(.top, 4)
+        Group {
+            if tool.isUnderProduction {
+                Button { showProductionNotice = true } label: { suggestionLabel }
+                    .accessibilityLabel("\(tool.name), under production")
+            } else {
+                NavigationLink(value: tool) { suggestionLabel }
+                    .accessibilityLabel("Open \(tool.name)")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16).padding(.vertical, 10)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open \(tool.name)")
+        .alert("Under production", isPresented: $showProductionNotice) {
+            Button("Close", role: .cancel) { }
+        } message: {
+            Text("\(tool.name) is under production and is not available yet. You can keep browsing enV while it is being developed.")
+        }
+    }
+
+    private var suggestionLabel: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+                if tool.isUnderProduction { enVCharacterSpacedText("Under production").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+            }
+            enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+            HStack {
+                Spacer()
+                EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 }
 
@@ -599,12 +637,12 @@ struct ToolsView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .id(toolsNavigationReset)
         .navigationDestination(isPresented: $showSearchNavigation) {
-            if let searchNavigationTool { ToolDetailView(tool: searchNavigationTool) }
+            if let searchNavigationTool { ToolDestinationView(tool: searchNavigationTool) }
         }
         .onChange(of: toolsNavigationReset) { _ in
             toolsQuery = ""
@@ -678,7 +716,7 @@ struct CategoryView: View {
         .modifier(Screen())
         .navigationTitle(store.category(named: categoryID)?.name ?? "Category")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+        .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
     }
 }
 
@@ -821,10 +859,10 @@ struct SearchResultsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showSearchNavigation) {
-            if let searchNavigationTool { ToolDetailView(tool: searchNavigationTool) }
+            if let searchNavigationTool { ToolDestinationView(tool: searchNavigationTool) }
         }
         .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-        .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+        .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
         .onChange(of: text) { _ in visibleCount = 24 }
     }
 }
@@ -847,7 +885,7 @@ struct SavedView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDetailView(tool: $0) }
+            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
     }

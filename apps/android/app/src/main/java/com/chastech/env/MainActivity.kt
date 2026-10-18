@@ -64,6 +64,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -246,6 +247,10 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
+private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "developer", "video")
+
+private fun ToolRecord.isUnderProduction(): Boolean = !productionExemptCategories.contains(category.lowercase(Locale.ROOT))
+
 private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
 @Composable
@@ -256,6 +261,25 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var assistantDraft by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var productionTool by remember { mutableStateOf<ToolRecord?>(null) }
+    val openTool: (String) -> Unit = { id ->
+        val candidate = catalog.displayTool(id)
+        if (candidate?.isUnderProduction() == true) {
+            productionTool = candidate
+        } else {
+            productionTool = null
+            detailStack = listOf(id)
+        }
+    }
+    val openRelatedTool: (String) -> Unit = { id ->
+        val candidate = catalog.displayTool(id)
+        if (candidate?.isUnderProduction() == true) {
+            productionTool = candidate
+        } else {
+            productionTool = null
+            detailStack = detailStack + id
+        }
+    }
     var showExchange by rememberSaveable { mutableStateOf(false) }
     var showInformation by rememberSaveable { mutableStateOf(false) }
     var informationPage by rememberSaveable { mutableStateOf("about") }
@@ -269,9 +293,14 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
     }
     LaunchedEffect(selected?.id) {
-        selected?.id?.let {
-            favorites.recordRecent(it)
-            mostUsedIds = favorites.getMostUsed()
+        if (selected?.isUnderProduction() == true) {
+            productionTool = selected
+            detailStack = detailStack.dropLast(1)
+        } else {
+            selected?.id?.let {
+                favorites.recordRecent(it)
+                mostUsedIds = favorites.getMostUsed()
+            }
         }
     }
     if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
@@ -317,7 +346,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             Column(Modifier.align(Alignment.TopCenter).widthIn(max = 1152.dp).fillMaxHeight()) {
-                if (selected != null) {
+                if (selected != null && !selected.isUnderProduction()) {
                     ToolDetail(
                         catalog = catalog,
                         tool = selected,
@@ -325,16 +354,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         onHome = { detailStack = emptyList(); category = null; query = ""; tab = AppTab.Home.name },
                         onTools = { detailStack = emptyList(); category = null; query = ""; tab = AppTab.Tools.name },
                         onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
-                        onRelatedTool = { detailStack = detailStack + it },
+                        onRelatedTool = openRelatedTool,
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
                     )
                 } else {
                     when (currentTab) {
-                        AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
-                        AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, { detailStack = listOf(it) }, assistantDraft, { assistantDraft = it })
-                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, { detailStack = listOf(it) }, { tab = AppTab.Search.name })
-                        AppTab.Search -> SearchScreen(catalog, query, { query = it }, { detailStack = listOf(it) })
-                        AppTab.Saved -> SavedScreen(catalog, favoriteIds, { detailStack = listOf(it) }, { favoriteIds = favorites.toggle(it) })
+                        AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, openTool, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
+                        AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, openTool, assistantDraft, { assistantDraft = it })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, openTool, { tab = AppTab.Search.name })
+                        AppTab.Search -> SearchScreen(catalog, query, { query = it }, openTool)
+                        AppTab.Saved -> SavedScreen(catalog, favoriteIds, openTool, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
                             showExchange -> ContactExchangeScreen { showExchange = false }
                             showInformation -> NativeInformationScreen(informationPage) { showInformation = false; tab = informationReturnTab }
@@ -351,6 +380,22 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 }
             }
         }
+    }
+    productionTool?.let { requestedTool ->
+        AlertDialog(
+            onDismissRequest = { productionTool = null },
+            icon = { EnVIcon("Clock", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Under production") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(requestedTool.name, style = MaterialTheme.typography.titleMedium)
+                    Text("This tool is still being developed and is not available yet. You can keep browsing enV while we work on it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { productionTool = null }) { Text("Back to browsing") }
+            },
+        )
     }
 }
 
@@ -522,7 +567,8 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
             }
             Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 12.dp))
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-            if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+            else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (tool.clientSide) Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
@@ -535,7 +581,8 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
     Column(Modifier.fillMaxWidth().clickable { onTool(tool.id) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal)
-            if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -826,7 +873,8 @@ private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: M
         Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) { Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) } }
         Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
         Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-        if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         else if (tool.clientSide) Text("On device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
@@ -2719,7 +2767,9 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                     }
                     Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                     Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                    if (tool.status == "planned") {
+                    if (tool.isUnderProduction()) {
+                        StatusPill("Under production", Modifier.padding(top = 10.dp))
+                    } else if (tool.status == "planned") {
                         StatusPill("Coming soon", Modifier.padding(top = 10.dp))
                     } else if (NativeCopy.isWebRuntimeOnly(tool.id)) {
                         StatusPill("WEB ONLY", Modifier.padding(top = 10.dp))

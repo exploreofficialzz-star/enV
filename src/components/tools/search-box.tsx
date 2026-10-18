@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, getSearchableTools, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { cn } from "@/lib/utils";
+import type { ToolMeta } from "@/types/tool";
+import { isToolUnderProduction } from "@/lib/production-notice";
+import { UnderProductionDialog } from "@/components/tools/under-production";
 
 export function SearchBox({
   large = false,
@@ -41,6 +44,7 @@ export function SearchBox({
   const setQ = onValueChange ?? setInner;
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const nav = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +93,10 @@ export function SearchBox({
         if (e.key === "Enter") {
           e.preventDefault();
           if (onEnter) onEnter(q);
-          else if (results[0]) nav({ to: toolPath(results[0]) });
+          else if (results[0]) {
+            if (isToolUnderProduction(results[0])) setProductionTool(results[0]);
+            else nav({ to: toolPath(results[0]) });
+          }
           else nav({ to: "/search", search: { q } });
           setOpen(false);
         }
@@ -140,12 +147,13 @@ export function SearchBox({
                   type="button"
                   className="flex w-full items-end gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
                   onClick={() => {
-                    nav({ to: toolPath(t) });
+                    if (isToolUnderProduction(t)) setProductionTool(t);
+                    else nav({ to: toolPath(t) });
                     setOpen(false);
                   }}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-sm font-medium">{t.name}{t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                    <span className="flex items-center gap-2 text-sm font-medium">{t.name}{isToolUnderProduction(t) ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
                     <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
                   </span>
                   <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
@@ -167,6 +175,11 @@ export function SearchBox({
           </li>
         </ul>
       )}
+      <UnderProductionDialog
+        open={productionTool !== null}
+        toolName={productionTool?.name ?? "This tool"}
+        onClose={() => setProductionTool(null)}
+      />
     </div>
   );
 }

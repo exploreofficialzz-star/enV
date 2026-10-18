@@ -9,43 +9,19 @@ import UniformTypeIdentifiers
 
 struct ToolCard: View {
     @EnvironmentObject private var store: CatalogStore
+    @State private var showProductionNotice = false
     let tool: Tool
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            NavigationLink(value: tool) {
-                VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        iconTile(tool.icon)
-                        enVCharacterSpacedText(tool.name)
-                            .font(.envScaled(size: 14, weight: .semibold))
-                            .tracking(-0.15)
-                            .foregroundStyle(Color.envInk)
-                            .lineLimit(1)
-                            .padding(.top, 12)
-                        enVCharacterSpacedText(tool.description)
-                            .font(.envScaled(size: 12, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                            .lineLimit(2)
-                            .lineSpacing(2)
-                            .padding(.top, 4)
-                        if !NativeCopy.isWebRuntimeOnly(tool.id), NativeBackendEngine.supports(tool) {
-                            StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
-                        } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeCoverage.isLocallyExecutable(tool) {
-                            enVCharacterSpacedText("ON DEVICE").font(.envScaled(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
-                        } else if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
-                        } else {
-                            StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    HStack {
-                        Spacer(minLength: 0)
-                        EnVIcon(name: "ArrowRight", size: 16, tint: .primary)
-                    }
-                    .padding(.top, 10)
+            Group {
+                if tool.isUnderProduction {
+                    Button { showProductionNotice = true } label: { cardLabel }
+                        .accessibilityLabel("\(tool.name), under production")
+                } else {
+                    NavigationLink(value: tool) { cardLabel }
+                        .accessibilityLabel("Open \(tool.name)")
                 }
-                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             Button {
@@ -61,8 +37,49 @@ struct ToolCard: View {
         .padding(16)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-        .opacity(tool.isPlanned ? 0.72 : 1)
+        .opacity(tool.isPlanned || tool.isUnderProduction ? 0.82 : 1)
         .accessibilityElement(children: .contain)
+        .alert("Under production", isPresented: $showProductionNotice) {
+            Button("Close", role: .cancel) { }
+        } message: {
+            Text("\(tool.name) is under production and is not available yet. You can keep browsing enV while it is being developed.")
+        }
+    }
+
+    private var cardLabel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            iconTile(tool.icon)
+            enVCharacterSpacedText(tool.name)
+                .font(.envScaled(size: 14, weight: .semibold))
+                .tracking(-0.15)
+                .foregroundStyle(Color.envInk)
+                .lineLimit(1)
+                .padding(.top, 12)
+            enVCharacterSpacedText(tool.description)
+                .font(.envScaled(size: 12, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .lineLimit(2)
+                .lineSpacing(2)
+                .padding(.top, 4)
+            if tool.isUnderProduction {
+                StatusPill(text: "Under production", color: .envMuted).padding(.top, 10)
+            } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeBackendEngine.supports(tool) {
+                StatusPill(text: "ONLINE", color: .envMuted).padding(.top, 10)
+            } else if !NativeCopy.isWebRuntimeOnly(tool.id), NativeCoverage.isLocallyExecutable(tool) {
+                enVCharacterSpacedText("ON DEVICE").font(.envScaled(size: 9, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
+            } else if tool.isPlanned {
+                StatusPill(text: "Coming soon", color: .envMuted).padding(.top, 10)
+            } else {
+                StatusPill(text: "WEB ONLY", color: .envMuted).padding(.top, 10)
+            }
+            HStack {
+                Spacer(minLength: 0)
+                EnVIcon(name: "ArrowRight", size: 16, tint: .primary)
+            }
+            .padding(.top, 10)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
@@ -288,6 +305,9 @@ private struct RelatedToolDetailCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
+            if tool.isUnderProduction {
+                enVCharacterSpacedText("Under production").font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envSubtle).padding(.top, 2)
+            }
             enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2)
             HStack {
                 Spacer()
@@ -301,6 +321,63 @@ private struct RelatedToolDetailCard: View {
         .padding(.vertical, 12)
         .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+    }
+}
+
+struct ToolDestinationView: View {
+    let tool: Tool
+
+    @ViewBuilder var body: some View {
+        if tool.isUnderProduction {
+            UnderProductionDestinationView(tool: tool)
+        } else {
+            ToolDetailView(tool: tool)
+        }
+    }
+}
+
+private struct UnderProductionDestinationView: View {
+    @Environment(\.dismiss) private var dismiss
+    let tool: Tool
+
+    var body: some View {
+        ZStack {
+            Color.envSurface.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: "clock.badge.exclamationmark")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(Color.envMuted)
+                    .frame(width: 52, height: 52)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+                Text("UNDER PRODUCTION")
+                    .font(.envScaled(size: 11, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(Color.envMuted)
+                Text("\(tool.name) is under production")
+                    .font(.envScaled(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                Text("This tool is still being developed and is not available yet. You can go back and keep browsing enV.")
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Back to browsing") { dismiss() }
+                    .font(.envScaled(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 9))
+                    .padding(.top, 4)
+            }
+            .padding(24)
+            .frame(maxWidth: 440, alignment: .leading)
+            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.envBorder, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.10), radius: 24, y: 10)
+            .padding(20)
+        }
+        .navigationBarBackButtonHidden(false)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

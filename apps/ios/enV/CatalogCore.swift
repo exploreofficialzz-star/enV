@@ -103,6 +103,9 @@ struct Tool: Decodable, Identifiable, Hashable {
     let engine: ToolEngine
 
     var isPlanned: Bool { status.lowercased() == "planned" }
+    var isUnderProduction: Bool {
+        !["accessibility", "audio", "business", "calculators", "developer", "video"].contains(category.lowercased())
+    }
     var searchText: String {
         ([id, slug, name, description, category, subcategory ?? "", keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
     }

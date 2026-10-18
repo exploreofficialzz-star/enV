@@ -10,6 +10,8 @@ import type { ToolMeta } from "@/types/tool";
 import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
+import { UnderProductionDialog } from "@/components/tools/under-production";
+import { isToolUnderProduction } from "@/lib/production-notice";
 
 export function ToolShell({
   tool,
@@ -21,6 +23,7 @@ export function ToolShell({
   const Icon = toolIcon(tool.icon);
   const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
+  const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
@@ -102,14 +105,28 @@ export function ToolShell({
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {related.slice(0, visibleRelatedCount).map((r) => (
               <li key={r.id}>
-                <Link
-                  to={toolPath(r)}
-                  className="group flex min-h-24 flex-col rounded-lg bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)] hover:text-accent"
-                >
-                  <span className="font-medium">{r.name}</span>
-                  <span className="mt-0.5 block text-xs text-muted">{r.description}</span>
-                  <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
-                </Link>
+                {isToolUnderProduction(r) ? (
+                  <button
+                    type="button"
+                    onClick={() => setProductionTool(r)}
+                    aria-haspopup="dialog"
+                    className="group flex min-h-24 w-full flex-col rounded-lg bg-surface px-4 py-3 text-left text-sm shadow-[var(--shadow-border)] hover:text-accent"
+                  >
+                    <span className="font-medium">{r.name}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{r.description}</span>
+                    <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span>
+                    <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <Link
+                    to={toolPath(r)}
+                    className="group flex min-h-24 flex-col rounded-lg bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)] hover:text-accent"
+                  >
+                    <span className="font-medium">{r.name}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{r.description}</span>
+                    <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -128,6 +145,11 @@ export function ToolShell({
           ) : null}
         </section>
       ) : null}
+      <UnderProductionDialog
+        open={productionTool !== null}
+        toolName={productionTool?.name ?? "This tool"}
+        onClose={() => setProductionTool(null)}
+      />
     </article>
   );
 }

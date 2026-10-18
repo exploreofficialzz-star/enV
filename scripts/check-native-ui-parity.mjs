@@ -26,7 +26,9 @@ const iosAccessibilityEngine = readFileSync("apps/ios/enV/NativeAccessibilityEng
 // Android detail links push onto a stack; system Back returns to the prior detail.
 assert.match(android, /var detailStack by rememberSaveable/);
 assert.match(android, /BackHandler \{ detailStack = detailStack\.dropLast\(1\) \}/);
-assert.match(android, /onRelatedTool = \{ detailStack = detailStack \+ it \}/);
+assert.match(android, /onRelatedTool = openRelatedTool/);
+assert.match(android, /private fun ToolRecord\.isUnderProduction\(\): Boolean/);
+assert.match(android, /productionTool\?\.let \{ requestedTool ->[\s\S]*?AlertDialog/);
 
 // Home search drafts remain local until submit, rather than leaking into Tools/Search.
 assert.match(android, /var homeQuery by rememberSaveable/);
