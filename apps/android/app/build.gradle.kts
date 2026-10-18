@@ -21,6 +21,7 @@ android {
 
     // Keep the canonical catalog in apps/shared; do not duplicate the 10,001 records.
     sourceSets["main"].assets.srcDir(file("../../shared"))
+    sourceSets["test"].resources.srcDir(file("../../shared"))
 
     val keystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
     val hasReleaseKey = !keystorePath.isNullOrBlank()

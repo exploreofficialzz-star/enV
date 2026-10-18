@@ -1,6 +1,54 @@
 import { defineHandler } from "nitro/h3";
 import { backendConfig, joinUrl } from "../../../../backend/config";
-import { optionsResponse, proxyRequest, jsonResponse } from "../../../../backend/http";
-import { spawn } from "node:child_process";import fs from "node:fs/promises";import os from "node:os";import path from "node:path";import { randomUUID } from "node:crypto";
-function run(bin:string,args:string[]){return new Promise<void>((resolve,reject)=>{const c=spawn(bin,args,{stdio:["ignore","pipe","pipe"]});let err="";c.stderr.on("data",x=>err+=x.toString());c.on("error",reject);c.on("close",n=>n===0?resolve():reject(new Error(`${bin} failed (${n}). ${err.slice(-1000)}`)))})}
-export default defineHandler(async e=>{if(e.req.method==="OPTIONS")return optionsResponse();if(backendConfig().ocr)return proxyRequest(e.req,joinUrl(backendConfig().ocr,"ocr"));const dir=await fs.mkdtemp(path.join(os.tmpdir(),`env-ocr-${randomUUID()}-`));try{const f=await e.req.formData();const files=f.getAll("files").filter((x):x is File=>x instanceof File);if(!files.length)return jsonResponse({error:"Choose an image or PDF first."},400);const lang=String(f.get("language")??"eng").replace(/[^a-zA-Z+_-]/g,"")||"eng";const texts:string[]=[];for(const file of files){const input=path.join(dir,file.name.replace(/[^a-zA-Z0-9._-]/g,"_")||"input");await fs.writeFile(input,Buffer.from(await file.arrayBuffer()));const base=path.join(dir,`ocr-${texts.length}`);await run(process.env.TESSERACT_BIN||"tesseract",[input,base,"-l",lang]);texts.push(await fs.readFile(`${base}.txt`,"utf8"))}return jsonResponse({text:texts.join("\n\n"),language:lang})}catch(err){return jsonResponse({error:err instanceof Error?err.message:"OCR failed."},400)}finally{await fs.rm(dir,{recursive:true,force:true}).catch(()=>{})}})
+import { jsonResponse, optionsResponse, proxyRequest, measureServerOperation } from "../../../../backend/http";
+import { spawn } from "node:child_process";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+
+function run(bin: string, args: string[]) {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.on("error", reject);
+    child.on("close", (code) => code === 0
+      ? resolve()
+      : reject(new Error(`${bin} failed (${code}). ${stderr.slice(-1000)}`)));
+  });
+}
+
+export default defineHandler(async (event) => {
+  if (event.req.method === "OPTIONS") return optionsResponse();
+  const configuredOcr = backendConfig().ocr;
+  if (configuredOcr) {
+    return proxyRequest(event.req, joinUrl(configuredOcr, "ocr"), "cloud.document_processing");
+  }
+
+  // Tesseract fallback runs in the gateway process. Meter only operational dimensions and never
+  // include image/PDF contents, file names, extracted text, or OCR results in billing telemetry.
+  return measureServerOperation(event.req, "server.ocr_processing", async () => {
+    const directory = await mkdtemp(join(tmpdir(), `env-ocr-${randomUUID()}-`));
+    try {
+      const form = await event.req.formData();
+      const files = form.getAll("files").filter((item): item is File => item instanceof File);
+      if (!files.length) return jsonResponse({ error: "Choose an image or PDF first." }, 400);
+      const language = String(form.get("language") ?? "eng").replace(/[^a-zA-Z+_-]/g, "") || "eng";
+      const results: string[] = [];
+      for (const file of files) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "input";
+        const input = join(directory, safeName);
+        await writeFile(input, Buffer.from(await file.arrayBuffer()));
+        const base = join(directory, `ocr-${results.length}`);
+        await run(process.env.TESSERACT_BIN || "tesseract", [input, base, "-l", language]);
+        results.push(await readFile(`${base}.txt`, "utf8"));
+      }
+      return jsonResponse({ text: results.join("\n\n"), language });
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : "OCR failed." }, 400);
+    } finally {
+      await rm(directory, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});

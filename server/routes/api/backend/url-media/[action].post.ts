@@ -8,5 +8,5 @@ export default defineHandler(async (event) => {
   if (action !== "info" && action !== "download") return jsonResponse({ error: "URL media action must be info or download." }, 404);
   const upstream = backendConfig().urlMedia;
   if (!upstream) return unavailable("The URL media processor", "URL_MEDIA_PROCESSOR_URL");
-  return proxyRequest(event.req, joinUrl(upstream, action));
+  return proxyRequest(event.req, joinUrl(upstream, action), "cloud.generic_processing");
 });

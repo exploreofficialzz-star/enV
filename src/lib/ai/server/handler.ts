@@ -24,7 +24,31 @@ export interface HandlerDeps {
   limiter?: RateLimiter;
   /** Resolve the signed-in user's id, or null. Only consulted when authentication is configured. */
   getUserId?: (request: Request) => Promise<string | null>;
+  /**
+   * Optional server-side usage capture. Receives metrics only (never prompt or output content).
+   * Capture failures must not turn a successful AI result into a failed user request; the caller
+   * is expected to log a safe error and keep billing inactive unless settlement is fully wired.
+   */
+  recordUsage?: (event: AiUsageCaptureEvent) => Promise<void>;
   log?: AiLogger;
+}
+
+export interface AiUsageCaptureEvent {
+  requestId: string;
+  taskId: string;
+  userId: string | null;
+  provider: string | null;
+  model: string | null;
+  usage: { inputTokens: number | null; outputTokens: number | null; totalTokens: number | null; audioSeconds: number | null };
+  estimatedCostUsd: number | null;
+  costBasis: "estimated" | "unknown";
+  latencyMs: number | null;
+  attempts: number | null;
+  cached: boolean;
+  fallbackUsed: boolean;
+  promptVersion: string;
+  finishReason: string;
+  executionStatus: "succeeded" | "failed";
 }
 
 export interface AiHandlers {
@@ -157,6 +181,9 @@ export function createAiHandlers(deps: HandlerDeps): AiHandlers {
     async run(request) {
       const requestId = newRequestId();
       const headers: Record<string, string> = {};
+      let observedTaskId: string | null = null;
+      let observedUserId: string | null = null;
+      let executionStartedAt: number | null = null;
       try {
         if (request.method !== "POST") throw new AiError("AI_INVALID_INPUT", { detail: "Use POST." });
         if (!config.enabled) throw new AiError("AI_DISABLED");
@@ -179,12 +206,14 @@ export function createAiHandlers(deps: HandlerDeps): AiHandlers {
         const envelope = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
         const taskId = typeof envelope.task === "string" ? envelope.task : "";
         if (!taskId || taskId.length > 80) throw new AiError("AI_INVALID_INPUT", { detail: "A task id is required." });
+        observedTaskId = taskId;
         // Only `task` and `input` are ever read. A client cannot choose providers, models or limits.
         const task = core.getTask(taskId);
         if (!task) throw new AiError("AI_TASK_UNKNOWN");
 
         let userId: string | null = null;
         if (config.authConfigured && deps.getUserId) userId = await deps.getUserId(request).catch(() => null);
+        observedUserId = userId;
         if (config.requireAuth && !userId) throw new AiError("AI_AUTH_REQUIRED");
 
         const secret = config.sessionSecret?.reveal() ?? INSTANCE_SECRET;
@@ -204,9 +233,69 @@ export function createAiHandlers(deps: HandlerDeps): AiHandlers {
         const blocked = checks.find((c) => !c.allowed);
         if (blocked) throw limited(blocked);
 
+        executionStartedAt = Date.now();
         const result = await core.run({ taskId, input: envelope.input, signal: request.signal, requestId, dedupeScope: identity });
-        return jsonResponse(200, { ok: true, data: { taskId, result: result.result, meta: publicMeta(result, config) } }, { "x-request-id": requestId, ...headers });
+        // Serialize the outgoing result before writing the success event. If serialization itself
+        // fails, the catch path records the run as unknown-cost instead of conflicting with a
+        // previously persisted success event under the same request id.
+        const successResponse = jsonResponse(200, { ok: true, data: { taskId, result: result.result, meta: publicMeta(result, config) } }, { "x-request-id": requestId, ...headers });
+        if (deps.recordUsage) {
+          // Never store prompts, model output, uploaded content or history in the billing ledger.
+          // A cache hit is recorded as zero provider spend because no new provider call was made.
+          const capture: AiUsageCaptureEvent = {
+            requestId,
+            taskId,
+            userId,
+            provider: result.cached ? null : result.provider,
+            model: result.cached ? null : result.model,
+            usage: result.cached
+              ? { inputTokens: 0, outputTokens: 0, totalTokens: 0, audioSeconds: 0 }
+              : result.usage,
+            estimatedCostUsd: result.cached ? 0 : result.cost.usd,
+            costBasis: result.cached ? "estimated" : result.cost.basis,
+            latencyMs: result.latencyMs,
+            attempts: result.cached ? 0 : result.attempts,
+            cached: result.cached,
+            fallbackUsed: result.cached ? false : result.fallbackUsed,
+            promptVersion: result.promptVersion,
+            finishReason: result.finishReason,
+            executionStatus: "succeeded",
+          };
+          try {
+            await deps.recordUsage(capture);
+          } catch {
+            // Billing capture is observability-only in this phase. Keep the user's AI result usable;
+            // the runtime's callback emits a redacted operational warning for reconciliation.
+            log({ event: "ai.billing_usage_capture", requestId, taskId, status: "error", errorCode: "BILLING_USAGE_CAPTURE_FAILED" });
+          }
+        }
+        return successResponse;
       } catch (error) {
+        // Provider failures can still incur upstream cost. Record an explicit unknown-cost event
+        // after a valid execution was attempted rather than falsely recording $0 or charging blind.
+        if (deps.recordUsage && observedTaskId && executionStartedAt !== null) {
+          try {
+            await deps.recordUsage({
+              requestId,
+              taskId: observedTaskId,
+              userId: observedUserId,
+              provider: null,
+              model: null,
+              usage: { inputTokens: null, outputTokens: null, totalTokens: null, audioSeconds: null },
+              estimatedCostUsd: null,
+              costBasis: "unknown",
+              latencyMs: Math.max(0, Date.now() - executionStartedAt),
+              attempts: null,
+              cached: false,
+              fallbackUsed: false,
+              promptVersion: "unknown",
+              finishReason: "unknown",
+              executionStatus: "failed",
+            });
+          } catch {
+            log({ event: "ai.billing_usage_capture", requestId, taskId: observedTaskId, status: "error", errorCode: "BILLING_USAGE_CAPTURE_FAILED" });
+          }
+        }
         return failure(error, requestId, headers);
       }
     },

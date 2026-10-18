@@ -12,6 +12,7 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { ToolTokenEstimate } from "@/components/billing/tool-token-estimate";
 
 export function ToolShell({
   tool,
@@ -83,6 +84,7 @@ export function ToolShell({
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      <ToolTokenEstimate toolId={tool.id} />
 
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
         {children}

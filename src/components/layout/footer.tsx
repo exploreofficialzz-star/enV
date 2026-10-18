@@ -3,11 +3,18 @@ import { Logo } from "@/components/brand/logo";
 import { CATEGORIES } from "@/data/categories";
 import { activeCount } from "@/lib/registry";
 
-const LINKS = [
+const PRODUCT_LINKS = [
   { to: "/about", label: "About" },
   { to: "/tools", label: "Tools" },
   { to: "/pricing", label: "Pricing" },
+  { to: "/tokens", label: "Token guide" },
+] as const;
+const RESOURCE_LINKS = [
+  { to: "/help", label: "Help center" },
+  { to: "/blog", label: "Blog & guides" },
   { to: "/contact", label: "Contact" },
+] as const;
+const LEGAL_LINKS = [
   { to: "/privacy", label: "Privacy" },
   { to: "/terms", label: "Terms" },
   { to: "/disclaimer", label: "Disclaimer" },
@@ -18,7 +25,7 @@ export function Footer() {
   const count = activeCount();
   return (
     <footer className="mt-auto border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-5">
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-3 max-w-sm text-sm text-muted">
@@ -29,11 +36,19 @@ export function Footer() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Product</p>
           <ul className="mt-3 space-y-2">
-            {LINKS.slice(0, 4).map((l) => (
+            {PRODUCT_LINKS.map((l) => (
               <li key={l.to}>
-                <Link to={l.to} className="text-sm text-muted hover:text-fg">
-                  {l.label}
-                </Link>
+                <Link to={l.to} className="text-sm text-muted hover:text-fg">{l.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Resources</p>
+          <ul className="mt-3 space-y-2">
+            {RESOURCE_LINKS.map((l) => (
+              <li key={l.to}>
+                <Link to={l.to} className="text-sm text-muted hover:text-fg">{l.label}</Link>
               </li>
             ))}
           </ul>
@@ -41,11 +56,9 @@ export function Footer() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Legal</p>
           <ul className="mt-3 space-y-2">
-            {LINKS.slice(4).map((l) => (
+            {LEGAL_LINKS.map((l) => (
               <li key={l.to}>
-                <Link to={l.to} className="text-sm text-muted hover:text-fg">
-                  {l.label}
-                </Link>
+                <Link to={l.to} className="text-sm text-muted hover:text-fg">{l.label}</Link>
               </li>
             ))}
           </ul>

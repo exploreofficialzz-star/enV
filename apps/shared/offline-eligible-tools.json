@@ -1,0 +1,1341 @@
+{
+  "pricingVersion": "env-metering-preview-2026-10-18-v1",
+  "toolCount": 267,
+  "profiles": [
+    {
+      "toolId": "angular-speed-rad-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "angular-speed-rpm-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "area-per-person-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "automotive-braking-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "automotive-wheel-speed-from-rpm",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "average-speed-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "battery-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "beam-load-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "beam-uniform-load-total-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "belt-speed-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "calorie-burn-per-minute-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "civil-concrete-weight",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "civil-earthwork-trapezoidal-volume",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "civil-hydrostatic-force-vertical-wall",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "click-through-rate-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "commission-rate-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-board-foot-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-carpet-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-concrete-volume-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-concrete-weight-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-excavation-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-flooring-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-gravel-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-grout-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-gutter-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-insulation-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-land-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-lumber-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-material-cost-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-mortar-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-mulch-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-paint-coverage-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-post-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-shingle-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "construction-soil-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cooking-ratio-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cooking-temperature-conversion-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cost-per-acquisition-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cost-per-click-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cost-per-thousand-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "cycling-speed-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "data-transfer-time-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "days-inventory-outstanding-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "decimal-hours-to-minutes-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "decimal-to-percent-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "download-time-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "drag-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "dynamic-pressure-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-battery-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-capacitive-reactance",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-capacitor-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-energy-kwh",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-frequency-period",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-inductive-reactance",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-lr-time-constant",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-power-v-i",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-rc-time-constant",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-resistor-power-i-r",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-resistor-power-v-r",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-transformer-secondary-voltage",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "electrical-voltage-drop-percent",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-circle-area",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-circle-section-modulus",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-pipe-flow-area",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-poisson-ratio",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-rectangle-second-moment",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-rectangle-section-modulus",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-solid-circle-inertia",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-thermal-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "engineering-trapezoid-area",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-401k-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-apr-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-arr-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-bond-yield-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-burn-rate-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-cagr-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-cash-flow-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-churn-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-commission-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-customer-acquisition-cost-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-customer-lifetime-value-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-debt-to-income-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-discount-rate-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-emergency-fund-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-hourly-to-salary-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-inventory-turnover-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-mrr-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-operating-margin-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-overtime-pay-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-pension-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-present-value-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-recurring-revenue-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-runway-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "finance-salary-to-hourly-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "flow-velocity-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-bernoulli-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-darcy-friction-factor-laminar",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-darcy-pressure-drop",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-dynamic-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-flow-rate",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-hydraulic-diameter",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "fluid-reynolds-number",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "force-from-pressure-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "gear-output-speed-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "gear-ratio-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "gear-train-ratio-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "gravitational-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "half-life-decay-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "heat-transfer-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "hydration-needs-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "hydraulic-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "hydraulic-pressure-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "inventory-turnover-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "labor-cost-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "lift-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "materials-bulk-modulus",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "materials-shear-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "materials-strain",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "materials-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "materials-youngs-modulus",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-ellipse-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-exponent-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-frustum-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-gcd-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-matrix-2x2-determinant",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-midpoint-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-parallelogram-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-point-slope-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-prism-volume-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-pyramid-volume-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-rhombus-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-scale-factor-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-sector-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-similarity-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-torus-volume-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-trapezoid-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-vector-3d-dot",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "math-z-score-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-advantage-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-beam-deflection-cantilever",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-bearing-life",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-belt-speed",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-bending-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-bolt-preload-from-torque",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-deflection-cantilever-end-load",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-deflection-simply-supported-center-load",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-gear-ratio",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-horsepower-to-power",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-hydraulic-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-hydraulic-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-kinetic-friction-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-linear-momentum-change",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-output-rpm",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-power-to-horsepower",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-power-torque-rpm",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-pressure-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-pulley-speed-ratio",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-pump-hydraulic-power",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-rpm-from-speed",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-safety-factor",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-shaft-angle-of-twist",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-shaft-power-from-rpm",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-shaft-torsional-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-spring-rate",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-torsional-shear-stress",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "mechanical-work-energy-spring",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "midpoint-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "minutes-to-decimal-hours-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "molarity-dilution-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "molarity-from-mass-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "momentum-velocity-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "ohms-power-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "operating-margin-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "payback-period-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "percent-to-decimal-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "photon-wavelength-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-angular-acceleration",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-angular-momentum",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-buoyant-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-capacitor-charge",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-capacitor-voltage",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-centripetal-acceleration",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-centripetal-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-coefficient-friction",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-density",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-efficiency",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-electric-field-point-charge",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-electric-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-electric-potential-point-charge",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-frequency-period",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-gravitational-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-hydrostatic-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-impulse",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-induction-emf",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-kinematic-displacement",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-kinematic-distance-velocity",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-kinematic-final-velocity",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-kinetic-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-mechanical-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-momentum",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-newtons-second-law",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-photon-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-potential-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-power",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-relativistic-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-resistivity",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-rotational-kinematics",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-rotational-kinetic-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-spring-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-spring-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-wave-speed",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "physics-weight-force",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "pipe-volume-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "power-law-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "pressure-force-area-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "pressure-from-depth-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "pump-power-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "recipe-cost-per-serving-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "revenue-per-user-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "reynolds-number-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-acceleration-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-buoyancy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-capacitor-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-density-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-dilution-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-electrical-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-frequency-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-half-life-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-heat-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-ideal-gas-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-inductor-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-kinetic-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-molarity-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-moles-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-momentum-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-photon-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-potential-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-power-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-pressure-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-resistor-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-velocity-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-voltage-divider-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "science-wavelength-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "solar-panel-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "spring-energy-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "statistics-coefficient-variation",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "statistics-z-score",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "steps-to-distance-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "structures-beam-self-weight-load",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "structures-column-slenderness-ratio",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "structures-euler-buckling-load",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "structures-thermal-expansion",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-cop-refrigerator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-expansion-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-heat-energy",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-heat-exchanger-duty",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-heat-transfer-rate",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-hvac-air-changes-per-hour",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-hvac-sensible-load",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-ideal-gas-pressure",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-ideal-gas-volume",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-latent-heat",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "thermal-newton-cooling-rate",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "torque-from-force-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    },
+    {
+      "toolId": "wave-period-calculator",
+      "billingKey": "local.calculator",
+      "subunitsPerUnit": 100
+    }
+  ]
+}

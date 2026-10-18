@@ -161,10 +161,11 @@ test("company pages use the supplied brand, distinct contact emails, and transpa
   assert.match(about, /registered in Delaware, USA/);
   assert.match(contact, /mailto:envtoolkit@gmail\.com/);
   assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
-  assert.match(pricing, /Planned pricing — purchases are not available yet/);
-  for (const price of ["$0.30", "$0.50", "$0.80", "$1.20", "$5.00"]) assert.ok(pricing.includes(price), `Missing supplied token price ${price}`);
-  assert.match(pricing, /100 tokens/);
-  assert.match(pricing, /50 tokens/);
+  assert.match(pricing, /Monetization foundation in progress/);
+  assert.match(pricing, /100 tokens = \$1\.00/);
+  assert.match(pricing, /Usage values are provisional hypotheses, not final rates or purchase bundles/);
+  assert.match(pricing, /No checkout is active yet/);
+  assert.match(pricing, /Explore the token guide and tool-by-tool explanations/);
   assert.match(footer, /chAs Technologies LLC · enV/);
 });
 
@@ -189,10 +190,11 @@ test("Web information routes contain complete company, privacy, terms, disclaime
   assert.match(responsibleUse, /aged 13 or older/);
   assert.match(responsibleUse, /Reporting a concern/);
   assert.match(terms, /at least 13 years old/);
-  assert.match(terms, /listed reference prices are in USD/);
-  assert.match(terms, /final amount and currency will be shown before payment/);
-  assert.match(pricing, /Prices are listed in USD/);
-  assert.match(pricing, /final currency and total will be shown before you confirm payment/);
+  assert.match(terms, /proposed USD reference value of 100 tokens per \$1\.00/);
+  assert.match(terms, /this is not an active offer or a guaranteed local price/);
+  assert.match(terms, /Actual store price points, minimum top-ups, supported payment methods, taxes and local currencies will be shown before a purchase/);
+  assert.match(pricing, /Proposed USD reference value/);
+  assert.match(pricing, /No checkout is active yet/);
   assert.match(privacy, /registered in Delaware, USA/);
   assert.match(terms, /Governing Law and Venue/);
   assert.match(terms, /governed by the laws of the State of Delaware, United States/);

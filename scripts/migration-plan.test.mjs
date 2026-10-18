@@ -34,11 +34,17 @@ test("non-SQL entries are dropped", () => {
   assert.deepEqual(pendingMigrations(["auth", "README.md"], []), []);
 });
 
-test("the production auth schema is a root-level migration for explicit deployment", () => {
+test("production schema migrations remain root-level, ordered, and explicit", () => {
   const migrationsDir = join(projectRoot(), "migrations");
   const entries = readdirSync(migrationsDir);
-  assert.ok(entries.includes("0001_auth.sql"));
-  assert.deepEqual(pendingMigrations(entries, []), [{ name: "0001_auth.sql", path: "0001_auth.sql" }]);
+  const orderedMigrations = entries.filter(isMigrationFile).sort();
+  assert.ok(orderedMigrations.includes("0001_auth.sql"));
+  assert.ok(orderedMigrations.includes("0002_billing.sql"));
+  assert.ok(orderedMigrations.includes("0003_offline_wallet.sql"));
+  assert.ok(orderedMigrations.includes("0004_offline_wallet_hardening.sql"));
+  assert.ok(orderedMigrations.includes("0005_offline_finalization_batch_binding.sql"));
+  assert.equal(orderedMigrations[0], "0001_auth.sql");
+  assert.deepEqual(pendingMigrations(entries, []), orderedMigrations.map((name) => ({ name, path: name })));
 });
 
 test("migration files sort and apply idempotently in a fresh workspace", () => {

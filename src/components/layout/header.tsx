@@ -15,6 +15,11 @@ export function Header() {
         </Link>
 
         <nav className="ml-auto flex items-center gap-1" aria-label="Quick links">
+          <div className="mr-2 hidden items-center gap-1 lg:flex">
+            <Link to="/blog" className="rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-fg">Blog</Link>
+            <Link to="/help" className="rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-fg">Help</Link>
+            <Link to="/tokens" className="rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2 hover:text-fg">Tokens</Link>
+          </div>
           <Link
             to="/favorites"
             aria-label="Saved tools"
@@ -45,6 +50,9 @@ export function Header() {
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/account">Account</Link>
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/search" search={{ q: "" }}>Search tools</Link>
               <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/pricing">Pricing</Link>
+              <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/tokens">Token guide</Link>
+              <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/help">Help center</Link>
+              <Link className="block rounded-lg px-3 py-2 text-sm hover:bg-surface-2" to="/blog">Blog</Link>
             </div>
           </details>
         </nav>

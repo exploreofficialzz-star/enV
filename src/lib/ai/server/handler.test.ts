@@ -3,7 +3,7 @@ import test from "node:test";
 import { AiError } from "../errors.ts";
 import type { MockStep } from "./providers/mock.ts";
 import { createAiHandlers } from "./handler.ts";
-import type { HandlerDeps } from "./handler.ts";
+import type { AiUsageCaptureEvent, HandlerDeps } from "./handler.ts";
 import { FAKE_KEYS, testCore } from "./test-utils.ts";
 import type { TestCoreOptions } from "./test-utils.ts";
 
@@ -20,9 +20,12 @@ function post(body: unknown, headers: Record<string, string> = {}, raw?: string)
 function get(path: string, headers: Record<string, string> = {}): Request {
   return new Request(`${ORIGIN}${path}`, { method: "GET", headers: { host: "env.test", ...headers } });
 }
-function setup(options: TestCoreOptions & { getUserId?: HandlerDeps["getUserId"] } = {}) {
+function setup(options: TestCoreOptions & {
+  getUserId?: HandlerDeps["getUserId"];
+  recordUsage?: HandlerDeps["recordUsage"];
+} = {}) {
   const made = testCore(options);
-  const handlers = createAiHandlers({ core: made.core, getUserId: options.getUserId });
+  const handlers = createAiHandlers({ core: made.core, getUserId: options.getUserId, recordUsage: options.recordUsage });
   return { ...made, handlers };
 }
 const readJson = async (res: Response) => (await res.json()) as any;
@@ -48,6 +51,64 @@ test("success: JSON contract, security headers, no CORS, no provider details, Ht
   assert.deepEqual(Object.keys(json.data.meta).sort(), ["cached", "requestId", "warnings"]);
   const dump = JSON.stringify(json);
   for (const leak of ["groq", "openrouter", "gemini", "gpt-oss", "promptVersion", ...Object.values(FAKE_KEYS)]) assert.ok(!dump.includes(leak), leak);
+});
+
+test("successful AI work emits a metrics-only usage event for persistent billing capture", async () => {
+  const events: AiUsageCaptureEvent[] = [];
+  const { handlers } = setup({
+    env: { VITE_AUTH_ENABLED: "true" },
+    getUserId: async () => "account-42",
+    recordUsage: async (event) => { events.push(event); },
+  });
+  const res = await handlers.run(post(CAPTION));
+  assert.equal(res.status, 200);
+  assert.equal(events.length, 1);
+  const event = events[0]!;
+  assert.equal(event.userId, "account-42");
+  assert.equal(event.taskId, CAPTION.task);
+  assert.match(event.requestId, /^req_/);
+  assert.equal(event.cached, false);
+  assert.equal(event.usage.inputTokens, 100);
+  assert.equal(event.usage.outputTokens, 50);
+  assert.ok(event.estimatedCostUsd === null || (typeof event.estimatedCostUsd === "number" && event.estimatedCostUsd >= 0));
+  const serialized = JSON.stringify(event);
+  for (const privateContent of [CAPTION.input.topic, "Mock response.", ...Object.values(FAKE_KEYS)]) {
+    assert.ok(!serialized.includes(privateContent), `usage event must not store private content or secrets: ${privateContent}`);
+  }
+});
+
+test("billing usage capture failure never destroys a successful AI result", async () => {
+  const logged: string[] = [];
+  const made = testCore();
+  const handlers = createAiHandlers({
+    core: made.core,
+    recordUsage: async () => { throw new Error("database credentials or SQL internals must not escape"); },
+    log: (event) => { if (event.event === "ai.billing_usage_capture") logged.push(event.errorCode ?? ""); },
+  });
+  const res = await handlers.run(post(CAPTION));
+  assert.equal(res.status, 200);
+  assert.equal((await readJson(res)).ok, true);
+  assert.deepEqual(logged, ["BILLING_USAGE_CAPTURE_FAILED"]);
+});
+
+test("failed provider execution is recorded as unknown cost, never assumed free", async () => {
+  const events: AiUsageCaptureEvent[] = [];
+  const { handlers } = setup({
+    scripts: {
+      openrouter: [fail("AI_PROVIDER_UNAVAILABLE"), fail("AI_PROVIDER_UNAVAILABLE")],
+      groq: [fail("AI_PROVIDER_UNAVAILABLE"), fail("AI_PROVIDER_UNAVAILABLE")],
+      gemini: [fail("AI_PROVIDER_UNAVAILABLE"), fail("AI_PROVIDER_UNAVAILABLE")],
+    },
+    recordUsage: async (event) => { events.push(event); },
+  });
+  const res = await handlers.run(post(CAPTION));
+  assert.equal(res.status, 503);
+  assert.equal(events.length, 1);
+  assert.equal(events[0]!.executionStatus, "failed");
+  assert.equal(events[0]!.costBasis, "unknown");
+  assert.equal(events[0]!.estimatedCostUsd, null);
+  assert.equal(events[0]!.usage.inputTokens, null);
+  assert.equal(events[0]!.attempts, null, "attempt count is not fabricated when the request fails");
 });
 
 test("sessions: a valid cookie is reused, a tampered one is replaced", async () => {

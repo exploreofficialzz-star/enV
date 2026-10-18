@@ -1949,17 +1949,48 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
     val values = remember(tool.id) { mutableStateMapOf<String, String>().apply { operation.fields.forEach { field -> put(field.name, field.defaultValue) } } }
     var output by rememberSaveable(tool.id) { mutableStateOf("") }
     var error by rememberSaveable(tool.id) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val journal = remember { com.chastech.env.billing.OfflineWalletJournal(context) }
+    fun render(rows: List<NativeCalculatorEngine.Output>) = rows.joinToString("\n") { row -> "${row.label}: ${row.value}${row.hint?.let { " $it" } ?: ""}" }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         operation.formula?.takeIf { it.isNotBlank() }?.let { Text("Formula: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        operation.fields.forEach { field ->
-            InputField(values[field.name].orEmpty(), { values[field.name] = it }, field.label, singleLine = true)
-        }
+        operation.fields.forEach { field -> InputField(values[field.name].orEmpty(), { values[field.name] = it }, field.label, singleLine = true) }
         ActionRow(
-            onRun = { runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
-                { rows -> output = rows.joinToString("\n") { row -> "${row.label}: ${row.value}${row.hint?.let { " $it" } ?: ""}" }; error = "" },
-                { output = ""; error = it.message ?: "Unable to run calculator" }
-            ) },
+            onRun = {
+                val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
+                val metered = allowanceId != null && runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
+                if (!metered || allowanceId == null) {
+                    runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
+                        { rows -> output = render(rows); error = "" },
+                        { output = ""; error = it.message ?: "Unable to run calculator" }
+                    )
+                } else scope.launch {
+                    var ticket: com.chastech.env.billing.OfflineWalletJournal.OperationTicket? = null
+                    try {
+                        // Validate and compute before reserving a billable journal ticket so
+                        // invalid input does not consume offline tokens. Do not display the
+                        // prepared result until the successful Calculate action is journaled.
+                        val rows = NativeCalculatorEngine.run(operation, values.toMap())
+                        val operationTicket = journal.beginOperation(context, allowanceId, tool.id)
+                        ticket = operationTicket
+                        journal.finishOperation(context, operationTicket, "succeeded")
+                        output = render(rows); error = ""
+                        if (com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+                            runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
+                        }
+                    } catch (failure: Exception) {
+                        val journalMessage = ticket?.let { operationTicket ->
+                            runCatching { journal.finishOperation(context, operationTicket, "failed") }.exceptionOrNull()?.message
+                        }
+                        output = ""
+                        error = listOfNotNull(failure.message ?: "Unable to run calculator", journalMessage?.let { "Usage record needs recovery: $it" }).joinToString(" ")
+                        if (ticket != null && com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+                            runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
+                        }
+                    }
+                }
+            },
             onReset = { operation.fields.forEach { values[it.name] = it.defaultValue }; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)

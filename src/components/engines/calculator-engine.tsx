@@ -7,18 +7,19 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CalcInputError, isBlank } from "@/lib/calc/numeric";
 import { DEFAULT_DISPLAY, applyDisplaySettings, buildCalculationSummary, describeOutput, type DisplaySettings } from "@/lib/calc/display";
 import { calculators, type CalcOutput } from "@/lib/engines/formulas";
+import { runOfflineMeteredOperationIfSelected } from "@/lib/billing/offline-client";
 import { Clock3, RotateCcw, Trash2, X } from "lucide-react";
 
 type CalcError = { message: string; /** Name of the input the error is about, when known. */ field: string | null };
 type Computed = { outputs: CalcOutput[]; inputs: Record<string, string>; steps: string[] };
 type HistoryItem = { id: string; summary: string; result: string; time: string; values: Record<string, string> };
 
-export function CalculatorEngine({ formula }: { formula: string; toolId?: string }) {
-  // Keyed by formula so navigating between calculators never carries over inputs, results or errors.
-  return <CalculatorForm key={formula} formula={formula} />;
+export function CalculatorEngine({ formula, toolId }: { formula: string; toolId?: string }) {
+  // Keyed by tool and formula so navigating between calculators never carries over inputs, results or errors.
+  return <CalculatorForm key={`${toolId ?? formula}:${formula}`} formula={formula} toolId={toolId} />;
 }
 
-function CalculatorForm({ formula }: { formula: string }) {
+function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string }) {
   const def = calculators[formula];
   const fields = useMemo(() => def?.fields ?? [], [def]);
   const errorId = useId();
@@ -48,12 +49,21 @@ function CalculatorForm({ formula }: { formula: string }) {
 
   const onChange = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }));
 
-  const run = () => {
-    if (!def) return;
+  const [isRunning, setIsRunning] = useState(false);
+
+  const run = async () => {
+    if (!def || isRunning) return;
+    setIsRunning(true);
     try {
       const missing = fields.find((field) => field.type !== "select" && !/\boptional\b/i.test(`${field.label} ${field.hint ?? ""}`) && isBlank(values[field.name]));
       if (missing) throw new CalcInputError(`Enter a value for ${missing.label}.`, missing.name);
-      const outputs = def.compute(values);
+      // Validate and compute deterministically before opening a billable journal ticket.
+      // Invalid user input must never consume an offline token. The result is not displayed
+      // until the selected allowance has durably recorded the successful Calculate action.
+      const preparedOutputs = def.compute(values);
+      const outputs = toolId
+        ? await runOfflineMeteredOperationIfSelected({ toolId }, () => preparedOutputs)
+        : preparedOutputs;
       let steps: string[] = [];
       try {
         steps = def.explain?.(values) ?? [];
@@ -79,6 +89,8 @@ function CalculatorForm({ formula }: { formula: string }) {
       setComputed(null);
       setStatus("");
       setError({ message: e instanceof Error ? e.message : "Could not calculate. Check your inputs.", field: target?.name ?? null });
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -110,7 +122,7 @@ function CalculatorForm({ formula }: { formula: string }) {
       <CalculatorFields fields={fields} values={values} onChange={onChange} invalidField={error?.field ?? null} errorId={errorId} />
       {def.formula ? <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-subtle">Formula: {def.formula}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit">Calculate</Button>
+        <Button type="submit" disabled={isRunning}>{isRunning ? "Calculating…" : "Calculate"}</Button>
         <Button type="button" variant="ghost" onClick={reset}>
           Reset
         </Button>

@@ -6,5 +6,5 @@ export default defineHandler(async (event) => {
   if (event.req.method === "OPTIONS") return optionsResponse();
   const upstream = backendConfig().transcription;
   if (!upstream) return unavailable("The transcription processor", "TRANSCRIBE_URL");
-  return proxyRequest(event.req, joinUrl(upstream, "transcribe"));
+  return proxyRequest(event.req, joinUrl(upstream, "transcribe"), "cloud.transcription");
 });

@@ -5,7 +5,7 @@
  * name, an API key or a provider response body.
  */
 export interface AiLogEvent {
-  event: "ai.request" | "ai.attempt" | "ai.handler";
+  event: "ai.request" | "ai.attempt" | "ai.handler" | "ai.billing_usage_capture";
   requestId: string;
   taskId?: string;
   provider?: string;

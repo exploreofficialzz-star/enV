@@ -24,7 +24,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.chastech.env.billing.OfflineWalletJournal
+import com.chastech.env.billing.OfflineWalletNativeApi
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +90,10 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 "about" -> AboutInformation()
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()
-                "account" -> InformationSection("", listOf("No account is required for the browser toolkit."))
+                "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    InformationSection("Account and wallet", listOf("Pair this native app through your signed-in enV web wallet. The one-time pairing code expires quickly and can be used only once.", "Native token spending remains paused unless the server explicitly enables the isolated test mode. Production use requires native integrity verification."))
+                    OfflineWalletPairingPanel()
+                }
                 "history" -> InformationSection("", listOf("Recently used tools will appear here."))
                 "privacy" -> PrivacyInformation()
                 "terms" -> TermsInformation()
@@ -87,6 +102,91 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 else -> AboutInformation()
             }
             Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun OfflineWalletPairingPanel() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val journal = remember { OfflineWalletJournal(context) }
+    var code by remember { mutableStateOf("") }
+    var enabled by remember { mutableStateOf(false) }
+    var availabilityCode by remember { mutableStateOf("") }
+    var showFinalizeConfirmation by remember { mutableStateOf(false) }
+    var availabilityMessage by remember { mutableStateOf("Checking offline-wallet availability…") }
+    var paired by remember { mutableStateOf(OfflineWalletNativeApi.isPaired(context)) }
+    var busy by remember { mutableStateOf(false) }
+    var feedback by remember { mutableStateOf("") }
+    var activeAllowanceId by remember { mutableStateOf(runCatching { journal.activeAllowanceId() }.getOrNull()) }
+
+    LaunchedEffect(Unit) {
+        val state = OfflineWalletNativeApi.checkAvailability()
+        enabled = state.ok
+        availabilityCode = state.code.orEmpty()
+        availabilityMessage = state.message
+        paired = OfflineWalletNativeApi.isPaired(context)
+        activeAllowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
+    }
+
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Offline token wallet", style = MaterialTheme.typography.titleMedium)
+            Text(availabilityMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!enabled) {
+                Text("Offline token spending is paused in this preview. Local tools remain available; no allowance is issued or deducted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(if (paired) "This device has a secure paired session." else "To connect: open enV web → Wallet → Offline token allowance → Generate one-time code.", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = code, onValueChange = { code = it.trim().take(80) }, enabled = !busy && !paired,
+                    label = { Text("One-time pairing code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(onClick = { scope.launch {
+                    busy = true; feedback = ""
+                    try { val result = OfflineWalletNativeApi.pair(context, code); paired = true; code = ""; feedback = result.message }
+                    catch (failure: Throwable) { feedback = failure.message ?: "Pairing could not be completed." }
+                    finally { busy = false }
+                } }, enabled = enabled && !busy && !paired && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                    Text(if (busy) "Connecting…" else "Pair this Android device")
+                }
+                if (paired) {
+                    Text("Paired. The native signing key stays in Android Keystore. Losing the app's data can make unsynchronized usage unrecoverable.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { scope.launch {
+                        busy = true; feedback = ""
+                        try { val result = OfflineWalletNativeApi.reserveAllowance(context, journal); activeAllowanceId = journal.activeAllowanceId(); feedback = result.message }
+                        catch (failure: Throwable) { feedback = failure.message ?: "The allowance was not reserved." }
+                        finally { busy = false }
+                    } }, enabled = !busy && activeAllowanceId == null, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Reserving…" else "Reserve 5 tokens for this device") }
+                    activeAllowanceId?.let { allowanceId ->
+                        Text("An offline allowance is active on this device.", style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = { scope.launch {
+                            busy = true; feedback = ""
+                            try { val result = OfflineWalletNativeApi.synchronize(context, journal, allowanceId); feedback = result.message; activeAllowanceId = journal.activeAllowanceId() }
+                            catch (failure: Throwable) { feedback = failure.message ?: "Synchronization failed; local records were preserved." }
+                            finally { busy = false }
+                        } }, enabled = !busy && journal.pendingTransactionCount(allowanceId) > 0, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Synchronizing…" else "Synchronize pending calculator records") }
+                        if (availabilityCode == "LOCAL_TEST_ONLY") {
+                            OutlinedButton(onClick = { showFinalizeConfirmation = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Finalize local-test allowance") }
+                        }
+                    }
+                }
+            }
+            if (showFinalizeConfirmation) {
+                AlertDialog(onDismissRequest = { showFinalizeConfirmation = false },
+                    title = { Text("Finalize local-test allowance?") },
+                    text = { Text("This closes the allowance and settles accepted usage only in the isolated in-memory test environment. Production finalization remains disabled until independent app-integrity verification is implemented.") },
+                    confirmButton = { TextButton(onClick = {
+                        showFinalizeConfirmation = false
+                        val allowanceId = activeAllowanceId ?: return@TextButton
+                        scope.launch {
+                            busy = true; feedback = ""
+                            try { val result = OfflineWalletNativeApi.synchronize(context, journal, allowanceId, finalize = true); feedback = result.message; activeAllowanceId = journal.activeAllowanceId() }
+                            catch (failure: Throwable) { feedback = failure.message ?: "Finalization failed; reserved funds remain protected." }
+                            finally { busy = false }
+                        }
+                    }) { Text("Finalize test allowance") } },
+                    dismissButton = { TextButton(onClick = { showFinalizeConfirmation = false }) { Text("Cancel") } })
+            }
+            if (feedback.isNotBlank()) Text(feedback, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -177,37 +277,58 @@ private fun EmailAction(address: String, context: android.content.Context, label
 @Composable
 private fun PricingInformation() {
     val surface2 = informationSurface2()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            InformationSection("", listOf("The token amounts and prices below are the schedule supplied by chAs Technologies LLC."))
-            Text("Prices are listed in USD. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final currency and total will be shown before you confirm payment; availability and conversion rates depend on the provider.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Card(colors = CardDefaults.cardColors(containerColor = surface2), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Planned pricing — purchases are not available yet", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
-                Text("The current enV codebase does not include a token balance, checkout, or referral-award system. You cannot buy, redeem, or receive these tokens in the app at this time. This page lists the proposed schedule and is not a live offer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = surface2),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EnVIcon("ShieldCheck", tint = MaterialTheme.colorScheme.primary)
+                    Text("No advertising", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+                }
+                Text("enV is moving toward one transparent token wallet for tools and AI-agent work. Lightweight operations are intended to use fractions of a token; intensive cloud and AI operations will be priced from measured usage and shown before execution.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-            Column(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth().background(surface2).padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text("Tokens", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Normal)
-                    Text("Price (USD)", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.Normal)
-                }
-                listOf("100" to "$0.30", "300" to "$0.50", "500" to "$0.80", "1,000" to "$1.20", "5,000" to "$5.00").forEach { (tokens, price) ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("$tokens tokens", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(price, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.End, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    if (tokens != "5,000") Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
-                }
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Proposed reference value", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+                Text("100 tokens ≈ $1.00 USD", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
+                Text("One token represents one US cent at the reference rate. The ledger stores integer milli-tokens so a lightweight operation can use 0.1 token without floating-point rounding errors.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Illustrative value only — not an active offer or store price.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        InformationCardSection("Planned rewards", listOf(
-            "First sign-up bonus: 100 tokens.",
-            "Referral reward: 50 tokens.",
-            "Sign-up and referral rewards are not currently issued by the app. Eligibility and complete program rules will be published before the rewards become available.",
+        InformationSection("How usage is intended to work", listOf(
+            "Local utilities: very small token charges for lightweight calculations, text tools and conversions. Ten basic calculator operations are a draft target for one token, subject to the tool-by-tool cost and pricing audit.",
+            "Cloud and media tools: the quote will account for factors such as file size, pages, duration, resolution, provider cost and processing requirements.",
+            "AI and the agent: the agent should estimate a task, reserve an approved budget, meter every underlying tool and model call, then release unused reserved tokens. It must pause for approval before exceeding the user's limit.",
+            "Premium: frontier models and large workflows may require premium access, while their actual execution still consumes tokens.",
         ))
+        InformationSection("Offline usage and recovery", listOf(
+            "Offline token spending is paused in this preview while independent app-integrity verification and production review are completed. Local tools can still work offline without token deductions where the tool supports it.",
+            "When offline allowances are enabled in a future release, enV will reserve a bounded amount before disconnection, record eligible operations locally, and reconcile them with the shared server wallet after reconnecting.",
+            "Clearing app data or reinstalling before synchronization can destroy unsubmitted usage records. enV cannot reconstruct exact usage it never received, so unresolved reservations will not be automatically refunded. Report missing records through the wallet recovery flow or contact support.",
+        ))
+        InformationSection("One wallet, no monthly reset", listOf(
+            "The intended token ledger is shared across Web, Android and iOS, with platform-specific purchase verification and an auditable transaction history.",
+            "Purchased tokens are intended not to expire. Final terms and available purchase amounts must comply with local law, provider rules and the applicable store's requirements.",
+            "Minimum top-ups and supported payment methods vary by platform, country, currency and provider. Carrier billing, prepaid vouchers and enV gift cards are future integrations, not currently available payment options.",
+        ))
+        Card(
+            colors = CardDefaults.cardColors(containerColor = surface2),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Monetization foundation in progress", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
+                Text("The shared token rules, pricing-preview API and persistent ledger schema are included in this preview build. Authentication, provider adapters, store products and verified payment callbacks must be configured before real purchases or automatic charging can begin. This screen is informational; no payment will be taken here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Questions about enV pricing can be sent to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             EmailAction("envtoolkit@gmail.com", LocalContext.current)
@@ -237,7 +358,7 @@ private fun PrivacyInformation() {
         "Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. These are not the same as a marketing-cookie profile.",
         "If you have used a sign-in-enabled deployment and want to ask about, correct, or delete account information, email envtoolkit@gmail.com. Information stored only on your device can generally be removed by clearing that browser’s site data or the app’s local data.",
     ))
-    InformationSection("Payments and tokens", listOf("The current enV codebase does not provide token balances, token purchases, or referral awards, and does not collect payment-card information through a checkout. The figures on the Pricing page are the proposed schedule supplied by chAs Technologies LLC, not an active purchase offer. If payments are introduced, the applicable payment provider and data handling will be described before checkout is enabled."))
+    InformationSection("Payments and tokens", listOf("The enV monetization foundation includes a planned token ledger and pricing preview, but no real payment provider, store purchase adapter or checkout is active in this release. The pricing screen presents reference values only. enV does not collect payment-card details directly through the toolkit. Before launch, the chosen providers, payment data handling, token terms, refunds and purchase verification processes will be documented. No payment is taken and no purchased tokens are issued in this build."))
     InformationSection("Changes and contact", listOf(
         "We may revise this notice when product features, providers, or data practices change. The published version should be checked before using connected features.",
         "For privacy questions or requests, contact envtoolkit@gmail.com. Company correspondence may also be sent to chastechnologiesllc@gmail.com.",
@@ -259,7 +380,7 @@ private fun TermsInformation() {
         "Do not rely on enV as a substitute for qualified legal, medical, financial, tax, safety, or other professional advice. See the Disclaimer for more detail.",
     ))
     InformationSection("Availability and changes", listOf("We may update, suspend, or discontinue a tool or feature to maintain, improve, or protect enV. We do not guarantee that the service will be uninterrupted, error-free, compatible with every device, or available in every location. Third-party features are also subject to the availability and terms of their providers."))
-    InformationSection("Tokens and pricing", listOf("The listed reference prices are in USD. The token packages, sign-up bonus, and referral reward shown on the Pricing page are planned offers. The current codebase does not implement token balances, purchases, or reward issuance; no purchase can currently be made through enV. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final amount and currency will be shown before payment; availability and conversion rates depend on the provider. Any future token terms, eligibility requirements, expiry, refunds, and payment-provider terms will be shown before a purchase or reward program is activated."))
+    InformationSection("Tokens and pricing", listOf("The Pricing page shows a proposed USD reference value of 100 tokens per $1.00; it is not an active offer or a guaranteed local price. The intended ledger supports fractional-token usage for lightweight operations and measured usage for cloud, AI and agent workflows. Purchased tokens are intended not to expire, subject to applicable law and platform rules. Actual store price points, minimum top-ups, supported payment methods, taxes and local currencies will be shown before a purchase. No real purchases, balances or promotional rewards are active in this release."))
     InformationSection("Disclaimer and limits", listOf("To the extent permitted by applicable law, enV is provided “as is” and “as available,” without warranties that cannot be disclaimed under that law. To the extent permitted by applicable law, chAs Technologies LLC is not responsible for indirect or consequential losses arising from use of the service. Nothing in these Terms excludes a right or liability that cannot lawfully be excluded."))
     InformationSection("Questions", listOf("For questions about these Terms, contact envtoolkit@gmail.com or chastechnologiesllc@gmail.com."))
 }

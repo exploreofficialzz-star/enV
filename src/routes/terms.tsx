@@ -42,7 +42,7 @@ function Terms() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Tokens and pricing</h2>
-        <p>The listed reference prices are in USD. The token packages, sign-up bonus, and referral reward shown on the Pricing page are planned offers. The current codebase does not implement token balances, purchases, or reward issuance; no purchase can currently be made through enV. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final amount and currency will be shown before payment; availability and conversion rates depend on the provider. Any future token terms, eligibility requirements, expiry, refunds, and payment-provider terms will be shown before a purchase or reward program is activated.</p>
+        <p>The Pricing page shows a proposed USD reference value of 100 tokens per $1.00; this is not an active offer or a guaranteed local price. The intended ledger supports fractional-token usage for lightweight operations and measured usage for cloud, AI and agent workflows. Purchased tokens are intended not to expire, subject to applicable law and platform rules. Actual store price points, minimum top-ups, supported payment methods, taxes and local currencies will be shown before a purchase. No real purchases, token balances or promotional rewards are active in this release.</p>
       </section>
 
       <section className="space-y-2">

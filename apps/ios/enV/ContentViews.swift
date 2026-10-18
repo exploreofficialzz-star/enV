@@ -1083,7 +1083,10 @@ struct NativeInformationPageView: View {
         case "about": NativeAboutInformationPage()
         case "pricing": NativePricingInformationPage()
         case "contact": NativeContactInformationPage()
-        case "account": NativeInfoSectionView(title: nil, paragraphs: ["No account is required for the browser toolkit."])
+        case "account": VStack(alignment: .leading, spacing: 14) {
+            NativeInfoSectionView(title: "Connect your enV wallet", paragraphs: ["Pair this native app through the signed-in enV web wallet. The single-use code expires quickly and is entered only on the device you control.", "Ordinary local tools remain usable without an account or wallet. Offline token spending is paused unless the server explicitly enables isolated test mode; production use requires verified native integrity checks."])
+            NativeOfflineWalletPairingPanel()
+        }
         case "history": NativeInfoSectionView(title: nil, paragraphs: ["Recently used tools will appear here."])
         case "privacy": NativePrivacyInformationPage()
         case "terms": NativeTermsInformationPage()
@@ -1092,6 +1095,123 @@ struct NativeInformationPageView: View {
         default: NativeAboutInformationPage()
         }
     }
+}
+
+private struct NativeOfflineWalletPairingPanel: View {
+    @State private var code = ""
+    @State private var enabled = false
+    @State private var availabilityCode = ""
+    @State private var availabilityMessage = "Checking offline-wallet availability…"
+    @State private var paired = OfflineWalletNativeAPI.isPaired
+    @State private var busy = false
+    @State private var showFinalizeConfirmation = false
+    @State private var feedback = ""
+    @State private var journal: OfflineWalletJournal? = try? OfflineWalletJournal()
+    @State private var allowanceID: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText("Offline token wallet").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
+            enVCharacterSpacedText(availabilityMessage).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            if !enabled {
+                enVCharacterSpacedText("Offline token spending is paused in this preview. Local tools remain available; no allowance is issued or deducted.")
+                    .font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            } else {
+                enVCharacterSpacedText(paired ? "This device has a securely stored paired session." : "Open enV Web → Wallet → Offline token allowance → Generate one-time code.")
+                    .font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+                TextField("One-time pairing code", text: $code)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled().textFieldStyle(.roundedBorder)
+                    .disabled(busy || paired)
+                Button {
+                    Task { @MainActor in
+                        busy = true; defer { busy = false }
+                        do {
+                            try await OfflineWalletNativeAPI.pair(code: code)
+                            code = ""; paired = true
+                            feedback = "This iOS device is paired. Reserve an offline allowance below to opt in to eligible calculator metering."
+                        } catch { feedback = error.localizedDescription }
+                    }
+                } label: {
+                    Label(busy ? "Connecting…" : "Pair this iOS device", systemImage: "iphone")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderedProminent).disabled(!enabled || busy || paired || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if paired {
+                    enVCharacterSpacedText("The device signing key remains in this device's Keychain. Clearing app data or losing the device can make unsynchronized records unavailable.")
+                        .font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { @MainActor in
+                            busy = true; defer { busy = false }
+                            do {
+                                guard let journal else { throw OfflineWalletNativeAPIErrorForUI.message("The local offline journal is unavailable.") }
+                                allowanceID = try await OfflineWalletNativeAPI.reserveAllowance(journal: journal)
+                                feedback = "Five tokens are reserved for eligible local calculator operations on this device."
+                            } catch { feedback = error.localizedDescription }
+                        }
+                    } label: { Label("Reserve 5 tokens for this device", systemImage: "wallet.pass") .frame(maxWidth: .infinity, alignment: .leading) }
+                        .buttonStyle(.bordered).disabled(!paired || busy || allowanceID != nil)
+
+                    if let allowanceID {
+                        enVCharacterSpacedText("An offline allowance is active on this device.").font(.footnote).foregroundStyle(Color.envMuted)
+                        Button {
+                            Task { @MainActor in
+                                busy = true; defer { busy = false }
+                                do {
+                                    guard let journal else { throw OfflineWalletNativeAPIErrorForUI.message("The local offline journal is unavailable.") }
+                                    feedback = try await OfflineWalletNativeAPI.synchronize(journal: journal, allowanceID: allowanceID)
+                                } catch { feedback = error.localizedDescription }
+                            }
+                        } label: { Label("Synchronize pending calculator records", systemImage: "arrow.triangle.2.circlepath") .frame(maxWidth: .infinity, alignment: .leading) }
+                            .buttonStyle(.bordered).disabled(busy || ((try? journal?.pendingTransactionCount(allowanceID: allowanceID)) ?? 0) < 1)
+                        if availabilityCode == "LOCAL_TEST_ONLY" {
+                            Button { showFinalizeConfirmation = true } label: {
+                                Label("Finalize local-test allowance", systemImage: "checkmark.shield")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(busy)
+                        }
+                    }
+                }
+            }
+            if !feedback.isEmpty {
+                enVCharacterSpacedText(feedback).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+        .confirmationDialog("Finalize local-test allowance?", isPresented: $showFinalizeConfirmation, titleVisibility: .visible) {
+            Button("Finalize test allowance", role: .destructive) {
+                guard let allowanceID else { return }
+                Task { @MainActor in
+                    busy = true; defer { busy = false }
+                    do {
+                        guard let journal else { throw OfflineWalletNativeAPIErrorForUI.message("The local offline journal is unavailable.") }
+                        feedback = try await OfflineWalletNativeAPI.synchronize(journal: journal, allowanceID: allowanceID, finalize: true)
+                        self.allowanceID = try journal.activeAllowanceID()
+                    } catch { feedback = error.localizedDescription }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This settles only an isolated in-memory local-test allowance. Production finalization stays disabled until independent device-integrity proof is verified server-side.")
+        }
+        .task {
+            let state = await OfflineWalletNativeAPI.checkAvailability()
+            enabled = state.enabled
+            availabilityCode = state.code
+            availabilityMessage = state.message
+            paired = OfflineWalletNativeAPI.isPaired
+            if let journal { allowanceID = try? journal.activeAllowanceID() }
+        }
+    }
+}
+
+private enum OfflineWalletNativeAPIErrorForUI: LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case .message(let text) = self { return text }; return "Offline wallet unavailable." }
 }
 
 private struct NativeInfoSectionView: View {
@@ -1179,72 +1299,61 @@ private struct NativeAboutInformationPage: View {
 }
 
 private struct NativePricingInformationPage: View {
-    private let packages = [
-        NativeTokenPackage(tokens: "100", price: "$0.30"),
-        NativeTokenPackage(tokens: "300", price: "$0.50"),
-        NativeTokenPackage(tokens: "500", price: "$0.80"),
-        NativeTokenPackage(tokens: "1,000", price: "$1.20"),
-        NativeTokenPackage(tokens: "5,000", price: "$5.00"),
-    ]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            NativeInfoSectionView(title: nil, paragraphs: [
-                "The token amounts and prices below are the schedule supplied by chAs Technologies LLC.",
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("No advertising", systemImage: "checkmark.shield")
+                    .font(.envScaled(size: 17, weight: .semibold)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("enV is moving toward one transparent token wallet for tools and AI-agent work. Lightweight operations are intended to use fractions of a token; intensive cloud and AI operations will be priced from measured usage and shown before execution.")
+                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 8) {
+                enVCharacterSpacedText("Proposed reference value").font(.envScaled(size: 15, weight: .medium)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("100 tokens ≈ $1.00 USD").font(.envScaled(size: 25, weight: .semibold)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("One token represents one US cent at the reference rate. The ledger stores integer milli-tokens so a lightweight operation can use 0.1 token without floating-point rounding errors.")
+                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("Illustrative value only — not an active offer or store price.")
+                    .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+
+            NativeInfoSectionView(title: "How usage is intended to work", paragraphs: [
+                "Local utilities: very small token charges for lightweight calculations, text tools and conversions. Ten basic calculator operations are a draft target for one token, subject to the tool-by-tool cost and pricing audit.",
+                "Cloud and media tools: the quote will account for factors such as file size, pages, duration, resolution, provider cost and processing requirements.",
+                "AI and the agent: the agent should estimate a task, reserve an approved budget, meter every underlying tool and model call, then release unused reserved tokens. It must pause for approval before exceeding the user's limit.",
+                "Premium: frontier models and large workflows may require premium access, while their actual execution still consumes tokens."
             ])
-            enVCharacterSpacedText("Prices are listed in USD. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final currency and total will be shown before you confirm payment; availability and conversion rates depend on the provider.")
-                .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
-            VStack(alignment: .leading, spacing: 6) {
-                enVCharacterSpacedText("Planned pricing — purchases are not available yet").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                enVCharacterSpacedText("The current enV codebase does not include a token balance, checkout, or referral-award system. You cannot buy, redeem, or receive these tokens in the app at this time. This page lists the proposed schedule and is not a live offer.")
+            NativeInfoSectionView(title: "Offline usage and recovery", paragraphs: [
+                "Offline token spending is paused in this preview while independent app-integrity verification and production review are completed. Local tools can still work offline without token deductions where the tool supports it.",
+                "When offline allowances are enabled in a future release, enV will reserve a bounded amount before disconnection, record eligible operations locally, and reconcile them with the shared server wallet after reconnecting.",
+                "Clearing app data or reinstalling before synchronization can destroy unsubmitted usage records. enV cannot reconstruct exact usage it never received, so unresolved reservations will not be automatically refunded. Report missing records through the wallet recovery flow or contact support."
+            ])
+            NativeInfoSectionView(title: "One wallet, no monthly reset", paragraphs: [
+                "The intended token ledger is shared across Web, Android and iOS, with platform-specific purchase verification and an auditable transaction history.",
+                "Purchased tokens are intended not to expire. Final terms and available purchase amounts must comply with local law, provider rules and the applicable store's requirements.",
+                "Minimum top-ups and supported payment methods vary by platform, country, currency and provider. Carrier billing, prepaid vouchers and enV gift cards are future integrations, not currently available payment options."
+            ])
+            VStack(alignment: .leading, spacing: 7) {
+                enVCharacterSpacedText("Monetization foundation in progress").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("The shared token rules, pricing-preview API and persistent ledger schema are included in this preview build. Authentication, provider adapters, store products and verified payment callbacks must be configured before real purchases or automatic charging can begin. This screen is informational; no payment will be taken here.")
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envAccent.opacity(0.4), lineWidth: 1))
-
-            VStack(spacing: 0) {
-                HStack {
-                    enVCharacterSpacedText("Tokens")
-                    Spacer()
-                    enVCharacterSpacedText("Price (USD)")
-                }
-                .font(.envScaled(size: 14, weight: .semibold))
-                .foregroundStyle(Color.envInk)
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                .background(Color.envSurface2)
-                ForEach(packages) { package in
-                    HStack {
-                        enVCharacterSpacedText("\(package.tokens) tokens").foregroundStyle(Color.envMuted)
-                        Spacer()
-                        enVCharacterSpacedText(package.price).fontWeight(.medium).foregroundStyle(Color.envInk)
-                    }
-                    .font(.envScaled(size: 14, weight: .regular))
-                    .padding(.horizontal, 16).padding(.vertical, 12)
-                    .overlay(alignment: .top) { Rectangle().fill(Color.envBorder).frame(height: 1) }
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-
-            NativeInfoSectionView(title: "Planned rewards", paragraphs: [
-                "**First sign-up bonus:** 100 tokens.",
-                "**Referral reward:** 50 tokens.",
-                "Sign-up and referral rewards are not currently issued by the app. Eligibility and complete program rules will be published before the rewards become available.",
-            ])
-            .padding(16)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
             enVLocalizedCharacterSpacedText(LocalizedStringKey("Questions about enV pricing can be sent to [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com)."))
                 .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
         }
     }
-}
-
-private struct NativeTokenPackage: Identifiable {
-    let tokens: String
-    let price: String
-    var id: String { tokens }
 }
 
 private struct NativeContactInformationPage: View {
@@ -1305,7 +1414,7 @@ private struct NativePrivacyInformationPage: View {
                 "Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. These are not the same as a marketing-cookie profile.",
                 "If you have used a sign-in-enabled deployment and want to ask about, correct, or delete account information, email [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Information stored only on your device can generally be removed by clearing that browser’s site data or the app’s local data.",
             ])
-            NativeInfoSectionView(title: "Payments and tokens", paragraphs: ["The current enV codebase does not provide token balances, token purchases, or referral awards, and does not collect payment-card information through a checkout. The figures on the Pricing page are the proposed schedule supplied by chAs Technologies LLC, not an active purchase offer. If payments are introduced, the applicable payment provider and data handling will be described before checkout is enabled."])
+            NativeInfoSectionView(title: "Payments and tokens", paragraphs: ["The enV monetization foundation includes a planned token ledger and pricing preview, but no real payment provider, store purchase adapter or checkout is active in this release. The pricing screen presents reference values only. enV does not collect payment-card details directly through the toolkit. Before launch, the chosen providers, payment data handling, token terms, refunds and purchase verification processes will be documented. No payment is taken and no purchased tokens are issued in this build."])
             NativeInfoSectionView(title: "Changes and contact", paragraphs: [
                 "We may revise this notice when product features, providers, or data practices change. The published version should be checked before using connected features.",
                 "For privacy questions or requests, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company correspondence may also be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com).",
@@ -1330,7 +1439,7 @@ private struct NativeTermsInformationPage: View {
                 "Do not rely on enV as a substitute for qualified legal, medical, financial, tax, safety, or other professional advice. See the Disclaimer for more detail.",
             ])
             NativeInfoSectionView(title: "Availability and changes", paragraphs: ["We may update, suspend, or discontinue a tool or feature to maintain, improve, or protect enV. We do not guarantee that the service will be uninterrupted, error-free, compatible with every device, or available in every location. Third-party features are also subject to the availability and terms of their providers."])
-            NativeInfoSectionView(title: "Tokens and pricing", paragraphs: ["The listed reference prices are in USD. The token packages, sign-up bonus, and referral reward shown on the Pricing page are planned offers. The current codebase does not implement token balances, purchases, or reward issuance; no purchase can currently be made through enV. When payments are enabled, checkout is intended to convert the USD price to local currency in countries supported by the selected gateway. The final amount and currency will be shown before payment; availability and conversion rates depend on the provider. Any future token terms, eligibility requirements, expiry, refunds, and payment-provider terms will be shown before a purchase or reward program is activated."])
+            NativeInfoSectionView(title: "Tokens and pricing", paragraphs: ["The Pricing page shows a proposed USD reference value of 100 tokens per $1.00; it is not an active offer or a guaranteed local price. The intended ledger supports fractional-token usage for lightweight operations and measured usage for cloud, AI and agent workflows. Purchased tokens are intended not to expire, subject to applicable law and platform rules. Actual store price points, minimum top-ups, supported payment methods, taxes and local currencies will be shown before a purchase. No real purchases, balances or promotional rewards are active in this release."])
             NativeInfoSectionView(title: "Disclaimer and limits", paragraphs: ["To the extent permitted by applicable law, enV is provided “as is” and “as available,” without warranties that cannot be disclaimed under that law. To the extent permitted by applicable law, chAs Technologies LLC is not responsible for indirect or consequential losses arising from use of the service. Nothing in these Terms excludes a right or liability that cannot lawfully be excluded."])
             NativeInfoSectionView(title: "Questions", paragraphs: ["For questions about these Terms, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com) or [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com)."])
         }

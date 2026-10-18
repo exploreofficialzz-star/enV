@@ -3498,12 +3498,15 @@ private struct NativeCalculatorToolView: View {
     @State private var values: [String: String]
     @State private var output = ""
     @State private var error: String?
+    @State private var isRunning = false
+    @State private var offlineJournal: OfflineWalletJournal?
 
     init(tool: Tool) {
         self.tool = tool
         let op = NativeCalculatorEngine.operation(for: tool.id)
         _values = State(initialValue: Dictionary(uniqueKeysWithValues: (op?.fields ?? []).map { ($0.name, $0.defaultValue) }))
         _error = State(initialValue: nil)
+        _offlineJournal = State(initialValue: try? OfflineWalletJournal())
     }
 
     var body: some View {
@@ -3514,11 +3517,37 @@ private struct NativeCalculatorToolView: View {
                     NativeInputField(title: field.suffix.map { "\(field.label) (\($0))" } ?? field.label, text: binding(for: field.name))
                 }
                 NativeActionRow(output: output, run: {
-                    do {
-                        let rows = try NativeCalculatorEngine.run(op, values: values)
-                        output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
-                        error = nil
-                    } catch let caughtError { output = ""; error = caughtError.localizedDescription }
+                    guard !isRunning else { return }
+                    isRunning = true
+                    Task { @MainActor in
+                        defer { isRunning = false }
+                        let journal = offlineJournal
+                        let normalizedAllowanceID = try? journal?.activeAllowanceID()
+                        let shouldMeter = normalizedAllowanceID != nil && (journal?.isEligibleTool(tool.id) ?? false)
+                        var ticket: OfflineWalletJournal.OperationTicket?
+                        do {
+                            // Validate and compute before reserving an offline token. Invalid
+                            // input must not consume a token. Keep the result hidden until the
+                            // successful action has a durable local journal record.
+                            let rows = try NativeCalculatorEngine.run(op, values: values)
+                            if shouldMeter, let journal, let allowanceID = normalizedAllowanceID {
+                                ticket = try journal.beginOperation(allowanceID: allowanceID, toolID: tool.id)
+                            }
+                            if let journal, let ticket { _ = try journal.finishOperation(ticket, outcome: "succeeded") }
+                            output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n")
+                            error = nil
+                            if let journal, let allowanceID = normalizedAllowanceID, ticket != nil, OfflineWalletNativeAPI.isPaired {
+                                _ = try? await OfflineWalletNativeAPI.synchronize(journal: journal, allowanceID: allowanceID)
+                            }
+                        } catch let caughtError {
+                            if let journal, let ticket { _ = try? journal.finishOperation(ticket, outcome: "failed") }
+                            output = ""
+                            error = caughtError.localizedDescription
+                            if let journal, let allowanceID = normalizedAllowanceID, ticket != nil, OfflineWalletNativeAPI.isPaired {
+                                _ = try? await OfflineWalletNativeAPI.synchronize(journal: journal, allowanceID: allowanceID)
+                            }
+                        }
+                    }
                 }, reset: { values = Dictionary(uniqueKeysWithValues: op.fields.map { ($0.name, $0.defaultValue) }); output = ""; error = nil })
                 NativeOutputView(output: output, error: error)
             }

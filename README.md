@@ -61,6 +61,14 @@ Apply the committed SQL schema as a separate, deliberate release operation with 
 
 Never prefix secrets with `VITE_` and never commit their values. Keep preview and production credentials in their respective Vercel environments. OAuth and account creation remain unavailable until the corresponding provider and database settings are configured.
 
+## Monetization foundation (preview only)
+
+enV uses an advertising-free monetization policy and is being prepared for a shared usage-based token wallet across Web, Android and iOS. The proposed reference value is 100 tokens ≈ USD $1.00; rates are provisional, and remote AI/media work must be priced from measured usage and provider costs. Premium access is intended for frontier models and advanced workflows, not unlimited compute.
+
+The initiation release adds the metering rules, generated billing profiles for the current 10,025-entry Web catalogue, preview quote endpoint, database ledger/reservation schema, authenticated wallet endpoint, and cross-platform pricing copy. **Live purchases and automatic deductions remain disabled.** Do not set billing launch flags to true until each payment adapter, store product, receipt/webhook verifier, cost audit, entitlement check and usage-metering integration has been implemented and tested.
+
+See [Monetization architecture and launch checklist](docs/monetization-architecture.md) and [tool-by-tool billing profile audit](docs/billing-tool-audit-2026-10-18.md). Validate changes with `npm run check:billing`; regenerate catalogue profiles with `npm run generate:billing-profiles`.
+
 ## Optional AI features
 
 enV can add optional AI help (captions, titles, regex/SQL/JSON explanations, image alt text, short audio transcripts) through a server-side layer that routes to OpenRouter, Groq and Gemini with cost-aware fallback. It stays off until you set at least one provider key, and every deterministic tool works without it. Setup, costs, privacy, operations and how to extend it are in [docs/ai-infrastructure.md](docs/ai-infrastructure.md); the variables are listed in `.env.example`. Run `npm run check:ai` after changing anything under `src/lib/ai`.

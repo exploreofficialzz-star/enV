@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { defineHandler } from "nitro/h3";
-import { jsonResponse, optionsResponse } from "../../../../backend/http";
+import { jsonResponse, optionsResponse, measureServerOperation } from "../../../../backend/http";
 import { parseSocialToolId, buildSocialOutput } from "../../../../src/components/engines/social-engine-utils";
 import { parseGamingToolId, buildGamingOutput } from "../../../../src/components/engines/gaming-engine-utils";
 import { parseWebDesignToolId, buildWebDesignOutput } from "../../../../src/components/engines/webdesign-engine-utils";
@@ -34,7 +34,7 @@ function execute(id: string, category: string, input: string, o: Record<string, 
   throw new Error(`No backend execution contract is implemented for ${category}/${id}.`);
 }
 
-export default defineHandler(async e => {
+export default defineHandler(async e => measureServerOperation(e.req, "server.template_tool", async () => {
   if (e.req.method === "OPTIONS") return optionsResponse();
   try {
     const body = await e.req.json().catch(() => ({}));
@@ -44,4 +44,4 @@ export default defineHandler(async e => {
     const output = execute(id,category,clean(body.input),options);
     return jsonResponse({toolId:id,output});
   } catch (err) { return jsonResponse({error:err instanceof Error?err.message:"Tool execution failed."},400); }
-});
+}));

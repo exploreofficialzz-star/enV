@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "transaction": {
+    "allowanceId": "6f4d2a10-90af-44a6-bd0c-4bf82ba31234",
+    "transactionId": "abcdeffedcba0123456789abcdef0123",
+    "sequenceNumber": 7,
+    "toolId": "simple-calculator",
+    "pricingVersion": "env-metering-preview-2026-10-18-v1",
+    "unitCount": 1,
+    "outcome": "succeeded",
+    "recordedAt": "2026-10-18T20:15:30.000Z",
+    "canonical": "[\"6f4d2a10-90af-44a6-bd0c-4bf82ba31234\",\"abcdeffedcba0123456789abcdef0123\",7,\"simple-calculator\",\"env-metering-preview-2026-10-18-v1\",1,\"succeeded\",\"2026-10-18T20:15:30.000Z\"]"
+  },
+  "checkpoint": {
+    "allowanceId": "6f4d2a10-90af-44a6-bd0c-4bf82ba31234",
+    "checkpointSequence": 7,
+    "finalized": true,
+    "canonical": "[\"6f4d2a10-90af-44a6-bd0c-4bf82ba31234\",7,true]"
+  }
+}
