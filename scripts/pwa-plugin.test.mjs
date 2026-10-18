@@ -94,12 +94,12 @@ test("tool detail Save action stays in the title row on compact screens", () => 
   assert.match(shell, /className="shrink-0"/);
 });
 
-test("tool and category cards use theme-aware icon strokes and directional click affordances", () => {
+test("tool cards use distinct app-icon tiles while category cards retain theme-aware icons", () => {
   const toolCard = readFileSync(join(PROJECT_ROOT, "src/components/tools/tool-card.tsx"), "utf8");
   const categoryCard = readFileSync(join(PROJECT_ROOT, "src/components/tools/category-card.tsx"), "utf8");
-  assert.match(toolCard, /toolIcon\(tool\.icon\)/);
+  assert.match(toolCard, /ToolAppIcon tool=\{tool\}/);
   assert.match(toolCard, /ArrowRight/);
-  assert.match(toolCard, /text-black dark:text-white/);
+  assert.match(toolCard, /text-black[^"]*dark:text-white/);
   assert.ok(toolCard.indexOf('className="mt-auto flex justify-end pt-3"') > toolCard.indexOf("tool.description"), "Tool arrow should sit at the bottom-right after the description");
   assert.match(categoryCard, /toolIcon\(category\.icon\)/);
   assert.match(categoryCard, /ArrowRight/);

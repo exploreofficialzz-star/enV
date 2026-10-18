@@ -123,8 +123,8 @@ assert.match(androidHome, /Popup\(alignment = Alignment\.TopStart, offset = IntO
 assert.match(iosHome, /\.overlay\(alignment: \.top\)[\s\S]*?if isHomeSearchFocused && hasSearchText[\s\S]*?\.zIndex\(isHomeSearchFocused && hasSearchText/);
 assert.match(webSearchBox, /className="absolute z-20 mt-2 w-full/);
 assert.match(webSearchBox, /ArrowRight className="size-4 shrink-0"/);
-assert.match(androidSearchSuggestion, /EnVIcon\("ArrowRight", Modifier\.size\(16\.dp\)/);
-assert.match(iosSearchSuggestion, /EnVIcon\(name: "ArrowRight", size: 16, tint: \.envInk\)/);
+assert.match(androidSearchSuggestion, /EnVToolAppIcon\(tool, size = 32\.dp\)[\s\S]*?EnVIcon\("ArrowRight", Modifier\.size\(16\.dp\)/, "Android search suggestions must show tool icon tiles.");
+assert.match(iosSearchSuggestion, /EnVToolAppIcon\(tool: tool, size: 32\)[\s\S]*?EnVIcon\(name: "ArrowRight", size: 16, tint: \.envInk\)/, "iOS search suggestions must show tool icon tiles.");
 assert.match(androidHome, /shape = RoundedCornerShape\(percent = 50\)/, "Android hero search should use a capsule shape");
 assert.match(iosHome, /\.background\(Color\.envCard, in: Capsule\(\)\)/, "iOS hero search should use a native capsule shape");
 assert.match(iosHome, /\.overlay\(Capsule\(\)\.stroke\(/, "iOS focused and resting search borders should follow the capsule shape");
@@ -155,10 +155,10 @@ assert.match(android, /val homeSurface2 = if \(darkMode\) Color\(0xFF1E2327\) el
 assert.match(androidHome, /MostUsedToolsTray\(mostUsed, onTool, homeSurface2, Modifier\.fillMaxWidth\(\)\)/);
 assert.match(androidHome, /val visibleCount = if \(maxWidth >= 768\.dp\) 10 else 5/);
 assert.match(androidHome, /val iconSize = if \(maxWidth >= 768\.dp\) 44\.dp else 40\.dp/);
-assert.match(androidHome, /EnVIcon\(tool\.icon, Modifier\.size\(20\.dp\), tint = MaterialTheme\.colorScheme\.onSurface\)/);
+assert.match(androidHome, /EnVToolAppIcon\(tool, size = iconSize\)/, "Android home shortcuts must use the redesigned app icon tile.");
 assert.match(iosMostUsed, /let iconSide = proxy\.size\.width >= 768 \? 44\.0 : 40\.0/);
-assert.match(iosMostUsed, /EnVIcon\(name: tool\.icon, size: 20, tint: \.envInk\)/);
-assert.match(iosMostUsed, /\.background\(Color\.envSurface2, in: Circle\(\)\)/);
+assert.match(iosMostUsed, /EnVToolAppIcon\(tool: tool, size: iconSide\)/, "iOS home shortcuts must use the redesigned app icon tile.");
+assert.match(iosMostUsed, /EnVToolAppIcon\(tool: tool, size: iconSide\)/);
 assert.match(androidPreview, /fontSize = if \(isLarge\) 14\.sp else 10\.sp/);
 assert.match(iosHome, /proxy\.size\.width \* 0\.84, 640/);
 assert.match(iosFooter, /Rectangle\(\)\.fill\(Color\.envBorder\)\.frame\(height: 1\)/);

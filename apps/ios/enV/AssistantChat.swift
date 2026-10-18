@@ -196,7 +196,7 @@ struct AssistantChatView: View {
                                                         if let tool = store.catalog.tools.first(where: { $0.id == toolId && ($0.status == "active" || $0.status == "beta") }) {
                                                             NavigationLink(value: tool) {
                                                                 HStack(spacing: 10) {
-                                                                    EnVIcon(name: tool.icon, size: 20, tint: .envMuted)
+                                                                    EnVToolAppIcon(tool: tool, size: 36)
                                                                     VStack(alignment: .leading, spacing: 3) {
                                                                         enVCharacterSpacedText(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
                                                                         if tool.isUnderProduction {

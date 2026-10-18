@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "90580890ae05",
+  "catalogVersion": "e9943f7f4c1f",
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",

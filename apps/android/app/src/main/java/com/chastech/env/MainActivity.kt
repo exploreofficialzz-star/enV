@@ -157,6 +157,7 @@ import com.chastech.env.engine.NativeTextEngine
 import com.chastech.env.engine.NativeUtilityEngine
 import com.chastech.env.ui.ChasTechnologiesLogo
 import com.chastech.env.ui.EnVIcon
+import com.chastech.env.ui.EnVToolAppIcon
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVTheme
 import kotlinx.coroutines.Dispatchers
@@ -293,14 +294,9 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
     }
     LaunchedEffect(selected?.id) {
-        if (selected?.isUnderProduction() == true) {
-            productionTool = selected
-            detailStack = detailStack.dropLast(1)
-        } else {
-            selected?.id?.let {
-                favorites.recordRecent(it)
-                mostUsedIds = favorites.getMostUsed()
-            }
+        selected?.id?.let {
+            favorites.recordRecent(it)
+            mostUsedIds = favorites.getMostUsed()
         }
     }
     if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
@@ -346,7 +342,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             Column(Modifier.align(Alignment.TopCenter).widthIn(max = 1152.dp).fillMaxHeight()) {
-                if (selected != null && !selected.isUnderProduction()) {
+                if (selected != null) {
                     ToolDetail(
                         catalog = catalog,
                         tool = selected,
@@ -535,11 +531,7 @@ private fun MostUsedToolsTray(tools: List<ToolRecord>, onTool: (String) -> Unit,
                             modifier = Modifier.width(cellWidth).clickable { onTool(tool.id) },
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Surface(Modifier.size(iconSize), shape = CircleShape, color = iconBackgroundColor) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
+                            EnVToolAppIcon(tool, size = iconSize)
                             Text(
                                 tool.name,
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
@@ -562,9 +554,7 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
     val shape = RoundedCornerShape(12.dp)
     Card(modifier.fillMaxWidth().shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).clickable { onTool(tool.id) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = shape, elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.padding(16.dp).fillMaxWidth()) {
-            Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
-                Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
-            }
+            EnVToolAppIcon(tool, size = 36.dp)
             Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 12.dp))
             Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
@@ -578,17 +568,22 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
 
 @Composable
 private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable { onTool(tool.id) }.padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal)
-            if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(
+        Modifier.fillMaxWidth().clickable { onTool(tool.id) }.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        EnVToolAppIcon(tool, size = 32.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tool.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
-            EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
-        }
+        EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -870,7 +865,7 @@ private fun WebToolsSearchField(
 private fun WebToolsCard(tool: ToolRecord, onTool: (String) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
     Column(modifier.fillMaxWidth().alpha(if (tool.status == "planned") 0.7f else 1f).shadow(2.dp, shape, clip = false).border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), shape).background(MaterialTheme.colorScheme.surface, shape).clickable { onTool(tool.id) }.padding(16.dp)) {
-        Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) { Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) } }
+        EnVToolAppIcon(tool, size = 36.dp)
         Text(tool.name, style = MaterialTheme.typography.titleSmall.copy(letterSpacing = (-0.35).sp), fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
         Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
@@ -1120,9 +1115,7 @@ private fun ToolDetail(
 @Composable
 private fun NativeToolHeader(tool: ToolRecord, compact: Boolean, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(Modifier.size(44.dp), color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(8.dp)) {
-            Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary) }
-        }
+        EnVToolAppIcon(tool, size = 44.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tool.name, style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (compact) 24.sp else 30.sp, lineHeight = if (compact) 30.sp else 36.sp), fontWeight = FontWeight.Normal)
@@ -1147,8 +1140,11 @@ private fun NativeToolSaveButton(isFavorite: Boolean, onClick: () -> Unit) {
 @Composable
 private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Normal)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                EnVToolAppIcon(tool, size = 32.dp)
+                Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
             Text(tool.description, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
@@ -2762,9 +2758,7 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
             Row(Modifier.weight(1f).clickable { onTool(tool.id) }, verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
-                        Box(contentAlignment = Alignment.Center) { EnVIcon(tool.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
-                    }
+                    EnVToolAppIcon(tool, size = 36.dp)
                     Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                     Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (tool.isUnderProduction()) {

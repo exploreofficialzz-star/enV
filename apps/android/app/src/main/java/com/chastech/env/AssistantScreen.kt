@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.ui.EnVIcon
+import com.chastech.env.ui.EnVToolAppIcon
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -343,7 +344,7 @@ private fun AssistantRecommendationCard(tool: ToolRecord, onClick: () -> Unit, m
         shape = RoundedCornerShape(14.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            EnVIcon(tool.icon, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+            EnVToolAppIcon(tool, size = 36.dp)
             Column(Modifier.weight(1f)) {
                 Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
                 Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)

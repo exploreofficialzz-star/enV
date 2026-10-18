@@ -98,6 +98,9 @@ export interface ToolMeta {
   keywords: string[];
   tags: string[];
   icon: string;
+  /** Shared app-icon artwork colors generated deterministically from the tool ID. */
+  iconBackground?: string;
+  iconAccent?: string;
   popularity: number;
   featured: boolean;
   clientSide: boolean;

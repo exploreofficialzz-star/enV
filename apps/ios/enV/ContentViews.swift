@@ -245,7 +245,7 @@ private struct DiscoveryToolCard: View {
 
     private var cardLabel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            iconTile(tool.icon)
+            iconTile(tool)
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
             enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
             if tool.isUnderProduction {
@@ -287,19 +287,19 @@ private struct WebHomeSearchSuggestion: View {
     }
 
     private var suggestionLabel: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk)
-                if tool.isUnderProduction { enVCharacterSpacedText("Under production").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
-                else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
-                else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+        HStack(spacing: 10) {
+            EnVToolAppIcon(tool: tool, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .medium)).foregroundStyle(Color.envInk).lineLimit(1)
+                    if tool.isUnderProduction { enVCharacterSpacedText("Under production").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                    else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                    else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
+                }
+                enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
-            enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
-            HStack {
-                Spacer()
-                EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
-            }
-            .padding(.top, 4)
+            Spacer(minLength: 4)
+            EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 10)
@@ -421,9 +421,7 @@ private struct HomeMostUsedToolsTray: View {
                             ForEach(tools) { tool in
                                 Button { onSelect(tool) } label: {
                                     VStack(spacing: 6) {
-                                        EnVIcon(name: tool.icon, size: 20, tint: .envInk)
-                                            .frame(width: iconSide, height: iconSide)
-                                            .background(Color.envSurface2, in: Circle())
+                                        EnVToolAppIcon(tool: tool, size: iconSide)
                                         enVCharacterSpacedText(tool.name)
                                             .font(.envScaled(size: 10, weight: .medium))
                                             .foregroundStyle(Color.envMuted)
@@ -1001,10 +999,8 @@ private struct HomePreviewBar: View {
     }
 }
 
-func iconTile(_ iconName: String) -> some View {
-    EnVIcon(name: iconName, size: 16, tint: .primary)
-        .frame(width: 36, height: 36)
-        .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 6))
+func iconTile(_ tool: Tool) -> some View {
+    EnVToolAppIcon(tool: tool, size: 42)
 }
 
 private func settingsRow(_ icon: String, _ title: String, _ detail: String) -> some View {

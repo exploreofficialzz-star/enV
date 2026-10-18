@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { toolIcon } from "@/lib/icons";
 import { toolPath } from "@/lib/registry";
 import type { ToolMeta } from "@/types/tool";
 import { cn } from "@/lib/utils";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
+import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { useState } from "react";
@@ -16,7 +16,6 @@ export function ToolCard({
   tool: ToolMeta;
   className?: string;
 }) {
-  const Icon = toolIcon(tool.icon);
   const planned = tool.status === "planned";
   const underProduction = isToolUnderProduction(tool);
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -27,9 +26,7 @@ export function ToolCard({
   );
   const cardContent = (
     <>
-      <span className="inline-flex size-9 items-center justify-center rounded-md bg-accent-soft text-black dark:text-white">
-        <Icon className="size-4" aria-hidden="true" />
-      </span>
+      <ToolAppIcon tool={tool} className="size-9" />
       <span className="mt-3 text-sm font-semibold tracking-tight text-fg group-hover:text-accent">
         {tool.name}
       </span>

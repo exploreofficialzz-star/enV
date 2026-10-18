@@ -48,7 +48,7 @@ struct ToolCard: View {
 
     private var cardLabel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            iconTile(tool.icon)
+            iconTile(tool)
             enVCharacterSpacedText(tool.name)
                 .font(.envScaled(size: 14, weight: .semibold))
                 .tracking(-0.15)
@@ -262,9 +262,7 @@ struct ToolDetailView: View {
 
     private var toolHeading: some View {
         HStack(alignment: .top, spacing: 12) {
-            EnVIcon(name: tool.icon, size: 20, tint: .envAccent)
-                .frame(width: 44, height: 44)
-                .background(Color.envAccentSoft, in: RoundedRectangle(cornerRadius: 8))
+            EnVToolAppIcon(tool: tool, size: 44)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     enVCharacterSpacedText(tool.name)
@@ -6520,7 +6518,7 @@ struct NativeMusicStudioView: View {
     private var editor: some View {
         let canvas = colorScheme == .dark ? Color.black : Color.white
         let ink = colorScheme == .dark ? Color.white : Color.black
-        return VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             label("TRACK EDITOR")
             Text(sourceName.isEmpty ? "No audio track selected" : sourceName).font(.headline).foregroundStyle(ink)
             ZStack(alignment: .leading) {
@@ -6534,7 +6532,7 @@ struct NativeMusicStudioView: View {
 
     private var pads: some View {
         let canvas = colorScheme == .dark ? Color.black : Color.white
-        return VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack { label("PERFORMANCE PADS"); Spacer(); Button("Stop") { player?.stop(); isPlaying = false } .buttonStyle(.bordered) }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0..<8, id: \.self) { index in

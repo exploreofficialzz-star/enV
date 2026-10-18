@@ -235,6 +235,73 @@ struct EnVIcon: View {
     }
 }
 
+private func envToolIconHash(_ id: String) -> UInt32 {
+    var hash: UInt32 = 2166136261
+    for byte in id.utf8 {
+        hash = (hash ^ UInt32(byte)) &* 16777619
+    }
+    return hash
+}
+
+private func envToolIconColor(hue: Double, saturation: Double, lightness: Double) -> Color {
+    let s = saturation / 100.0
+    let l = lightness / 100.0
+    let chroma = (1.0 - abs(2.0 * l - 1.0)) * s
+    let normalizedHue = (((hue.truncatingRemainder(dividingBy: 360.0)) + 360.0).truncatingRemainder(dividingBy: 360.0)) / 60.0
+    let x = chroma * (1.0 - abs(normalizedHue.truncatingRemainder(dividingBy: 2.0) - 1.0))
+    let rgb: (Double, Double, Double)
+    switch normalizedHue {
+    case ..<1.0: rgb = (chroma, x, 0)
+    case ..<2.0: rgb = (x, chroma, 0)
+    case ..<3.0: rgb = (0, chroma, x)
+    case ..<4.0: rgb = (0, x, chroma)
+    case ..<5.0: rgb = (x, 0, chroma)
+    default: rgb = (chroma, 0, x)
+    }
+    let m = l - chroma / 2.0
+    func channel(_ value: Double) -> Double {
+        Double(max(0, min(255, Int(((value + m) * 255.0).rounded())))) / 255.0
+    }
+    return Color(red: channel(rgb.0), green: channel(rgb.1), blue: channel(rgb.2))
+}
+
+struct EnVToolAppIcon: View {
+    let tool: Tool
+    var size: CGFloat = 40
+
+    private var colors: (background: Color, accent: Color) {
+        let hash = envToolIconHash(tool.id)
+        let accentHash = envToolIconHash("\(tool.id):accent")
+        let hue = (Double(hash) / Double(UInt32.max)) * 360.0
+        let accentHue = (Double(accentHash) / Double(UInt32.max)) * 360.0
+        return (
+            envToolIconColor(hue: hue, saturation: 74.0, lightness: 34.0),
+            envToolIconColor(hue: accentHue, saturation: 76.0, lightness: 43.0)
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+                .fill(LinearGradient(colors: [colors.background, colors.accent], startPoint: .topLeading, endPoint: .bottomTrailing))
+            Circle()
+                .fill(colors.accent.opacity(0.28))
+                .frame(width: size * 0.62, height: size * 0.62)
+                .offset(x: size * 0.22, y: -size * 0.25)
+            RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+                .stroke(Color.white.opacity(0.21), lineWidth: 0.8)
+            EnVIcon(name: tool.icon, size: size * 0.48, tint: .white)
+            Circle()
+                .fill(Color.white.opacity(0.86))
+                .frame(width: size * 0.075, height: size * 0.075)
+                .offset(x: size * 0.30, y: size * 0.29)
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.27, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
 struct EnVLogo: View {
     @Environment(\.colorScheme) private var colorScheme
     var homeHero: Bool = false
