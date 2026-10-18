@@ -48,7 +48,7 @@
     "check:native-calculators": "node scripts/check-native-calculators.mjs",
     "check:native-math-exercises": "node scripts/check-native-math-exercises.mjs",
     "export:native-execution-matrix": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/export-native-execution-matrix.mjs",
-    "check:screenshots": "node --experimental-strip-types scripts/check-screenshots.mjs",
+    "check:screenshots": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-screenshots.mjs",
     "check:calculators:registry": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/audit-calculator-registry.mjs --strict",
     "check:native-no-web": "node scripts/check-native-no-web-runtime.mjs",
     "check:ai": "node --experimental-strip-types scripts/check-ai.mjs",
