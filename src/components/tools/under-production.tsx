@@ -85,7 +85,7 @@ export function UnderProductionPage({ toolName }: { toolName: string }) {
           This tool is still being developed and is not available yet. Please return to the tool catalog to continue browsing.
         </p>
         <div className="mt-5 flex justify-end">
-          <Link to="/tools" className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+          <Link to="/tools" search={{ q: "" }} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">
             Back to tools
           </Link>
         </div>
