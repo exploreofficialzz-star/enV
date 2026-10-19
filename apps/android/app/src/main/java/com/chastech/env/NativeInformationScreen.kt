@@ -315,6 +315,7 @@ private fun PricingInformation() {
                 Text("100 tokens ≈ $1.00 USD", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
                 Text("Wallet accounting uses integer milli-tokens, allowing fractional-token amounts without floating-point rounding errors.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Any payment must show the applicable currency, total, terms, and provider details before confirmation.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Prices are listed in USD for reference. Before any purchase, the final currency and total will be shown.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         InformationSection("How usage is measured", listOf(

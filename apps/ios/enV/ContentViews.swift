@@ -1335,6 +1335,8 @@ private struct NativePricingInformationPage: View {
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                 enVCharacterSpacedText("Any payment must show the applicable currency, total, terms, and provider details before confirmation.")
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("Prices are listed in USD for reference. Before any purchase, the final currency and total will be shown.")
+                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
