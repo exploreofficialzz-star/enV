@@ -164,6 +164,12 @@ assert.match(iosTokenDashboard, /Label\("Open wallet", systemImage: "wallet\.bif
 assert.doesNotMatch(iosTokenDashboard, /connectAccountCard|Connect your enV account/, "iOS token dashboard must not be blocked by a connect-account fallback");
 assert.match(iosTokenDashboard, /minimumFractionDigits = 3/, "iOS token amounts must display three decimal places");
 assert.match(iosTokenDashboard, /displayDailyUsage/, "iOS empty-wallet preview must show seven zero-use chart days");
+assert.match(tokenDashboardComponent, /enV estimated reference value = \\$0\.010/, "web token card must show the enV unit reference value as one cent");
+assert.doesNotMatch(tokenDashboardComponent, /Available balance · Token name: enV/, "web token card must use the concise enV reference label");
+assert.match(androidTokenDashboard, /enV estimated reference value = \\$0\.010/, "Android token card must show the enV unit reference value as one cent");
+assert.doesNotMatch(androidTokenDashboard, /Available balance · Token name: enV/, "Android token card must use the concise enV reference label");
+assert.match(iosTokenDashboard, /enV estimated reference value = \\$0\.010/, "iOS token card must show the enV unit reference value as one cent");
+assert.doesNotMatch(iosTokenDashboard, /Available balance · Token name: enV/, "iOS token card must use the concise enV reference label");
 assert.doesNotMatch(tokenDashboardComponent, /Preview display|preview values|preview history/i, "web token dashboard must not expose preview disclaimers");
 assert.doesNotMatch(androidTokenDashboard, /Preview display/i, "Android token dashboard must not expose a preview disclaimer");
 assert.doesNotMatch(iosTokenDashboard, /Preview display/i, "iOS token dashboard must not expose a preview disclaimer");
