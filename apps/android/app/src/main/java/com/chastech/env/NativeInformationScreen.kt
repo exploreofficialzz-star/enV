@@ -197,34 +197,28 @@ private fun NativeWalletDashboard() {
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            NativeWalletMetric("Deposited", dashboard?.lifetimePurchasedTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.lifetimePurchasedTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "ReceiptText")
-            NativeWalletMetric("Remaining", dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.availableTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "Wallet")
-            NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.lifetimeConsumedTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "ChartNoAxesCombined")
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.bonusTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "PartyPopper")
-            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.referralTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "Users")
-            NativeWalletMetric("Affiliate", dashboard?.affiliateTokens?.formatWalletTokens()?.plus(" enV") ?: "—", dashboard?.affiliateTokens?.formatWalletReferenceValue() ?: "Value —", Modifier.weight(1f), "Link2")
+            NativeWalletMetric("Deposited", dashboard?.lifetimePurchasedTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.lifetimePurchasedTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "ReceiptText")
+            NativeWalletMetric("Remaining", dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.availableTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "Wallet")
+            NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.lifetimeConsumedTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "ChartNoAxesCombined")
         }
 
         val videoLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}" }
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(17.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                        EnVIcon("Video", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Video", Modifier.size(19.dp), tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("Tag enV on your videos", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Tag enV on your videos", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                         Text("Earn tokens based on conversion.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    NativeWalletSparkline(Modifier.size(width = 68.dp, height = 36.dp), Color(0xFF16B58A))
+                    NativeWalletSparkline(Modifier.size(width = 60.dp, height = 30.dp), Color(0xFF16B58A))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     EnVIcon("Link2", Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -258,20 +252,26 @@ private fun NativeWalletDashboard() {
             }
         }
 
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.bonusTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "PartyPopper")
+            NativeWalletMetric("Referral tokens", dashboard?.referralTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.referralTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "Users")
+            NativeWalletMetric("Affiliate program", dashboard?.affiliateTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", dashboard?.affiliateTokens?.formatWalletReferenceValue() ?: "Est. value $0.000", Modifier.weight(1f), "Link2")
+        }
+
         val referralLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}" }
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(17.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                        EnVIcon("Users", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurface)
+            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Users", Modifier.size(19.dp), tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("Refer a friend", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Refer a friend", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                         Text("Share your referral link and you both get rewarded with enV tokens!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -312,13 +312,13 @@ private fun NativeWalletDashboard() {
                 } else {
                     rows.forEachIndexed { index, row ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.size(34.dp).background(if (row.deltaAvailableSubunits >= 0) Color(0xFF0E7A61) else Color(0xFF57356E), CircleShape), contentAlignment = Alignment.Center) {
-                                Text(if (row.deltaAvailableSubunits >= 0) "↓" else "↑", color = Color.White)
+                            Box(Modifier.size(30.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
+                                Text(walletActivityGlyph(row.type, row.deltaAvailableSubunits, row.consumedSubunits), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
                             }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(row.description.ifBlank { walletActivityLabel(row.type, row.consumedSubunits) }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                Text(walletActivityLabel(row.type, row.consumedSubunits), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -387,12 +387,12 @@ private fun NativeWalletHero(
     onToggleVisibility: () -> Unit,
     onAddFunds: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(20.dp)
     Box(
         Modifier.fillMaxWidth()
             .background(Brush.linearGradient(listOf(Color(0xFF1747AF), Color(0xFF07384D), Color(0xFF00A77D))), shape)
             .border(BorderStroke(1.dp, Color(0xFF3DEBC2).copy(alpha = 0.35f)), shape)
-            .padding(12.dp),
+            .padding(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.size(42.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
@@ -406,7 +406,7 @@ private fun NativeWalletHero(
                     }
                 }
                 Text(
-                    if (!showBalance) "••••••" else availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—",
+                    if (!showBalance) "••••••" else availableTokens?.formatWalletCurrency() ?: "$0.000",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Normal,
                     color = Color.White,
@@ -415,13 +415,13 @@ private fun NativeWalletHero(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("🪙", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBFFFE9))
                     Text(
-                        if (!showBalance) "•••• enV" else availableTokens?.let { "≈ ${it.formatWalletTokens()} enV" } ?: subtitle,
+                        if (!showBalance) "•••• enV" else "≈ " + (availableTokens?.formatWalletTokens() ?: "0.000") + " enV",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFBFFFE9),
                         maxLines = 1,
                     )
                 }
-                Text("Estimated reference value · not cash", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.68f))
+                Text("Estimated token value " + (availableTokens?.formatWalletCurrency() ?: "$0.000"), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 NativeWalletSparkline(Modifier.size(width = 64.dp, height = 34.dp), Color(0xFF52FFD0))
@@ -436,17 +436,17 @@ private fun NativeWalletHero(
 @Composable
 private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
     Canvas(modifier.padding(end = 2.dp, top = 2.dp)) {
-        val tipX = size.width * 0.97f
-        val tipY = size.height * 0.05f
+        val tipX = size.width * 0.95f
+        val tipY = size.height * 0.06f
         val path = Path().apply {
             moveTo(size.width * 0.02f, size.height * 0.87f)
             cubicTo(size.width * 0.14f, size.height * 0.78f, size.width * 0.17f, size.height * 0.52f, size.width * 0.28f, size.height * 0.63f)
             cubicTo(size.width * 0.38f, size.height * 0.79f, size.width * 0.44f, size.height * 0.40f, size.width * 0.55f, size.height * 0.46f)
             cubicTo(size.width * 0.68f, size.height * 0.58f, size.width * 0.72f, size.height * 0.18f, size.width * 0.82f, size.height * 0.25f)
             lineTo(tipX, tipY)
-            moveTo(size.width * 0.80f, size.height * 0.04f)
+            moveTo(tipX - size.width * 0.18f, tipY + size.height * 0.02f)
             lineTo(tipX, tipY)
-            lineTo(tipX, size.height * 0.28f)
+            lineTo(tipX - size.width * 0.02f, tipY + size.height * 0.24f
         }
         drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
@@ -461,18 +461,18 @@ private fun NativeWalletMetric(
     iconName: String = "Wallet",
 ) {
     Card(
-        modifier = modifier.defaultMinSize(minHeight = 60.dp),
+        modifier = modifier.defaultMinSize(minHeight = 54.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
-                Modifier.size(22.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(7.dp)),
+                Modifier.size(20.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 EnVIcon(iconName, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurface)
@@ -487,14 +487,45 @@ private fun NativeWalletMetric(
 }
 
 private fun Double.formatWalletTokens(): String =
-    java.text.NumberFormat.getNumberInstance().apply { maximumFractionDigits = 3 }.format(this)
+    java.text.NumberFormat.getNumberInstance().apply {
+        minimumFractionDigits = 3
+        maximumFractionDigits = 3
+    }.format(this)
 
-private fun Double.formatWalletReferenceValue(): String {
-    val formatted = java.text.NumberFormat.getNumberInstance().apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
+private fun Double.formatWalletCurrency(): String =
+    "$" + java.text.NumberFormat.getNumberInstance().apply {
+        minimumFractionDigits = 3
+        maximumFractionDigits = 3
     }.format(this * 0.01)
-    return "≈ $" + formatted
+
+private fun Double.formatWalletReferenceValue(): String = "Est. value " + formatWalletCurrency()
+
+private fun walletActivityLabel(type: String, consumedSubunits: Double): String {
+    val normalized = type.lowercase()
+    return when {
+        normalized.contains("referral") -> "Referral reward"
+        normalized.contains("affiliate") || normalized.contains("video") -> "Affiliate reward"
+        normalized.contains("bonus") || normalized.contains("reward") || normalized.contains("grant") -> "Bonus reward"
+        normalized == "reservation" -> "Tokens reserved"
+        normalized == "release" -> "Reservation released"
+        consumedSubunits > 0 || normalized.contains("consum") -> "Tool usage"
+        listOf("purchase", "deposit", "top_up", "funding").any(normalized::contains) -> "Wallet funded"
+        normalized.contains("refund") -> "Refund"
+        else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
+    }
+}
+
+private fun walletActivityGlyph(type: String, deltaAvailableSubunits: Double, consumedSubunits: Double): String {
+    val normalized = type.lowercase()
+    return when {
+        normalized.contains("referral") || normalized.contains("affiliate") || normalized.contains("bonus") || normalized.contains("reward") || normalized.contains("grant") -> "✦"
+        normalized == "reservation" -> "◷"
+        normalized == "release" || normalized.contains("refund") -> "↻"
+        listOf("purchase", "deposit", "top_up", "funding").any(normalized::contains) -> "↓"
+        consumedSubunits > 0 || normalized.contains("consum") -> "↗"
+        deltaAvailableSubunits >= 0 -> "↓"
+        else -> "↑"
+    }
 }
 
 @Composable

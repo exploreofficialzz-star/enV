@@ -1142,15 +1142,16 @@ private struct NativeWalletSparklineView: View {
             let width = proxy.size.width
             let height = proxy.size.height
             let tip = CGPoint(x: width * 0.96, y: height * 0.04)
+            let trendEnd = CGPoint(x: width * 0.78, y: height * 0.28)
             Path { path in
                 path.move(to: CGPoint(x: width * 0.02, y: height * 0.86))
                 path.addCurve(to: CGPoint(x: width * 0.24, y: height * 0.62), control1: CGPoint(x: width * 0.12, y: height * 0.82), control2: CGPoint(x: width * 0.14, y: height * 0.50))
                 path.addCurve(to: CGPoint(x: width * 0.48, y: height * 0.43), control1: CGPoint(x: width * 0.33, y: height * 0.78), control2: CGPoint(x: width * 0.38, y: height * 0.30))
-                path.addCurve(to: CGPoint(x: width * 0.70, y: height * 0.25), control1: CGPoint(x: width * 0.57, y: height * 0.58), control2: CGPoint(x: width * 0.60, y: height * 0.19))
+                path.addCurve(to: trendEnd, control1: CGPoint(x: width * 0.57, y: height * 0.58), control2: CGPoint(x: width * 0.60, y: height * 0.30))
                 path.addLine(to: tip)
-                path.move(to: CGPoint(x: width * 0.80, y: height * 0.04))
+                path.move(to: CGPoint(x: width * 0.82, y: height * 0.04))
                 path.addLine(to: tip)
-                path.addLine(to: CGPoint(x: width * 0.96, y: height * 0.28))
+                path.addLine(to: CGPoint(x: width * 0.94, y: height * 0.24))
             }
             .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
         }
@@ -1190,31 +1191,25 @@ private struct NativeWalletDashboardView: View {
             )
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                walletMetric("Deposited", dashboard == nil ? "—" : token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), iconName: "arrow.down.to.line")
-                walletMetric("Remaining", dashboard == nil ? "—" : token(number("availableTokens", from: wallet)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
-                walletMetric("Used", dashboard == nil ? "—" : token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
+                walletMetric("Deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), iconName: "arrow.down.to.line")
+                walletMetric("Remaining", token(number("availableTokens", from: wallet)) + " enV", tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
+                walletMetric("Used", token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                walletMetric("Bonuses", dashboard == nil ? "—" : token(number("bonusTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
-                walletMetric("Referrals", dashboard == nil ? "—" : token(number("referralTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
-                walletMetric("Affiliate", dashboard == nil ? "—" : token(number("affiliateTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 7) {
                     Image(systemName: "play.rectangle.fill")
-                        .font(.system(size: 20))
+                        .font(.system(size: 18))
                         .foregroundStyle(Color.envInk)
-                        .frame(width: 40, height: 40)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Tag enV on your videos").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
+                        .frame(width: 36, height: 36)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Tag enV on your videos").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
                         Text("Earn tokens based on conversion.").font(.caption).foregroundStyle(Color.envMuted)
                     }
                     Spacer(minLength: 0)
                     NativeWalletSparklineView(color: Color(red: 0.08, green: 0.70, blue: 0.50))
-                        .frame(width: 70, height: 38)
+                        .frame(width: 58, height: 30)
                 }
 
                 HStack(spacing: 8) {
@@ -1253,6 +1248,8 @@ private struct NativeWalletDashboardView: View {
                         Label(showVideoDetails ? "Hide details" : "View details", systemImage: "arrow.up.right")
                     }
                     .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 if showVideoDetails {
                     HStack(spacing: 10) {
@@ -1261,20 +1258,26 @@ private struct NativeWalletDashboardView: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 21).stroke(Color.envBorder, lineWidth: 1))
+            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .center, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
+                walletMetric("Bonuses", token(number("bonusTokens", from: rewards)) + " enV", tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
+                walletMetric("Referral tokens", token(number("referralTokens", from: rewards)) + " enV", tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
+                walletMetric("Affiliate program", token(number("affiliateTokens", from: rewards)) + " enV", tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 7) {
                     Image(systemName: "person.2.fill")
-                        .font(.system(size: 23))
+                        .font(.system(size: 18))
                         .foregroundStyle(Color.envInk)
-                        .frame(width: 48, height: 48)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Refer a friend").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
+                        .frame(width: 36, height: 36)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Refer a friend").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
                         Text("Share your referral link and you both get rewarded with enV tokens!").font(.caption).foregroundStyle(Color.envMuted)
                     }
                     Spacer(minLength: 0)
@@ -1319,30 +1322,40 @@ private struct NativeWalletDashboardView: View {
                     }
                 }
             }
-            .padding(12)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 21).stroke(Color.envBorder, lineWidth: 1))
+            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Recent transactions").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
                     Spacer()
                     Button("Refresh") { refreshKey += 1 }
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 if activity.isEmpty {
                     Text("No transactions yet. Your deposits, usage and rewards will appear here.")
                         .font(.subheadline).foregroundStyle(Color.envMuted)
                 } else {
                     ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.element["description"] as? String ?? "Wallet activity").font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
-                            Text((item.element["entry_type"] as? String ?? "activity").replacingOccurrences(of: "_", with: " ")).font(.caption).foregroundStyle(Color.envMuted)
-                            Text(item.element["created_at"] as? String ?? "").font(.caption2).foregroundStyle(Color.envMuted)
+                        HStack(alignment: .center, spacing: 9) {
+                            Image(systemName: transactionSymbol(item.element))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Color.envInk)
+                                .frame(width: 32, height: 32)
+                                .background(Color.envSurface2, in: Circle())
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(transactionTypeLabel(item.element)).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                                Text(item.element["description"] as? String ?? "Wallet activity").font(.caption).foregroundStyle(Color.envMuted).lineLimit(1)
+                                Text(item.element["created_at"] as? String ?? "").font(.caption2).foregroundStyle(Color.envMuted)
+                            }
+                            Spacer(minLength: 0)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                        if item.offset < min(activity.count, 5) - 1 { Divider().overlay(Color.envBorder) }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .padding(.vertical, 4)
+                        if item.offset < min(activity.count, 5) - 1 { Divider().overlay(Color.envBorder, lineWidth: 1) }
                     }
                 }
             }
@@ -1426,7 +1439,7 @@ private struct NativeWalletDashboardView: View {
             Image(systemName: "wallet.pass.fill")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
+                .frame(width: 38, height: 38)
                 .background(Color.white.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
@@ -1441,19 +1454,19 @@ private struct NativeWalletDashboardView: View {
                     .contentShape(Rectangle())
                     .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
                 }
-                Text(showBalance ? available.map { "$\(token($0 * 0.01))" } ?? "—" : "••••••")
+                Text(showBalance ? available.map { tokenCurrency($0) } ?? "$0.000" : "••••••")
                     .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
                     Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
-                    Text(showBalance ? available.map { "≈ \(token($0)) enV" } ?? "— enV" : "•••• enV")
+                    Text(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV")
                         .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
                 }
-                Text("Estimated reference value · not cash").font(.caption2).foregroundStyle(Color.white.opacity(0.66))
+                Text(showBalance ? "Estimated token value " + tokenCurrency(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 8) {
                 NativeWalletSparklineView(color: Color(red: 0.30, green: 1.0, blue: 0.80))
-                    .frame(width: 62, height: 32)
+                    .frame(width: 52, height: 28)
                 Button(action: onAddFunds) {
                     Label("Add funds", systemImage: "arrow.up.right")
                         .font(.caption.weight(.semibold))
@@ -1463,7 +1476,7 @@ private struct NativeWalletDashboardView: View {
                 .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
             }
         }
-        .padding(12)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(LinearGradient(colors: [Color(red: 0.09, green: 0.27, blue: 0.69), Color(red: 0.02, green: 0.22, blue: 0.31), Color(red: 0.0, green: 0.59, blue: 0.42)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 23).stroke(Color(red: 0.22, green: 0.95, blue: 0.75).opacity(0.36), lineWidth: 1))
@@ -1493,12 +1506,42 @@ private struct NativeWalletDashboardView: View {
     private func token(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 3
         formatter.maximumFractionDigits = 3
-        return formatter.string(from: NSNumber(value: value)) ?? "0"
+        return formatter.string(from: NSNumber(value: value)) ?? "0.000"
+    }
+
+    private func tokenCurrency(_ tokens: Double) -> String {
+        "$" + String(format: "%.3f", tokens * 0.01)
     }
 
     private func tokenReferenceValue(_ tokens: Double) -> String {
-        "≈ $" + String(format: "%.2f", tokens * 0.01)
+        "Est. value " + tokenCurrency(tokens)
+    }
+
+    private func transactionTypeLabel(_ entry: [String: Any]) -> String {
+        let type = (entry["entry_type"] as? String ?? "activity").lowercased()
+        if type.contains("referral") { return "Referral reward" }
+        if type.contains("affiliate") || type.contains("video") { return "Affiliate reward" }
+        if type.contains("bonus") || type.contains("reward") || type.contains("grant") { return "Bonus reward" }
+        if type == "reservation" { return "Tokens reserved" }
+        if type == "release" { return "Reservation released" }
+        if number("consumed_subunits", from: entry) > 0 || type.contains("consum") { return "Tool usage" }
+        if ["purchase", "deposit", "top_up", "funding"].contains(where: type.contains) { return "Wallet funded" }
+        if type.contains("refund") { return "Refund" }
+        if number("delta_available_subunits", from: entry) > 0 { return "Tokens added" }
+        if number("delta_available_subunits", from: entry) < 0 { return "Tokens used" }
+        return "Wallet activity"
+    }
+
+    private func transactionSymbol(_ entry: [String: Any]) -> String {
+        let type = (entry["entry_type"] as? String ?? "activity").lowercased()
+        if type.contains("referral") || type.contains("affiliate") || type.contains("bonus") || type.contains("reward") || type.contains("grant") { return "gift.fill" }
+        if type == "reservation" { return "clock.fill" }
+        if type == "release" || type.contains("refund") { return "arrow.uturn.backward" }
+        if ["purchase", "deposit", "top_up", "funding"].contains(where: type.contains) { return "creditcard.fill" }
+        if number("consumed_subunits", from: entry) > 0 || type.contains("consum") { return "bolt.fill" }
+        return number("delta_available_subunits", from: entry) >= 0 ? "arrow.down.left" : "arrow.up.right"
     }
 
     private func paymentMethod(_ title: String, systemImage: String) -> some View {
@@ -1531,7 +1574,7 @@ private struct NativeWalletDashboardView: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
         .padding(5)
         .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
