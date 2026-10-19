@@ -29,6 +29,30 @@ object OfflineWalletNativeApi {
     private val lock = Any()
 
     data class Result(val ok: Boolean, val message: String, val code: String? = null)
+    data class ActivityItem(
+        val id: String,
+        val type: String,
+        val description: String,
+        val deltaAvailableSubunits: Double,
+        val consumedSubunits: Double,
+        val createdAt: String,
+    )
+    data class WalletDashboard(
+        val availableTokens: Double,
+        val reservedTokens: Double,
+        val lifetimePurchasedTokens: Double,
+        val lifetimeConsumedTokens: Double,
+        val referralCode: String,
+        val referralCount: Int,
+        val qualifiedReferrals: Int,
+        val videoSignups: Int,
+        val videoConversions: Int,
+        val referralTokens: Double,
+        val affiliateTokens: Double,
+        val bonusTokens: Double,
+        val totalRewardTokens: Double,
+        val activity: List<ActivityItem>,
+    )
 
     private fun preferences(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -142,6 +166,44 @@ object OfflineWalletNativeApi {
             throw IllegalStateException(if (code == null) message else "$message [$code]")
         }
         return response.body.optJSONObject("data") ?: throw IllegalStateException("The offline wallet response was incomplete.")
+    }
+
+    suspend fun fetchWalletDashboard(context: Context): WalletDashboard = withContext(Dispatchers.IO) {
+        val bearer = sessionToken(context)
+            ?: throw IllegalStateException("Pair this device from your signed-in enV web Wallet first.")
+        val data = requireData(request("/api/billing/native-wallet", "GET", bearer = bearer))
+        val wallet = data.optJSONObject("wallet")
+            ?: throw IllegalStateException("The shared wallet response was incomplete.")
+        val rewards = data.optJSONObject("rewards")
+            ?: throw IllegalStateException("The wallet rewards response was incomplete.")
+        val activityJson = data.optJSONArray("activity")
+        val activity = (0 until (activityJson?.length() ?: 0)).mapNotNull { index ->
+            val row = activityJson?.optJSONObject(index) ?: return@mapNotNull null
+            ActivityItem(
+                id = row.optString("id"),
+                type = row.optString("entry_type", "activity").replace('_', ' '),
+                description = row.optString("description", "Wallet activity"),
+                deltaAvailableSubunits = row.optDouble("delta_available_subunits", 0.0),
+                consumedSubunits = row.optDouble("consumed_subunits", 0.0),
+                createdAt = row.optString("created_at"),
+            )
+        }
+        WalletDashboard(
+            availableTokens = wallet.optDouble("availableTokens", 0.0),
+            reservedTokens = wallet.optDouble("reservedTokens", 0.0),
+            lifetimePurchasedTokens = wallet.optDouble("lifetimePurchasedSubunits", 0.0) / 1_000.0,
+            lifetimeConsumedTokens = wallet.optDouble("lifetimeConsumedSubunits", 0.0) / 1_000.0,
+            referralCode = rewards.optString("referralCode"),
+            referralCount = rewards.optInt("referralCount", 0),
+            qualifiedReferrals = rewards.optInt("qualifiedReferrals", 0),
+            videoSignups = rewards.optInt("videoSignups", 0),
+            videoConversions = rewards.optInt("videoConversions", 0),
+            referralTokens = rewards.optDouble("referralTokens", 0.0),
+            affiliateTokens = rewards.optDouble("affiliateTokens", 0.0),
+            bonusTokens = rewards.optDouble("bonusTokens", 0.0),
+            totalRewardTokens = rewards.optDouble("totalRewardTokens", 0.0),
+            activity = activity,
+        )
     }
 
     suspend fun checkAvailability(): Result = withContext(Dispatchers.IO) {
