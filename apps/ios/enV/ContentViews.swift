@@ -1634,6 +1634,8 @@ private struct NativeWalletDashboardView: View {
                 .contentShape(Rectangle())
                 .buttonStyle(.bordered)
                 .tint(.white)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
 
             if showVideoDetails {
@@ -1773,7 +1775,7 @@ private struct NativeWalletDashboardView: View {
                 .foregroundStyle(Color.envInk)
             Spacer()
             Button("Refresh") { refreshKey += 1 }
-                .frame(minHeight: 44)
+                .frame(minWidth: 60, minHeight: 44)
                 .contentShape(Rectangle())
         }
     }
@@ -1832,7 +1834,8 @@ private struct NativeWalletDashboardView: View {
                     message = ""
                 }
                 .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Connect your enV wallet")
@@ -1844,9 +1847,12 @@ private struct NativeWalletDashboardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Link(destination: URL(string: "https://envtools.store/wallet")!) {
                         Label("Open enV web Wallet", systemImage: "arrow.up.right.square")
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     TextField("One-time pairing code", text: $pairingCode)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -1873,6 +1879,8 @@ private struct NativeWalletDashboardView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                     .disabled(busy || pairingCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(16)
@@ -1882,6 +1890,8 @@ private struct NativeWalletDashboardView: View {
             }
         } label: {
             Text(dashboard == nil ? "Connect account" : "Device connection")
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
         }
         .font(.subheadline.weight(.medium))
         .foregroundStyle(Color.envInk)
@@ -1935,7 +1945,7 @@ private struct NativeWalletDashboardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
-                .frame(minHeight: 44)
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
         }
