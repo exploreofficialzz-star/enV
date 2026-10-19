@@ -153,6 +153,8 @@ assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.lifetimeCon
 assert.match(tokenDashboardComponent, /Array\.from\(\{ length: 7 \}/, "the empty-wallet preview must keep seven zero-use chart days visible");
 const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashboard()")[1]?.split("private fun NativeWalletDashboard()")[0] ?? "";
 assert.match(androidTokenDashboard, /Text\("Open wallet"\)/, "Android token dashboard must place Open wallet beside the welcome heading");
+assert.match(androidTokenDashboard, /Row\(Modifier\.fillMaxWidth\(\), verticalAlignment = Alignment\.Top[\s\S]*"Welcome to your token dashboard"[\s\S]*Text\("Open wallet"\)/, "Android Open wallet action must share the welcome row");
+assert.match(androidTokenDashboard, /displayDaily = if \(daily\.isEmpty\(\)\)/, "Android empty-wallet preview must render seven zero-use chart bars");
 assert.match(androidTokenDashboard, /dashboard\?\.availableTokens \?: 0\.0/, "Android empty-wallet preview must show zero token balance");
 assert.match(androidTokenDashboard, /NativeWalletMetric\("Total deposited"/ , "Android dashboard must show total deposited");
 assert.match(androidTokenDashboard, /NativeWalletMetric\("Token deductions"/ , "Android dashboard must show a deductions count");
