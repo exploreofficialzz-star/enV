@@ -189,7 +189,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("Tools")
                     .accessibilityIdentifier("tools-navigation-action")
                     Menu {
-                        Button("Account") { informationRouter.open("account") }
+                        Button("Account") { if let url = URL(string: "https://envtools.store/account") { openURL(url) } }
                         Button("Wallet") { informationRouter.open("wallet") }
                         Divider()
                         Section("PRODUCT") {
