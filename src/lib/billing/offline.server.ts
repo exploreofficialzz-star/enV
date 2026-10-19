@@ -228,8 +228,8 @@ async function ensureAccount(tx: Awaited<ReturnType<typeof getSql>>, userId: str
   await tx.query("insert into billing_accounts (user_id) values ($1) on conflict (user_id) do nothing", [userId]);
 }
 
+/** Device pairing authorizes a revocable, read-only Wallet session even while offline spending is disabled. */
 export async function createOfflinePairingCode(input: { userId: string; platform: "android" | "ios" }) {
-  requireOfflineEnabled();
   if (input.platform !== "android" && input.platform !== "ios") {
     throw new OfflineWalletError("INVALID_REQUEST", "Choose Android or iOS for this pairing request.");
   }
@@ -250,8 +250,8 @@ export async function createOfflinePairingCode(input: { userId: string; platform
   return { pairingCode, pairingId, platform: input.platform, expiresAt: expiresAt.toISOString() };
 }
 
+/** Redeem a single-use pairing code for a revocable native session; offline allowances remain separately gated. */
 export async function redeemOfflinePairingCode(input: { pairingCode: string; platform: "android" | "ios"; publicKeyValue: unknown }) {
-  requireOfflineEnabled();
   if (input.platform !== "android" && input.platform !== "ios" || typeof input.pairingCode !== "string" ||
       !/^envpair1_[A-Za-z0-9_-]{43}$/.test(input.pairingCode)) {
     throw new OfflineWalletError("PAIRING_CODE_INVALID", "This pairing code is invalid or expired. Generate a new code from the signed-in enV wallet.", 401);
