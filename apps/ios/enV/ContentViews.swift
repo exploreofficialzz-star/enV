@@ -1149,9 +1149,9 @@ private struct NativeWalletSparklineView: View {
                 path.addCurve(to: CGPoint(x: width * 0.48, y: height * 0.43), control1: CGPoint(x: width * 0.33, y: height * 0.78), control2: CGPoint(x: width * 0.38, y: height * 0.30))
                 path.addCurve(to: trendEnd, control1: CGPoint(x: width * 0.57, y: height * 0.58), control2: CGPoint(x: width * 0.60, y: height * 0.30))
                 path.addLine(to: tip)
-                path.move(to: CGPoint(x: width * 0.82, y: height * 0.04))
+                path.move(to: CGPoint(x: width * 0.82, y: height * 0.14))
                 path.addLine(to: tip)
-                path.addLine(to: CGPoint(x: width * 0.94, y: height * 0.24))
+                path.addLine(to: CGPoint(x: width * 0.92, y: height * 0.23))
             }
             .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
         }
@@ -1182,7 +1182,22 @@ private struct NativeWalletDashboardView: View {
     private var videoLink: String { "https://envtools.store/signup?ref=\(referralCode)&source=video&sig=\(videoSignature)" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+            walletOverviewSection
+            videoTagCard
+            rewardMetricsSection
+            referralCard
+            recentTransactionsSection
+            connectionSection
+            if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
+            if !message.isEmpty && (showConnection || dashboard != nil) { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
+        }
+        .task(id: "\(refreshKey)-\(paired)") { await refresh() }
+    }
+
+
+    @ViewBuilder private var walletOverviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             balanceHero(
                 available: dashboard == nil ? nil : number("availableTokens", from: wallet),
                 showBalance: showBalance,
@@ -1195,17 +1210,20 @@ private struct NativeWalletDashboardView: View {
                 walletMetric("Remaining", token(number("availableTokens", from: wallet)) + " enV", tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
                 walletMetric("Used", token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
             }
+        }
+    }
 
+    @ViewBuilder private var videoTagCard: some View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center, spacing: 7) {
                     Image(systemName: "play.rectangle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.envInk)
-                        .frame(width: 36, height: 36)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                        .font(.system(size: 17))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 9))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Tag enV on your videos").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                        Text("Earn tokens based on conversion.").font(.caption).foregroundStyle(Color.envMuted)
+                        Text("Tag enV on your videos").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        Text("Earn tokens based on conversion.").font(.caption).foregroundStyle(Color.white.opacity(0.78))
                     }
                     Spacer(minLength: 0)
                     NativeWalletSparklineView(color: Color(red: 0.08, green: 0.70, blue: 0.50))
@@ -1213,22 +1231,22 @@ private struct NativeWalletDashboardView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Image(systemName: "link").foregroundStyle(Color.envMuted)
+                    Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
                     Text(dashboard == nil ? "Your signed tag link" : videoLink)
                         .font(.caption).lineLimit(1).truncationMode(.middle)
-                        .foregroundStyle(Color.envMuted).textSelection(.enabled)
+                        .foregroundStyle(Color.white.opacity(0.78)).textSelection(.enabled)
                     Spacer(minLength: 0)
                     Button {
                         UIPasteboard.general.string = videoLink
                     } label: {
-                        Image(systemName: "doc.on.doc").frame(width: 44, height: 44)
+                        Image(systemName: "doc.on.doc").foregroundStyle(.white).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.bordered)
                     .disabled(dashboard == nil)
                     .accessibilityLabel("Copy video tag link")
                 }
                 .padding(8)
-                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 13))
+                .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 13))
 
                 HStack(spacing: 8) {
                     if dashboard != nil {
@@ -1258,57 +1276,61 @@ private struct NativeWalletDashboardView: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+            .background(LinearGradient(colors: [Color(red: 0.02, green: 0.23, blue: 0.21), Color(red: 0.03, green: 0.13, blue: 0.24)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.12, green: 0.57, blue: 0.47).opacity(0.65), lineWidth: 1))
+    }
 
+    @ViewBuilder private var rewardMetricsSection: some View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
                 walletMetric("Bonuses", token(number("bonusTokens", from: rewards)) + " enV", tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
                 walletMetric("Referral tokens", token(number("referralTokens", from: rewards)) + " enV", tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
                 walletMetric("Affiliate program", token(number("affiliateTokens", from: rewards)) + " enV", tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
             }
+    }
 
+    @ViewBuilder private var referralCard: some View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center, spacing: 7) {
                     Image(systemName: "person.2.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.envInk)
-                        .frame(width: 36, height: 36)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                        .font(.system(size: 17))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 9))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Refer a friend").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                        Text("Share your referral link and you both get rewarded with enV tokens!").font(.caption).foregroundStyle(Color.envMuted)
+                        Text("Refer a friend").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        Text("Share your referral link and you both get rewarded with enV tokens!").font(.caption).foregroundStyle(Color.white.opacity(0.78))
                     }
                     Spacer(minLength: 0)
                     VStack(spacing: 3) {
-                        Image(systemName: "gift.fill").font(.title3).foregroundStyle(Color.envInk)
-                        Text("Both get rewarded!").font(.caption2.weight(.medium)).foregroundStyle(Color.envMuted).multilineTextAlignment(.center)
+                        Image(systemName: "gift.fill").font(.title3).foregroundStyle(.white)
+                        Text("Both get rewarded!").font(.caption2.weight(.medium)).foregroundStyle(Color.white.opacity(0.78)).multilineTextAlignment(.center)
                     }
                     .frame(width: 76)
                 }
 
                 HStack(spacing: 8) {
-                    Image(systemName: "link").foregroundStyle(Color.envMuted)
+                    Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
                     Text(dashboard == nil ? "Your referral link" : referralLink)
                         .font(.caption).lineLimit(1).truncationMode(.middle)
-                        .foregroundStyle(Color.envMuted).textSelection(.enabled)
+                        .foregroundStyle(Color.white.opacity(0.78)).textSelection(.enabled)
                     Spacer(minLength: 0)
                     Button {
                         UIPasteboard.general.string = referralLink
                     } label: {
-                        Image(systemName: "doc.on.doc").frame(width: 44, height: 44)
+                        Image(systemName: "doc.on.doc").foregroundStyle(.white).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.bordered)
                     .disabled(dashboard == nil)
                     .accessibilityLabel("Copy referral link")
                 }
                 .padding(8)
-                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 13))
+                .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 13))
 
                 HStack {
                     Text(dashboard == nil ? "Share your personal link with friends." : "\(rewards["referralCount"] as? Int ?? 0) invites · \(rewards["qualifiedReferrals"] as? Int ?? 0) qualified")
-                        .font(.caption).foregroundStyle(Color.envMuted)
+                        .font(.caption).foregroundStyle(Color.white.opacity(0.78))
                     Spacer(minLength: 0)
                     if dashboard != nil {
                         ShareLink(item: "Join me on enV: \(referralLink)") {
@@ -1322,11 +1344,13 @@ private struct NativeWalletDashboardView: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+            .background(LinearGradient(colors: [Color(red: 0.08, green: 0.09, blue: 0.30), Color(red: 0.22, green: 0.10, blue: 0.39)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.purple.opacity(0.55), lineWidth: 1))
+    }
 
+    @ViewBuilder private var recentTransactionsSection: some View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Recent transactions").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
@@ -1363,7 +1387,9 @@ private struct NativeWalletDashboardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+    }
 
+    @ViewBuilder private var connectionSection: some View {
             DisclosureGroup(isExpanded: $showConnection) {
             if dashboard != nil {
                 Button("Reconnect this device") {
@@ -1422,11 +1448,9 @@ private struct NativeWalletDashboardView: View {
             .padding(12)
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+    }
 
-            if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
-            if !message.isEmpty && (showConnection || dashboard != nil) { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
-        }
-        .task(id: "\(refreshKey)-\(paired)") { await refresh() }
+efresh() }
     }
 
     private func balanceHero(
@@ -1461,7 +1485,7 @@ private struct NativeWalletDashboardView: View {
                     Text(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV")
                         .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
                 }
-                Text(showBalance ? "Estimated token value " + tokenCurrency(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
+                Text(showBalance ? tokenReferenceValue(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 8) {
@@ -1516,7 +1540,7 @@ private struct NativeWalletDashboardView: View {
     }
 
     private func tokenReferenceValue(_ tokens: Double) -> String {
-        "Est. value " + tokenCurrency(tokens)
+        "Estimated token value " + token(tokens * 0.01)
     }
 
     private func transactionTypeLabel(_ entry: [String: Any]) -> String {
@@ -1561,24 +1585,27 @@ private struct NativeWalletDashboardView: View {
     }
 
     private func walletMetric(_ title: String, _ value: String, _ detail: String, iconName: String? = nil) -> some View {
-        HStack(alignment: .center, spacing: 5) {
-            Image(systemName: iconName ?? "wallet.pass.fill")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.envInk)
-                .frame(width: 22, height: 22)
-                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 7))
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .center, spacing: 6) {
+            if let iconName {
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.envInk)
+                    .frame(width: 23, height: 23)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+            }
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.envMuted).lineLimit(2)
-                Text(value).font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(Color.envInk).lineLimit(1).minimumScaleFactor(0.55)
-                Text(detail).font(.system(size: 8)).foregroundStyle(Color.envMuted).lineLimit(1).minimumScaleFactor(0.55)
+                Text(value).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.envInk).lineLimit(1).minimumScaleFactor(0.7)
+                Text(detail).font(.system(size: 8)).foregroundStyle(Color.envMuted).lineLimit(2).minimumScaleFactor(0.75)
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .padding(5)
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+        .padding(7)
         .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
+}
 }
 
 struct NativeOfflineWalletPairingPanel: View {

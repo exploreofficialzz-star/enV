@@ -92,7 +92,7 @@ function tokenValueAmount(tokens: number): string {
 }
 
 function tokenReferenceValue(tokens: number): string {
-  return "Est. value " + tokenValueAmount(tokens);
+  return "Estimated token value " + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
 function activitySummary(entry: WalletActivity): string {
@@ -562,11 +562,11 @@ function Account() {
                 </div>
                 <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{showBalance ? tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "••••••"}</p>
                 <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true"/><span>≈ {showBalance ? (visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " enV" : "•••• enV"}</span></p>
-                <p className="mt-0.5 text-[10px] text-white/75 sm:text-xs">{showBalance ? "Estimated token value " + tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "Estimated token value ••••••"}</p>
+                <p className="mt-0.5 text-[10px] text-white/75 sm:text-xs">{showBalance ? "Estimated token value " + ((visibleWallet?.availableTokens ?? 0) * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "Estimated token value ••••••"}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <svg viewBox="0 0 120 64" className="h-8 w-16 sm:h-10 sm:w-20" fill="none" aria-label="Upward token trend">
-                  <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M101 5 L113 5 L113 17" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } void startFundingCheckout(); }} disabled={fundingBusy} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-2.5 py-2 text-xs font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-3">
                   <CreditCard size={15} aria-hidden="true"/>{fundingBusy ? "Opening…" : "Add funds"}<ArrowUpRight size={13} aria-hidden="true"/>
@@ -584,27 +584,27 @@ function Account() {
 
         <section className="mt-2 space-y-2" aria-labelledby="rewards-title">
           <h2 id="rewards-title" className="sr-only">Referral and creator rewards</h2>
-          <article className="relative overflow-hidden rounded-[18px] border border-border bg-surface p-3 shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><Video size={19} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-fg sm:text-base">Tag enV on your videos</h2><p className="mt-0.5 text-xs leading-4 text-muted">Earn tokens based on conversion.</p></div>
-              <svg viewBox="0 0 120 64" className="h-8 w-14 shrink-0 sm:h-9 sm:w-16" fill="none" aria-label="Video conversions trend">
-                <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M101 5 L113 5 L113 17" stroke="#16b58a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <article className="relative overflow-hidden rounded-[16px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-2.5 text-white shadow-sm sm:p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/10 text-white"><Video size={17} aria-hidden="true"/></span>
+              <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-white sm:text-base">Tag enV on your videos</h2><p className="mt-0.5 text-xs leading-4 text-white/75">Earn tokens based on conversion.</p></div>
+              <svg viewBox="0 0 120 64" className="h-7 w-12 shrink-0 sm:h-8 sm:w-14" fill="none" aria-label="Video conversions trend">
+                <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-2.5 py-1.5">
-              <Link2 size={14} className="shrink-0 text-fg" aria-hidden="true"/>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted">{rewardsState.status === "ready" && rewardsState.data ? `${appOrigin}/signup?ref=${rewardsState.data.referralCode}&source=video&sig=${rewardsState.data.videoSignature}` : "Your signed tag link"}</span>
-              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} aria-label="Copy video tag link" title="Copy video tag link" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-fg hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40"><Copy size={15} aria-hidden="true"/></button>
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/15 bg-black/15 px-2 py-1">
+              <Link2 size={13} className="shrink-0 text-white/90" aria-hidden="true"/>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-white/85">{rewardsState.status === "ready" && rewardsState.data ? `${appOrigin}/signup?ref=${rewardsState.data.referralCode}&source=video&sig=${rewardsState.data.videoSignature}` : "Your signed tag link"}</span>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} aria-label="Copy video tag link" title="Copy video tag link" className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-40"><Copy size={14} aria-hidden="true"/></button>
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex gap-1.5">
-                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent disabled:opacity-40"><Link2 size={13} aria-hidden="true"/> Copy link</button>
-                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-fg hover:bg-surface-2 disabled:opacity-40"><Share2 size={13} aria-hidden="true"/> Share link</button>
+                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-8 items-center gap-1 rounded-full bg-[#3df1c2] px-2.5 py-1 text-[11px] font-semibold text-[#052a2a] disabled:opacity-40"><Link2 size={12} aria-hidden="true"/> Copy link</button>
+                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-white/25 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-white/10 disabled:opacity-40"><Share2 size={12} aria-hidden="true"/> Share link</button>
               </div>
-              <button type="button" onClick={() => setShowVideoDetails(value => !value)} className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 py-1.5 text-xs font-semibold text-fg hover:bg-surface-2">{showVideoDetails ? "Hide details" : "View details"} <ArrowUpRight size={13} aria-hidden="true"/></button>
+              <button type="button" onClick={() => setShowVideoDetails(value => !value)} className="inline-flex min-h-8 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold text-white hover:bg-white/10">{showVideoDetails ? "Hide details" : "View details"} <ArrowUpRight size={12} aria-hidden="true"/></button>
             </div>
-            {showVideoDetails ? <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface-2 p-2.5"><div><p className="text-[10px] text-muted">Video sign-ups</p><p className="mt-1 text-sm font-semibold text-fg">{rewardsState.status === "ready" && rewardsState.data ? rewardsState.data.videoSignups.toLocaleString() : "0"}</p></div><div><p className="text-[10px] text-muted">Verified conversions</p><p className="mt-1 text-sm font-semibold text-fg">{rewardsState.status === "ready" && rewardsState.data ? rewardsState.data.videoConversions.toLocaleString() : "0"}</p></div></div> : null}
+            {showVideoDetails ? <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-white/15 bg-black/15 p-2"><div><p className="text-[10px] text-white/70">Video sign-ups</p><p className="mt-1 text-sm font-semibold text-white">{rewardsState.status === "ready" && rewardsState.data ? rewardsState.data.videoSignups.toLocaleString() : "0"}</p></div><div><p className="text-[10px] text-white/70">Verified conversions</p><p className="mt-1 text-sm font-semibold text-white">{rewardsState.status === "ready" && rewardsState.data ? rewardsState.data.videoConversions.toLocaleString() : "0"}</p></div></div> : null}
           </article>
 
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2" aria-label="Reward token balances">
@@ -613,20 +613,20 @@ function Account() {
             <MetricCard title="Affiliate program" value={rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.affiliateTokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV` : "0.000 enV"} description={tokenReferenceValue(rewardsState.status === "ready" && rewardsState.data ? rewardsState.data.affiliateTokens : 0)} icon={<Link2 size={15} aria-hidden="true"/>} />
           </div>
 
-          <article className="relative overflow-hidden rounded-[18px] border border-border bg-surface p-3 shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><Users size={19} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-fg sm:text-base">Refer a friend</h2><p className="mt-0.5 text-xs leading-4 text-muted">Share your referral link and you both get rewarded with enV tokens!</p></div>
-              <span className="flex shrink-0 flex-col items-center text-fg"><Gift size={19} aria-hidden="true"/><span className="mt-0.5 text-[9px] font-semibold leading-3 text-muted">Both rewarded</span></span>
+          <article className="relative overflow-hidden rounded-[16px] border border-violet-300/30 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-2.5 text-white shadow-sm sm:p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/10 text-white"><Users size={17} aria-hidden="true"/></span>
+              <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-white sm:text-base">Refer a friend</h2><p className="mt-0.5 text-xs leading-4 text-white/80">Share your referral link and you both get rewarded with enV tokens!</p></div>
+              <span className="flex shrink-0 flex-col items-center text-white"><Gift size={18} aria-hidden="true"/><span className="mt-0.5 text-[9px] font-semibold leading-3 text-white/75">Both rewarded</span></span>
             </div>
-            <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-2.5 py-1.5">
-              <Link2 size={14} className="shrink-0 text-fg" aria-hidden="true"/>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted">{rewardsState.status === "ready" && rewardsState.data ? `${appOrigin}/signup?ref=${rewardsState.data.referralCode}` : "Your personal referral link"}</span>
-              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "referral"); }} aria-label="Copy referral link" title="Copy referral link" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-fg hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40"><Copy size={15} aria-hidden="true"/></button>
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/15 bg-black/15 px-2 py-1">
+              <Link2 size={13} className="shrink-0 text-white/90" aria-hidden="true"/>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-white/85">{rewardsState.status === "ready" && rewardsState.data ? `${appOrigin}/signup?ref=${rewardsState.data.referralCode}` : "Your personal referral link"}</span>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "referral"); }} aria-label="Copy referral link" title="Copy referral link" className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-40"><Copy size={14} aria-hidden="true"/></button>
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[10px] text-muted">{rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.referralCount} invites · ${rewardsState.data.qualifiedReferrals} qualified` : "Share your personal link with friends."}</p>
-              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "referral"); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent disabled:opacity-40"><Share2 size={14} aria-hidden="true"/> Share now</button>
+              <p className="text-[10px] text-white/75">{rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.referralCount} invites · ${rewardsState.data.qualifiedReferrals} qualified` : "Share your personal link with friends."}</p>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "referral"); }} className="inline-flex min-h-8 items-center gap-1 rounded-full bg-[#3df1c2] px-2.5 py-1 text-[11px] font-semibold text-[#052a2a] disabled:opacity-40"><Share2 size={12} aria-hidden="true"/> Share now</button>
             </div>
           </article>
         </section>

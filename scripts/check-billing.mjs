@@ -116,7 +116,7 @@ assert.match(rewardsService, /createHmac\("sha256"/);
 assert.match(rewardsService, /timingSafeEqual/);
 assert.match(rewardsService, /INVALID_VIDEO_REFERRAL_SIGNATURE/);
 assert.match(walletDashboard, /videoSignature/);
-assert.match(walletDashboard, /&amp;sig=/);
+assert.match(walletDashboard, /(?:&amp;|&)sig=/);
 assert.match(ledger, /referral_invitee/);
 assert.match(ledger, /affiliate_conversion/);
 assert.match(walletDashboard, /Total deposited/);
