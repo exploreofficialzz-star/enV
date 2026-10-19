@@ -223,10 +223,33 @@ const pairingCreate = read("server/routes/api/billing/offline/pairing.post.ts");
 const pairingRedeem = read("server/routes/api/billing/offline/pairing/redeem.post.ts");
 const pairingSessions = read("server/routes/api/billing/offline/pairing/sessions.get.ts");
 const pairingRevoke = read("server/routes/api/billing/offline/pairing/revoke.post.ts");
+const offlineServer = read("src/lib/billing/offline.server.ts");
+const nativeWalletRoute = read("server/routes/api/billing/native-wallet.get.ts");
+const nativeDashboard = read("src/routes/wallet.tsx");
+const rewardsMigration = read("migrations/0007_wallet_rewards.sql");
+const rewardsServer = read("src/lib/billing/rewards.server.ts");
+const paystackServer = read("src/lib/billing/paystack.server.ts");
 assert.ok(pairingCreate.includes("requireOfflineBillingUser") && pairingCreate.includes("createOfflinePairingCode"), "Only an authenticated web account can issue a one-time pairing code.");
 assert.ok(pairingRedeem.includes("redeemOfflinePairingCode") && pairingRedeem.includes("publicKeyJwk") && pairingRedeem.includes("isSameOriginRequest"), "Pairing redemption must validate a native public key and one-time code.");
 assert.ok(pairingSessions.includes("listOfflineNativeSessions") && pairingSessions.includes("requireBillingUser"), "Device session inventory must remain account scoped.");
 assert.ok(pairingRevoke.includes("revokeOfflineNativeSession") && pairingRevoke.includes("requireBillingUser") && pairingRevoke.includes("isSameOriginRequest"), "Revocation must be authenticated, same-origin, and server enforced.");
+const pairingCreateLogic = offlineServer.slice(offlineServer.indexOf("export async function createOfflinePairingCode"), offlineServer.indexOf("export async function redeemOfflinePairingCode"));
+const pairingRedeemLogic = offlineServer.slice(offlineServer.indexOf("export async function redeemOfflinePairingCode"), offlineServer.indexOf("export async function", offlineServer.indexOf("export async function redeemOfflinePairingCode") + 30));
+assert.ok(pairingCreateLogic.length > 0 && pairingRedeemLogic.length > 0 &&
+  !pairingCreateLogic.includes("requireOfflineEnabled()") && !pairingRedeemLogic.includes("requireOfflineEnabled()"),
+  "Read-only Wallet pairing must work without turning on offline spending.");
+assert.ok(offlineServer.includes("export async function issueOfflineAllowance") && offlineServer.includes("const signingSecret = requireOfflineEnabled();") &&
+  offlineServer.includes("export async function syncOfflineAllowance"),
+  "Offline allowance issue and sync must remain gated independently from native wallet pairing.");
+assert.ok(nativeWalletRoute.includes("requireOfflineBillingUser") && nativeWalletRoute.includes("nativeSessionId") &&
+  nativeWalletRoute.includes("readWallet") && nativeWalletRoute.includes("getRewardsSummary"),
+  "Native Wallet reads must require a paired session and return shared ledger data only.");
+assert.ok(nativeDashboard.includes("Total deposited") && nativeDashboard.includes("Total used") &&
+  nativeDashboard.includes("Referral and creator rewards") && nativeDashboard.includes("Fund your wallet"),
+  "Web Wallet must expose balance, usage, creator rewards and funding sections.");
+assert.ok(rewardsMigration.includes("billing_reward_events") && rewardsServer.includes("SELF_REFERRAL") &&
+  paystackServer.includes("verifyAndCreditPaystackReference"),
+  "Reward attribution and deposits must use server-side verification and idempotent event records.");
 const webIssueFunction = webClient.slice(webClient.indexOf("export async function requestWebOfflineAllowance"), webClient.indexOf("/** Send the persisted, retry-safe batch"));
 const webSyncFunction = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("/** Retry selected local records"));
 assert.ok(webIssueFunction.includes("/api/billing/offline/allowances") && webIssueFunction.includes("requestedSubunits: input.requestedSubunits") &&
