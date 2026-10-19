@@ -1139,6 +1139,7 @@ private struct NativeWalletDashboardView: View {
                     .foregroundStyle(Color(red: 0.23, green: 0.96, blue: 0.72))
                     .frame(width: 42, height: 42)
                     .background(Color(red: 0.04, green: 0.28, blue: 0.25), in: RoundedRectangle(cornerRadius: 13))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("enV Tokens").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
                     Text(dashboard == nil ? "Connect to view your current balance" : "\(token(number("availableTokens", from: wallet))) enV")
@@ -1164,6 +1165,7 @@ private struct NativeWalletDashboardView: View {
                     Image(systemName: "play.rectangle.fill").font(.title2).foregroundStyle(.white)
                         .frame(width: 42, height: 42)
                         .background(Color(red: 0.04, green: 0.58, blue: 0.43), in: RoundedRectangle(cornerRadius: 13))
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Tag enV on your videos").font(.headline.weight(.semibold)).foregroundStyle(.white)
                         Text("Earn affiliate tokens from verified conversions.").font(.caption).foregroundStyle(Color.white.opacity(0.78))
@@ -1193,6 +1195,7 @@ private struct NativeWalletDashboardView: View {
                     Image(systemName: "person.2.fill").font(.title2).foregroundStyle(.white)
                         .frame(width: 42, height: 42)
                         .background(Color.blue, in: RoundedRectangle(cornerRadius: 13))
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Refer a friend").font(.headline.weight(.semibold)).foregroundStyle(.white)
                         Text("Share your link and you can both earn tokens.").font(.caption).foregroundStyle(Color.white.opacity(0.78))
@@ -1222,7 +1225,7 @@ private struct NativeWalletDashboardView: View {
                 Label("Fund wallet", systemImage: "creditcard.fill").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
                 Text("Continue to enV secure checkout to add tokens to your wallet.").font(.subheadline).foregroundStyle(Color.envMuted)
                 HStack {
-                    Image(systemName: "lock.shield.fill").foregroundStyle(Color.envAccent)
+                    Image(systemName: "lock.shield.fill").foregroundStyle(Color.envAccent).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Paystack checkout").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
                         Text("NGN · verified checkout").font(.caption).foregroundStyle(Color.envMuted)
