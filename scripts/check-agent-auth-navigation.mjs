@@ -21,7 +21,10 @@ if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) err
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
 if (account.includes("Wallet") || account.includes("Manage your enV identity")) errors.push("The Account route must open sign-in directly without an overview or wallet panel.");
-const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', '>Wallet</h1>', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
+const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
+for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">Wallet</h1>', 'aria-label="Notifications"', 'aria-label="Profile and account"']) {
+  if (!header.includes(item)) errors.push(`Wallet shared header is missing ${item}`);
+}
 const authPage = requireText("src/components/auth/auth-page.tsx", ['type="email"', 'autoComplete={isSignUp ? "new-password" : "current-password"}', "Confirm password", "EyeOff", "Sign in with Google", "Sign in with Apple", "Forgot password?", '"/signup"'], "Sign-in/sign-up page");
 if (authPage.includes("Authentication is disabled until production")) errors.push("Sign-in/sign-up UI still displays the configuration warning.");
 const tokenPage = requireText("src/routes/tokens.tsx", ["Token guide", "Tool-by-tool token explanations", "Balance & history"], "Token guide");
