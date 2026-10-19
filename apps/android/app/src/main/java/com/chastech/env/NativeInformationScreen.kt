@@ -184,14 +184,6 @@ private fun NativeTokenDashboard() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (dashboard == null && !loading) {
-            Text(
-                "Preview display: showing 0.000 enV until real account data is connected.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
         if (loading) {
             Text("Loading token usage…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
