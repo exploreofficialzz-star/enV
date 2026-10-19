@@ -33,7 +33,7 @@ const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword", "socialProviders", "googleConfigured", "appleConfigured"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 
-const nativeAndroid = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ['Text("Account")', 'Text("Wallet")', 'Text("PRODUCT"', 'Text("RESOURCES"', 'onInformation("tokens")', "FooterLegalLinks"], "Android menu/footer");
+const nativeAndroid = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ['Text("Account")', 'Text("Wallet")', 'Text("PRODUCT"', 'Text("RESOURCES"', 'Text("Token guide")', 'informationPage = "tokens"', "FooterLegalLinks"], "Android menu/footer");
 const androidMenu = nativeAndroid.split("DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false })")[1]?.split("colors = TopAppBarDefaults.topAppBarColors")[0] ?? "";
 for (const removed of ['Text("AI Agent")', 'Text("Sign in")', 'Text("Create account")', 'Text("Search tools")', 'Text("LEGAL")']) if (androidMenu.includes(removed)) errors.push(`Android overflow menu still contains ${removed}`);
 requireText("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", ['"help" -> "Help center"', '"tokens" -> "Token guide"', 'Text("Continue to sign in")', 'https://envtools.store/account'], "Android Account/token pages");
