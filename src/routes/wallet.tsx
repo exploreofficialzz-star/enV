@@ -519,9 +519,9 @@ function Account() {
               <MetricCard title="Reserved" value={`${state.wallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens`} description="Held for active work" icon={<ShieldCheck size={17} aria-hidden="true" />} />
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <MetricCard title="Referral rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Earned from qualified invites" icon={<Gift size={17} aria-hidden="true" />}} />
-              <MetricCard title="Affiliate rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Verified video conversions" icon={<Video size={17} aria-hidden="true" />}} />
-              <MetricCard title="Bonus tokens" value={rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Promotional awards" icon={<Gift size={17} aria-hidden="true" />}} />
+              <MetricCard title="Referral rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Earned from qualified invites" icon={<Gift size={17} aria-hidden="true" />} />
+              <MetricCard title="Affiliate rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Verified video conversions" icon={<Video size={17} aria-hidden="true" />} />
+              <MetricCard title="Bonus tokens" value={rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Promotional awards" icon={<Gift size={17} aria-hidden="true" />} />
             </div>
           </section>
         ) : null}
