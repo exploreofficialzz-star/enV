@@ -98,9 +98,8 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()
                 "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    InformationSection("Your enV account", listOf("Sign in to access your account-linked features, or create an account to connect supported enV experiences across your devices."))
-                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/login"))) }, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
-                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/signup"))) }, modifier = Modifier.fillMaxWidth()) { Text("Create account") }
+                    InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
+                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
                 }
                 "wallet" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     InformationSection("Your wallet", listOf("Review token balances, reservations, usage history, and connected devices from the Wallet dashboard.", "To pair this native app, generate a one-time code from the signed-in Wallet dashboard and enter it below."))
