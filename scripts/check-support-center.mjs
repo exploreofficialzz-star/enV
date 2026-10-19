@@ -6,6 +6,7 @@ const requiredFiles = [
   'src/routes/blog.$slug.tsx',
   'src/routes/help.tsx',
   'src/routes/tokens.tsx',
+  'src/routes/tokens.guide.tsx',
   'src/routes/tokens.$toolId.tsx',
   'src/data/blog-articles.ts',
   'server/routes/api/billing/tool.get.ts',
@@ -20,12 +21,12 @@ const header = read('src/components/layout/header.tsx');
 const footer = read('src/components/layout/footer.tsx');
 const articles = read('src/data/blog-articles.ts');
 const help = read('src/routes/help.tsx');
-const tokens = read('src/routes/tokens.tsx');
+const tokens = read('src/routes/tokens.guide.tsx');
 const detail = read('src/routes/tokens.$toolId.tsx');
 const migration = read('migrations/0003_offline_wallet.sql');
 const security = read('docs/billing-offline-wallet-security.md');
 
-for (const path of ['/blog', '/help', '/tokens']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
+for (const path of ['/blog', '/help', '/tokens', '/tokens/guide']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
 for (const path of ['/blog', '/help', '/tokens']) assert.ok(!footer.includes(path), `compact footer must not duplicate navigation to ${path}`);
 for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety']) {
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
