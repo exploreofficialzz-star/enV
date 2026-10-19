@@ -196,6 +196,10 @@ function Account() {
         window.localStorage.removeItem("env.pendingReferralSource");
         setFundingFeedback({ kind: "error", message: payload?.message ?? "This referral could not be applied to the account." });
       }
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setFundingFeedback({ kind: "error", message: "Referral claim could not be completed. Keep this page open and retry after signing in; no reward was credited." });
+      }
     }).finally(() => {
       if (!controller.signal.aborted) window.history.replaceState({}, "", "/wallet");
     });
