@@ -1119,8 +1119,9 @@ private struct NativeWalletDashboardView: View {
     private var rewards: [String: Any] { dashboard?["rewards"] as? [String: Any] ?? [:] }
     private var activity: [[String: Any]] { dashboard?["activity"] as? [[String: Any]] ?? [] }
     private var referralCode: String { rewards["referralCode"] as? String ?? "" }
+    private var videoSignature: String { rewards["videoSignature"] as? String ?? "" }
     private var referralLink: String { "https://envtools.store/signup?ref=\(referralCode)" }
-    private var videoLink: String { "https://envtools.store/signup?ref=\(referralCode)&source=video" }
+    private var videoLink: String { "https://envtools.store/signup?ref=\(referralCode)&source=video&sig=\(videoSignature)" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
