@@ -99,7 +99,7 @@ export function AuthPage({ mode }: AuthPageProps) {
 
   return (
     <AppShell>
-      <main className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-6xl items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-6xl items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
         <section className="w-full max-w-md">
           <div className="mb-7 flex justify-center">
             <Logo size="hero" className="mx-auto" />
@@ -226,7 +226,7 @@ export function AuthPage({ mode }: AuthPageProps) {
             </p>
           </div>
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }
