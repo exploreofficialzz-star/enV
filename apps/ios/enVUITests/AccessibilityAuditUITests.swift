@@ -60,7 +60,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 5))
         walletMenuItem.tap()
 
-        XCTAssertTrue(app.staticTexts["Connect your enV wallet"].waitForExistence(timeout: 5), "The Wallet destination should open its native dashboard.")
+        XCTAssertTrue(app.staticTexts["Total balance"].waitForExistence(timeout: 5), "The Wallet destination should open its designed balance dashboard.")
         if #available(iOS 17.0, *) {
             try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }
