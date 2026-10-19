@@ -174,7 +174,7 @@ private fun NativeWalletDashboard() {
                 Text(
                     dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "Balance appears after connection",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Normal,
                     color = Color(0xFF65F2C5),
                 )
                 Text(
@@ -201,7 +201,7 @@ private fun NativeWalletDashboard() {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(42.dp).background(Color(0xFF0DAF8A), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("▶", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("▶", color = Color.White, fontWeight = FontWeight.Normal)
                     }
                     Column(Modifier.weight(1f)) {
                         Text("Tag enV on your videos", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -235,7 +235,7 @@ private fun NativeWalletDashboard() {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(42.dp).background(Color(0xFF2563EB), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("2×", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("2×", color = Color.White, fontWeight = FontWeight.Normal)
                     }
                     Column(Modifier.weight(1f)) {
                         Text("Refer a friend", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -269,7 +269,7 @@ private fun NativeWalletDashboard() {
                 Text("Add tokens through enV's secure checkout.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB5C4D7))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.size(36.dp).background(Color(0xFF123A62), CircleShape), contentAlignment = Alignment.Center) {
-                        Text("₦", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("₦", color = Color.White, fontWeight = FontWeight.Normal)
                     }
                     Column(Modifier.weight(1f)) {
                         Text("Paystack checkout", style = MaterialTheme.typography.bodyMedium, color = Color.White)
@@ -370,7 +370,7 @@ private fun NativeWalletHero(availableTokens: Double?, subtitle: String) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
-            Text(availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Normal, color = Color.White)
             Text(availableTokens?.let { "${it.formatWalletTokens()} enV tokens" } ?: subtitle, style = MaterialTheme.typography.titleMedium, color = Color(0xFFBFFFE9))
             Text("Estimated reference value · not cash", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.68f))
         }
@@ -387,7 +387,7 @@ private fun NativeWalletMetric(title: String, value: String, subtitle: String, m
     ) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9FB2C9))
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, color = Color.White)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color(0xFF91A7C0))
         }
     }
