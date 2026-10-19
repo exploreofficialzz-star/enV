@@ -1248,6 +1248,29 @@ private struct NativeWalletDashboardView: View {
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
 
+            Link(destination: URL(string: "https://envtools.store/wallet#fund-wallet")!) {
+                HStack(spacing: 12) {
+                    Image(systemName: "bolt.fill")
+                        .font(.title3)
+                        .foregroundStyle(Color.purple)
+                        .frame(width: 40, height: 40)
+                        .background(Color.purple.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Payment Gateways").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                        Text("Manage your payment methods and gateways.").font(.caption).foregroundStyle(Color.envMuted)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Color.envMuted).accessibilityHidden(true)
+                }
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+
+
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Recent transactions").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowDownToLine, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink, Share2, ArrowUpRight, Link2, Landmark } from "lucide-react";
+import { ArrowDownToLine, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink, Share2, ArrowUpRight, Link2, Landmark, Zap, ChevronRight, ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -129,6 +129,7 @@ function Account() {
   const [fundingBusy, setFundingBusy] = useState(false);
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [showGateways, setShowGateways] = useState(false);
 
 
   useEffect(() => {
@@ -668,6 +669,18 @@ function Account() {
             </div>
             <p className="mt-3 text-xs leading-5 text-muted">Token credits are added after the payment provider confirms a successful transaction.</p>
           </> : null}
+        </section>
+
+        <section className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm" aria-label="Payment gateways">
+          <button type="button" aria-expanded={showGateways} onClick={() => setShowGateways(value => !value)} className="flex min-h-[72px] w-full items-center gap-3 p-4 text-left transition hover:bg-surface-2">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-500"><Zap size={19} aria-hidden="true"/></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-fg">Payment Gateways</span><span className="mt-1 block text-xs text-muted">Manage your payment methods and gateways.</span></span>
+            {showGateways ? <ChevronDown size={19} className="text-muted" aria-hidden="true"/> : <ChevronRight size={19} className="text-muted" aria-hidden="true"/>}
+          </button>
+          {showGateways ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 p-4">
+            <div><p className="text-sm font-medium text-fg">{fundingState.status === "ready" && fundingState.data ? fundingState.data.provider.toUpperCase() + " secure checkout" : "Secure checkout"}</p><p className="mt-1 text-xs text-muted">{fundingState.status === "ready" && fundingState.data ? fundingState.data.currency + " · verified payment provider" : "Provider availability is being checked."}</p></div>
+            <a href="#fund-wallet" className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-semibold text-fg hover:bg-surface"><CreditCard size={15} aria-hidden="true"/> Manage methods</a>
+          </div> : null}
         </section>
 
         <section className="mt-3 rounded-[24px] border border-border bg-surface p-4 shadow-sm sm:p-5" aria-labelledby="recent-transactions-title">
