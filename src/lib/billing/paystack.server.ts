@@ -37,7 +37,7 @@ export function getFundingOptions() {
     })),
     message: enabled
       ? "Choose a token pack. Payment is verified by enV before tokens are added."
-      : "Wallet funding is not live yet. Provider credentials, an approved NGN token price, persistent database, and billing launch checks must all be configured first.",
+      : "No payment was taken. Wallet funding is not live yet. Provider credentials, an approved NGN token price, persistent database, and billing launch checks must all be configured first.",
   };
 }
 
@@ -199,7 +199,8 @@ export async function handlePaystackWebhook(request: Request) {
   const signature = request.headers.get("x-paystack-signature") ?? "";
   const raw = await request.text();
   if (raw.length > 256_000) throw Object.assign(new Error("Webhook payload is too large."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
-  const expected = createHmac("sha512", configuration.secret).update(raw).digest("hex");
+  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET || configuration.secret;
+  const expected = createHmac("sha512", webhookSecret).update(raw).digest("hex");
   if (!/^[a-f0-9]{128}$/i.test(signature) ||
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
     throw Object.assign(new Error("The payment-provider signature is invalid."), { code: "INVALID_WEBHOOK_SIGNATURE", status: 401 });
