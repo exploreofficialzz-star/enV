@@ -37,6 +37,34 @@ object OfflineWalletNativeApi {
         val consumedSubunits: Double,
         val createdAt: String,
     )
+    data class TokenCharge(
+        val id: String,
+        val toolId: String,
+        val toolName: String,
+        val billingKey: String,
+        val tokensSpent: Double,
+        val description: String,
+        val createdAt: String,
+    )
+    data class TokenUsageActivity(
+        val id: String,
+        val toolId: String,
+        val billingKey: String,
+        val provider: String,
+        val billedTokens: Double,
+        val status: String,
+        val metrics: Map<String, Double>,
+        val createdAt: String,
+    )
+    data class DailyTokenUsage(val day: String, val tokensSpent: Double)
+    data class TokenUsageDashboard(
+        val todaySpentTokens: Double,
+        val last7DaysSpentTokens: Double,
+        val last30DaysSpentTokens: Double,
+        val weeklyUsage: List<DailyTokenUsage>,
+        val charges: List<TokenCharge>,
+        val activity: List<TokenUsageActivity>,
+    )
     data class WalletDashboard(
         val availableTokens: Double,
         val reservedTokens: Double,
@@ -53,6 +81,7 @@ object OfflineWalletNativeApi {
         val bonusTokens: Double,
         val totalRewardTokens: Double,
         val activity: List<ActivityItem>,
+        val tokenUsage: TokenUsageDashboard,
     )
 
     private fun preferences(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -172,7 +201,8 @@ object OfflineWalletNativeApi {
     suspend fun fetchWalletDashboard(context: Context): WalletDashboard = withContext(Dispatchers.IO) {
         val bearer = sessionToken(context)
             ?: throw IllegalStateException("Pair this device from your signed-in enV web Wallet first.")
-        val data = requireData(request("/api/billing/native-wallet", "GET", bearer = bearer))
+        val timeZone = java.net.URLEncoder.encode(java.util.TimeZone.getDefault().id, StandardCharsets.UTF_8.name())
+        val data = requireData(request("/api/billing/native-wallet?timezone=$timeZone", "GET", bearer = bearer))
         val wallet = data.optJSONObject("wallet")
             ?: throw IllegalStateException("The shared wallet response was incomplete.")
         val rewards = data.optJSONObject("rewards")
@@ -189,6 +219,54 @@ object OfflineWalletNativeApi {
                 createdAt = row.optString("created_at"),
             )
         }
+        val usageJson = data.optJSONObject("tokenUsage") ?: JSONObject()
+        val summaryJson = usageJson.optJSONObject("summary") ?: JSONObject()
+        val dailyJson = usageJson.optJSONArray("weeklyUsage")
+        val weeklyUsage = (0 until (dailyJson?.length() ?: 0)).mapNotNull { index ->
+            val row = dailyJson?.optJSONObject(index) ?: return@mapNotNull null
+            DailyTokenUsage(row.optString("day"), row.optDouble("subunits", 0.0) / 1_000.0)
+        }
+        val chargesJson = usageJson.optJSONArray("charges")
+        val charges = (0 until (chargesJson?.length() ?: 0)).mapNotNull { index ->
+            val row = chargesJson?.optJSONObject(index) ?: return@mapNotNull null
+            TokenCharge(
+                id = row.optString("id"),
+                toolId = row.optString("toolId", "unknown-tool"),
+                toolName = row.optString("toolName", row.optString("toolId", "Tool usage")),
+                billingKey = row.optString("billingKey"),
+                tokensSpent = row.optDouble("tokensSpent", 0.0),
+                description = row.optString("description", "Confirmed token deduction"),
+                createdAt = row.optString("createdAt"),
+            )
+        }
+        val usageActivityJson = usageJson.optJSONArray("activity")
+        val allowedMetrics = setOf("inputTokens", "outputTokens", "totalTokens", "audioSeconds", "latencyMs", "inputBytes", "outputBytes", "inputCharacters", "outputCharacters", "pageCount", "durationSeconds", "frameCount", "requestCount")
+        val usageActivity = (0 until (usageActivityJson?.length() ?: 0)).mapNotNull { index ->
+            val row = usageActivityJson?.optJSONObject(index) ?: return@mapNotNull null
+            val metricObject = row.optJSONObject("metrics")
+            val metrics = linkedMapOf<String, Double>()
+            metricObject?.keys()?.forEach { key ->
+                if (key in allowedMetrics && metricObject.opt(key) is Number) metrics[key] = metricObject.optDouble(key)
+            }
+            TokenUsageActivity(
+                id = row.optString("id"),
+                toolId = row.optString("toolId", "unknown-tool"),
+                billingKey = row.optString("billingKey"),
+                provider = row.optString("provider"),
+                billedTokens = row.optDouble("billedTokens", 0.0),
+                status = row.optString("status", "recorded"),
+                metrics = metrics,
+                createdAt = row.optString("createdAt"),
+            )
+        }
+        val tokenUsage = TokenUsageDashboard(
+            todaySpentTokens = summaryJson.optDouble("todaySpentSubunits", 0.0) / 1_000.0,
+            last7DaysSpentTokens = summaryJson.optDouble("weekSpentSubunits", 0.0) / 1_000.0,
+            last30DaysSpentTokens = summaryJson.optDouble("monthSpentSubunits", 0.0) / 1_000.0,
+            weeklyUsage = weeklyUsage,
+            charges = charges,
+            activity = usageActivity,
+        )
         WalletDashboard(
             availableTokens = wallet.optDouble("availableTokens", 0.0),
             reservedTokens = wallet.optDouble("reservedTokens", 0.0),
@@ -205,6 +283,7 @@ object OfflineWalletNativeApi {
             bonusTokens = rewards.optDouble("bonusTokens", 0.0),
             totalRewardTokens = rewards.optDouble("totalRewardTokens", 0.0),
             activity = activity,
+            tokenUsage = tokenUsage,
         )
     }
 
