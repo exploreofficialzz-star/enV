@@ -889,67 +889,33 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
-    @EnvironmentObject private var store: CatalogStore
-    @EnvironmentObject private var informationRouter: NativeInformationRouter
-    @AppStorage("env.themeMode") private var themeMode = "system"
+    @Environment(\.openURL) private var openURL
+
+    private func openSignIn() {
+        if let url = URL(string: "https://envtools.store/account") {
+            openURL(url)
+        }
+    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    enVCharacterSpacedText("Your enV")
-                        .font(.envScaled(size: 28, weight: .semibold))
-                        .foregroundStyle(Color.envInk)
-                    VStack(alignment: .leading, spacing: 12) {
-                        settingsRow("CircleCheck", "Offline catalog", "The complete tool catalog is bundled on this device.")
-                        enVCharacterSpacedText("\(NativeCoverage.localActiveToolCount(in: store.catalog)) of \(NativeCoverage.canonicalActiveToolCount(in: store.catalog)) active tools currently execute locally using the native engine families. URL media inspection still requires its remote service.")
-                            .font(.footnote)
-                            .foregroundStyle(Color.envMuted)
-                    }
-                    .padding(16)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-
-                    sectionHeader("Settings", subtitle: "App information and preferences")
-                    VStack(spacing: 0) {
-                        Button { themeMode = "system" } label: {
-                            settingsRow("Settings", "Appearance", themeMode == "system" ? "Following device light/dark setting" : "Tap to follow the device appearance")
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(themeMode == "system")
-                        Divider().overlay(Color.envBorder)
-                        settingsRow("Bell", "Notifications", "Notifications are not configured in this foundation release.")
-                        Divider().overlay(Color.envBorder)
-                        NavigationLink { ContactExchangeView() } label: { settingsRow("Contact", "Instant Contact Exchange", "Native nearby sharing with explicit activation and Contacts saving.") }
-                            .buttonStyle(.plain)
-                        Divider().overlay(Color.envBorder)
-                        Button { informationRouter.open("about") } label: { settingsRow("Info", "About enV & chAs Technologies LLC", "Company details and contact information.") }
-                            .buttonStyle(.plain)
-                        Divider().overlay(Color.envBorder)
-                        Button { informationRouter.open("account") } label: { settingsRow("Info", "Account", "No account is required for the browser toolkit.") }
-                            .buttonStyle(.plain)
-                        Divider().overlay(Color.envBorder)
-                        Button { informationRouter.open("history") } label: { settingsRow("Info", "History", "Recently used tools will appear here.") }
-                            .buttonStyle(.plain)
-                        Divider().overlay(Color.envBorder)
-                        settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
-                        Divider().overlay(Color.envBorder)
-                        settingsRow("Info", "Version 1.1.0 (6)", "Separate native Android and iOS applications.")
-                    }
-                    .padding(16)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-
-                    sectionHeader("Privacy", subtitle: "Local-first catalog browsing")
-                    settingsRow("ShieldCheck", "No account required", "Browse and save tools locally on this device.")
-                }
-                .padding(16)
-            }
-            .modifier(Screen())
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .modifier(EnVBrandNavigationStyle())
+        VStack(spacing: 16) {
+            EnVLogo().frame(width: 142, height: 56)
+            enVCharacterSpacedText("Welcome back to enV")
+                .font(.envScaled(size: 26, weight: .semibold))
+                .foregroundStyle(Color.envInk)
+                .multilineTextAlignment(.center)
+            enVCharacterSpacedText("Sign in or create your account on enV to continue.")
+                .font(.envScaled(size: 15))
+                .foregroundStyle(Color.envMuted)
+                .multilineTextAlignment(.center)
+            Button("Continue to sign in", action: openSignIn)
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: 360)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.envSurface)
+        .onAppear(perform: openSignIn)
     }
 }
 
@@ -1090,11 +1056,9 @@ struct NativeInformationPageView: View {
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
         case "tokens": NativeInfoSectionView(title: "Understanding tokens", paragraphs: ["Token usage depends on the tool and the work being performed.", "Local utilities may use different rules from hosted AI, media processing, and multi-step workflows.", "Review relevant tool information and Wallet activity when evaluating token usage."])
         case "account": VStack(alignment: .leading, spacing: 14) {
-             NativeInfoSectionView(title: "Your enV account", paragraphs: ["Sign in to access your account-linked features, or create an account to connect supported enV experiences across your devices."])
-             Button("Sign in") { if let url = URL(string: "https://en-v.vercel.app/login") { openURL(url) } }
+             NativeInfoSectionView(title: "Welcome back to enV", paragraphs: ["Sign in or create an account from the enV sign-in page."])
+             Button("Continue to sign in") { if let url = URL(string: "https://envtools.store/account") { openURL(url) } }
                  .buttonStyle(.borderedProminent)
-             Button("Create account") { if let url = URL(string: "https://en-v.vercel.app/signup") { openURL(url) } }
-                 .buttonStyle(.bordered)
          }
         case "wallet": VStack(alignment: .leading, spacing: 14) {
             NativeInfoSectionView(title: "Your wallet", paragraphs: ["Review token balances, reservations, usage history, and connected devices from the Wallet dashboard.", "To pair this native app, generate a one-time code from the signed-in Wallet dashboard and enter it below."])
