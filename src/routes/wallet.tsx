@@ -556,7 +556,9 @@ function Account() {
               <div className="min-w-0 rounded-2xl border border-sky-300/20 bg-gradient-to-br from-sky-400/15 to-blue-700/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-sky-300/15 text-sky-300"><Users size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-slate-300 sm:text-xs">Referral tokens</p><p className="mt-1 break-words text-sm font-semibold text-white sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"}</p></div>
               <div className="min-w-0 rounded-2xl border border-violet-300/20 bg-gradient-to-br from-violet-400/15 to-fuchsia-700/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-violet-300/15 text-violet-300"><Link2 size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-slate-300 sm:text-xs">Affiliate tokens</p><p className="mt-1 break-words text-sm font-semibold text-white sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"}</p></div>
             </div>
-            <div className="grid gap-3 lg:grid-cols-2">
+            <section className="mt-1" aria-labelledby="rewards-title">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 id="rewards-title" className="font-semibold text-white">Referral and creator rewards</h2><span className="text-xs text-slate-400">Verified conversions</span></div>
+              <div className="grid gap-3 lg:grid-cols-2>
               <article className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-4 sm:p-5">
                 <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Video size={22} aria-hidden="true"/></span><div className="min-w-0 flex-1"><h2 className="font-semibold text-white">Tag enV on your videos</h2><p className="mt-1 text-sm leading-5 text-slate-300">Earn affiliate tokens when your video drives a verified qualifying conversion.</p></div></div>
                 {rewardsState.status === "ready" && rewardsState.data ? <>
@@ -573,7 +575,8 @@ function Account() {
                   <p className="mt-2 text-xs text-violet-100/65">{rewardsState.data.referralCount} invites · {rewardsState.data.qualifiedReferrals} qualified</p>
                 </> : <p className="mt-3 text-xs text-violet-100/70">{rewardsState.status === "loading" ? "Loading your referral link…" : rewardsState.message ?? "Referral link unavailable right now."}</p>}
               </article>
-            </div>
+              </div>
+            </section>
           </section>
         ) : null}
 
