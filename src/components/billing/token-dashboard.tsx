@@ -254,7 +254,7 @@ export function TokenDashboard() {
                   const height = item.subunits > 0 ? Math.max(8, Math.round((item.subunits / maxDaily) * 76)) : 3;
                   return (
                     <div key={item.day} className="flex min-w-0 flex-col items-center gap-2">
-                      <span className="text-center text-[10px] tabular-nums text-muted">{amount > 0 ? amount.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}</span>
+                      <span className="text-center text-[10px] tabular-nums text-muted">{amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
                       <div className="flex h-20 w-full items-end justify-center rounded-lg bg-surface-2 p-1">
                         <div className="w-full max-w-8 rounded-md bg-accent" style={{ height: `${height}px` }} aria-label={`${item.day}: ${tokenLabel(amount)} spent`} />
                       </div>
@@ -314,8 +314,8 @@ export function TokenDashboard() {
               ) : (
                 <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center">
                   <span className="mx-auto grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><ShieldCheck size={20} aria-hidden="true" /></span>
-                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "auth-disabled" ? "Account authentication is not enabled" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
-                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. No token values are guessed." : loadState === "auth-disabled" ? "Enable production authentication to load the account-specific history and balance." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
+                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "auth-disabled" ? "Preview history until your account is connected" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
+                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. These zero values are only the initial wallet preview." : loadState === "auth-disabled" ? "These are initial 0.000 enV preview values. Connect production authentication to display the real account balance and activity." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
                 </div>
               )}
               {visibleTimeline.length > 12 ? (
