@@ -23,18 +23,23 @@ The repository intentionally ships `.enV/app-env.json` with `VITE_AUTH_ENABLED=f
 VITE_AUTH_ENABLED=true
 # For email/password, also set VITE_AUTH_EMAIL_ENABLED=true in the build environment.
 AUTH_EMAIL_PASSWORD_ENABLED=true
-BETTER_AUTH_URL=https://en-v.vercel.app
+BETTER_AUTH_URL=https://envtools.store
 BETTER_AUTH_SECRET=<server-only high-entropy secret>
 DATABASE_URL=<persistent PostgreSQL connection string>
+# Choose the credentials required by the providers you enable:
+GOOGLE_CLIENT_ID=<Google OAuth client ID>
+GOOGLE_CLIENT_SECRET=<server-only Google OAuth client secret>
+APPLE_CLIENT_ID=<Apple Services ID>
+APPLE_CLIENT_SECRET=<server-only Apple client-secret JWT>
+AUTH_OAUTH_ISSUER=<HTTPS OIDC issuer URL, optional>
+AUTH_OAUTH_CLIENT_ID=<OIDC client ID, optional>
+AUTH_OAUTH_CLIENT_SECRET=<server-only OIDC client secret, optional>
+# Required only for email/password; configure a verified sender domain in Resend.
 RESEND_API_KEY=<server-only Resend key>
 AUTH_EMAIL_FROM=<verified sender, for example enV <auth@your-verified-domain.example>>
-# Or configure all three OIDC values instead of enabling email/password.
-AUTH_OAUTH_ISSUER=<HTTPS issuer URL>
-AUTH_OAUTH_CLIENT_ID=<client ID>
-AUTH_OAUTH_CLIENT_SECRET=<server-only client secret>
 ```
 
-Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) and `VITE_AUTH_EMAIL_ENABLED=true` (public UI build flag), along with a verified transactional email sender. OAuth issuer/client settings must be supplied together. Production auth fails closed if durable Postgres, a secure canonical origin, or the Better Auth secret is missing. Apply `migrations/0001_auth.sql` using `npm run db:migrate` as an explicit release operation before enabling auth.
+Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) and `VITE_AUTH_EMAIL_ENABLED=true` (public UI build flag), along with a verified transactional email sender. Google and Apple credentials must be supplied as complete pairs; Apple web sign-in uses a client-secret JWT that must be rotated before expiry. Generic OIDC issuer/client settings must be supplied together. Production auth fails closed if durable Postgres, a secure canonical origin, or the Better Auth secret is missing. Apply `migrations/0001_auth.sql` using `npm run db:migrate` as an explicit release operation before enabling auth.
 
 Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design. Email verification, password reset, OIDC callbacks, account recovery, and session revocation still require staging sign-off before enabling a public launch.
 
