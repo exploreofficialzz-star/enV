@@ -59,10 +59,14 @@ Required production settings:
 - `BETTER_AUTH_SECRET` — high-entropy server-only signing secret.
 - `DATABASE_URL` — durable Postgres connection string; production authentication refuses to start without it.
 
-Choose at least one identity method:
+Choose at least one identity method for the shared Account, sign-in and sign-up screens:
 
+- **Google:** Set server-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to enable Google sign-in.
+- **Apple:** Set server-only `APPLE_CLIENT_ID` and `APPLE_CLIENT_SECRET`. Apple requires a properly signed client-secret JWT; rotate it before it expires.
 - **OIDC/OAuth:** Set `AUTH_OAUTH_ISSUER`, `AUTH_OAUTH_CLIENT_ID`, and `AUTH_OAUTH_CLIENT_SECRET` together. The issuer must expose standard OIDC discovery, authorization, token, and user-info endpoints. Register the Better Auth callback URL for the deployed origin with the identity provider.
 - **Email/password:** Set server-only `AUTH_EMAIL_PASSWORD_ENABLED=true` and public `VITE_AUTH_EMAIL_ENABLED=true`, plus `RESEND_API_KEY` and `AUTH_EMAIL_FROM`. Verify the sender domain with Resend. Email/password sign-up requires email verification and password reset uses emailed, expiring links. Never put `RESEND_API_KEY` in a `VITE_` variable.
+
+The Web Account route and native Android/iOS Account entry points open the same responsive sign-in page, with sign-up and password recovery links available from that screen.
 
 Apply the committed SQL schema as a deliberate release operation with `npm run db:migrate` after setting `DATABASE_URL`; the build does not write to the production database. Verify migration completion, sender deliverability, OIDC callback URLs, password reset, verification expiry, session cookies, and logout in a staging deployment before enabling production auth. Do not enable either auth flag until these settings are present.
 
