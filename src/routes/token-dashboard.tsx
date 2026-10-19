@@ -58,10 +58,10 @@ function tokenAmount(subunits: number): string {
   return (subunits / 1_000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 function tokenLabel(tokens: number): string {
-  return \`${tokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV\`;
+  return `${tokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV`;
 }
 function referenceValue(tokens: number): string {
-  return \`Estimated reference value $ ${(tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}\`;
+  return `Estimated reference value $ ${(tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
 }
 function resolveToolName(toolId: string, fallback?: string): string {
   const tool = getToolById(toolId);
@@ -75,7 +75,7 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 function dayLabel(value: string): string {
-  const date = new Date(\`${value}T12:00:00\`);
+  const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date);
 }
 function metricDetails(metrics: Record<string, number>): string[] {
@@ -97,7 +97,7 @@ function metricDetails(metrics: Record<string, number>): string[] {
   return Object.entries(metrics)
     .filter(([key, value]) => labels[key] && Number.isFinite(value))
     .slice(0, 4)
-    .map(([key, value]) => \`${labels[key]}: ${value.toLocaleString()}\`);
+    .map(([key, value]) => `${labels[key]}: ${value.toLocaleString()}`);
 }
 
 function MetricCard({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: React.ReactNode }) {
@@ -123,7 +123,7 @@ function TokenDashboard() {
   useEffect(() => {
     const controller = new AbortController();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    void fetch(\`/api/billing/token-usage?timezone=${encodeURIComponent(timeZone)}\`, {
+    void fetch(`/api/billing/token-usage?timezone=${encodeURIComponent(timeZone)}`, {
       credentials: "same-origin",
       cache: "no-store",
       signal: controller.signal,
@@ -151,13 +151,13 @@ function TokenDashboard() {
     const charges: TimelineItem[] = data.tokenUsage.charges.map((item) => ({
       ...item,
       kind: "charge",
-      timelineId: \`charge:${item.id}\`,
+      timelineId: `charge:${item.id}`,
       resolvedName: resolveToolName(item.toolId, item.toolName),
     }));
     const activity: TimelineItem[] = data.tokenUsage.activity.map((item) => ({
       ...item,
       kind: "activity",
-      timelineId: \`activity:${item.id}\`,
+      timelineId: `activity:${item.id}`,
       resolvedName: resolveToolName(item.toolId),
     }));
     return [...charges, ...activity].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
@@ -261,7 +261,7 @@ function TokenDashboard() {
                     <div key={item.day} className="flex min-w-0 flex-col items-center gap-2">
                       <span className="text-center text-[10px] tabular-nums text-muted">{amount > 0 ? amount.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0"}</span>
                       <div className="flex h-20 w-full items-end justify-center rounded-lg bg-surface-2 p-1">
-                        <div className="w-full max-w-8 rounded-md bg-accent" style={{ height: \`${height}px\` }} aria-label={\`${item.day}: ${tokenLabel(amount)} spent\`} />
+                        <div className="w-full max-w-8 rounded-md bg-accent" style={{ height: `${height}px` }} aria-label={`${item.day}: ${tokenLabel(amount)} spent`} />
                       </div>
                       <span className="text-[10px] text-muted">{dayLabel(item.day)}</span>
                     </div>
@@ -277,9 +277,9 @@ function TokenDashboard() {
                   <p className="mt-1 text-xs leading-5 text-muted">Every entry shows the recorded tool, enV token amount, and exact date and time.</p>
                 </div>
                 <div className="flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1" role="group" aria-label="Filter token history">
-                  <button type="button" onClick={() => setFilter("all")} aria-pressed={filter === "all"} className={\`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "all" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}\`}>All</button>
-                  <button type="button" onClick={() => setFilter("deductions")} aria-pressed={filter === "deductions"} className={\`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "deductions" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}\`}>Deductions</button>
-                  <button type="button" onClick={() => setFilter("tool-activity")} aria-pressed={filter === "tool-activity"} className={\`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "tool-activity" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}\`}>Tool activity</button>
+                  <button type="button" onClick={() => setFilter("all")} aria-pressed={filter === "all"} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "all" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>All</button>
+                  <button type="button" onClick={() => setFilter("deductions")} aria-pressed={filter === "deductions"} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "deductions" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>Deductions</button>
+                  <button type="button" onClick={() => setFilter("tool-activity")} aria-pressed={filter === "tool-activity"} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${filter === "tool-activity" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>Tool activity</button>
                 </div>
               </div>
 
@@ -296,7 +296,7 @@ function TokenDashboard() {
                           </span>
                           <div className="min-w-0">
                             <h3 className="break-words text-sm font-semibold text-fg">{item.resolvedName}</h3>
-                            <p className="mt-1 break-words text-xs leading-5 text-muted">{isCharge ? item.description : \`Tool activity · ${item.status.replaceAll("_", " ")}${item.provider ? \` · ${item.provider}\` : ""}\`}</p>
+                            <p className="mt-1 break-words text-xs leading-5 text-muted">{isCharge ? item.description : `Tool activity · ${item.status.replaceAll("_", " ")}${item.provider ? ` · ${item.provider}` : ""}`}</p>
                             <p className="mt-1 flex items-center gap-1 text-[11px] text-subtle"><CalendarDays size={12} aria-hidden="true" />{formatTimestamp(item.createdAt)}</p>
                             {item.kind === "activity" && item.billingKey ? <p className="mt-1 break-all text-[10px] text-subtle">Meter: {item.billingKey}</p> : null}
                             {metrics.length ? <p className="mt-1 text-[11px] leading-5 text-muted">{metrics.join(" · ")}</p> : null}
@@ -304,7 +304,7 @@ function TokenDashboard() {
                         </div>
                         <div className="flex shrink-0 items-center justify-between gap-3 pl-12 sm:flex-col sm:items-end sm:pl-0">
                           <p className="text-sm font-semibold tabular-nums text-fg">{isCharge ? tokenLabel(item.tokensSpent) : tokenLabel(item.billedTokens)}</p>
-                          <span className={\`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${isCharge ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-surface-2 text-muted"}\`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${isCharge ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-surface-2 text-muted"}`}>
                             {isCharge ? <CheckCircle2 size={11} aria-hidden="true" /> : <Activity size={11} aria-hidden="true" />}
                             {isCharge ? "Confirmed deduction" : item.billedTokens > 0 ? "Metered amount" : "No token deduction"}
                           </span>
@@ -322,7 +322,7 @@ function TokenDashboard() {
               )}
               {visibleTimeline.length > 12 ? (
                 <button type="button" onClick={() => setShowAll((value) => !value)} className="mt-3 text-sm font-semibold text-accent hover:underline">
-                  {showAll ? "Show less" : \`View all ${visibleTimeline.length} records\`}
+                  {showAll ? "Show less" : `View all ${visibleTimeline.length} records`}
                 </button>
               ) : null}
             </section>
