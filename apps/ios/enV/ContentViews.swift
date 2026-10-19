@@ -1235,7 +1235,7 @@ private struct NativeTokenDashboardView: View {
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
-                    Text("enV estimated reference value = $0.010")
+                    Text("enV estimated reference value ≈ $0.010")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.80))
                 }
