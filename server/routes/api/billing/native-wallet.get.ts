@@ -2,6 +2,7 @@ import { defineHandler } from "nitro/h3";
 import { jsonResponse, requireOfflineBillingUser } from "../../../../src/lib/billing/http.server";
 import { readWallet, getWalletActivity } from "../../../../src/lib/billing/ledger.server";
 import { getRewardsSummary } from "../../../../src/lib/billing/rewards.server";
+import { getTokenUsageDashboard } from "../../../../src/lib/billing/token-usage.server";
 
 /**
  * Read-only native Wallet snapshot. It requires a currently valid, revocable paired-device
@@ -18,13 +19,15 @@ export default defineHandler(async (event) => {
     }, 403);
   }
   try {
-    const [wallet, activity, rewards] = await Promise.all([
+    const timeZone = new URL(event.req.url).searchParams.get("timezone");
+    const [wallet, activity, rewards, tokenUsage] = await Promise.all([
       readWallet(auth.userId),
       getWalletActivity(auth.userId, 20),
       getRewardsSummary(auth.userId),
+      getTokenUsageDashboard(auth.userId, timeZone),
     ]);
     const { userId: _userId, ...walletSnapshot } = wallet;
-    return jsonResponse({ ok: true, data: { wallet: walletSnapshot, activity, rewards } });
+    return jsonResponse({ ok: true, data: { wallet: walletSnapshot, activity, rewards, tokenUsage } });
   } catch {
     return jsonResponse({
       ok: false,
