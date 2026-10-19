@@ -186,7 +186,7 @@ private fun NativeWalletDashboard() {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Available to use", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("${data.availableTokens.formatWalletTokens()} tokens", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Reference value is not cash and cannot be withdrawn.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Illustrative reference value: ${(data.availableTokens * 0.01).formatWalletTokens()} USD. This is not cash or a guaranteed redemption value.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(onClick = { message = "In-app funding is not enabled for this Android build. Google Play Billing and server-side purchase verification must be configured before payments can be taken." }, modifier = Modifier.fillMaxWidth()) { Text("Funding setup") }
                     Text("Fund wallet is unavailable until this app has verified Google Play Billing products.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -202,6 +202,7 @@ private fun NativeWalletDashboard() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 NativeWalletMetric("Referral rewards", data.referralTokens.formatWalletTokens(), "Qualified invites", Modifier.weight(1f))
                 NativeWalletMetric("Affiliate rewards", data.affiliateTokens.formatWalletTokens(), "Verified video conversions", Modifier.weight(1f))
+                NativeWalletMetric("Bonus tokens", data.bonusTokens.formatWalletTokens(), "Promotional awards", Modifier.weight(1f))
             }
             Card(
                 modifier = Modifier.fillMaxWidth(),
