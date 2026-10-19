@@ -232,7 +232,7 @@ internal fun AssistantScreen(
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 EnVIcon("Sparkles", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("AI assistant", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
+                Text("AI Agent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
             }
             TextButton(onClick = {
                 activeRequestHandle?.cancel()
@@ -322,7 +322,7 @@ internal fun AssistantScreen(
                 value = draft,
             onValueChange = { onDraftChange(it.take(ASSISTANT_MESSAGE_MAX)) },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask about enV tools or the enV brand…") },
+                placeholder = { Text("Describe your goal or ask about enV tools…") },
                 minLines = 1,
                 maxLines = 4,
                 enabled = !sending,

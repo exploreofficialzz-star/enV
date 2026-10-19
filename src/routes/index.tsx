@@ -63,7 +63,7 @@ function Home() {
           )}
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
-          <Link to="/assistant" aria-label="Open AI assistant" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI assistant</Link>
+          <Link to="/agent" aria-label="Open AI Agent" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI Agent</Link>
           <div className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted sm:px-4 sm:text-sm">Total token = 100</div>
         </div>
         <MostUsedToolsTray tools={mostUsedTools} />

@@ -21,9 +21,22 @@ The repository intentionally ships `.enV/app-env.json` with `VITE_AUTH_ENABLED=f
 
 ```text
 VITE_AUTH_ENABLED=true
+# For email/password, also set VITE_AUTH_EMAIL_PASSWORD_ENABLED=true in the build environment.
+AUTH_EMAIL_PASSWORD_ENABLED=true
+BETTER_AUTH_URL=https://en-v.vercel.app
+BETTER_AUTH_SECRET=<server-only high-entropy secret>
+DATABASE_URL=<persistent PostgreSQL connection string>
+RESEND_API_KEY=<server-only Resend key>
+AUTH_EMAIL_FROM=<verified sender, for example enV <auth@your-verified-domain.example>>
+# Or configure all three OIDC values instead of enabling email/password.
+AUTH_OAUTH_ISSUER=<HTTPS issuer URL>
+AUTH_OAUTH_CLIENT_ID=<client ID>
+AUTH_OAUTH_CLIENT_SECRET=<server-only client secret>
 ```
 
-Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design.
+Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) and `VITE_AUTH_EMAIL_PASSWORD_ENABLED=true` (public UI build flag), along with a verified transactional email sender. OAuth issuer/client settings must be supplied together. Production auth fails closed if durable Postgres, a secure canonical origin, or the Better Auth secret is missing. Apply `migrations/0001_auth.sql` using `npm run db:migrate` as an explicit release operation before enabling auth.
+
+Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design. Email verification, password reset, OIDC callbacks, account recovery, and session revocation still require staging sign-off before enabling a public launch.
 
 ## Security headers
 

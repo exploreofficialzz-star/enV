@@ -84,7 +84,7 @@ const screens = [
 for (const [label, text] of screens) {
   if (!text.includes("assistant.chat")) fail(`${label} screen is not connected to the registered assistant.chat task`);
   if (!text.includes("recommendedToolIds")) fail(`${label} screen does not render returned recommendation IDs`);
-  if (!/Ask about enV tools or the (enV )?brand/.test(text)) fail(`${label} screen lacks the focused tool/brand chat prompt`);
+  if (!/Describe your goal or ask about enV tools/.test(text)) fail(`${label} screen lacks the focused tool/brand chat prompt`);
   if (/configured AI provider|This chat is not saved|I agree that my message|AI responses can be inaccurate|Questions, planning, writing|Choose a starting point|Draft a professional email/i.test(text)) fail(`${label} screen still contains removed generic-chat write-up or consent/disclaimer copy`);
 }
 if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.includes("onTool(tool.id)")) fail("Android assistant is missing catalog-backed, tappable tool recommendations");
@@ -100,7 +100,7 @@ if (!webRootSource.includes("<AssistantStateProvider><Outlet /></AssistantStateP
 if (!androidAssistantSource.includes('retry?.let { pending -> TextButton(onClick = { requestReply(pending) }') || !iosAssistantSource.includes("if let retryRequest")) fail("Native Retry visibility must match the web chat's any-error retry action");
 if (!iosAssistantSource.includes('.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)')) fail("iOS assistant heading is missing responsive system typography");
 if (!iosAssistantSource.includes('.envScaled(size: 14, weight: .regular)')) fail("iOS assistant message text is missing system typography");
-if (!iosAssistantSource.includes("Ask about enV tools or the enV brand…")) fail("iOS assistant composer prompt does not match the web prompt");
+if (!iosAssistantSource.includes("Describe your goal or ask about enV tools…")) fail("iOS AI Agent composer prompt does not match the web prompt");
 if (!webAssistantSource.includes("searchTools(getActiveTools(), query, 8)") || !webAssistantSource.includes("<ToolCard key={tool.id} tool={tool}")) fail("Web assistant is missing catalog-backed, tappable tool recommendations");
 if (!androidActivitySource.includes("suggestions.firstOrNull()?.let { onTool(it.id) }") || !iosHomeSource.includes("homePath.append(first)")) fail("Home search submission must open the first ranked suggestion before global-search fallback");
 if (!androidActivitySource.includes("AssistantScreen(catalog, assistantMessages") || !androidActivitySource.includes("assistantMessages = it }, openTool, assistantDraft") || !androidActivitySource.includes("candidate?.isUnderProduction() == true") || !androidActivitySource.includes("detailStack = listOf(id)")) fail("Android recommendations must use the centrally gated native tool detail route");
@@ -118,9 +118,9 @@ for (const heading of ["Breakdown", "Watch out for", "Suggested examples (AI gue
 
 const androidHome = androidActivitySource;
 const webHomeSource = readFileSync(webHome, "utf8");
-if (!androidHome.includes('HomePreviewBar("AI assistant"') || !androidHome.includes("onClick = onAssistant")) fail("Android Home assistant preview is not actionable");
-if (!iosHomeSource.includes('HomePreviewBar(title: "AI assistant", action: onAssistant)')) fail("iOS Home assistant preview is not actionable");
-if (!webHomeSource.includes('to="/assistant"')) fail("Web Home assistant preview is not actionable");
+if (!androidHome.includes('HomePreviewBar("AI Agent"') || !androidHome.includes("onClick = onAssistant")) fail("Android Home AI Agent preview is not actionable");
+if (!iosHomeSource.includes('HomePreviewBar(title: "AI Agent", action: onAssistant)')) fail("iOS Home AI Agent preview is not actionable");
+if (!webHomeSource.includes('to="/agent"')) fail("Web Home AI Agent preview is not actionable");
 
 const androidBuild = readFileSync(resolve(root, "apps/android/app/build.gradle.kts"), "utf8");
 const androidEnv = readFileSync(resolve(root, "apps/android/.env.example"), "utf8");

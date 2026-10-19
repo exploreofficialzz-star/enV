@@ -60,7 +60,7 @@ private enum AssistantClientError: LocalizedError {
         switch self {
         case .missingServer: return "Assistant is unavailable in this build."
         case .unavailable(let message): return message
-        case .invalidReply: return "The assistant response was not usable. Please try again."
+        case .invalidReply: return "The AI Agent response was not usable. Please try again."
         }
     }
 }
@@ -155,7 +155,7 @@ struct AssistantChatView: View {
                 HStack(alignment: .center) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles").foregroundStyle(Color.envAccent)
-                            enVCharacterSpacedText("AI assistant").font(.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
+                            enVCharacterSpacedText("AI Agent").font(.envScaled(size: horizontalSizeClass == .regular ? 30 : 24, weight: .semibold)).foregroundStyle(Color.envInk)
                     }
                     Spacer()
                     Button(action: startNewChat) {
@@ -274,7 +274,7 @@ struct AssistantChatView: View {
                 }
 
                 HStack(alignment: .bottom, spacing: 10) {
-                    TextField("Ask about enV tools or the enV brand…", text: Binding(
+                    TextField("Describe your goal or ask about enV tools…", text: Binding(
                         get: { draft },
                         set: { draft = String($0.prefix(messageLimit)) }
                     ), axis: .vertical)

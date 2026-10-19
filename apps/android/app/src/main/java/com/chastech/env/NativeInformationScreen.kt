@@ -67,6 +67,8 @@ import com.chastech.env.ui.EnVIcon
 fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
     val title = when (pageId) {
         "about" -> "About enV"
+        "help" -> "Help center"
+        "tokens" -> "Token guide"
         "pricing" -> "Pricing"
         "contact" -> "Contact"
         "account" -> "Account"
@@ -89,6 +91,8 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
 
             when (pageId) {
                 "about" -> AboutInformation()
+                "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
+                "tokens" -> InformationSection("Understanding tokens", listOf("Token pricing and allowances depend on the feature and the current enV plan.", "Do not assume that every tool consumes tokens: local tools may run on-device without an account, while hosted AI and processor features may use metered services.", "Purchases and token deduction should remain disabled until production billing, verified provider callbacks, and usage metering are configured."))
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()
                 "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {

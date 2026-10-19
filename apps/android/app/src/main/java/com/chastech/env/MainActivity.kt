@@ -256,6 +256,7 @@ private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
 @Composable
 private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
+    val context = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var homeQuery by rememberSaveable { mutableStateOf("") }
@@ -329,10 +330,25 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
-                            DropdownMenuItem(text = { Text("AI assistant") }, onClick = { tab = AppTab.Assistant.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("AI Agent") }, onClick = { tab = AppTab.Assistant.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Sign in") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/login"))); overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Create account") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/signup"))); overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
+                            Text("PRODUCT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
+                            DropdownMenuItem(text = { Text("About") }, onClick = { informationReturnTab = tab; informationPage = "about"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Tools") }, onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Pricing") }, onClick = { informationReturnTab = tab; informationPage = "pricing"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Token guide") }, onClick = { informationReturnTab = tab; informationPage = "tokens"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            Text("RESOURCES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
+                            DropdownMenuItem(text = { Text("Help center") }, onClick = { informationReturnTab = tab; informationPage = "help"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/blog"))); overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Contact") }, onClick = { informationReturnTab = tab; informationPage = "contact"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            Text("LEGAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
+                            DropdownMenuItem(text = { Text("Privacy") }, onClick = { informationReturnTab = tab; informationPage = "privacy"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Terms") }, onClick = { informationReturnTab = tab; informationPage = "terms"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Disclaimer") }, onClick = { informationReturnTab = tab; informationPage = "disclaimer"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Responsible use") }, onClick = { informationReturnTab = tab; informationPage = "responsible-use"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }
                 },
@@ -467,7 +483,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
                     Row(Modifier.width(previewWidth), horizontalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 12.dp else 8.dp)) {
-                        HomePreviewBar("AI assistant", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = onAssistant)
+                        HomePreviewBar("AI Agent", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = onAssistant)
                         HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2)
                     }
                 }
@@ -492,7 +508,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 }
             }
         }
-        item { WebHomeFooter(catalog, onTools, onInformation, screenWidth) }
+        item { WebHomeFooter(catalog, screenWidth) }
     }
 }
 
@@ -588,98 +604,19 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter(catalog: Catalog, onTools: () -> Unit, onInformation: (String) -> Unit, screenWidth: Int) {
+private fun WebHomeFooter(catalog: Catalog, screenWidth: Int) {
     val horizontalPadding = if (screenWidth >= 640) 24.dp else 16.dp
     val footerSubtle = if (isSystemInDarkTheme()) Color(0xFF7C848C) else Color(0xFF8A9098)
     val borderColor = MaterialTheme.colorScheme.outline
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            if (screenWidth >= 768) {
-                Row(
-                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 48.dp),
-                    horizontalArrangement = Arrangement.spacedBy(40.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    FooterBrandBlock(catalog, Modifier.weight(2f))
-                    FooterLinkGroup("Product", listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact"), onTools, onInformation, footerSubtle, Modifier.weight(1f))
-                    FooterLinkGroup("Legal", listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use"), onTools, onInformation, footerSubtle, Modifier.weight(1f))
-                }
-            } else {
-                Column(
-                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(40.dp),
-                ) {
-                    FooterBrandBlock(catalog)
-                    FooterLinkGroup("Product", listOf("About" to "about", "Tools" to "tools", "Pricing" to "pricing", "Contact" to "contact"), onTools, onInformation, footerSubtle)
-                    FooterLinkGroup("Legal", listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use"), onTools, onInformation, footerSubtle)
-                }
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-        Row(
-            Modifier.widthIn(max = 1152.dp).fillMaxWidth().align(Alignment.CenterHorizontally).padding(horizontal = horizontalPadding, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "© ${Year.now().value} chAs Technologies LLC · enV",
-                color = footerSubtle,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
-            )
-            if (screenWidth >= 640) {
-                Text(
-                    "${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools",
-                    color = footerSubtle,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FooterBrandBlock(catalog: Catalog, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        EnVLogo(Modifier.width(84.dp).height(56.dp))
-        Text(
-            "Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
-            modifier = Modifier.widthIn(max = 384.dp),
-        )
-    }
-}
-
-@Composable
-private fun FooterLinkGroup(
-    title: String,
-    links: List<Pair<String, String>>,
-    onTools: () -> Unit,
-    onInformation: (String) -> Unit,
-    footerSubtle: Color,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        Text(
-            title.uppercase(),
-            color = footerSubtle,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 18.sp, letterSpacing = 0.6.sp),
-            fontWeight = FontWeight.Normal,
-        )
-        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            links.forEach { (label, route) ->
-                Row(
-                    Modifier.fillMaxWidth().height(21.dp).clickable { if (route == "tools") onTools() else onInformation(route) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        label,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
-                    )
-                }
-            }
+        Row(Modifier.widthIn(max = 1152.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
+            .padding(horizontal = horizontalPadding, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("© ${Year.now().value} chAs Technologies LLC · enV", color = footerSubtle,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
+            if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools", color = footerSubtle,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
         }
     }
 }
@@ -956,7 +893,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
-        SettingCard("Account", "No account is required for the browser toolkit.", "Info", onClick = { onOpenInformationPage("account") })
+        SettingCard("Account", "Sign in or create an account from More options when account access is enabled.", "Info", onClick = { onOpenInformationPage("account") })
         SettingCard("History", "Recently used tools will appear here.", "Info", onClick = { onOpenInformationPage("history") })
         SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
         SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
@@ -2879,7 +2816,7 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
 @Composable
 private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, containerColor: Color, onClick: (() -> Unit)? = null) {
     Surface(
-        modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI assistant" },
+        modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI Agent" },
         color = containerColor,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

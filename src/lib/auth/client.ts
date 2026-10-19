@@ -6,6 +6,8 @@ export const authClient = createAuthClient({ plugins: [genericOAuthClient()] });
 
 /** Authentication remains off unless it is explicitly enabled at build time. */
 export const authEnabled = import.meta.env.VITE_AUTH_ENABLED === "true";
+/** Public UI flag paired with the server-only AUTH_EMAIL_PASSWORD_ENABLED setting. */
+export const emailPasswordEnabled = import.meta.env.VITE_AUTH_EMAIL_PASSWORD_ENABLED === "true";
 export { OAUTH_PROVIDERS };
 
 export async function signIn(

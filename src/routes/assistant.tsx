@@ -31,7 +31,7 @@ function candidatesFor(messages: ChatMessage[]): ToolCandidate[] {
   return searchTools(getActiveTools(), query, 8).map(({ id, name, description, category }) => ({ id, name, description, category }));
 }
 
-function AssistantPage() {
+export function AssistantPage() {
   const { messages, setMessages, draft, setDraft, busy, setBusy, error, setError, retryRequest, setRetryRequest, activeRequest } = useAssistantState();
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -97,7 +97,7 @@ function AssistantPage() {
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-accent">
             <Sparkles className="size-5" aria-hidden="true" />
-            <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">AI assistant</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">AI Agent</h1>
           </div>
           <Button variant="outline" size="sm" onClick={startNewChat} aria-label="Start a new chat">
             <SquarePen aria-hidden="true" />
@@ -105,7 +105,7 @@ function AssistantPage() {
           </Button>
         </header>
 
-        <div className="mt-4 flex min-h-[320px] max-h-[68vh] flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-bg p-4 sm:p-5" role="log" aria-label="Assistant conversation" aria-live="polite">
+        <div className="mt-4 flex min-h-[320px] max-h-[68vh] flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-bg p-4 sm:p-5" role="log" aria-label="AI Agent conversation" aria-live="polite">
           {messages.length === 0 ? (
             <div className="my-auto flex flex-col items-center justify-center py-8 text-center">
               <div className="flex size-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
@@ -121,7 +121,7 @@ function AssistantPage() {
               return (
                 <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`w-fit max-w-[96%] rounded-2xl border px-4 py-3 text-sm leading-6 sm:max-w-[90%] ${message.role === "user" ? "border-accent/20 bg-accent/10 text-fg" : "border-border bg-surface text-fg"}`}>
-                    <p className="mb-1 text-xs font-semibold text-muted">{message.role === "user" ? "You" : "enV"}</p>
+                    <p className="mb-1 text-xs font-semibold text-muted">{message.role === "user" ? "You" : "enV Agent"}</p>
                     <p className="whitespace-pre-wrap break-words">{message.content}</p>
                     {recommendedTools.length > 0 && (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -136,7 +136,7 @@ function AssistantPage() {
           {busy && (
             <div className="flex items-center gap-2 self-start rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted" role="status">
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-              <span>Thinking…</span>
+              <span>Working on your request…</span>
               <button type="button" className="ml-2 underline underline-offset-2" onClick={() => activeRequest.current?.abort()}>Stop</button>
             </div>
           )}
@@ -161,8 +161,8 @@ function AssistantPage() {
                   submitDraft();
                 }
               }}
-              placeholder="Ask about enV tools or the enV brand…"
-              aria-label="Message the enV assistant"
+              placeholder="Describe your goal or ask about enV tools…"
+              aria-label="Message the enV AI Agent"
               maxLength={AI_LIMITS.assistantMessageMax}
               rows={2}
               disabled={busy}

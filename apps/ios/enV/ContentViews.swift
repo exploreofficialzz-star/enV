@@ -109,7 +109,7 @@ struct HomeView: View {
                         .zIndex(isHomeSearchFocused && hasSearchText ? 1 : 0)
                         GeometryReader { proxy in
                             HStack(spacing: horizontalSizeClass == .regular ? 12 : 8) {
-                                HomePreviewBar(title: "AI assistant", action: onAssistant).frame(maxWidth: .infinity)
+                                HomePreviewBar(title: "AI Agent", action: onAssistant).frame(maxWidth: .infinity)
                                 HomePreviewBar(title: "Total token = 100").frame(maxWidth: .infinity)
                             }
                             .frame(width: min(proxy.size.width * 0.84, 640), height: 40)
@@ -155,7 +155,7 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .frame(maxWidth: 1152)
                     .frame(maxWidth: .infinity)
-                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
+                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count)
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity)
@@ -310,37 +310,9 @@ private struct WebHomeFooter: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let activeCount: Int
     let categoryCount: Int
-    let onInformation: (String) -> Void
-    let onTools: () -> Void
-
     private var wideLayout: Bool { horizontalSizeClass == .regular }
-    private var wideColumnUnit: CGFloat {
-        max(0, (min(UIScreen.main.bounds.width, 1152) - 48 - 80) / 4)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(Color.envBorder).frame(height: 1)
-            Group {
-                if wideLayout {
-                    HStack(alignment: .top, spacing: 40) {
-                        brandBlock.frame(width: wideColumnUnit * 2, alignment: .leading)
-                        linkGroup("Product", links: [("About", "about"), ("Tools", "tools"), ("Pricing", "pricing"), ("Contact", "contact")]).frame(width: wideColumnUnit, alignment: .leading)
-                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")]).frame(width: wideColumnUnit, alignment: .leading)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 40) {
-                        brandBlock
-                        linkGroup("Product", links: [("About", "about"), ("Tools", "tools"), ("Pricing", "pricing"), ("Contact", "contact")])
-                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")])
-                    }
-                }
-            }
-            .padding(.horizontal, wideLayout ? 24 : 16)
-            .padding(.vertical, 48)
-            .frame(maxWidth: 1152)
-            .frame(maxWidth: .infinity)
-
             Rectangle().fill(Color.envBorder).frame(height: 1)
             HStack(spacing: 12) {
                 enVCharacterSpacedText("© \(Calendar.current.component(.year, from: .now)) chAs Technologies LLC · enV")
@@ -361,40 +333,6 @@ private struct WebHomeFooter: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.envSurface)
-    }
-
-    private var brandBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            EnVLogo().frame(width: 84, height: 56)
-            enVCharacterSpacedText("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.")
-                .font(.envScaled(size: 14, weight: .regular))
-                .foregroundStyle(Color.envMuted)
-                .lineSpacing(4)
-                .frame(maxWidth: 384, alignment: .leading)
-        }
-    }
-
-    private func linkGroup(_ title: String, links: [(String, String)]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            enVCharacterSpacedText(title.uppercased())
-                .font(.envScaled(size: 12, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Color.envSubtle)
-                .frame(height: 18, alignment: .leading)
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(links, id: \.0) { label, route in
-                    Button(label) {
-                        if route == "tools" { onTools() }
-                        else { onInformation(route) }
-                    }
-                    .font(.envScaled(size: 14, weight: .regular))
-                    .foregroundStyle(Color.envMuted)
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 21, alignment: .leading)
-                }
-            }
-        }
     }
 }
 
@@ -977,7 +915,7 @@ private struct HomePreviewBar: View {
             if let action {
                 Button(action: action) { content }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Open AI assistant")
+                    .accessibilityLabel("Open AI Agent")
             } else {
                 content
             }
@@ -1042,6 +980,8 @@ struct NativeInformationPageView: View {
         case "about": return "About enV"
         case "pricing": return "Pricing"
         case "contact": return "Contact"
+        case "help": return "Help center"
+        case "tokens": return "Token guide"
         case "account": return "Account"
         case "history": return "History"
         case "privacy": return "Privacy"
@@ -1083,6 +1023,8 @@ struct NativeInformationPageView: View {
         case "about": NativeAboutInformationPage()
         case "pricing": NativePricingInformationPage()
         case "contact": NativeContactInformationPage()
+        case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
+        case "tokens": NativeInfoSectionView(title: "Understanding tokens", paragraphs: ["Token pricing and allowances depend on the feature and current enV plan.", "Not every tool necessarily consumes tokens: local tools may run on-device, while hosted AI and processor features may use metered services.", "Purchases and token deduction must remain disabled until production billing, verified provider callbacks, and usage metering are configured."])
         case "account": VStack(alignment: .leading, spacing: 14) {
             NativeInfoSectionView(title: "Connect your enV wallet", paragraphs: ["Pair this native app through the signed-in enV web wallet. The single-use code expires quickly and is entered only on the device you control.", "Ordinary local tools remain usable without an account or wallet. Offline token spending is paused unless the server explicitly enables isolated test mode; production use requires verified native integrity checks."])
             NativeOfflineWalletPairingPanel()

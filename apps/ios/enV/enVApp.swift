@@ -126,7 +126,7 @@ struct RootTabView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(NativeTab.home.rawValue)
             AssistantChatView(messages: $assistantMessages, draft: $assistantDraft)
-                .tabItem { Label("AI assistant", systemImage: "sparkles") }
+                .tabItem { Label("AI Agent", systemImage: "sparkles") }
                 .tag(NativeTab.assistant.rawValue)
             ToolsView(toolsQuery: $searchQuery, onSearchNoMatch: { selectedTab = NativeTab.search.rawValue })
                 .tabItem { Label("Tools", systemImage: "square.grid.2x2") }
@@ -161,6 +161,7 @@ struct RootTabView: View {
 
 struct EnVBrandNavigationStyle: ViewModifier {
     @EnvironmentObject private var informationRouter: NativeInformationRouter
+    @Environment(\.openURL) private var openURL
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
 
     func body(content: Content) -> some View {
@@ -188,11 +189,30 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("Tools")
                     .accessibilityIdentifier("tools-navigation-action")
                     Menu {
-                        Button("AI assistant") { selectedTab = NativeTab.assistant.rawValue }
-                        Button("Account") { selectedTab = NativeTab.account.rawValue }
+                        Button("AI Agent") { selectedTab = NativeTab.assistant.rawValue }
+                        Button("Account & wallet") { selectedTab = NativeTab.account.rawValue }
+                        Button("Sign in") { if let url = URL(string: "https://en-v.vercel.app/login") { openURL(url) } }
+                        Button("Create account") { if let url = URL(string: "https://en-v.vercel.app/signup") { openURL(url) } }
                         Button("Search tools") { selectedTab = NativeTab.search.rawValue }
                             .accessibilityIdentifier("Search tools")
-                        Button("Pricing") { informationRouter.open("pricing") }
+                        Divider()
+                        Section("PRODUCT") {
+                            Button("About") { informationRouter.open("about") }
+                            Button("Tools") { selectedTab = NativeTab.tools.rawValue }
+                            Button("Pricing") { informationRouter.open("pricing") }
+                            Button("Token guide") { informationRouter.open("tokens") }
+                        }
+                        Section("RESOURCES") {
+                            Button("Help center") { informationRouter.open("help") }
+                            Button("Blog & guides") { if let url = URL(string: "https://en-v.vercel.app/blog") { openURL(url) } }
+                            Button("Contact") { informationRouter.open("contact") }
+                        }
+                        Section("LEGAL") {
+                            Button("Privacy") { informationRouter.open("privacy") }
+                            Button("Terms") { informationRouter.open("terms") }
+                            Button("Disclaimer") { informationRouter.open("disclaimer") }
+                            Button("Responsible use") { informationRouter.open("responsible-use") }
+                        }
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in

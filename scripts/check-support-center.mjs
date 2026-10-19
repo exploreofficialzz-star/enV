@@ -25,9 +25,8 @@ const detail = read('src/routes/tokens.$toolId.tsx');
 const migration = read('migrations/0003_offline_wallet.sql');
 const security = read('docs/billing-offline-wallet-security.md');
 
-for (const [name, source] of [['header', header], ['footer', footer]]) {
-  for (const path of ['/blog', '/help', '/tokens']) assert.ok(source.includes(path), `${name} is missing ${path}`);
-}
+for (const path of ['/blog', '/help', '/tokens']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
+for (const path of ['/blog', '/help', '/tokens']) assert.ok(!footer.includes(path), `compact footer must not duplicate navigation to ${path}`);
 for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety']) {
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
 }

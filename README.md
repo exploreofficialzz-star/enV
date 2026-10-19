@@ -50,16 +50,23 @@ The production install intentionally omits development-only packages; build-time
 
 ### Optional authentication
 
-Authentication is off by default. To enable the optional Better Auth integration, configure its production secrets and OAuth broker in Vercel Project Settings, then set `VITE_AUTH_ENABLED=true`:
+Authentication is off by default. The app now has sign-in, sign-up, password-reset, and Better Auth API routes, but these screens do not make account creation live by themselves. Enable authentication only after completing the deployment setup below.
 
-- `BETTER_AUTH_URL` — canonical HTTPS origin for the deployed application.
+Required production settings:
+
+- `VITE_AUTH_ENABLED=true` — public feature switch; must be set in the production build and server environment.
+- `BETTER_AUTH_URL` — canonical HTTPS origin for the deployed application (currently `https://en-v.vercel.app`).
 - `BETTER_AUTH_SECRET` — high-entropy server-only signing secret.
-- `DATABASE_URL` — Postgres connection string, if persistent accounts are required.
-- `AUTH_OAUTH_ISSUER`, `AUTH_OAUTH_CLIENT_ID`, `AUTH_OAUTH_CLIENT_SECRET` — credentials for a compatible OAuth broker. The broker must support the authorization, token, and user-info endpoints used by Better Auth.
+- `DATABASE_URL` — durable Postgres connection string; production authentication refuses to start without it.
 
-Apply the committed SQL schema as a separate, deliberate release operation with `npm run db:migrate` after setting `DATABASE_URL`, then enable auth. The build intentionally cannot write to the production database. The same migration files are applied automatically to local PGLite during development.
+Choose at least one identity method:
 
-Never prefix secrets with `VITE_` and never commit their values. Keep preview and production credentials in their respective Vercel environments. OAuth and account creation remain unavailable until the corresponding provider and database settings are configured.
+- **OIDC/OAuth:** Set `AUTH_OAUTH_ISSUER`, `AUTH_OAUTH_CLIENT_ID`, and `AUTH_OAUTH_CLIENT_SECRET` together. The issuer must expose standard OIDC discovery, authorization, token, and user-info endpoints. Register the Better Auth callback URL for the deployed origin with the identity provider.
+- **Email/password:** Set server-only `AUTH_EMAIL_PASSWORD_ENABLED=true` and public `VITE_AUTH_EMAIL_PASSWORD_ENABLED=true`, plus `RESEND_API_KEY` and `AUTH_EMAIL_FROM`. Verify the sender domain with Resend. Email/password sign-up requires email verification and password reset uses emailed, expiring links. Never put `RESEND_API_KEY` in a `VITE_` variable.
+
+Apply the committed SQL schema as a deliberate release operation with `npm run db:migrate` after setting `DATABASE_URL`; the build does not write to the production database. Verify migration completion, sender deliverability, OIDC callback URLs, password reset, verification expiry, session cookies, and logout in a staging deployment before enabling production auth. Do not enable either auth flag until these settings are present.
+
+Never commit secret values. Keep preview and production credentials separate and use secure environment settings. Local development intentionally ships with auth disabled until a developer opts in.
 
 ## Monetization foundation (preview only)
 
