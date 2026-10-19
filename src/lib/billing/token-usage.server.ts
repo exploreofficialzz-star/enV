@@ -117,8 +117,12 @@ export async function getTokenUsageDashboard(userId: string, requestedTimeZone?:
            select ue.tool_id, ue.billing_key
              from billing_usage_events ue
             where ue.user_id = l.user_id
-              and (ue.execution_id = r.operation_id or ue.execution_id = l.reference_id or ue.tool_id = r.operation_id)
-            order by ue.created_at desc
+              and (ue.execution_id = r.operation_id or ue.execution_id = l.reference_id or ue.tool_id = r.operation_id or ue.billing_key = r.operation_id)
+            order by case
+              when ue.execution_id = r.operation_id or ue.execution_id = l.reference_id then 0
+              when ue.tool_id = r.operation_id then 1
+              else 2
+            end, ue.created_at desc
             limit 1
          ) u on true
         where l.user_id = $1 and l.entry_type = 'settlement' and l.consumed_subunits > 0
