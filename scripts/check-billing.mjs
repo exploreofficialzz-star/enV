@@ -164,6 +164,9 @@ assert.match(iosTokenDashboard, /Label\("Open wallet", systemImage: "wallet\.bif
 assert.doesNotMatch(iosTokenDashboard, /connectAccountCard|Connect your enV account/, "iOS token dashboard must not be blocked by a connect-account fallback");
 assert.match(iosTokenDashboard, /minimumFractionDigits = 3/, "iOS token amounts must display three decimal places");
 assert.match(iosTokenDashboard, /displayDailyUsage/, "iOS empty-wallet preview must show seven zero-use chart days");
+assert.doesNotMatch(tokenDashboardComponent, /Preview display|preview values|preview history/i, "web token dashboard must not expose preview disclaimers");
+assert.doesNotMatch(androidTokenDashboard, /Preview display/i, "Android token dashboard must not expose a preview disclaimer");
+assert.doesNotMatch(iosTokenDashboard, /Preview display/i, "iOS token dashboard must not expose a preview disclaimer");
 assert.match(tokenDashboardComponent, /resolveToolName\(item\.toolId/, "usage history must resolve recorded tool names");
 assert.match(tokenUsageRoute, /requireOfflineBillingUser/, "token history must require an authenticated account or valid paired-device session");
 assert.match(tokenUsageRoute, /getTokenUsageDashboard\(auth\.userId/, "the endpoint must scope token history to the authenticated user");
