@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { ArrowDownToLine, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink, Share2, ArrowUpRight, Link2 } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowDownToLine, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink, Share2, ArrowUpRight, Link2, Landmark } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -351,7 +351,14 @@ function Account() {
       }
       window.location.assign(checkout.href);
     } catch (error) {
-      setFundingFeedback({ kind: "error", message: error instanceof Error ? error.message : "Secure checkout is unavailable. No payment was taken." });
+      const detail = error instanceof Error ? error.message : "";
+      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|wallet funding is not live yet|provider credentials|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
+      setFundingFeedback({
+        kind: "error",
+        message: requiresSetup
+          ? "Secure checkout is unavailable at the moment. Your wallet has not been charged."
+          : detail || "Secure checkout could not be opened. No payment was taken.",
+      });
     } finally {
       setFundingBusy(false);
     }
