@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowDownToLine, ArrowLeft, CircleAlert, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, CircleAlert, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -33,6 +33,15 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
+type RewardsData = {
+  referralCode: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
+  videoSignups: number; videoConversions: number; referralTokens: number; affiliateTokens: number;
+  bonusTokens: number; pendingRewardTokens: number; totalRewardTokens: number;
+};
+type RewardsState = { status: "loading" | "ready" | "unavailable"; data?: RewardsData; message?: string };
+type FundingPack = { tokens: number; amountMinor: number | null; currency: string };
+type FundingData = { enabled: boolean; provider: string; currency: string; message: string; packs: FundingPack[] };
+type FundingState = { status: "loading" | "ready" | "unavailable"; data?: FundingData; message?: string };
 type OfflineAllowance = {
   allowanceId: string;
   platform?: "web" | "android" | "ios" | string;
@@ -91,6 +100,14 @@ function activitySummary(entry: WalletActivity): string {
   return entry.entry_type.replaceAll("_", " ");
 }
 
+function MetricCard({ title, value, description, icon }: { title: string; value: string; description: string; icon: React.ReactNode }) {
+  return <div className="min-w-0 rounded-2xl border border-border bg-surface p-4">
+    <div className="flex items-center gap-2 text-muted">{icon}<span className="text-xs font-medium">{title}</span></div>
+    <p className="mt-3 break-words text-lg font-semibold tracking-tight text-fg sm:text-xl">{value}</p>
+    <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
+  </div>;
+}
+
 function Account() {
   const [state, setState] = useState<WalletState>({ status: "loading" });
   const [offlineState, setOfflineState] = useState<OfflineWalletState>({ status: "loading" });
@@ -104,6 +121,86 @@ function Account() {
   const [pairingPlatform, setPairingPlatform] = useState<"android" | "ios">("android");
   const [nativeSessions, setNativeSessions] = useState<NativeDeviceSession[]>([]);
   const [nativeSessionsMessage, setNativeSessionsMessage] = useState("");
+  const [rewardsState, setRewardsState] = useState<RewardsState>({ status: "loading" });
+  const [fundingState, setFundingState] = useState<FundingState>({ status: "loading" });
+  const [rewardsReloadKey, setRewardsReloadKey] = useState(0);
+  const [selectedTokenPack, setSelectedTokenPack] = useState(100);
+  const [fundingBusy, setFundingBusy] = useState(false);
+  const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/billing/rewards/summary", { credentials: "same-origin", signal: controller.signal })
+      .then(async response => {
+        const payload = await response.json() as { ok?: boolean; data?: RewardsData; message?: string };
+        if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.message ?? "Referral rewards are not available yet.");
+        setRewardsState({ status: "ready", data: payload.data });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setRewardsState({ status: "unavailable", message: error instanceof Error ? error.message : "Referral rewards are unavailable." });
+      });
+    return () => controller.abort();
+  }, [rewardsReloadKey, reloadKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
+      .then(async response => {
+        const payload = await response.json() as { ok?: boolean; data?: FundingData; message?: string };
+        if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.message ?? "Funding options are unavailable.");
+        setFundingState({ status: "ready", data: payload.data });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setFundingState({ status: "unavailable", message: error instanceof Error ? error.message : "Funding options are unavailable." });
+      });
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentState = params.get("payment");
+    if (paymentState === "success") {
+      setFundingFeedback({ kind: "success", message: "Payment verified by enV. Your wallet has been refreshed." });
+      setReloadKey(value => value + 1);
+      window.history.replaceState({}, "", "/wallet");
+    } else if (paymentState === "pending") {
+      setFundingFeedback({ kind: "success", message: "The payment is still processing. No tokens were added yet; refresh after provider confirmation." });
+      window.history.replaceState({}, "", "/wallet");
+    } else if (paymentState === "failed" || paymentState === "unverified") {
+      setFundingFeedback({ kind: "error", message: "The payment could not be verified. Your wallet was not credited. Contact support if you were charged." });
+      window.history.replaceState({}, "", "/wallet");
+    }
+    if (params.get("claimReferral") !== "1") return;
+    const referralCode = window.localStorage.getItem("env.pendingReferralCode");
+    const source = window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
+    if (!referralCode) {
+      window.history.replaceState({}, "", "/wallet");
+      return;
+    }
+    const controller = new AbortController();
+    void fetch("/api/billing/rewards/claim-referral", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ referralCode, source }), signal: controller.signal,
+    }).then(async response => {
+      const payload = await response.json().catch(() => null) as { ok?: boolean; data?: { alreadyClaimed?: boolean }; message?: string } | null;
+      if (response.ok && payload?.ok) {
+        window.localStorage.removeItem("env.pendingReferralCode");
+        window.localStorage.removeItem("env.pendingReferralSource");
+        setFundingFeedback({ kind: "success", message: payload.data?.alreadyClaimed ? "Your referral is already connected to this account." : "Your referral is connected. Rewards unlock after a verified qualifying purchase." });
+        setRewardsReloadKey(value => value + 1);
+      } else if (response.status !== 401 && response.status !== 503) {
+        window.localStorage.removeItem("env.pendingReferralCode");
+        window.localStorage.removeItem("env.pendingReferralSource");
+        setFundingFeedback({ kind: "error", message: payload?.message ?? "This referral could not be applied to the account." });
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) window.history.replaceState({}, "", "/wallet");
+    });
+    return () => controller.abort();
+  }, []);
+
 
   useEffect(() => {
     const controller = new AbortController();
