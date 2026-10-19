@@ -64,7 +64,7 @@ function Home() {
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
           <Link to="/agent" aria-label="Open AI Agent" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI Agent</Link>
-          <Link to="/token-dashboard" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
+          <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
         </div>
         <MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
