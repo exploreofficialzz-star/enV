@@ -63,10 +63,10 @@ export async function getTokenUsageDashboard(userId: string, requestedTimeZone?:
            where created_at >= (date_trunc('day', now() at time zone $2) at time zone $2)
          ), 0) as today_subunits,
          coalesce(sum(consumed_subunits) filter (
-           where created_at >= (date_trunc('week', now() at time zone $2) at time zone $2)
+           where created_at >= now() - interval '7 days'
          ), 0) as week_subunits,
          coalesce(sum(consumed_subunits) filter (
-           where created_at >= (date_trunc('month', now() at time zone $2) at time zone $2)
+           where created_at >= now() - interval '30 days'
          ), 0) as month_subunits
        from billing_credit_ledger
        where user_id = $1 and entry_type = 'settlement'`,
@@ -149,16 +149,22 @@ export async function getTokenUsageDashboard(userId: string, requestedTimeZone?:
   const summary = summaryRows[0] ?? { today_subunits: 0, week_subunits: 0, month_subunits: 0 };
   const dailyTotals = new Map(dailyRows.map((row) => [row.day, numeric(row.subunits)]));
   const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "01";
+  const localToday = new Date(Date.UTC(Number(part("year")), Number(part("month")) - 1, Number(part("day"))));
   const week = Array.from({ length: 7 }, (_, index) => {
-    const day = new Date(now);
-    day.setDate(day.getDate() - (6 - index));
-    const localDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(day);
-    const key = localDate.replace(/\//g, "-");
+    const day = new Date(localToday);
+    day.setUTCDate(day.getUTCDate() - (6 - index));
+    const key = [
+      day.getUTCFullYear().toString().padStart(4, "0"),
+      (day.getUTCMonth() + 1).toString().padStart(2, "0"),
+      day.getUTCDate().toString().padStart(2, "0"),
+    ].join("-");
     return { day: key, subunits: dailyTotals.get(key) ?? 0 };
   });
 
