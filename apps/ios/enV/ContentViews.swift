@@ -1091,10 +1091,14 @@ struct NativeInformationPageView: View {
                         Button { showWalletNotifications = true } label: {
                             Image(systemName: "bell").font(.system(size: 17, weight: .medium))
                         }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Notifications")
                         Button { openURL(URL(string: "https://envtools.store/account")!) } label: {
                             Image(systemName: "person.crop.circle.fill").font(.system(size: 22, weight: .regular))
                         }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Profile and account")
                     }
                 } else {
@@ -1591,7 +1595,8 @@ private struct NativeWalletDashboardView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
@@ -1605,7 +1610,8 @@ private struct NativeWalletDashboardView: View {
                     ShareLink(item: "Discover enV: \(videoLink)") {
                         Label("Share link", systemImage: "square.and.arrow.up")
                             .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
@@ -1613,7 +1619,8 @@ private struct NativeWalletDashboardView: View {
                     Button {} label: {
                         Label("Share link", systemImage: "square.and.arrow.up")
                             .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
@@ -1623,6 +1630,8 @@ private struct NativeWalletDashboardView: View {
                     Label(showVideoDetails ? "Hide details" : "View details", systemImage: "arrow.up.right")
                         .font(.caption.weight(.medium))
                 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .buttonStyle(.bordered)
                 .tint(.white)
             }
@@ -1696,7 +1705,8 @@ private struct NativeWalletDashboardView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
@@ -1714,6 +1724,8 @@ private struct NativeWalletDashboardView: View {
                     ShareLink(item: "Join me on enV: \(referralLink)") {
                         Label("Share now", systemImage: "square.and.arrow.up")
                             .font(.caption.weight(.semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
@@ -1721,6 +1733,8 @@ private struct NativeWalletDashboardView: View {
                     Button {} label: {
                         Label("Share now", systemImage: "square.and.arrow.up")
                             .font(.caption.weight(.semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
@@ -1921,6 +1935,8 @@ private struct NativeWalletDashboardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
         }
         .padding(10)
