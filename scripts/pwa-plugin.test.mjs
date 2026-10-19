@@ -165,11 +165,11 @@ test("company pages use the supplied brand, distinct contact emails, and transpa
   assert.match(about, /registered in Delaware, USA/);
   assert.match(contact, /mailto:envtoolkit@gmail\.com/);
   assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
-  assert.match(pricing, /Monetization foundation in progress/);
-  assert.match(pricing, /100 tokens = \$1\.00/);
-  assert.match(pricing, /Usage values are provisional hypotheses, not final rates or purchase bundles/);
-  assert.match(pricing, /No checkout is active yet/);
-  assert.match(pricing, /Explore the token guide and tool-by-tool explanations/);
+  assert.match(pricing, /Before a metered operation/);
+  assert.match(pricing, /100 tokens = \\$1\\.00/);
+  assert.match(pricing, /Usage depends on the selected tool/);
+  assert.match(pricing, /Open Wallet/);
+  assert.match(pricing, /Explore token guide/);
   assert.match(footer, /chAs Technologies LLC · enV/);
 });
 

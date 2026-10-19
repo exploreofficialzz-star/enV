@@ -161,7 +161,7 @@ assert.ok(androidNativeScreen.includes("import androidx.compose.material3.AlertD
   "Android allowance settlement must compile structurally and remain guarded by the server test-mode code.");
 const iosNativeScreen = read("apps/ios/enV/ContentViews.swift");
 assert.ok(iosNativeScreen.includes("@State private var availabilityCode") && iosNativeScreen.includes("availabilityCode = state.code") &&
-  iosNativeScreen.includes('confirmationDialog("Close offline allowance?"') && iosNativeScreen.includes('availabilityCode == "LOCAL_TEST_ONLY"') && iosNativeScreen.includes("finalize: true"),
+  iosNativeScreen.includes('confirmationDialog("Close allowance?"') && iosNativeScreen.includes('availabilityCode == "LOCAL_TEST_ONLY"') && iosNativeScreen.includes("finalize: true"),
   "iOS allowance settlement must remain guarded by the server test-mode code.");
 
 const calculatorWebSource = read("src/components/engines/calculator-engine.tsx");
