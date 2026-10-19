@@ -97,11 +97,14 @@ function activitySummary(entry: WalletActivity): string {
   return entry.entry_type.replaceAll("_", " ");
 }
 
-function MetricCard({ title, value, description, icon }: { title: string; value: string; description: string; icon: React.ReactNode }) {
-  return <div className="min-w-0 rounded-2xl border border-border bg-surface p-4">
-    <div className="flex items-center gap-2 text-muted">{icon}<span className="text-xs font-medium">{title}</span></div>
-    <p className="mt-3 break-words text-lg font-semibold tracking-tight text-fg sm:text-xl">{value}</p>
-    <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
+function MetricCard({ title, value, description, icon, className = "" }: { title: string; value: string; description: string; icon: React.ReactNode; className?: string }) {
+  return <div className={`flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-surface px-2 py-2.5 sm:gap-3 sm:px-3 sm:py-3 ${className}`}>
+    <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg sm:size-8">{icon}</span>
+    <div className="min-w-0 flex-1">
+      <p className="break-words text-[9px] font-medium leading-3 text-muted sm:text-xs">{title}</p>
+      <p className="mt-0.5 break-words text-[11px] font-semibold leading-4 tracking-tight text-fg sm:text-sm">{value}</p>
+      <p className="mt-0.5 text-[9px] leading-3 text-muted sm:text-[10px]">{description}</p>
+    </div>
   </div>;
 }
 
@@ -508,11 +511,6 @@ function Account() {
   }
 
   const visibleWallet = state.status === "ready" ? state.wallet : undefined;
-  const totalDepositedTokens = visibleWallet ? visibleWallet.lifetimePurchasedSubunits / 1_000 : 0;
-  const totalUsedTokens = visibleWallet ? visibleWallet.lifetimeConsumedSubunits / 1_000 : 0;
-  const remainingPercent = totalDepositedTokens > 0 ? Math.min(100, Math.max(0, visibleWallet!.availableTokens / totalDepositedTokens * 100)) : 0;
-  const usedPercent = totalDepositedTokens > 0 ? Math.min(100, Math.max(0, totalUsedTokens / totalDepositedTokens * 100)) : 0;
-
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
@@ -521,11 +519,10 @@ function Account() {
         <section className="space-y-3" aria-label="Wallet overview">
           <div className="relative isolate overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-4 text-white shadow-sm sm:p-6">
             <svg viewBox="0 0 240 130" className="pointer-events-none absolute right-20 top-1 h-20 w-24 opacity-80 sm:right-28 sm:top-0 sm:h-32 sm:w-56" fill="none" aria-hidden="true">
-              <path d="M4 112 C20 108 30 95 44 98 S63 73 78 82 S98 104 116 70 S140 56 155 66 S177 26 194 38 S218 23 235 8" stroke="#52ffd0" strokeWidth="3.5" strokeLinecap="round"/>
+              <path d="M4 112 C20 108 30 95 44 98 S63 73 78 82 S98 104 116 70 S140 56 155 66 S177 26 194 38 S218 23 235 8" stroke="#52ffd0" strokeWidth="3.5" strokeLinecap="round"/><path d="M222 10 L235 8 L232 21" stroke="#52ffd0" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M4 112 C20 108 30 95 44 98 S63 73 78 82 S98 104 116 70 S140 56 155 66 S177 26 194 38 S218 23 235 8 L235 130 L4 130 Z" fill="url(#wallet-balance-fill)" opacity=".18"/>
               <defs><linearGradient id="wallet-balance-fill" x1="120" y1="8" x2="120" y2="130" gradientUnits="userSpaceOnUse"><stop stopColor="#52ffd0"/><stop offset="1" stopColor="#52ffd0" stopOpacity="0"/></linearGradient></defs>
             </svg>
-            <ArrowUpRight className="pointer-events-none absolute right-20 top-2 size-4 text-emerald-200 sm:right-28 sm:size-5" aria-hidden="true"/>
             <div className="relative flex flex-wrap items-center gap-3">
               <span className="grid size-14 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner"><Wallet size={28} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1 pr-16 sm:pr-28">
@@ -547,48 +544,31 @@ function Account() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-            <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><ArrowDownToLine size={16} aria-hidden="true"/></span>
-              <p className="mt-3 text-xs font-medium text-muted">Total deposited</p>
-              <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? tokenAmount(visibleWallet.lifetimePurchasedSubunits) : "—"}</p>
-              <p className="mt-1 text-[11px] text-muted">Tokens</p>
-            </div>
-            <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><RefreshCw size={16} aria-hidden="true"/></span>
-              <p className="mt-3 text-xs font-medium text-muted">Total remaining</p>
-              <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) : "—"}</p>
-              <p className="mt-1 text-[11px] text-muted">Tokens</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400" style={{ width: visibleWallet ? `${remainingPercent}%` : "0%" }}/></div>
-            </div>
-            <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><TrendingUp size={16} aria-hidden="true"/></span>
-              <p className="mt-3 text-xs font-medium text-muted">Total used</p>
-              <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? tokenAmount(visibleWallet.lifetimeConsumedSubunits) : "—"}</p>
-              <p className="mt-1 text-[11px] text-muted">Tokens</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-violet-500" style={{ width: visibleWallet ? `${usedPercent}%` : "0%" }}/></div>
-            </div>
+          <div className="grid grid-cols-3 gap-2">
+            <MetricCard title="Total deposited" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimePurchasedSubunits)} enV` : "—"} description="Deposited" icon={<ArrowDownToLine size={15} aria-hidden="true"/>} />
+            <MetricCard title="Total remaining" value={visibleWallet ? `${visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"} description="Available" icon={<RefreshCw size={15} aria-hidden="true"/>} />
+            <MetricCard title="Total used" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimeConsumedSubunits)} enV` : "—"} description="Used" icon={<TrendingUp size={15} aria-hidden="true"/>} />
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-            <div className="min-w-0 rounded-2xl border border-amber-400/25 bg-amber-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Gift size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Bonuses</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
-            <div className="min-w-0 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Users size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Referral tokens</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
-            <div className="min-w-0 rounded-2xl border border-violet-400/25 bg-violet-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Link2 size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Affiliate program</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
+          <div className="grid grid-cols-3 gap-2">
+            <MetricCard title="Bonuses" value={rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.bonusTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"} description="Bonus rewards" icon={<Gift size={15} aria-hidden="true"/>} className="border-amber-400/30" />
+            <MetricCard title="Referral tokens" value={rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"} description="Invite rewards" icon={<Users size={15} aria-hidden="true"/>} className="border-blue-400/30" />
+            <MetricCard title="Affiliate" value={rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"} description="Creator rewards" icon={<Link2 size={15} aria-hidden="true"/>} className="border-violet-400/30" />
           </div>
         </section>
 
         <section className="mt-3 grid gap-3 lg:grid-cols-2" aria-labelledby="rewards-title">
           <h2 id="rewards-title" className="sr-only">Referral and creator rewards</h2>
-          <article className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-4 text-white sm:p-5">
+          <article className="relative overflow-hidden rounded-[20px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-3 text-white sm:p-4">
             <svg viewBox="0 0 160 90" className="pointer-events-none absolute right-4 top-3 h-16 w-24 opacity-80 sm:h-20 sm:w-28" fill="none" aria-hidden="true">
-              <path d="M3 76 C18 70 23 49 37 57 S57 72 69 47 S89 36 101 43 S120 14 132 24 L150 7" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round"/>
+              <path d="M3 76 C18 70 23 49 37 57 S57 72 69 47 S89 36 101 43 S120 14 132 24 L151 6" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round"/>
               <path d="M137 8 L151 6 L149 20" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <div className="flex items-start gap-3 pr-24">
-              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Video size={27} aria-hidden="true"/></span>
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Video size={24} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1"><h2 className="font-semibold">Tag enV on your videos</h2><p className="mt-1 text-sm leading-5 text-white/75">Earn tokens based on conversion.</p></div>
             </div>
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 p-2.5">
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 p-2">
               <Link2 size={16} className="shrink-0 text-emerald-100" aria-hidden="true"/>
               <span className="min-w-0 flex-1 truncate text-xs text-white/80">{rewardsState.status === "ready" && rewardsState.data ? <>{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video&amp;sig={rewardsState.data.videoSignature}</> : "Your signed tag link"}</span>
               <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} aria-label="Copy video tag link" title="Copy video tag link" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-40"><Copy size={16} aria-hidden="true"/></button>
@@ -603,9 +583,9 @@ function Account() {
             {showVideoDetails ? <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/15 p-3"><div><p className="text-[11px] text-white/65">Video sign-ups</p><p className="mt-1 text-sm font-semibold">{rewardsState.status === "ready" ? rewardsState.data?.videoSignups.toLocaleString() : "—"}</p></div><div><p className="text-[11px] text-white/65">Verified conversions</p><p className="mt-1 text-sm font-semibold">{rewardsState.status === "ready" ? rewardsState.data?.videoConversions.toLocaleString() : "—"}</p></div></div> : null}
           </article>
 
-          <article className="relative overflow-hidden rounded-[24px] border border-violet-300/30 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-4 text-white sm:p-5">
+          <article className="relative overflow-hidden rounded-[20px] border border-violet-300/30 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-3 text-white sm:p-4">
             <div className="flex items-start gap-3 pr-20">
-              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Users size={27} aria-hidden="true"/></span>
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Users size={24} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1"><h2 className="font-semibold">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your referral link and you both get rewarded with enV tokens!</p></div>
             </div>
             <div className="absolute right-4 top-4 flex flex-col items-center gap-1.5" aria-label="Both get rewarded">

@@ -196,15 +196,15 @@ private fun NativeWalletDashboard() {
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NativeWalletMetric("Deposited", dashboard?.lifetimePurchasedTokens?.formatWalletTokens() ?: "—", "Verified tokens", Modifier.weight(1f))
-            NativeWalletMetric("Remaining", dashboard?.availableTokens?.formatWalletTokens() ?: "—", "Available now", Modifier.weight(1f))
-            NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens() ?: "—", "Recorded usage", Modifier.weight(1f))
+            NativeWalletMetric("Deposited", dashboard?.lifetimePurchasedTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Deposited", Modifier.weight(1f), "ReceiptText")
+            NativeWalletMetric("Remaining", dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Available", Modifier.weight(1f), "Wallet")
+            NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Used", Modifier.weight(1f), "ChartNoAxesCombined")
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens() ?: "—", "Bonus tokens", Modifier.weight(1f), "Gift")
-            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens() ?: "—", "Invite rewards", Modifier.weight(1f), "Users")
-            NativeWalletMetric("Affiliate program", dashboard?.affiliateTokens?.formatWalletTokens() ?: "—", "Video rewards", Modifier.weight(1f), "Link2")
+            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Bonus rewards", Modifier.weight(1f), "PartyPopper")
+            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Invite rewards", Modifier.weight(1f), "Users")
+            NativeWalletMetric("Affiliate", dashboard?.affiliateTokens?.formatWalletTokens()?.plus(" enV") ?: "—", "Creator rewards", Modifier.weight(1f), "Link2")
         }
 
         val videoLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}" }
@@ -434,18 +434,20 @@ private fun NativeWalletHero(
 
 @Composable
 private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
-    androidx.compose.foundation.layout.Box(modifier) {
-        Canvas(Modifier.fillMaxSize().padding(end = 5.dp, top = 3.dp)) {
-            val path = Path().apply {
-                moveTo(size.width * 0.02f, size.height * 0.87f)
-                cubicTo(size.width * 0.14f, size.height * 0.78f, size.width * 0.17f, size.height * 0.52f, size.width * 0.28f, size.height * 0.63f)
-                cubicTo(size.width * 0.38f, size.height * 0.79f, size.width * 0.44f, size.height * 0.40f, size.width * 0.55f, size.height * 0.46f)
-                cubicTo(size.width * 0.68f, size.height * 0.58f, size.width * 0.72f, size.height * 0.18f, size.width * 0.82f, size.height * 0.25f)
-                lineTo(size.width * 0.98f, size.height * 0.04f)
-            }
-            drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
+    Canvas(modifier.padding(end = 2.dp, top = 2.dp)) {
+        val tipX = size.width * 0.97f
+        val tipY = size.height * 0.05f
+        val path = Path().apply {
+            moveTo(size.width * 0.02f, size.height * 0.87f)
+            cubicTo(size.width * 0.14f, size.height * 0.78f, size.width * 0.17f, size.height * 0.52f, size.width * 0.28f, size.height * 0.63f)
+            cubicTo(size.width * 0.38f, size.height * 0.79f, size.width * 0.44f, size.height * 0.40f, size.width * 0.55f, size.height * 0.46f)
+            cubicTo(size.width * 0.68f, size.height * 0.58f, size.width * 0.72f, size.height * 0.18f, size.width * 0.82f, size.height * 0.25f)
+            lineTo(tipX, tipY)
+            moveTo(size.width * 0.79f, size.height * 0.07f)
+            lineTo(tipX, tipY)
+            lineTo(size.width * 0.90f, size.height * 0.26f)
         }
-        Text("↗", modifier = Modifier.align(Alignment.TopEnd), color = tint, style = MaterialTheme.typography.labelSmall)
+        drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 
@@ -458,18 +460,29 @@ private fun NativeWalletMetric(
     iconName: String? = null,
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.defaultMinSize(minHeight = 68.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(13.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (iconName != null) EnVIcon(iconName, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
-                Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            if (iconName != null) {
+                Box(
+                    Modifier.size(25.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EnVIcon(iconName, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                }
             }
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 2)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
         }
     }
 }
