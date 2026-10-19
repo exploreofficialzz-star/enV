@@ -497,6 +497,70 @@ export async function creditVerifiedPurchase(input: {
       `update billing_purchase_intents set status = 'credited', provider_transaction_id = $2, credited_at = now(), updated_at = now() where id = $1`,
       [intent.id, input.providerTransactionId],
     );
+
+    // Referral rewards are granted only after the first verified paid conversion.
+    // The reward, immutable ledger entry, and referral status update share this transaction.
+    const referrals = await tx.query<{
+      id: string; referrer_user_id: string; referred_user_id: string; source: "referral" | "video";
+    }>(
+      `select id, referrer_user_id, referred_user_id, source
+         from billing_referrals where referred_user_id = $1 and status = 'pending'
+         for update`,
+      [intent.user_id],
+    );
+    const referral = referrals[0];
+    if (referral) {
+      const configuredBase = Number(process.env.BILLING_REFERRAL_REWARD_TOKENS ?? "5");
+      const baseTokens = Number.isSafeInteger(configuredBase) && configuredBase > 0 && configuredBase <= 100 ? configuredBase : 5;
+      const configuredPercent = Number(process.env.BILLING_AFFILIATE_REWARD_PERCENT ?? "10");
+      const affiliatePercent = Number.isFinite(configuredPercent) && configuredPercent > 0 && configuredPercent <= 25 ? configuredPercent : 10;
+      const configuredMax = Number(process.env.BILLING_AFFILIATE_REWARD_MAX_TOKENS ?? "100");
+      const affiliateMaxSubunits = Number.isSafeInteger(configuredMax) && configuredMax > 0 && configuredMax <= 1_000
+        ? configuredMax * SUBUNITS_PER_TOKEN : 100 * SUBUNITS_PER_TOKEN;
+      const rewards: Array<{ userId: string; sourceUserId: string; type: "referral_inviter" | "referral_invitee" | "affiliate_conversion"; subunits: number; key: string; description: string }> = [
+        { userId: referral.referrer_user_id, sourceUserId: referral.referred_user_id, type: "referral_inviter",
+          subunits: baseTokens * SUBUNITS_PER_TOKEN, key: `referral:${referral.id}:inviter`, description: "Verified enV referral reward" },
+        { userId: referral.referred_user_id, sourceUserId: referral.referrer_user_id, type: "referral_invitee",
+          subunits: baseTokens * SUBUNITS_PER_TOKEN, key: `referral:${referral.id}:invitee`, description: "Welcome reward for a verified enV referral" },
+      ];
+      if (referral.source === "video") {
+        const affiliateSubunits = Math.min(affiliateMaxSubunits, Math.floor(creditSubunits * affiliatePercent / 100));
+        if (affiliateSubunits > 0) rewards.push({
+          userId: referral.referrer_user_id, sourceUserId: referral.referred_user_id, type: "affiliate_conversion",
+          subunits: affiliateSubunits, key: `referral:${referral.id}:affiliate`, description: "Verified video affiliate conversion reward",
+        });
+      }
+      for (const reward of rewards) {
+        await ensureBillingAccount(tx, reward.userId);
+        const created = await tx.query<{ id: string }>(
+          `insert into billing_reward_events
+            (id, user_id, source_user_id, referral_id, reward_type, amount_subunits, status, idempotency_key, metadata, credited_at)
+           values ($1, $2, $3, $4, $5, $6, 'credited', $7, $8::jsonb, now())
+           on conflict (idempotency_key) do nothing returning id`,
+          [randomUUID(), reward.userId, reward.sourceUserId, referral.id, reward.type, reward.subunits, reward.key,
+            JSON.stringify({ purchaseIntentId: intent.id, provider: input.provider })],
+        );
+        if (!created[0]) continue;
+        const credited = await tx.query<{ user_id: string }>(
+          `update billing_accounts set available_subunits = available_subunits + $2, updated_at = now()
+            where user_id = $1 returning user_id`,
+          [reward.userId, reward.subunits],
+        );
+        if (!credited[0]) throw new Error("A referral reward could not be credited.");
+        await tx.query(
+          `insert into billing_credit_ledger
+            (id, user_id, entry_type, delta_available_subunits, idempotency_key, reference_id, description, metadata)
+           values ($1, $2, 'promotion', $3, $4, $5, $6, $7::jsonb)`,
+          [randomUUID(), reward.userId, reward.subunits, `reward:${reward.key}`, referral.id, reward.description,
+            JSON.stringify({ rewardType: reward.type, purchaseIntentId: intent.id })],
+        );
+      }
+      await tx.query(
+        `update billing_referrals set status = 'rewarded', qualified_purchase_intent_id = $2, rewarded_at = now()
+          where id = $1 and status = 'pending'`,
+        [referral.id, intent.id],
+      );
+    }
     await tx.query(`update billing_webhook_events set processing_status = 'processed', processed_at = now() where provider = $1 and provider_event_id = $2`, [input.provider, input.providerEventId]);
     return { status: "credited" as const, creditedSubunits: creditSubunits };
   });
