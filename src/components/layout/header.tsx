@@ -34,23 +34,16 @@ export function Header() {
             <summary aria-label="More options" title="More options" className="flex size-10 list-none cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
               <MoreVertical className="size-6" strokeWidth={2.4} />
             </summary>
-            <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(78dvh,680px)] w-[min(88vw,300px)] overflow-y-auto rounded-2xl border border-border bg-surface p-2 shadow-2xl" aria-label="More navigation">
-              <div className="px-3 pb-2 pt-2">
-                <p className="text-sm font-semibold text-fg">Explore enV</p>
-                <p className="mt-0.5 text-xs text-muted">Product, help, and account links</p>
-              </div>
-              <div className="border-t border-border px-1 py-1">
-                <Link to="/agent" onClick={closeMenu} className="flex min-h-10 items-center rounded-lg px-3 py-2 text-sm font-semibold text-accent hover:bg-surface-2">AI Agent</Link>
-                <Link to="/account" onClick={closeMenu} className="block min-h-10 rounded-lg px-3 py-2 text-sm text-fg hover:bg-surface-2">Account & wallet</Link>
-                <Link to="/login" onClick={closeMenu} className="block min-h-10 rounded-lg px-3 py-2 text-sm text-fg hover:bg-surface-2">Sign in</Link>
-                <Link to="/signup" onClick={closeMenu} className="block min-h-10 rounded-lg px-3 py-2 text-sm text-fg hover:bg-surface-2">Create account</Link>
-                <Link to="/search" search={{ q: "" }} onClick={closeMenu} className="block min-h-10 rounded-lg px-3 py-2 text-sm text-fg hover:bg-surface-2">Search tools</Link>
+            <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(78dvh,760px)] w-[min(88vw,520px)] overflow-y-auto rounded-[2rem] border border-border bg-surface p-4 shadow-2xl" aria-label="More navigation">
+              <div className="border-b border-border px-1 py-2">
+                <Link to="/account" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Account</Link>
+                <Link to="/wallet" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Wallet</Link>
               </div>
               {MENU_GROUPS.map((group) => (
-                <section key={group.title} className="border-t border-border px-1 py-2" aria-label={group.title}>
-                  <h2 className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-subtle">{group.title}</h2>
+                <section key={group.title} className="border-b border-border px-1 py-3 last:border-b-0" aria-label={group.title}>
+                  <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{group.title}</h2>
                   {group.links.map((link) => (
-                    <Link key={link.to} to={link.to} onClick={closeMenu} className="block min-h-10 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg">{link.label}</Link>
+                    <Link key={link.to} to={link.to} onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">{link.label}</Link>
                   ))}
                 </section>
               ))}

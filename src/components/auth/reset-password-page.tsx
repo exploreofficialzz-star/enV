@@ -20,7 +20,7 @@ export function ResetPasswordPage({ token, invalidReason }: { token: string; inv
     setBusy(true);
     try {
       if (!token) throw new Error("This password-reset link is invalid or expired. Request a new one.");
-      if (!authEnabled || !emailPasswordEnabled) throw new Error("Password recovery is not enabled for this deployment.");
+      if (!authEnabled || !emailPasswordEnabled) throw new Error("We couldn’t reset your password right now. Please try again.");
       const result = await authClient.resetPassword({ newPassword: password, token });
       if (result.error) throw new Error(result.error.message || "The reset link may have expired. Request a new one.");
       setSuccess(true);

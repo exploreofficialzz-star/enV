@@ -127,14 +127,18 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.match(searchBox, /nav\(\{ to: "\/search", search: \{ q \} \}\)/);
 });
 
-test("AI Agent uses the secured backend task and is reachable from Home and the header", () => {
+test("AI Agent uses the secured backend task, while overflow navigation prioritizes Account and Wallet", () => {
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");
   const assistant = readFileSync(join(PROJECT_ROOT, "src/routes/assistant.tsx"), "utf8");
   const task = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/assistant.ts"), "utf8");
   const registry = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/index.ts"), "utf8");
   assert.match(home, /<Link to="\/agent"[^>]*>AI Agent<\/Link>/);
-  assert.match(header, /to="\/agent"[^>]*>AI Agent<\/Link>/);
+  assert.match(header, /to="\/account"[^>]*>Account<\/Link>/);
+  assert.match(header, /to="\/wallet"[^>]*>Wallet<\/Link>/);
+  assert.match(header, /title: "Product"/);
+  assert.match(header, /title: "Resources"/);
+  assert.doesNotMatch(header, /Explore enV|AI Agent|Search tools|Sign in|Create account/);
   assert.match(assistant, /runAiTask\("assistant\.chat", request/);
   assert.match(assistant, /searchTools\(getActiveTools\(\), query, 8\)/);
   assert.match(assistant, /recommendedToolIds/);
@@ -229,6 +233,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
   assert.match(home, /Total token = 100/);
+  assert.match(home, /to="\/tokens" aria-label="Open token guide"/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
   assert.match(home, /text-center text-\[11\.1px\]/);

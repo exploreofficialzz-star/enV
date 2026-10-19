@@ -44,7 +44,7 @@ function Privacy() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Payments and tokens</h2>
-        <p>The enV monetization foundation includes a planned token ledger and pricing preview, but no real payment provider, store purchase adapter or checkout is active in this release. The Pricing page presents reference values only. enV does not collect payment-card details directly through the toolkit. Before launch, the chosen providers, payment-data handling, token terms, refunds and purchase verification processes will be documented. No payment is taken and no purchased tokens are issued in this build.</p>
+        <p>Token accounting records balances, reservations, and usage for supported operations. enV does not collect payment-card details directly through the toolkit. When payment or store purchase options are offered, the chosen provider, payment-data handling, token terms, refunds, and purchase-verification process should be disclosed before confirmation.</p>
       </section>
 
       <section className="space-y-2">

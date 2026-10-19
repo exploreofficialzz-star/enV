@@ -330,11 +330,12 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             }
                         }
                         DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
-                            DropdownMenuItem(text = { Text("AI Agent") }, onClick = { tab = AppTab.Assistant.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Account") }, onClick = { tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Sign in") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/login"))); overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Create account") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/signup"))); overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Search tools") }, onClick = { tab = AppTab.Search.name; detailStack = emptyList(); showExchange = false; showInformation = false; overflowExpanded = false })
+
+                            DropdownMenuItem(text = { Text("Account") }, onClick = { informationReturnTab = tab; informationPage = "account"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Wallet") }, onClick = { informationReturnTab = tab; informationPage = "wallet"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+
+
+
                             Text("PRODUCT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
                             DropdownMenuItem(text = { Text("About") }, onClick = { informationReturnTab = tab; informationPage = "about"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Tools") }, onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
@@ -479,7 +480,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
                     Row(Modifier.width(previewWidth), horizontalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 12.dp else 8.dp)) {
                         HomePreviewBar("AI Agent", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = onAssistant)
-                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2)
+                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = { onInformation("tokens") }, accessibilityLabel = "Open token guide")
                     }
                 }
                 MostUsedToolsTray(mostUsed, onTool, homeSurface2, Modifier.fillMaxWidth())
@@ -940,7 +941,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
         )
         SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
-        SettingCard("Account", "Sign in or create an account from More options when account access is enabled.", "Info", onClick = { onOpenInformationPage("account") })
+        SettingCard("Account", "Sign in or create an account to sync supported enV features.", "Info", onClick = { onOpenInformationPage("account") })
         SettingCard("History", "Recently used tools will appear here.", "Info", onClick = { onOpenInformationPage("history") })
         SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
         SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
@@ -2861,9 +2862,9 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
 }
 
 @Composable
-private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, containerColor: Color, onClick: (() -> Unit)? = null) {
+private fun HomePreviewBar(label: String, modifier: Modifier = Modifier, isLarge: Boolean = false, containerColor: Color, onClick: (() -> Unit)? = null, accessibilityLabel: String = label) {
     Surface(
-        modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = "Open AI Agent" },
+        modifier = if (onClick == null) modifier.height(40.dp) else modifier.height(40.dp).clickable(onClick = onClick).semantics { contentDescription = accessibilityLabel },
         color = containerColor,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

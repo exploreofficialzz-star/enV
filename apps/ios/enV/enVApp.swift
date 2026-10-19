@@ -189,12 +189,8 @@ struct EnVBrandNavigationStyle: ViewModifier {
                     .accessibilityLabel("Tools")
                     .accessibilityIdentifier("tools-navigation-action")
                     Menu {
-                        Button("AI Agent") { selectedTab = NativeTab.assistant.rawValue }
-                        Button("Account & wallet") { selectedTab = NativeTab.account.rawValue }
-                        Button("Sign in") { if let url = URL(string: "https://en-v.vercel.app/login") { openURL(url) } }
-                        Button("Create account") { if let url = URL(string: "https://en-v.vercel.app/signup") { openURL(url) } }
-                        Button("Search tools") { selectedTab = NativeTab.search.rawValue }
-                            .accessibilityIdentifier("Search tools")
+                        Button("Account") { informationRouter.open("account") }
+                        Button("Wallet") { informationRouter.open("wallet") }
                         Divider()
                         Section("PRODUCT") {
                             Button("About") { informationRouter.open("about") }
