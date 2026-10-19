@@ -129,6 +129,7 @@ private fun NativeWalletDashboard() {
     var refresh by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf("") }
     var errorState by remember { mutableStateOf(false) }
+    var showPairing by remember { mutableStateOf(false) }
 
     fun shareLink(link: String, chooserTitle: String) {
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -166,23 +167,22 @@ private fun NativeWalletDashboard() {
 
         Box(
             Modifier.fillMaxWidth()
-                .background(Brush.linearGradient(listOf(Color(0xFF0B3A33), Color(0xFF0D283A))), RoundedCornerShape(18.dp))
-                .border(BorderStroke(1.dp, Color(0xFF1B6054)), RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface)), RoundedCornerShape(18.dp))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(18.dp))
                 .padding(15.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("enV Tokens", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text("enV Tokens", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "Balance appears after connection",
+                    dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "— enV",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Normal,
-                    color = Color(0xFF65F2C5),
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    if (dashboard != null) "${dashboard!!.reservedTokens.formatWalletTokens()} tokens reserved for active work"
-                    else "Your available, reserved and used tokens stay in one ledger.",
+                    if (dashboard != null) "${dashboard!!.reservedTokens.formatWalletTokens()} tokens reserved for active work" else "Available balance and reserved tokens",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFB8CFD8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -262,19 +262,27 @@ private fun NativeWalletDashboard() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
-            border = BorderStroke(1.dp, Color(0xFF22344C)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Fund wallet", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                Text("Add tokens through enV's secure checkout.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB5C4D7))
+                Text("Fund wallet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("Add funds securely to your enV wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    listOf("Card", "PayPal", "Bank transfer", "Crypto", "More").forEach { method ->
+                        Column(Modifier.weight(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp)).padding(vertical = 8.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(when (method) { "Card" -> "▭"; "PayPal" -> "P"; "Bank transfer" -> "⌂"; "Crypto" -> "₿"; else -> "•••" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                            Text(method, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        }
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(36.dp).background(Color(0xFF123A62), CircleShape), contentAlignment = Alignment.Center) {
-                        Text("₦", color = Color.White, fontWeight = FontWeight.Normal)
+                    Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+                        Text("₦", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Normal)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("Paystack checkout", style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        Text("NGN · verified checkout", style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                        Text("Paystack checkout", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("NGN · verified checkout", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet#fund-wallet")))
@@ -286,18 +294,18 @@ private fun NativeWalletDashboard() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
-            border = BorderStroke(1.dp, Color(0xFF22344C)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recent transactions", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                    Text("Recent transactions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { refresh += 1 }) { Text("Refresh") }
                 }
                 val rows = dashboard?.activity.orEmpty().take(5)
                 if (rows.isEmpty()) {
-                    Text(if (dashboard != null) "No wallet activity yet." else "Connect to view your transaction history.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                    Text("No transactions yet. Your deposits, usage and rewards will appear here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     rows.forEachIndexed { index, row ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -305,9 +313,9 @@ private fun NativeWalletDashboard() {
                                 Text(if (row.deltaAvailableSubunits >= 0) "↓" else "↑", color = Color.White)
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = Color(0xFF91A7C0))
-                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -315,19 +323,30 @@ private fun NativeWalletDashboard() {
             }
         }
 
-        if (dashboard == null) {
+        TextButton(onClick = {
+            if (dashboard != null) {
+                paired = false
+                code = ""
+                dashboard = null
+                message = ""
+            } else {
+                showPairing = !showPairing
+            }
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (dashboard != null) "Disconnect this device" else if (showPairing) "Hide account connection" else "Connect account")
+        }
+        if (showPairing && dashboard == null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
-                border = BorderStroke(1.dp, Color(0xFF22344C)),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, color = Color.White)
-                    Text("Pair this app with your signed-in enV web wallet to securely load your personal balance, rewards and activity.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFB5C4D7))
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("Link your enV account", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web Wallet") }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web wallet") }
                     OutlinedTextField(value = code, onValueChange = { code = it.trim().take(80) }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
                     Button(onClick = {
                         scope.launch {
@@ -337,22 +356,19 @@ private fun NativeWalletDashboard() {
                                 if (!result.ok) throw IllegalStateException(result.message)
                                 code = ""
                                 paired = true
+                                showPairing = false
                                 refresh += 1
-                                message = "This Android device is paired."
+                                message = "This device is connected."
                                 errorState = false
-                            } catch (error: Exception) {
-                                message = error.message ?: "The device could not be paired."
+                            } catch (_: Exception) {
+                                message = "The device could not be connected. Check the pairing code and try again."
                                 errorState = true
                             } finally { busy = false }
                         }
                     }, enabled = !busy && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                        Text(if (busy) "Connecting…" else "Pair this Android device")
+                        Text(if (busy) "Connecting…" else "Connect device")
                     }
                 }
-            }
-        } else {
-            OutlinedButton(onClick = { paired = false; code = ""; dashboard = null; message = "" }, modifier = Modifier.fillMaxWidth()) {
-                Text("Reconnect this device")
             }
         }
         if (loading) Text("Loading wallet…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -382,14 +398,14 @@ private fun NativeWalletHero(availableTokens: Double?, subtitle: String) {
 private fun NativeWalletMetric(title: String, value: String, subtitle: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C1A2B)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(15.dp),
-        border = BorderStroke(1.dp, Color(0xFF20364F)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9FB2C9))
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, color = Color.White)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color(0xFF91A7C0))
+            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
