@@ -111,7 +111,7 @@ struct HomeView: View {
                         GeometryReader { proxy in
                             HStack(spacing: horizontalSizeClass == .regular ? 12 : 8) {
                                 HomePreviewBar(title: "AI Agent", action: onAssistant).frame(maxWidth: .infinity)
-                                HomePreviewBar(title: "Total token = 100", action: { onInformation("tokens") }, accessibilityLabel: "Open token guide").frame(maxWidth: .infinity)
+                                HomePreviewBar(title: "Total token = 100", action: { onInformation("token-dashboard") }, accessibilityLabel: "Open token dashboard").frame(maxWidth: .infinity)
                             }
                             .frame(width: min(proxy.size.width * 0.84, 640), height: 40)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
