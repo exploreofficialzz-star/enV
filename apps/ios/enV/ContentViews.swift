@@ -889,33 +889,67 @@ struct SavedView: View {
 }
 
 struct AccountView: View {
-    @Environment(\.openURL) private var openURL
-
-    private func openSignIn() {
-        if let url = URL(string: "https://envtools.store/account") {
-            openURL(url)
-        }
-    }
+    @EnvironmentObject private var store: CatalogStore
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
+    @AppStorage("env.themeMode") private var themeMode = "system"
 
     var body: some View {
-        VStack(spacing: 16) {
-            EnVLogo().frame(width: 142, height: 56)
-            enVCharacterSpacedText("Welcome back to enV")
-                .font(.envScaled(size: 26, weight: .semibold))
-                .foregroundStyle(Color.envInk)
-                .multilineTextAlignment(.center)
-            enVCharacterSpacedText("Sign in or create your account on enV to continue.")
-                .font(.envScaled(size: 15))
-                .foregroundStyle(Color.envMuted)
-                .multilineTextAlignment(.center)
-            Button("Continue to sign in", action: openSignIn)
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: 360)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    enVCharacterSpacedText("Your enV")
+                        .font(.envScaled(size: 28, weight: .semibold))
+                        .foregroundStyle(Color.envInk)
+                    VStack(alignment: .leading, spacing: 12) {
+                        settingsRow("CircleCheck", "Offline catalog", "The complete tool catalog is bundled on this device.")
+                        enVCharacterSpacedText("\(NativeCoverage.localActiveToolCount(in: store.catalog)) of \(NativeCoverage.canonicalActiveToolCount(in: store.catalog)) active tools currently execute locally using the native engine families. URL media inspection still requires its remote service.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.envMuted)
+                    }
+                    .padding(16)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+
+                    sectionHeader("Settings", subtitle: "App information and preferences")
+                    VStack(spacing: 0) {
+                        Button { themeMode = "system" } label: {
+                            settingsRow("Settings", "Appearance", themeMode == "system" ? "Following device light/dark setting" : "Tap to follow the device appearance")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(themeMode == "system")
+                        Divider().overlay(Color.envBorder)
+                        settingsRow("Bell", "Notifications", "Notifications are not configured in this foundation release.")
+                        Divider().overlay(Color.envBorder)
+                        NavigationLink { ContactExchangeView() } label: { settingsRow("Contact", "Instant Contact Exchange", "Native nearby sharing with explicit activation and Contacts saving.") }
+                            .buttonStyle(.plain)
+                        Divider().overlay(Color.envBorder)
+                        Button { informationRouter.open("about") } label: { settingsRow("Info", "About enV & chAs Technologies LLC", "Company details and contact information.") }
+                            .buttonStyle(.plain)
+                        Divider().overlay(Color.envBorder)
+                        Button { informationRouter.open("account") } label: { settingsRow("Info", "Account", "No account is required for the browser toolkit.") }
+                            .buttonStyle(.plain)
+                        Divider().overlay(Color.envBorder)
+                        Button { informationRouter.open("history") } label: { settingsRow("Info", "History", "Recently used tools will appear here.") }
+                            .buttonStyle(.plain)
+                        Divider().overlay(Color.envBorder)
+                        settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
+                        Divider().overlay(Color.envBorder)
+                        settingsRow("Info", "Version 1.1.0 (6)", "Separate native Android and iOS applications.")
+                    }
+                    .padding(16)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+
+                    sectionHeader("Privacy", subtitle: "Local-first catalog browsing")
+                    settingsRow("ShieldCheck", "No account required", "Browse and save tools locally on this device.")
+                }
+                .padding(16)
+            }
+            .modifier(Screen())
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .modifier(EnVBrandNavigationStyle())
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.envSurface)
-        .onAppear(perform: openSignIn)
     }
 }
 
