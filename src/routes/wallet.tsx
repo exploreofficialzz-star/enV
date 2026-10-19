@@ -558,7 +558,7 @@ function Account() {
             </div>
             <section className="mt-1" aria-labelledby="rewards-title">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 id="rewards-title" className="font-semibold text-white">Referral and creator rewards</h2><span className="text-xs text-slate-400">Verified conversions</span></div>
-              <div className="grid gap-3 lg:grid-cols-2>
+              <div className="grid gap-3 lg:grid-cols-2">
               <article className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-4 sm:p-5">
                 <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-300"><Video size={22} aria-hidden="true"/></span><div className="min-w-0 flex-1"><h2 className="font-semibold text-white">Tag enV on your videos</h2><p className="mt-1 text-sm leading-5 text-slate-300">Earn affiliate tokens when your video drives a verified qualifying conversion.</p></div></div>
                 {rewardsState.status === "ready" && rewardsState.data ? <>
