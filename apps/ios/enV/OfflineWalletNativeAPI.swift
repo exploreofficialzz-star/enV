@@ -97,9 +97,14 @@ enum OfflineWalletNativeAPI {
         }
     }
 
-    private static func makeRequest(path: String, method: String, body: Data? = nil, bearer: String? = nil) async throws -> (Int, [String: Any]) {
+    private static func makeRequest(path: String, method: String, body: Data? = nil, bearer: String? = nil, queryItems: [URLQueryItem]? = nil) async throws -> (Int, [String: Any]) {
         guard var url = baseURL else { throw OfflineWalletNativeAPIError.missingServer }
         for component in path.split(separator: "/") { url.appendPathComponent(String(component)) }
+        if let queryItems, !queryItems.isEmpty,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems = queryItems
+            if let resolved = components.url { url = resolved }
+        }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 15
@@ -131,7 +136,7 @@ enum OfflineWalletNativeAPI {
         guard let bearer = loadSessionToken() else {
             throw OfflineWalletNativeAPIError.unavailable("Pair this iOS device from your signed-in enV web Wallet first.")
         }
-        return try responseData(await makeRequest(path: "api/billing/native-wallet", method: "GET", bearer: bearer))
+        return try responseData(await makeRequest(path: "api/billing/native-wallet", method: "GET", bearer: bearer, queryItems: [URLQueryItem(name: "timezone", value: TimeZone.current.identifier)]))
     }
 
     static func checkAvailability() async -> (enabled: Bool, code: String, message: String) {
