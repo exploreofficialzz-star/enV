@@ -78,6 +78,7 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
         "about" -> "About enV"
         "help" -> "Help center"
         "tokens" -> "Token guide"
+        "token-dashboard" -> "Token dashboard"
         "wallet" -> "Wallet"
         "pricing" -> "Pricing"
         "contact" -> "Contact"
@@ -123,6 +124,7 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 "about" -> AboutInformation()
                 "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
                 "tokens" -> InformationSection("Understanding tokens", listOf("Token usage depends on the tool and the work being performed.", "Local utilities may use different rules from hosted AI, media processing, and multi-step workflows.", "Review relevant tool information and Wallet activity when evaluating token usage."))
+                "token-dashboard" -> NativeTokenDashboard()
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()
                 "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -138,6 +140,206 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                 else -> AboutInformation()
             }
             Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun NativeTokenDashboard() {
+    val context = LocalContext.current
+    var dashboard by remember { mutableStateOf<OfflineWalletNativeApi.WalletDashboard?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var message by remember { mutableStateOf("") }
+    var refresh by remember { mutableStateOf(0) }
+
+    LaunchedEffect(refresh) {
+        loading = true
+        message = ""
+        try {
+            dashboard = OfflineWalletNativeApi.fetchWalletDashboard(context)
+        } catch (error: Exception) {
+            dashboard = null
+            message = error.message ?: "Token usage is temporarily unavailable."
+        } finally {
+            loading = false
+        }
+    }
+
+    val usage = dashboard?.tokenUsage
+    val moneyLabel: (Double) -> String = { amount -> "Est. value $" + (amount * 0.01).formatWalletTokens() }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Welcome to your token dashboard",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            "Review your available enV tokens, recent usage, and the exact tool and time recorded for each event.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (dashboard == null && !loading) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Connect your enV account", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        message.ifBlank { "Pair this device from the signed-in enV web Wallet to see your private token balance and usage." },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }) {
+                        Text("Open enV wallet")
+                    }
+                    OutlinedButton(onClick = { refresh += 1 }) { Text("Try again") }
+                }
+            }
+        }
+
+        if (loading) {
+            Text("Loading token usage…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        if (dashboard != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, Color(0xFF16B58A).copy(alpha = 0.55f)),
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().background(
+                        Brush.linearGradient(listOf(Color(0xFF063E37), Color(0xFF06304A), Color(0xFF0B1E36))),
+                        RoundedCornerShape(20.dp),
+                    ).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Total token", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.82f))
+                            Text(
+                                dashboard!!.availableTokens.formatWalletTokens() + " enV",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text("Available balance · Token name: enV", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
+                            Text(moneyLabel(dashboard!!.availableTokens), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.70f))
+                        }
+                        EnVIcon("Coins", Modifier.size(34.dp), tint = Color(0xFF52FFD0))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Reserved", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+                            Text(dashboard!!.reservedTokens.formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Total used ever", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+                            Text(dashboard!!.lifetimeConsumedTokens.formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NativeWalletMetric("Today's spent", usage?.todaySpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Since midnight", Modifier.weight(1f), "Clock3")
+                NativeWalletMetric("Last week", usage?.last7DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "7 days", Modifier.weight(1f), "CalendarDays")
+                NativeWalletMetric("Last month", usage?.last30DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "30 days", Modifier.weight(1f), "ChartNoAxesCombined")
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Daily token usage", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Confirmed enV deductions · last 7 local days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val daily = usage?.weeklyUsage.orEmpty()
+                    val maxSpent = daily.maxOfOrNull { it.tokensSpent }?.coerceAtLeast(0.001) ?: 0.001
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                        daily.forEach { day ->
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(day.tokensSpent.formatWalletTokens(), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                Box(
+                                    Modifier.fillMaxWidth().height(64.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(7.dp)),
+                                    contentAlignment = Alignment.BottomCenter,
+                                ) {
+                                    Box(
+                                        Modifier.fillMaxWidth(0.65f).height(if (day.tokensSpent > 0) (day.tokensSpent / maxSpent * 58).coerceAtLeast(5.0).dp else 2.dp)
+                                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp)),
+                                    )
+                                }
+                                Text(day.day.takeLast(5), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Confirmed token deductions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Tool name, amount spent and recorded date/time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val charges = usage?.charges.orEmpty()
+                    if (charges.isEmpty()) {
+                        Text("No confirmed token deductions recorded yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else charges.forEachIndexed { index, row ->
+                        if (index > 0) androidx.compose.material3.HorizontalDivider()
+                        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(row.toolName.ifBlank { row.toolId }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(row.tokensSpent.formatWalletTokens() + " enV spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (row.description.isNotBlank()) Text(row.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (row.billingKey.isNotBlank()) Text("Meter: " + row.billingKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Recorded tool activity", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Metering details are separate from confirmed deductions.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val events = usage?.activity.orEmpty()
+                    if (events.isEmpty()) {
+                        Text("No tool activity records yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else events.forEachIndexed { index, row ->
+                        if (index > 0) androidx.compose.material3.HorizontalDivider()
+                        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(row.toolId.replace(Regex("[._-]+"), " "), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Recorded status: " + row.status.replace('_', ' '), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(row.billedTokens.formatWalletTokens() + " enV charged in metering record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val metricText = row.metrics.entries.take(4).joinToString(" · ") { (key, value) -> "$key: \${value.formatWalletTokens()}" }
+                            if (metricText.isNotBlank()) Text(metricText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            TextButton(onClick = { refresh += 1 }) { Text("Refresh token usage") }
+            Text(
+                "Spending totals include confirmed wallet settlements only. Metering events are shown separately and may record zero billed tokens.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
