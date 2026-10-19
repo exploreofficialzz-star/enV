@@ -34,6 +34,16 @@ export function AuthPage({ mode }: AuthPageProps) {
     setGreeting(options[Math.floor(Math.random() * options.length)]);
   }, []);
 
+  useEffect(() => {
+    if (!isSignUp) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("ref");
+    if (!code || !/^[A-Za-z0-9]{8,24}$/.test(code)) return;
+    const source = params.get("source") === "video" ? "video" : "referral";
+    window.localStorage.setItem("env.pendingReferralCode", code.toUpperCase());
+    window.localStorage.setItem("env.pendingReferralSource", source);
+  }, [isSignUp]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -49,12 +59,14 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     setBusy(true);
     try {
+      const pendingReferral = isSignUp ? window.localStorage.getItem("env.pendingReferralCode") : null;
+      const referralCallback = pendingReferral ? "/wallet?claimReferral=1" : "/agent";
       if (isSignUp) {
         const result = await authClient.signUp.email({
           name: name.trim(),
           email: email.trim(),
           password,
-          callbackURL: "/agent",
+          callbackURL: referralCallback,
         });
         if (result.error) throw new Error(result.error.message || "Account creation failed.");
         setPassword("");
@@ -84,7 +96,9 @@ export function AuthPage({ mode }: AuthPageProps) {
       if (!authEnabled) throw new Error("Sign-in is temporarily unavailable. Please try again shortly.");
       const result = await authClient.signIn.social({
         provider,
-        callbackURL: "/agent",
+        callbackURL: isSignUp
+          ? (window.localStorage.getItem("env.pendingReferralCode") ? "/wallet?claimReferral=1" : "/agent")
+          : "/agent",
         errorCallbackURL: isSignUp ? "/signup" : "/account",
         disableRedirect: true,
       });
