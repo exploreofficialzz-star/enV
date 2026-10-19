@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { getSql } from "./db";
+import { getSql } from "../db";
 
 const SUBUNITS_PER_TOKEN = 1_000;
 
