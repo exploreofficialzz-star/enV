@@ -201,9 +201,7 @@ export function TokenDashboard() {
                 ? "Loading your account token data…"
                 : loadState === "signed-out"
                   ? "Sign in to load your real enV balance, spending totals, and token activity."
-                  : loadState === "auth-disabled"
-                    ? ""
-                    : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
+                  : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
             </p>
             {loadState === "signed-out" ? (
               <Link to="/account" className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white">Sign in</Link>
