@@ -45,3 +45,7 @@ create index if not exists billing_reward_events_referral_idx
 -- Look up provider references efficiently when a verified Paystack callback arrives.
 create index if not exists billing_purchase_paystack_reference_idx
   on billing_purchase_intents (id) where provider = 'paystack';
+
+
+comment on table billing_offline_native_sessions is
+  'Revocable paired-device sessions provide read-only native Wallet access; offline allowance issue/sync remains separately gated.';
