@@ -406,7 +406,7 @@ private fun NativeWalletHero(
                     }
                 }
                 Text(
-                    if (!showBalance) "••••••" else availableTokens?.let { "$${(it * 0.20).formatWalletTokens()}" } ?: "—",
+                    if (!showBalance) "••••••" else availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Normal,
                     color = Color.White,
@@ -493,7 +493,7 @@ private fun Double.formatWalletReferenceValue(): String {
     val formatted = java.text.NumberFormat.getNumberInstance().apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
-    }.format(this * 0.20)
+    }.format(this * 0.01)
     return "≈ $" + formatted
 }
 

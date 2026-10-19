@@ -1441,7 +1441,7 @@ private struct NativeWalletDashboardView: View {
                     .contentShape(Rectangle())
                     .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
                 }
-                Text(showBalance ? available.map { "$\(token($0 * 0.20))" } ?? "—" : "••••••")
+                Text(showBalance ? available.map { "$\(token($0 * 0.01))" } ?? "—" : "••••••")
                     .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
                     Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
@@ -1498,7 +1498,7 @@ private struct NativeWalletDashboardView: View {
     }
 
     private func tokenReferenceValue(_ tokens: Double) -> String {
-        "≈ $" + String(format: "%.2f", tokens * 0.20)
+        "≈ $" + String(format: "%.2f", tokens * 0.01)
     }
 
     private func paymentMethod(_ title: String, systemImage: String) -> some View {

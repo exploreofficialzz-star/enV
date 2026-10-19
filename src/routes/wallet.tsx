@@ -88,7 +88,7 @@ function tokenAmount(subunits: number): string {
 }
 
 function tokenReferenceValue(tokens: number): string {
-  return "≈ $" + (tokens * 0.20).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return "≈ $" + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function activitySummary(entry: WalletActivity): string {
@@ -536,7 +536,7 @@ function Account() {
                     {showBalance ? <Eye size={17} aria-hidden="true"/> : <EyeOff size={17} aria-hidden="true"/>}
                   </button>
                 </div>
-                <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{showBalance ? visibleWallet ? "$" + (visibleWallet.availableTokens * 0.20).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—" : "••••••"}</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{showBalance ? visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—" : "••••••"}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-50/90"><Coins size={16} aria-hidden="true"/><span>≈ {showBalance ? visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV" : "— enV" : "•••• enV"}</span></p>
                 <p className="mt-1 text-xs text-white/70">Estimated reference value · not cash</p>
               </div>
