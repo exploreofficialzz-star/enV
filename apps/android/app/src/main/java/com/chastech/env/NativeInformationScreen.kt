@@ -174,7 +174,7 @@ private fun NativeTokenDashboard() {
             )
             TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }) {
                 EnVIcon("Wallet", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.size(4.dp))
                 Text("Open wallet")
             }
         }
@@ -208,7 +208,6 @@ private fun NativeTokenDashboard() {
                                 (dashboard?.availableTokens ?: 0.0).formatWalletTokens() + " enV",
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
                             )
                             Text("enV estimated reference value = $0.010", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
                         }
@@ -293,7 +292,7 @@ private fun NativeTokenDashboard() {
                     } else charges.forEachIndexed { index, row ->
                         if (index > 0) androidx.compose.material3.HorizontalDivider()
                         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(row.toolName.ifBlank { row.toolId }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(row.toolName.ifBlank { row.toolId }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text(row.tokensSpent.formatWalletTokens() + " enV spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (row.description.isNotBlank()) Text(row.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
