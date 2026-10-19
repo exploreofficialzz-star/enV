@@ -1404,51 +1404,69 @@ private struct NativeWalletDashboardView: View {
 
     private var recentTransactionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Recent transactions")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Color.envInk)
-                Spacer()
-                Button("Refresh") { refreshKey += 1 }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            if activity.isEmpty {
-                Text("No transactions yet. Your deposits, usage and rewards will appear here.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.envMuted)
-            } else {
-                ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
-                    HStack(alignment: .center, spacing: 9) {
-                        Image(systemName: transactionSymbol(item.element))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.envInk)
-                            .frame(width: 32, height: 32)
-                            .background(Color.envSurface2, in: Circle())
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(transactionTypeLabel(item.element))
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Color.envInk)
-                            Text(item.element["description"] as? String ?? "Wallet activity")
-                                .font(.caption)
-                                .foregroundStyle(Color.envMuted)
-                                .lineLimit(1)
-                            Text(item.element["created_at"] as? String ?? "")
-                                .font(.caption2)
-                                .foregroundStyle(Color.envMuted)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .padding(.vertical, 4)
-                    if item.offset < min(activity.count, 5) - 1 { Divider().overlay(Color.envBorder, lineWidth: 1) }
-                }
-            }
+            recentTransactionsHeader
+            recentTransactionsList
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private var recentTransactionsHeader: some View {
+        HStack {
+            Text("Recent transactions")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(Color.envInk)
+            Spacer()
+            Button("Refresh") { refreshKey += 1 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+    }
+
+    @ViewBuilder private var recentTransactionsList: some View {
+        if activity.isEmpty {
+            Text("No transactions yet. Your deposits, usage and rewards will appear here.")
+                .font(.subheadline)
+                .foregroundStyle(Color.envMuted)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
+                    transactionRow(item.element, showDivider: item.offset < min(activity.count, 5) - 1)
+                }
+            }
+        }
+    }
+
+    private func transactionRow(_ entry: [String: Any], showDivider: Bool) -> some View {
+        VStack(spacing: 6) {
+            HStack(alignment: .center, spacing: 9) {
+                Image(systemName: transactionSymbol(entry))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.envInk)
+                    .frame(width: 32, height: 32)
+                    .background(Color.envSurface2, in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(transactionTypeLabel(entry))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.envInk)
+                    Text(entry["description"] as? String ?? "Wallet activity")
+                        .font(.caption)
+                        .foregroundStyle(Color.envMuted)
+                        .lineLimit(1)
+                    Text(entry["created_at"] as? String ?? "")
+                        .font(.caption2)
+                        .foregroundStyle(Color.envMuted)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            if showDivider {
+                Divider().overlay(Color.envBorder, lineWidth: 1)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private var connectionSection: some View {
