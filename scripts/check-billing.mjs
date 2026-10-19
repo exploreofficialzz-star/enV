@@ -142,6 +142,8 @@ assert.match(tokenDashboardComponent, /Last week token spent/, "dashboard must e
 assert.match(tokenDashboardComponent, /Last month token spent/, "dashboard must expose its thirty-day token total");
 assert.match(tokenDashboardComponent, /Token usage history/, "dashboard must expose the usage timeline");
 assert.doesNotMatch(tokenDashboardComponent, /Token usage could not be loaded/, "the token dashboard must not collapse to a blocking error fallback");
+assert.doesNotMatch(tokenDashboardComponent, /Loading your account token data/, "refreshing the token dashboard must not show an account-data loading banner");
+assert.match(tokenDashboardComponent, /loadState === "signed-out" \|\| loadState === "unavailable"/, "the account status banner must be reserved for sign-in or actual data failures");
 assert.doesNotMatch(tokenDashboardComponent, /loadState === "ready" && wallet && summary \?/, "the full dashboard layout must render even while account data is unavailable");
 assert.match(tokenDashboardComponent, /loadState === "auth-disabled"/, "the dashboard must distinguish disabled production auth from a transient API failure");
 assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.availableTokens\) : tokenLabel\(0\)/, "the empty-wallet preview must show a formatted 0.000 enV balance");
