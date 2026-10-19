@@ -488,7 +488,7 @@ function Account() {
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <Link to="/pricing" className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg"><ArrowLeft size={16} aria-hidden="true" /> Back to pricing</Link>
         <header className="mt-5">
           <div className="grid size-12 place-items-center rounded-2xl border border-border bg-surface-2"><Wallet size={24} aria-hidden="true" /></div>
@@ -715,7 +715,7 @@ function Account() {
             <li className="flex gap-2"><ArrowDownToLine size={16} className="mt-1 shrink-0" aria-hidden="true" /> A workflow should reserve an approved budget, settle measured usage and release unused tokens.</li>
           </ul>
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }
