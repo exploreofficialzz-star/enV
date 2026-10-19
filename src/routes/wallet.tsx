@@ -503,7 +503,7 @@ function Account() {
                 <div>
                   <p className="text-sm font-medium text-muted">Available to use</p>
                   <p className="mt-2 text-4xl font-semibold tracking-tight text-fg sm:text-5xl">{state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} <span className="text-lg font-medium text-muted">tokens</span></p>
-                  <p className="mt-2 text-sm text-muted">Reference value ${(state.wallet.availableTokens * 0.01).toFixed(2)} USD · not cash or withdrawable value</p>
+                  <p className="mt-2 text-sm text-muted">Illustrative reference value: ${(state.wallet.availableTokens * 0.01).toFixed(2)} USD. This is not cash or a guaranteed redemption value.</p>
                 </div>
                 <a href="#fund-wallet" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent no-underline hover:opacity-90"><CreditCard size={17} aria-hidden="true" /> Fund wallet</a>
               </div>
@@ -517,6 +517,7 @@ function Account() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <MetricCard title="Referral rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Earned from qualified invites" icon={<Gift size={17} aria-hidden="true"} />} />
               <MetricCard title="Affiliate rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Verified video conversions" icon={<Video size={17} aria-hidden="true"} />} />
+              <MetricCard title="Bonus tokens" value={rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Promotional awards" icon={<Gift size={17} aria-hidden="true"} />} />
             </div>
           </section>
         ) : null}
