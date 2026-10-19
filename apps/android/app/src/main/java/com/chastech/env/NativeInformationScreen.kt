@@ -247,9 +247,9 @@ private fun NativeTokenDashboard() {
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                NativeWalletMetric("Today's spent", usage?.todaySpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Since midnight", Modifier.weight(1f), "Clock3")
-                NativeWalletMetric("Last week", usage?.last7DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "7 days", Modifier.weight(1f), "CalendarDays")
-                NativeWalletMetric("Last month", usage?.last30DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "30 days", Modifier.weight(1f), "ChartNoAxesCombined")
+                NativeWalletMetric("Today's token spent", usage?.todaySpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Since local midnight", Modifier.weight(1f), "Clock3")
+                NativeWalletMetric("Last week token spent", usage?.last7DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Rolling 7 days", Modifier.weight(1f), "CalendarDays")
+                NativeWalletMetric("Last month token spent", usage?.last30DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Rolling 30 days", Modifier.weight(1f), "ChartNoAxesCombined")
             }
 
             Card(
