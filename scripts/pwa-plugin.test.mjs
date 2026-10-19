@@ -166,7 +166,7 @@ test("company pages use the supplied brand, distinct contact emails, and transpa
   assert.match(contact, /mailto:envtoolkit@gmail\.com/);
   assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
   assert.match(pricing, /Before a metered operation/);
-  assert.match(pricing, /100 tokens = \\$1\\.00/);
+  assert.match(pricing, /Rates depend on the operation and measured work/);
   assert.match(pricing, /Usage depends on the selected tool/);
   assert.match(pricing, /Open Wallet/);
   assert.match(pricing, /Explore token guide/);
