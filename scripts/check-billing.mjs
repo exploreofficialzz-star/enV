@@ -4,6 +4,13 @@ import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const migration = await read("migrations/0002_billing.sql");
+const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
+const rewardsService = await read("src/lib/billing/rewards.server.ts");
+const paystackService = await read("src/lib/billing/paystack.server.ts");
+const walletDashboard = await read("src/routes/wallet.tsx");
+const nativeWalletRoute = await read("server/routes/api/billing/native-wallet.get.ts");
+const fundingOptionsRoute = await read("server/routes/api/billing/funding-options.get.ts");
+const rewardsSummaryRoute = await read("server/routes/api/billing/rewards/summary.get.ts");
 const catalog = await read("src/lib/billing/catalog.ts");
 const walletRoute = await read("server/routes/api/billing/wallet.get.ts");
 const purchasesRoute = await read("server/routes/api/billing/purchases.post.ts");
@@ -93,8 +100,28 @@ for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iO
   const missing = ids.filter((id) => !profileIds.has(id));
   assert.deepEqual(missing, [], `${platform} native tool IDs must all have billing profiles`);
 }
-assert.match(purchasesRoute, /PAYMENTS_NOT_CONFIGURED/);
+assert.match(purchasesRoute, /initializePaystackCheckout/);
 assert.match(purchasesRoute, /No payment was taken/);
+assert.match(paystackService, /PAYMENTS_NOT_CONFIGURED/);
+assert.match(paystackService, /BILLING_LAUNCH_ENABLED === "true"/);
+assert.match(paystackService, /BILLING_ENFORCEMENT_ENABLED === "true"/);
+assert.match(paystackService, /createHmac\("sha512"/);
+assert.match(paystackService, /timingSafeEqual/);
+assert.match(paystackService, /verifyAndCreditPaystackReference/);
+assert.match(rewardsMigration, /billing_referral_profiles/);
+assert.match(rewardsMigration, /billing_referrals/);
+assert.match(rewardsMigration, /billing_reward_events/);
+assert.match(rewardsService, /SELF_REFERRAL/);
+assert.match(ledger, /referral_invitee/);
+assert.match(ledger, /affiliate_conversion/);
+assert.match(walletDashboard, /Total deposited/);
+assert.match(walletDashboard, /Total used/);
+assert.match(walletDashboard, /Referral and creator rewards/);
+assert.match(walletDashboard, /Fund your wallet/);
+assert.match(fundingOptionsRoute, /getFundingOptions/);
+assert.match(rewardsSummaryRoute, /requireBillingUser/);
+assert.match(nativeWalletRoute, /requireOfflineBillingUser/);
+assert.match(nativeWalletRoute, /NATIVE_PAIRING_REQUIRED/);
 assert.match(pricingPage, /No advertising/);
 assert.match(pricingPage, /100 tokens = \$1\.00/);
 assert.match(androidPricing, /100 tokens ≈ \$1\.00 USD/);
@@ -102,4 +129,4 @@ assert.match(iosPricing, /100 tokens ≈ \$1\.00 USD/);
 for (const file of [pricingPage, androidPricing, iosPricing]) {
   assert.doesNotMatch(file, /\$0\.30|\$0\.50|\$0\.80|\$1\.20|5,000 tokens/i, "old token-package pricing should not remain in active pricing UI");
 }
-console.log(`[billing] schema, idempotency, fail-closed APIs, ${profiles.toolCount} provisional profiles, ${nativeInventory.androidToolIds.length} Android IDs, ${nativeInventory.iosToolIds.length} iOS IDs and pricing-policy checks passed.`);
+console.log(`[billing] schema, ledger idempotency, fail-closed Paystack checkout, verified payment callbacks, referral/affiliate reward accounting, native wallet access, ${profiles.toolCount} provisional profiles, ${nativeInventory.androidToolIds.length} Android IDs, ${nativeInventory.iosToolIds.length} iOS IDs and pricing-policy checks passed.`);
