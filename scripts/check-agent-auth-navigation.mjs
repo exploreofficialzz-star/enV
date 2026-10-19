@@ -19,20 +19,22 @@ for (const removed of ["Explore enV", "Product, help, and account links", 'to="/
 }
 if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) errors.push("Account must appear before Wallet at the top of the overflow menu.");
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
-const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'to="/login"', 'to="/signup"', 'useSession()'], "Account page");
+const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
+if (account.includes("Wallet") || account.includes("Manage your enV identity")) errors.push("The Account route must open sign-in directly without an overview or wallet panel.");
 const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Your enV wallet"], "Wallet page");
-const authPage = requireText("src/components/auth/auth-page.tsx", ["type=\"email\"", 'autoComplete={isSignUp ? "new-password" : "current-password"}', "Confirm password"], "Sign-in/sign-up page");
+const authPage = requireText("src/components/auth/auth-page.tsx", ['type="email"', 'autoComplete={isSignUp ? "new-password" : "current-password"}', "Confirm password", "EyeOff", "Sign in with Google", "Sign in with Apple", "Forgot password?", 'to="/signup"'], "Sign-in/sign-up page");
 if (authPage.includes("Authentication is disabled until production")) errors.push("Sign-in/sign-up UI still displays the configuration warning.");
 const tokenPage = requireText("src/routes/tokens.tsx", ["Token guide", "Tool-by-tool token explanations", "Balance & history"], "Token guide");
 for (const removed of ["Preview only", "Prices are not charged in this preview", "All generated rates are provisional", "Purchases and automatic token deductions are disabled"]) if (tokenPage.includes(removed)) errors.push(`Token guide still contains placeholder wording: ${removed}`);
 const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open token guide"', "AI Agent"], "Home token guide link");
-const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword"], "Server auth wiring");
+const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword", "socialProviders", "googleConfigured", "appleConfigured"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 
 const nativeAndroid = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ['Text("Account")', 'Text("Wallet")', 'Text("PRODUCT"', 'Text("RESOURCES"', 'onInformation("tokens")', "FooterLegalLinks"], "Android menu/footer");
 const androidMenu = nativeAndroid.split("DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false })")[1]?.split("colors = TopAppBarDefaults.topAppBarColors")[0] ?? "";
 for (const removed of ['Text("AI Agent")', 'Text("Sign in")', 'Text("Create account")', 'Text("Search tools")', 'Text("LEGAL")']) if (androidMenu.includes(removed)) errors.push(`Android overflow menu still contains ${removed}`);
-requireText("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", ['"help" -> "Help center"', '"tokens" -> "Token guide"', 'Text("Sign in")', 'Text("Create account")'], "Android Account/token pages");
+requireText("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", ['"help" -> "Help center"', '"tokens" -> "Token guide"', 'Text("Continue to sign in")', 'https://envtools.store/account'], "Android Account/token pages");
+if (!androidMenu.includes('Uri.parse("https://envtools.store/account")')) errors.push("Android Account must open the unified enV sign-in page directly.");
 
 const ios = requireText("apps/ios/enV/enVApp.swift", ['Button("Account")', 'Button("Wallet")', 'Section("PRODUCT")', 'Section("RESOURCES")'], "iOS overflow menu");
 const iosMenuStart = ios.indexOf("Menu {", ios.indexOf("ToolbarItemGroup(placement: .topBarTrailing)"));
@@ -41,6 +43,7 @@ const iosMenu = iosMenuStart >= 0 && iosMenuEnd > iosMenuStart ? ios.slice(iosMe
 for (const removed of ['Button("AI Agent")', 'Button("Sign in")', 'Button("Create account")', 'Button("Search tools")', 'Section("LEGAL")']) if (iosMenu.includes(removed)) errors.push(`iOS overflow menu still contains ${removed}`);
 const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Understanding tokens"]);
 if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("iOS footer still renders the moved Product/Resources groups.");
-if (!iosViews.includes('Button("Sign in")') || !iosViews.includes('Button("Create account")')) errors.push("iOS Account page must expose sign-in and create-account actions.");
+if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
+if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");
 if (errors.length) { console.error(`Account/Wallet navigation audit failed with ${errors.length} error(s):`); for (const error of errors) console.error(`- ${error}`); process.exit(1); }
-console.log("Account/Wallet navigation audit passed: exact Product/Resources menu groups, separate Account and Wallet pages, clickable token guide, auth screens, and retained Legal footer are present.");
+console.log("Account/Wallet navigation audit passed: Product/Resources groups, separate Wallet page, direct shared Account sign-in, password controls, Google/Apple actions, token guide, and Legal footer are present.");
