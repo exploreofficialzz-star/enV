@@ -109,6 +109,7 @@ function MetricCard({ title, value, description, icon }: { title: string; value:
 }
 
 function Account() {
+  const appOrigin = typeof window !== "undefined" ? window.location.origin : "https://envtools.store";
   const [state, setState] = useState<WalletState>({ status: "loading" });
   const [offlineState, setOfflineState] = useState<OfflineWalletState>({ status: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
@@ -582,13 +583,13 @@ function Account() {
                   <div className="rounded-2xl border border-border p-4">
                     <h3 className="font-medium text-fg">Refer a friend</h3>
                     <p className="mt-1 text-sm leading-5 text-muted">Share your personal link. You and your friend become eligible for a reward after their first verified qualifying purchase.</p>
-                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{window.location.origin}/signup?ref={rewardsState.data.referralCode}</code>
+                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{appOrigin}/signup?ref={rewardsState.data.referralCode}</code>
                     <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "referral")} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy invite link</button>
                   </div>
                   <div className="rounded-2xl border border-border p-4">
                     <h3 className="font-medium text-fg">Video affiliate program</h3>
                     <p className="mt-1 text-sm leading-5 text-muted">Mention enV in relevant videos and add this unique link to your caption or profile. Affiliate tokens are calculated from verified purchase conversions, with server-side caps against abuse.</p>
-                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{window.location.origin}/signup?ref={rewardsState.data.referralCode}&amp;source=video</code>
+                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video</code>
                     <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video")} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy video link</button>
                   </div>
                 </div>
