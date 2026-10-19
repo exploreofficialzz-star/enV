@@ -291,6 +291,41 @@ function Account() {
     return () => controller.abort();
   }, [reloadKey]);
 
+  async function copyReferralLink(code: string, source: "referral" | "video") {
+    const link = `${window.location.origin}/signup?ref=${encodeURIComponent(code)}${source === "video" ? "&source=video" : ""}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setFundingFeedback({ kind: "success", message: source === "video" ? "Video affiliate link copied. Add it to your video caption or profile." : "Referral link copied. Your conversion and reward status will appear here." });
+    } catch {
+      setFundingFeedback({ kind: "error", message: "Clipboard access was denied. Select and copy the link shown in the referral card." });
+    }
+  }
+
+  async function startFundingCheckout() {
+    if (fundingBusy) return;
+    setFundingBusy(true);
+    setFundingFeedback(null);
+    try {
+      const response = await fetch("/api/billing/purchases", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ tokenPack: selectedTokenPack, idempotencyKey: `wallet-topup-${crypto.randomUUID()}` }),
+      });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; data?: { authorizationUrl?: string }; message?: string } | null;
+      const target = payload?.data?.authorizationUrl;
+      let checkout: URL | null = null;
+      try { if (target) checkout = new URL(target); } catch { checkout = null; }
+      if (!response.ok || !payload?.ok || !checkout || checkout.protocol !== "https:" || checkout.hostname !== "checkout.paystack.com") {
+        throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
+      }
+      window.location.assign(checkout.href);
+    } catch (error) {
+      setFundingFeedback({ kind: "error", message: error instanceof Error ? error.message : "Secure checkout is unavailable. No payment was taken." });
+    } finally {
+      setFundingBusy(false);
+    }
+  }
+
   async function reportMissingOfflineRecords(allowance: OfflineAllowance) {
     if (!window.confirm(
       "Report that this device's offline records are missing? enV will preserve the reservation and mark it for recovery review. This does not automatically refund tokens or release the unused allowance. Continue only if local app/browser data was lost."
@@ -457,22 +492,44 @@ function Account() {
         <header className="mt-5">
           <div className="grid size-12 place-items-center rounded-2xl border border-border bg-surface-2"><Wallet size={24} aria-hidden="true" /></div>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-fg">Your enV wallet</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">View your available token balance, reserved amounts, recent activity, offline allowances, and connected devices.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">A clearer view of your tokens: deposits, remaining balance, usage, rewards, referrals and connected devices.</p>
         </header>
+
+        {state.status === "ready" && state.wallet ? (
+          <section className="mt-6 space-y-3" aria-label="Wallet overview">
+            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted">Available to use</p>
+                  <p className="mt-2 text-4xl font-semibold tracking-tight text-fg sm:text-5xl">{state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} <span className="text-lg font-medium text-muted">tokens</span></p>
+                  <p className="mt-2 text-sm text-muted">Reference value ${(state.wallet.availableTokens * 0.01).toFixed(2)} USD · not cash or withdrawable value</p>
+                </div>
+                <a href="#fund-wallet" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent no-underline hover:opacity-90"><CreditCard size={17} aria-hidden="true" /> Fund wallet</a>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <MetricCard title="Total deposited" value={`${tokenAmount(state.wallet.lifetimePurchasedSubunits)} tokens`} description="Verified purchases" icon={<ArrowDownToLine size={17} aria-hidden="true" />} />
+              <MetricCard title="Total remaining" value={`${state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens`} description="Available now" icon={<Wallet size={17} aria-hidden="true" />} />
+              <MetricCard title="Total used" value={`${tokenAmount(state.wallet.lifetimeConsumedSubunits)} tokens`} description="Recorded usage" icon={<TrendingUp size={17} aria-hidden="true" />} />
+              <MetricCard title="Reserved" value={`${state.wallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens`} description="Held for active work" icon={<ShieldCheck size={17} aria-hidden="true" />} />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <MetricCard title="Referral rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Earned from qualified invites" icon={<Gift size={17} aria-hidden="true"} />} />
+              <MetricCard title="Affiliate rewards" value={rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens` : "—"} description="Verified video conversions" icon={<Video size={17} aria-hidden="true"} />} />
+            </div>
+          </section>
+        ) : null}
 
         {state.status === "loading" ? (
           <div className="mt-6 rounded-2xl border border-border p-5 text-sm text-muted" aria-live="polite">Checking wallet availability…</div>
         ) : state.status === "ready" && state.wallet ? (
-          <section className="mt-6 rounded-2xl border border-border p-5 sm:p-6">
-            <p className="text-sm text-muted">Available balance</p>
-            <p className="mt-1 text-3xl font-semibold text-fg">{state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">Reserved for tasks</p><p className="mt-1 font-semibold text-fg">{state.wallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens</p></div>
-              <div className="rounded-xl bg-surface-2 p-3"><p className="text-sm text-muted">USD reference value</p><p className="mt-1 font-semibold text-fg">${(state.wallet.availableTokens * 0.01).toFixed(2)}</p></div>
+          <section className="mt-6 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h2 className="font-semibold text-fg">Account activity</h2><p className="mt-1 text-sm text-muted">Dated records of deposits, rewards, reservations, usage and releases.</p></div>
+              <button type="button" onClick={() => setReloadKey(value => value + 1)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><RefreshCw size={15} aria-hidden="true" /> Refresh</button>
             </div>
-            <p className="mt-4 text-xs leading-5 text-muted">The reference value is not a cash balance and cannot be withdrawn. Actual purchase pricing depends on the platform and region.</p>
             <div className="mt-6">
-              <h2 className="font-semibold text-fg">Recent token activity</h2>
+              <h3 className="font-medium text-fg">Recent transactions</h3>
               {state.activity?.length ? (
                 <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
                   {state.activity.map((entry) => (
@@ -505,6 +562,69 @@ function Account() {
             </div>
           </section>
         )}
+
+        <section className="mt-5 rounded-2xl border border-border p-5 sm:p-6" aria-labelledby="rewards-title">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><Gift size={20} aria-hidden="true" /></span>
+            <div className="min-w-0 flex-1">
+              <h2 id="rewards-title" className="font-semibold text-fg">Referral and creator rewards</h2>
+              <p className="mt-1 text-sm leading-6 text-muted">Invite a friend or feature enV in a video. Rewards are earned only when a referred account completes a qualifying verified purchase—not from self-reported views or clicks.</p>
+              {rewardsState.status === "loading" ? <p className="mt-3 text-sm text-muted">Loading your rewards…</p> : null}
+              {rewardsState.status === "unavailable" ? <p className="mt-3 text-sm text-muted">{rewardsState.message} Confirm that the wallet rewards migration is applied.</p> : null}
+              {rewardsState.status === "ready" && rewardsState.data ? <>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <MetricCard title="Invites" value={String(rewardsState.data.referralCount)} description="Signed-up friends" icon={<Users size={16} aria-hidden="true" />} />
+                  <MetricCard title="Qualified" value={String(rewardsState.data.qualifiedReferrals)} description="Verified conversions" icon={<ShieldCheck size={16} aria-hidden="true" />} />
+                  <MetricCard title="Video conversions" value={String(rewardsState.data.videoConversions)} description="Attributed purchases" icon={<Video size={16} aria-hidden="true" />} />
+                  <MetricCard title="Total rewards" value={`${rewardsState.data.totalRewardTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens`} description="Credited to wallet" icon={<Gift size={16} aria-hidden="true" />} />
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-border p-4">
+                    <h3 className="font-medium text-fg">Refer a friend</h3>
+                    <p className="mt-1 text-sm leading-5 text-muted">Share your personal link. You and your friend become eligible for a reward after their first verified qualifying purchase.</p>
+                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{window.location.origin}/signup?ref={rewardsState.data.referralCode}</code>
+                    <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "referral")} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy invite link</button>
+                  </div>
+                  <div className="rounded-2xl border border-border p-4">
+                    <h3 className="font-medium text-fg">Video affiliate program</h3>
+                    <p className="mt-1 text-sm leading-5 text-muted">Mention enV in relevant videos and add this unique link to your caption or profile. Affiliate tokens are calculated from verified purchase conversions, with server-side caps against abuse.</p>
+                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{window.location.origin}/signup?ref={rewardsState.data.referralCode}&amp;source=video</code>
+                    <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video")} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy video link</button>
+                  </div>
+                </div>
+              </> : null}
+            </div>
+          </div>
+        </section>
+
+        <section id="fund-wallet" className="mt-5 scroll-mt-24 rounded-2xl border border-border p-5 sm:p-6" aria-labelledby="fund-wallet-title">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><CreditCard size={20} aria-hidden="true" /></span>
+            <div className="min-w-0 flex-1">
+              <h2 id="fund-wallet-title" className="font-semibold text-fg">Fund your wallet</h2>
+              <p className="mt-1 text-sm leading-6 text-muted">Choose a token pack and use secure checkout. enV credits tokens only after server-side transaction verification.</p>
+              {fundingFeedback ? <p className={`mt-3 rounded-lg border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : "border-rose-500/30 bg-rose-500/5 text-fg"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
+              {fundingState.status === "loading" ? <p className="mt-3 text-sm text-muted">Checking supported payment methods…</p> : null}
+              {fundingState.status === "unavailable" ? <p className="mt-3 text-sm text-muted">{fundingState.message}</p> : null}
+              {fundingState.status === "ready" && fundingState.data ? <>
+                {fundingState.data.enabled ? <>
+                  <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {fundingState.data.packs.map(pack => <button key={pack.tokens} type="button" aria-pressed={selectedTokenPack === pack.tokens} onClick={() => setSelectedTokenPack(pack.tokens)} className={`rounded-xl border p-3 text-left transition ${selectedTokenPack === pack.tokens ? "border-accent bg-surface-2 ring-1 ring-accent" : "border-border hover:bg-surface-2"}`}>
+                      <span className="block text-lg font-semibold text-fg">{pack.tokens.toLocaleString()}</span>
+                      <span className="mt-1 block text-xs text-muted">tokens</span>
+                      <span className="mt-2 block text-sm font-medium text-fg">{pack.amountMinor !== null ? `₦${(pack.amountMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "Price unavailable"}</span>
+                    </button>)}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-muted">The NGN price is server-controlled. Token reference value is not cash; packs and regional prices may change before checkout.</p>
+                  <button type="button" disabled={fundingBusy || state.status !== "ready"} onClick={() => void startFundingCheckout()} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-50">{fundingBusy ? "Opening secure checkout…" : "Continue to secure checkout"} <ExternalLink size={16} aria-hidden="true" /></button>
+                </> : <div className="mt-4 rounded-xl bg-surface-2 p-4">
+                  <p className="font-medium text-fg">Payments are not enabled yet</p>
+                  <p className="mt-1 text-sm leading-6 text-muted">{fundingState.data.message} No payment will be taken until these checks pass.</p>
+                </div>}
+              </> : null}
+            </div>
+          </div>
+        </section>
 
         <section className="mt-5 rounded-2xl border border-border p-5 sm:p-6" aria-labelledby="offline-wallet-title">
           <div className="flex items-start gap-3">
