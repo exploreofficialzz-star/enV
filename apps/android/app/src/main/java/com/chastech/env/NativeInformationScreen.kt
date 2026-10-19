@@ -168,11 +168,19 @@ private fun NativeTokenDashboard() {
     val usage = dashboard?.tokenUsage
     val moneyLabel: (Double) -> String = { amount -> "Est. value $" + (amount * 0.01).formatWalletTokens() }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            "Welcome to your token dashboard",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Welcome to your token dashboard",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }) {
+                EnVIcon("Wallet", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(4.dp))
+                Text("Open wallet")
+            }
+        }
         Text(
             "Review your available enV tokens, recent usage, and the exact tool and time recorded for each event.",
             style = MaterialTheme.typography.bodyMedium,
@@ -180,33 +188,18 @@ private fun NativeTokenDashboard() {
         )
 
         if (dashboard == null && !loading) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Connect your enV account", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(
-                        message.ifBlank { "Pair this device from the signed-in enV web Wallet to see your private token balance and usage." },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }) {
-                        Text("Open enV wallet")
-                    }
-                    OutlinedButton(onClick = { refresh += 1 }) { Text("Try again") }
-                }
-            }
+            Text(
+                "Preview display: showing 0.000 enV until real account data is connected.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (loading) {
             Text("Loading token usage…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        if (dashboard != null) {
-            Card(
+        Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent),
@@ -223,24 +216,24 @@ private fun NativeTokenDashboard() {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("Total token", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.82f))
                             Text(
-                                dashboard!!.availableTokens.formatWalletTokens() + " enV",
+                                (dashboard?.availableTokens ?: 0.0).formatWalletTokens() + " enV",
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text("Available balance · Token name: enV", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
-                            Text(moneyLabel(dashboard!!.availableTokens), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.70f))
+                            Text(moneyLabel(dashboard?.availableTokens ?: 0.0), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.70f))
                         }
                         EnVIcon("Coins", Modifier.size(34.dp), tint = Color(0xFF52FFD0))
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text("Reserved", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
-                            Text(dashboard!!.reservedTokens.formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                            Text((dashboard?.reservedTokens ?: 0.0).formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
                         }
                         Column(Modifier.weight(1f)) {
                             Text("Total used ever", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
-                            Text(dashboard!!.lifetimeConsumedTokens.formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                            Text((dashboard?.lifetimeConsumedTokens ?: 0.0).formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
                         }
                     }
                 }
@@ -250,6 +243,10 @@ private fun NativeTokenDashboard() {
                 NativeWalletMetric("Today's token spent", usage?.todaySpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Since local midnight", Modifier.weight(1f), "Clock3")
                 NativeWalletMetric("Last week token spent", usage?.last7DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Rolling 7 days", Modifier.weight(1f), "CalendarDays")
                 NativeWalletMetric("Last month token spent", usage?.last30DaysSpentTokens?.formatWalletTokens()?.plus(" enV") ?: "0.000 enV", "Rolling 30 days", Modifier.weight(1f), "ChartNoAxesCombined")
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NativeWalletMetric("Total deposited", (dashboard?.lifetimePurchasedTokens ?: 0.0).formatWalletTokens() + " enV", moneyLabel(dashboard?.lifetimePurchasedTokens ?: 0.0), Modifier.weight(1f), "ReceiptText")
+                NativeWalletMetric("Token deductions", usage?.charges?.size?.toString() ?: "0", "Confirmed spending records", Modifier.weight(1f), "ArrowUpRight")
             }
 
             Card(
@@ -263,7 +260,8 @@ private fun NativeTokenDashboard() {
                     Text("Confirmed enV deductions · last 7 local days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val daily = usage?.weeklyUsage.orEmpty()
                     val maxSpent = daily.maxOfOrNull { it.tokensSpent }?.coerceAtLeast(0.001) ?: 0.001
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                    if (daily.isEmpty()) Text("0.000 enV · No confirmed deductions this week", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
                         daily.forEach { day ->
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(day.tokensSpent.formatWalletTokens(), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -340,7 +338,6 @@ private fun NativeTokenDashboard() {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
     }
 }
 
