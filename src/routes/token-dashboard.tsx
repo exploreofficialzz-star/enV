@@ -113,7 +113,7 @@ function MetricCard({ title, value, detail, icon }: { title: string; value: stri
   );
 }
 
-function TokenDashboard() {
+export function TokenDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [message, setMessage] = useState("");
