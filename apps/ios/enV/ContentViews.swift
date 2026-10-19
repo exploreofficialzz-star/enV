@@ -1183,218 +1183,280 @@ private struct NativeWalletDashboardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            walletOverviewSection
-            videoTagCard
-            rewardMetricsSection
-            referralCard
-            recentTransactionsSection
-            connectionSection
-            if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
-            if !message.isEmpty && (showConnection || dashboard != nil) { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
-        }
-        .task(id: "\(refreshKey)-\(paired)") { await refresh() }
-    }
-
-
-    @ViewBuilder private var walletOverviewSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+            Text("Manage your balance, tokens, rewards and more.")
+                .font(.subheadline)
+                .foregroundStyle(Color.envMuted)
             balanceHero(
                 available: dashboard == nil ? nil : number("availableTokens", from: wallet),
                 showBalance: showBalance,
                 onToggleVisibility: { showBalance.toggle() },
                 onAddFunds: { if let url = URL(string: "https://envtools.store/wallet") { openURL(url) } }
             )
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                walletMetric("Deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), iconName: "arrow.down.to.line")
-                walletMetric("Remaining", token(number("availableTokens", from: wallet)) + " enV", tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
-                walletMetric("Used", token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
+            balanceMetrics
+            videoTagCard
+            rewardMetricsSection
+            referralCard
+            recentTransactionsSection
+            connectionSection
+            if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
+            if !message.isEmpty && (showConnection || dashboard != nil) {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(isError ? Color.red : Color.envMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        .task(id: "\(refreshKey)-\(paired)") { await refresh() }
+    }
+
+    private var balanceMetrics: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+            walletMetric("Total deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), iconName: "arrow.down.to.line")
+            walletMetric("Total remaining", token(number("availableTokens", from: wallet)) + " enV", tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
+            walletMetric("Total used", token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
         }
     }
 
-    @ViewBuilder private var videoTagCard: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 7) {
-                    Image(systemName: "play.rectangle.fill")
+    private var videoTagCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 7) {
+                Image(systemName: "play.rectangle.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tag enV on your videos")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("Earn tokens based on conversion.")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.78))
+                }
+                Spacer(minLength: 0)
+                NativeWalletSparklineView(color: Color(red: 0.32, green: 1.0, blue: 0.80))
+                    .frame(width: 52, height: 27)
+            }
+
+            HStack(spacing: 7) {
+                Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
+                Text(dashboard == nil ? "Your signed tag link" : videoLink)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(Color.white.opacity(0.86))
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+                Button {
+                    UIPasteboard.general.string = videoLink
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .disabled(dashboard == nil)
+                .accessibilityLabel("Copy video tag link")
+            }
+            .padding(.horizontal, 8)
+            .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+
+            HStack(spacing: 7) {
+                if dashboard != nil {
+                    ShareLink(item: "Discover enV: \(videoLink)") {
+                        Label("Share link", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
+                } else {
+                    Button {} label: {
+                        Label("Share link", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
+                    .disabled(true)
+                }
+                Button { showVideoDetails.toggle() } label: {
+                    Label(showVideoDetails ? "Hide details" : "View details", systemImage: "arrow.up.right")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+            }
+
+            if showVideoDetails {
+                HStack(spacing: 8) {
+                    walletMetric("Video sign-ups", dashboard == nil ? "0" : "\(rewards["videoSignups"] as? Int ?? 0)", "Tracked")
+                    walletMetric("Conversions", dashboard == nil ? "0" : "\(rewards["videoConversions"] as? Int ?? 0)", "Verified")
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.02, green: 0.23, blue: 0.21), Color(red: 0.03, green: 0.13, blue: 0.24)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.12, green: 0.57, blue: 0.47).opacity(0.65), lineWidth: 1))
+    }
+
+    private var rewardMetricsSection: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
+            walletMetric("Bonuses", token(number("bonusTokens", from: rewards)) + " enV", tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
+            walletMetric("Referral tokens", token(number("referralTokens", from: rewards)) + " enV", tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
+            walletMetric("Affiliate program", token(number("affiliateTokens", from: rewards)) + " enV", tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
+        }
+    }
+
+    private var referralCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 7) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Refer a friend")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("Share your referral link and you both get rewarded with enV tokens!")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.80))
+                }
+                Spacer(minLength: 0)
+                VStack(spacing: 2) {
+                    Image(systemName: "gift.fill")
                         .font(.system(size: 17))
                         .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 9))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Tag enV on your videos").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
-                        Text("Earn tokens based on conversion.").font(.caption).foregroundStyle(Color.white.opacity(0.78))
-                    }
-                    Spacer(minLength: 0)
-                    NativeWalletSparklineView(color: Color(red: 0.08, green: 0.70, blue: 0.50))
-                        .frame(width: 58, height: 30)
+                    Text("Both rewarded")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.78))
                 }
+            }
 
-                HStack(spacing: 8) {
-                    Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
-                    Text(dashboard == nil ? "Your signed tag link" : videoLink)
-                        .font(.caption).lineLimit(1).truncationMode(.middle)
-                        .foregroundStyle(Color.white.opacity(0.78)).textSelection(.enabled)
-                    Spacer(minLength: 0)
-                    Button {
-                        UIPasteboard.general.string = videoLink
-                    } label: {
-                        Image(systemName: "doc.on.doc").foregroundStyle(.white).frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(dashboard == nil)
-                    .accessibilityLabel("Copy video tag link")
+            HStack(spacing: 7) {
+                Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
+                Text(dashboard == nil ? "Your referral link" : referralLink)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(Color.white.opacity(0.86))
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+                Button {
+                    UIPasteboard.general.string = referralLink
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
                 }
-                .padding(8)
-                .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 13))
+                .buttonStyle(.plain)
+                .disabled(dashboard == nil)
+                .accessibilityLabel("Copy referral link")
+            }
+            .padding(.horizontal, 8)
+            .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
 
-                HStack(spacing: 8) {
-                    if dashboard != nil {
-                        ShareLink(item: "Discover enV: \(videoLink)") {
-                            Label("Share link", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.envAccent)
-                    } else {
-                        Button {} label: {
-                            Label("Share link", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(true)
+            HStack {
+                Text(dashboard == nil ? "Share your personal link with friends." : "\(rewards["referralCount"] as? Int ?? 0) invites · \(rewards["qualifiedReferrals"] as? Int ?? 0) qualified")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.white.opacity(0.75))
+                Spacer(minLength: 0)
+                if dashboard != nil {
+                    ShareLink(item: "Join me on enV: \(referralLink)") {
+                        Label("Share now", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.semibold))
                     }
-                    Button { showVideoDetails.toggle() } label: {
-                        Label(showVideoDetails ? "Hide details" : "View details", systemImage: "arrow.up.right")
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
+                } else {
+                    Button {} label: {
+                        Label("Share now", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
+                    .disabled(true)
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.08, green: 0.09, blue: 0.30), Color(red: 0.22, green: 0.10, blue: 0.39)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.purple.opacity(0.55), lineWidth: 1))
+    }
+
+    private var recentTransactionsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Recent transactions")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Color.envInk)
+                Spacer()
+                Button("Refresh") { refreshKey += 1 }
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
-                }
-                if showVideoDetails {
-                    HStack(spacing: 10) {
-                        walletMetric("Video sign-ups", dashboard == nil ? "—" : "\(rewards["videoSignups"] as? Int ?? 0)", "Tracked")
-                        walletMetric("Conversions", dashboard == nil ? "—" : "\(rewards["videoConversions"] as? Int ?? 0)", "Verified")
-                    }
-                }
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LinearGradient(colors: [Color(red: 0.02, green: 0.23, blue: 0.21), Color(red: 0.03, green: 0.13, blue: 0.24)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(red: 0.12, green: 0.57, blue: 0.47).opacity(0.65), lineWidth: 1))
-    }
-
-    @ViewBuilder private var rewardMetricsSection: some View {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
-                walletMetric("Bonuses", token(number("bonusTokens", from: rewards)) + " enV", tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
-                walletMetric("Referral tokens", token(number("referralTokens", from: rewards)) + " enV", tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
-                walletMetric("Affiliate program", token(number("affiliateTokens", from: rewards)) + " enV", tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
-            }
-    }
-
-    @ViewBuilder private var referralCard: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 7) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 9))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Refer a friend").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
-                        Text("Share your referral link and you both get rewarded with enV tokens!").font(.caption).foregroundStyle(Color.white.opacity(0.78))
-                    }
-                    Spacer(minLength: 0)
-                    VStack(spacing: 3) {
-                        Image(systemName: "gift.fill").font(.title3).foregroundStyle(.white)
-                        Text("Both get rewarded!").font(.caption2.weight(.medium)).foregroundStyle(Color.white.opacity(0.78)).multilineTextAlignment(.center)
-                    }
-                    .frame(width: 76)
-                }
-
-                HStack(spacing: 8) {
-                    Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
-                    Text(dashboard == nil ? "Your referral link" : referralLink)
-                        .font(.caption).lineLimit(1).truncationMode(.middle)
-                        .foregroundStyle(Color.white.opacity(0.78)).textSelection(.enabled)
-                    Spacer(minLength: 0)
-                    Button {
-                        UIPasteboard.general.string = referralLink
-                    } label: {
-                        Image(systemName: "doc.on.doc").foregroundStyle(.white).frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(dashboard == nil)
-                    .accessibilityLabel("Copy referral link")
-                }
-                .padding(8)
-                .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 13))
-
-                HStack {
-                    Text(dashboard == nil ? "Share your personal link with friends." : "\(rewards["referralCount"] as? Int ?? 0) invites · \(rewards["qualifiedReferrals"] as? Int ?? 0) qualified")
-                        .font(.caption).foregroundStyle(Color.white.opacity(0.78))
-                    Spacer(minLength: 0)
-                    if dashboard != nil {
-                        ShareLink(item: "Join me on enV: \(referralLink)") {
-                            Label("Share now", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.envAccent)
-                    } else {
-                        Button {} label: { Label("Share now", systemImage: "square.and.arrow.up") }
-                            .buttonStyle(.borderedProminent).disabled(true)
-                    }
-                }
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LinearGradient(colors: [Color(red: 0.08, green: 0.09, blue: 0.30), Color(red: 0.22, green: 0.10, blue: 0.39)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.purple.opacity(0.55), lineWidth: 1))
-    }
-
-    @ViewBuilder private var recentTransactionsSection: some View {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Recent transactions").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
-                    Spacer()
-                    Button("Refresh") { refreshKey += 1 }
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                if activity.isEmpty {
-                    Text("No transactions yet. Your deposits, usage and rewards will appear here.")
-                        .font(.subheadline).foregroundStyle(Color.envMuted)
-                } else {
-                    ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
-                        HStack(alignment: .center, spacing: 9) {
-                            Image(systemName: transactionSymbol(item.element))
-                                .font(.system(size: 14, weight: .medium))
+            if activity.isEmpty {
+                Text("No transactions yet. Your deposits, usage and rewards will appear here.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.envMuted)
+            } else {
+                ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
+                    HStack(alignment: .center, spacing: 9) {
+                        Image(systemName: transactionSymbol(item.element))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.envInk)
+                            .frame(width: 32, height: 32)
+                            .background(Color.envSurface2, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(transactionTypeLabel(item.element))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Color.envInk)
-                                .frame(width: 32, height: 32)
-                                .background(Color.envSurface2, in: Circle())
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(transactionTypeLabel(item.element)).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
-                                Text(item.element["description"] as? String ?? "Wallet activity").font(.caption).foregroundStyle(Color.envMuted).lineLimit(1)
-                                Text(item.element["created_at"] as? String ?? "").font(.caption2).foregroundStyle(Color.envMuted)
-                            }
-                            Spacer(minLength: 0)
+                            Text(item.element["description"] as? String ?? "Wallet activity")
+                                .font(.caption)
+                                .foregroundStyle(Color.envMuted)
+                                .lineLimit(1)
+                            Text(item.element["created_at"] as? String ?? "")
+                                .font(.caption2)
+                                .foregroundStyle(Color.envMuted)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .padding(.vertical, 4)
-                        if item.offset < min(activity.count, 5) - 1 { Divider().overlay(Color.envBorder, lineWidth: 1) }
+                        Spacer(minLength: 0)
                     }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.vertical, 4)
+                    if item.offset < min(activity.count, 5) - 1 { Divider().overlay(Color.envBorder, lineWidth: 1) }
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
     }
 
-    @ViewBuilder private var connectionSection: some View {
-            DisclosureGroup(isExpanded: $showConnection) {
+    private var connectionSection: some View {
+        DisclosureGroup(isExpanded: $showConnection) {
             if dashboard != nil {
                 Button("Reconnect this device") {
                     paired = false
-                    self.dashboard = nil
+                    dashboard = nil
                     pairingCode = ""
                     message = ""
                 }
@@ -1402,12 +1464,18 @@ private struct NativeWalletDashboardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Connect your enV wallet").font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
-                    Text("Pair this app with your signed-in web wallet to securely load your personal balance, rewards and transactions.")
-                        .font(.subheadline).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+                    Text("Connect your enV wallet")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Color.envInk)
+                    Text("Pair this app with your signed-in enV web wallet to securely load your personal balance, rewards and transactions.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
                     Link(destination: URL(string: "https://envtools.store/wallet")!) {
-                        Label("Open enV web Wallet", systemImage: "arrow.up.right.square").frame(maxWidth: .infinity)
-                    }.buttonStyle(.borderedProminent)
+                        Label("Open enV web Wallet", systemImage: "arrow.up.right.square")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
                     TextField("One-time pairing code", text: $pairingCode)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -1430,7 +1498,8 @@ private struct NativeWalletDashboardView: View {
                             }
                         }
                     } label: {
-                        Label(busy ? "Connecting…" : "Pair this iOS device", systemImage: "iphone").frame(maxWidth: .infinity)
+                        Label(busy ? "Connecting…" : "Pair this iOS device", systemImage: "iphone")
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(busy || pairingCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -1440,17 +1509,14 @@ private struct NativeWalletDashboardView: View {
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
             }
-            } label: {
-                Text(dashboard == nil ? "Connect account" : "Device connection")
-            }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(Color.envInk)
-            .padding(12)
-            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-    }
-
-efresh() }
+        } label: {
+            Text(dashboard == nil ? "Connect account" : "Device connection")
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(Color.envInk)
+        .padding(12)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
     }
 
     private func balanceHero(
@@ -1568,22 +1634,6 @@ efresh() }
         return number("delta_available_subunits", from: entry) >= 0 ? "arrow.down.left" : "arrow.up.right"
     }
 
-    private func paymentMethod(_ title: String, systemImage: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Color.envAccent)
-                .frame(width: 38, height: 38)
-                .background(Color.envSurface2, in: Circle())
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color.envInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private func walletMetric(_ title: String, _ value: String, _ detail: String, iconName: String? = nil) -> some View {
         HStack(alignment: .center, spacing: 6) {
             if let iconName {
@@ -1606,8 +1656,6 @@ efresh() }
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 }
-}
-
 struct NativeOfflineWalletPairingPanel: View {
     @State private var code = ""
     @State private var enabled = false
