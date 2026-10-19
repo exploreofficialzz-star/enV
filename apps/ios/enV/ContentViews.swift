@@ -1148,9 +1148,9 @@ private struct NativeWalletSparklineView: View {
                 path.addCurve(to: CGPoint(x: width * 0.48, y: height * 0.43), control1: CGPoint(x: width * 0.33, y: height * 0.78), control2: CGPoint(x: width * 0.38, y: height * 0.30))
                 path.addCurve(to: CGPoint(x: width * 0.70, y: height * 0.25), control1: CGPoint(x: width * 0.57, y: height * 0.58), control2: CGPoint(x: width * 0.60, y: height * 0.19))
                 path.addLine(to: tip)
-                path.move(to: CGPoint(x: width * 0.79, y: height * 0.08))
+                path.move(to: CGPoint(x: width * 0.80, y: height * 0.04))
                 path.addLine(to: tip)
-                path.addLine(to: CGPoint(x: width * 0.90, y: height * 0.27))
+                path.addLine(to: CGPoint(x: width * 0.96, y: height * 0.28))
             }
             .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
         }
@@ -1189,32 +1189,32 @@ private struct NativeWalletDashboardView: View {
                 onAddFunds: { if let url = URL(string: "https://envtools.store/wallet") { openURL(url) } }
             )
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                walletMetric("Deposited", dashboard == nil ? "—" : token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", "Deposited", iconName: "arrow.down.to.line")
-                walletMetric("Remaining", dashboard == nil ? "—" : token(number("availableTokens", from: wallet)) + " enV", "Available", iconName: "wallet.pass.fill")
-                walletMetric("Used", dashboard == nil ? "—" : token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", "Used", iconName: "chart.line.uptrend.xyaxis")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                walletMetric("Deposited", dashboard == nil ? "—" : token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), iconName: "arrow.down.to.line")
+                walletMetric("Remaining", dashboard == nil ? "—" : token(number("availableTokens", from: wallet)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("availableTokens", from: wallet)), iconName: "wallet.pass.fill")
+                walletMetric("Used", dashboard == nil ? "—" : token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("lifetimeConsumedSubunits", from: wallet) / 1000), iconName: "chart.line.uptrend.xyaxis")
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                walletMetric("Bonuses", dashboard == nil ? "—" : token(number("bonusTokens", from: rewards)) + " enV", "Bonus rewards", iconName: "gift.fill")
-                walletMetric("Referrals", dashboard == nil ? "—" : token(number("referralTokens", from: rewards)) + " enV", "Invite rewards", iconName: "person.2.fill")
-                walletMetric("Affiliate", dashboard == nil ? "—" : token(number("affiliateTokens", from: rewards)) + " enV", "Creator rewards", iconName: "link")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                walletMetric("Bonuses", dashboard == nil ? "—" : token(number("bonusTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("bonusTokens", from: rewards)), iconName: "gift.fill")
+                walletMetric("Referrals", dashboard == nil ? "—" : token(number("referralTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("referralTokens", from: rewards)), iconName: "person.2.fill")
+                walletMetric("Affiliate", dashboard == nil ? "—" : token(number("affiliateTokens", from: rewards)) + " enV", dashboard == nil ? "Value —" : tokenReferenceValue(number("affiliateTokens", from: rewards)), iconName: "link")
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "play.rectangle.fill")
-                        .font(.system(size: 23))
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "play.rectangle.fill"
+                        .font(.system(size: 20))
                         .foregroundStyle(Color.envInk)
-                        .frame(width: 48, height: 48)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+                        .frame(width: 40, height: 40)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Tag enV on your videos").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
                         Text("Earn tokens based on conversion.").font(.caption).foregroundStyle(Color.envMuted)
                     }
                     Spacer(minLength: 0)
                     NativeWalletSparklineView(color: Color(red: 0.08, green: 0.70, blue: 0.50))
-                        .frame(width: 84, height: 46)
+                        .frame(width: 70, height: 38)
                 }
 
                 HStack(spacing: 8) {
@@ -1266,9 +1266,9 @@ private struct NativeWalletDashboardView: View {
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 21).stroke(Color.envBorder, lineWidth: 1))
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "person.2.fill")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "person.2.fill"
                         .font(.system(size: 23))
                         .foregroundStyle(Color.envInk)
                         .frame(width: 48, height: 48)
@@ -1346,7 +1346,7 @@ private struct NativeWalletDashboardView: View {
                     }
                 }
             }
-            .padding(16)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
@@ -1422,11 +1422,11 @@ private struct NativeWalletDashboardView: View {
         onToggleVisibility: @escaping () -> Void,
         onAddFunds: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "wallet.pass.fill")
-                .font(.system(size: 27, weight: .medium))
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
+                .frame(width: 42, height: 42)
                 .background(Color.white.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
@@ -1453,7 +1453,7 @@ private struct NativeWalletDashboardView: View {
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 8) {
                 NativeWalletSparklineView(color: Color(red: 0.30, green: 1.0, blue: 0.80))
-                    .frame(width: 70, height: 42)
+                    .frame(width: 62, height: 32)
                 Button(action: onAddFunds) {
                     Label("Add funds", systemImage: "arrow.up.right")
                         .font(.caption.weight(.semibold))
@@ -1463,9 +1463,9 @@ private struct NativeWalletDashboardView: View {
                 .tint(Color(red: 0.20, green: 0.92, blue: 0.72))
             }
         }
-        .padding(16)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LinearGradient(colors: [Color(red: 0.09, green: 0.27, blue: 0.69), Color(red: 0.02, green: 0.22, blue: 0.31), Color(red: 0.0, green: 0.59, blue: 0.42)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 23))
+        .background(LinearGradient(colors: [Color(red: 0.09, green: 0.27, blue: 0.69), Color(red: 0.02, green: 0.22, blue: 0.31), Color(red: 0.0, green: 0.59, blue: 0.42)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 23).stroke(Color(red: 0.22, green: 0.95, blue: 0.75).opacity(0.36), lineWidth: 1))
     }
 
@@ -1497,6 +1497,10 @@ private struct NativeWalletDashboardView: View {
         return formatter.string(from: NSNumber(value: value)) ?? "0"
     }
 
+    private func tokenReferenceValue(_ tokens: Double) -> String {
+        "≈ $" + String(format: "%.2f", tokens * 0.01)
+    }
+
     private func paymentMethod(_ title: String, systemImage: String) -> some View {
         VStack(spacing: 6) {
             Image(systemName: systemImage)
@@ -1514,25 +1518,23 @@ private struct NativeWalletDashboardView: View {
     }
 
     private func walletMetric(_ title: String, _ value: String, _ detail: String, iconName: String? = nil) -> some View {
-        HStack(alignment: .center, spacing: 7) {
-            if let iconName {
-                Image(systemName: iconName)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.envInk)
-                    .frame(width: 26, height: 26)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 8))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.caption2.weight(.medium)).foregroundStyle(Color.envMuted).lineLimit(2)
-                Text(value).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(Color.envInk).lineLimit(2).minimumScaleFactor(0.8)
-                Text(detail).font(.system(size: 10)).foregroundStyle(Color.envMuted).lineLimit(1)
+        HStack(alignment: .center, spacing: 5) {
+            Image(systemName: iconName ?? "wallet.pass.fill")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.envInk)
+                .frame(width: 22, height: 22)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 7))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.envMuted).lineLimit(2)
+                Text(value).font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(Color.envInk).lineLimit(1).minimumScaleFactor(0.55)
+                Text(detail).font(.system(size: 8)).foregroundStyle(Color.envMuted).lineLimit(1).minimumScaleFactor(0.55)
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-        .padding(8)
-        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.envBorder, lineWidth: 1))
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .padding(5)
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 }
 
