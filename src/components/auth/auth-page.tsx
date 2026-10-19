@@ -60,7 +60,10 @@ export function AuthPage({ mode }: AuthPageProps) {
     setBusy(true);
     try {
       const pendingReferral = isSignUp ? window.localStorage.getItem("env.pendingReferralCode") : null;
-      const referralCallback = pendingReferral ? "/wallet?claimReferral=1" : "/agent";
+      const pendingSource = window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
+      const referralCallback = pendingReferral
+        ? `/wallet?claimReferral=1&ref=${encodeURIComponent(pendingReferral)}&source=${pendingSource}`
+        : "/agent";
       if (isSignUp) {
         const result = await authClient.signUp.email({
           name: name.trim(),
@@ -96,8 +99,8 @@ export function AuthPage({ mode }: AuthPageProps) {
       if (!authEnabled) throw new Error("Sign-in is temporarily unavailable. Please try again shortly.");
       const result = await authClient.signIn.social({
         provider,
-        callbackURL: isSignUp
-          ? (window.localStorage.getItem("env.pendingReferralCode") ? "/wallet?claimReferral=1" : "/agent")
+        callbackURL: isSignUp && window.localStorage.getItem("env.pendingReferralCode")
+          ? `/wallet?claimReferral=1&ref=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralCode")!)}&source=${window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral"}`
           : "/agent",
         errorCallbackURL: isSignUp ? "/signup" : "/account",
         disableRedirect: true,
