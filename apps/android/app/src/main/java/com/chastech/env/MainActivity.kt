@@ -481,7 +481,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     val previewWidth = minOf(maxWidth * 0.84f, 640.dp)
                     Row(Modifier.width(previewWidth), horizontalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 12.dp else 8.dp)) {
                         HomePreviewBar("AI Agent", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = onAssistant)
-                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = { onInformation("tokens") }, accessibilityLabel = "Open token guide")
+                        HomePreviewBar("Total token = 100", Modifier.weight(1f), isLarge = screenWidth >= 640, containerColor = homeSurface2, onClick = { onInformation("token-dashboard") }, accessibilityLabel = "Open token dashboard")
                     }
                 }
                 MostUsedToolsTray(mostUsed, onTool, homeSurface2, Modifier.fillMaxWidth())
