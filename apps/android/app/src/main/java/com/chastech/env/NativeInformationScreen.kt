@@ -204,30 +204,30 @@ private fun NativeWalletDashboard() {
 
         val videoLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}" }
         Card(
-            modifier = Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF063E37), Color(0xFF06304A), Color(0xFF0B1E36))), RoundedCornerShape(17.dp)),
+            modifier = Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF063E37), Color(0xFF06304A), Color(0xFF0B1E36))), RoundedCornerShape(15.dp)),
             shape = RoundedCornerShape(17.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             border = BorderStroke(1.dp, Color(0xFF16B58A).copy(alpha = 0.55f)),
         ) {
-            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.fillMaxWidth().padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Box(Modifier.size(32.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
-                        EnVIcon("Video", Modifier.size(17.dp), tint = Color.White)
+                    Box(Modifier.size(29.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Video", Modifier.size(15.dp), tint = Color.White)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Tag enV on your videos", style = MaterialTheme.typography.titleSmall, color = Color.White)
                         Text("Earn tokens based on conversion.", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
                     }
-                    NativeWalletSparkline(Modifier.size(width = 52.dp, height = 26.dp), Color(0xFF52FFD0))
+                    NativeWalletSparkline(Modifier.size(width = 46.dp, height = 23.dp), Color(0xFF52FFD0))
                 }
-                Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.14f), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.14f), RoundedCornerShape(10.dp)).padding(horizontal = 6.dp, vertical = 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     EnVIcon("Link2", Modifier.size(15.dp), tint = Color.White.copy(alpha = 0.9f))
                     Text(videoLink ?: "Your signed tag link", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.86f), maxLines = 1)
-                    IconButton(onClick = { videoLink?.let(::copyLink) }, enabled = videoLink != null, modifier = Modifier.size(30.dp).semantics { contentDescription = "Copy video tag link" }) {
+                    IconButton(onClick = { videoLink?.let(::copyLink) }, enabled = videoLink != null, modifier = Modifier.size(28.dp).semantics { contentDescription = "Copy video tag link" }) {
                         EnVIcon("Copy", Modifier.size(16.dp), tint = Color.White)
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = { videoLink?.let(::copyLink) }, enabled = videoLink != null, modifier = Modifier.weight(1f), colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = Color.White), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))) {
                         EnVIcon("Link2", Modifier.size(15.dp), tint = Color.White)
                         Spacer(Modifier.size(4.dp))
@@ -241,7 +241,7 @@ private fun NativeWalletDashboard() {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("${dashboard?.videoConversions ?: 0} verified conversions", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
-                    TextButton(onClick = { showVideoDetails = !showVideoDetails }, colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp)) { Text(if (showVideoDetails) "Hide details" else "View details", style = MaterialTheme.typography.labelSmall) }
+                    TextButton(onClick = { showVideoDetails = !showVideoDetails }, colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 5.dp, vertical = 1.dp)) { Text(if (showVideoDetails) "Hide details" else "View details", style = MaterialTheme.typography.labelSmall) }
                 }
                 if (showVideoDetails) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -260,33 +260,33 @@ private fun NativeWalletDashboard() {
 
         val referralLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}" }
         Card(
-            modifier = Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF171854), Color(0xFF24206B), Color(0xFF48206C))), RoundedCornerShape(17.dp)),
+            modifier = Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF171854), Color(0xFF24206B), Color(0xFF48206C))), RoundedCornerShape(15.dp)),
             shape = RoundedCornerShape(17.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             border = BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.45f)),
         ) {
-            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.fillMaxWidth().padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Box(Modifier.size(32.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
-                        EnVIcon("Users", Modifier.size(17.dp), tint = Color.White)
+                    Box(Modifier.size(29.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Users", Modifier.size(15.dp), tint = Color.White)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Refer a friend", style = MaterialTheme.typography.titleSmall, color = Color.White)
                         Text("Share your referral link and you both get rewarded with enV tokens!", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.80f))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        EnVIcon("PartyPopper", Modifier.size(21.dp), tint = Color.White)
+                        EnVIcon("PartyPopper", Modifier.size(19.dp), tint = Color.White)
                         Text("Both get rewarded!", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.78f))
                     }
                 }
-                Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.14f), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.14f), RoundedCornerShape(10.dp)).padding(horizontal = 6.dp, vertical = 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     EnVIcon("Link2", Modifier.size(15.dp), tint = Color.White.copy(alpha = 0.9f))
                     Text(referralLink ?: "Your referral link", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.86f), maxLines = 1)
-                    IconButton(onClick = { referralLink?.let(::copyLink) }, enabled = referralLink != null, modifier = Modifier.size(30.dp).semantics { contentDescription = "Copy referral link" }) {
+                    IconButton(onClick = { referralLink?.let(::copyLink) }, enabled = referralLink != null, modifier = Modifier.size(28.dp).semantics { contentDescription = "Copy referral link" }) {
                         EnVIcon("Copy", Modifier.size(16.dp), tint = Color.White)
                     }
                 }
-                Button(onClick = { referralLink?.let { shareLink(it, "Share referral link") } }, enabled = referralLink != null, modifier = Modifier.fillMaxWidth(), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFF3DF1C2), contentColor = Color(0xFF052A2A)), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 7.dp)) {
+                Button(onClick = { referralLink?.let { shareLink(it, "Share referral link") } }, enabled = referralLink != null, modifier = Modifier.fillMaxWidth(), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color(0xFF3DF1C2), contentColor = Color(0xFF052A2A)), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 5.dp)) {
                     EnVIcon("Share2", Modifier.size(15.dp), tint = Color(0xFF052A2A))
                     Spacer(Modifier.size(5.dp))
                     Text("Share now", style = MaterialTheme.typography.labelLarge)

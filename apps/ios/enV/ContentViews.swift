@@ -1218,12 +1218,12 @@ private struct NativeWalletDashboardView: View {
     }
 
     private var videoTagCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 7) {
                 Image(systemName: "play.rectangle.fill")
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Tag enV on your videos")
@@ -1235,10 +1235,10 @@ private struct NativeWalletDashboardView: View {
                 }
                 Spacer(minLength: 0)
                 NativeWalletSparklineView(color: Color(red: 0.32, green: 1.0, blue: 0.80))
-                    .frame(width: 52, height: 27)
+                    .frame(width: 46, height: 23)
             }
 
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 Image(systemName: "link").foregroundStyle(Color.white.opacity(0.9))
                 Text(dashboard == nil ? "Your signed tag link" : videoLink)
                     .font(.caption)
@@ -1252,13 +1252,13 @@ private struct NativeWalletDashboardView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
                 .accessibilityLabel("Copy video tag link")
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
             .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
 
             HStack(spacing: 7) {
@@ -1295,7 +1295,7 @@ private struct NativeWalletDashboardView: View {
                 }
             }
         }
-        .padding(8)
+         .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
@@ -1317,12 +1317,12 @@ private struct NativeWalletDashboardView: View {
     }
 
     private var referralCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 7) {
                 Image(systemName: "person.2.fill")
-                    .font(.system(size: 17))
+                    .font(.system(size: 16))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Refer a friend")
@@ -1335,7 +1335,7 @@ private struct NativeWalletDashboardView: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 2) {
                     Image(systemName: "gift.fill")
-                        .font(.system(size: 17))
+                        .font(.system(size: 16))
                         .foregroundStyle(.white)
                     Text("Both rewarded")
                         .font(.system(size: 9, weight: .medium))
@@ -1357,13 +1357,13 @@ private struct NativeWalletDashboardView: View {
                 } label: {
                     Image(systemName: "doc.on.doc")
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
                 .accessibilityLabel("Copy referral link")
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6)
             .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
 
             HStack {
@@ -1389,7 +1389,7 @@ private struct NativeWalletDashboardView: View {
                 }
             }
         }
-        .padding(8)
+         .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
