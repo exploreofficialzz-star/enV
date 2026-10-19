@@ -58,6 +58,18 @@ function tokenAmount(subunits: number): string {
 function tokenLabel(tokens: number): string {
   return `${tokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV`;
 }
+function tokenUnitDisplay(label: string): React.ReactNode {
+  const unitIndex = label.lastIndexOf(" enV");
+  if (unitIndex < 0) return label;
+  const trailingText = label.slice(unitIndex + 4).trim();
+  return (
+    <>
+      {label.slice(0, unitIndex)}
+      <span className="ml-1 align-baseline text-[0.62em] font-semibold tracking-normal opacity-80">enV</span>
+      {trailingText ? <span className="ml-1">{trailingText}</span> : null}
+    </>
+  );
+}
 function referenceValue(tokens: number): string {
   return `Estimated reference value $${(tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
 }
@@ -105,7 +117,7 @@ function MetricCard({ title, value, detail, icon }: { title: string; value: stri
         <p className="text-sm font-medium text-muted">{title}</p>
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent">{icon}</span>
       </div>
-      <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{value}</p>
+      <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{tokenUnitDisplay(value)}</p>
       <p className="mt-1 text-xs leading-5 text-muted">{detail}</p>
     </article>
   );
@@ -217,14 +229,14 @@ export function TokenDashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-white/75">Total token</p>
-                    <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{wallet ? tokenLabel(wallet.availableTokens) : tokenLabel(0)}</p>
+                    <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{tokenUnitDisplay(wallet ? tokenLabel(wallet.availableTokens) : tokenLabel(0))}</p>
                     <p className="mt-2 text-xs text-white/75">enV estimated reference value ≈ $0.010</p>
                   </div>
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10"><Coins size={23} aria-hidden="true" /></span>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/15 pt-3">
-                  <div><p className="text-xs text-white/70">Reserved</p><p className="mt-1 text-sm font-semibold tabular-nums">{wallet ? tokenLabel(wallet.reservedTokens) : tokenLabel(0)}</p></div>
-                  <div><p className="text-xs text-white/70">Total used ever</p><p className="mt-1 text-sm font-semibold tabular-nums">{wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : tokenLabel(0)}</p></div>
+                  <div><p className="text-xs text-white/70">Reserved</p><p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.reservedTokens) : tokenLabel(0))}</p></div>
+                  <div><p className="text-xs text-white/70">Total used ever</p><p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : tokenLabel(0))}</p></div>
                 </div>
               </article>
               <MetricCard title="Today's token spent" value={summary ? tokenLabel(summary.todaySpentSubunits / 1_000) : tokenLabel(0)} detail="Confirmed deductions since local midnight" icon={<Clock3 size={16} aria-hidden="true" />} />
@@ -296,7 +308,7 @@ export function TokenDashboard() {
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center justify-between gap-3 pl-12 sm:flex-col sm:items-end sm:pl-0">
-                          <p className="text-sm font-semibold tabular-nums text-fg">{isCharge ? tokenLabel(item.tokensSpent) : tokenLabel(item.billedTokens)}</p>
+                          <p className="text-sm font-semibold tabular-nums text-fg">{tokenUnitDisplay(isCharge ? tokenLabel(item.tokensSpent) : tokenLabel(item.billedTokens))}</p>
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${isCharge ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-surface-2 text-muted"}`}>
                             {isCharge ? <CheckCircle2 size={11} aria-hidden="true" /> : <Activity size={11} aria-hidden="true" />}
                             {isCharge ? "Confirmed deduction" : item.billedTokens > 0 ? "Metered amount" : "No token deduction"}

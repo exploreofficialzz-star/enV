@@ -205,7 +205,7 @@ private fun NativeTokenDashboard() {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("Total token", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.82f))
                             Text(
-                                (dashboard?.availableTokens ?: 0.0).formatWalletTokens() + " enV",
+                                walletTokenUnitDisplay((dashboard?.availableTokens ?: 0.0).formatWalletTokens() + " enV"),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
                             )
@@ -216,11 +216,11 @@ private fun NativeTokenDashboard() {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text("Reserved", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
-                            Text((dashboard?.reservedTokens ?: 0.0).formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                            Text(walletTokenUnitDisplay((dashboard?.reservedTokens ?: 0.0).formatWalletTokens() + " enV"), style = MaterialTheme.typography.titleSmall, color = Color.White)
                         }
                         Column(Modifier.weight(1f)) {
                             Text("Total used ever", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
-                            Text((dashboard?.lifetimeConsumedTokens ?: 0.0).formatWalletTokens() + " enV", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                            Text(walletTokenUnitDisplay((dashboard?.lifetimeConsumedTokens ?: 0.0).formatWalletTokens() + " enV"), style = MaterialTheme.typography.titleSmall, color = Color.White)
                         }
                     }
                 }
@@ -293,7 +293,7 @@ private fun NativeTokenDashboard() {
                         if (index > 0) androidx.compose.material3.HorizontalDivider()
                         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(row.toolName.ifBlank { row.toolId }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                            Text(row.tokensSpent.formatWalletTokens() + " enV spent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            Text(walletTokenUnitDisplay(row.tokensSpent.formatWalletTokens() + " enV spent"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (row.description.isNotBlank()) Text(row.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (row.billingKey.isNotBlank()) Text("Meter: " + row.billingKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -319,7 +319,7 @@ private fun NativeTokenDashboard() {
                         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(row.toolId.replace(Regex("[._-]+"), " "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text("Recorded status: " + row.status.replace('_', ' '), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(row.billedTokens.formatWalletTokens() + " enV charged in metering record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(walletTokenUnitDisplay(row.billedTokens.formatWalletTokens() + " enV charged in metering record"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             val metricText = row.metrics.entries.take(4).joinToString(" · ") { (key, value) -> "$key: ${value.formatWalletTokens()}" }
                             if (metricText.isNotBlank()) Text(metricText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -610,7 +610,7 @@ private fun NativeWalletHero(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("🪙", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBFFFE9))
                     Text(
-                        if (!showBalance) "•••• enV" else "≈ " + (availableTokens?.formatWalletTokens() ?: "0.000") + " enV",
+                        walletTokenUnitDisplay(if (!showBalance) "•••• enV" else "≈ " + (availableTokens?.formatWalletTokens() ?: "0.000") + " enV"),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFBFFFE9),
                         maxLines = 1,
@@ -674,9 +674,24 @@ private fun NativeWalletMetric(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(title, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                Text(value, style = MaterialTheme.typography.labelMedium, fontSize = 10.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
+                Text(walletTokenUnitDisplay(value), style = MaterialTheme.typography.labelMedium, fontSize = 10.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
                 Text(subtitle, style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)
             }
+        }
+    }
+}
+
+private fun walletTokenUnitDisplay(label: String) = buildAnnotatedString {
+    val unitIndex = label.lastIndexOf(" enV")
+    if (unitIndex < 0) {
+        append(label)
+    } else {
+        append(label.substring(0, unitIndex))
+        withStyle(SpanStyle(fontSize = 0.62.em, fontWeight = FontWeight.Medium)) { append(" enV") }
+        val trailingText = label.substring(unitIndex + 4).trim()
+        if (trailingText.isNotEmpty()) {
+            append(" ")
+            append(trailingText)
         }
     }
 }

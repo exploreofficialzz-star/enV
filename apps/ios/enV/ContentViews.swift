@@ -1,6 +1,14 @@
 import SwiftUI
 import UIKit
 
+private func styledEnVUnit(_ label: String, unitSize: CGFloat) -> Text {
+    var attributed = AttributedString(label)
+    if let unitRange = attributed.range(of: " enV", options: .backwards) {
+        attributed[unitRange].font = .system(size: unitSize, weight: .medium)
+    }
+    return Text(attributed)
+}
+
 struct Screen: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -1230,7 +1238,7 @@ private struct NativeTokenDashboardView: View {
                     Text("Total token")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white.opacity(0.78))
-                    Text(token(number("availableTokens", from: wallet)) + " enV")
+                    styledEnVUnit(token(number("availableTokens", from: wallet)) + " enV", unitSize: 13)
                         .font(.system(size: 31, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
@@ -1250,7 +1258,7 @@ private struct NativeTokenDashboardView: View {
                     Text("Reserved")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.70))
-                    Text(token(number("reservedTokens", from: wallet)) + " enV")
+                    styledEnVUnit(token(number("reservedTokens", from: wallet)) + " enV", unitSize: 9)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                 }
@@ -1259,7 +1267,7 @@ private struct NativeTokenDashboardView: View {
                     Text("Total used ever")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.70))
-                    Text(token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV")
+                    styledEnVUnit(token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV", unitSize: 9)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                 }
@@ -1330,7 +1338,7 @@ private struct NativeTokenDashboardView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.envInk)
                         HStack {
-                            Text(token(number("tokensSpent", from: item)) + " enV spent")
+                            styledEnVUnit(token(number("tokensSpent", from: item)) + " enV spent", unitSize: 9)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Color.envAccent)
                             Spacer(minLength: 4)
@@ -1378,7 +1386,7 @@ private struct NativeTokenDashboardView: View {
                             .font(.caption)
                             .foregroundStyle(Color.envMuted)
                         HStack {
-                            Text(token(number("billedTokens", from: item)) + " enV billed in telemetry")
+                            styledEnVUnit(token(number("billedTokens", from: item)) + " enV billed in telemetry", unitSize: 8)
                                 .font(.caption)
                                 .foregroundStyle(Color.envMuted)
                             Spacer(minLength: 4)
@@ -1413,7 +1421,7 @@ private struct NativeTokenDashboardView: View {
                 Image(systemName: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
                 Text(title).font(.caption.weight(.medium)).foregroundStyle(Color.envMuted)
             }
-            Text(value)
+            styledEnVUnit(value, unitSize: 10)
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.envInk)
                 .lineLimit(2)
@@ -1588,7 +1596,7 @@ private struct NativeWalletDashboardView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(Color.white.opacity(0.86))
-                    .textSelection(.enabled)
+                    
                 Spacer(minLength: 0)
                 Button {
                     UIPasteboard.general.string = videoLink
@@ -1601,6 +1609,8 @@ private struct NativeWalletDashboardView: View {
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
                 .accessibilityLabel("Copy video tag link")
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .padding(.horizontal, 6)
             .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
@@ -1700,7 +1710,7 @@ private struct NativeWalletDashboardView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(Color.white.opacity(0.86))
-                    .textSelection(.enabled)
+                    
                 Spacer(minLength: 0)
                 Button {
                     UIPasteboard.general.string = referralLink
@@ -1713,6 +1723,8 @@ private struct NativeWalletDashboardView: View {
                 .buttonStyle(.plain)
                 .disabled(dashboard == nil)
                 .accessibilityLabel("Copy referral link")
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .padding(.horizontal, 6)
             .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
@@ -1929,7 +1941,7 @@ private struct NativeWalletDashboardView: View {
                     .font(.system(size: 30, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
                     Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
-                    Text(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV")
+                    styledEnVUnit(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV", unitSize: 9)
                         .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
                 }
                 Text(showBalance ? tokenReferenceValue(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
@@ -2028,7 +2040,7 @@ private struct NativeWalletDashboardView: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.envMuted).lineLimit(2)
-                Text(value).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.envInk).lineLimit(1).minimumScaleFactor(0.7)
+                styledEnVUnit(value, unitSize: 7).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.envInk).lineLimit(1).minimumScaleFactor(0.7)
                 Text(detail).font(.system(size: 8)).foregroundStyle(Color.envMuted).lineLimit(2).minimumScaleFactor(0.75)
             }
             Spacer(minLength: 0)

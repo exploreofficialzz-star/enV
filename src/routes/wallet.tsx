@@ -95,6 +95,19 @@ function tokenReferenceValue(tokens: number): string {
   return "Estimated token value " + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
+function tokenUnitDisplay(label: string): React.ReactNode {
+  const unitIndex = label.lastIndexOf(" enV");
+  if (unitIndex < 0) return label;
+  const trailingText = label.slice(unitIndex + 4).trim();
+  return (
+    <>
+      {label.slice(0, unitIndex)}
+      <span className="ml-1 align-baseline text-[0.62em] font-semibold tracking-normal opacity-80">enV</span>
+      {trailingText ? <span className="ml-1">{trailingText}</span> : null}
+    </>
+  );
+}
+
 function activitySummary(entry: WalletActivity): string {
   if (entry.entry_type === "reservation") return `Reserved ${tokenAmount(Math.abs(entry.delta_reserved_subunits))} tokens`;
   if (entry.consumed_subunits > 0) return `Used ${tokenAmount(entry.consumed_subunits)} tokens`;
@@ -135,7 +148,7 @@ function MetricCard({ title, value, description, icon, className = "" }: { title
     <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg sm:size-8">{icon}</span>
     <div className="min-w-0 flex-1">
       <p className="break-words text-[10px] font-medium leading-3 text-muted sm:text-xs">{title}</p>
-      <p className="mt-0.5 break-words text-xs font-semibold leading-4 tracking-tight text-fg sm:text-sm">{value}</p>
+      <p className="mt-0.5 break-words text-xs font-semibold leading-4 tracking-tight text-fg sm:text-sm">{tokenUnitDisplay(value)}</p>
       <p className="mt-0.5 text-[9px] leading-3 text-muted sm:text-[10px]">{description}</p>
     </div>
   </div>;
@@ -561,7 +574,7 @@ function Account() {
                   </button>
                 </div>
                 <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{showBalance ? tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "••••••"}</p>
-                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true"/><span>≈ {showBalance ? (visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " enV" : "•••• enV"}</span></p>
+                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true"/><span>{tokenUnitDisplay(showBalance ? "≈ " + (visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " enV" : "•••• enV")}</span></p>
                 <p className="mt-0.5 text-[10px] text-white/75 sm:text-xs">{showBalance ? "Estimated token value " + ((visibleWallet?.availableTokens ?? 0) * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "Estimated token value ••••••"}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">

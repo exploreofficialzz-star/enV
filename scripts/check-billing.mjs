@@ -127,6 +127,7 @@ assert.match(ledger, /referral_invitee/);
 assert.match(ledger, /affiliate_conversion/);
 assert.match(walletDashboard, /Total deposited/);
 assert.match(walletDashboard, /Total used/);
+assert.match(walletDashboard, /function tokenUnitDisplay\(label: string\): React\.ReactNode[\s\S]*?text-\[0\.62em\]/, "web wallet must render enV as a smaller unit suffix");
 assert.match(walletDashboard, /Referral and creator rewards/);
 assert.match(walletDashboard, /Fund(?: your)? wallet/i);
 assert.match(fundingOptionsRoute, /getFundingOptions/);
@@ -137,6 +138,7 @@ assert.ok(homePage.includes('to="/tokens" aria-label="Open token dashboard"'), "
 assert.ok(tokensRoute.includes('createFileRoute("/tokens")') && tokensRoute.includes("TokenDashboard"), "the established tokens URL must render the token dashboard");
 assert.match(tokenDashboardPage, /createFileRoute\("\/token-dashboard"\)/, "the usage dashboard route must be registered");
 assert.match(tokenDashboardComponent, /Welcome to your token dashboard/, "dashboard must welcome users directly");
+assert.match(tokenDashboardComponent, /function tokenUnitDisplay\(label: string\): React\.ReactNode[\s\S]*?text-\[0\.62em\]/, "web token dashboard must render enV as a smaller unit suffix");
 assert.match(tokenDashboardComponent, /Today's token spent/, "dashboard must expose today's token total");
 assert.match(tokenDashboardComponent, /Last week token spent/, "dashboard must expose its seven-day token total");
 assert.match(tokenDashboardComponent, /Last month token spent/, "dashboard must expose its thirty-day token total");
@@ -157,6 +159,10 @@ const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashb
 assert.match(androidTokenDashboard, /Text\("Open wallet"\)/, "Android token dashboard must place Open wallet beside the welcome heading");
 assert.match(androidTokenDashboard, /Row\(Modifier\.fillMaxWidth\(\), verticalAlignment = Alignment\.Top[\s\S]*"Welcome to your token dashboard"[\s\S]*Text\("Open wallet"\)/, "Android Open wallet action must share the welcome row");
 assert.match(androidTokenDashboard, /displayDaily = if \(daily\.isEmpty\(\)\)/, "Android empty-wallet preview must render seven zero-use chart bars");
+assert.match(androidPricing, /private fun walletTokenUnitDisplay\(label: String\)[\s\S]*?fontSize = 0\.62\.em/, "Android token units must use a smaller proportional suffix");
+assert.match(iosPricing, /private func styledEnVUnit\(_ label: String, unitSize: CGFloat\)[\s\S]*?range\(of: " enV", options: \.backwards\)/, "iOS token units must render with a smaller suffix font");
+assert.doesNotMatch(iosPricing, /Text\(dashboard == nil \? "Your signed tag link" : videoLink\)[\s\S]{0,180}\.textSelection\(\.enabled\)/, "iOS wallet link text must not create a small text-selection hit target");
+assert.match(iosPricing, /\.accessibilityLabel\("Copy video tag link"\)[\s\S]{0,100}\.frame\(width: 44, height: 44\)/, "iOS copy-link hit target must remain at least 44pt");
 assert.match(androidTokenDashboard, /dashboard\?\.availableTokens \?: 0\.0/, "Android empty-wallet preview must show zero token balance");
 assert.match(androidTokenDashboard, /NativeWalletMetric\("Total deposited"/ , "Android dashboard must show total deposited");
 assert.match(androidTokenDashboard, /NativeWalletMetric\("Token deductions"/ , "Android dashboard must show a deductions count");
