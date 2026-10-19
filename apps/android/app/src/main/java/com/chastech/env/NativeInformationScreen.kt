@@ -327,7 +327,7 @@ private fun NativeTokenDashboard() {
                             Text("Recorded status: " + row.status.replace('_', ' '), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(row.billedTokens.formatWalletTokens() + " enV charged in metering record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            val metricText = row.metrics.entries.take(4).joinToString(" · ") { (key, value) -> "$key: \${value.formatWalletTokens()}" }
+                            val metricText = row.metrics.entries.take(4).joinToString(" · ") { (key, value) -> "$key: ${value.formatWalletTokens()}" }
                             if (metricText.isNotBlank()) Text(metricText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
