@@ -33,7 +33,7 @@ for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-
 for (const phrase of ['clear storage before syncing', 'automatic token deductions', 'How does enV prevent fraud?']) {
   assert.ok(help.toLowerCase().includes(phrase.toLowerCase()), `Help center must explain: ${phrase}`);
 }
-for (const phrase of ['provisional', 'tool-by-tool', 'getSearchableTools']) assert.ok(tokens.toLowerCase().includes(phrase.toLowerCase()), `Token guide is missing ${phrase}`);
+for (const phrase of ['tool-by-tool', 'getSearchableTools', 'usage factors']) assert.ok(tokens.toLowerCase().includes(phrase.toLowerCase()), `Token guide is missing ${phrase}`);
 assert.ok(detail.includes('/api/billing/tool?toolId='), 'Tool detail must load a server-owned billing profile');
 for (const phrase of ['billing_offline_allowances', 'billing_offline_transactions', 'billing_security_events', 'unique (allowance_id, transaction_id)', 'unique (allowance_id, sequence_number)']) {
   assert.ok(migration.includes(phrase), `Offline migration missing safety invariant: ${phrase}`);
