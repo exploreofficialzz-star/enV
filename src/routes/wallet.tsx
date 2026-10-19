@@ -34,7 +34,7 @@ type WalletActivity = {
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type RewardsData = {
-  referralCode: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
+  referralCode: string; videoSignature: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
   videoSignups: number; videoConversions: number; referralTokens: number; affiliateTokens: number;
   bonusTokens: number; pendingRewardTokens: number; totalRewardTokens: number;
 };
@@ -175,6 +175,7 @@ function Account() {
     if (params.get("claimReferral") !== "1") return;
     const referralCode = params.get("ref") ?? window.localStorage.getItem("env.pendingReferralCode");
     const source = params.get("source") === "video" || window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
+    const signature = params.get("sig") ?? window.localStorage.getItem("env.pendingReferralSignature");
     if (!referralCode) {
       window.history.replaceState({}, "", "/wallet");
       return;
@@ -183,17 +184,19 @@ function Account() {
     void fetch("/api/billing/rewards/claim-referral", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ referralCode, source }), signal: controller.signal,
+      body: JSON.stringify({ referralCode, source, signature }), signal: controller.signal,
     }).then(async response => {
       const payload = await response.json().catch(() => null) as { ok?: boolean; data?: { alreadyClaimed?: boolean }; message?: string } | null;
       if (response.ok && payload?.ok) {
         window.localStorage.removeItem("env.pendingReferralCode");
         window.localStorage.removeItem("env.pendingReferralSource");
+        window.localStorage.removeItem("env.pendingReferralSignature");
         setFundingFeedback({ kind: "success", message: payload.data?.alreadyClaimed ? "Your referral is already connected to this account." : "Your referral is connected. Rewards unlock after a verified qualifying purchase." });
         setRewardsReloadKey(value => value + 1);
       } else if (response.status !== 401 && response.status !== 503) {
         window.localStorage.removeItem("env.pendingReferralCode");
         window.localStorage.removeItem("env.pendingReferralSource");
+        window.localStorage.removeItem("env.pendingReferralSignature");
         setFundingFeedback({ kind: "error", message: payload?.message ?? "This referral could not be applied to the account." });
       }
     }).catch(() => {
@@ -296,8 +299,12 @@ function Account() {
     return () => controller.abort();
   }, [reloadKey]);
 
-  async function copyReferralLink(code: string, source: "referral" | "video") {
-    const link = `${window.location.origin}/signup?ref=${encodeURIComponent(code)}${source === "video" ? "&source=video" : ""}`;
+  async function copyReferralLink(code: string, source: "referral" | "video", signature?: string) {
+    if (source === "video" && !signature) {
+      setFundingFeedback({ kind: "error", message: "The signed video affiliate link is unavailable. Refresh the wallet and try again." });
+      return;
+    }
+    const link = `${window.location.origin}/signup?ref=${encodeURIComponent(code)}${source === "video" ? `&source=video&sig=${encodeURIComponent(signature!)}` : ""}`;
     try {
       await navigator.clipboard.writeText(link);
       setFundingFeedback({ kind: "success", message: source === "video" ? "Video affiliate link copied. Add it to your video caption or profile." : "Referral link copied. Your conversion and reward status will appear here." });
@@ -597,8 +604,8 @@ function Account() {
                   <div className="rounded-2xl border border-border p-4">
                     <h3 className="font-medium text-fg">Video affiliate program</h3>
                     <p className="mt-1 text-sm leading-5 text-muted">Mention enV in relevant videos and add this unique link to your caption or profile. Affiliate tokens are calculated from verified purchase conversions, with server-side caps against abuse.</p>
-                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video</code>
-                    <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video")} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy video link</button>
+                    <code className="mt-3 block break-all rounded-lg bg-surface-2 p-3 text-xs text-fg">{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video&amp;sig={rewardsState.data.videoSignature}</code>
+                    <button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video", rewardsState.data!.videoSignature)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><Copy size={15} aria-hidden="true" /> Copy video link</button>
                   </div>
                 </div>
               </> : null}
