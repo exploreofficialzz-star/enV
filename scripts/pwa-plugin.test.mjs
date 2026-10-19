@@ -233,7 +233,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
   assert.match(home, /Total token = 100/);
-  assert.match(home, /to="\/tokens" aria-label="Open token guide"/);
+  assert.match(home, /to="\/token-dashboard" aria-label="Open token dashboard"/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
   assert.match(home, /text-center text-\[11\.1px\]/);
