@@ -141,6 +141,10 @@ assert.match(tokenDashboardComponent, /Today's token spent/, "dashboard must exp
 assert.match(tokenDashboardComponent, /Last week token spent/, "dashboard must expose its seven-day token total");
 assert.match(tokenDashboardComponent, /Last month token spent/, "dashboard must expose its thirty-day token total");
 assert.match(tokenDashboardComponent, /Token usage history/, "dashboard must expose the usage timeline");
+assert.doesNotMatch(tokenDashboardComponent, /Token usage could not be loaded/, "the token dashboard must not collapse to a blocking error fallback");
+assert.doesNotMatch(tokenDashboardComponent, /loadState === "ready" && wallet && summary \?/, "the full dashboard layout must render even while account data is unavailable");
+assert.match(tokenDashboardComponent, /loadState === "auth-disabled"/, "the dashboard must distinguish disabled production auth from a transient API failure");
+assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/, "unavailable wallet balances must remain unknown instead of being fabricated");
 assert.match(tokenDashboardComponent, /formatTimestamp\(item\.createdAt\)/, "usage history must show recorded timestamps");
 assert.match(tokenDashboardComponent, /resolveToolName\(item\.toolId/, "usage history must resolve recorded tool names");
 assert.match(tokenUsageRoute, /requireOfflineBillingUser/, "token history must require an authenticated account or valid paired-device session");
