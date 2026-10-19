@@ -194,7 +194,7 @@ export function TokenDashboard() {
           </p>
         </header>
 
-        {loadState !== "ready" ? (
+        {loadState !== "ready" && loadState !== "auth-disabled" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3" role="status" aria-live="polite">
             <p className="min-w-0 flex-1 text-sm leading-5 text-muted">
               {loadState === "loading"
@@ -202,7 +202,7 @@ export function TokenDashboard() {
                 : loadState === "signed-out"
                   ? "Sign in to load your real enV balance, spending totals, and token activity."
                   : loadState === "auth-disabled"
-                    ? "Preview display: showing 0.000 enV until real account data is connected."
+                    ? ""
                     : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
             </p>
             {loadState === "signed-out" ? (
@@ -314,8 +314,8 @@ export function TokenDashboard() {
               ) : (
                 <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center">
                   <span className="mx-auto grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><ShieldCheck size={20} aria-hidden="true" /></span>
-                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "auth-disabled" ? "Preview history until your account is connected" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
-                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. These zero values are only the initial wallet preview." : loadState === "auth-disabled" ? "These are initial 0.000 enV preview values. Connect production authentication to display the real account balance and activity." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
+                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "auth-disabled" ? "No token activity recorded yet" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
+                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. These zero values are only the initial wallet preview." : loadState === "auth-disabled" ? "Confirmed wallet deductions and recorded tool activity will appear here." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
                 </div>
               )}
               {visibleTimeline.length > 12 ? (
