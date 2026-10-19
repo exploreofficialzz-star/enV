@@ -1317,6 +1317,10 @@ private struct NativePricingInformationPage: View {
                 enVCharacterSpacedText("100 tokens ≈ $1.00 USD").font(.envScaled(size: 25, weight: .semibold)).foregroundStyle(Color.envInk)
                 enVCharacterSpacedText("One token represents one US cent at the reference rate. The ledger stores integer milli-tokens so a lightweight operation can use 0.1 token without floating-point rounding errors.")
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("Prices are listed in USD for reference. Before any future purchase, the final currency and total will be shown.")
+                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                enVCharacterSpacedText("Illustrative reference amounts: $0.30, $0.50, $0.80, $1.20, and $5.00.")
+                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                 enVCharacterSpacedText("Illustrative value only — not an active offer or store price.")
                     .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
             }
