@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowDownToLine, Coins, RefreshCw, ShieldCheck, Wallet, WifiOff, Clock3, Copy, Smartphone, ShieldBan, Gift, Users, Video, CreditCard, TrendingUp, ExternalLink, Share2, ArrowUpRight, Link2, Landmark, Zap, ChevronRight, ChevronDown } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -39,9 +39,6 @@ type RewardsData = {
   bonusTokens: number; pendingRewardTokens: number; totalRewardTokens: number;
 };
 type RewardsState = { status: "loading" | "ready" | "unavailable"; data?: RewardsData; message?: string };
-type FundingPack = { tokens: number; amountMinor: number | null; currency: string };
-type FundingData = { enabled: boolean; provider: string; currency: string; message: string; packs: FundingPack[] };
-type FundingState = { status: "loading" | "ready" | "unavailable"; data?: FundingData; message?: string };
 type OfflineAllowance = {
   allowanceId: string;
   platform?: "web" | "android" | "ios" | string;
@@ -123,13 +120,13 @@ function Account() {
   const [nativeSessions, setNativeSessions] = useState<NativeDeviceSession[]>([]);
   const [nativeSessionsMessage, setNativeSessionsMessage] = useState("");
   const [rewardsState, setRewardsState] = useState<RewardsState>({ status: "loading" });
-  const [fundingState, setFundingState] = useState<FundingState>({ status: "loading" });
   const [rewardsReloadKey, setRewardsReloadKey] = useState(0);
   const [selectedTokenPack, setSelectedTokenPack] = useState(100);
   const [fundingBusy, setFundingBusy] = useState(false);
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
-  const [showGateways, setShowGateways] = useState(false);
+  const [showBalance, setShowBalance] = useState(true);
+  const [showVideoDetails, setShowVideoDetails] = useState(false);
 
 
   useEffect(() => {
@@ -145,20 +142,6 @@ function Account() {
       });
     return () => controller.abort();
   }, [rewardsReloadKey, reloadKey]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
-      .then(async response => {
-        const payload = await response.json() as { ok?: boolean; data?: FundingData; message?: string };
-        if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.message ?? "Funding options are unavailable.");
-        setFundingState({ status: "ready", data: payload.data });
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setFundingState({ status: "unavailable", message: error instanceof Error ? error.message : "Funding options are unavailable." });
-      });
-    return () => controller.abort();
-  }, [reloadKey]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -533,155 +516,115 @@ function Account() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
-        <header className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-1 text-xl font-semibold tracking-tight text-fg" aria-label="enV">
-              <span>en</span><span className="text-accent">V</span>
-            </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">Wallet</h1>
-            <p className="mt-1 text-sm text-muted">Manage your balance, tokens, rewards and more.</p>
-          </div>
-          <button type="button" onClick={() => { setReloadKey(value => value + 1); setRewardsReloadKey(value => value + 1); }} aria-label="Refresh wallet" title="Refresh wallet" className="mt-1 inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-muted transition hover:bg-surface-2 hover:text-fg">
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-        </header>
+        <p className="mb-4 text-sm leading-6 text-muted">Manage your balance, tokens, rewards and more.</p>
 
         <section className="space-y-3" aria-label="Wallet overview">
-          <div className="relative isolate overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-5 text-white shadow-sm sm:p-7">
-            <div className="pointer-events-none absolute -right-3 top-0 hidden opacity-90 sm:block" aria-hidden="true">
-              <svg viewBox="0 0 240 130" className="h-32 w-56" fill="none">
-                <path d="M4 112 C35 105 41 80 65 90 S89 110 111 77 S142 58 159 68 S188 24 206 39 S226 30 238 8" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round"/>
-                <path d="M4 112 C35 105 41 80 65 90 S89 110 111 77 S142 58 159 68 S188 24 206 39 S226 30 238 8 L238 130 L4 130 Z" fill="url(#wallet-chart-fill)" opacity=".18"/>
-                <defs><linearGradient id="wallet-chart-fill" x1="120" y1="8" x2="120" y2="130" gradientUnits="userSpaceOnUse"><stop stopColor="#52ffd0"/><stop offset="1" stopColor="#52ffd0" stopOpacity="0"/></linearGradient></defs>
-              </svg>
-            </div>
-            <div className="relative flex flex-wrap items-end justify-between gap-5">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-medium text-white/90"><Wallet size={17} aria-hidden="true"/> Total balance</div>
-                <p className="mt-2 text-3xl font-semibold tracking-tight sm:text-5xl">{visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</p>
-                <p className="mt-2 text-sm font-medium text-emerald-50/90">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV tokens" : "Your enV token balance"}</p>
+          <div className="relative isolate overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-4 text-white shadow-sm sm:p-6">
+            <svg viewBox="0 0 240 130" className="pointer-events-none absolute right-20 top-1 h-20 w-24 opacity-80 sm:right-28 sm:top-0 sm:h-32 sm:w-56" fill="none" aria-hidden="true">
+              <path d="M4 112 C20 108 30 95 44 98 S63 73 78 82 S98 104 116 70 S140 56 155 66 S177 26 194 38 S218 23 235 8" stroke="#52ffd0" strokeWidth="3.5" strokeLinecap="round"/>
+              <path d="M4 112 C20 108 30 95 44 98 S63 73 78 82 S98 104 116 70 S140 56 155 66 S177 26 194 38 S218 23 235 8 L235 130 L4 130 Z" fill="url(#wallet-balance-fill)" opacity=".18"/>
+              <defs><linearGradient id="wallet-balance-fill" x1="120" y1="8" x2="120" y2="130" gradientUnits="userSpaceOnUse"><stop stopColor="#52ffd0"/><stop offset="1" stopColor="#52ffd0" stopOpacity="0"/></linearGradient></defs>
+            </svg>
+            <ArrowUpRight className="pointer-events-none absolute right-20 top-2 size-4 text-emerald-200 sm:right-28 sm:size-5" aria-hidden="true"/>
+            <div className="relative flex flex-wrap items-center gap-3">
+              <span className="grid size-14 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner"><Wallet size={28} aria-hidden="true"/></span>
+              <div className="min-w-0 flex-1 pr-16 sm:pr-28">
+                <div className="flex items-center gap-2 text-sm font-medium text-white/90">
+                  <span>Total balance</span>
+                  <button type="button" onClick={() => setShowBalance(value => !value)} aria-label={showBalance ? "Hide balance" : "Show balance"} title={showBalance ? "Hide balance" : "Show balance"} className="inline-flex size-7 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+                    {showBalance ? <Eye size={17} aria-hidden="true"/> : <EyeOff size={17} aria-hidden="true"/>}
+                  </button>
+                </div>
+                <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{showBalance ? visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—" : "••••••"}</p>
+                <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-50/90"><Coins size={16} aria-hidden="true"/><span>≈ {showBalance ? visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV" : "— enV" : "•••• enV"}</span></p>
                 <p className="mt-1 text-xs text-white/70">Estimated reference value · not cash</p>
               </div>
-              <a href="#fund-wallet" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2.5 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7]">
-                <CreditCard size={17} aria-hidden="true"/> Fund wallet <ArrowUpRight size={15} aria-hidden="true"/>
-              </a>
+              <div className="relative z-10 flex w-full justify-end sm:absolute sm:bottom-0 sm:right-0 sm:w-auto">
+                <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } void startFundingCheckout(); }} disabled={fundingBusy} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60">
+                  <CreditCard size={17} aria-hidden="true"/>{fundingBusy ? "Opening…" : "Add funds"}<ArrowUpRight size={15} aria-hidden="true"/>
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
             <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-blue-500/10 text-blue-500"><ArrowDownToLine size={16} aria-hidden="true"/></span>
+              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><ArrowDownToLine size={16} aria-hidden="true"/></span>
               <p className="mt-3 text-xs font-medium text-muted">Total deposited</p>
               <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? tokenAmount(visibleWallet.lifetimePurchasedSubunits) : "—"}</p>
               <p className="mt-1 text-[11px] text-muted">Tokens</p>
             </div>
             <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-cyan-500/10 text-cyan-600"><RefreshCw size={16} aria-hidden="true"/></span>
+              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><RefreshCw size={16} aria-hidden="true"/></span>
               <p className="mt-3 text-xs font-medium text-muted">Total remaining</p>
               <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) : "—"}</p>
               <p className="mt-1 text-[11px] text-muted">Tokens</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400" style={{ width: visibleWallet ? `${remainingPercent}%` : "0%" }} /></div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-400" style={{ width: visibleWallet ? `${remainingPercent}%` : "0%" }}/></div>
             </div>
             <div className="min-w-0 rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
-              <span className="grid size-8 place-items-center rounded-xl bg-violet-500/10 text-violet-500"><TrendingUp size={16} aria-hidden="true"/></span>
+              <span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><TrendingUp size={16} aria-hidden="true"/></span>
               <p className="mt-3 text-xs font-medium text-muted">Total used</p>
               <p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{visibleWallet ? tokenAmount(visibleWallet.lifetimeConsumedSubunits) : "—"}</p>
               <p className="mt-1 text-[11px] text-muted">Tokens</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-violet-500" style={{ width: visibleWallet ? `${usedPercent}%` : "0%" }} /></div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-violet-500" style={{ width: visibleWallet ? `${usedPercent}%` : "0%" }}/></div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-accent-soft p-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600"><Coins size={23} aria-hidden="true"/></span>
-              <div className="min-w-0"><p className="text-sm font-semibold text-fg">enV Tokens</p><p className="mt-0.5 text-lg font-semibold tabular-nums text-fg">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV" : "— enV"}</p></div>
-            </div>
-            <div className="text-left sm:text-right"><p className="text-sm font-semibold text-accent">{visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</p><p className="mt-1 text-xs text-muted">{visibleWallet ? visibleWallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " reserved" : "Available token value"}</p></div>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-            <div className="min-w-0 rounded-2xl border border-amber-400/25 bg-amber-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-amber-400/15 text-amber-600"><Gift size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Bonuses</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
-            <div className="min-w-0 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-blue-400/15 text-blue-600"><Users size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Referral tokens</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
-            <div className="min-w-0 rounded-2xl border border-violet-400/25 bg-violet-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-violet-400/15 text-violet-600"><Link2 size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Affiliate tokens</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
+            <div className="min-w-0 rounded-2xl border border-amber-400/25 bg-amber-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Gift size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Bonuses</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
+            <div className="min-w-0 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Users size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Referral tokens</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.referralTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
+            <div className="min-w-0 rounded-2xl border border-violet-400/25 bg-violet-500/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-surface-2 text-fg"><Link2 size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-muted sm:text-xs">Affiliate program</p><p className="mt-1 break-words text-sm font-semibold text-fg sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.affiliateTokens?.toLocaleString(undefined, { maximumFractionDigits: 3 }) ?? "—"} enV` : "—"}</p></div>
           </div>
         </section>
 
         <section className="mt-3 grid gap-3 lg:grid-cols-2" aria-labelledby="rewards-title">
           <h2 id="rewards-title" className="sr-only">Referral and creator rewards</h2>
           <article className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-4 text-white sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200"><Video size={23} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><h2 className="font-semibold">Tag enV on your videos</h2><p className="mt-1 text-sm leading-5 text-white/75">Earn affiliate tokens when your video drives a verified conversion.</p></div>
+            <svg viewBox="0 0 160 90" className="pointer-events-none absolute right-4 top-3 h-16 w-24 opacity-80 sm:h-20 sm:w-28" fill="none" aria-hidden="true">
+              <path d="M3 76 C18 70 23 49 37 57 S57 72 69 47 S89 36 101 43 S120 14 132 24 L150 7" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round"/>
+              <path d="M137 8 L151 6 L149 20" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <div className="flex items-start gap-3 pr-24">
+              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Video size={27} aria-hidden="true"/></span>
+              <div className="min-w-0 flex-1"><h2 className="font-semibold">Tag enV on your videos</h2><p className="mt-1 text-sm leading-5 text-white/75">Earn tokens based on conversion.</p></div>
             </div>
-            {rewardsState.status === "ready" && rewardsState.data ? <>
-              <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-white/65">Your tag link</p><code className="mt-1 block break-all text-xs leading-5 text-emerald-100">{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video&amp;sig={rewardsState.data.videoSignature}</code></div>
-              <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video", rewardsState.data!.videoSignature)} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a]"><Link2 size={15} aria-hidden="true"/> Copy tag link <Copy size={14} aria-hidden="true"/></button><button type="button" onClick={() => void shareReferralLink(rewardsState.data!.referralCode, "video", rewardsState.data!.videoSignature)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/5"><Share2 size={15} aria-hidden="true"/> Share</button></div>
-              <p className="mt-2 text-xs text-white/65">{rewardsState.data.videoConversions.toLocaleString()} verified video conversions</p>
-            </> : <p className="mt-3 text-xs text-white/70">{rewardsState.status === "loading" ? "Preparing your creator link…" : "Your signed creator link will appear here."}</p>}
-            <div className="pointer-events-none absolute right-3 top-5 hidden opacity-70 md:block" aria-hidden="true"><TrendingUp size={54} className="text-emerald-300"/></div>
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 p-2.5">
+              <Link2 size={16} className="shrink-0 text-emerald-100" aria-hidden="true"/>
+              <span className="min-w-0 flex-1 truncate text-xs text-white/80">{rewardsState.status === "ready" && rewardsState.data ? <>{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video&amp;sig={rewardsState.data.videoSignature}</> : "Your signed tag link"}</span>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} aria-label="Copy video tag link" title="Copy video tag link" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-40"><Copy size={16} aria-hidden="true"/></button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#3df1c2] px-3 py-2 text-xs font-semibold text-[#052a2a] disabled:opacity-40"><Link2 size={14} aria-hidden="true"/> Copy link</button>
+                <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "video", rewardsState.data.videoSignature); }} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/20 px-3 py-2 text-xs font-medium text-white hover:bg-white/5 disabled:opacity-40"><Share2 size={14} aria-hidden="true"/> Share link</button>
+              </div>
+              <button type="button" onClick={() => setShowVideoDetails(value => !value)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#3df1c2] px-3 py-2 text-xs font-semibold text-[#052a2a]">{showVideoDetails ? "Hide details" : "View details"} <ArrowUpRight size={14} aria-hidden="true"/></button>
+            </div>
+            {showVideoDetails ? <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/15 p-3"><div><p className="text-[11px] text-white/65">Video sign-ups</p><p className="mt-1 text-sm font-semibold">{rewardsState.status === "ready" ? rewardsState.data?.videoSignups.toLocaleString() : "—"}</p></div><div><p className="text-[11px] text-white/65">Verified conversions</p><p className="mt-1 text-sm font-semibold">{rewardsState.status === "ready" ? rewardsState.data?.videoConversions.toLocaleString() : "—"}</p></div></div> : null}
           </article>
 
           <article className="relative overflow-hidden rounded-[24px] border border-violet-300/30 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-4 text-white sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-blue-400/20 text-blue-100"><Users size={23} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><h2 className="font-semibold">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your referral link and you and your friend can both earn tokens after a qualifying conversion is verified.</p></div>
+            <div className="flex items-start gap-3 pr-20">
+              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-white"><Users size={27} aria-hidden="true"/></span>
+              <div className="min-w-0 flex-1"><h2 className="font-semibold">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your referral link and you both get rewarded with enV tokens!</p></div>
             </div>
-            {rewardsState.status === "ready" && rewardsState.data ? <>
-              <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-violet-100/70">Your referral link</p><code className="mt-1 block break-all text-xs leading-5 text-white">{appOrigin}/signup?ref={rewardsState.data.referralCode}</code></div>
-              <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "referral")} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a]"><Copy size={15} aria-hidden="true"/> Copy invite link</button><button type="button" onClick={() => void shareReferralLink(rewardsState.data!.referralCode, "referral")} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/5"><Share2 size={15} aria-hidden="true"/> Share now</button></div>
-              <p className="mt-2 text-xs text-violet-100/65">{rewardsState.data.referralCount} invites · {rewardsState.data.qualifiedReferrals} qualified</p>
-            </> : <p className="mt-3 text-xs text-violet-100/70">{rewardsState.status === "loading" ? "Preparing your referral link…" : "Your personal invite link will appear here."}</p>}
-            <div className="pointer-events-none absolute bottom-3 right-5 opacity-60" aria-hidden="true"><Gift size={43} className="text-cyan-300"/></div>
+            <div className="absolute right-4 top-4 flex flex-col items-center gap-1.5" aria-label="Both get rewarded">
+              <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-white"><Gift size={22} aria-hidden="true"/></span>
+              <span className="max-w-20 text-center text-[10px] font-semibold leading-3 text-violet-100">Both get rewarded!</span>
+            </div>
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 p-2.5">
+              <Link2 size={16} className="shrink-0 text-violet-100" aria-hidden="true"/>
+              <span className="min-w-0 flex-1 truncate text-xs text-white/85">{rewardsState.status === "ready" && rewardsState.data ? `${appOrigin}/signup?ref=${rewardsState.data.referralCode}` : "Your personal referral link"}</span>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void copyReferralLink(rewardsState.data.referralCode, "referral"); }} aria-label="Copy referral link" title="Copy referral link" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-40"><Copy size={16} aria-hidden="true"/></button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-violet-100/70">{rewardsState.status === "ready" && rewardsState.data ? `${rewardsState.data.referralCount} invites · ${rewardsState.data.qualifiedReferrals} qualified` : "Share your personal link with friends."}</p>
+              <button type="button" disabled={rewardsState.status !== "ready" || !rewardsState.data} onClick={() => { if (rewardsState.data) void shareReferralLink(rewardsState.data.referralCode, "referral"); }} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a] disabled:opacity-40"><Share2 size={15} aria-hidden="true"/> Share now</button>
+            </div>
           </article>
         </section>
 
-        <section id="fund-wallet" className="mt-3 rounded-[24px] border border-border bg-surface p-4 shadow-sm sm:p-5" aria-labelledby="fund-wallet-title">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><CreditCard size={20} aria-hidden="true"/></span>
-              <div className="min-w-0"><h2 id="fund-wallet-title" className="font-semibold text-fg">Fund wallet</h2><p className="mt-1 text-sm text-muted">Add funds securely to your enV token balance.</p></div>
-            </div>
-            <button type="button" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } void startFundingCheckout(); }} disabled={fundingBusy} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-60">{fundingBusy ? "Opening checkout…" : "Add funds"} <ArrowUpRight size={15} aria-hidden="true"/></button>
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 gap-1.5 sm:gap-3" aria-label="Checkout methods">
-            <div className="flex min-w-0 flex-col items-center gap-2 rounded-2xl border border-border bg-surface-2 px-1 py-3 text-center"><span className="grid size-10 place-items-center rounded-full bg-blue-500/10 text-blue-600"><CreditCard size={19} aria-hidden="true"/></span><span className="whitespace-nowrap text-[10px] font-medium leading-tight text-fg sm:text-xs">Card</span></div>
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-2 px-2 py-3 text-center"><span className="grid size-10 place-items-center rounded-full bg-sky-500/10 text-sky-600"><span className="text-sm font-bold">P</span></span><span className="whitespace-nowrap text-[10px] font-medium leading-tight text-fg sm:text-xs">PayPal</span></div>
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-2 px-2 py-3 text-center"><span className="grid size-10 place-items-center rounded-full bg-cyan-500/10 text-cyan-600"><Landmark size={19} aria-hidden="true"/></span><span className="whitespace-nowrap text-[10px] font-medium leading-tight text-fg sm:text-xs">Bank transfer</span></div>
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-2 px-2 py-3 text-center"><span className="grid size-10 place-items-center rounded-full bg-amber-500/10 text-amber-600"><Coins size={19} aria-hidden="true"/></span><span className="whitespace-nowrap text-[10px] font-medium leading-tight text-fg sm:text-xs">Crypto</span></div>
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-2 px-2 py-3 text-center"><span className="grid size-10 place-items-center rounded-full bg-surface text-muted"><span className="text-lg leading-none">•••</span></span><span className="whitespace-nowrap text-[10px] font-medium leading-tight text-fg sm:text-xs">More</span></div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-border bg-surface-2 p-3">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent"><ShieldCheck size={19} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-fg">Secure payment gateway</p><p className="mt-0.5 text-xs text-muted">{fundingState.status === "ready" && fundingState.data ? `${fundingState.data.provider.toUpperCase()} · ${fundingState.data.currency}` : "Protected checkout"}</p></div>
-              <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">Verified</span>
-            </div>
-          </div>
-
-          {fundingFeedback ? <p className={`mt-3 rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : "border-rose-500/30 bg-rose-500/5 text-fg"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
-          {fundingState.status === "ready" && fundingState.data?.packs?.length ? <>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {fundingState.data.packs.map(pack => <button key={pack.tokens} type="button" aria-pressed={selectedTokenPack === pack.tokens} onClick={() => setSelectedTokenPack(pack.tokens)} className={`rounded-xl border p-3 text-left transition ${selectedTokenPack === pack.tokens ? "border-accent bg-accent-soft ring-1 ring-accent" : "border-border bg-surface hover:bg-surface-2"}`}>
-                <span className="block text-base font-semibold text-fg">{pack.tokens.toLocaleString()}</span><span className="mt-0.5 block text-xs text-muted">enV tokens</span><span className="mt-2 block text-sm font-medium text-fg">{pack.amountMinor !== null ? `₦${(pack.amountMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "Secure checkout"}</span>
-              </button>)}
-            </div>
-            <p className="mt-3 text-xs leading-5 text-muted">Token credits are added after the payment provider confirms a successful transaction.</p>
-          </> : null}
-        </section>
-
-        <section className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm" aria-label="Payment gateways">
-          <button type="button" aria-expanded={showGateways} onClick={() => setShowGateways(value => !value)} className="flex min-h-[72px] w-full items-center gap-3 p-4 text-left transition hover:bg-surface-2">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-500"><Zap size={19} aria-hidden="true"/></span>
-            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-fg">Payment Gateways</span><span className="mt-1 block text-xs text-muted">Manage your payment methods and gateways.</span></span>
-            {showGateways ? <ChevronDown size={19} className="text-muted" aria-hidden="true"/> : <ChevronRight size={19} className="text-muted" aria-hidden="true"/>}
-          </button>
-          {showGateways ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 p-4">
-            <div><p className="text-sm font-medium text-fg">{fundingState.status === "ready" && fundingState.data ? fundingState.data.provider.toUpperCase() + " secure checkout" : "Secure checkout"}</p><p className="mt-1 text-xs text-muted">{fundingState.status === "ready" && fundingState.data ? fundingState.data.currency + " · verified payment provider" : "Provider availability is being checked."}</p></div>
-            <a href="#fund-wallet" className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-semibold text-fg hover:bg-surface"><CreditCard size={15} aria-hidden="true"/> Manage methods</a>
-          </div> : null}
-        </section>
+        {fundingFeedback ? <p className={`rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : "border-rose-500/30 bg-rose-500/5 text-fg"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
 
         <section className="mt-3 rounded-[24px] border border-border bg-surface p-4 shadow-sm sm:p-5" aria-labelledby="recent-transactions-title">
           <div className="flex items-center justify-between gap-3">

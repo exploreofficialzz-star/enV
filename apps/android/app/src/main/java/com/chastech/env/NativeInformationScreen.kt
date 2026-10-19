@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
@@ -87,11 +91,31 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth().widthIn(max = 768.dp).align(Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
-                    EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+            if (pageId == "wallet") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
+                        EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text("Wallet", modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp), fontWeight = FontWeight.Normal)
+                    IconButton(onClick = { Toast.makeText(context, "You're all caught up.", Toast.LENGTH_SHORT).show() }, modifier = Modifier.semantics { contentDescription = "Notifications" }) {
+                        EnVIcon("Bell", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    IconButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.semantics { contentDescription = "Profile and account" }) {
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.size(34.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape).border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            EnVIcon("UserRound", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
                 }
-                Text(title, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), fontWeight = FontWeight.Normal)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
+                        EnVIcon("ArrowLeft", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text(title, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp), fontWeight = FontWeight.Normal)
+                }
             }
 
             when (pageId) {
@@ -130,6 +154,8 @@ private fun NativeWalletDashboard() {
     var message by remember { mutableStateOf("") }
     var errorState by remember { mutableStateOf(false) }
     var showPairing by remember { mutableStateOf(false) }
+    var showBalance by remember { mutableStateOf(true) }
+    var showVideoDetails by remember { mutableStateOf(false) }
 
     fun shareLink(link: String, chooserTitle: String) {
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -137,6 +163,12 @@ private fun NativeWalletDashboard() {
             putExtra(Intent.EXTRA_TEXT, link)
         }
         context.startActivity(Intent.createChooser(send, chooserTitle))
+    }
+
+    fun copyLink(link: String) {
+        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("enV wallet link", link))
+        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
     }
 
     LaunchedEffect(refresh, paired) {
@@ -154,9 +186,13 @@ private fun NativeWalletDashboard() {
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Manage your balance, tokens, rewards and more.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         NativeWalletHero(
             availableTokens = dashboard?.availableTokens,
             subtitle = "enV tokens · available to use",
+            showBalance = showBalance,
+            onToggleVisibility = { showBalance = !showBalance },
+            onAddFunds = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) },
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -165,128 +201,94 @@ private fun NativeWalletDashboard() {
             NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens() ?: "—", "Recorded usage", Modifier.weight(1f))
         }
 
-        Box(
-            Modifier.fillMaxWidth()
-                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface)), RoundedCornerShape(18.dp))
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(18.dp))
-                .padding(15.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("enV Tokens", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text(
-                    dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "— enV",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    if (dashboard != null) "${dashboard!!.reservedTokens.formatWalletTokens()} tokens reserved for active work" else "Available balance and reserved tokens",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens() ?: "—", "Bonus tokens", Modifier.weight(1f))
-            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens() ?: "—", "Invite rewards", Modifier.weight(1f))
-            NativeWalletMetric("Affiliate", dashboard?.affiliateTokens?.formatWalletTokens() ?: "—", "Video rewards", Modifier.weight(1f))
+            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens() ?: "—", "Bonus tokens", Modifier.weight(1f), "Gift")
+            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens() ?: "—", "Invite rewards", Modifier.weight(1f), "Users")
+            NativeWalletMetric("Affiliate program", dashboard?.affiliateTokens?.formatWalletTokens() ?: "—", "Video rewards", Modifier.weight(1f), "Link2")
         }
 
+        val videoLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}" }
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF082A2E)),
-            border = BorderStroke(1.dp, Color(0xFF176C60)),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(42.dp).background(Color(0xFF0DAF8A), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("▶", color = Color.White, fontWeight = FontWeight.Normal)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Tag enV on your videos", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                        Text("Earn tokens from verified video conversions.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
-                    }
-                }
-                val videoLink = dashboard?.let {
-                    "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}"
-                }
-                if (videoLink != null) {
-                    Text(videoLink, style = MaterialTheme.typography.bodySmall, color = Color(0xFF8DEFD0))
-                    Text("${dashboard!!.videoConversions} verified video conversions", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB8D3D4))
-                    Button(onClick = { shareLink("Discover enV: $videoLink", "Share video link") }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Share video link")
-                    }
-                } else {
-                    Text("Your signed tag link will appear here.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
-                    OutlinedButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF171A4A)),
-            border = BorderStroke(1.dp, Color(0xFF48419A)),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(42.dp).background(Color(0xFF2563EB), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("2×", color = Color.White, fontWeight = FontWeight.Normal)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Refer a friend", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                        Text("Share your link and you can both earn tokens.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
-                    }
-                }
-                val referralLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}" }
-                if (referralLink != null) {
-                    Text(referralLink, style = MaterialTheme.typography.bodySmall, color = Color(0xFFD4D9FF))
-                    Text("${dashboard!!.referralCount} invites · ${dashboard!!.qualifiedReferrals} qualified", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB8BAE8))
-                    Button(onClick = { shareLink("Join me on enV: $referralLink", "Share your enV referral") }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Share referral link")
-                    }
-                } else {
-                    Text("Your invite link will appear here.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
-                    OutlinedButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Fund wallet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text("Add funds securely to your enV wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    listOf("Card", "PayPal", "Bank transfer", "Crypto", "More").forEach { method ->
-                        Column(Modifier.weight(1f).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp)).padding(vertical = 8.dp, horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(when (method) { "Card" -> "▭"; "PayPal" -> "P"; "Bank transfer" -> "⌂"; "Crypto" -> "₿"; else -> "•••" }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-                            Text(method, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        }
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(54.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Video", Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Tag enV on your videos", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Earn tokens based on conversion.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    NativeWalletSparkline(Modifier.size(width = 82.dp, height = 48.dp), Color(0xFF16B58A))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EnVIcon("Link2", Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(videoLink ?: "Your signed tag link", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    IconButton(onClick = { videoLink?.let(::copyLink) }, enabled = videoLink != null, modifier = Modifier.size(36.dp).semantics { contentDescription = "Copy video tag link" }) {
+                        EnVIcon("Copy", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { videoLink?.let(::copyLink) }, enabled = videoLink != null, modifier = Modifier.weight(1f)) {
+                        EnVIcon("Link2", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.size(6.dp))
+                        Text("Copy link")
+                    }
+                    Button(onClick = { videoLink?.let { shareLink(it, "Share video link") } }, enabled = videoLink != null, modifier = Modifier.weight(1f)) {
+                        EnVIcon("Share2", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                        Spacer(Modifier.size(6.dp))
+                        Text("Share link")
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${dashboard?.videoConversions ?: 0} verified conversions", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showVideoDetails = !showVideoDetails }) { Text(if (showVideoDetails) "Hide details" else "View details") }
+                }
+                if (showVideoDetails) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NativeWalletMetric("Video sign-ups", dashboard?.videoSignups?.toString() ?: "—", "Tracked", Modifier.weight(1f))
+                        NativeWalletMetric("Conversions", dashboard?.videoConversions?.toString() ?: "—", "Verified", Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        val referralLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}" }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(54.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                        EnVIcon("Users", Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Refer a friend", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Share your referral link and you both get rewarded with enV tokens!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        EnVIcon("Gift", Modifier.size(25.dp), tint = MaterialTheme.colorScheme.onSurface)
+                        Text("Both get rewarded!", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("₦", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Normal)
+                    EnVIcon("Link2", Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(referralLink ?: "Your referral link", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    IconButton(onClick = { referralLink?.let(::copyLink) }, enabled = referralLink != null, modifier = Modifier.size(36.dp).semantics { contentDescription = "Copy referral link" }) {
+                        EnVIcon("Copy", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text("Paystack checkout", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("NGN · verified checkout", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    OutlinedButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet#fund-wallet")))
-                    }) { Text("Add funds") }
+                }
+                Button(onClick = { referralLink?.let { shareLink(it, "Share referral link") } }, enabled = referralLink != null, modifier = Modifier.fillMaxWidth()) {
+                    EnVIcon("Share2", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.size(6.dp))
+                    Text("Share now")
                 }
             }
         }
@@ -377,25 +379,84 @@ private fun NativeWalletDashboard() {
 }
 
 @Composable
-private fun NativeWalletHero(availableTokens: Double?, subtitle: String) {
+private fun NativeWalletHero(
+    availableTokens: Double?,
+    subtitle: String,
+    showBalance: Boolean,
+    onToggleVisibility: () -> Unit,
+    onAddFunds: () -> Unit,
+) {
     val shape = RoundedCornerShape(24.dp)
     Box(
         Modifier.fillMaxWidth()
             .background(Brush.linearGradient(listOf(Color(0xFF1747AF), Color(0xFF07384D), Color(0xFF00A77D))), shape)
             .border(BorderStroke(1.dp, Color(0xFF3DEBC2).copy(alpha = 0.35f)), shape)
-            .padding(20.dp),
+            .padding(16.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
-            Text(availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Normal, color = Color.White)
-            Text(availableTokens?.let { "${it.formatWalletTokens()} enV tokens" } ?: subtitle, style = MaterialTheme.typography.titleMedium, color = Color(0xFFBFFFE9))
-            Text("Estimated reference value · not cash", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.68f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(48.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                EnVIcon("Wallet", Modifier.size(28.dp), tint = Color.White)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
+                    IconButton(onClick = onToggleVisibility, modifier = Modifier.size(28.dp).semantics { contentDescription = if (showBalance) "Hide balance" else "Show balance" }) {
+                        EnVIcon(if (showBalance) "Eye" else "EyeOff", Modifier.size(17.dp), tint = Color.White)
+                    }
+                }
+                Text(
+                    if (!showBalance) "••••••" else availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Normal,
+                    color = Color.White,
+                    maxLines = 1,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    EnVIcon("Coins", Modifier.size(15.dp), tint = Color(0xFFBFFFE9))
+                    Text(
+                        if (!showBalance) "•••• enV" else availableTokens?.let { "≈ ${it.formatWalletTokens()} enV" } ?: subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFBFFFE9),
+                        maxLines = 1,
+                    )
+                }
+                Text("Estimated reference value · not cash", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.68f))
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                NativeWalletSparkline(Modifier.size(width = 74.dp, height = 38.dp), Color(0xFF52FFD0))
+                Button(onClick = onAddFunds, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp)) {
+                    Text("Add funds", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun NativeWalletMetric(title: String, value: String, subtitle: String, modifier: Modifier = Modifier) {
+private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
+    androidx.compose.foundation.layout.Box(modifier) {
+        Canvas(Modifier.fillMaxSize().padding(end = 5.dp, top = 3.dp)) {
+            val path = Path().apply {
+                moveTo(size.width * 0.02f, size.height * 0.87f)
+                cubicTo(size.width * 0.14f, size.height * 0.78f, size.width * 0.17f, size.height * 0.52f, size.width * 0.28f, size.height * 0.63f)
+                cubicTo(size.width * 0.38f, size.height * 0.79f, size.width * 0.44f, size.height * 0.40f, size.width * 0.55f, size.height * 0.46f)
+                cubicTo(size.width * 0.68f, size.height * 0.58f, size.width * 0.72f, size.height * 0.18f, size.width * 0.82f, size.height * 0.25f)
+                lineTo(size.width * 0.98f, size.height * 0.04f)
+            }
+            drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
+        }
+        EnVIcon("ArrowUpRight", Modifier.align(Alignment.TopEnd).size(15.dp), tint = tint)
+    }
+}
+
+@Composable
+private fun NativeWalletMetric(
+    title: String,
+    value: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    iconName: String? = null,
+) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -403,7 +464,10 @@ private fun NativeWalletMetric(title: String, value: String, subtitle: String, m
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (iconName != null) EnVIcon(iconName, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
             Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
