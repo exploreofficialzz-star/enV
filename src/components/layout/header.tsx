@@ -6,7 +6,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 const MENU_GROUPS = [
   { title: "Product", links: [
     { to: "/about", label: "About" }, { to: "/tools", label: "Tools" },
-    { to: "/pricing", label: "Pricing" }, { to: "/tokens", label: "Token guide" },
+    { to: "/pricing", label: "Pricing" }, { to: "/tokens/guide", label: "Token guide" },
   ] },
   { title: "Resources", links: [
     { to: "/help", label: "Help center" }, { to: "/blog", label: "Blog & guides" },
