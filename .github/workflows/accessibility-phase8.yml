@@ -59,9 +59,9 @@ jobs:
         run: npm run build
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
-      - name: Start local production preview
+      - name: Start local audit server
         run: |
-          npm run preview -- --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/env-preview.log" 2>&1 &
+          npm run dev -- --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/env-preview.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/env-preview.pid"
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:8080/ > /dev/null; then

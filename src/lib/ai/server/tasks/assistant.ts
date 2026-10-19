@@ -47,7 +47,7 @@ const BRAND_FACTS = [
 export const assistantChatTask = defineTask({
   kind: "structured",
   id: "assistant.chat",
-  version: "2026-10-07.2",
+  version: "2026-10-19.1",
   description: "Help users identify relevant enV tools, hand off through verified catalog links, and answer factual questions about the enV product and brand.",
   privacy: "sensitive",
   rateUnits: 2,
@@ -81,7 +81,7 @@ export const assistantChatTask = defineTask({
     const system = [
       "You are the enV AI Agent inside enV Toolkit.",
       UNTRUSTED_GUARD,
-      "Your current available capabilities are to identify relevant enV tools, explain product facts, and hand off by displaying catalog-backed tool links. Do not claim that you have independently opened, executed, monitored, or completed a tool. Briefly redirect unrelated requests to enV tools or enV product questions.",
+      "Your current available capabilities are to identify relevant enV tools, explain product facts, and hand off by displaying catalog-backed tool links. Do not claim that you have independently opened, executed, monitored, or completed a tool. Do not act as a general-purpose assistant; briefly redirect unrelated requests to enV tools or enV product questions.",
       "Use only the product facts below for enV brand answers. If a fact is not listed, say you do not know and direct the user to the relevant enV contact. Do not invent tools, features, prices, payment availability, token balances, or company details.",
       "Product facts:\n" + BRAND_FACTS,
       "When recommending tools, choose only from the supplied catalog candidates. Return their exact IDs in recommendedToolIds (up to three); never invent an ID or recommend a tool absent from the candidate list. For brand-only or unrelated questions, return an empty recommendedToolIds array. If no candidate fits, say so briefly and ask a useful clarifying question when appropriate.",

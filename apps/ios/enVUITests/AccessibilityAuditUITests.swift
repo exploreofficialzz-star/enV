@@ -41,25 +41,26 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
         moreOptions.tap()
 
-        // Query the menu action, not the Home TextField which carries the same accessibility label.
-        let searchMenuItem = app.buttons["Search tools"]
-        XCTAssertTrue(searchMenuItem.waitForExistence(timeout: 5), "The open menu should expose its Search tools action.")
+        let walletMenuItem = app.buttons["Wallet"]
+        let aboutMenuItem = app.buttons["About"]
+        XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 5), "The open menu should expose the Wallet destination.")
+        XCTAssertTrue(aboutMenuItem.exists, "The open menu should expose Product destinations.")
 
         if #available(iOS 17.0, *) {
             try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }
     }
 
-    func testSearchDestinationIsAuditedAfterMenuNavigation() throws {
+    func testWalletDestinationIsAuditedAfterMenuNavigation() throws {
         let moreOptions = toolbarAction("more-options-navigation-action")
         XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
         moreOptions.tap()
 
-        let searchMenuItem = app.buttons["Search tools"]
-        XCTAssertTrue(searchMenuItem.waitForExistence(timeout: 5))
-        searchMenuItem.tap()
+        let walletMenuItem = app.buttons["Wallet"]
+        XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 5))
+        walletMenuItem.tap()
 
-        XCTAssertTrue(app.textFields["Search tools"].waitForExistence(timeout: 5), "The native Search screen should expose a named search field.")
+        XCTAssertTrue(app.staticTexts["Connect your enV wallet"].waitForExistence(timeout: 5), "The Wallet destination should open its native dashboard.")
         if #available(iOS 17.0, *) {
             try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription])
         }

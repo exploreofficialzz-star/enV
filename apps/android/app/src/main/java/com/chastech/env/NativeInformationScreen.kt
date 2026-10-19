@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
@@ -127,6 +129,14 @@ private fun NativeWalletDashboard() {
     var message by remember { mutableStateOf("") }
     var errorState by remember { mutableStateOf(false) }
 
+    fun shareLink(link: String, chooserTitle: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, link)
+        }
+        context.startActivity(Intent.createChooser(send, chooserTitle))
+    }
+
     LaunchedEffect(refresh, paired) {
         if (!paired) { dashboard = null; return@LaunchedEffect }
         loading = true
@@ -142,18 +152,182 @@ private fun NativeWalletDashboard() {
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        NativeWalletHero(
+            availableTokens = dashboard?.availableTokens,
+            subtitle = if (dashboard != null) "enV tokens · available to use" else "Connect to see your live token balance",
+        )
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NativeWalletMetric("Deposited", dashboard?.lifetimePurchasedTokens?.formatWalletTokens() ?: "—", "Verified tokens", Modifier.weight(1f))
+            NativeWalletMetric("Remaining", dashboard?.availableTokens?.formatWalletTokens() ?: "—", "Available now", Modifier.weight(1f))
+            NativeWalletMetric("Used", dashboard?.lifetimeConsumedTokens?.formatWalletTokens() ?: "—", "Recorded usage", Modifier.weight(1f))
+        }
+
+        Box(
+            Modifier.fillMaxWidth()
+                .background(Brush.linearGradient(listOf(Color(0xFF0B3A33), Color(0xFF0D283A))), RoundedCornerShape(18.dp))
+                .border(BorderStroke(1.dp, Color(0xFF1B6054)), RoundedCornerShape(18.dp))
+                .padding(15.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("enV Tokens", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(
+                    dashboard?.availableTokens?.formatWalletTokens()?.plus(" enV") ?: "Balance appears after connection",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF65F2C5),
+                )
+                Text(
+                    if (dashboard != null) "${dashboard!!.reservedTokens.formatWalletTokens()} tokens reserved for active work"
+                    else "Your available, reserved and used tokens stay in one ledger.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFB8CFD8),
+                )
+            }
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NativeWalletMetric("Bonuses", dashboard?.bonusTokens?.formatWalletTokens() ?: "—", "Bonus tokens", Modifier.weight(1f))
+            NativeWalletMetric("Referrals", dashboard?.referralTokens?.formatWalletTokens() ?: "—", "Invite rewards", Modifier.weight(1f))
+            NativeWalletMetric("Affiliate", dashboard?.affiliateTokens?.formatWalletTokens() ?: "—", "Video rewards", Modifier.weight(1f))
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF082A2E)),
+            border = BorderStroke(1.dp, Color(0xFF176C60)),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(42.dp).background(Color(0xFF0DAF8A), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                        Text("▶", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Tag enV on your videos", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        Text("Earn tokens from verified video conversions.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
+                    }
+                }
+                val videoLink = dashboard?.let {
+                    "https://envtools.store/signup?ref=${it.referralCode}&source=video&sig=${it.videoSignature}"
+                }
+                if (videoLink != null) {
+                    Text(videoLink, style = MaterialTheme.typography.bodySmall, color = Color(0xFF8DEFD0))
+                    Text("${dashboard!!.videoConversions} verified video conversions", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB8D3D4))
+                    Button(onClick = { shareLink("Discover enV: $videoLink", "Share video link") }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Share video link")
+                    }
+                } else {
+                    Text("Connect your wallet to generate your signed tagging link.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF171A4A)),
+            border = BorderStroke(1.dp, Color(0xFF48419A)),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(42.dp).background(Color(0xFF2563EB), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                        Text("2×", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Refer a friend", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        Text("Share your link and you can both earn tokens.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
+                    }
+                }
+                val referralLink = dashboard?.let { "https://envtools.store/signup?ref=${it.referralCode}" }
+                if (referralLink != null) {
+                    Text(referralLink, style = MaterialTheme.typography.bodySmall, color = Color(0xFFD4D9FF))
+                    Text("${dashboard!!.referralCount} invites · ${dashboard!!.qualifiedReferrals} qualified", style = MaterialTheme.typography.labelSmall, color = Color(0xFFB8BAE8))
+                    Button(onClick = { shareLink("Join me on enV: $referralLink", "Share your enV referral") }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Share referral link")
+                    }
+                } else {
+                    Text("Your personal referral link appears when your wallet is connected.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
+            border = BorderStroke(1.dp, Color(0xFF22344C)),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Fund wallet", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text("Add tokens through enV's secure checkout.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB5C4D7))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(36.dp).background(Color(0xFF123A62), CircleShape), contentAlignment = Alignment.Center) {
+                        Text("₦", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Paystack checkout", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        Text("NGN · verified checkout", style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                    }
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet#fund-wallet")))
+                    }) { Text("Add funds") }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
+            border = BorderStroke(1.dp, Color(0xFF22344C)),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Recent transactions", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { refresh += 1 }) { Text("Refresh") }
+                }
+                val rows = dashboard?.activity.orEmpty().take(5)
+                if (rows.isEmpty()) {
+                    Text(if (dashboard != null) "No wallet activity yet." else "Connect to view your transaction history.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                } else {
+                    rows.forEachIndexed { index, row ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.size(34.dp).background(if (row.deltaAvailableSubunits >= 0) Color(0xFF0E7A61) else Color(0xFF57356E), CircleShape), contentAlignment = Alignment.Center) {
+                                Text(if (row.deltaAvailableSubunits >= 0) "↓" else "↑", color = Color.White)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = Color(0xFF91A7C0))
+                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = Color(0xFF91A7C0))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (dashboard == null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1729)),
+                border = BorderStroke(1.dp, Color(0xFF22344C)),
             ) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
-                    Text("Sign in on the enV website, open Wallet and generate a one-time code in the Connect Android/iOS section. Enter the code here to securely view your shared balance, rewards and history.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web Wallet") }
-                    OutlinedTextField(value = code, onValueChange = { code = it }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                    Text("Pair this app with your signed-in enV web wallet to securely load your personal balance, rewards and activity.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFB5C4D7))
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web Wallet") }
+                    OutlinedTextField(value = code, onValueChange = { code = it.trim().take(80) }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
                     Button(onClick = {
                         scope.launch {
                             busy = true
@@ -175,89 +349,31 @@ private fun NativeWalletDashboard() {
                     }
                 }
             }
-        } else if (dashboard != null) {
-            val data = dashboard!!
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Available to use", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${data.availableTokens.formatWalletTokens()} tokens", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Normal)
-                    Text("Illustrative reference value: ${(data.availableTokens * 0.01).formatWalletTokens()} USD. This is not cash or a guaranteed redemption value.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = { message = "In-app funding is not enabled for this Android build. Google Play Billing and server-side purchase verification must be configured before payments can be taken." }, modifier = Modifier.fillMaxWidth()) { Text("Funding setup") }
-                    Text("Fund wallet is unavailable until this app has verified Google Play Billing products.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+        } else {
+            OutlinedButton(onClick = { paired = false; code = ""; dashboard = null; message = "" }, modifier = Modifier.fillMaxWidth()) {
+                Text("Reconnect this device")
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NativeWalletMetric("Total deposited", data.lifetimePurchasedTokens.formatWalletTokens(), "Verified purchases", Modifier.weight(1f))
-                NativeWalletMetric("Total remaining", data.availableTokens.formatWalletTokens(), "Available now", Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NativeWalletMetric("Total used", data.lifetimeConsumedTokens.formatWalletTokens(), "Recorded usage", Modifier.weight(1f))
-                NativeWalletMetric("Reserved", data.reservedTokens.formatWalletTokens(), "Held for active work", Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NativeWalletMetric("Referral rewards", data.referralTokens.formatWalletTokens(), "Qualified invites", Modifier.weight(1f))
-                NativeWalletMetric("Affiliate rewards", data.affiliateTokens.formatWalletTokens(), "Verified video conversions", Modifier.weight(1f))
-                NativeWalletMetric("Bonus tokens", data.bonusTokens.formatWalletTokens(), "Promotional awards", Modifier.weight(1f))
-            }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Invite friends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
-                    Text("${data.referralCount} invites · ${data.qualifiedReferrals} qualified · ${data.totalRewardTokens.formatWalletTokens()} reward tokens", style = MaterialTheme.typography.bodyMedium)
-                    Text("https://envtools.store/signup?ref=${data.referralCode}", style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = {
-                        val link = "https://envtools.store/signup?ref=${data.referralCode}"
-                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Join me on enV: $link") }
-                        context.startActivity(Intent.createChooser(send, "Share your enV invite"))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Share invite link") }
-                    Text("Video affiliate · ${data.videoConversions} verified conversions", style = MaterialTheme.typography.titleSmall)
-                    Text("https://envtools.store/signup?ref=${data.referralCode}&source=video&sig=${data.videoSignature}", style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = {
-                        val link = "https://envtools.store/signup?ref=${data.referralCode}&source=video&sig=${data.videoSignature}"
-                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Discover enV: $link") }
-                        context.startActivity(Intent.createChooser(send, "Share your enV video link"))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Share video link") }
-                    Text("Rewards follow verified purchase conversions, not self-reported views.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Recent activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { refresh += 1 }) { Text("Refresh") }
-                    }
-                    if (data.activity.isEmpty()) {
-                        Text("No wallet activity has been recorded yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else {
-                        data.activity.take(12).forEach { row ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal)
-                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            }
-            OutlinedButton(onClick = { paired = false; code = ""; message = "" }, modifier = Modifier.fillMaxWidth()) { Text("Reconnect or pair another session") }
         }
-        if (loading) Text("Loading your shared wallet…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (loading) Text("Loading wallet…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = if (errorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun NativeWalletHero(availableTokens: Double?, subtitle: String) {
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        Modifier.fillMaxWidth()
+            .background(Brush.linearGradient(listOf(Color(0xFF1747AF), Color(0xFF07384D), Color(0xFF00A77D))), shape)
+            .border(BorderStroke(1.dp, Color(0xFF3DEBC2).copy(alpha = 0.35f)), shape)
+            .padding(20.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
+            Text(availableTokens?.let { "$${(it * 0.01).formatWalletTokens()}" } ?: "—", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(availableTokens?.let { "${it.formatWalletTokens()} enV tokens" } ?: subtitle, style = MaterialTheme.typography.titleMedium, color = Color(0xFFBFFFE9))
+            Text("Estimated reference value · not cash", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.68f))
+        }
     }
 }
 
@@ -265,14 +381,14 @@ private fun NativeWalletDashboard() {
 private fun NativeWalletMetric(title: String, value: String, subtitle: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C1A2B)),
+        shape = RoundedCornerShape(15.dp),
+        border = BorderStroke(1.dp, Color(0xFF20364F)),
     ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.labelSmall, color = Color(0xFF9FB2C9))
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color(0xFF91A7C0))
         }
     }
 }
