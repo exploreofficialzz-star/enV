@@ -1527,7 +1527,7 @@ private struct NativeWalletDashboardView: View {
         if type == "reservation" { return "Tokens reserved" }
         if type == "release" { return "Reservation released" }
         if number("consumed_subunits", from: entry) > 0 || type.contains("consum") { return "Tool usage" }
-        if ["purchase", "deposit", "top_up", "funding"].contains(where: type.contains) { return "Wallet funded" }
+        if ["purchase", "deposit", "top_up", "funding"].contains(where: { type.contains($0) }) { return "Wallet funded" }
         if type.contains("refund") { return "Refund" }
         if number("delta_available_subunits", from: entry) > 0 { return "Tokens added" }
         if number("delta_available_subunits", from: entry) < 0 { return "Tokens used" }
@@ -1539,7 +1539,7 @@ private struct NativeWalletDashboardView: View {
         if type.contains("referral") || type.contains("affiliate") || type.contains("bonus") || type.contains("reward") || type.contains("grant") { return "gift.fill" }
         if type == "reservation" { return "clock.fill" }
         if type == "release" || type.contains("refund") { return "arrow.uturn.backward" }
-        if ["purchase", "deposit", "top_up", "funding"].contains(where: type.contains) { return "creditcard.fill" }
+        if ["purchase", "deposit", "top_up", "funding"].contains(where: { type.contains($0) }) { return "creditcard.fill" }
         if number("consumed_subunits", from: entry) > 0 || type.contains("consum") { return "bolt.fill" }
         return number("delta_available_subunits", from: entry) >= 0 ? "arrow.down.left" : "arrow.up.right"
     }

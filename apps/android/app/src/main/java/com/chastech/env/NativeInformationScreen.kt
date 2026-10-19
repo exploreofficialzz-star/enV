@@ -446,7 +446,7 @@ private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
             lineTo(tipX, tipY)
             moveTo(tipX - size.width * 0.18f, tipY + size.height * 0.02f)
             lineTo(tipX, tipY)
-            lineTo(tipX - size.width * 0.02f, tipY + size.height * 0.24f
+            lineTo(tipX - size.width * 0.02f, tipY + size.height * 0.24f)
         }
         drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
@@ -509,7 +509,7 @@ private fun walletActivityLabel(type: String, consumedSubunits: Double): String 
         normalized == "reservation" -> "Tokens reserved"
         normalized == "release" -> "Reservation released"
         consumedSubunits > 0 || normalized.contains("consum") -> "Tool usage"
-        listOf("purchase", "deposit", "top_up", "funding").any(normalized::contains) -> "Wallet funded"
+        listOf("purchase", "deposit", "top_up", "funding").any { normalized.contains(it) } -> "Wallet funded"
         normalized.contains("refund") -> "Refund"
         else -> type.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
@@ -521,7 +521,7 @@ private fun walletActivityGlyph(type: String, deltaAvailableSubunits: Double, co
         normalized.contains("referral") || normalized.contains("affiliate") || normalized.contains("bonus") || normalized.contains("reward") || normalized.contains("grant") -> "✦"
         normalized == "reservation" -> "◷"
         normalized == "release" || normalized.contains("refund") -> "↻"
-        listOf("purchase", "deposit", "top_up", "funding").any(normalized::contains) -> "↓"
+        listOf("purchase", "deposit", "top_up", "funding").any { normalized.contains(it) } -> "↓"
         consumedSubunits > 0 || normalized.contains("consum") -> "↗"
         deltaAvailableSubunits >= 0 -> "↓"
         else -> "↑"
