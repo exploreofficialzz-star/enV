@@ -1319,8 +1319,6 @@ private struct NativePricingInformationPage: View {
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                 enVCharacterSpacedText("Prices are listed in USD for reference. Before any future purchase, the final currency and total will be shown.")
                     .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
-                enVCharacterSpacedText("Illustrative reference amounts: $0.30, $0.50, $0.80, $1.20, and $5.00.")
-                    .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
                 enVCharacterSpacedText("Illustrative value only — not an active offer or store price.")
                     .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
             }

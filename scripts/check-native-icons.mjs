@@ -74,10 +74,7 @@ assert.ok(iosInformation.includes("registered in Delaware, USA") && iosInformati
 for (const pageID of ["about", "pricing", "contact", "account", "history", "privacy", "terms", "disclaimer", "responsible-use"]) {
   assert.ok(androidInformation.includes(`\"${pageID}\" ->`) && iosInformation.includes(`case \"${pageID}\"`), `Android and iOS must have a dedicated native destination for ${pageID}`);
 }
-for (const offer of ["$0.30", "$0.50", "$0.80", "$1.20", "$5.00"]) {
-  assert.ok(androidInformation.includes(offer), `Android pricing is missing ${offer}`);
-  assert.ok(iosInformation.includes(offer), `iOS pricing is missing ${offer}`);
-}
+assert.ok(androidInformation.includes("Illustrative value only — not an active offer or store price.") && iosInformation.includes("Illustrative value only — not an active offer or store price."), "Native pricing must clearly mark reference values as inactive");
 assert.ok(androidAssets.includes('"native-icons/logo-header-dark.png"'), "Android must use the contrast-safe dark logo");
 assert.ok(iosApp.includes('"native-icons/logo-header-dark.png"'), "iOS must use the contrast-safe dark logo");
 assert.ok(androidAssets.includes('"native-icons/logo-home-transparent.png"') && androidAssets.includes('"native-icons/logo-home-dark.png"'), "Android must load cropped home logo variants");
