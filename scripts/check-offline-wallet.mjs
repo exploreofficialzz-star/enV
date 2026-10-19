@@ -248,8 +248,9 @@ assert.ok(nativeDashboard.includes("Total deposited") && nativeDashboard.include
   nativeDashboard.includes("Referral and creator rewards") && nativeDashboard.includes("Fund your wallet"),
   "Web Wallet must expose balance, usage, creator rewards and funding sections.");
 assert.ok(rewardsMigration.includes("billing_reward_events") && rewardsServer.includes("SELF_REFERRAL") &&
+  rewardsServer.includes("verifyVideoReferralSignature") && rewardsServer.includes("timingSafeEqual") &&
   paystackServer.includes("verifyAndCreditPaystackReference"),
-  "Reward attribution and deposits must use server-side verification and idempotent event records.");
+  "Reward attribution and deposits must use server-side verification, signed video attribution and idempotent event records.");
 const webIssueFunction = webClient.slice(webClient.indexOf("export async function requestWebOfflineAllowance"), webClient.indexOf("/** Send the persisted, retry-safe batch"));
 const webSyncFunction = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("/** Retry selected local records"));
 assert.ok(webIssueFunction.includes("/api/billing/offline/allowances") && webIssueFunction.includes("requestedSubunits: input.requestedSubunits") &&
