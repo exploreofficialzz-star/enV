@@ -210,8 +210,7 @@ private fun NativeTokenDashboard() {
                                 color = Color.White,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            Text("Available balance · Token name: enV", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
-                            Text(moneyLabel(dashboard?.availableTokens ?: 0.0), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.70f))
+                            Text("enV estimated reference value = $0.010", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
                         }
                         EnVIcon("Coins", Modifier.size(34.dp), tint = Color(0xFF52FFD0))
                     }
