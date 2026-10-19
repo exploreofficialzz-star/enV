@@ -1,7 +1,23 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 
 const SUBUNITS_PER_TOKEN = 1_000;
+
+function videoReferralSignature(code: string): string {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw Object.assign(new Error("Referral link signing is not configured for this deployment."), {
+      code: "REFERRAL_SIGNING_NOT_CONFIGURED", status: 503,
+    });
+  }
+  return createHmac("sha256", secret).update(`env-referral:video:${code}`).digest("hex");
+}
+
+function verifyVideoReferralSignature(code: string, supplied: unknown): boolean {
+  if (typeof supplied !== "string" || !/^[a-f0-9]{64}$/i.test(supplied)) return false;
+  const expected = videoReferralSignature(code);
+  return timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"));
+}
 
 function newReferralCode(): string {
   return `ENV${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -73,6 +89,7 @@ export async function getRewardsSummary(userId: string) {
   }
   return {
     referralCode,
+    videoSignature: videoReferralSignature(referralCode),
     referralCount: Number(counts.referral_count),
     pendingReferrals: Number(counts.pending_referrals),
     qualifiedReferrals: Number(counts.qualified_referrals),
@@ -82,10 +99,22 @@ export async function getRewardsSummary(userId: string) {
   };
 }
 
-export async function claimReferral(input: { referredUserId: string; referralCode: string; source: "referral" | "video" }) {
+export async function claimReferral(input: {
+  referredUserId: string;
+  referralCode: string;
+  source: "referral" | "video";
+  signature?: unknown;
+}) {
   const code = input.referralCode.trim().toUpperCase();
   if (!/^[A-Z0-9]{8,24}$/.test(code)) {
     throw Object.assign(new Error("That referral link is not valid."), { code: "INVALID_REFERRAL", status: 400 });
+  }
+  // The video marker is server-signed. Arbitrary source=video query parameters
+  // cannot mint the additional affiliate-conversion reward.
+  if (input.source === "video" && !verifyVideoReferralSignature(code, input.signature)) {
+    throw Object.assign(new Error("This video affiliate link is invalid or has been changed. Use the exact link provided by enV."), {
+      code: "INVALID_VIDEO_REFERRAL_SIGNATURE", status: 400,
+    });
   }
   const sql = await getSql();
   const profiles = await sql.query<{ user_id: string }>(
