@@ -151,7 +151,7 @@ assert.match(tokenDashboardComponent, /flex items-start justify-between gap-3 sm
 assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.reservedTokens\) : tokenLabel\(0\)/, "reserved tokens must use the same 0.000 enV empty-wallet format");
 assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.lifetimeConsumedSubunits \/ 1_000\) : tokenLabel\(0\)/, "total used ever must use the same 0.000 enV empty-wallet format");
 assert.match(tokenDashboardComponent, /Array\.from\(\{ length: 7 \}/, "the empty-wallet preview must keep seven zero-use chart days visible");
-const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashboard()")[1]?.split("@Composable\\nprivate fun NativeWalletDashboard()")[0] ?? "";
+const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashboard()")[1]?.split("private fun NativeWalletDashboard()")[0] ?? "";
 assert.match(androidTokenDashboard, /Text\("Open wallet"\)/, "Android token dashboard must place Open wallet beside the welcome heading");
 assert.match(androidTokenDashboard, /dashboard\?\.availableTokens \?: 0\.0/, "Android empty-wallet preview must show zero token balance");
 assert.match(androidTokenDashboard, /NativeWalletMetric\("Total deposited"/ , "Android dashboard must show total deposited");
