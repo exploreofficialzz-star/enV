@@ -10,7 +10,8 @@ export default defineHandler(async (event) => {
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   const body = await readJsonObject(request, 2_048);
   if (!body || typeof body.referralCode !== "string" ||
-      (body.source !== "referral" && body.source !== "video")) {
+      (body.source !== "referral" && body.source !== "video") ||
+      (body.signature !== undefined && typeof body.signature !== "string")) {
     return jsonResponse({ ok: false, error: "INVALID_REFERRAL", message: "The referral details are not valid." }, 400);
   }
   try {
@@ -18,6 +19,7 @@ export default defineHandler(async (event) => {
       referredUserId: auth.userId,
       referralCode: body.referralCode,
       source: body.source,
+      signature: body.signature,
     });
     return jsonResponse({ ok: true, data: result });
   } catch (error) {
