@@ -317,7 +317,7 @@ private fun NativeTokenDashboard() {
                     } else events.forEachIndexed { index, row ->
                         if (index > 0) androidx.compose.material3.HorizontalDivider()
                         Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(row.toolId.replace(Regex("[._-]+"), " "), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(row.toolId.replace(Regex("[._-]+"), " "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text("Recorded status: " + row.status.replace('_', ' '), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(row.billedTokens.formatWalletTokens() + " enV charged in metering record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
