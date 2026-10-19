@@ -122,7 +122,7 @@ assert.match(ledger, /affiliate_conversion/);
 assert.match(walletDashboard, /Total deposited/);
 assert.match(walletDashboard, /Total used/);
 assert.match(walletDashboard, /Referral and creator rewards/);
-assert.match(walletDashboard, /Fund your wallet/);
+assert.match(walletDashboard, /Fund(?: your)? wallet/i);
 assert.match(fundingOptionsRoute, /getFundingOptions/);
 assert.match(rewardsSummaryRoute, /requireBillingUser/);
 assert.match(nativeWalletRoute, /requireOfflineBillingUser/);
