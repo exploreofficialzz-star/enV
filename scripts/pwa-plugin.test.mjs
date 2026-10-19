@@ -127,19 +127,19 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.match(searchBox, /nav\(\{ to: "\/search", search: \{ q \} \}\)/);
 });
 
-test("AI assistant uses the secured backend task and is reachable from Home and the header", () => {
+test("AI Agent uses the secured backend task and is reachable from Home and the header", () => {
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const header = readFileSync(join(PROJECT_ROOT, "src/components/layout/header.tsx"), "utf8");
   const assistant = readFileSync(join(PROJECT_ROOT, "src/routes/assistant.tsx"), "utf8");
   const task = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/assistant.ts"), "utf8");
   const registry = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/index.ts"), "utf8");
-  assert.match(home, /<Link to="\/assistant"[^>]*>AI assistant<\/Link>/);
-  assert.match(header, /to="\/assistant">AI assistant<\/Link>/);
+  assert.match(home, /<Link to="\/agent"[^>]*>AI Agent<\/Link>/);
+  assert.match(header, /to="\/agent"[^>]*>AI Agent<\/Link>/);
   assert.match(assistant, /runAiTask\("assistant\.chat", request/);
   assert.match(assistant, /searchTools\(getActiveTools\(\), query, 8\)/);
   assert.match(assistant, /recommendedToolIds/);
   assert.match(assistant, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
-  assert.match(assistant, /Ask about enV tools or the enV brand/);
+  assert.match(assistant, /Describe your goal or ask about enV tools/);
   assert.doesNotMatch(assistant, /fetchAiAvailability|configured AI provider|I understand my message|AI responses can be inaccurate|planning, writing, and everyday work/);
   assert.match(task, /id: "assistant\.chat"/);
   assert.match(task, /privacy: "sensitive"/);
@@ -227,7 +227,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /getPopularTools\(12\)/);
   assert.match(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
-  assert.match(home, /AI assistant/);
+  assert.match(home, /AI Agent/);
   assert.match(home, /Total token = 100/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);

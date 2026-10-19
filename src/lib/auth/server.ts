@@ -67,7 +67,7 @@ const localOrigins = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
-const trustedOrigins = explicitBaseURL ? [explicitBaseURL, ...localOrigins] : localOrigins;
+const trustedOrigins = explicitBaseURL ? [explicitBaseURL, ...(secureCookies ? [] : localOrigins)] : localOrigins;
 const issuerDiscoveryUrl = oauthIssuer ? `${oauthIssuer}/.well-known/openid-configuration` : "";
 
 const oauthPlugin = authRequested && oauthConfigured
@@ -118,6 +118,7 @@ export const auth = betterAuth({
       requireEmailVerification: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
         const safeUrl = escapeHtml(url);
         await sendTransactionalEmail({

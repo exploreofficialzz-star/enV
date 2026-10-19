@@ -10,10 +10,6 @@ const MENU_GROUPS = [
     { to: "/help", label: "Help center" }, { to: "/blog", label: "Blog & guides" },
     { to: "/contact", label: "Contact" },
   ] },
-  { title: "Legal", links: [
-    { to: "/privacy", label: "Privacy" }, { to: "/terms", label: "Terms" },
-    { to: "/disclaimer", label: "Disclaimer" }, { to: "/responsible-use", label: "Responsible use" },
-  ] },
 ] as const;
 
 function closeMenu(event: React.MouseEvent<HTMLAnchorElement>) {

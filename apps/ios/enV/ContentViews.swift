@@ -155,7 +155,7 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .frame(maxWidth: 1152)
                     .frame(maxWidth: .infinity)
-                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count)
+                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity)
@@ -310,9 +310,36 @@ private struct WebHomeFooter: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let activeCount: Int
     let categoryCount: Int
+    let onInformation: (String) -> Void
+    let onTools: () -> Void
+
     private var wideLayout: Bool { horizontalSizeClass == .regular }
+    private var wideColumnUnit: CGFloat {
+        max(0, (min(UIScreen.main.bounds.width, 1152) - 48 - 40) / 4)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            Rectangle().fill(Color.envBorder).frame(height: 1)
+            Group {
+                if wideLayout {
+                    HStack(alignment: .top, spacing: 40) {
+                        brandBlock.frame(width: wideColumnUnit * 3, alignment: .leading)
+                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")])
+                            .frame(width: wideColumnUnit, alignment: .leading)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 24) {
+                        brandBlock
+                        linkGroup("Legal", links: [("Privacy", "privacy"), ("Terms", "terms"), ("Disclaimer", "disclaimer"), ("Responsible use", "responsible-use")])
+                    }
+                }
+            }
+            .padding(.horizontal, wideLayout ? 24 : 16)
+            .padding(.vertical, wideLayout ? 28 : 24)
+            .frame(maxWidth: 1152)
+            .frame(maxWidth: .infinity)
+
             Rectangle().fill(Color.envBorder).frame(height: 1)
             HStack(spacing: 12) {
                 enVCharacterSpacedText("© \(Calendar.current.component(.year, from: .now)) chAs Technologies LLC · enV")
@@ -333,6 +360,40 @@ private struct WebHomeFooter: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.envSurface)
+    }
+
+    private var brandBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            EnVLogo().frame(width: 84, height: 56)
+            enVCharacterSpacedText("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.")
+                .font(.envScaled(size: 14, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .lineSpacing(4)
+                .frame(maxWidth: 384, alignment: .leading)
+        }
+    }
+
+    private func linkGroup(_ title: String, links: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            enVCharacterSpacedText(title.uppercased())
+                .font(.envScaled(size: 12, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(Color.envSubtle)
+                .frame(height: 18, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(links, id: \.0) { label, route in
+                    Button(label) {
+                        if route == "tools" { onTools() }
+                        else { onInformation(route) }
+                    }
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 32, alignment: .leading)
+                }
+            }
+        }
     }
 }
 

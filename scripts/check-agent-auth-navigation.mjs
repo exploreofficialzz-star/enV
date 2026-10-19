@@ -12,7 +12,7 @@ const requireText = (path, fragments, label = path) => {
 const footer = requireText("src/components/layout/footer.tsx", ["<footer", "chAs Technologies LLC"], "Web footer");
 if (footer.includes("About") || footer.includes("Help center") || footer.includes("Token guide")) errors.push("Web footer must not contain the old navigation groups.");
 requireText("src/components/layout/header.tsx", ["/about", "/tools", "/pricing", "/tokens", "/help", "/blog", "/contact", "/privacy", "/terms", "/disclaimer", "/responsible-use", "/login", "/signup", "AI Agent"], "Web overflow menu");
-for (const path of ["src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.$token.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
+for (const path of ["src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "RESEND_API_KEY", "sendVerificationEmail", "sendResetPassword"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 const agent = requireText("src/lib/ai/server/tasks/assistant.ts", ["You are the enV AI Agent", "user must open each tool"], "Agent capability instructions");

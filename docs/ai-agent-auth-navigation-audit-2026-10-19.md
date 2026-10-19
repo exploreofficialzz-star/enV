@@ -2,11 +2,11 @@
 
 ## Implemented
 
-- Web footer now contains only the compact copyright/catalogue status row. Product, Resources and Legal links are available from the three-dot menu.
+- Web footer now contains only the compact copyright/catalogue status row. Only the screenshoted Product (About, Tools, Pricing, Token guide) and Resources (Help center, Blog & guides, Contact) groups are in the three-dot menu. Legal links remain in the footer.
 - Android and iOS mirror the compact footer and overflow destinations. Their account menus open hosted sign-in/create-account routes.
 - The user-visible AI assistant labels become **AI Agent**. Web uses canonical `/agent`; `/assistant` remains for compatibility.
-- Web has sign-in, sign-up, forgot-password, reset-password, and Better Auth API routes.
-- Email/password authentication requires both client and server feature flags, verification/reset email delivery, and a configured Resend sender. Production auth fails closed without persistent Postgres, a server-only signing secret and canonical HTTPS origin.
+- Web has sign-in, sign-up, forgot-password, query-token reset-password, and Better Auth API routes.
+- Email/password authentication requires both client and server feature flags, verification/reset email delivery, and a configured Resend sender. Reset links use Better Auth's `?token=` query contract; password changes revoke existing sessions. Production auth fails closed without persistent Postgres, a server-only signing secret and canonical HTTPS origin.
 - Dependency-free audit checks are included in `npm test`.
 
 ## Deployment requirements before enabling accounts

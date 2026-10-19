@@ -78,7 +78,7 @@ enum NativeUtilityEngine {
         case "seo": return Output(text: try runSEO(op, options: options), filename: "env-seo-\(op).txt")
         case "developer": return Output(text: try runDeveloperParity(op, input: input, options: options), filename: "env-\(op).txt")
         case "cssgen": return runCSS(op, options: options)
-        default: throw NativeSimpleError.message("No native utility engine for \(tool.engine.type).")
+        default: throw NativeSimpleError.message("No native utility engine for \(String(describing: tool.engine.type)).")
         }
     }
 

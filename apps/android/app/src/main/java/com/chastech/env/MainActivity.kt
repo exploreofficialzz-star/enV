@@ -344,11 +344,6 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("Help center") }, onClick = { informationReturnTab = tab; informationPage = "help"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/blog"))); overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Contact") }, onClick = { informationReturnTab = tab; informationPage = "contact"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            Text("LEGAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
-                            DropdownMenuItem(text = { Text("Privacy") }, onClick = { informationReturnTab = tab; informationPage = "privacy"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Terms") }, onClick = { informationReturnTab = tab; informationPage = "terms"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Disclaimer") }, onClick = { informationReturnTab = tab; informationPage = "disclaimer"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Responsible use") }, onClick = { informationReturnTab = tab; informationPage = "responsible-use"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }
                 },
@@ -508,7 +503,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                 }
             }
         }
-        item { WebHomeFooter(catalog, screenWidth) }
+        item { WebHomeFooter(catalog, onInformation, screenWidth) }
     }
 }
 
@@ -604,19 +599,71 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
 }
 
 @Composable
-private fun WebHomeFooter(catalog: Catalog, screenWidth: Int) {
+private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, screenWidth: Int) {
     val horizontalPadding = if (screenWidth >= 640) 24.dp else 16.dp
     val footerSubtle = if (isSystemInDarkTheme()) Color(0xFF7C848C) else Color(0xFF8A9098)
     val borderColor = MaterialTheme.colorScheme.outline
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
-        Row(Modifier.widthIn(max = 1152.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
-            .padding(horizontal = horizontalPadding, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            if (screenWidth >= 768) {
+                Row(
+                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(40.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    BrandFooterIdentity(catalog, Modifier.weight(3f))
+                    FooterLegalLinks(onInformation, footerSubtle, Modifier.weight(1f))
+                }
+            } else {
+                Column(
+                    Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    BrandFooterIdentity(catalog)
+                    FooterLegalLinks(onInformation, footerSubtle)
+                }
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(borderColor))
+        Row(
+            Modifier.widthIn(max = 1152.dp).fillMaxWidth().align(Alignment.CenterHorizontally).padding(horizontal = horizontalPadding, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text("© ${Year.now().value} chAs Technologies LLC · enV", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
             if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
+        }
+    }
+}
+
+@Composable
+private fun BrandFooterIdentity(catalog: Catalog, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        EnVLogo(Modifier.width(84.dp).height(56.dp))
+        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
+            modifier = Modifier.widthIn(max = 384.dp))
+    }
+}
+
+@Composable
+private fun FooterLegalLinks(onInformation: (String) -> Unit, footerSubtle: Color, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text("Legal".uppercase(), color = footerSubtle,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 18.sp, letterSpacing = 0.6.sp),
+            fontWeight = FontWeight.Normal)
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Privacy" to "privacy", "Terms" to "terms", "Disclaimer" to "disclaimer", "Responsible use" to "responsible-use").forEach { (label, route) ->
+                Row(Modifier.fillMaxWidth().height(32.dp).clickable { onInformation(route) },
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp))
+                }
+            }
         }
     }
 }

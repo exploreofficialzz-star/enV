@@ -146,7 +146,7 @@ public enum NativeDateTimeEngine {
         return date
     }
     private static func businessDaysBetween(_ from: Date, _ to: Date) -> Int {
-        var cal = calendar(.gregorian); let start = cal.startOfDay(for: from), end = cal.startOfDay(for: to); if start == end { return 0 }
+        let cal = calendar(.gregorian); let start = cal.startOfDay(for: from), end = cal.startOfDay(for: to); if start == end { return 0 }
         let direction = end > start ? 1 : -1; var date = start; var count = 0
         while date != end { date = cal.date(byAdding: .day, value: direction, to: date)!; let weekday = cal.component(.weekday, from: date); if weekday != 1 && weekday != 7 { count += direction } }
         return count

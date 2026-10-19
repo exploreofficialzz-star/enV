@@ -30,7 +30,7 @@ enum OfflineWalletDeviceKey {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecSuccess, let key = item as? SecKey { return key }
+        if status == errSecSuccess, let item, CFGetTypeID(item) == SecKeyGetTypeID() { return item as! SecKey }
         guard status == errSecItemNotFound else { throw OfflineWalletKeyError.keychain(status) }
 
         let attributes: [String: Any] = [

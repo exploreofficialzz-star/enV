@@ -207,12 +207,6 @@ struct EnVBrandNavigationStyle: ViewModifier {
                             Button("Blog & guides") { if let url = URL(string: "https://en-v.vercel.app/blog") { openURL(url) } }
                             Button("Contact") { informationRouter.open("contact") }
                         }
-                        Section("LEGAL") {
-                            Button("Privacy") { informationRouter.open("privacy") }
-                            Button("Terms") { informationRouter.open("terms") }
-                            Button("Disclaimer") { informationRouter.open("disclaimer") }
-                            Button("Responsible use") { informationRouter.open("responsible-use") }
-                        }
                     } label: {
                         VStack(spacing: 3) {
                             ForEach(0..<3, id: \.self) { _ in
