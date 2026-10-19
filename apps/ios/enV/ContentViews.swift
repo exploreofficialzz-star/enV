@@ -1223,7 +1223,14 @@ private struct NativeWalletDashboardView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Label("Fund wallet", systemImage: "creditcard.fill").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
-                Text("Continue to enV secure checkout to add tokens to your wallet.").font(.subheadline).foregroundStyle(Color.envMuted)
+                Text("Add funds securely to your enV token balance.").font(.subheadline).foregroundStyle(Color.envMuted)
+                HStack(spacing: 6) {
+                    paymentMethod("Card", systemImage: "creditcard.fill")
+                    paymentMethod("PayPal", systemImage: "p.circle.fill")
+                    paymentMethod("Bank transfer", systemImage: "building.columns.fill")
+                    paymentMethod("Crypto", systemImage: "bitcoinsign.circle.fill")
+                    paymentMethod("More", systemImage: "ellipsis")
+                }
                 HStack {
                     Image(systemName: "lock.shield.fill").foregroundStyle(Color.envAccent).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
@@ -1248,7 +1255,7 @@ private struct NativeWalletDashboardView: View {
                     Button("Refresh") { refreshKey += 1 }
                 }
                 if activity.isEmpty {
-                    Text(dashboard == nil ? "Connect to view your transaction history." : "No wallet activity has been recorded yet.")
+                    Text("No transactions yet. Your deposits, usage and rewards will appear here.")
                         .font(.subheadline).foregroundStyle(Color.envMuted)
                 } else {
                     ForEach(Array(activity.prefix(5).enumerated()), id: \.offset) { item in
@@ -1268,6 +1275,7 @@ private struct NativeWalletDashboardView: View {
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
 
+            DisclosureGroup(dashboard == nil ? "Connect account" : "Device connection") {
             if dashboard != nil {
                 Button("Reconnect this device") {
                     paired = false
@@ -1317,6 +1325,12 @@ private struct NativeWalletDashboardView: View {
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
             }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(Color.envInk)
+            .padding(12)
+            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
 
             if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
             if !message.isEmpty { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
@@ -1365,6 +1379,22 @@ private struct NativeWalletDashboardView: View {
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 3
         return formatter.string(from: NSNumber(value: value)) ?? "0"
+    }
+
+    private func paymentMethod(_ title: String, systemImage: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Color.envAccent)
+                .frame(width: 38, height: 38)
+                .background(Color.envSurface2, in: Circle())
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(Color.envInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func walletMetric(_ title: String, _ value: String, _ detail: String) -> some View {
