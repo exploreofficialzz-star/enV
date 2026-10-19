@@ -140,6 +140,9 @@ assert.match(tokenDashboardComponent, /Welcome to your token dashboard/, "dashbo
 assert.match(tokenDashboardComponent, /Today's token spent/, "dashboard must expose today's token total");
 assert.match(tokenDashboardComponent, /Last week token spent/, "dashboard must expose its seven-day token total");
 assert.match(tokenDashboardComponent, /Last month token spent/, "dashboard must expose its thirty-day token total");
+assert.match(tokenDashboardComponent, /Token usage history/, "dashboard must expose the usage timeline");
+assert.match(tokenDashboardComponent, /formatTimestamp\(item\.createdAt\)/, "usage history must show recorded timestamps");
+assert.match(tokenDashboardComponent, /resolveToolName\(item\.toolId/, "usage history must resolve recorded tool names");
 assert.match(tokenUsageRoute, /requireOfflineBillingUser/, "token history must require an authenticated account or valid paired-device session");
 assert.match(tokenUsageRoute, /getTokenUsageDashboard\(auth\.userId/, "the endpoint must scope token history to the authenticated user");
 assert.match(tokenUsageService, /where user_id = \$1 and entry_type = 'settlement'/, "spending totals must derive only from confirmed account settlements");
