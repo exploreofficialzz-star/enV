@@ -199,12 +199,12 @@ const issueRoute = read("server/routes/api/billing/offline/allowances.post.ts");
 const offlineStatusRoute = read("server/routes/api/billing/offline/status.get.ts");
 const adminRecoveriesRoute = read("server/routes/api/billing/admin/offline-recoveries.get.ts");
 assert.ok(offlineStatusRoute.includes("offlineWalletAvailability"), "User-facing offline status must be sourced from server gates.");
-const accountRoute = read("src/routes/account.tsx");
-assert.ok(accountRoute.includes("/api/billing/offline/status") && accountRoute.includes("/api/billing/offline/allowances") &&
-  accountRoute.includes("recoveryReason"), "Wallet view must clearly surface offline availability and unresolved recovery state.");
-assert.ok(accountRoute.includes("/api/billing/offline/recovery") && accountRoute.includes("window.confirm") &&
-  accountRoute.includes("does not automatically refund tokens") && accountRoute.includes('Link to="/help"') &&
-  accountRoute.includes('allowance.platform !== "web"') && accountRoute.includes('allowance.platform === "web"'),
+const walletRoute = read("src/routes/wallet.tsx");
+assert.ok(walletRoute.includes("/api/billing/offline/status") && walletRoute.includes("/api/billing/offline/allowances") &&
+  walletRoute.includes("recoveryReason"), "Wallet view must clearly surface offline availability and unresolved recovery state.");
+assert.ok(walletRoute.includes("/api/billing/offline/recovery") && walletRoute.includes("window.confirm") &&
+  walletRoute.includes("does not automatically refund tokens") && walletRoute.includes('Link to="/help"') &&
+  walletRoute.includes('allowance.platform !== "web"') && walletRoute.includes('allowance.platform === "web"'),
   "Missing-record recovery must require explicit user confirmation, explain no automatic refund, and link to Help.");
 assert.ok(adminRecoveriesRoute.includes("offlineRecoveryQueue") && adminRecoveriesRoute.includes("BILLING_ADMIN_TOKEN") && adminRecoveriesRoute.includes("timingSafeEqual"),
   "Recovery queue must be read-only and protected with a high-entropy admin secret.");
