@@ -1231,12 +1231,9 @@ private struct NativeTokenDashboardView: View {
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
-                    Text("Available balance · Token name: enV")
+                    Text("enV estimated reference value = $0.010")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.80))
-                    Text(tokenReferenceValue(number("availableTokens", from: wallet)))
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.70))
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "circle.hexagongrid.fill")
