@@ -47,9 +47,9 @@ test("prompts are versioned: any change to a task's prompt or output schema requ
     const was = saved[id]!;
     if (was.hash === entry.hash && was.version === entry.version) continue;
     if (was.hash !== entry.hash && was.version === entry.version) {
-      assert.fail(`${id}: its prompt or output schema changed but the version is still ${entry.version}. Bump the task's version, then refresh the snapshot with: ${REFRESH}`);
+      assert.fail(`${id}: its prompt or output schema changed but the version is still ${entry.version} (saved hash ${was.hash}; current hash ${entry.hash}). Bump the task's version, then refresh the snapshot with: ${REFRESH}`);
     }
-    assert.fail(`${id}: version or content moved (${was.version} -> ${entry.version}) but the snapshot was not refreshed. Run: ${REFRESH}`);
+    assert.fail(`${id}: version or content moved (${was.version} -> ${entry.version}; saved hash ${was.hash}; current hash ${entry.hash}) but the snapshot was not refreshed. Run: ${REFRESH}`);
   }
 });
 
