@@ -47,7 +47,7 @@ type DashboardData = {
     activity: ActivityRecord[];
   };
 };
-type LoadState = "loading" | "ready" | "signed-out" | "unavailable";
+type LoadState = "loading" | "ready" | "signed-out" | "auth-disabled" | "unavailable";
 type TimelineItem =
   | (ChargeRecord & { kind: "charge"; timelineId: string; resolvedName: string })
   | (ActivityRecord & { kind: "activity"; timelineId: string; resolvedName: string });
@@ -114,7 +114,6 @@ function MetricCard({ title, value, detail, icon }: { title: string; value: stri
 export function TokenDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<"all" | "deductions" | "tool-activity">("all");
   const [showAll, setShowAll] = useState(false);
 
@@ -129,13 +128,15 @@ export function TokenDashboard() {
       const payload = await response.json() as { ok?: boolean; data?: DashboardData; message?: string; error?: string };
       if (response.status === 401) {
         setLoadState("signed-out");
-        setMessage(payload.message ?? "Sign in to view token usage for your account.");
+        return;
+      }
+      if (payload.error === "BILLING_AUTH_NOT_CONFIGURED") {
+        setLoadState("auth-disabled");
         return;
       }
       if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.message ?? "Token usage is temporarily unavailable.");
       setData(payload.data);
       setLoadState("ready");
-      setMessage("");
     }).catch((reason: unknown) => {
       if (controller.signal.aborted) return;
       setLoadState("unavailable");
@@ -193,12 +194,6 @@ export function TokenDashboard() {
           </p>
         </header>
 
-        {loadState === "loading" ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Loading token usage" aria-busy="true">
-            {[0, 1, 2, 3].map((item) => <div key={item} className="h-36 animate-pulse rounded-2xl border border-border bg-surface-2" />)}
-          </div>
-        ) : null}
-
         {loadState !== "ready" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3" role="status" aria-live="polite">
             <p className="min-w-0 flex-1 text-sm leading-5 text-muted">
@@ -206,7 +201,9 @@ export function TokenDashboard() {
                 ? "Loading your account token data…"
                 : loadState === "signed-out"
                   ? "Sign in to load your real enV balance, spending totals, and token activity."
-                  : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
+                  : loadState === "auth-disabled"
+                    ? "Production account authentication is disabled, so personal token balances cannot load yet."
+                    : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
             </p>
             {loadState === "signed-out" ? (
               <Link to="/account" className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white">Sign in</Link>
@@ -317,8 +314,8 @@ export function TokenDashboard() {
               ) : (
                 <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center">
                   <span className="mx-auto grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><ShieldCheck size={20} aria-hidden="true" /></span>
-                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
-                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. No token values are guessed." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
+                  <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Sign in to load token history" : loadState === "auth-disabled" ? "Account authentication is not enabled" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
+                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted">{loadState === "signed-out" ? "Sign in to load the real account-specific history. No token values are guessed." : loadState === "auth-disabled" ? "Enable production authentication to load the account-specific history and balance." : loadState === "unavailable" ? "The account ledger could not be reached. Try again when the service is available." : "Only confirmed wallet settlements count as tokens spent. Tool telemetry without a token deduction is listed separately and does not increase spending totals."}</p>
                 </div>
               )}
               {visibleTimeline.length > 12 ? (
