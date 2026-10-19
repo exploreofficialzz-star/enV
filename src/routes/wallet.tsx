@@ -173,8 +173,8 @@ function Account() {
       window.history.replaceState({}, "", "/wallet");
     }
     if (params.get("claimReferral") !== "1") return;
-    const referralCode = window.localStorage.getItem("env.pendingReferralCode");
-    const source = window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
+    const referralCode = params.get("ref") ?? window.localStorage.getItem("env.pendingReferralCode");
+    const source = params.get("source") === "video" || window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
     if (!referralCode) {
       window.history.replaceState({}, "", "/wallet");
       return;
