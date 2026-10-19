@@ -1150,86 +1150,78 @@ private struct NativeTokenDashboardView: View {
     private var charges: [[String: Any]] { usage["charges"] as? [[String: Any]] ?? [] }
     private var activity: [[String: Any]] { usage["activity"] as? [[String: Any]] ?? [] }
     private var dailyUsage: [[String: Any]] { usage["weeklyUsage"] as? [[String: Any]] ?? [] }
+    private var displayDailyUsage: [[String: Any]] {
+        if !dailyUsage.isEmpty { return dailyUsage }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return (0..<7).compactMap { offset in
+            guard let date = Calendar.current.date(byAdding: .day, value: offset - 6, to: Date()) else { return nil }
+            return ["day": formatter.string(from: date), "subunits": 0] as [String: Any]
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Welcome to your token dashboard")
-                .font(.system(size: 25, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.envInk)
+            HStack(alignment: .top, spacing: 8) {
+                Text("Welcome to your token dashboard")
+                    .font(.system(size: 25, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.envInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    if let url = URL(string: "https://envtools.store/wallet") { openURL(url) }
+                } label: {
+                    Label("Open wallet", systemImage: "wallet.bifold")
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.envAccent)
+            }
             Text("See your remaining enV tokens, spending windows, and the tools and timestamps behind recorded activity.")
                 .font(.subheadline)
                 .foregroundStyle(Color.envMuted)
 
-            if !paired {
-                connectAccountCard
+            if dashboard == nil && !loading {
+                Text("Preview display: showing 0.000 enV until real account data is connected.")
+                    .font(.caption)
+                    .foregroundStyle(Color.envMuted)
             } else if loading && dashboard == nil {
                 ProgressView("Loading token usage…")
+                    .font(.caption)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-            } else if dashboard == nil {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(message.isEmpty ? "Token usage is temporarily unavailable." : message)
-                        .font(.footnote)
-                        .foregroundStyle(Color.envMuted)
-                    Button("Try again") { refreshKey += 1 }
-                        .buttonStyle(.borderedProminent)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
             }
 
-            if dashboard != nil {
-                totalTokensCard
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    metric("Today's token spent", token(number("todaySpentSubunits", from: summary) / 1000) + " enV", "Since midnight · local time", icon: "clock")
-                    metric("Last week token spent", token(number("weekSpentSubunits", from: summary) / 1000) + " enV", "Rolling 7 days", icon: "calendar")
-                    metric("Last month token spent", token(number("monthSpentSubunits", from: summary) / 1000) + " enV", "Rolling 30 days", icon: "chart.bar")
-                    metric("Total deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), icon: "arrow.down.to.line")
-                }
-
-                dailyUsageCard
-                deductionsCard
-                activityCard
-
-                HStack(alignment: .top, spacing: 7) {
-                    Image(systemName: "checkmark.shield")
-                    Text("Spending totals use confirmed wallet settlements only. Tool telemetry is shown separately and is not counted as tokens spent unless a confirmed deduction exists.")
-                }
-                .font(.caption)
-                .foregroundStyle(Color.envMuted)
-                .padding(.vertical, 4)
-
-                Button {
-                    refreshKey += 1
-                } label: {
-                    Label("Refresh token usage", systemImage: "arrow.clockwise")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            totalTokensCard
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                metric("Today's token spent", token(number("todaySpentSubunits", from: summary) / 1000) + " enV", "Since midnight · local time", icon: "clock")
+                metric("Last week token spent", token(number("weekSpentSubunits", from: summary) / 1000) + " enV", "Rolling 7 days", icon: "calendar")
+                metric("Last month token spent", token(number("monthSpentSubunits", from: summary) / 1000) + " enV", "Rolling 30 days", icon: "chart.bar")
+                metric("Total deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), icon: "arrow.down.to.line")
+                metric("Token deductions", String(charges.count), "Confirmed spending records", icon: "arrow.up.right")
             }
+
+            dailyUsageCard
+            deductionsCard
+            activityCard
+
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: "checkmark.shield")
+                Text("Spending totals use confirmed wallet settlements only. Tool telemetry is shown separately and is not counted as tokens spent unless a confirmed deduction exists.")
+            }
+            .font(.caption)
+            .foregroundStyle(Color.envMuted)
+            .padding(.vertical, 4)
+
+            Button {
+                refreshKey += 1
+            } label: {
+                Label("Refresh token usage", systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
         }
         .task(id: "\(refreshKey)-\(paired)") { await refresh() }
-    }
-
-    private var connectAccountCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Connect your enV account")
-                .font(.headline)
-                .foregroundStyle(Color.envInk)
-            Text("For privacy, native token balances are available after this device is paired from the signed-in enV web Wallet.")
-                .font(.subheadline)
-                .foregroundStyle(Color.envMuted)
-            Button("Open enV wallet") {
-                if let url = URL(string: "https://envtools.store/wallet") { openURL(url) }
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
     }
 
     private var totalTokensCard: some View {
@@ -1291,9 +1283,9 @@ private struct NativeTokenDashboardView: View {
             Text("Confirmed deductions · last 7 local calendar days")
                 .font(.caption)
                 .foregroundStyle(Color.envMuted)
-            let maxValue = max(1, dailyUsage.map { number("subunits", from: $0) }.max() ?? 0)
+            let maxValue = max(1, displayDailyUsage.map { number("subunits", from: $0) }.max() ?? 0)
             HStack(alignment: .bottom, spacing: 5) {
-                ForEach(Array(dailyUsage.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(displayDailyUsage.enumerated()), id: \.offset) { _, item in
                     let amount = number("subunits", from: item) / 1000
                     let height = amount > 0 ? max(5, amount / maxValue * 62) : 2
                     VStack(spacing: 5) {
@@ -1456,7 +1448,11 @@ private struct NativeTokenDashboardView: View {
     }
 
     private func token(_ value: Double) -> String {
-        NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 3
+        formatter.maximumFractionDigits = 3
+        return formatter.string(from: NSNumber(value: value)) ?? "0.000"
     }
 
     private func tokenReferenceValue(_ value: Double) -> String {
