@@ -194,14 +194,12 @@ export function TokenDashboard() {
           </p>
         </header>
 
-        {loadState !== "ready" && loadState !== "auth-disabled" ? (
+        {loadState === "signed-out" || loadState === "unavailable" ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3" role="status" aria-live="polite">
             <p className="min-w-0 flex-1 text-sm leading-5 text-muted">
-              {loadState === "loading"
-                ? "Loading your account token data…"
-                : loadState === "signed-out"
-                  ? "Sign in to load your real enV balance, spending totals, and token activity."
-                  : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
+              {loadState === "signed-out"
+                ? "Sign in to load your real enV balance, spending totals, and token activity."
+                : "Your dashboard is ready, but account data is unavailable right now. Balances are left blank rather than guessed."}
             </p>
             {loadState === "signed-out" ? (
               <Link to="/account" className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white">Sign in</Link>
