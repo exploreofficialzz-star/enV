@@ -23,20 +23,35 @@ const explicitBaseURL = env("BETTER_AUTH_URL");
 const configuredSecret = env("BETTER_AUTH_SECRET");
 const resendApiKey = env("RESEND_API_KEY");
 const authEmailFrom = env("AUTH_EMAIL_FROM");
+const googleClientId = env("GOOGLE_CLIENT_ID");
+const googleClientSecret = env("GOOGLE_CLIENT_SECRET");
+const appleClientId = env("APPLE_CLIENT_ID");
+const appleClientSecret = env("APPLE_CLIENT_SECRET");
 const secureCookies = env("NODE_ENV") === "production" || isVercel;
 const emailPasswordAuthEnabled = authRequested && emailAndPasswordEnabled;
 const oauthConfigured = Boolean(oauthIssuer && oauthClientId && oauthClientSecret);
 const oauthPartiallyConfigured = Boolean(oauthIssuer || oauthClientId || oauthClientSecret) && !oauthConfigured;
+const googleConfigured = Boolean(googleClientId && googleClientSecret);
+const googlePartiallyConfigured = Boolean(googleClientId || googleClientSecret) && !googleConfigured;
+const appleConfigured = Boolean(appleClientId && appleClientSecret);
+const applePartiallyConfigured = Boolean(appleClientId || appleClientSecret) && !appleConfigured;
+const socialProviderConfigured = googleConfigured || appleConfigured;
 
 export const authConfigured = authRequested;
 
 if (authRequested && oauthPartiallyConfigured) {
   throw new Error(
-    "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use email/password authentication.",
+    "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use social providers or email/password authentication.",
   );
 }
-if (authRequested && !oauthConfigured && !emailPasswordAuthEnabled) {
-  throw new Error("Authentication is enabled but no provider is configured. Configure a complete OAuth provider or enable email/password with transactional email delivery.");
+if (authRequested && googlePartiallyConfigured) {
+  throw new Error("Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+}
+if (authRequested && applePartiallyConfigured) {
+  throw new Error("Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.");
+}
+if (authRequested && !oauthConfigured && !socialProviderConfigured && !emailPasswordAuthEnabled) {
+  throw new Error("Authentication is enabled but no provider is configured. Configure Google, Apple, a complete OIDC provider, or email/password with transactional email delivery.");
 }
 if (authRequested && emailPasswordAuthEnabled && (!resendApiKey || !authEmailFrom)) {
   throw new Error("Email/password authentication requires RESEND_API_KEY and AUTH_EMAIL_FROM so verification and password-reset emails can be delivered.");
@@ -67,7 +82,10 @@ const localOrigins = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
-const trustedOrigins = explicitBaseURL ? [explicitBaseURL, ...(secureCookies ? [] : localOrigins)] : localOrigins;
+const trustedOrigins = [
+  ...(explicitBaseURL ? [explicitBaseURL, ...(secureCookies ? [] : localOrigins)] : localOrigins),
+  ...(appleConfigured ? ["https://appleid.apple.com"] : []),
+];
 const issuerDiscoveryUrl = oauthIssuer ? `${oauthIssuer}/.well-known/openid-configuration` : "";
 
 const oauthPlugin = authRequested && oauthConfigured
@@ -103,6 +121,10 @@ export const auth = betterAuth({
   secret,
   database,
   trustedOrigins,
+  socialProviders: {
+    ...(googleConfigured ? { google: { clientId: googleClientId!, clientSecret: googleClientSecret! } } : {}),
+    ...(appleConfigured ? { apple: { clientId: appleClientId!, clientSecret: appleClientSecret! } } : {}),
+  },
   account: {
     encryptOAuthTokens: true,
     accountLinking: {
