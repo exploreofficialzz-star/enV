@@ -1180,11 +1180,7 @@ private struct NativeTokenDashboardView: View {
                 .font(.subheadline)
                 .foregroundStyle(Color.envMuted)
 
-            if dashboard == nil && !loading {
-                Text("Preview display: showing 0.000 enV until real account data is connected.")
-                    .font(.caption)
-                    .foregroundStyle(Color.envMuted)
-            } else if loading && dashboard == nil {
+            if loading && dashboard == nil {
                 ProgressView("Loading token usage…")
                     .font(.caption)
                     .frame(maxWidth: .infinity, alignment: .leading)
