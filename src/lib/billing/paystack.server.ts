@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
 
