@@ -1130,7 +1130,7 @@ private struct NativeWalletDashboardView: View {
                     Text("\(token(number("availableTokens", from: wallet))) tokens")
                         .font(.system(size: 34, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.envInk)
-                    Text("Illustrative reference value: ${token(number("availableTokens", from: wallet) * 0.01)} USD. This is not cash or a guaranteed redemption value.")
+                    Text("Illustrative reference value: $\(token(number("availableTokens", from: wallet) * 0.01)) USD. This is not cash or a guaranteed redemption value.")
                         .font(.footnote).foregroundStyle(Color.envMuted)
                 }
                 .padding(20)
