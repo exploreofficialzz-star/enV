@@ -137,10 +137,9 @@ export function TokenDashboard() {
       if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.message ?? "Token usage is temporarily unavailable.");
       setData(payload.data);
       setLoadState("ready");
-    }).catch((reason: unknown) => {
+    }).catch(() => {
       if (controller.signal.aborted) return;
       setLoadState("unavailable");
-      setMessage(reason instanceof Error ? reason.message : "Token usage is temporarily unavailable.");
     });
     return () => controller.abort();
   }, []);
