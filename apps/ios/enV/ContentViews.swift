@@ -1203,7 +1203,7 @@ private struct NativeWalletDashboardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: "play.rectangle.fill"
+                    Image(systemName: "play.rectangle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(Color.envInk)
                         .frame(width: 40, height: 40)
@@ -1268,7 +1268,7 @@ private struct NativeWalletDashboardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: "person.2.fill"
+                    Image(systemName: "person.2.fill")
                         .font(.system(size: 23))
                         .foregroundStyle(Color.envInk)
                         .frame(width: 48, height: 48)
