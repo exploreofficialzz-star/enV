@@ -1047,6 +1047,7 @@ struct NativeInformationPageView: View {
         case "contact": return "Contact"
         case "help": return "Help center"
         case "tokens": return "Token guide"
+        case "token-dashboard": return "Token dashboard"
         case "wallet": return "Wallet"
         case "account": return "Account"
         case "history": return "History"
@@ -1118,6 +1119,7 @@ struct NativeInformationPageView: View {
         case "contact": NativeContactInformationPage()
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
         case "tokens": NativeInfoSectionView(title: "Understanding tokens", paragraphs: ["Token usage depends on the tool and the work being performed.", "Local utilities may use different rules from hosted AI, media processing, and multi-step workflows.", "Review relevant tool information and Wallet activity when evaluating token usage."])
+        case "token-dashboard": NativeTokenDashboardView()
         case "account": VStack(alignment: .leading, spacing: 14) {
              NativeInfoSectionView(title: "Welcome back to enV", paragraphs: ["Sign in or create an account from the enV sign-in page."])
              Button("Continue to sign in") { if let url = URL(string: "https://envtools.store/account") { openURL(url) } }
@@ -1130,6 +1132,357 @@ struct NativeInformationPageView: View {
         case "disclaimer": NativeDisclaimerInformationPage()
         case "responsible-use": NativeResponsibleUseInformationPage()
         default: NativeAboutInformationPage()
+        }
+    }
+}
+
+private struct NativeTokenDashboardView: View {
+    @Environment(\.openURL) private var openURL
+    @State private var paired = OfflineWalletNativeAPI.isPaired
+    @State private var dashboard: [String: Any]?
+    @State private var loading = false
+    @State private var message = ""
+    @State private var refreshKey = 0
+
+    private var wallet: [String: Any] { dashboard?["wallet"] as? [String: Any] ?? [:] }
+    private var usage: [String: Any] { dashboard?["tokenUsage"] as? [String: Any] ?? [:] }
+    private var summary: [String: Any] { usage["summary"] as? [String: Any] ?? [:] }
+    private var charges: [[String: Any]] { usage["charges"] as? [[String: Any]] ?? [] }
+    private var activity: [[String: Any]] { usage["activity"] as? [[String: Any]] ?? [] }
+    private var dailyUsage: [[String: Any]] { usage["weeklyUsage"] as? [[String: Any]] ?? [] }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Welcome to your token dashboard")
+                .font(.system(size: 25, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.envInk)
+            Text("See your remaining enV tokens, spending windows, and the tools and timestamps behind recorded activity.")
+                .font(.subheadline)
+                .foregroundStyle(Color.envMuted)
+
+            if !paired {
+                connectAccountCard
+            } else if loading && dashboard == nil {
+                ProgressView("Loading token usage…")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+            } else if dashboard == nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(message.isEmpty ? "Token usage is temporarily unavailable." : message)
+                        .font(.footnote)
+                        .foregroundStyle(Color.envMuted)
+                    Button("Try again") { refreshKey += 1 }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
+            }
+
+            if dashboard != nil {
+                totalTokensCard
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    metric("Today's token spent", token(number("todaySpentSubunits", from: summary) / 1000) + " enV", "Since midnight · local time", icon: "clock")
+                    metric("Last week token spent", token(number("weekSpentSubunits", from: summary) / 1000) + " enV", "Rolling 7 days", icon: "calendar")
+                    metric("Last month token spent", token(number("monthSpentSubunits", from: summary) / 1000) + " enV", "Rolling 30 days", icon: "chart.bar")
+                    metric("Total deposited", token(number("lifetimePurchasedSubunits", from: wallet) / 1000) + " enV", tokenReferenceValue(number("lifetimePurchasedSubunits", from: wallet) / 1000), icon: "arrow.down.to.line")
+                }
+
+                dailyUsageCard
+                deductionsCard
+                activityCard
+
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "checkmark.shield")
+                    Text("Spending totals use confirmed wallet settlements only. Tool telemetry is shown separately and is not counted as tokens spent unless a confirmed deduction exists.")
+                }
+                .font(.caption)
+                .foregroundStyle(Color.envMuted)
+                .padding(.vertical, 4)
+
+                Button {
+                    refreshKey += 1
+                } label: {
+                    Label("Refresh token usage", systemImage: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .task(id: "\(refreshKey)-\(paired)") { await refresh() }
+    }
+
+    private var connectAccountCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Connect your enV account")
+                .font(.headline)
+                .foregroundStyle(Color.envInk)
+            Text("For privacy, native token balances are available after this device is paired from the signed-in enV web Wallet.")
+                .font(.subheadline)
+                .foregroundStyle(Color.envMuted)
+            Button("Open enV wallet") {
+                if let url = URL(string: "https://envtools.store/wallet") { openURL(url) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
+    }
+
+    private var totalTokensCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Total token")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.78))
+                    Text(token(number("availableTokens", from: wallet)) + " enV")
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    Text("Available balance · Token name: enV")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.80))
+                    Text(tokenReferenceValue(number("availableTokens", from: wallet)))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.70))
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "circle.hexagongrid.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Color(red: 0.32, green: 1.0, blue: 0.80))
+            }
+            Divider().overlay(.white.opacity(0.17))
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Reserved")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.70))
+                    Text(token(number("reservedTokens", from: wallet)) + " enV")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("Total used ever")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.70))
+                    Text(token(number("lifetimeConsumedSubunits", from: wallet) / 1000) + " enV")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(colors: [Color(red: 0.02, green: 0.24, blue: 0.21), Color(red: 0.02, green: 0.19, blue: 0.29), Color(red: 0.02, green: 0.11, blue: 0.21)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color(red: 0.22, green: 0.95, blue: 0.75).opacity(0.35), lineWidth: 1))
+    }
+
+    private var dailyUsageCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Daily token usage")
+                .font(.headline)
+                .foregroundStyle(Color.envInk)
+            Text("Confirmed deductions · last 7 local calendar days")
+                .font(.caption)
+                .foregroundStyle(Color.envMuted)
+            let maxValue = max(1, dailyUsage.map { number("subunits", from: $0) }.max() ?? 0)
+            HStack(alignment: .bottom, spacing: 5) {
+                ForEach(Array(dailyUsage.enumerated()), id: \.offset) { _, item in
+                    let amount = number("subunits", from: item) / 1000
+                    let height = amount > 0 ? max(5, amount / maxValue * 62) : 2
+                    VStack(spacing: 5) {
+                        Text(token(amount))
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(Color.envMuted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        ZStack(alignment: .bottom) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.envSurface)
+                                .frame(height: 64)
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(Color.envAccent)
+                                .frame(height: height)
+                        }
+                        Text(String((item["day"] as? String ?? "").suffix(5)))
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.envMuted)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
+    }
+
+    private var deductionsCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Confirmed token deductions")
+                .font(.headline)
+                .foregroundStyle(Color.envInk)
+            Text("Tool name, tokens spent, and recorded date/time")
+                .font(.caption)
+                .foregroundStyle(Color.envMuted)
+            if charges.isEmpty {
+                emptyMessage("No confirmed token deductions recorded yet.")
+            } else {
+                ForEach(Array(charges.prefix(120).enumerated()), id: \.offset) { index, item in
+                    if index > 0 { Divider().overlay(Color.envMuted.opacity(0.12)) }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text((item["toolName"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (item["toolId"] as? String ?? "Tool usage"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.envInk)
+                        HStack {
+                            Text(token(number("tokensSpent", from: item)) + " enV spent")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(Color.envAccent)
+                            Spacer(minLength: 4)
+                            Text("Confirmed")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.envMuted)
+                        }
+                        Text(formattedTimestamp(item["createdAt"] as? String ?? ""))
+                            .font(.caption2)
+                            .foregroundStyle(Color.envMuted)
+                        if let description = item["description"] as? String, !description.isEmpty {
+                            Text(description).font(.caption).foregroundStyle(Color.envMuted)
+                        }
+                        if let key = item["billingKey"] as? String, !key.isEmpty {
+                            Text("Meter: \(key)").font(.system(size: 10)).foregroundStyle(Color.envMuted)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
+    }
+
+    private var activityCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Recorded tool activity")
+                .font(.headline)
+                .foregroundStyle(Color.envInk)
+            Text("Metering telemetry is separate from confirmed token deductions.")
+                .font(.caption)
+                .foregroundStyle(Color.envMuted)
+            if activity.isEmpty {
+                emptyMessage("No tool activity records yet.")
+            } else {
+                ForEach(Array(activity.prefix(120).enumerated()), id: \.offset) { index, item in
+                    if index > 0 { Divider().overlay(Color.envMuted.opacity(0.12)) }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text((item["toolId"] as? String ?? "Tool activity").replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " "))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.envInk)
+                        Text("Status: \((item["status"] as? String ?? "recorded").replacingOccurrences(of: "_", with: " "))")
+                            .font(.caption)
+                            .foregroundStyle(Color.envMuted)
+                        HStack {
+                            Text(token(number("billedTokens", from: item)) + " enV billed in telemetry")
+                                .font(.caption)
+                                .foregroundStyle(Color.envMuted)
+                            Spacer(minLength: 4)
+                            Text(number("billedTokens", from: item) > 0 ? "Metered amount" : "No token deduction")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.envMuted)
+                        }
+                        Text(formattedTimestamp(item["createdAt"] as? String ?? ""))
+                            .font(.caption2)
+                            .foregroundStyle(Color.envMuted)
+                        let metrics = item["metrics"] as? [String: Any] ?? [:]
+                        let metricText = metrics.keys.sorted().prefix(4).compactMap { key -> String? in
+                            guard let value = metrics[key] else { return nil }
+                            return "\(key): \(value)"
+                        }.joined(separator: " · ")
+                        if !metricText.isEmpty {
+                            Text(metricText).font(.system(size: 10)).foregroundStyle(Color.envMuted)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
+    }
+
+    private func metric(_ title: String, _ value: String, _ detail: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                Text(title).font(.caption.weight(.medium)).foregroundStyle(Color.envMuted)
+            }
+            Text(value)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.envInk)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+            Text(detail)
+                .font(.system(size: 10))
+                .foregroundStyle(Color.envMuted)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .padding(10)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envMuted.opacity(0.18), lineWidth: 1))
+    }
+
+    private func emptyMessage(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(Color.envMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+    }
+
+    private func number(_ key: String, from object: [String: Any]) -> Double {
+        if let value = object[key] as? NSNumber { return value.doubleValue }
+        if let value = object[key] as? String, let parsed = Double(value) { return parsed }
+        return 0
+    }
+
+    private func token(_ value: Double) -> String {
+        NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    }
+
+    private func tokenReferenceValue(_ value: Double) -> String {
+        "Estimated reference value $" + token(value * 0.01)
+    }
+
+    private func formattedTimestamp(_ raw: String) -> String {
+        let iso = ISO8601DateFormatter()
+        guard let date = iso.date(from: raw) else { return raw.isEmpty ? "Time unavailable" : raw }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return formatter.string(from: date) + " · local time"
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard paired else { dashboard = nil; return }
+        loading = true
+        defer { loading = false }
+        do {
+            dashboard = try await OfflineWalletNativeAPI.fetchWalletDashboard()
+            message = ""
+        } catch {
+            dashboard = nil
+            message = error.localizedDescription
         }
     }
 }
