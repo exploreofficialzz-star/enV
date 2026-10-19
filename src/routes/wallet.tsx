@@ -648,9 +648,9 @@ function Account() {
                   {state.status === "ready" && state.wallet && state.wallet.availableTokens < 5 ? <p className="mt-2 text-xs text-muted">At least five available tokens are required. </p> : null}
                   {selectedLocalAllowanceId ? <button type="button" disabled={offlineActionBusy} onClick={() => void activateLocalAllowance(null)} className="ml-2 mt-3 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg disabled:opacity-50">Pause local metering</button> : null}
                 </div> : null}
-                {offlineState.enabled ? <section className="mt-4 rounded-xl border border-border p-3" aria-labelledby="native-pairing-title">
+                {state.status === "ready" ? <section className="mt-4 rounded-xl border border-border p-3" aria-labelledby="native-pairing-title">
                   <div className="flex items-center gap-2"><Smartphone size={17} aria-hidden="true" /><h3 id="native-pairing-title" className="text-sm font-semibold text-fg">Connect Android or iOS</h3></div>
-                  <p className="mt-1 text-xs leading-5 text-muted">Generate a one-time code here, then enter it in the native enV app. The app creates its own device-bound signing key; the private key never leaves that device. Pairing codes are single-use and expire quickly.</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">Generate a one-time code here, then enter it in your native enV app to securely view shared balances, rewards and activity. The app creates its own device-bound signing key; the private key never leaves the device. If offline allowances are enabled later, the same pairing can support that feature too. Pairing codes are single-use and expire quickly.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <label className="sr-only" htmlFor="pairing-platform">Native platform</label>
                     <select id="pairing-platform" value={pairingPlatform} onChange={(event) => setPairingPlatform(event.target.value as "android" | "ios")} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg">
