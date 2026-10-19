@@ -1130,7 +1130,7 @@ private struct NativeWalletDashboardView: View {
                     Text("\(token(number("availableTokens", from: wallet))) tokens")
                         .font(.system(size: 34, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.envInk)
-                    Text("Reference value is not cash and cannot be withdrawn.")
+                    Text("Illustrative reference value: ${token(number("availableTokens", from: wallet) * 0.01)} USD. This is not cash or a guaranteed redemption value.")
                         .font(.footnote).foregroundStyle(Color.envMuted)
                 }
                 .padding(20)
@@ -1145,6 +1145,7 @@ private struct NativeWalletDashboardView: View {
                     walletMetric("Reserved", token(number("reservedTokens", from: wallet)), "Held for active work")
                     walletMetric("Referral rewards", token(number("referralTokens", from: rewards)), "Qualified invites")
                     walletMetric("Affiliate rewards", token(number("affiliateTokens", from: rewards)), "Verified video conversions")
+                    walletMetric("Bonus tokens", token(number("bonusTokens", from: rewards)), "Promotional awards")
                 }
 
                 NativeInfoSectionView(title: "Fund your wallet", paragraphs: [
