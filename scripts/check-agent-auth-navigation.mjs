@@ -14,7 +14,7 @@ if (footer.includes("About") || footer.includes("Help center") || footer.include
 requireText("src/components/layout/header.tsx", ["/about", "/tools", "/pricing", "/tokens", "/help", "/blog", "/contact", "/privacy", "/terms", "/disclaimer", "/responsible-use", "/login", "/signup", "AI Agent"], "Web overflow menu");
 for (const path of ["src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.$token.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "RESEND_API_KEY", "sendVerificationEmail", "sendResetPassword"], "Server auth wiring");
-requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_PASSWORD_ENABLED"], "Auth client gates");
+requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 const agent = requireText("src/lib/ai/server/tasks/assistant.ts", ["You are the enV AI Agent", "user must open each tool"], "Agent capability instructions");
 if (!agent.includes("Never claim to open, run, operate, monitor, or finish")) errors.push("Agent prompt does not protect against claiming tool execution.");
 const android = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ["AI Agent", "Sign in", "Create account", "PRODUCT", "RESOURCES", "LEGAL", "private fun WebHomeFooter(catalog: Catalog, screenWidth: Int)"], "Android menu/footer");
