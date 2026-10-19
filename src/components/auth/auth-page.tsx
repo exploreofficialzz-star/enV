@@ -39,9 +39,13 @@ export function AuthPage({ mode }: AuthPageProps) {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("ref");
     if (!code || !/^[A-Za-z0-9]{8,24}$/.test(code)) return;
-    const source = params.get("source") === "video" ? "video" : "referral";
+    const suppliedSignature = params.get("sig") ?? "";
+    const signedVideo = params.get("source") === "video" && /^[a-f0-9]{64}$/i.test(suppliedSignature);
+    const source = signedVideo ? "video" : "referral";
     window.localStorage.setItem("env.pendingReferralCode", code.toUpperCase());
     window.localStorage.setItem("env.pendingReferralSource", source);
+    if (signedVideo) window.localStorage.setItem("env.pendingReferralSignature", suppliedSignature);
+    else window.localStorage.removeItem("env.pendingReferralSignature");
   }, [isSignUp]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -61,8 +65,9 @@ export function AuthPage({ mode }: AuthPageProps) {
     try {
       const pendingReferral = isSignUp ? window.localStorage.getItem("env.pendingReferralCode") : null;
       const pendingSource = window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
+      const pendingSignature = window.localStorage.getItem("env.pendingReferralSignature");
       const referralCallback = pendingReferral
-        ? `/wallet?claimReferral=1&ref=${encodeURIComponent(pendingReferral)}&source=${pendingSource}`
+        ? `/wallet?claimReferral=1&ref=${encodeURIComponent(pendingReferral)}&source=${pendingSource}${pendingSource === "video" && pendingSignature ? `&sig=${encodeURIComponent(pendingSignature)}` : ""}`
         : "/agent";
       if (isSignUp) {
         const result = await authClient.signUp.email({
@@ -100,7 +105,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       const result = await authClient.signIn.social({
         provider,
         callbackURL: isSignUp && window.localStorage.getItem("env.pendingReferralCode")
-          ? `/wallet?claimReferral=1&ref=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralCode")!)}&source=${window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral"}`
+          ? `/wallet?claimReferral=1&ref=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralCode")!)}&source=${window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral"}${window.localStorage.getItem("env.pendingReferralSource") === "video" && window.localStorage.getItem("env.pendingReferralSignature") ? `&sig=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralSignature")!)}` : ""}`
           : "/agent",
         errorCallbackURL: isSignUp ? "/signup" : "/account",
         disableRedirect: true,
