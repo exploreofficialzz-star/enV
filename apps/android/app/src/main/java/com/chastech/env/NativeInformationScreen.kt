@@ -209,7 +209,7 @@ private fun NativeTokenDashboard() {
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
                             )
-                            Text("enV estimated reference value = $0.010", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
+                            Text("enV estimated reference value ≈ $0.010", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
                         }
                         EnVIcon("Coins", Modifier.size(34.dp), tint = Color(0xFF52FFD0))
                     }
