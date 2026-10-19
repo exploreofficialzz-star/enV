@@ -1463,7 +1463,7 @@ private struct NativeWalletDashboardView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             if showDivider {
-                Divider().overlay(Color.envBorder, lineWidth: 1)
+                Divider().overlay(Color.envBorder)
             }
         }
         .padding(.vertical, 4)
