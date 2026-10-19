@@ -101,11 +101,7 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
                     InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
                     Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
                 }
-                "wallet" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    InformationSection("Your wallet", listOf("Review token balances, reservations, usage history, and connected devices from the Wallet dashboard.", "To pair this native app, generate a one-time code from the signed-in Wallet dashboard and enter it below."))
-                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open Wallet dashboard") }
-                    OfflineWalletPairingPanel()
-                }
+                "wallet" -> NativeWalletDashboard()
                 "history" -> InformationSection("", listOf("Recently used tools will appear here."))
                 "privacy" -> PrivacyInformation()
                 "terms" -> TermsInformation()
@@ -117,6 +113,171 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun NativeWalletDashboard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var paired by remember { mutableStateOf(OfflineWalletNativeApi.isPaired(context)) }
+    var dashboard by remember { mutableStateOf<OfflineWalletNativeApi.WalletDashboard?>(null) }
+    var code by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var refresh by remember { mutableStateOf(0) }
+    var message by remember { mutableStateOf("") }
+    var errorState by remember { mutableStateOf(false) }
+
+    LaunchedEffect(refresh, paired) {
+        if (!paired) { dashboard = null; return@LaunchedEffect }
+        loading = true
+        try {
+            dashboard = OfflineWalletNativeApi.fetchWalletDashboard(context)
+            message = ""
+            errorState = false
+        } catch (error: Exception) {
+            dashboard = null
+            message = error.message ?: "The shared wallet could not be loaded."
+            errorState = true
+        } finally { loading = false }
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (dashboard == null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Sign in on the enV website, open Wallet and generate a one-time code in the Connect Android/iOS section. Enter the code here to securely view your shared balance, rewards and history.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web Wallet") }
+                    OutlinedTextField(value = code, onValueChange = { code = it }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
+                    Button(onClick = {
+                        scope.launch {
+                            busy = true
+                            try {
+                                val result = OfflineWalletNativeApi.pair(context, code)
+                                if (!result.ok) throw IllegalStateException(result.message)
+                                code = ""
+                                paired = true
+                                refresh += 1
+                                message = "This Android device is paired."
+                                errorState = false
+                            } catch (error: Exception) {
+                                message = error.message ?: "The device could not be paired."
+                                errorState = true
+                            } finally { busy = false }
+                        }
+                    }, enabled = !busy && code.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                        Text(if (busy) "Connecting…" else "Pair this Android device")
+                    }
+                }
+            }
+        } else if (dashboard != null) {
+            val data = dashboard!!
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Available to use", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${data.availableTokens.formatWalletTokens()} tokens", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Reference value is not cash and cannot be withdrawn.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = { message = "In-app funding is not enabled for this Android build. Google Play Billing and server-side purchase verification must be configured before payments can be taken." }, modifier = Modifier.fillMaxWidth()) { Text("Funding setup") }
+                    Text("Fund wallet is unavailable until this app has verified Google Play Billing products.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NativeWalletMetric("Total deposited", data.lifetimePurchasedTokens.formatWalletTokens(), "Verified purchases", Modifier.weight(1f))
+                NativeWalletMetric("Total remaining", data.availableTokens.formatWalletTokens(), "Available now", Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NativeWalletMetric("Total used", data.lifetimeConsumedTokens.formatWalletTokens(), "Recorded usage", Modifier.weight(1f))
+                NativeWalletMetric("Reserved", data.reservedTokens.formatWalletTokens(), "Held for active work", Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NativeWalletMetric("Referral rewards", data.referralTokens.formatWalletTokens(), "Qualified invites", Modifier.weight(1f))
+                NativeWalletMetric("Affiliate rewards", data.affiliateTokens.formatWalletTokens(), "Verified video conversions", Modifier.weight(1f))
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Invite friends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${data.referralCount} invites · ${data.qualifiedReferrals} qualified · ${data.totalRewardTokens.formatWalletTokens()} reward tokens", style = MaterialTheme.typography.bodyMedium)
+                    Text("https://envtools.store/signup?ref=${data.referralCode}", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = {
+                        val link = "https://envtools.store/signup?ref=${data.referralCode}"
+                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Join me on enV: $link") }
+                        context.startActivity(Intent.createChooser(send, "Share your enV invite"))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Share invite link") }
+                    Text("Video affiliate · ${data.videoConversions} verified conversions", style = MaterialTheme.typography.titleSmall)
+                    Text("https://envtools.store/signup?ref=${data.referralCode}&source=video", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = {
+                        val link = "https://envtools.store/signup?ref=${data.referralCode}&source=video"
+                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Discover enV: $link") }
+                        context.startActivity(Intent.createChooser(send, "Share your enV video link"))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Share video link") }
+                    Text("Rewards follow verified purchase conversions, not self-reported views.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Recent activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { refresh += 1 }) { Text("Refresh") }
+                    }
+                    if (data.activity.isEmpty()) {
+                        Text("No wallet activity has been recorded yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        data.activity.take(12).forEach { row ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text(row.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+            OutlinedButton(onClick = { paired = false; code = ""; message = "" }, modifier = Modifier.fillMaxWidth()) { Text("Reconnect or pair another session") }
+        }
+        if (loading) Text("Loading your shared wallet…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = if (errorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun NativeWalletMetric(title: String, value: String, subtitle: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun Double.formatWalletTokens(): String =
+    java.text.NumberFormat.getNumberInstance().apply { maximumFractionDigits = 3 }.format(this)
 
 @Composable
 private fun OfflineWalletPairingPanel() {
