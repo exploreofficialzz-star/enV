@@ -127,6 +127,13 @@ enum OfflineWalletNativeAPI {
         return data
     }
 
+    static func fetchWalletDashboard() async throws -> [String: Any] {
+        guard let bearer = loadSessionToken() else {
+            throw OfflineWalletNativeAPIError.unavailable("Pair this iOS device from your signed-in enV web Wallet first.")
+        }
+        return try responseData(await makeRequest(path: "api/billing/native-wallet", method: "GET", bearer: bearer))
+    }
+
     static func checkAvailability() async -> (enabled: Bool, code: String, message: String) {
         do {
             let data = try responseData(await makeRequest(path: "api/billing/offline/status", method: "GET"))
