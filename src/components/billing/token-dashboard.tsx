@@ -220,7 +220,7 @@ export function TokenDashboard() {
                   <div>
                     <p className="text-sm font-medium text-white/75">Total token</p>
                     <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{wallet ? tokenLabel(wallet.availableTokens) : tokenLabel(0)}</p>
-                    <p className="mt-2 text-xs text-white/75">enV estimated reference value = $0.010</p>
+                    <p className="mt-2 text-xs text-white/75">enV estimated reference value ≈ $0.010</p>
                   </div>
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10"><Coins size={23} aria-hidden="true" /></span>
                 </div>
