@@ -220,9 +220,9 @@ private fun NativeWalletDashboard() {
                         context.startActivity(Intent.createChooser(send, "Share your enV invite"))
                     }, modifier = Modifier.fillMaxWidth()) { Text("Share invite link") }
                     Text("Video affiliate · ${data.videoConversions} verified conversions", style = MaterialTheme.typography.titleSmall)
-                    Text("https://envtools.store/signup?ref=${data.referralCode}&source=video", style = MaterialTheme.typography.bodySmall)
+                    Text("https://envtools.store/signup?ref=${data.referralCode}&source=video&sig=${data.videoSignature}", style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = {
-                        val link = "https://envtools.store/signup?ref=${data.referralCode}&source=video"
+                        val link = "https://envtools.store/signup?ref=${data.referralCode}&source=video&sig=${data.videoSignature}"
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Discover enV: $link") }
                         context.startActivity(Intent.createChooser(send, "Share your enV video link"))
                     }, modifier = Modifier.fillMaxWidth()) { Text("Share video link") }
