@@ -18,7 +18,7 @@ for (const removed of ["Explore enV", "Product, help, and account links", 'to="/
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
 }
 if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) errors.push("Account must appear before Wallet at the top of the overflow menu.");
-for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
+for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/tokens.guide.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
 if (account.includes("Wallet") || account.includes("Manage your enV identity")) errors.push("The Account route must open sign-in directly without an overview or wallet panel.");
 const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
@@ -27,9 +27,9 @@ for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 classNam
 }
 const authPage = requireText("src/components/auth/auth-page.tsx", ['type="email"', 'autoComplete={isSignUp ? "new-password" : "current-password"}', "Confirm password", "EyeOff", "Sign in with Google", "Sign in with Apple", "Forgot password?", '"/signup"'], "Sign-in/sign-up page");
 if (authPage.includes("Authentication is disabled until production")) errors.push("Sign-in/sign-up UI still displays the configuration warning.");
-const tokenPage = requireText("src/routes/tokens.tsx", ["Token guide", "Tool-by-tool token explanations", "Balance & history"], "Token guide");
+const tokenPage = requireText("src/routes/tokens.guide.tsx", ["Token guide", "Tool-by-tool token explanations", "Balance & history"], "Token guide");
 for (const removed of ["Preview only", "Prices are not charged in this preview", "All generated rates are provisional", "Purchases and automatic token deductions are disabled"]) if (tokenPage.includes(removed)) errors.push(`Token guide still contains placeholder wording: ${removed}`);
-const home = requireText("src/routes/index.tsx", ['to="/token-dashboard" aria-label="Open token dashboard"', "AI Agent"], "Home token dashboard link");
+const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open token dashboard"', "AI Agent"], "Home token dashboard link");
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword", "socialProviders", "googleConfigured", "appleConfigured"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 
