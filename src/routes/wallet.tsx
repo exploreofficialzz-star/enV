@@ -563,7 +563,10 @@ function Account() {
                 <h2 className="font-semibold text-fg">Wallet information unavailable</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">{state.message}</p>
                 <p className="mt-2 text-sm leading-6 text-muted">Wallet data could not be retrieved. Refresh the page or sign in to view personal wallet information.</p>
-                <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><RefreshCw size={15} aria-hidden="true" /> Try again</button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to="/account" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-on-accent no-underline">Sign in to enV</Link>
+                  <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"><RefreshCw size={15} aria-hidden="true" /> Try again</button>
+                </div>
               </div>
             </div>
           </section>
