@@ -516,6 +516,8 @@ function Account() {
     } finally { setOfflineActionBusy(false); }
   }
 
+  const visibleWallet = state.status === "ready" ? state.wallet : undefined;
+
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-10">
@@ -526,8 +528,7 @@ function Account() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Manage your balance, tokens, rewards and more.</p>
         </header>
 
-        {state.status === "ready" && state.wallet ? (
-          <section className="mt-6 space-y-3" aria-label="Wallet overview">
+        <section className="mt-6 space-y-3" aria-label="Wallet overview">
             <div className="relative isolate overflow-hidden rounded-[26px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-5 shadow-[0_24px_70px_rgba(0,180,145,0.13)] sm:p-7">
               <div className="pointer-events-none absolute -right-5 -top-4 opacity-50 sm:right-2 sm:top-0" aria-hidden="true">
                 <svg viewBox="0 0 240 130" className="h-28 w-48 sm:h-36 sm:w-60" fill="none"><path d="M4 112 C35 105 41 80 65 90 S89 110 111 77 S142 58 159 68 S188 24 206 39 S226 30 238 8" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round"/><path d="M4 112 C35 105 41 80 65 90 S89 110 111 77 S142 58 159 68 S188 24 206 39 S226 30 238 8 L238 130 L4 130 Z" fill="url(#wallet-chart-fill)" opacity=".2"/><defs><linearGradient id="wallet-chart-fill" x1="120" y1="8" x2="120" y2="130" gradientUnits="userSpaceOnUse"><stop stopColor="#52ffd0"/><stop offset="1" stopColor="#52ffd0" stopOpacity="0"/></linearGradient></defs></svg>
@@ -535,21 +536,21 @@ function Account() {
               <div className="relative flex flex-wrap items-end justify-between gap-5">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-sm font-medium text-emerald-50/90"><Wallet size={17} aria-hidden="true"/> Total balance</div>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-5xl">${(state.wallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="mt-2 text-sm font-medium text-emerald-50/90">{state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV tokens available</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-5xl">{visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</p>
+                  <p className="mt-2 text-sm font-medium text-emerald-50/90">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV tokens available" : "Sign in to load your token balance"}</p>
                   <p className="mt-1 text-xs text-white/65">Estimated reference value · not cash or a guaranteed redemption value</p>
                 </div>
                 <a href="#fund-wallet" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2.5 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7]"><CreditCard size={17} aria-hidden="true"/> Fund wallet <ArrowUpRight size={15} aria-hidden="true"/></a>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-              <MetricCard title="Total deposited" value={`${tokenAmount(state.wallet.lifetimePurchasedSubunits)} tokens`} description="Verified deposits" icon={<ArrowDownToLine size={16} aria-hidden="true" />} />
-              <MetricCard title="Total remaining" value={`${state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} tokens`} description="Ready to use" icon={<Wallet size={16} aria-hidden="true" />} />
-              <MetricCard title="Total used" value={`${tokenAmount(state.wallet.lifetimeConsumedSubunits)} tokens`} description="Recorded usage" icon={<TrendingUp size={16} aria-hidden="true" />} />
+              <MetricCard title="Total deposited" value={visibleWallet ? tokenAmount(visibleWallet.lifetimePurchasedSubunits) + " tokens" : "—"} description="Verified deposits" icon={<ArrowDownToLine size={16} aria-hidden="true" />} />
+              <MetricCard title="Total remaining" value={visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " tokens" : "—"} description="Ready to use" icon={<Wallet size={16} aria-hidden="true" />} />
+              <MetricCard title="Total used" value={visibleWallet ? tokenAmount(visibleWallet.lifetimeConsumedSubunits) + " tokens" : "—"} description="Recorded usage" icon={<TrendingUp size={16} aria-hidden="true" />} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-300/20 bg-gradient-to-r from-emerald-500/15 via-cyan-500/10 to-blue-500/10 p-4">
-              <div className="flex min-w-0 items-center gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-emerald-300"><Coins size={23} aria-hidden="true"/></span><div className="min-w-0"><p className="text-sm font-semibold text-white">enV Tokens</p><p className="mt-0.5 text-lg font-semibold tabular-nums text-white">{state.wallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV</p></div></div>
-              <div className="text-left sm:text-right"><p className="text-sm font-semibold text-emerald-300">${(state.wallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} estimated value</p><p className="mt-1 text-xs text-slate-300">{state.wallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} reserved for active work</p></div>
+              <div className="flex min-w-0 items-center gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-emerald-300"><Coins size={23} aria-hidden="true"/></span><div className="min-w-0"><p className="text-sm font-semibold text-white">enV Tokens</p><p className="mt-0.5 text-lg font-semibold tabular-nums text-white">{visibleWallet ? visibleWallet.availableTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " enV" : "— enV"}</p></div></div>
+              <div className="text-left sm:text-right"><p className="text-sm font-semibold text-emerald-300">{visibleWallet ? "$" + (visibleWallet.availableTokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " estimated value" : "—"}</p><p className="mt-1 text-xs text-slate-300">{visibleWallet ? visibleWallet.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " reserved for active work" : "Reserved balance appears after sign-in"}</p></div>
             </div>
             <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
               <div className="min-w-0 rounded-2xl border border-amber-300/20 bg-gradient-to-br from-amber-400/15 to-amber-700/5 p-3 sm:p-4"><span className="grid size-8 place-items-center rounded-xl bg-amber-300/15 text-amber-300"><Gift size={17} aria-hidden="true"/></span><p className="mt-3 text-[11px] font-medium text-slate-300 sm:text-xs">Bonuses</p><p className="mt-1 break-words text-sm font-semibold text-white sm:text-lg">{rewardsState.status === "ready" ? `${rewardsState.data?.bonusTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV` : "—"}</p></div>
@@ -565,7 +566,7 @@ function Account() {
                   <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-slate-400">Your signed video link</p><code className="mt-1 block break-all text-xs leading-5 text-emerald-100">{appOrigin}/signup?ref={rewardsState.data.referralCode}&amp;source=video&amp;sig={rewardsState.data.videoSignature}</code></div>
                   <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "video", rewardsState.data!.videoSignature)} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a]"><Link2 size={15} aria-hidden="true"/> Copy tag link <Copy size={14} aria-hidden="true"/></button><button type="button" onClick={() => void shareReferralLink(rewardsState.data!.referralCode, "video", rewardsState.data!.videoSignature)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/5"><Share2 size={15} aria-hidden="true"/> Share</button></div>
                   <p className="mt-2 text-xs text-slate-400">{rewardsState.data.videoConversions.toLocaleString()} verified video conversions</p>
-                </> : <p className="mt-3 text-xs text-slate-400">{rewardsState.status === "loading" ? "Loading your creator link…" : rewardsState.message ?? "Creator link unavailable right now."}</p>}
+                </> : <p className="mt-3 text-xs text-slate-400">{rewardsState.status === "loading" ? "Preparing your creator link…" : "Sign in to generate your personal signed link."}</p>}
               </article>
               <article className="relative overflow-hidden rounded-[24px] border border-violet-300/25 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-4 sm:p-5">
                 <div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-blue-400/20 text-blue-200"><Users size={22} aria-hidden="true"/></span><div className="min-w-0 flex-1"><h2 className="font-semibold text-white">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your personal link. You and your friend can both earn tokens after a verified qualifying purchase.</p></div></div>
@@ -573,15 +574,15 @@ function Account() {
                   <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-violet-200/70">Your referral link</p><code className="mt-1 block break-all text-xs leading-5 text-white">{appOrigin}/signup?ref={rewardsState.data.referralCode}</code></div>
                   <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void copyReferralLink(rewardsState.data!.referralCode, "referral")} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3df1c2] px-4 py-2 text-sm font-semibold text-[#052a2a]"><Copy size={15} aria-hidden="true"/> Copy invite link</button><button type="button" onClick={() => void shareReferralLink(rewardsState.data!.referralCode, "referral")} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/5"><Share2 size={15} aria-hidden="true"/> Share now</button></div>
                   <p className="mt-2 text-xs text-violet-100/65">{rewardsState.data.referralCount} invites · {rewardsState.data.qualifiedReferrals} qualified</p>
-                </> : <p className="mt-3 text-xs text-violet-100/70">{rewardsState.status === "loading" ? "Loading your referral link…" : rewardsState.message ?? "Referral link unavailable right now."}</p>}
+                </> : <p className="mt-3 text-xs text-violet-100/70">{rewardsState.status === "loading" ? "Preparing your referral link…" : "Sign in to load your personal referral link."}</p>}
               </article>
               </div>
             </section>
           </section>
-        ) : null}
+
 
         {state.status === "loading" ? (
-          <div className="mt-6 rounded-2xl border border-white/10 p-5 text-sm text-slate-300" aria-live="polite">Checking wallet availability…</div>
+          <div className="mt-6 rounded-2xl border border-white/10 p-5 text-sm text-slate-300" aria-live="polite">Loading your verified balance…</div>
         ) : state.status === "ready" && state.wallet ? (
           <section className="mt-6 rounded-2xl border border-white/10 bg-[#0b1729] p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -614,9 +615,8 @@ function Account() {
             <div className="flex items-start gap-3">
               <span className="mt-0.5 text-slate-300"><CircleAlert size={22} aria-hidden="true" /></span>
               <div>
-                <h2 className="font-semibold text-white">Wallet information unavailable</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-300">{state.message}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Wallet data could not be retrieved. Refresh the page or sign in to view personal wallet information.</p>
+                <h2 className="font-semibold text-white">Connect your enV wallet</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Sign in to view your verified token balance, rewards and transaction history. If you are already signed in, retry once your account connection is available.</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link to="/account" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-on-accent no-underline">Sign in to enV</Link>
                   <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/5"><RefreshCw size={15} aria-hidden="true" /> Try again</button>
