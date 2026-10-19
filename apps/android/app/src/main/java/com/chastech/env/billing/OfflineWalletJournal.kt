@@ -29,6 +29,7 @@ internal object OfflineWalletWireProtocol {
  * Wallet settlement remains authoritative on the server.
  */
 class OfflineWalletJournal(context: Context) : SQLiteOpenHelper(context.applicationContext, DB_NAME, null, DB_VERSION) {
+    private val appContext = context.applicationContext
     data class OperationTicket(val allowanceId: String, val sequenceNumber: Long, val transactionId: String, val reservedSubunits: Long)
     data class TransactionRecord(
         val transactionId: String, val sequenceNumber: Long, val toolId: String, val pricingVersion: String,
@@ -264,7 +265,7 @@ class OfflineWalletJournal(context: Context) : SQLiteOpenHelper(context.applicat
             val chosen = all.take(MAX_BATCH)
             val actualFinalize = finalize && all.size <= MAX_BATCH
             val checkpoint = chosen.lastOrNull()?.sequenceNumber ?: allowance.lastAckSequence
-            val checkpointSignature = OfflineWalletDeviceKey.signBase64Url(context, allowance.deviceKeyId,
+            val checkpointSignature = OfflineWalletDeviceKey.signBase64Url(appContext, allowance.deviceKeyId,
                 OfflineWalletWireProtocol.canonicalCheckpoint(allowanceId, checkpoint, actualFinalize))
             val batch = SyncBatch(allowance.token, UUID.randomUUID().toString().replace("-", ""), chosen.map { it.toRecord() }, checkpoint, checkpointSignature, actualFinalize)
             val sequenceArray = JSONArray().apply { chosen.forEach { put(it.sequenceNumber) } }
