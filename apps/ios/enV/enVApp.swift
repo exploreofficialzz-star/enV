@@ -169,7 +169,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { selectedTab = NativeTab.home.rawValue } label: {
-                        EnVIcon(name: "Home", size: 24, tint: .envMuted).frame(width: 40, height: 40)
+                        EnVIcon(name: "Home", size: 24, tint: .envMuted).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Home")
@@ -177,13 +177,13 @@ struct EnVBrandNavigationStyle: ViewModifier {
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { selectedTab = NativeTab.saved.rawValue } label: {
-                        EnVIcon(name: "Heart", size: 24, tint: .envMuted).frame(width: 36, height: 40)
+                        EnVIcon(name: "Heart", size: 24, tint: .envMuted).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Saved tools")
                     .accessibilityIdentifier("saved-tools-navigation-action")
                     Button { selectedTab = NativeTab.tools.rawValue } label: {
-                        EnVIcon(name: "LayoutGrid", size: 24, tint: .envMuted).frame(width: 36, height: 40)
+                        EnVIcon(name: "LayoutGrid", size: 24, tint: .envMuted).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Tools")
@@ -209,7 +209,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                                 Circle().fill(Color.envMuted).frame(width: 4, height: 4)
                             }
                         }
-                            .frame(width: 32, height: 36)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("More options")
