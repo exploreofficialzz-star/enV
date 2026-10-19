@@ -157,12 +157,12 @@ assert.ok(iosProject.includes("OfflineWalletNativeAPI.swift in Sources") && iosP
   "The native iOS transport must be part of the Xcode application Sources build phase, not just present on disk.");
 const androidNativeScreen = read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 assert.ok(androidNativeScreen.includes("import androidx.compose.material3.AlertDialog") &&
-  androidNativeScreen.includes("Finalize local-test allowance") && !androidNativeScreen.includes("\n                }\n            }\n            if (feedback.isNotBlank())"),
-  "Android local-test settlement UI must compile structurally and stay explicitly test-gated.");
+  androidNativeScreen.includes("Close allowance") && androidNativeScreen.includes('availabilityCode == "LOCAL_TEST_ONLY"') && !androidNativeScreen.includes("\n                }\n            }\n            if (feedback.isNotBlank())"),
+  "Android allowance settlement must compile structurally and remain guarded by the server test-mode code.");
 const iosNativeScreen = read("apps/ios/enV/ContentViews.swift");
 assert.ok(iosNativeScreen.includes("@State private var availabilityCode") && iosNativeScreen.includes("availabilityCode = state.code") &&
-  iosNativeScreen.includes("confirmationDialog(\"Finalize local-test allowance?\"") && iosNativeScreen.includes("finalize: true"),
-  "iOS must mirror the isolated local-test finalization affordance with the server-side code gate.");
+  iosNativeScreen.includes('confirmationDialog("Close offline allowance?"') && iosNativeScreen.includes('availabilityCode == "LOCAL_TEST_ONLY"') && iosNativeScreen.includes("finalize: true"),
+  "iOS allowance settlement must remain guarded by the server test-mode code.");
 
 const calculatorWebSource = read("src/components/engines/calculator-engine.tsx");
 const calculatorAndroidSource = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");

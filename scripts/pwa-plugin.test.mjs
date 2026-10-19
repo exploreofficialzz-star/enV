@@ -194,11 +194,11 @@ test("Web information routes contain complete company, privacy, terms, disclaime
   assert.match(responsibleUse, /aged 13 or older/);
   assert.match(responsibleUse, /Reporting a concern/);
   assert.match(terms, /at least 13 years old/);
-  assert.match(terms, /proposed USD reference value of 100 tokens per \$1\.00/);
-  assert.match(terms, /this is not an active offer or a guaranteed local price/);
-  assert.match(terms, /Actual store price points, minimum top-ups, supported payment methods, taxes and local currencies will be shown before a purchase/);
-  assert.match(pricing, /Proposed USD reference value/);
-  assert.match(pricing, /No checkout is active yet/);
+  assert.match(terms, /The Pricing page explains the token conversion reference/);
+  assert.match(terms, /Before any purchase is confirmed, the applicable price, currency, taxes, payment method, refund terms, expiry rules/);
+  assert.match(terms, /Token accounting and usage records are governed by the wallet ledger/);
+  assert.match(pricing, /Token conversion reference/);
+  assert.match(pricing, /Before a metered operation/);
   assert.match(privacy, /registered in Delaware, USA/);
   assert.match(terms, /Governing Law and Venue/);
   assert.match(terms, /governed by the laws of the State of Delaware, United States/);
