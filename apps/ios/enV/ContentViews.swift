@@ -1141,7 +1141,6 @@ private struct NativeTokenDashboardView: View {
     @State private var paired = OfflineWalletNativeAPI.isPaired
     @State private var dashboard: [String: Any]?
     @State private var loading = false
-    @State private var message = ""
     @State private var refreshKey = 0
 
     private var wallet: [String: Any] { dashboard?["wallet"] as? [String: Any] ?? [:] }
@@ -1475,10 +1474,8 @@ private struct NativeTokenDashboardView: View {
         defer { loading = false }
         do {
             dashboard = try await OfflineWalletNativeAPI.fetchWalletDashboard()
-            message = ""
         } catch {
             dashboard = nil
-            message = error.localizedDescription
         }
     }
 }
