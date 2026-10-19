@@ -1369,7 +1369,7 @@ private struct NativeWalletDashboardView: View {
             Text("Total balance").font(.subheadline.weight(.medium)).foregroundStyle(Color.white.opacity(0.88))
             Text(available.map { "$\(token($0 * 0.01))" } ?? "—")
                 .font(.system(size: 34, weight: .semibold, design: .rounded)).foregroundStyle(.white)
-            Text(available.map { "\(token($0)) enV tokens available" } ?? "Connect to view your live token balance")
+            Text(available.map { "\(token($0)) enV tokens available" } ?? "enV tokens available")
                 .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
             Text("Estimated reference value · not cash").font(.caption).foregroundStyle(Color.white.opacity(0.66))
         }
