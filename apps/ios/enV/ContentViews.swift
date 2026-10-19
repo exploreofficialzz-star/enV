@@ -1160,6 +1160,7 @@ private struct NativeWalletSparklineView: View {
 }
 
 private struct NativeWalletDashboardView: View {
+    @Environment(\.openURL) private var openURL
     @State private var paired = OfflineWalletNativeAPI.isPaired
     @State private var dashboard: [String: Any]?
     @State private var pairingCode = ""
@@ -1531,7 +1532,6 @@ private struct NativeWalletDashboardView: View {
         .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
     }
-}
 }
 
 struct NativeOfflineWalletPairingPanel: View {

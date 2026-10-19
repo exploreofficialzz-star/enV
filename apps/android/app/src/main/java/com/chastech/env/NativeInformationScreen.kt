@@ -274,7 +274,7 @@ private fun NativeWalletDashboard() {
                         Text("Share your referral link and you both get rewarded with enV tokens!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        EnVIcon("Gift", Modifier.size(25.dp), tint = MaterialTheme.colorScheme.onSurface)
+                        EnVIcon("PartyPopper", Modifier.size(25.dp), tint = MaterialTheme.colorScheme.onSurface)
                         Text("Both get rewarded!", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -401,7 +401,7 @@ private fun NativeWalletHero(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
                     IconButton(onClick = onToggleVisibility, modifier = Modifier.size(28.dp).semantics { contentDescription = if (showBalance) "Hide balance" else "Show balance" }) {
-                        EnVIcon(if (showBalance) "Eye" else "EyeOff", Modifier.size(17.dp), tint = Color.White)
+                        Text(if (showBalance) "◉" else "⊘", color = Color.White, style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 Text(
@@ -412,7 +412,7 @@ private fun NativeWalletHero(
                     maxLines = 1,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    EnVIcon("Coins", Modifier.size(15.dp), tint = Color(0xFFBFFFE9))
+                    Text("🪙", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBFFFE9))
                     Text(
                         if (!showBalance) "•••• enV" else availableTokens?.let { "≈ ${it.formatWalletTokens()} enV" } ?: subtitle,
                         style = MaterialTheme.typography.bodySmall,
@@ -445,7 +445,7 @@ private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
             }
             drawPath(path, tint, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
         }
-        EnVIcon("ArrowUpRight", Modifier.align(Alignment.TopEnd).size(15.dp), tint = tint)
+        Text("↗", modifier = Modifier.align(Alignment.TopEnd), color = tint, style = MaterialTheme.typography.labelSmall)
     }
 }
 
