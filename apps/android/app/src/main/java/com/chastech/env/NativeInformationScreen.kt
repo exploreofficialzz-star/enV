@@ -7,7 +7,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -157,7 +156,7 @@ private fun NativeWalletDashboard() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NativeWalletHero(
             availableTokens = dashboard?.availableTokens,
-            subtitle = if (dashboard != null) "enV tokens · available to use" else "Connect to see your live token balance",
+            subtitle = "enV tokens · available to use",
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -220,7 +219,7 @@ private fun NativeWalletDashboard() {
                         Text("Share video link")
                     }
                 } else {
-                    Text("Connect your wallet to generate your signed tagging link.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
+                    Text("Your signed tag link will appear here.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB8D3D4))
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
                     }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
@@ -252,7 +251,7 @@ private fun NativeWalletDashboard() {
                         Text("Share referral link")
                     }
                 } else {
-                    Text("Your personal referral link appears when your wallet is connected.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
+                    Text("Your invite link will appear here.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFD0D1F6))
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
                     }, modifier = Modifier.fillMaxWidth()) { Text("Open wallet") }
@@ -291,35 +290,6 @@ private fun NativeWalletDashboard() {
                 }
             }
         }
-
-
-        Card(
-            modifier = Modifier.fillMaxWidth().clickable {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet#fund-wallet")))
-            },
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("ϟ", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.titleLarge)
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Payment Gateways", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Manage your payment methods and gateways.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -402,7 +372,7 @@ private fun NativeWalletDashboard() {
             }
         }
         if (loading) Text("Loading wallet…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = if (errorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        if (message.isNotBlank() && (showPairing || dashboard != null)) Text(message, style = MaterialTheme.typography.bodyMedium, color = if (errorState) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

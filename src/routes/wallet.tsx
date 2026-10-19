@@ -624,7 +624,7 @@ function Account() {
           <article className="relative overflow-hidden rounded-[24px] border border-violet-300/30 bg-gradient-to-br from-[#171854] via-[#24206b] to-[#48206c] p-4 text-white sm:p-5">
             <div className="flex items-start gap-3">
               <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-blue-400/20 text-blue-100"><Users size={23} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1"><h2 className="font-semibold">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your referral link and earn tokens when a qualifying conversion is verified.</p></div>
+              <div className="min-w-0 flex-1"><h2 className="font-semibold">Refer a friend</h2><p className="mt-1 text-sm leading-5 text-violet-100/80">Share your referral link and you and your friend can both earn tokens after a qualifying conversion is verified.</p></div>
             </div>
             {rewardsState.status === "ready" && rewardsState.data ? <>
               <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-violet-100/70">Your referral link</p><code className="mt-1 block break-all text-xs leading-5 text-white">{appOrigin}/signup?ref={rewardsState.data.referralCode}</code></div>

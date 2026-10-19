@@ -245,7 +245,7 @@ assert.ok(nativeWalletRoute.includes("requireOfflineBillingUser") && nativeWalle
   nativeWalletRoute.includes("readWallet") && nativeWalletRoute.includes("getRewardsSummary"),
   "Native Wallet reads must require a paired session and return shared ledger data only.");
 assert.ok(nativeDashboard.includes("Total deposited") && nativeDashboard.includes("Total used") &&
-  nativeDashboard.includes("Referral and creator rewards") && nativeDashboard.includes("Fund your wallet"),
+  nativeDashboard.includes("Referral and creator rewards") && /Fund(?: your)? wallet/i.test(nativeDashboard),
   "Web Wallet must expose balance, usage, creator rewards and funding sections.");
 assert.ok(rewardsMigration.includes("billing_reward_events") && rewardsServer.includes("SELF_REFERRAL") &&
   rewardsServer.includes("verifyVideoReferralSignature") && rewardsServer.includes("timingSafeEqual") &&

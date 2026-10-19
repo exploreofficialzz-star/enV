@@ -1114,6 +1114,7 @@ private struct NativeWalletDashboardView: View {
     @State private var refreshKey = 0
     @State private var message = ""
     @State private var isError = false
+    @State private var showConnection = false
 
     private var wallet: [String: Any] { dashboard?["wallet"] as? [String: Any] ?? [:] }
     private var rewards: [String: Any] { dashboard?["rewards"] as? [String: Any] ?? [:] }
@@ -1142,7 +1143,7 @@ private struct NativeWalletDashboardView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("enV Tokens").font(.headline.weight(.semibold)).foregroundStyle(Color.envInk)
-                    Text(dashboard == nil ? "Connect to view your current balance" : "\(token(number("availableTokens", from: wallet))) enV")
+                    Text(dashboard == nil ? "enV tokens available" : "\(token(number("availableTokens", from: wallet))) enV")
                         .font(.title3.weight(.semibold)).foregroundStyle(Color.envAccent)
                     Text(dashboard == nil ? "Your token balance and reservations stay linked to your account." : "\(token(number("reservedTokens", from: wallet))) tokens reserved for active work")
                         .font(.caption).foregroundStyle(Color.envMuted)
@@ -1179,7 +1180,7 @@ private struct NativeWalletDashboardView: View {
                         Label("Share video link", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
                     }.buttonStyle(.borderedProminent).tint(Color(red: 0.20, green: 0.92, blue: 0.72))
                 } else {
-                    Text("Connect your wallet to create a signed video-tagging link.").font(.subheadline).foregroundStyle(Color.white.opacity(0.78))
+                    Text("Your signed tag link will appear here.").font(.subheadline).foregroundStyle(Color.white.opacity(0.78))
                     Link(destination: URL(string: "https://envtools.store/wallet")!) {
                         Label("Open enV web Wallet", systemImage: "arrow.up.right.square").frame(maxWidth: .infinity)
                     }.buttonStyle(.borderedProminent).tint(Color(red: 0.20, green: 0.92, blue: 0.72))
@@ -1210,7 +1211,7 @@ private struct NativeWalletDashboardView: View {
                         Label("Share referral link", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
                     }.buttonStyle(.borderedProminent).tint(Color(red: 0.20, green: 0.92, blue: 0.72))
                 } else {
-                    Text("Your personal referral link appears after your wallet is connected.").font(.subheadline).foregroundStyle(Color.white.opacity(0.78))
+                    Text("Your invite link will appear here.").font(.subheadline).foregroundStyle(Color.white.opacity(0.78))
                     Link(destination: URL(string: "https://envtools.store/wallet")!) {
                         Label("Open enV web Wallet", systemImage: "arrow.up.right.square").frame(maxWidth: .infinity)
                     }.buttonStyle(.bordered).tint(.white)
@@ -1298,7 +1299,7 @@ private struct NativeWalletDashboardView: View {
             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
 
-            DisclosureGroup(dashboard == nil ? "Connect account" : "Device connection") {
+            DisclosureGroup(isExpanded: $showConnection) {
             if dashboard != nil {
                 Button("Reconnect this device") {
                     paired = false
@@ -1348,6 +1349,8 @@ private struct NativeWalletDashboardView: View {
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 18))
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.envBorder, lineWidth: 1))
             }
+            } label: {
+                Text(dashboard == nil ? "Connect account" : "Device connection")
             }
             .font(.subheadline.weight(.medium))
             .foregroundStyle(Color.envInk)
@@ -1356,7 +1359,7 @@ private struct NativeWalletDashboardView: View {
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
 
             if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
-            if !message.isEmpty { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
+            if !message.isEmpty && (showConnection || dashboard != nil) { Text(message).font(.footnote).foregroundStyle(isError ? Color.red : Color.envMuted).fixedSize(horizontal: false, vertical: true) }
         }
         .task(id: "\(refreshKey)-\(paired)") { await refresh() }
     }
