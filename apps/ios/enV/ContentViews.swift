@@ -1207,7 +1207,7 @@ private struct NativeWalletDashboardView: View {
 
                 Button("Reconnect this device") {
                     paired = false
-                    dashboard = nil
+                    self.dashboard = nil
                     pairingCode = ""
                     message = ""
                 }
