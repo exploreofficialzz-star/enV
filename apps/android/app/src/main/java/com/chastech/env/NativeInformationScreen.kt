@@ -256,22 +256,31 @@ private fun NativeTokenDashboard() {
                     Text("Daily token usage", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     Text("Confirmed enV deductions · last 7 local days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val daily = usage?.weeklyUsage.orEmpty()
-                    val maxSpent = daily.maxOfOrNull { it.tokensSpent }?.coerceAtLeast(0.001) ?: 0.001
-                    if (daily.isEmpty()) Text("0.000 enV · No confirmed deductions this week", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
-                        daily.forEach { day ->
+                    val displayDaily = if (daily.isEmpty()) {
+                        (0..6).map { offset ->
+                            val date = java.util.Calendar.getInstance().apply {
+                                add(java.util.Calendar.DAY_OF_YEAR, offset - 6)
+                            }.time
+                            java.text.SimpleDateFormat("MM-dd", java.util.Locale.getDefault()).format(date) to 0.0
+                        }
+                    } else {
+                        daily.map { it.day.takeLast(5) to it.tokensSpent }
+                    }
+                    val maxSpent = displayDaily.maxOfOrNull { it.second }?.coerceAtLeast(0.001) ?: 0.001
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                        displayDaily.forEach { (dayLabel, tokensSpent) ->
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(day.tokensSpent.formatWalletTokens(), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                Text(tokensSpent.formatWalletTokens(), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 Box(
                                     Modifier.fillMaxWidth().height(64.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(7.dp)),
                                     contentAlignment = Alignment.BottomCenter,
                                 ) {
                                     Box(
-                                        Modifier.fillMaxWidth(0.65f).height(if (day.tokensSpent > 0) (day.tokensSpent / maxSpent * 58).coerceAtLeast(5.0).dp else 2.dp)
+                                        Modifier.fillMaxWidth(0.65f).height(if (tokensSpent > 0) (tokensSpent / maxSpent * 58).coerceAtLeast(5.0).dp else 2.dp)
                                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp)),
                                     )
                                 }
-                                Text(day.day.takeLast(5), style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(dayLabel, style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
