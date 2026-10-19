@@ -300,8 +300,10 @@ assert.ok(androidProtocolTests.includes("isRecoverableBatchRejection") && iosPro
 const androidPricingPage = read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 const iosContentViews = read("apps/ios/enV/ContentViews.swift");
 for (const [platformName, source] of [["Android", androidPricingPage], ["iOS", iosContentViews]]) {
-  assert.ok(source.includes("Offline usage and recovery") && source.includes("Offline token spending is paused in this preview") &&
-    source.includes("will not be automatically refunded"), `${platformName} pricing/help copy must accurately describe offline gating and lost-record recovery.`);
+  assert.ok(source.includes("Offline usage and recovery") &&
+    source.includes("Keep unsynchronized records until the server confirms receipt.") &&
+    source.includes("report them through the wallet recovery flow instead of assuming the allowance was unused."),
+    `${platformName} pricing/help copy must accurately describe offline gating and lost-record recovery.`);
 }
 
 const env = read(".env.example");
