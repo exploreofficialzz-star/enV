@@ -150,7 +150,7 @@ private fun NativeWalletDashboard() {
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
                     Text("Sign in on the enV website, open Wallet and generate a one-time code in the Connect Android/iOS section. Enter the code here to securely view your shared balance, rewards and history.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web Wallet") }
                     OutlinedTextField(value = code, onValueChange = { code = it }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
@@ -185,7 +185,7 @@ private fun NativeWalletDashboard() {
             ) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Available to use", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${data.availableTokens.formatWalletTokens()} tokens", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                    Text("${data.availableTokens.formatWalletTokens()} tokens", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Normal)
                     Text("Illustrative reference value: ${(data.availableTokens * 0.01).formatWalletTokens()} USD. This is not cash or a guaranteed redemption value.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(onClick = { message = "In-app funding is not enabled for this Android build. Google Play Billing and server-side purchase verification must be configured before payments can be taken." }, modifier = Modifier.fillMaxWidth()) { Text("Funding setup") }
                     Text("Fund wallet is unavailable until this app has verified Google Play Billing products.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -211,7 +211,7 @@ private fun NativeWalletDashboard() {
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Invite friends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Invite friends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
                     Text("${data.referralCount} invites · ${data.qualifiedReferrals} qualified · ${data.totalRewardTokens.formatWalletTokens()} reward tokens", style = MaterialTheme.typography.bodyMedium)
                     Text("https://envtools.store/signup?ref=${data.referralCode}", style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = {
@@ -237,7 +237,7 @@ private fun NativeWalletDashboard() {
             ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Recent activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Recent activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
                         Spacer(Modifier.weight(1f))
                         TextButton(onClick = { refresh += 1 }) { Text("Refresh") }
                     }
@@ -246,7 +246,7 @@ private fun NativeWalletDashboard() {
                     } else {
                         data.activity.take(12).forEach { row ->
                             Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text(row.description.ifBlank { row.type.replaceFirstChar { it.uppercase() } }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal)
                                 Text(row.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(row.createdAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -271,7 +271,7 @@ private fun NativeWalletMetric(title: String, value: String, subtitle: String, m
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
