@@ -61,7 +61,7 @@ function tokenLabel(tokens: number): string {
   return `${tokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV`;
 }
 function referenceValue(tokens: number): string {
-  return `Estimated reference value $ ${(tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+  return `Estimated reference value ${(tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
 }
 function resolveToolName(toolId: string, fallback?: string): string {
   const tool = getToolById(toolId);
