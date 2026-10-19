@@ -149,17 +149,14 @@ private fun NativeTokenDashboard() {
     val context = LocalContext.current
     var dashboard by remember { mutableStateOf<OfflineWalletNativeApi.WalletDashboard?>(null) }
     var loading by remember { mutableStateOf(true) }
-    var message by remember { mutableStateOf("") }
     var refresh by remember { mutableStateOf(0) }
 
     LaunchedEffect(refresh) {
         loading = true
-        message = ""
         try {
             dashboard = OfflineWalletNativeApi.fetchWalletDashboard(context)
-        } catch (error: Exception) {
+        } catch (_: Exception) {
             dashboard = null
-            message = error.message ?: "Token usage is temporarily unavailable."
         } finally {
             loading = false
         }
