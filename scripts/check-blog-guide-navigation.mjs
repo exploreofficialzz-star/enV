@@ -126,12 +126,13 @@ try {
   console.log(`PASS: Read the full guide navigated to ${href} and rendered the complete tool guide.`);
 
   // Verify article detail URLs both load directly and open through the visible action.
-  await page.goto(new URL("/blog", baseUrl).href, {
-    waitUntil: "domcontentloaded",
-    timeout: 30_000,
-  });
-  // Wait for client hydration before interacting with server-rendered controls.
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  // Return through the guide's in-app navigation so the next interaction follows
+  // the same hydrated client-side journey a reader uses.
+  await page.getByRole("link", { name: "All documentation", exact: true }).click();
+  await page.waitForURL(
+    (url) => url.origin === baseUrl.origin && (url.pathname === "/blog" || url.pathname === "/blog/"),
+    { timeout: 15_000 },
+  );
   await page.getByRole("button", { name: "Browse product articles" }).click();
   await page.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
   const articleLink = page.getByRole("link", { name: /Read article/i }).first();
