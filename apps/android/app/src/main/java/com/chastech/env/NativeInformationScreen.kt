@@ -922,9 +922,9 @@ private fun SocialLinksSection(brand: String) {
         )
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).widthIn(min = 800.dp, max = 800.dp).padding(horizontal = 32.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             profiles.forEach { profile ->
                 androidx.compose.material3.IconButton(
@@ -932,7 +932,7 @@ private fun SocialLinksSection(brand: String) {
                         profile.url?.let { url -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
                     },
                     enabled = profile.url != null,
-                    modifier = Modifier.semantics {
+                    modifier = Modifier.size(64.dp).semantics {
                         contentDescription = if (profile.url != null) {
                             "Follow $owner on ${profile.platform}"
                         } else {
@@ -943,7 +943,7 @@ private fun SocialLinksSection(brand: String) {
                     androidx.compose.foundation.Image(
                         painter = androidx.compose.ui.res.painterResource(profile.iconRes),
                         contentDescription = null,
-                        modifier = Modifier.size(30.dp),
+                        modifier = Modifier.size(48.dp),
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
                     )
                 }
