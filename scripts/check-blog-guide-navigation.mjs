@@ -120,6 +120,8 @@ try {
     waitUntil: "domcontentloaded",
     timeout: 30_000,
   });
+  // Wait for client hydration before interacting with server-rendered controls.
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
   await page.getByRole("button", { name: "Browse product articles" }).click();
   await page.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
   const articleLink = page.getByRole("link", { name: /Read article/i }).first();
