@@ -79,6 +79,14 @@ try {
     0,
     "Tool guide content must not display a raw keyword-fragment description.",
   );
+  assert.equal(
+    await directPage.getByText(
+      "Use 2×2 Matrix Determinant Calculator to calculate results from the values you enter. Confirm the field labels, units, and assumptions, then check the output before relying on it.",
+      { exact: true },
+    ).count(),
+    1,
+    "The guide summary must be clear without being repeated verbatim in the body.",
+  );
   await directPage.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
   await directPage.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
   await directPage.close();
