@@ -32,6 +32,8 @@ if (!installCapture.includes("event.preventDefault()")) errors.push("PWA install
 const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode"], "Persistent display preferences");
 requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture"], "Root PWA installation capture");
 if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");
+if (!installPage.includes("browser\'s permission")) errors.push("Installation must remain under browser control.");
+if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must disclose that feedback is prepared in the user\'s email app.");
 if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Automatic display mode must restore the responsive viewport.");
 
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/tokens.guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
