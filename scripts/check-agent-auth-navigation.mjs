@@ -48,5 +48,30 @@ const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar
 if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("iOS footer still renders the moved Product/Resources groups.");
 if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
 if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");
+
+const blogPage = requireText("src/routes/blog.tsx", [
+  "Blogs &amp; Guides",
+  'placeholder="Search blogs, guides, and tools…"',
+  "lg:flex-row lg:items-start lg:justify-between",
+  "Search blogs, guides, and tools",
+], "Web Blogs & Guides");
+if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
+if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
+
+const androidGradle = requireText("apps/android/app/build.gradle.kts", ['androidx.browser:browser:1.10.0'], "Android in-app browser dependency");
+const androidBlogBrowser = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", [
+  "CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse(\"https://envtools.store/blog\"))",
+], "Android shared Blogs & Guides route");
+if (androidBlogBrowser.includes("https://en-v.vercel.app/blog")) errors.push("Android Blogs & Guides must use the canonical envtools.store URL.");
+
+const iosBlogBrowser = requireText("apps/ios/enV/enVApp.swift", [
+  "import SafariServices",
+  "@State private var isShowingBlogGuides = false",
+  'Button("Blog & guides") { isShowingBlogGuides = true }',
+  'fullScreenCover(isPresented: $isShowingBlogGuides)',
+  'EnVSafariBrowser(url: url)',
+  "https://envtools.store/blog",
+], "iOS shared Blogs & Guides route");
+if (iosBlogBrowser.includes("https://en-v.vercel.app/blog")) errors.push("iOS Blogs & Guides must use the canonical envtools.store URL.");
 if (errors.length) { console.error(`Account/Wallet navigation audit failed with ${errors.length} error(s):`); for (const error of errors) console.error(`- ${error}`); process.exit(1); }
 console.log("Account/Wallet navigation audit passed: Product/Resources groups, separate Wallet page, direct shared Account sign-in, password controls, Google/Apple actions, token guide, and Legal footer are present.");

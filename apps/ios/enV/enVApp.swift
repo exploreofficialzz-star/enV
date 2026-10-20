@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SafariServices
 
 extension Font {
     static func envScaled(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
@@ -163,6 +164,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
     @EnvironmentObject private var informationRouter: NativeInformationRouter
     @Environment(\.openURL) private var openURL
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
+    @State private var isShowingBlogGuides = false
 
     func body(content: Content) -> some View {
         content
@@ -200,7 +202,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                         }
                         Section("RESOURCES") {
                             Button("Help center") { informationRouter.open("help") }
-                            Button("Blog & guides") { if let url = URL(string: "https://en-v.vercel.app/blog") { openURL(url) } }
+                            Button("Blog & guides") { isShowingBlogGuides = true }
                             Button("Contact") { informationRouter.open("contact") }
                         }
                     } label: {
@@ -218,7 +220,23 @@ struct EnVBrandNavigationStyle: ViewModifier {
             }
             .toolbarBackground(Color.envChrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .fullScreenCover(isPresented: $isShowingBlogGuides) {
+                if let url = URL(string: "https://envtools.store/blog") {
+                    EnVSafariBrowser(url: url)
+                        .ignoresSafeArea()
+                }
+            }
     }
+}
+
+private struct EnVSafariBrowser: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
 
 struct EnVIcon: View {

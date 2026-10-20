@@ -17,6 +17,7 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -344,7 +345,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("Token guide") }, onClick = { informationReturnTab = tab; informationPage = "tokens"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             Text("RESOURCES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
                             DropdownMenuItem(text = { Text("Help center") }, onClick = { informationReturnTab = tab; informationPage = "help"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/blog"))); overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse("https://envtools.store/blog")); overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Contact") }, onClick = { informationReturnTab = tab; informationPage = "contact"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }

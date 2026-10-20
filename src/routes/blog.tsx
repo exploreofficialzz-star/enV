@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight,
-  BookOpen,
   BookText,
   CheckCircle2,
   ChevronDown,
@@ -86,18 +85,28 @@ function BlogIndex() {
   return (
     <AppShell>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        <header className="max-w-3xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted">
-            <BookOpen size={14} aria-hidden="true" /> enV knowledge centre
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
+              Blogs &amp; Guides
+            </h1>
+            <p className="mt-4 text-base leading-7 text-muted">
+              Full documentation for enV tools, practical instructions for using them,
+              and product articles about how the toolkit works. Each tool guide is
+              linked to the tool's actual catalogue entry.
+            </p>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Blogs &amp; Guides
-          </h1>
-          <p className="mt-4 text-base leading-7 text-muted">
-            Full documentation for enV tools, practical instructions for using them,
-            and product articles about how the toolkit works. Each tool guide is
-            linked to the tool's actual catalogue entry.
-          </p>
+          <label className="flex min-h-12 w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 lg:mt-1 lg:w-[24rem] lg:shrink-0">
+            <Search size={18} className="shrink-0 text-muted" aria-hidden="true" />
+            <span className="sr-only">Search blogs, guides, and tools</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => changeQuery(event.target.value)}
+              placeholder="Search blogs, guides, and tools…"
+              className="min-w-0 flex-1 bg-transparent py-3 text-sm text-fg outline-none placeholder:text-subtle"
+            />
+          </label>
         </header>
 
         <section className="mt-7 grid gap-3 sm:grid-cols-3" aria-label="Knowledge centre contents">
@@ -174,18 +183,7 @@ function BlogIndex() {
               </p>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_13rem_12rem]">
-              <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3">
-                <Search size={18} className="shrink-0 text-muted" aria-hidden="true" />
-                <span className="sr-only">Search tool documentation</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => changeQuery(event.target.value)}
-                  placeholder="Search tools and guides…"
-                  className="min-w-0 flex-1 bg-transparent py-3 text-sm text-fg outline-none placeholder:text-subtle"
-                />
-              </label>
+            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
               <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3">
                 <span className="sr-only">Filter documentation by category</span>
                 <select
