@@ -45,6 +45,8 @@ assert.ok(!filterMarkup.includes('ChevronDown'), 'Filter selects must not render
 assert.ok(blogIndex.includes('href={"/blog/" + article.slug}'), 'Article links must use a direct article URL.');
 assert.ok(blogIndex.includes('toolDocumentationSummary(tool)'), 'Tool cards must use readable catalogue summaries.');
 assert.ok(toolDocumentation.includes('export function toolDocumentationSummary'), 'Generated guide summaries must repair short or fragmentary catalogue descriptions.');
+const toolGuidance = toolDocumentation.slice(toolDocumentation.indexOf('function toolSpecificGuidance'), toolDocumentation.indexOf('export function getToolDocumentation'));
+assert.ok(!toolGuidance.includes('toolDocumentationSummary(tool)'), 'Guide body sections must not repeat the header summary verbatim.');
 assert.ok(blogDetail.includes('toolDocumentationSummary(tool)') && blogDetail.includes('toolDocumentationSummary(item)'), 'Guide headers and related tools must use readable summaries.');
 assert.ok(blogDetail.includes('createFileRoute("/blog/$slug")') && blogDetail.includes('getBlogArticle(params.slug)'), 'The article and guide detail route must resolve its slug.');
 for (const [label, source] of [['blog index', blogIndex], ['blog detail', blogDetail], ['article data', articles]]) {
