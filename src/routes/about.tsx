@@ -50,7 +50,15 @@ function About() {
                 alt="chAs Technologies LLC logo"
                 width={600}
                 height={173}
-                className="h-auto w-full object-contain"
+                className="h-auto w-full object-contain dark:hidden"
+              />
+              <img
+                src="/chas-technologies-logo-dark.webp"
+                alt=""
+                aria-hidden="true"
+                width={600}
+                height={173}
+                className="hidden h-auto w-full object-contain dark:block"
               />
             </div>
             <div>

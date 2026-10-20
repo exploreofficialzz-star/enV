@@ -48,13 +48,21 @@ function Contact() {
           </article>
 
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <div className="flex h-12 w-12 items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center">
+              <img
+                src="/env-brand-mark-light.webp"
+                alt="enV brand mark"
+                width={32}
+                height={33}
+                className="h-8 w-8 object-contain dark:hidden"
+              />
               <img
                 src="/env-brand-mark-transparent.webp"
-                alt="enV brand mark"
-                width={48}
-                height={48}
-                className="h-12 w-12 object-contain"
+                alt=""
+                aria-hidden="true"
+                width={32}
+                height={33}
+                className="hidden h-8 w-8 object-contain dark:block"
               />
             </div>
             <h2 className="mt-4 text-lg font-semibold text-fg">chAs Technologies LLC</h2>
