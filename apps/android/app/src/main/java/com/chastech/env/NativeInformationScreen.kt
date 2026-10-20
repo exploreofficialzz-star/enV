@@ -919,7 +919,7 @@ private fun SocialLinksSection(brand: String) {
             Text(
                 if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -943,10 +943,10 @@ private fun SocialLinksSection(brand: String) {
                             Modifier.size(40.dp).background(profile.background, RoundedCornerShape(11.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(profile.glyph, fontSize = if (profile.platform == "LinkedIn") 14.sp else 19.sp, fontWeight = FontWeight.Bold, color = profile.foreground)
+                            Text(profile.glyph, fontSize = if (profile.platform == "LinkedIn") 14.sp else 19.sp, fontWeight = FontWeight.Normal, color = profile.foreground)
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp), horizontalAlignment = Alignment.Start) {
-                            Text(profile.platform, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(profile.platform, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
                             Text(profile.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                         if (profile.url != null) EnVIcon("ArrowUpRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
