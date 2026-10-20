@@ -4,7 +4,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   BookOpen,
-  Clock3,
   FileText,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -88,7 +87,6 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
             <span className="rounded-full bg-surface-2 px-2.5 py-1 font-medium">{article.category}</span>
             <span>{article.publishedLabel}</span>
-            <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden="true" /> {article.readingMinutes} min read</span>
           </div>
           <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">{article.title}</h1>
           <p className="mt-4 text-base leading-7 text-muted">{article.summary}</p>
