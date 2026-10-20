@@ -834,9 +834,9 @@ private fun AboutInformation() {
         ) {
             ChasTechnologiesLogo(Modifier.fillMaxWidth().aspectRatio(3.2f))
         }
-        InformationSection("A focused toolkit for everyday work", listOf(
-            "enV brings practical utilities together in one place across Web, Android, and iOS. Browse by category, search for a tool, and use the tools that fit your task.",
-            "enV is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA. Some tools process information on your device; features that need a server or an external provider make that clear in their use and are described in our Privacy page.",
+        InformationSection("A practical toolkit for everyday digital work", listOf(
+            "enV brings useful tools, calculators, converters, generators, and creator and developer utilities together in one searchable workspace. Browse by category or search by task to find a tool that fits the work in front of you.",
+            "enV is available on the web and through dedicated Android and iOS apps. It is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA. Many tools work on your device; review the tool guidance and our Privacy page when a feature needs a server or external provider.",
         ), titleSize = 20.sp)
         CompanyContactCard()
         SocialLinksSection("enV")
@@ -860,12 +860,12 @@ private fun CompanyContactCard() {
 @Composable
 private fun ContactInformation() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InformationSection("", listOf("Choose the address that best matches your inquiry. We will use your message to respond to the request you send."))
+        InformationSection("", listOf("Have a question, found something we can improve, or want to discuss working together? Choose the contact route that best fits your message."))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             if (maxWidth >= 640.dp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ContactCard("enV product support", "Questions, feedback, accessibility concerns, or help using the toolkit.", showProductSupport = true, modifier = Modifier.weight(1f))
-                    ContactCard("Company inquiries", "Business, partnership, and company-related correspondence for chAs Technologies LLC.", showCompanyAddress = true, modifier = Modifier.weight(1f))
+                    ContactCard("enV product support", "For help using the toolkit, product feedback, accessibility concerns, bug reports, or ideas for improving enV.", showProductSupport = true, modifier = Modifier.weight(1f))
+                    ContactCard("chAs Technologies LLC", "For business proposals, partnerships, media inquiries, and other company-related correspondence.", showCompanyAddress = true, modifier = Modifier.weight(1f))
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
