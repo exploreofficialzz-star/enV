@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
+import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
@@ -85,14 +86,13 @@ export function ToolShell({
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <div className="mt-3">
-        <Link
-          to="/blog/$slug"
-          params={{ slug: "tool-" + tool.id }}
+        <a
+          href={toolDocumentationPath(tool)}
           className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
         >
           <BookOpen className="size-4" aria-hidden="true" />
           Read the full guide
-        </Link>
+        </a>
       </div>
       <ToolTokenEstimate toolId={tool.id} />
 

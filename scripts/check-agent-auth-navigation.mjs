@@ -54,8 +54,19 @@ const blogPage = requireText("src/routes/blog.tsx", [
   'placeholder="Search blogs, guides, and tools…"',
   "md:flex-row md:items-center md:justify-between",
   "Search blogs, guides, and tools",
+  "toolDocumentationPath(tool)",
+  "compareToolNames",
 ], "Web Blogs & Guides");
 if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
+if (blogPage.includes('aria-label="Knowledge centre contents"')
+  || blogPage.includes("Practical instructions")
+  || blogPage.includes("documented entries")
+  || blogPage.includes("tools.length.toLocaleString()")
+  || blogPage.includes("BLOG_ARTICLES.length.toLocaleString()")) {
+  errors.push("Web Blogs & Guides must not show the removed catalogue summary cards or count badges.");
+}
+if (!blogPage.includes('href={toolDocumentationPath(tool)}')) errors.push("Tool catalogue entries must use direct navigable guide URLs.");
+if (!blogPage.includes('sensitivity: "base", numeric: true')) errors.push("Tool guides on the Blogs & Guides page must be sorted alphabetically.");
 if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
 if (!blogPage.includes('md:flex-row md:items-center md:justify-between') || !blogPage.includes('md:w-[24rem] md:shrink-0')) errors.push("Blogs & Guides heading and search must share one aligned header row at desktop widths.");
 
@@ -100,10 +111,11 @@ const guideRenderer = requireText("src/routes/blog.$slug.tsx", [
   "section.steps ?",
   '<ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">',
   "Read the full guide",
+  "href={toolDocumentationPath(item)}",
 ], "Full tool guide renderer");
 if (!guideRenderer.includes("section.bullets ?")) errors.push("Tool guides must render their troubleshooting and validation lists.");
 const toolShell = requireText("src/components/tools/tool-shell.tsx", [
-  'to="/blog/$slug"',
+  "href={toolDocumentationPath(tool)}",
   "Read the full guide",
 ], "Tool-to-guide links");
 

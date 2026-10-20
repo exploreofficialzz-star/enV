@@ -34,7 +34,10 @@ export const Route = createFileRoute("/blog/$slug")({
         return {
           kind: "tool" as const,
           tool,
-          related: getRelatedTools(tool, 8),
+          related: getRelatedTools(tool, 8).slice().sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
+            || a.id.localeCompare(b.id),
+          ),
         };
       }
     }
@@ -217,9 +220,9 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
                       <h3 className="font-semibold text-fg">{item.name}</h3>
                       <p className="mt-1 text-sm leading-5 text-muted">{item.description}</p>
                       <div className="mt-3 flex flex-wrap gap-3">
-                        <Link to="/blog/$slug" params={{ slug: toolDocumentationPath(item).replace("/blog/", "") }} className="text-sm font-semibold text-accent">
+                        <a href={toolDocumentationPath(item)} className="text-sm font-semibold text-accent">
                           Read the full guide
-                        </Link>
+                        </a>
                         <Link to={toolPath(item)} className="text-sm font-medium text-muted hover:text-fg">
                           Open tool
                         </Link>

@@ -1,20 +1,13 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  BookText,
-  CheckCircle2,
-  ChevronDown,
-  Clock3,
-  FileText,
-  Search,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, Clock3, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { BLOG_ARTICLES } from "@/data/blog-articles";
 import { getSearchableTools, categoryLabel, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import {
   toolCategoryLabel,
+  toolDocumentationPath,
   toolExecutionLabel,
   toolStatusLabel,
 } from "@/lib/tool-documentation";
@@ -23,6 +16,11 @@ export const Route = createFileRoute("/blog")({ component: BlogIndex });
 
 type LibraryView = "tools" | "articles";
 const PAGE_SIZE = 24;
+
+function compareToolNames(a: { name: string; id: string }, b: { name: string; id: string }) {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
+    || a.id.localeCompare(b.id);
+}
 
 function BlogIndex() {
   const [view, setView] = useState<LibraryView>("tools");
@@ -43,12 +41,8 @@ function BlogIndex() {
       (category === "all" || tool.category === category)
       && (status === "all" || tool.status === status),
     );
-    if (!query.trim()) {
-      return filtered.slice().sort(
-        (a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name),
-      );
-    }
-    return searchTools(filtered, query, filtered.length);
+    if (!query.trim()) return filtered.slice().sort(compareToolNames);
+    return searchTools(filtered, query, filtered.length).slice().sort(compareToolNames);
   }, [tools, query, category, status]);
 
   const matchingArticles = useMemo(() => {
@@ -109,36 +103,6 @@ function BlogIndex() {
           </p>
         </header>
 
-        <section className="mt-7 grid gap-3 sm:grid-cols-3" aria-label="Knowledge centre contents">
-          <article className="rounded-2xl border border-border bg-surface p-4">
-            <BookText size={20} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-3 font-semibold text-fg">Tool documentation</h2>
-            <p className="mt-1 text-sm leading-5 text-muted">
-              Search the complete public tool catalogue and open an individual reference.
-            </p>
-            <p className="mt-3 text-sm font-semibold text-fg">
-              {tools.length.toLocaleString()} documented entries
-            </p>
-          </article>
-          <article className="rounded-2xl border border-border bg-surface p-4">
-            <CheckCircle2 size={20} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-3 font-semibold text-fg">Practical instructions</h2>
-            <p className="mt-1 text-sm leading-5 text-muted">
-              Each guide covers the purpose, usage steps, inputs, output checks,
-              processing path, availability, limitations, and troubleshooting.
-            </p>
-          </article>
-          <article className="rounded-2xl border border-border bg-surface p-4">
-            <FileText size={20} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-3 font-semibold text-fg">Product articles</h2>
-            <p className="mt-1 text-sm leading-5 text-muted">
-              Explore product principles, privacy, security, tokens, and design decisions.
-            </p>
-            <p className="mt-3 text-sm font-semibold text-fg">
-              {BLOG_ARTICLES.length.toLocaleString()} articles
-            </p>
-          </article>
-        </section>
 
         <div className="mt-8 flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Knowledge centre sections">
           <button
@@ -152,9 +116,6 @@ function BlogIndex() {
             )}
           >
             Tool documentation
-            <span className={view === "tools" ? "rounded-full bg-white/15 px-2 py-0.5 text-xs" : "rounded-full bg-surface-2 px-2 py-0.5 text-xs"}>
-              {tools.length.toLocaleString()}
-            </span>
           </button>
           <button
             type="button"
@@ -167,9 +128,6 @@ function BlogIndex() {
             )}
           >
             Articles &amp; product guides
-            <span className={view === "articles" ? "rounded-full bg-white/15 px-2 py-0.5 text-xs" : "rounded-full bg-surface-2 px-2 py-0.5 text-xs"}>
-              {BLOG_ARTICLES.length}
-            </span>
           </button>
         </div>
 
@@ -247,26 +205,24 @@ function BlogIndex() {
                       </span>
                     </div>
                     <h4 className="mt-4 text-base font-semibold leading-snug text-fg">
-                      <Link
-                        to="/blog/$slug"
-                        params={{ slug: "tool-" + tool.id }}
+                      <a
+                        href={toolDocumentationPath(tool)}
                         className="hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       >
                         {tool.name}
-                      </Link>
+                      </a>
                     </h4>
                     <p className="mt-2 flex-1 text-sm leading-6 text-muted">{tool.description}</p>
                     <p className="mt-3 text-xs leading-5 text-subtle">
                       Processing: {toolExecutionLabel(tool)}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-                      <Link
-                        to="/blog/$slug"
-                        params={{ slug: "tool-" + tool.id }}
+                      <a
+                        href={toolDocumentationPath(tool)}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent"
                       >
                         Read the full guide <ArrowRight size={14} aria-hidden="true" />
-                      </Link>
+                      </a>
                       <Link to={toolPath(tool)} className="text-sm font-medium text-muted hover:text-fg">
                         Open tool
                       </Link>
