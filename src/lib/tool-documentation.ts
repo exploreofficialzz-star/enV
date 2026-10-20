@@ -442,7 +442,8 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
       heading: "Purpose and scope",
       paragraphs: [
         tool.description,
-        "This entry belongs to the " + (category?.name ?? tool.category) + " category and uses enV's " + engineLabel(tool).toLowerCase() + " workflow. " + engineOverview(tool),
+        (category?.description ? category.description + (category.blurb ? " " + category.blurb : "") : "This tool is part of enV's " + tool.category + " collection."),
+        "This entry uses enV's " + engineLabel(tool).toLowerCase() + " workflow. " + engineOverview(tool),
       ],
     },
     {

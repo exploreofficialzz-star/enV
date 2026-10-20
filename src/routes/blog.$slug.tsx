@@ -8,7 +8,7 @@ import {
   FileText,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { getBlogArticle } from "@/data/blog-articles";
+import { getBlogArticle, type BlogArticle } from "@/data/blog-articles";
 import {
   getRelatedTools,
   getToolById,
@@ -69,7 +69,7 @@ function BlogResourcePage() {
   return <BlogArticlePage article={resource.article} />;
 }
 
-function BlogArticlePage({ article }: { article: ReturnType<typeof getBlogArticle> & {} }) {
+function BlogArticlePage({ article }: { article: BlogArticle }) {
   return (
     <AppShell>
       <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
