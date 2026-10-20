@@ -50,11 +50,28 @@ try {
   const [guideResponse] = await Promise.all([guideResponsePromise, guideUrlPromise]);
 
   assert.equal(guideResponse.status(), 200, `The individual guide must return HTTP 200: ${href}`);
-  await page.getByRole("heading", { name: /documentation and usage guide/i }).waitFor({ timeout: 15_000 });
-  await page.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
-  await page.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
-  assert.equal(await page.getByText("Tool not found.", { exact: true }).count(), 0, "A listed tool must not open the not-found state.");
-  assert.deepEqual(pageErrors, [], "Opening a guide must not trigger a client-side page error.");
+  // Surface the actual rendered destination when this regression test catches a
+  // route that returns HTTP 200 but renders an error or the wrong page.
+  const diagnostics = async () => ({
+    requestedHref: href,
+    finalUrl: page.url(),
+    navigationResponseUrl: guideResponse.url(),
+    navigationStatus: guideResponse.status(),
+    title: await page.title().catch(() => ""),
+    headings: await page.locator("h1, h2, h3").allInnerTexts().catch(() => []),
+    visibleBody: (await page.locator("body").innerText().catch(() => "")).slice(0, 2_500),
+    pageErrors,
+  });
+  try {
+    await page.getByRole("heading", { name: /documentation and usage guide/i }).waitFor({ timeout: 15_000 });
+    await page.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
+    await page.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
+    assert.equal(await page.getByText("Tool not found.", { exact: true }).count(), 0, "A listed tool must not open the not-found state.");
+    assert.deepEqual(pageErrors, [], "Opening a guide must not trigger a client-side page error.");
+  } catch (error) {
+    console.error("Guide navigation diagnostics:", JSON.stringify(await diagnostics(), null, 2));
+    throw error;
+  }
 
   console.log(`PASS: Read the full guide navigated to ${href} and rendered the complete tool guide.`);
 } finally {

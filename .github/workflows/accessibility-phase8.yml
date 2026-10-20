@@ -23,6 +23,7 @@ on:
       - "public/**"
       - "apps/shared/**"
       - "scripts/audit-accessibility-live.mjs"
+      - "scripts/check-blog-guide-navigation.mjs"
       - "scripts/audit-accessibility-live.test.mjs"
       - "scripts/lib/accessibility-live-audit.mjs"
       - "package.json"
