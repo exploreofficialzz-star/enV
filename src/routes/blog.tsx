@@ -104,44 +104,19 @@ function BlogIndex() {
         </header>
 
 
-        <div className="mt-8 flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Knowledge centre sections">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "tools"}
-            aria-controls="tool-documentation-panel"
-            onClick={() => changeView("tools")}
-            className={"inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition " + (
-              view === "tools" ? "bg-accent text-white" : "text-muted hover:bg-surface-2 hover:text-fg"
-            )}
-          >
-            Tool documentation
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "articles"}
-            aria-controls="articles-panel"
-            onClick={() => changeView("articles")}
-            className={"inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition " + (
-              view === "articles" ? "bg-accent text-white" : "text-muted hover:bg-surface-2 hover:text-fg"
-            )}
-          >
-            Articles &amp; product guides
-          </button>
-        </div>
-
         {view === "tools" ? (
-          <section id="tool-documentation-panel" role="tabpanel" aria-label="Tool documentation" className="pt-6">
-            <div className="max-w-3xl">
-              <h2 className="text-2xl font-semibold tracking-tight text-fg">Find documentation for a tool</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Search by tool name, category, keyword, or purpose. Open any result for a complete,
-                structured guide based on that tool's current catalogue metadata.
-              </p>
+          <section id="tool-documentation-panel" aria-label="Tool documentation" className="pt-6">
+            <div className="mb-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => changeView("articles")}
+                className="text-sm font-semibold text-accent underline underline-offset-4 hover:text-fg"
+              >
+                Browse product articles
+              </button>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
               <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3">
                 <span className="sr-only">Filter documentation by category</span>
                 <select
@@ -252,7 +227,16 @@ function BlogIndex() {
             ) : null}
           </section>
         ) : (
-          <section id="articles-panel" role="tabpanel" aria-label="Articles and product guides" className="pt-6">
+          <section id="articles-panel" aria-label="Articles and product guides" className="pt-6">
+            <div className="mb-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => changeView("tools")}
+                className="text-sm font-semibold text-accent underline underline-offset-4 hover:text-fg"
+              >
+                Back to tool guides
+              </button>
+            </div>
             <div className="max-w-3xl">
               <h2 className="text-2xl font-semibold tracking-tight text-fg">Articles &amp; product guides</h2>
               <p className="mt-2 text-sm leading-6 text-muted">

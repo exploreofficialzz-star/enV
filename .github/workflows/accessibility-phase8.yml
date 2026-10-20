@@ -8,6 +8,7 @@ on:
       - "public/**"
       - "apps/shared/**"
       - "scripts/audit-accessibility-live.mjs"
+      - "scripts/check-blog-guide-navigation.mjs"
       - "scripts/audit-accessibility-live.test.mjs"
       - "scripts/lib/accessibility-live-audit.mjs"
       - "package.json"
@@ -73,6 +74,8 @@ jobs:
           cat "$RUNNER_TEMP/env-preview.log"
           echo "enV preview did not become ready." >&2
           exit 1
+      - name: Verify Read the full guide navigation
+        run: node scripts/check-blog-guide-navigation.mjs
       - name: Run rendered-route accessibility audit
         run: npm run audit:accessibility:live -- --base-url=http://127.0.0.1:8080 --max-pages=40 --max-interactions=4 --fail-on-scan-errors
       - name: Upload rendered audit evidence

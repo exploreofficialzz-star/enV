@@ -11,6 +11,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getBlogArticle, type BlogArticle } from "@/data/blog-articles";
 import {
   getRelatedTools,
+  getSearchableTools,
   getToolById,
   toolPath,
 } from "@/lib/registry";
@@ -29,7 +30,11 @@ export const Route = createFileRoute("/blog/$slug")({
     if (article) return { kind: "article" as const, article };
 
     if (params.slug.startsWith("tool-")) {
-      const tool = getToolById(params.slug.slice("tool-".length));
+      const toolId = params.slug.slice("tool-".length);
+      // Resolve through the public list as a fallback: every result shown by the
+      // guide index must map to a guide, including generated virtual tools.
+      const tool = getToolById(toolId)
+        ?? getSearchableTools().find((candidate) => candidate.id === toolId);
       if (tool) {
         return {
           kind: "tool" as const,

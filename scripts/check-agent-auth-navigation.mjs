@@ -56,8 +56,16 @@ const blogPage = requireText("src/routes/blog.tsx", [
   "Search blogs, guides, and tools",
   "toolDocumentationPath(tool)",
   "compareToolNames",
+  "Browse product articles",
+  "Back to tool guides",
 ], "Web Blogs & Guides");
 if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
+if (blogPage.includes('aria-label="Knowledge centre sections"')
+  || blogPage.includes("Find documentation for a tool")
+  || blogPage.includes("Search by tool name, category, keyword, or purpose.")) {
+  errors.push("Web Blogs & Guides must not show the removed tab row or tool-introduction block.");
+}
+if (!blogPage.includes("Browse product articles") || !blogPage.includes("Back to tool guides")) errors.push("Blogs & Guides must preserve a simple path between tool documentation and product articles.");
 if (blogPage.includes('aria-label="Knowledge centre contents"')
   || blogPage.includes("Practical instructions")
   || blogPage.includes("documented entries")
@@ -112,7 +120,9 @@ const guideRenderer = requireText("src/routes/blog.$slug.tsx", [
   '<ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">',
   "Read the full guide",
   "href={toolDocumentationPath(item)}",
+  "getSearchableTools().find((candidate) => candidate.id === toolId)",
 ], "Full tool guide renderer");
+if (!existsSync(resolve("scripts/check-blog-guide-navigation.mjs"))) errors.push("Missing browser regression test for Read the full guide navigation.");
 if (!guideRenderer.includes("section.bullets ?")) errors.push("Tool guides must render their troubleshooting and validation lists.");
 const toolShell = requireText("src/components/tools/tool-shell.tsx", [
   "href={toolDocumentationPath(tool)}",
