@@ -127,7 +127,7 @@ try {
   assert.ok(articleHref, "A published article must expose a destination URL.");
   assert.match(articleHref, /^\/blog\/[a-z0-9-]+$/i, "The article action must target an individual article URL.");
   assert.doesNotMatch(articleHref, /^\/blog\/tool-/, "Article actions must not point to a tool guide.");
-  assert.equal(await page.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "Article cards must not show estimated reading time.");
+  assert.equal(await page.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "Article cards must not show estimated reading time.");
 
   const articleUrl = new URL(articleHref, baseUrl);
   const directArticlePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -138,7 +138,7 @@ try {
   assert.equal(directArticleResponse?.status(), 200, `The direct article route must return HTTP 200: ${articleHref}`);
   const articleTitle = await directArticlePage.locator("h1").innerText();
   assert.ok(articleTitle.trim().length > 0, "The article route must render a visible page title.");
-  assert.equal(await directArticlePage.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "Article detail pages must not show estimated reading time.");
+  assert.equal(await directArticlePage.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "Article detail pages must not show estimated reading time.");
   await directArticlePage.close();
 
   const articleResponsePromise = page.waitForResponse(
@@ -158,7 +158,7 @@ try {
   const [articleResponse] = await Promise.all([articleResponsePromise, articleUrlPromise]);
   assert.equal(articleResponse.status(), 200, `The article action must return HTTP 200: ${articleHref}`);
   await page.locator("h1").waitFor({ state: "visible", timeout: 15_000 });
-  assert.equal(await page.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "The opened article must not display estimated reading time.");
+  assert.equal(await page.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "The opened article must not display estimated reading time.");
   assert.deepEqual(pageErrors, [], "Guide and article navigation must not trigger client-side page errors.");
   console.log(`PASS: Read article navigated to ${articleHref} and rendered the article page.`);
 } finally {
