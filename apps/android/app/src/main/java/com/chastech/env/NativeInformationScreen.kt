@@ -913,7 +913,7 @@ private fun SocialLinksSection(brand: String) {
         Text(
             if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurface,
         )
         androidx.compose.foundation.layout.FlowRow(
