@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -886,12 +887,16 @@ private data class NativeSocialProfile(
     val iconRes: Int,
 )
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SocialLinksSection(brand: String) {
     val context = LocalContext.current
     val isEnv = brand == "enV"
     val owner = if (isEnv) "enV" else "chAs Technologies LLC"
+    val description = if (isEnv) {
+        "Follow the enV channels for product updates, new tools, tips, and announcements."
+    } else {
+        "Connect with the team behind enV for company updates, partnerships, and news."
+    }
     val profiles = if (isEnv) listOf(
         NativeSocialProfile("X", "https://x.com/envtoolz", R.drawable.social_x),
         NativeSocialProfile("Instagram", "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", R.drawable.social_instagram),
@@ -908,25 +913,23 @@ private fun SocialLinksSection(brand: String) {
         NativeSocialProfile("Snapchat", "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", R.drawable.social_snapchat),
         NativeSocialProfile("YouTube", "https://www.youtube.com/@chAsTechnologiesLLC", R.drawable.social_youtube),
     )
-
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        androidx.compose.foundation.layout.FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             profiles.forEach { profile ->
                 androidx.compose.material3.IconButton(
                     onClick = {
-                        profile.url?.let { url ->
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                        }
+                        profile.url?.let { url -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
                     },
                     enabled = profile.url != null,
                     modifier = Modifier.semantics {

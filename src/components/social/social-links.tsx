@@ -1,10 +1,6 @@
 type SocialPlatform = "x" | "instagram" | "tiktok" | "youtube" | "facebook" | "whatsapp" | "linkedin" | "snapchat";
 
-type SocialLink = {
-  platform: SocialPlatform;
-  label: string;
-  href?: string;
-};
+type SocialLink = { platform: SocialPlatform; label: string; href?: string };
 
 const envLinks: SocialLink[] = [
   { platform: "x", label: "X", href: "https://x.com/envtoolz" },
@@ -29,59 +25,49 @@ export function SocialLinks({ brand }: { brand: "env" | "chas" }) {
   const isEnv = brand === "env";
   const owner = isEnv ? "enV" : "chAs Technologies LLC";
   const items = isEnv ? envLinks : chasLinks;
+  const description = isEnv
+    ? "Follow the enV channels for product updates, new tools, tips, and announcements."
+    : "Connect with the team behind enV for company updates, partnerships, and news.";
 
   return (
-    <section className="space-y-4" aria-label={`Official social links for ${owner}`}>
+    <section className="space-y-3" aria-label={`Official social links for ${owner}`}>
       <h2 className="text-lg font-semibold text-fg">
         {isEnv ? "Follow enV" : "Follow chAs Technologies LLC"}
       </h2>
-      <div
-        className="flex flex-wrap items-center gap-x-6 gap-y-3 sm:gap-x-8"
-        role="list"
-        aria-label={`Social platforms for ${owner}`}
-      >
-        {items.map((item) => {
-          const icon = (
-            <img
-              src={`/social-icons/${item.platform}.svg`}
-              alt=""
-              aria-hidden="true"
-              width={32}
-              height={32}
-              loading="lazy"
-              className="h-8 w-8 object-contain dark:invert"
-            />
-          );
-
-          if (!item.href) {
-            return (
-              <span
-                key={item.platform}
-                role="listitem"
-                className="inline-flex h-12 w-12 cursor-not-allowed items-center justify-center rounded-md opacity-40"
-                aria-label={`The ${item.label} profile for ${owner} has not been linked yet`}
-                title={`${item.label} profile link coming soon`}
-              >
-                {icon}
-              </span>
+      <p className="max-w-3xl text-sm leading-6 text-muted">{description}</p>
+      <div className="overflow-x-auto" role="list" aria-label={`Social platforms for ${owner}`}>
+        <div className="flex w-max min-w-full flex-nowrap items-center gap-x-5 sm:gap-x-7">
+          {items.map((item) => {
+            const icon = (
+              <img
+                src={`/social-icons/${item.platform}.svg`}
+                alt=""
+                aria-hidden="true"
+                width={30}
+                height={30}
+                loading="lazy"
+                className="h-[30px] w-[30px] object-contain dark:invert"
+              />
             );
-          }
-
-          return (
-            <a
-              key={item.platform}
-              role="listitem"
-              href={item.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Follow ${owner} on ${item.label}`}
-              title={item.label}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-md text-fg outline-offset-4 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-            >
-              {icon}
-            </a>
-          );
-        })}
+            if (!item.href) {
+              return (
+                <span key={item.platform} role="listitem"
+                  className="inline-flex h-12 w-12 shrink-0 cursor-not-allowed items-center justify-center opacity-40"
+                  aria-label={`The ${item.label} profile for ${owner} has not been linked yet`}
+                  title={`${item.label} profile link coming soon`}>
+                  {icon}
+                </span>
+              );
+            }
+            return (
+              <a key={item.platform} role="listitem" href={item.href} target="_blank" rel="noopener noreferrer"
+                aria-label={`Follow ${owner} on ${item.label}`} title={item.label}
+                className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md text-fg outline-offset-4 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                {icon}
+              </a>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

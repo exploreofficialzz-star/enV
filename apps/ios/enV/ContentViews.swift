@@ -2303,29 +2303,37 @@ private struct NativeSocialLinksSection: View {
         ]
     }
 
+    private var description: String {
+        brand == "enV"
+            ? "Follow the enV channels for product updates, new tools, tips, and announcements."
+            : "Connect with the team behind enV for company updates, partnerships, and news."
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             enVCharacterSpacedText(brand == "enV" ? "Follow enV" : "Follow chAs Technologies LLC")
                 .font(.envScaled(size: 17, weight: .semibold))
                 .foregroundStyle(Color.envInk)
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 48, maximum: 48), spacing: 20)],
-                alignment: .leading,
-                spacing: 12
-            ) {
-                ForEach(profiles) { profile in
-                    if let rawURL = profile.url, let url = URL(string: rawURL) {
-                        Link(destination: url) {
+            enVCharacterSpacedText(description)
+                .font(.envScaled(size: 14, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(profiles) { profile in
+                        if let rawURL = profile.url, let url = URL(string: rawURL) {
+                            Link(destination: url) {
+                                socialIcon(profile)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Follow " + brand + " on " + profile.platform)
+                        } else {
                             socialIcon(profile)
+                                .opacity(0.42)
+                                .accessibilityLabel("The Facebook profile for " + brand + " has not been linked yet")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Follow (brand) on (profile.platform)")
-                    } else {
-                        socialIcon(profile)
-                            .opacity(0.42)
-                            .accessibilityLabel("The Facebook profile for (brand) has not been linked yet")
                     }
                 }
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2338,7 +2346,7 @@ private struct NativeSocialLinksSection: View {
             .scaledToFit()
             .frame(width: 30, height: 30)
             .foregroundStyle(Color.envInk)
-            .frame(width: 48, height: 48)
+            .frame(width: 44, height: 48)
             .contentShape(Rectangle())
     }
 }
