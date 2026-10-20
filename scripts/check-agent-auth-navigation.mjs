@@ -52,11 +52,12 @@ if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('h
 const blogPage = requireText("src/routes/blog.tsx", [
   "Blogs &amp; Guides",
   'placeholder="Search blogs, guides, and tools…"',
-  "lg:flex-row lg:items-start lg:justify-between",
+  "md:flex-row md:items-center md:justify-between",
   "Search blogs, guides, and tools",
 ], "Web Blogs & Guides");
 if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
 if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
+if (!blogPage.includes('md:flex-row md:items-center md:justify-between') || !blogPage.includes('md:w-[24rem] md:shrink-0')) errors.push("Blogs & Guides heading and search must share one aligned header row at desktop widths.");
 
 const androidGradle = requireText("apps/android/app/build.gradle.kts", ['androidx.browser:browser:1.8.0'], "Android in-app browser dependency");
 const androidBlogBrowser = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", [
@@ -73,5 +74,38 @@ const iosBlogBrowser = requireText("apps/ios/enV/enVApp.swift", [
   "https://envtools.store/blog",
 ], "iOS shared Blogs & Guides route");
 if (iosBlogBrowser.includes("https://en-v.vercel.app/blog")) errors.push("iOS Blogs & Guides must use the canonical envtools.store URL.");
+
+const toolTypes = requireText("src/types/tool.ts", ["export const CATEGORY_IDS = ["], "Tool category definitions");
+const categoryDeclaration = toolTypes.match(/export const CATEGORY_IDS = \[([\s\S]*?)\] as const;/);
+const declaredCategories = categoryDeclaration
+  ? [...categoryDeclaration[1].matchAll(/"([a-z]+)"/g)].map(match => match[1])
+  : [];
+const toolDocumentation = requireText("src/lib/tool-documentation.ts", [
+  "function toolSpecificGuidance(tool: ToolMeta)",
+  "const CATEGORY_TASK_GUIDANCE:",
+  'id: "when-to-use"',
+  'heading: "When to use this tool"',
+  "specific.validation",
+  "steps: usageSteps(tool)",
+  'id: "troubleshooting"',
+], "Full tool documentation generator");
+const categoryTaskBlock = toolDocumentation.match(/const CATEGORY_TASK_GUIDANCE:[\s\S]*?= \{([\s\S]*?)\n\};/);
+const documentedCategories = categoryTaskBlock
+  ? [...categoryTaskBlock[1].matchAll(/^  ([a-z]+): \{/gm)].map(match => match[1])
+  : [];
+const missingCategoryGuidance = declaredCategories.filter(category => !documentedCategories.includes(category));
+if (missingCategoryGuidance.length) errors.push("Full tool guides are missing tailored task guidance for categories: " + missingCategoryGuidance.join(", "));
+
+const guideRenderer = requireText("src/routes/blog.$slug.tsx", [
+  "section.steps ?",
+  '<ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">',
+  "Read the full guide",
+], "Full tool guide renderer");
+if (!guideRenderer.includes("section.bullets ?")) errors.push("Tool guides must render their troubleshooting and validation lists.");
+const toolShell = requireText("src/components/tools/tool-shell.tsx", [
+  'to="/blog/$slug"',
+  "Read the full guide",
+], "Tool-to-guide links");
+
 if (errors.length) { console.error(`Account/Wallet navigation audit failed with ${errors.length} error(s):`); for (const error of errors) console.error(`- ${error}`); process.exit(1); }
 console.log("Account/Wallet navigation audit passed: Product/Resources groups, separate Wallet page, direct shared Account sign-in, password controls, Google/Apple actions, token guide, and Legal footer are present.");

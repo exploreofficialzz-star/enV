@@ -6,6 +6,7 @@ export type ToolDocumentationSection = {
   heading: string;
   paragraphs: string[];
   bullets?: string[];
+  steps?: string[];
 };
 
 type CategoryAdvice = {
@@ -119,7 +120,528 @@ const CATEGORY_ADVICE: Partial<Record<CategoryId, CategoryAdvice>> = {
     prepare: "Read the requested date format, time zone, locale, and unit before entering values. Distinguish calendar dates from timestamps and elapsed durations.",
     verify: "Check the selected time zone, daylight-saving assumptions where relevant, and whether the result describes a local time, UTC time, or elapsed interval.",
   },
+  design: {
+    prepare: "Decide which visual property you need to create, measure, or adjust, then check the available controls and value formats. Color values, dimensions, spacing, and CSS units can look similar while representing different things.",
+    verify: "Review the rendered result at the intended size and in the context where it will be used. Test responsive layouts, contrast, browser support, and any generated CSS rather than relying only on a text value or preview.",
+  },
+  files: {
+    prepare: "Identify the source file or data format and the exact target format required by the receiving application. Keep a copy of the original before conversion or restructuring.",
+    verify: "Inspect the entire output, including encoding, delimiter or schema, missing values, line endings, and special characters. Successful conversion does not guarantee that another application will interpret the file identically.",
+  },
+  random: {
+    prepare: "Clarify the set of possible choices and the purpose of the random result. Use the options supplied by the tool and understand whether the output is intended for entertainment, decision support, or a technical identifier.",
+    verify: "Confirm that the output is within the requested choices and that any reroll, seed, weighting, or repeat behavior shown by the interface is understood. Do not use a casual randomizer for security-sensitive or regulated decisions unless its documentation explicitly supports that use.",
+  },
+  network: {
+    prepare: "Confirm the host, address, URL, or network value the tool asks you to inspect. Determine whether the result should describe a local configuration, a publicly observable service, or a calculation from values you supply.",
+    verify: "Network conditions, DNS records, geolocation estimates, and service responses can change by time and vantage point. Treat the result as a point-in-time observation and confirm critical findings from an authoritative system.",
+  },
+  ai: {
+    prepare: "Define the task, intended audience, source facts, and constraints before providing a prompt or source text. Supply only the context needed for the result and avoid confidential data unless the page's processing notice authorizes its use.",
+    verify: "Review generated content for accuracy, completeness, tone, unintended assumptions, and unsupported claims. Generated text is a draft to evaluate, not evidence that its facts or recommendations have been verified.",
+    responsibleUse: "Disclose and review AI-generated material where appropriate. Do not rely on generated output alone for high-impact medical, legal, financial, safety, or eligibility decisions.",
+  },
+  education: {
+    prepare: "Check the grading scale, credit weighting, term structure, and units expected by the form. Academic conventions differ between institutions, courses, and countries, so use the scale that applies to your programme.",
+    verify: "Compare the result against the official course or institution rules before submitting it or making an academic decision. An estimate cannot replace an official transcript, grade policy, or decision by the institution.",
+  },
+  productivity: {
+    prepare: "Define the task, duration, deadline, or planning interval you want to manage. Check whether the tool measures elapsed time, counts down to a target, or simply generates a plan or schedule.",
+    verify: "Confirm the start time, pause/resume behavior, selected time zone, and any boundary conditions that matter to the task. Treat generated schedules as planning aids and adjust them to real constraints.",
+  },
+  generators: {
+    prepare: "Decide what kind of output you need and gather the required inputs before generating it. Check whether the result is illustrative, fictional, random, or intended to be used as a real identifier or production asset.",
+    verify: "Review the complete output for formatting, completeness, uniqueness where required, and compatibility with the system that will receive it. A generated value is not automatically registered, reserved, valid in a third-party system, or factually true.",
+  },
+  screenshots: {
+    prepare: "Choose the source screenshot and the device frame, layout, or presentation style offered by the tool. Use assets you are authorized to share and preserve an unedited copy of the source.",
+    verify: "Check cropping, scaling, safe areas, interface text, and device proportions. A presentation mockup is not a captured test of every device, operating system version, or production UI state.",
+  },
+  interactive: {
+    prepare: "Decide what the participant should see and do, and prepare the content, options, and sequence required by the experience. Keep the flow understandable without relying on hidden assumptions.",
+    verify: "Run through the full experience as a participant, including keyboard or touch interaction, empty states, incorrect answers, and the end state. Do not claim that a form collects or stores responses unless the implementation explicitly provides that capability.",
+  },
+  celebrations: {
+    prepare: "Confirm the recipient, occasion, names, spelling, date, and tone before generating a greeting or celebration asset. Use only personal details that you have permission to include.",
+    verify: "Preview the finished message or page on the device where it will be shared. Check names, dates, links, and visual wrapping so the result remains respectful and readable.",
+  },
+  relationships: {
+    prepare: "Consider the participants, context, and tone that fit the activity or message. Choose language that is respectful and suitable for the people involved.",
+    verify: "Read the output as the recipient would see it. Edit any assumptions or wording that may be intrusive, misleading, or inappropriate for the relationship and context.",
+    responsibleUse: "Use playful prompts and relationship activities by mutual choice. Do not use generated content to pressure, impersonate, harass, or expose another person.",
+  },
+  gaming: {
+    prepare: "Check the game, ruleset, scoring convention, player count, or bracket format that the tool expects. Similar games and competitions can use different rules.",
+    verify: "Review player or team names, seed order, scoring, tie-breaks, and bracket progression against the competition's actual rules before publishing the result.",
+  },
+  photography: {
+    prepare: "Identify the camera, lens, sensor, print size, output dimensions, or exposure value relevant to your task. Units and crop factors must match the equipment and final use.",
+    verify: "Check the result against the target camera or print workflow. Calculated dimensions and exposure estimates depend on their assumptions and cannot fully account for lighting, lens behavior, sensor performance, or output conditions.",
+  },
+  career: {
+    prepare: "Prepare accurate role history, dates, skills, qualifications, and the target role or opportunity. Treat personal career facts as source material, not information to invent for a stronger-sounding result.",
+    verify: "Check every claim, date, contact detail, qualification, and example before sharing it with an employer or institution. Tailor wording to the actual role and keep all representations truthful.",
+  },
+  webdesign: {
+    prepare: "Identify the target page, viewport, component, and implementation constraints. Check whether the tool produces a visual preview, CSS, markup, or a checklist before deciding how to use its output.",
+    verify: "Test the result in the real project at mobile and desktop widths, and review accessibility, browser support, loading behavior, and interactions. A generated snippet should be reviewed before deployment.",
+  },
+  streaming: {
+    prepare: "Confirm the destination platform, stream resolution, frame rate, audio setup, and available upload bandwidth where those values are requested. Platform presets and network conditions may differ.",
+    verify: "Test the configuration against the current platform requirements and your actual upload conditions. Treat bitrate and performance estimates as planning guidance until a live test confirms stability.",
+  },
+  communication: {
+    prepare: "Identify the recipient, purpose, channel, and tone before drafting a message, meeting note, or communication asset. Include only the factual context needed for the recipient to understand it.",
+    verify: "Check recipient names, dates, time zones, attachments, links, and requested actions before sending. Generated wording should be reviewed for accuracy and tone.",
+  },
+  personal: {
+    prepare: "Decide the personal task or decision the tool should support and enter only the information it requests. Keep assumptions and personal preferences separate from objectively measured values.",
+    verify: "Check the result against the circumstances in which you will use it. A planning or decision aid can organize options, but it cannot account for context that the interface does not collect.",
+  },
 };
+
+
+type ToolSpecificGuidance = {
+  overview: string;
+  example: string;
+  validation: string;
+};
+
+const CATEGORY_TASK_GUIDANCE: Partial<Record<CategoryId, ToolSpecificGuidance>> = {
+  calculators: {
+    overview: "A calculator is most useful when its named calculation matches the decision or check you need to make. Identify the quantity being solved for, the meaning of each input, and the units before interpreting a number.",
+    example: "Use a small set of values whose relationship you can verify independently. Change one value at a time to see whether the result moves in the expected direction.",
+    validation: "Check domain limits, zero values, units, signs, rounding and any formula note. Estimates should not be treated as official quotes or measurements unless the tool explicitly uses an authoritative source.",
+  },
+  converters: {
+    overview: "A converter is appropriate when the same value needs to be represented in another unit or format. Choose the conversion system and the listed source and destination choices that match the task.",
+    example: "Convert a familiar reference value and, where possible, reverse the conversion to check the result. Keep the unit or target format attached to the copied value.",
+    validation: "Check whether the conversion is exact, rounded, context-dependent or limited to a listed set of choices. Do not treat a conversion as validation of the source data.",
+  },
+  developer: {
+    overview: "Developer utilities help inspect, validate, format, encode, compare, or generate technical values. Their output should be tested in the programming language, protocol, schema, or runtime where it will be used.",
+    example: "Start with a small input containing both a common case and an edge case, inspect the output, and test it in the downstream environment before applying the operation to production data.",
+    validation: "Check syntax separately from semantics, compatibility and security. Keep credentials, private keys, authentication cookies and sensitive production payloads out of samples.",
+  },
+  text: {
+    overview: "Text tools support a defined transformation or analysis of written content. Use them when the requested operation—such as counting, cleaning, reordering, comparing, or changing text—matches the job to be done.",
+    example: "Run a short sample containing punctuation, line breaks, repeated spaces, and non-ASCII characters where relevant. Compare the output with the original to understand exactly what changed.",
+    validation: "Confirm how the operation treats whitespace, line endings, case, punctuation, Unicode, and empty input. Preserve an original copy if the transformation is destructive.",
+  },
+  image: {
+    overview: "Image utilities help prepare or inspect an image for a specified visual or technical requirement. The appropriate settings depend on the output dimensions, format, transparency, quality, and intended display use.",
+    example: "Use a copy of a representative image and review the result at its intended size. Compare important details with the original before replacing the source asset.",
+    validation: "Check dimensions, cropping, image quality, transparency and metadata where relevant. Keep the original until the exported file has been verified.",
+  },
+  design: {
+    overview: "Design tools help create or check a particular visual value, style, or design artifact. Choose the output for the real component or page where it will be used rather than judging a value in isolation.",
+    example: "Apply the result to a representative component and inspect it on mobile and desktop widths. Review legibility, spacing, contrast, and the behavior of interactive states.",
+    validation: "A generated colour, CSS rule, or visual preview is not a complete design review. Confirm browser support, accessibility, responsiveness, and the constraints of the existing product.",
+  },
+  pdf: {
+    overview: "PDF and document tools help process pages or convert document content through the workflow exposed by the page. Use them when the source format, target result, and page-level operation match the task.",
+    example: "Use a duplicate document with a few representative pages. Process it once, open the output independently, and inspect both the first and last pages as well as any pages with important tables or images.",
+    validation: "Verify page count and order, rotation, text legibility, links, embedded images, and output integrity. A successful download alone does not prove that all pages survived correctly.",
+  },
+  files: {
+    overview: "File tools help inspect file information or transform structured data between supported representations. Choose the target format based on the application or system that will read the output.",
+    example: "Use a small sample with multiple rows or fields and include values that exercise quoting, empty cells, nested structures, or special characters as relevant to the format.",
+    validation: "Check encoding, separators, schema, null handling, quoting, line endings and nested data. Conversion may not preserve every feature when the target format has different capabilities.",
+  },
+  security: {
+    overview: "Security tools help with the specific generation, inspection, or transformation named by the tool. Use them as a focused utility within a broader security process, not as proof that an account, file, or system is completely secure.",
+    example: "Try a test value or non-production sample first. Confirm the output against the exact requirement of the system where it will be used.",
+    validation: "Protect secrets and verify the operation's scope. A strength indicator, hash, or metadata result answers only the question the tool actually tests.",
+  },
+  fitness: {
+    overview: "Fitness and health calculators provide estimates from the measurements and assumptions requested by the tool. Check the input units and context before comparing a result with reference guidance.",
+    example: "Use accurately measured values and test that a small input change produces a plausible result. Record the units alongside the output.",
+    validation: "Treat results as informational estimates, not a diagnosis or an individual treatment plan. Consult a qualified professional when using the result for a health decision.",
+  },
+  datetime: {
+    overview: "Date and time utilities calculate, compare, or format time-related values. The distinction between an instant, a local clock time, a calendar date, a time zone, and an elapsed duration is important to the result.",
+    example: "Use a known date, time, or timestamp and check the result against an independent reference. Where time zones are involved, test a date near a daylight-saving transition if it is relevant to the location.",
+    validation: "Verify units, time-zone assumptions, locale and daylight-saving behavior. Seconds and milliseconds are not interchangeable, and the same instant can display as different local clock times.",
+  },
+  creators: {
+    overview: "Creator tools help prepare content or calculate estimates related to publishing, audience, media, or monetization. Identify which inputs are measured facts and which are assumptions before using an estimate.",
+    example: "Run a sample with explicit, realistic assumptions, then change one assumption to understand how much it affects the result. Keep a note of the values used if you need to explain the estimate later.",
+    validation: "Creator platforms, eligibility rules, rates, and audience outcomes change. Verify important claims against the current platform information and do not treat projected earnings as guaranteed revenue.",
+  },
+  business: {
+    overview: "Business utilities help create or evaluate operational records, document drafts, pricing inputs, and other business information. Use verified business details and review generated material before issuing it externally.",
+    example: "Begin with a draft containing a small number of line items or fields. Check the arithmetic, dates and wording before replacing sample values with final transaction data.",
+    validation: "Verify names, identifiers, currency, quantities, taxes, totals, dates, and transaction terms. A generated document does not itself prove payment, legal compliance, or entry into an external accounting system.",
+  },
+  random: {
+    overview: "Random and decision tools help select from a defined set of choices or create a playful result. Define the available choices first and make sure the tool's randomness is appropriate for the purpose.",
+    example: "Use a small choice set whose result you can check, then confirm that the selected item belongs to the allowed options and that excluded choices are not included.",
+    validation: "Do not use casual randomizers for security tokens, regulated selection, or other fairness-sensitive tasks unless the implementation explicitly guarantees the required properties.",
+  },
+  seo: {
+    overview: "SEO tools help prepare, inspect, or preview search-related page information. Their output supports implementation and testing; it cannot guarantee crawling, indexing, eligibility for enhanced results, or ranking.",
+    example: "Prepare accurate page facts and check generated markup or metadata against the live page after deployment. Test the deployed URL with current validation tools where available.",
+    validation: "Check canonical URLs, metadata escaping, robots directives, schema fields, and consistency with visible content. Search engines make their own crawling and display decisions.",
+  },
+  qr: {
+    overview: "QR and barcode tools encode a value into a code that a compatible scanner can read. The encoded payload, code format and export settings must suit the destination system and the physical or digital context.",
+    example: "Generate a code using a non-sensitive sample and scan the exported file with the device or scanner that will be used in practice.",
+    validation: "Confirm the decoded payload exactly, then check contrast, quiet space, print size and scanner compatibility. Do not publish a code containing private information unintentionally.",
+  },
+  network: {
+    overview: "Network utilities inspect or calculate a network-related value. Results may depend on the data supplied, the network from which a request runs, and whether a remote service is reachable.",
+    example: "Test a known host, address, or sample configuration and compare the result with an authoritative source or the relevant local network configuration.",
+    validation: "Treat remote results as observations from a particular time and vantage point. They may not reflect every network, region, resolver, or access policy.",
+  },
+  ai: {
+    overview: "AI-assisted tools generate or transform content from prompts and source information. Define the task, audience, tone and constraints clearly so the result can be evaluated against a concrete purpose.",
+    example: "Run a focused prompt with a small amount of non-sensitive context. Review the result, identify missing or unsupported claims, and refine the request only through controls that the page actually provides.",
+    validation: "Verify factual claims, names, figures, dates, and links before publication. Generated material is not independently verified evidence and should not be the sole basis of a high-impact decision.",
+  },
+  education: {
+    overview: "Education tools help calculate, organise or prepare academic information. Make sure the grading scale, credit weighting, programme rules and other conventions match the institution or course involved.",
+    example: "Use a small example based on an official grading scale, and compare the result with the institution's stated method before applying it to a full term or programme.",
+    validation: "Institutional rules vary. Treat estimates as planning aids and use official course or transcript records for formal academic decisions.",
+  },
+  productivity: {
+    overview: "Productivity tools help manage a task, interval, deadline or plan. Confirm whether the tool counts down, tracks elapsed time, or prepares a schedule before interpreting its controls.",
+    example: "Run a short test interval and check start, pause, resume, reset and completion behavior where those actions are provided.",
+    validation: "Check time zones, deadlines, notification permissions and persistence behavior. A timer or plan should not be assumed to continue running after a browser or app is closed unless that behavior is documented.",
+  },
+  generators: {
+    overview: "Generators create a value, template, or content artifact from the inputs and options they expose. Define the intended output before generating it and verify its fit for the system or audience that will receive it.",
+    example: "Create a sample output, inspect its structure and formatting, then test it in the target environment before creating multiple or production-ready values.",
+    validation: "Generated data can be fictional, unregistered, duplicated, or incompatible with a third-party system. Confirm uniqueness, format, eligibility and accuracy whenever these properties matter.",
+  },
+  testdata: {
+    overview: "Test-data tools prepare example records or payloads for development and quality checks. Use them to exercise schemas and edge cases in test environments rather than to represent verified real-world records.",
+    example: "Generate a small fixture with both normal and boundary values, then validate its field types and schema using the same checks as the application under test.",
+    validation: "Keep generated records clearly separated from production records. Do not assume fictional identities, addresses, emails, or payment values belong to real people or work in live services.",
+  },
+  social: {
+    overview: "Social-media tools help prepare copy or assets for a target platform and placement. Start with the exact destination format because profile images, posts, stories, thumbnails and banners can have different requirements.",
+    example: "Preview the content at the intended aspect ratio and check any text-length or dimension constraints using current platform requirements before publishing.",
+    validation: "Check cropping, accessibility, link destinations, platform rules and factual claims. Requirements may change, so do not rely on an old preset alone.",
+  },
+  video: {
+    overview: "Video tools process or prepare video using the source types and outputs supported by the current workflow. File compatibility, codec support and connected-service availability can affect the result.",
+    example: "Test with a short, non-sensitive file, process it once, then play the full output and check image, audio, duration, rotation and synchronization where relevant.",
+    validation: "Confirm that the output file is complete and suitable for the destination platform. Only process or redistribute media that you are authorized to use.",
+  },
+  audio: {
+    overview: "Audio tools process, convert, or analyse sound according to the operation exposed by the page. The source codec, channels, sample rate and duration may affect processing compatibility and quality.",
+    example: "Use a short representative audio file and listen to the exported result on a compatible player. Check the beginning, end, and a section with the most important content.",
+    validation: "Check clipping, silence, channel balance, sample rate, duration and the actual file format when these properties matter. Do not infer quality from a successful export alone.",
+  },
+  mockups: {
+    overview: "Mockup tools create illustrative representations of interfaces or communication. Use them for design, storytelling, and prototyping while keeping the fictional or demonstrative nature clear to viewers.",
+    example: "Enter clearly fictional sample content, inspect the rendered layout and verify that names, messages, status indicators and exported files match the intended demonstration.",
+    validation: "Do not present simulated messages, identities, transactions or interfaces as genuine evidence or as records from a real service.",
+  },
+  screenshots: {
+    overview: "Screenshot and device-presentation tools arrange visual assets in a chosen frame or presentation. They support presentation and prototyping, but a frame does not prove that the application was tested on that hardware.",
+    example: "Use a copy of the screenshot, choose the intended presentation size, and inspect cropping, scale, orientation and text readability before exporting.",
+    validation: "Check device proportions, margins, visible interface content and export dimensions. Keep the original screenshot for comparison.",
+  },
+  interactive: {
+    overview: "Interactive-experience tools help assemble a guided sequence, quiz, reveal or other participant-facing interaction. Define the desired participant journey and verify each state rather than reviewing only the initial screen.",
+    example: "Run the experience from start to finish using touch and keyboard where supported. Test incorrect answers, empty inputs, back navigation, and the completion state when applicable.",
+    validation: "Do not claim live response collection, accounts, persistence, or tracking unless the current implementation explicitly supports those capabilities.",
+  },
+  celebrations: {
+    overview: "Celebration tools prepare a greeting or occasion-specific digital asset. Accurate names, dates and the relationship to the recipient matter as much as the visual result.",
+    example: "Create a draft with the recipient's name and occasion, then preview it on a phone-sized screen and check spelling, link behavior and text wrapping.",
+    validation: "Proofread the final message and share only the personal information appropriate for the intended audience.",
+  },
+  relationships: {
+    overview: "Relationship and social activities offer prompts, messages or playful experiences that should fit the people and context involved. Select wording and activities that participants can use comfortably and voluntarily.",
+    example: "Review a generated prompt as the intended recipient would see it. Edit wording that assumes facts you do not know or that may be intrusive for the relationship.",
+    validation: "Use content respectfully and by mutual choice. Do not use a generated message to pressure, impersonate, harass or expose another person.",
+  },
+  events: {
+    overview: "Event tools help prepare schedules, invitations, countdowns, or related planning materials. Ensure that the date, time zone, location and participant instructions are consistent across the final output.",
+    example: "Create a test event with a known local date and time, inspect how it is displayed, and check the final invitation or schedule before sharing it with participants.",
+    validation: "Confirm time-zone conversions, venue or meeting links, RSVP wording and the latest event details. A generated invitation does not by itself collect responses unless that functionality is explicitly provided.",
+  },
+  gaming: {
+    overview: "Gaming utilities support the specific rules, values, brackets or playful workflows named by the tool. Check the game or competition's actual scoring rules before using the output in a match or event.",
+    example: "Use a small test with known participants or scores and check all totals, rankings, ties and progression against the selected ruleset.",
+    validation: "Verify player names, seeds, scoring conventions, tie-breaks and bracket progression before publishing results.",
+  },
+  photography: {
+    overview: "Photography utilities help calculate or prepare a technical value for a camera, image, exposure, or print task. Accurate equipment details and consistent measurement units are essential to the result.",
+    example: "Use a known sensor size, image dimension or print requirement and compare the output with the equipment specifications or an independent reference.",
+    validation: "Distinguish a mathematical estimate from real-world optical, lighting, sensor and print behavior. Check the target device or print workflow before relying on the result.",
+  },
+  travel: {
+    overview: "Travel utilities organise or estimate a trip-related value. Separate the information you supply from live schedules, current prices, local conditions, and official entry requirements.",
+    example: "Use confirmed trip dates and locations to calculate a plan, then check all date, distance and budget assumptions against current official sources before committing.",
+    validation: "Schedules, prices, weather, transit conditions and entry rules change. Confirm current information with the relevant official service before booking or travelling.",
+  },
+  food: {
+    overview: "Food and cooking utilities help scale a recipe or convert measurements for preparation. Ingredient mass, volume and density are not always interchangeable, so use the measurement type expected by the tool.",
+    example: "Scale a recipe with a known serving count and compare the ingredient quantities, units and practical rounding with the original before cooking.",
+    validation: "Review ingredient substitutions, rounding and food-safety requirements separately. Mathematical scaling does not guarantee identical cooking time or culinary results.",
+  },
+  career: {
+    overview: "Career tools help organise job-related information or prepare application materials. Accurate experience, qualifications and outcomes are more important than wording that merely sounds impressive.",
+    example: "Use a draft for one target role, compare the output with the job requirements, then verify each skill, date, contact detail and achievement before submitting it.",
+    validation: "Never invent qualifications, job history, references or performance claims. Review the final material for accuracy, relevance and the receiving organisation's requirements.",
+  },
+  ecommerce: {
+    overview: "E-commerce utilities support product, stock, pricing, fulfilment or store operations. Make clear whether the inputs are estimates, manually entered values, or authoritative data from a live commerce system.",
+    example: "Use a sample product with known quantity and price, then check the displayed totals, margin or fulfilment assumptions against a separate calculation.",
+    validation: "Verify currency, tax treatment, shipping costs, inventory counts, identifiers and current store rules. Do not assume the tool updates a live catalogue unless the page explicitly says it does.",
+  },
+  accessibility: {
+    overview: "Accessibility tools help inspect or improve a specific interface, document or interaction. A result applies to the component, source or scenario the tool actually checks.",
+    example: "Test a concrete page or representative component, reproduce the flagged issue, and confirm the experience with keyboard interaction and assistive technology where relevant.",
+    validation: "No single automated checker proves full accessibility. Review semantics, focus order, contrast, keyboard access, labels and real user flows alongside the tool's output.",
+  },
+  webdesign: {
+    overview: "Web-design tools help create or validate web styling, layouts and interface details. The generated output must be tested in the browser, viewport and codebase where it will be used.",
+    example: "Use a small representative component and review the output at narrow and wide viewport sizes before copying it into the live project.",
+    validation: "Review responsive behavior, browser support, semantics, keyboard interaction, contrast and reduced-motion preferences where applicable. Generated code should be tested before deployment.",
+  },
+  marketing: {
+    overview: "Marketing tools help plan or draft a message, campaign asset, or offer. Ground the work in verified product facts, a defined audience and the channel where it will appear.",
+    example: "Prepare a draft for one specific audience and channel, then verify all claims, pricing, dates, links and offer terms before publishing it.",
+    validation: "Check brand fit, accessibility, disclosures and current platform or advertising requirements. Do not publish unsupported performance or product claims.",
+  },
+  streaming: {
+    overview: "Streaming utilities help plan or calculate settings for live video or audio delivery. The relevant platform, resolution, frame rate, audio setup and available upload capacity determine whether the result is suitable.",
+    example: "Use the target platform's current recommended settings as a reference, compare the suggested configuration, and run a private test stream before a public event.",
+    validation: "Bitrate and stability depend on the real network, encoder, hardware and platform. Recheck current service requirements and test under the intended streaming conditions.",
+  },
+  communication: {
+    overview: "Communication tools help draft or organise messages, invitations, meeting details and related content. Identify the recipient, purpose, channel and desired action before using the output.",
+    example: "Review a draft as the recipient would read it and confirm names, dates, time zones, attachments, URLs, and any action requested.",
+    validation: "Generated wording should be proofread for factual accuracy, privacy and tone before being sent. Confirm delivery or response through the actual communication service.",
+  },
+  personal: {
+    overview: "Personal utilities help with a defined everyday task or planning decision. Their output is most useful when the assumptions and personal inputs reflect the circumstances in which the result will be used.",
+    example: "Run a sample using the values you know, inspect which assumptions the tool makes, and adjust only those options the current page provides.",
+    validation: "Check important outputs against real constraints and context that the tool may not capture. A planning aid does not substitute for professional guidance where that is needed.",
+  },
+};
+
+function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+  const id = tool.id.toLowerCase();
+  const name = tool.name.toLowerCase();
+  const category = tool.category;
+
+  if (id === "percentage-calculator") {
+    return {
+      overview: "Use this calculator when you need to express one value as a percentage of another, or when you are comparing a value with a starting amount. Read the direction of each field carefully: a percentage of a number, the percentage represented by a part, and a percentage increase or decrease are related calculations but answer different questions.",
+      example: "For a simple check, use a small part and a known whole, calculate the share independently, and compare it with the displayed percentage. For increase or decrease work, identify the starting value before comparing the change; do not substitute the ending value as the base unless that is what the question asks.",
+      validation: "Check the denominator or starting amount and the meaning of each percentage field. A zero denominator cannot produce a meaningful share, and percentage change depends on the original value.",
+    };
+  }
+  if (id === "percentage-change-calculator" || /percentage change/.test(name)) {
+    return {
+      overview: "This guide is for comparing a starting value with a new value and expressing the difference relative to the starting value. The sign matters: a positive percentage indicates an increase under the usual new-minus-original convention, while a negative value indicates a decrease.",
+      example: "Test with an easy pair whose relationship you already know, then reverse the two values. The direction should change when the original and new values are switched; this is a useful check that the correct base value was used.",
+      validation: "Confirm which input is the original value and which is the new value. The percentage-change calculation is undefined when the original value is zero, and the sign should be interpreted alongside the direction of the change.",
+    };
+  }
+  if (id === "json-formatter" || id === "json-validator" || id === "json-minifier" || /json (formatter|validator|minifier)/.test(name)) {
+    return {
+      overview: "This workflow is for working with JSON as structured data. Formatting changes whitespace and indentation to make the structure easier to read; validation checks whether the input follows JSON syntax; minification removes unnecessary whitespace. These operations do not guarantee that the data matches an application's business schema.",
+      example: 'Begin with a small JSON object such as {"name":"Ada","active":true}. Compare the formatted and compact representations, then deliberately remove a quote or comma to see how the validator reports malformed syntax. Use a harmless sample rather than a production payload containing secrets.',
+      validation: "JSON has stricter syntax than JavaScript: property names and strings use double quotes, and comments and trailing commas are not valid standard JSON. After syntax validation, check required fields and value types separately against the receiving application's schema.",
+    };
+  }
+  if (id === "word-counter" || /word counter/.test(name)) {
+    return {
+      overview: "The Word Counter updates counts for words, characters, sentences, and paragraphs as text is entered. It is useful for checking writing length, content limits, and the overall size of a passage before submission or publication.",
+      example: "Paste a short sample containing two sentences and a blank line, then add or remove a word and watch which totals change. This helps you understand how the current counter treats spaces and paragraph breaks before using it on a longer document.",
+      validation: "Counting conventions can differ for hyphenated words, abbreviations, emojis, and languages that do not separate words with spaces. Use the destination platform's own count where a strict character or word limit determines acceptance.",
+    };
+  }
+  if (id === "image-compressor" || /image compressor/.test(name)) {
+    return {
+      overview: "Use this tool to reduce the file size of a compatible image while balancing the resulting visual quality. Compression is useful for web pages, uploads, sharing, and storage when the image must remain recognisable at its intended display size.",
+      example: "Keep the original, then process a copy of a compatible JPEG, PNG, or WebP image using the controls displayed by the tool. Compare the original and compressed previews at the same zoom level and compare the resulting file sizes before deciding which version is suitable.",
+      validation: "Smaller files can show visible artifacts, soften details, alter transparency behavior, or change metadata depending on the format and selected settings. Do not assume that every format supports the same quality controls or that a target size can always be reached without unacceptable loss.",
+    };
+  }
+  if (id === "image-resizer" || /image resizer/.test(name)) {
+    return {
+      overview: "This tool changes image dimensions for a target use such as a web asset, profile image, document, or print layout. The important choice is whether the image should fit within a bound, fill a frame, or be resized to exact dimensions.",
+      example: "Use a copy of an image with a known width and height, request a smaller output, and check both dimensions after processing. If the interface offers fit or fill modes, compare whether the whole image remains visible or whether cropping is introduced.",
+      validation: "Confirm output width, height, units, aspect ratio, and crop behavior. Upscaling cannot recover detail absent from the original, and physical print units depend on the intended resolution or DPI setting where one is provided.",
+    };
+  }
+  if (id === "qr-generator" || /qr code generator/.test(name)) {
+    return {
+      overview: "The QR Code Generator encodes text or a URL into a QR image that a compatible camera or scanner can read. It is suited to sharing a web destination or short piece of information without requiring people to type it manually.",
+      example: "Generate a code from a non-sensitive URL, download the PNG, and scan that downloaded image with a phone camera. Confirm that the decoded destination exactly matches the intended address before placing the code on a poster, label, presentation, or website.",
+      validation: "A QR image can be visually correct while encoding the wrong payload. Test the downloaded file—not only the preview—and check contrast, margin, print size, and scan reliability before wider distribution. Do not encode confidential secrets in a publicly visible code.",
+    };
+  }
+  if (id === "password-generator" || /password generator/.test(name)) {
+    return {
+      overview: "This tool generates a password using the length and character options exposed by its interface. The result should be unique to the account or service where it will be used, and the options should reflect the receiving service's password requirements.",
+      example: "Choose a length and character set accepted by your target service, generate a candidate, and verify that it meets the service's documented rules. Store the accepted password in a trusted password manager rather than reusing it across accounts.",
+      validation: "Check the requested length and included character types, and confirm that the generated value meets the destination's restrictions. Do not share generated passwords in screenshots, documents, support tickets, or chat messages.",
+    };
+  }
+  if (id === "regex-tester" || /regex tester/.test(name)) {
+    return {
+      overview: "The Regex Tester evaluates a JavaScript regular expression against sample text and lists matches. It is intended for experimentation and debugging before a pattern is used in search, validation, extraction, or replacement logic.",
+      example: "Start with a short sample whose expected matches you can identify by inspection, then try a boundary case and a non-matching string. Add flags only when the field supports them and compare the actual match list with the expected result.",
+      validation: "Regular-expression syntax differs across programming languages and engines. A pattern that works in JavaScript may behave differently in another environment; verify escaping, flags, Unicode handling, and performance before using it on large or untrusted input.",
+    };
+  }
+  if (id === "uuid-generator" || /uuid generator/.test(name)) {
+    return {
+      overview: "The UUID Generator creates version 4 UUID identifiers locally. UUIDs are useful as identifiers in test data, application records, and workflows that need a practically unique value, but generating one does not register it with another system.",
+      example: "Generate a small number of values and check that each follows the UUID v4 structure and is distinct from the other values shown. Then confirm the database or API that will receive the identifier accepts that representation.",
+      validation: "Do not confuse identifier uniqueness with authentication or secrecy. A UUID is not a substitute for a purpose-built credential, and the destination system may impose additional rules about storage, uniqueness, or ownership.",
+    };
+  }
+  if (id === "unix-timestamp-converter" || /timestamp converter/.test(name) || /unix time/.test(name)) {
+    return {
+      overview: "This converter helps translate between Unix timestamps and human-readable dates. The critical details are the timestamp unit, the time zone used for display, and whether the value represents seconds, milliseconds, or another format accepted by the interface.",
+      example: "Use a known date and convert it to the available timestamp representation, then convert that result back. If the page exposes a time-zone selector, check the same instant in two time zones and distinguish a changed clock display from a changed instant.",
+      validation: "A seconds-versus-milliseconds mistake can shift a timestamp by orders of magnitude. Confirm the source unit and time zone before using a converted time for logs, deadlines, scheduled jobs, or incident analysis.",
+    };
+  }
+  if (id === "invoice-generator" || /invoice generator/.test(name)) {
+    return {
+      overview: "This tool creates a printable invoice from the business details and line items provided in its form. It can help prepare a document for review or delivery, but the generated page should be checked against the real transaction and the requirements that apply to the business.",
+      example: "Prepare a draft with fictional or non-sensitive sample details, add a small number of line items, and review the rendered totals and printable layout. When using real transaction data, replace the sample values carefully and verify the document before sending it.",
+      validation: "Confirm legal business names, invoice identifiers, dates, quantities, currency, tax treatment, discounts, totals, payment terms, and contact information. Do not assume tax compliance, payment collection, or accounting-system registration unless the implementation explicitly provides it.",
+    };
+  }
+  if (id === "bmi-calculator" || /bmi calculator/.test(name)) {
+    return {
+      overview: "The BMI Calculator estimates body mass index from height and weight and may display adult reference categories. BMI is a screening measure based on a simple ratio; it does not directly measure body fat or diagnose an individual's health.",
+      example: "Enter a height and weight measured in the units requested by the form, then check that the displayed value changes sensibly if one measurement is adjusted. Confirm the units before comparing the number with published reference ranges.",
+      validation: "BMI uses weight divided by height squared when expressed in kilograms and metres. Adult category references are not interpreted the same way for children and adolescents, and the result should be discussed with a qualified clinician when making health decisions.",
+    };
+  }
+  if (id === "video-to-mp4" || id === "video-to-mp3" || /video to (mp4|mp3)/.test(name)) {
+    return {
+      overview: "This media conversion workflow uses a local video file as input and relies on the configured enV media processor when that service is available. The selected output determines whether the resulting file retains video or is converted to audio-only content.",
+      example: "Start with a short, non-sensitive file in a format accepted by the active form. Run the conversion, then open the resulting file and verify its duration, playback, audio synchronization where applicable, and actual output extension before using it elsewhere.",
+      validation: "The catalogue states that the enV FFmpeg media processor must be configured for this workflow. Support depends on the source codec, available service, file size, and output options; do not assume that every upload or codec is accepted.",
+    };
+  }
+  if (id === "youtube-video-downloader" || /youtube video downloader/.test(name)) {
+    return {
+      overview: "This tool describes a URL-based media workflow for YouTube when a compliant enV media-processing service is available. Availability depends on the configured service and source restrictions, not just on whether a URL opens in a browser.",
+      example: "Use only a public URL for content you are authorized to access and process. Submit it through the active form, follow the service response, and verify any returned media before saving or using it.",
+      validation: "The catalogue explicitly conditions this tool on a compliant media-processing service. It may not work when the source blocks access or service support is unavailable. Respect copyright, platform terms, and rights-holder permissions.",
+    };
+  }
+  if (id === "invoice-generator" || /receipt generator|quotation generator/.test(name)) {
+    return {
+      overview: "This business-document workflow creates a printable record or quote from the details entered in the form. Treat it as a draft until its figures and wording have been reviewed against the underlying sale or transaction.",
+      example: "Use a small example with a clear quantity and unit price, then verify the displayed line amount and overall total before substituting verified business details.",
+      validation: "Review identifiers, dates, currency, item descriptions, taxes, discounts, terms and totals. A generated document does not itself prove a payment occurred or a transaction was recorded in an accounting system.",
+    };
+  }
+  if (/json to csv|csv to json|json to yaml|yaml to json|json to xml|xml to json/.test(name) || /json.*(csv|yaml|xml)|(csv|yaml|xml).*json/.test(id)) {
+    return {
+      overview: "This tool converts structured data between the formats named in its title and description. The receiving format has its own rules for field names, values, arrays, nesting, quoting, and escaping, so conversion may require reviewing how the original structure is represented.",
+      example: "Start with a small sample containing more than one record and at least one value that needs quoting, such as text with a comma. Convert the sample, then inspect the output and convert it back where the workflow supports a reverse operation.",
+      validation: "Check nested structures, null or missing values, escaping, delimiter choices, and data types. Some target formats cannot represent every source structure identically, so use the output schema expected by the consuming system.",
+    };
+  }
+  if (/contrast/.test(name) || /contrast/.test(id)) {
+    return {
+      overview: "This tool supports evaluation of contrast or colour relationships for a specific design or accessibility task. The result should be interpreted against the actual foreground/background pair, display conditions, and criteria exposed by the interface.",
+      example: "Test the intended text colour against the real background colour rather than against a different nearby shade. Compare the result with the criterion your product or project is required to meet and review large text and other element types separately if the interface distinguishes them.",
+      validation: "A contrast result covers only the colour combination and measurement method tested. It does not by itself establish that an entire page meets accessibility requirements; review focus, semantics, labels, structure, and interactive states separately.",
+    };
+  }
+  if (/meta tag|serp|sitemap|robots.txt|structured data|schema generator/.test(name) || /meta-tags|serp|sitemap|robots|schema/.test(id)) {
+    return {
+      overview: "This SEO utility prepares or previews a specific search-related page element, such as metadata, crawl guidance, a sitemap, or structured data. Treat generated output as an implementation aid and confirm that it accurately describes the deployed page.",
+      example: "Use a draft page title, canonical URL, and accurate page description, then inspect the generated result before placing it on the site. After deployment, validate the live URL using the relevant search engine's current inspection or testing tools.",
+      validation: "Check canonical URLs, escaping, robots directives, schema types, required fields, and the relationship between markup and visible page content. Valid markup does not guarantee crawling, indexing, a rich result, or a particular search ranking.",
+    };
+  }
+
+  const engine = tool.engine;
+  if (engine.type === "calculator") {
+    return {
+      overview: tool.name + " is intended to answer the calculation described in the enV catalogue: " + tool.description + " The reliability of the answer depends on interpreting every input according to its label and on using consistent units and assumptions.",
+      example: "Choose a small test case for which you can estimate or independently calculate the expected result. Run it once, compare the output with that reference, and only then use more complex values.",
+      validation: "Check sign, units, decimal precision, zero values, and boundary cases. Use any formula or assumption note published with this tool, and do not infer precision or financial terms that the interface does not display.",
+    };
+  }
+  if (engine.type === "converter") {
+    return {
+      overview: tool.name + " converts values within the registered " + engine.system + " system. The available choices on the page define the actual supported conversion pairs; the registered system name is not a promise that every unit or format is available.",
+      example: "Convert a familiar value between two listed units and confirm that the displayed unit label accompanies the result. Repeat in the reverse direction when possible to check that the conversion is consistent.",
+      validation: "Verify source and target unit selection, scale, sign, rounding, and precision. Keep the unit next to the number when copying the result because the number alone may be ambiguous.",
+    };
+  }
+  if (engine.type === "image" || tool.category === "image" || tool.category === "photography") {
+    return {
+      overview: tool.description + " Image workflows should be judged by both the result's technical properties and its visual quality at the intended display or print size.",
+      example: "Use a duplicate of a small, representative image, process it with the available settings, then inspect the full-size output and compare its properties with the original.",
+      validation: "Confirm dimensions, crop, format, transparency, colour appearance, and metadata behavior as relevant to the selected operation. Keep the original until the output has been inspected.",
+    };
+  }
+  if (engine.type === "text" || engine.type === "codec" || engine.type === "developer") {
+    return {
+      overview: tool.description + " The useful workflow is to begin with a small, representative input, apply the operation provided by the tool, and validate the output in the format or system that will consume it.",
+      example: "Create a small sample containing a normal value and a boundary case, then run the operation on both. This makes it easier to distinguish a genuine formatting or conversion issue from malformed source input.",
+      validation: "Pay particular attention to quoting, escaping, whitespace, character encoding, line endings, case sensitivity, and special characters. Preserve the original input until the output has passed downstream validation.",
+    };
+  }
+  if (engine.type === "file-converter" || engine.type === "document" || engine.type === "document-backend" || engine.type === "pdf" || engine.type === "audio" || engine.type === "video") {
+    return {
+      overview: tool.description + " This workflow depends on the actual source type, target format, and processing options that the page exposes. The guide deliberately does not add unsupported formats or controls to the catalogue description.",
+      example: "Use a duplicate of a small file that meets the form's listed requirements. Process it once with the intended settings, then open the result in a viewer or player that supports the target format.",
+      validation: "Check file type and extension, output size, playback or document rendering, completeness, and any relevant page order, dimensions, channels, or timing. An output file being present does not prove that its contents are correct.",
+    };
+  }
+  if (engine.type === "qr" || engine.type === "barcode") {
+    return {
+      overview: tool.description + " The generated code represents a payload or identifier in the code type and format supported by the form.",
+      example: "Generate a code from a non-sensitive sample value and test it with the actual phone camera, scanner, or application that will be used in practice.",
+      validation: "Verify the decoded payload exactly. Check code format, print size, quiet space, contrast, and the limits of the intended scanner before distributing the code.",
+    };
+  }
+  if (engine.type === "url-media" || engine.type === "url-media-info") {
+    return {
+      overview: tool.description + " URL-based media workflows depend on source reachability, provider rules, and the availability of any configured processing service.",
+      example: "Use a test URL for content you are authorized to inspect, submit it through the form, and confirm that the returned output corresponds to the requested source.",
+      validation: "A valid-looking URL does not guarantee that remote processing is allowed or available. Review service errors and follow content rights and platform terms.",
+    };
+  }
+  if (engine.type === "security") {
+    return {
+      overview: tool.description + " This security-related workflow covers the specific check or operation described by the tool, not an unrestricted security audit.",
+      example: "Use a test value or non-production sample first, then compare the result with the security requirement you intend to satisfy.",
+      validation: "Do not infer comprehensive protection from one passing check. Avoid exposing live credentials or secrets, and verify suitability for the destination system.",
+    };
+  }
+  if (engine.type === "ai") {
+    return {
+      overview: tool.description + " The quality of the result depends on the context and constraints supplied and on the configured service for this operation.",
+      example: "Try one focused prompt with a clear task, intended audience, and constraints. Review the result, identify missing or unsupported points, and refine the request only where the tool supports it.",
+      validation: "Review every factual claim and instruction before reuse. Avoid including sensitive source material unless the tool's processing notice permits it, and do not treat generated content as independently verified.",
+    };
+  }
+  const categoryGuidance = CATEGORY_TASK_GUIDANCE[tool.category];
+  if (categoryGuidance) {
+    return {
+      overview: tool.description + " " + categoryGuidance.overview,
+      example: categoryGuidance.example,
+      validation: categoryGuidance.validation,
+    };
+  }
+  return {
+    overview: tool.description + " This guide is tailored to the catalogued purpose, category, and execution metadata for " + tool.name + ". Use the current page's labels and controls as the authority for exact input requirements and behavior.",
+    example: "Run a small, non-sensitive example that represents the task you intend to complete. Confirm the output matches the expected purpose before moving on to a larger or more consequential input.",
+    validation: "Check required fields, supported input types, output completeness, and any assumptions implied by the task. The guide does not claim support for an option unless it is documented by the catalogue or visible in the current interface.",
+  };
+}
 
 function engineLabel(tool: ToolMeta): string {
   switch (tool.engine.type) {
@@ -425,6 +947,7 @@ export function toolDocumentationPath(tool: ToolMeta): string {
 export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[] {
   const category = CATEGORIES.find((item) => item.id === tool.category);
   const advice = CATEGORY_ADVICE[tool.category];
+  const specific = toolSpecificGuidance(tool);
   const statusDescription = tool.status === "planned"
     ? "The catalogue currently marks this tool as planned. This guide documents the catalogued purpose and intended workflow, but it does not claim that the tool is already available or that its final controls and behavior have shipped."
     : tool.status === "beta"
@@ -447,6 +970,14 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
       ],
     },
     {
+      id: "when-to-use",
+      heading: "When to use this tool",
+      paragraphs: [
+        specific.overview,
+        specific.example,
+      ],
+    },
+    {
       id: "before-you-begin",
       heading: "Before you begin",
       paragraphs: [
@@ -462,7 +993,7 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
           ? "The steps below describe how to approach this tool once its working interface is available. If the current page shows a planned or unavailable state, do not treat the catalog description as proof that the operation is live."
           : "Follow the steps in order and use the current interface as the source of truth for the controls and options available in this release.",
       ],
-      bullets: usageSteps(tool),
+      steps: usageSteps(tool),
     },
     {
       id: "inputs-and-options",
@@ -470,6 +1001,7 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
       paragraphs: [
         inputLimit,
         "Use the exact units, syntax, source type, and options requested by the form. Required fields should be completed before running the operation. If the page returns a validation message, correct the named field or format instead of trying unrelated inputs.",
+        specific.validation,
         tool.keywords.length > 0
           ? "The catalogue associates this tool with these search topics: " + tool.keywords.slice(0, 12).join(", ") + ". These terms improve discovery; they are not a list of accepted input fields or supported formats."
           : "No separate keyword list is published for this tool. Use its name, description, field labels, and in-tool examples to identify the intended input.",

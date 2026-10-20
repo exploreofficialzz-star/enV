@@ -85,28 +85,28 @@ function BlogIndex() {
   return (
     <AppShell>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        <header className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
+        <header className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
               Blogs &amp; Guides
             </h1>
-            <p className="mt-4 text-base leading-7 text-muted">
-              Full documentation for enV tools, practical instructions for using them,
-              and product articles about how the toolkit works. Each tool guide is
-              linked to the tool's actual catalogue entry.
-            </p>
+            <label className="flex min-h-12 w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 md:w-[24rem] md:shrink-0">
+              <Search size={18} className="shrink-0 text-muted" aria-hidden="true" />
+              <span className="sr-only">Search blogs, guides, and tools</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => changeQuery(event.target.value)}
+                placeholder="Search blogs, guides, and tools…"
+                className="min-w-0 flex-1 bg-transparent py-3 text-sm text-fg outline-none placeholder:text-subtle"
+              />
+            </label>
           </div>
-          <label className="flex min-h-12 w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 lg:mt-1 lg:w-[24rem] lg:shrink-0">
-            <Search size={18} className="shrink-0 text-muted" aria-hidden="true" />
-            <span className="sr-only">Search blogs, guides, and tools</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => changeQuery(event.target.value)}
-              placeholder="Search blogs, guides, and tools…"
-              className="min-w-0 flex-1 bg-transparent py-3 text-sm text-fg outline-none placeholder:text-subtle"
-            />
-          </label>
+          <p className="max-w-3xl text-base leading-7 text-muted">
+            Full documentation for enV tools, practical instructions for using them,
+            and product articles about how the toolkit works. Each tool guide is
+            linked to the tool's actual catalogue entry.
+          </p>
         </header>
 
         <section className="mt-7 grid gap-3 sm:grid-cols-3" aria-label="Knowledge centre contents">
@@ -265,7 +265,7 @@ function BlogIndex() {
                         params={{ slug: "tool-" + tool.id }}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent"
                       >
-                        Read full guide <ArrowRight size={14} aria-hidden="true" />
+                        Read the full guide <ArrowRight size={14} aria-hidden="true" />
                       </Link>
                       <Link to={toolPath(tool)} className="text-sm font-medium text-muted hover:text-fg">
                         Open tool

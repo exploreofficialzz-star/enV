@@ -91,7 +91,7 @@ export function ToolShell({
           className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
         >
           <BookOpen className="size-4" aria-hidden="true" />
-          Read the full tool guide
+          Read the full guide
         </Link>
       </div>
       <ToolTokenEstimate toolId={tool.id} />

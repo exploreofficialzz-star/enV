@@ -191,6 +191,11 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
                   {section.paragraphs.map((paragraph, index) => (
                     <p key={section.id + "-p-" + index} className="text-base leading-7 text-muted">{paragraph}</p>
                   ))}
+                  {section.steps ? (
+                    <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">
+                      {section.steps.map((step, index) => <li key={section.id + "-step-" + index}>{step}</li>)}
+                    </ol>
+                  ) : null}
                   {section.bullets ? (
                     <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
                       {section.bullets.map((item, index) => <li key={section.id + "-b-" + index}>{item}</li>)}
@@ -213,7 +218,7 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
                       <p className="mt-1 text-sm leading-5 text-muted">{item.description}</p>
                       <div className="mt-3 flex flex-wrap gap-3">
                         <Link to="/blog/$slug" params={{ slug: toolDocumentationPath(item).replace("/blog/", "") }} className="text-sm font-semibold text-accent">
-                          Read guide
+                          Read the full guide
                         </Link>
                         <Link to={toolPath(item)} className="text-sm font-medium text-muted hover:text-fg">
                           Open tool
