@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, ChevronDown, Heart } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { getRelatedTools, toolPath } from "@/lib/registry";
@@ -84,6 +84,16 @@ export function ToolShell({
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      <div className="mt-3">
+        <Link
+          to="/blog/$slug"
+          params={{ slug: "tool-" + tool.id }}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
+        >
+          <BookOpen className="size-4" aria-hidden="true" />
+          Read the full tool guide
+        </Link>
+      </div>
       <ToolTokenEstimate toolId={tool.id} />
 
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
