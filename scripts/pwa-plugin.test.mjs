@@ -160,9 +160,11 @@ test("company pages use the supplied brand, distinct contact emails, and transpa
   const contact = readFileSync(join(PROJECT_ROOT, "src/routes/contact.tsx"), "utf8");
   const pricing = readFileSync(join(PROJECT_ROOT, "src/routes/pricing.tsx"), "utf8");
   const footer = readFileSync(join(PROJECT_ROOT, "src/components/layout/footer.tsx"), "utf8");
-  assert.match(about, /chas-technologies-logo\.jpg/);
+  assert.match(about, /chas-technologies-logo-transparent\.webp/);
   assert.match(about, /chAs Technologies LLC/);
   assert.match(about, /registered in Delaware, USA/);
+  assert.match(contact, /env-brand-mark-transparent\.webp/);
+  assert.match(contact, /chas-technologies-logo-transparent\.webp/);
   assert.match(contact, /mailto:envtoolkit@gmail\.com/);
   assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
   assert.match(pricing, /Before a metered operation/);
