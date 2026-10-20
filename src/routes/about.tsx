@@ -46,10 +46,10 @@ function About() {
           <div className="grid items-center gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="rounded-xl border border-border bg-white p-3">
               <img
-                src="/chas-technologies-logo.svg"
+                src="/chas-technologies-logo-transparent.webp"
                 alt="chAs Technologies LLC logo"
-                width={767}
-                height={264}
+                width={600}
+                height={173}
                 className="h-auto w-full object-contain"
               />
             </div>

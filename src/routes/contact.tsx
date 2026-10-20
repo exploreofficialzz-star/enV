@@ -17,13 +17,13 @@ function Contact() {
 
         <section className="grid gap-4 sm:grid-cols-2" aria-label="Contact options">
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0C0C14] p-1">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0C0C14] p-1.5">
               <img
-                src="/env-brand-mark.svg"
-                alt="enV brand mark"
-                width={36}
-                height={36}
-                className="h-9 w-9 object-contain"
+                src="/env-brand-mark-transparent.webp"
+                alt="enV brand logo"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
               />
             </span>
             <h2 className="mt-4 text-lg font-semibold text-fg">enV product support</h2>
@@ -40,15 +40,15 @@ function Contact() {
           </article>
 
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0C0C14] p-1">
+            <div className="flex h-12 w-full max-w-[190px] items-center justify-center rounded-xl border border-border bg-white px-2">
               <img
-                src="/env-brand-mark.svg"
-                alt="chAs Technologies LLC brand mark"
-                width={36}
-                height={36}
-                className="h-9 w-9 object-contain"
+                src="/chas-technologies-logo-transparent.webp"
+                alt="chAs Technologies LLC logo"
+                width={180}
+                height={52}
+                className="h-auto max-h-11 w-full object-contain"
               />
-            </span>
+            </div>
             <h2 className="mt-4 text-lg font-semibold text-fg">chAs Technologies LLC</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
               For business proposals, partnership opportunities, media requests, and other company-related matters.
