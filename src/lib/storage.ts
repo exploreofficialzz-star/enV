@@ -4,7 +4,12 @@ const FAV_KEY = "env:favorites";
 const RECENT_KEY = "env:recent";
 const USAGE_KEY = "env:tool-use-counts";
 const THEME_KEY = "env:theme";
+const VIEW_MODE_KEY = "env:view-mode";
+const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1, viewport-fit=cover";
 const MAX_RECENT = 24;
+
+export type ThemePreference = "system" | "light" | "dark";
+export type ViewMode = "auto" | "desktop" | "tablet";
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
@@ -17,6 +22,37 @@ function browserStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+function writeSetting(key: string, value: string): boolean {
+  try {
+    const storage = browserStorage();
+    if (!storage) return false;
+    storage.setItem(key, value);
+    return storage.getItem(key) === value;
+  } catch {
+    return false;
+  }
+}
+
+/** Apply a preferred layout without changing browser settings or removing content. */
+export function applyViewMode(mode: ViewMode): void {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+
+  document.documentElement.dataset.envViewMode = mode;
+  const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+  if (!viewport) return;
+
+  if (mode === "auto") {
+    viewport.content = DEFAULT_VIEWPORT;
+    return;
+  }
+
+  const targetWidth = mode === "desktop" ? 1024 : 768;
+  const physicalWidth = window.screen?.width || window.innerWidth;
+  viewport.content = physicalWidth < targetWidth
+    ? "width=" + targetWidth + ", viewport-fit=cover"
+    : DEFAULT_VIEWPORT;
 }
 
 function readList(key: string): string[] {
@@ -88,6 +124,8 @@ type PrefsState = {
   recent: string[];
   usageCounts: Record<string, number>;
   theme: "light" | "dark";
+  themePreference: ThemePreference;
+  viewMode: ViewMode;
   hydrated: boolean;
   storageAvailable: boolean;
   storageError: string | null;
@@ -96,14 +134,20 @@ type PrefsState = {
   isFavorite: (id: string) => boolean;
   recordRecent: (id: string) => void;
   setTheme: (theme: "light" | "dark") => void;
+  setThemePreference: (preference: ThemePreference) => void;
+  setViewMode: (mode: ViewMode) => void;
   toggleTheme: () => void;
 };
+
+const storageWarning = "Browser storage is blocked, so preferences and saved tools may reset when the page closes.";
 
 export const usePrefs = create<PrefsState>((set, get) => ({
   favorites: [],
   recent: [],
   usageCounts: {},
   theme: "light",
+  themePreference: "system",
+  viewMode: "auto",
   hydrated: false,
   storageAvailable: false,
   storageError: null,
@@ -111,21 +155,28 @@ export const usePrefs = create<PrefsState>((set, get) => ({
     if (typeof window === "undefined") return;
     const storage = browserStorage();
     const storedTheme = storage?.getItem(THEME_KEY);
+    const themePreference: ThemePreference =
+      storedTheme === "dark" || storedTheme === "light" ? storedTheme : "system";
     const theme: "light" | "dark" =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+      themePreference === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        : themePreference;
+    const storedViewMode = storage?.getItem(VIEW_MODE_KEY);
+    const viewMode: ViewMode =
+      storedViewMode === "desktop" || storedViewMode === "tablet" ? storedViewMode : "auto";
+
     document.documentElement.classList.toggle("dark", theme === "dark");
+    applyViewMode(viewMode);
     set({
       favorites: readList(FAV_KEY),
       recent: readList(RECENT_KEY),
       usageCounts: readCounts(USAGE_KEY),
       theme,
+      themePreference,
+      viewMode,
       hydrated: true,
       storageAvailable: Boolean(storage),
-      storageError: storage ? null : "Browser storage is blocked, so saved tools cannot persist on this device.",
+      storageError: storage ? null : storageWarning,
     });
   },
   toggleFavorite: (id) => {
@@ -149,8 +200,37 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   },
   setTheme: (theme) => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    browserStorage()?.setItem(THEME_KEY, theme);
-    set({ theme });
+    const persisted = writeSetting(THEME_KEY, theme);
+    set({ theme, themePreference: theme, storageError: persisted ? null : storageWarning });
+  },
+  setThemePreference: (preference) => {
+    const theme: "light" | "dark" = preference === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      : preference;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+
+    let persisted = false;
+    try {
+      const storage = browserStorage();
+      if (storage) {
+        if (preference === "system") {
+          storage.removeItem(THEME_KEY);
+          persisted = storage.getItem(THEME_KEY) === null;
+        } else {
+          storage.setItem(THEME_KEY, preference);
+          persisted = storage.getItem(THEME_KEY) === preference;
+        }
+      }
+    } catch {
+      persisted = false;
+    }
+
+    set({ theme, themePreference: preference, storageError: persisted ? null : storageWarning });
+  },
+  setViewMode: (mode) => {
+    applyViewMode(mode);
+    const persisted = writeSetting(VIEW_MODE_KEY, mode);
+    set({ viewMode: mode, storageError: persisted ? null : storageWarning });
   },
   toggleTheme: () => {
     get().setTheme(get().theme === "dark" ? "light" : "dark");

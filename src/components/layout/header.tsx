@@ -1,7 +1,22 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bell, Heart, Home, LayoutGrid, MoreVertical, UserRound } from "lucide-react";
+import {
+  Bell,
+  Check,
+  Download,
+  Heart,
+  Home,
+  LayoutGrid,
+  LifeBuoy,
+  MessageCircle,
+  Monitor,
+  MoreVertical,
+  Settings as SettingsIcon,
+  Tablet,
+  UserRound,
+} from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { usePrefs } from "@/lib/storage";
 
 const MENU_GROUPS = [
   { title: "Product", links: [
@@ -14,7 +29,7 @@ const MENU_GROUPS = [
   ] },
 ] as const;
 
-function closeMenu(event: React.MouseEvent<HTMLAnchorElement>) {
+function closeMenu(event: React.MouseEvent<HTMLElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
 }
 
@@ -23,6 +38,12 @@ export function Header() {
   const isWalletPage = pathname === "/wallet";
   const user = useCurrentUser();
   const [showNotifications, setShowNotifications] = useState(false);
+  const viewMode = usePrefs((state) => state.viewMode);
+  const setViewMode = usePrefs((state) => state.setViewMode);
+
+  function chooseViewMode(mode: "desktop" | "tablet") {
+    setViewMode(viewMode === mode ? "auto" : mode);
+  }
 
   return (
     <header className="sticky top-0 z-30 bg-bg/95 backdrop-blur-md">
@@ -59,11 +80,27 @@ export function Header() {
                 <summary aria-label="More options" title="More options" className="flex size-10 list-none cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
                   <MoreVertical className="size-6" strokeWidth={2.4} />
                 </summary>
-                <div className="absolute right-0 top-full z-50 mt-2 max-h-[min(78dvh,760px)] w-[min(88vw,520px)] overflow-y-auto rounded-[2rem] border border-border bg-surface p-4 shadow-2xl" aria-label="More navigation">
-                  <div className="border-b border-border px-1 py-2">
+                <div role="group" aria-label="More navigation" className="absolute right-0 top-full z-50 mt-2 max-h-[min(78dvh,760px)] w-[min(88vw,520px)] overflow-y-auto rounded-[2rem] border border-border bg-surface p-4 shadow-2xl">
+                  <section className="border-b border-border px-1 py-2" aria-label="Account">
                     <Link to="/account" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Account</Link>
                     <Link to="/wallet" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Wallet</Link>
-                  </div>
+                  </section>
+
+                  <section className="border-b border-border px-1 py-3" aria-label="View mode">
+                    <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">View mode</h2>
+                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                      <Monitor size={19} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">Desktop view</span>
+                      {viewMode === "desktop" ? <Check size={18} className="text-accent" aria-hidden="true" /> : null}
+                    </button>
+                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                      <Tablet size={19} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">Tablet view</span>
+                      {viewMode === "tablet" ? <Check size={18} className="text-accent" aria-hidden="true" /> : null}
+                    </button>
+                    <p className="px-4 pt-1 text-xs leading-5 text-subtle">Select an active mode again to return to Automatic.</p>
+                  </section>
+
                   {MENU_GROUPS.map((group) => (
                     <section key={group.title} className="border-b border-border px-1 py-3 last:border-b-0" aria-label={group.title}>
                       <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{group.title}</h2>
@@ -72,6 +109,19 @@ export function Header() {
                       ))}
                     </section>
                   ))}
+
+                  <section className="border-b border-border px-1 py-3 last:border-b-0" aria-label="Preferences and support">
+                    <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">Preferences & support</h2>
+                    <Link to="/install" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
+                      <Download size={18} aria-hidden="true" /><span>Install and create shortcut</span>
+                    </Link>
+                    <Link to="/settings" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
+                      <SettingsIcon size={18} aria-hidden="true" /><span>Settings</span>
+                    </Link>
+                    <Link to="/help-feedback" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
+                      <MessageCircle size={18} aria-hidden="true" /><span>Help & feedback</span>
+                    </Link>
+                  </section>
                 </div>
               </details>
             </nav>

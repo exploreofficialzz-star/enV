@@ -134,6 +134,20 @@
 }
 
 
+/* User-selectable layout modes. Automatic remains the default responsive layout. */
+.env-app-shell {
+  min-width: 0;
+  width: 100%;
+}
+html[data-env-view-mode="desktop"] .env-app-shell {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+}
+html[data-env-view-mode="tablet"] .env-app-shell {
+  width: min(100%, 768px);
+  margin-inline: auto;
+}
+
 @layer components {
   .personal-tools-scroll {
     width: 100%;

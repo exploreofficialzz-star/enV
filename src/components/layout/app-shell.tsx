@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("online", retry);
   }, []);
   return (
-    <div className="flex min-h-dvh flex-col bg-bg text-fg">
+    <div className="env-app-shell flex min-h-dvh flex-col bg-bg text-fg">
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

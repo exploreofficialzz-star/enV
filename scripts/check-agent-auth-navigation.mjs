@@ -18,6 +18,21 @@ for (const removed of ["Explore enV", "Product, help, and account links", 'to="/
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
 }
 if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) errors.push("Account must appear before Wallet at the top of the overflow menu.");
+for (const item of ["Desktop view", "Tablet view", "Install and create shortcut", "Settings", "Help & feedback"]) {
+  if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
+}
+for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
+  if (!existsSync(resolve(path))) errors.push("Missing requested settings/install/support feature: " + path);
+}
+const settingsPage = requireText("src/routes/settings.tsx", ['createFileRoute("/settings")', "themePreference", "setThemePreference", "setViewMode", "Reset appearance and display mode"], "Settings page");
+const installPage = requireText("src/routes/install.tsx", ['createFileRoute("/install")', "Install enV", "Add to Home Screen", "Create shortcut", "promptEnVInstallation"], "Install and shortcut page");
+const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
+const installCapture = requireText("src/lib/pwa-install.ts", ["beforeinstallprompt", "appinstalled", "userChoice", "promptEnVInstallation"], "PWA install capture");
+const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode"], "Persistent display preferences");
+requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture"], "Root PWA installation capture");
+if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");
+if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Automatic display mode must restore the responsive viewport.");
+
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/tokens.guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
 if (account.includes("Wallet") || account.includes("Manage your enV identity")) errors.push("The Account route must open sign-in directly without an overview or wallet panel.");

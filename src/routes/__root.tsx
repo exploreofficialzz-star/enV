@@ -1,8 +1,15 @@
+import { useEffect } from "react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
+import { startPwaInstallCapture } from "@/lib/pwa-install";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "enV — Browser Toolkit";
+
+function PwaInstallCapture() {
+  useEffect(() => startPwaInstallCapture(), []);
+  return null;
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -24,7 +31,10 @@ export const Route = createRootRoute({
     <html lang="en" suppressHydrationWarning>
       <head><HeadContent /></head>
       <body>
-        <AssistantStateProvider><Outlet /></AssistantStateProvider>
+        <AssistantStateProvider>
+          <PwaInstallCapture />
+          <Outlet />
+        </AssistantStateProvider>
         <Scripts />
       </body>
     </html>
