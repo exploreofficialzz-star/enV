@@ -121,7 +121,8 @@ try {
     timeout: 30_000,
   });
   await page.getByRole("button", { name: "Browse product articles" }).click();
-  const articleLink = page.locator('a[href^="/blog/"]').filter({ hasText: /Read article/i }).first();
+  await page.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
+  const articleLink = page.getByRole("link", { name: /Read article/i }).first();
   await articleLink.waitFor({ state: "visible", timeout: 15_000 });
   const articleHref = await articleLink.getAttribute("href");
   assert.ok(articleHref, "A published article must expose a destination URL.");
