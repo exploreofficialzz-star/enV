@@ -91,7 +91,7 @@ const toolDocumentation = requireText("src/lib/tool-documentation.ts", [
 ], "Full tool documentation generator");
 const categoryTaskBlock = toolDocumentation.match(/const CATEGORY_TASK_GUIDANCE:[\s\S]*?= \{([\s\S]*?)\n\};/);
 const documentedCategories = categoryTaskBlock
-  ? [...categoryTaskBlock[1].matchAll(/^  ([a-z]+): \{/gm)].map(match => match[1])
+  ? [...categoryTaskBlock[1].matchAll(/^ {2}([a-z]+): \{/gm)].map(match => match[1])
   : [];
 const missingCategoryGuidance = declaredCategories.filter(category => !documentedCategories.includes(category));
 if (missingCategoryGuidance.length) errors.push("Full tool guides are missing tailored task guidance for categories: " + missingCategoryGuidance.join(", "));
