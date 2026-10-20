@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BriefcaseBusiness, Mail, MessageCircle } from "lucide-react";
+import { Mail, Upload } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { SocialLinks } from "@/components/social/social-links";
 import { InfoPage } from "@/components/layout/info-page";
 
@@ -17,9 +18,9 @@ function Contact() {
 
         <section className="grid gap-4 sm:grid-cols-2" aria-label="Contact options">
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-2 text-accent">
-              <MessageCircle size={21} aria-hidden="true" />
-            </span>
+            <div className="flex h-11 items-center">
+              <Logo size="search" className="h-9 w-14" />
+            </div>
             <h2 className="mt-4 text-lg font-semibold text-fg">enV product support</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
               For help using enV, bug reports, accessibility feedback, and suggestions about tools or workflows.
@@ -35,7 +36,7 @@ function Contact() {
 
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-2 text-accent">
-              <BriefcaseBusiness size={21} aria-hidden="true" />
+              <Upload size={21} aria-hidden="true" />
             </span>
             <h2 className="mt-4 text-lg font-semibold text-fg">chAs Technologies LLC</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
