@@ -42,7 +42,7 @@ assert.ok(blogIndex.includes('href={"/blog/" + article.slug}'), 'Article links m
 assert.ok(blogDetail.includes('createFileRoute("/blog/$slug")') && blogDetail.includes('getBlogArticle(params.slug)'), 'The article and guide detail route must resolve its slug.');
 for (const [label, source] of [['blog index', blogIndex], ['blog detail', blogDetail], ['article data', articles]]) {
   assert.ok(!source.includes('readingMinutes'), `${label} must not define or render reading-time metadata.`);
-  assert.ok(!/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i.test(source), `${label} must not show estimated reading-time labels.`);
+  assert.ok(!/\b\d+\s*min(?:ute)?s?\s+read\b/i.test(source), `${label} must not show estimated reading-time labels.`);
 }
 for (const phrase of ['clear storage before syncing', 'automatic token deductions', 'How does enV prevent fraud?']) {
   assert.ok(help.toLowerCase().includes(phrase.toLowerCase()), `Help center must explain: ${phrase}`);
