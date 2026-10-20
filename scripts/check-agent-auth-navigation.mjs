@@ -58,7 +58,7 @@ const blogPage = requireText("src/routes/blog.tsx", [
 if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
 if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
 
-const androidGradle = requireText("apps/android/app/build.gradle.kts", ['androidx.browser:browser:1.10.0'], "Android in-app browser dependency");
+const androidGradle = requireText("apps/android/app/build.gradle.kts", ['androidx.browser:browser:1.8.0'], "Android in-app browser dependency");
 const androidBlogBrowser = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", [
   "CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse(\"https://envtools.store/blog\"))",
 ], "Android shared Blogs & Guides route");
