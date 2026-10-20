@@ -619,63 +619,63 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   const engine = tool.engine;
   if (engine.type === "calculator") {
     return {
-      overview: toolDocumentationSummary(tool) + " The reliability of the answer depends on interpreting every input according to its label and on using consistent units and assumptions.",
+      overview: "Use the fields to model the calculation you need. Check input units, assumptions, zero values, and expected precision before relying on the result.",
       example: "Choose a small test case for which you can estimate or independently calculate the expected result. Run it once, compare the output with that reference, and only then use more complex values.",
       validation: "Check sign, units, decimal precision, zero values, and boundary cases. Use any formula or assumption note published with this tool, and do not infer precision or financial terms that the interface does not display.",
     };
   }
   if (engine.type === "converter") {
     return {
-      overview: tool.name + " converts values within the registered " + engine.system + " system. The available choices on the page define the actual supported conversion pairs; the registered system name is not a promise that every unit or format is available.",
+      overview: "Use this converter when you need to move a value between supported units or formats. The choices shown on the page define the actual conversion pairs; do not assume an unlisted unit or format is supported.",
       example: "Convert a familiar value between two listed units and confirm that the displayed unit label accompanies the result. Repeat in the reverse direction when possible to check that the conversion is consistent.",
       validation: "Verify source and target unit selection, scale, sign, rounding, and precision. Keep the unit next to the number when copying the result because the number alone may be ambiguous.",
     };
   }
   if (engine.type === "image" || tool.category === "image" || tool.category === "photography") {
     return {
-      overview: toolDocumentationSummary(tool) + " Image workflows should be judged by both the result's technical properties and its visual quality at the intended display or print size.",
+      overview: "Choose image settings based on how the result will be displayed or printed. Compare a representative output against the original at the intended size.",
       example: "Use a duplicate of a small, representative image, process it with the available settings, then inspect the full-size output and compare its properties with the original.",
       validation: "Confirm dimensions, crop, format, transparency, colour appearance, and metadata behavior as relevant to the selected operation. Keep the original until the output has been inspected.",
     };
   }
   if (engine.type === "text" || engine.type === "codec" || engine.type === "developer") {
     return {
-      overview: toolDocumentationSummary(tool) + " The useful workflow is to begin with a small, representative input, apply the operation provided by the tool, and validate the output in the format or system that will consume it.",
+      overview: "Start with a small, representative input, apply the operation provided by the tool, and validate the output in the format or system that will consume it.",
       example: "Create a small sample containing a normal value and a boundary case, then run the operation on both. This makes it easier to distinguish a genuine formatting or conversion issue from malformed source input.",
       validation: "Pay particular attention to quoting, escaping, whitespace, character encoding, line endings, case sensitivity, and special characters. Preserve the original input until the output has passed downstream validation.",
     };
   }
   if (engine.type === "file-converter" || engine.type === "document" || engine.type === "document-backend" || engine.type === "pdf" || engine.type === "audio" || engine.type === "video") {
     return {
-      overview: toolDocumentationSummary(tool) + " This workflow depends on the actual source type, target format, and processing options that the page exposes. The guide deliberately does not add unsupported formats or controls to the catalogue description.",
+      overview: "Select the source type, target format, and processing options exposed by the page. Do not assume a format or control is supported unless it is listed.",
       example: "Use a duplicate of a small file that meets the form's listed requirements. Process it once with the intended settings, then open the result in a viewer or player that supports the target format.",
       validation: "Check file type and extension, output size, playback or document rendering, completeness, and any relevant page order, dimensions, channels, or timing. An output file being present does not prove that its contents are correct.",
     };
   }
   if (engine.type === "qr" || engine.type === "barcode") {
     return {
-      overview: toolDocumentationSummary(tool) + " The generated code represents a payload or identifier in the code type and format supported by the form.",
+      overview: "Enter the exact payload and code type required for your use case, then verify that the generated code decodes to the intended value.",
       example: "Generate a code from a non-sensitive sample value and test it with the actual phone camera, scanner, or application that will be used in practice.",
       validation: "Verify the decoded payload exactly. Check code format, print size, quiet space, contrast, and the limits of the intended scanner before distributing the code.",
     };
   }
   if (engine.type === "url-media" || engine.type === "url-media-info") {
     return {
-      overview: toolDocumentationSummary(tool) + " URL-based media workflows depend on source reachability, provider rules, and the availability of any configured processing service.",
+      overview: "Processing depends on source reachability, provider rules, and the availability of any configured service. Test a supported URL before using a more consequential input.",
       example: "Use a test URL for content you are authorized to inspect, submit it through the form, and confirm that the returned output corresponds to the requested source.",
       validation: "A valid-looking URL does not guarantee that remote processing is allowed or available. Review service errors and follow content rights and platform terms.",
     };
   }
   if (engine.type === "security") {
     return {
-      overview: toolDocumentationSummary(tool) + " This security-related workflow covers the specific check or operation described by the tool, not an unrestricted security audit.",
+      overview: "Treat the specific security check shown here as one part of a review, not as a guarantee that an entire system is secure.",
       example: "Use a test value or non-production sample first, then compare the result with the security requirement you intend to satisfy.",
       validation: "Do not infer comprehensive protection from one passing check. Avoid exposing live credentials or secrets, and verify suitability for the destination system.",
     };
   }
   if (engine.type === "ai") {
     return {
-      overview: toolDocumentationSummary(tool) + " The quality of the result depends on the context and constraints supplied and on the configured service for this operation.",
+      overview: "The quality of generated output depends on the context and constraints supplied and on the configured service. Treat the result as a draft that needs review.",
       example: "Try one focused prompt with a clear task, intended audience, and constraints. Review the result, identify missing or unsupported points, and refine the request only where the tool supports it.",
       validation: "Review every factual claim and instruction before reuse. Avoid including sensitive source material unless the tool's processing notice permits it, and do not treat generated content as independently verified.",
     };
@@ -683,13 +683,13 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   const categoryGuidance = CATEGORY_TASK_GUIDANCE[tool.category];
   if (categoryGuidance) {
     return {
-      overview: toolDocumentationSummary(tool) + " " + categoryGuidance.overview,
+      overview: categoryGuidance.overview,
       example: categoryGuidance.example,
       validation: categoryGuidance.validation,
     };
   }
   return {
-    overview: toolDocumentationSummary(tool) + " This guide is tailored to the catalogued purpose, category, and execution metadata for " + tool.name + ". Use the current page's labels and controls as the authority for exact input requirements and behavior.",
+    overview: "This guide is tailored to the catalogued purpose, category, and execution metadata for " + tool.name + ". Use the current page's labels and controls as the authority for exact input requirements and behavior.",
     example: "Run a small, non-sensitive example that represents the task you intend to complete. Confirm the output matches the expected purpose before moving on to a larger or more consequential input.",
     validation: "Check required fields, supported input types, output completeness, and any assumptions implied by the task. The guide does not claim support for an option unless it is documented by the catalogue or visible in the current interface.",
   };
@@ -1016,7 +1016,7 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
       id: "purpose-and-scope",
       heading: "Purpose and scope",
       paragraphs: [
-        toolDocumentationSummary(tool),
+        "This section explains the tool's intended scope and execution context. Use the current tool page to confirm the exact inputs, options, limits, and service behavior.",
         (category?.description ? category.description + (category.blurb ? " " + category.blurb : "") : "This tool is part of enV's " + tool.category + " collection."),
         "This entry uses enV's " + engineLabel(tool).toLowerCase() + " workflow. " + engineOverview(tool),
       ],
