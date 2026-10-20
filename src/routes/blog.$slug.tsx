@@ -81,7 +81,7 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
   return (
     <AppShell>
       <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg">
+        <Link to="/blog" search={{ view: undefined }} className="inline-flex items-center gap-2 text-sm text-muted hover:text-fg">
           <ArrowLeft size={16} aria-hidden="true" /> Blogs &amp; Guides
         </Link>
         <header className="mt-6 border-b border-border pb-6">
@@ -131,7 +131,7 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
         <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
           <Link to="/" className="hover:text-fg">Home</Link>
           <span aria-hidden="true">/</span>
-          <Link to="/blog" className="hover:text-fg">Blogs &amp; Guides</Link>
+          <Link to="/blog" search={{ view: undefined }} className="hover:text-fg">Blogs &amp; Guides</Link>
           <span aria-hidden="true">/</span>
           <span className="text-fg">Tool documentation</span>
         </nav>
@@ -157,8 +157,7 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
             >
               Open {tool.name} <ArrowUpRight size={16} aria-hidden="true" />
             </Link>
-            <Link
-              to="/blog"
+            <Link to="/blog" search={{ view: undefined }}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-fg hover:bg-surface-2"
             >
               All documentation <ArrowRight size={16} aria-hidden="true" />

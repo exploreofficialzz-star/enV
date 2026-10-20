@@ -834,11 +834,13 @@ private fun AboutInformation() {
         ) {
             ChasTechnologiesLogo(Modifier.fillMaxWidth().aspectRatio(3.2f))
         }
-        InformationSection("A focused toolkit for everyday work", listOf(
-            "enV brings practical utilities together in one place across Web, Android, and iOS. Browse by category, search for a tool, and use the tools that fit your task.",
-            "enV is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA. Some tools process information on your device; features that need a server or an external provider make that clear in their use and are described in our Privacy page.",
+        InformationSection("A practical toolkit for everyday digital work", listOf(
+            "enV brings useful tools, calculators, converters, generators, and creator and developer utilities together in one searchable workspace. Browse by category or search by task to find a tool that fits the work in front of you.",
+            "enV is available on the web and through dedicated Android and iOS apps. It is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA. Many tools work on your device; review the tool guidance and our Privacy page when a feature needs a server or external provider.",
         ), titleSize = 20.sp)
         CompanyContactCard()
+        SocialLinksSection("enV")
+        SocialLinksSection("chAs Technologies LLC")
     }
 }
 
@@ -858,12 +860,12 @@ private fun CompanyContactCard() {
 @Composable
 private fun ContactInformation() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InformationSection("", listOf("Choose the address that best matches your inquiry. We will use your message to respond to the request you send."))
+        InformationSection("", listOf("Have a question, found something we can improve, or want to discuss working together? Choose the contact route that best fits your message."))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             if (maxWidth >= 640.dp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ContactCard("enV product support", "Questions, feedback, accessibility concerns, or help using the toolkit.", showProductSupport = true, modifier = Modifier.weight(1f))
-                    ContactCard("Company inquiries", "Business, partnership, and company-related correspondence for chAs Technologies LLC.", showCompanyAddress = true, modifier = Modifier.weight(1f))
+                    ContactCard("enV product support", "For help using the toolkit, product feedback, accessibility concerns, bug reports, or ideas for improving enV.", showProductSupport = true, modifier = Modifier.weight(1f))
+                    ContactCard("chAs Technologies LLC", "For business proposals, partnerships, media inquiries, and other company-related correspondence.", showCompanyAddress = true, modifier = Modifier.weight(1f))
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -872,7 +874,86 @@ private fun ContactInformation() {
                 }
             }
         }
+        SocialLinksSection("enV")
+        SocialLinksSection("chAs Technologies LLC")
         Text("Please do not include passwords, payment-card details, or other highly sensitive information in ordinary email.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private data class NativeSocialProfile(
+    val platform: String,
+    val detail: String,
+    val url: String?,
+    val glyph: String,
+    val background: Color,
+    val foreground: Color,
+)
+
+@Composable
+private fun SocialLinksSection(brand: String) {
+    val context = LocalContext.current
+    val isEnv = brand == "enV"
+    val profiles = if (isEnv) listOf(
+        NativeSocialProfile("X", "@envtoolz", "https://x.com/envtoolz", "𝕏", Color(0xFF151515), Color.White),
+        NativeSocialProfile("Instagram", "@envtools.store", "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", "◎", Color(0xFFFCE7F3), Color(0xFFC13584)),
+        NativeSocialProfile("TikTok", "@envtools.store", "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", "♪", Color(0xFF151515), Color.White),
+        NativeSocialProfile("YouTube", "@envtoolz", "https://www.youtube.com/@envtoolz", "▶", Color(0xFFFF0033), Color.White),
+        NativeSocialProfile("Facebook", "Profile link coming soon", null, "f", Color(0xFFDBEAFE), Color(0xFF0866FF)),
+    ) else listOf(
+        NativeSocialProfile("Facebook", "chAs Technologies LLC", "https://www.facebook.com/share/1GfoVk8MZK/", "f", Color(0xFF0866FF), Color.White),
+        NativeSocialProfile("TikTok", "@chastechnologiesllc", "https://www.tiktok.com/@chastechnologiesllc", "♪", Color(0xFF151515), Color.White),
+        NativeSocialProfile("X", "@chAstechllc", "https://x.com/chAstechllc", "𝕏", Color(0xFF151515), Color.White),
+        NativeSocialProfile("WhatsApp", "Official channel", "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", "☎", Color(0xFF25D366), Color.White),
+        NativeSocialProfile("Instagram", "@chastechnologiesllc", "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", "◎", Color(0xFFFCE7F3), Color(0xFFC13584)),
+        NativeSocialProfile("LinkedIn", "chAs Technologies LLC", "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", "in", Color(0xFF0A66C2), Color.White),
+        NativeSocialProfile("Snapchat", "@chastechllc", "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", "👻", Color(0xFFFFFC00), Color(0xFF111111)),
+        NativeSocialProfile("YouTube", "@chAsTechnologiesLLC", "https://www.youtube.com/@chAsTechnologiesLLC", "▶", Color(0xFFFF0033), Color.White),
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                if (isEnv) "Product updates, new tools, tips, and announcements."
+                else "Company updates, partnerships, and news from the team behind enV.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            profiles.forEach { profile ->
+                TextButton(
+                    onClick = {
+                        profile.url?.let { url ->
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                        }
+                    },
+                    enabled = profile.url != null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            Modifier.size(40.dp).background(profile.background, RoundedCornerShape(11.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(profile.glyph, fontSize = if (profile.platform == "LinkedIn") 14.sp else 19.sp, fontWeight = FontWeight.Normal, color = profile.foreground)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp), horizontalAlignment = Alignment.Start) {
+                            Text(profile.platform, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
+                            Text(profile.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                        if (profile.url != null) EnVIcon("ArrowUpRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
     }
 }
 
