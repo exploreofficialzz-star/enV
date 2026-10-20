@@ -18,6 +18,7 @@ import {
   getToolDocumentation,
   toolCategoryLabel,
   toolDocumentationPath,
+  toolDocumentationSummary,
   toolExecutionLabel,
   toolStatusLabel,
 } from "@/lib/tool-documentation";
@@ -61,7 +62,7 @@ export const Route = createFileRoute("/blog/$slug")({
     return {
       meta: [
         { title: loaderData.tool.name + " documentation | enV" },
-        { name: "description", content: loaderData.tool.description },
+        { name: "description", content: toolDocumentationSummary(loaderData.tool) },
       ],
     };
   },
@@ -142,7 +143,7 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
           <h1 className="max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-fg sm:text-4xl">
             {tool.name}: documentation and usage guide
           </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-muted">{tool.description}</p>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-muted">{toolDocumentationSummary(tool)}</p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-border px-3 py-1.5 text-muted">{toolCategoryLabel(tool)}</span>
             <span className="rounded-full border border-border px-3 py-1.5 text-muted">{toolStatusLabel(tool)}</span>
@@ -221,7 +222,7 @@ function ToolGuidePage({ tool, related }: { tool: ToolMeta; related: ToolMeta[] 
                   {related.map((item) => (
                     <article key={item.id} className="rounded-xl border border-border bg-surface p-4">
                       <h3 className="font-semibold text-fg">{item.name}</h3>
-                      <p className="mt-1 text-sm leading-5 text-muted">{item.description}</p>
+                      <p className="mt-1 text-sm leading-5 text-muted">{toolDocumentationSummary(item)}</p>
                       <div className="mt-3 flex flex-wrap gap-3">
                         <a href={toolDocumentationPath(item)} className="text-sm font-semibold text-accent">
                           Read the full guide
