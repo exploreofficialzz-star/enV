@@ -835,8 +835,8 @@ private fun AboutInformation() {
             ChasTechnologiesLogo(Modifier.fillMaxWidth().aspectRatio(3.2f))
         }
         InformationSection("A practical toolkit for everyday digital work", listOf(
-            "enV brings useful tools, calculators, converters, generators, and creator and developer utilities together in one searchable workspace. Browse by category or search by task to find a tool that fits the work in front of you.",
-            "enV is available on the web and through dedicated Android and iOS apps. It is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA. Many tools work on your device; review the tool guidance and our Privacy page when a feature needs a server or external provider.",
+            "enV brings practical calculators, converters, generators, and creator and developer utilities into one searchable workspace. Browse by category or search by task to find a tool and understand how it can help.",
+            "Use enV on the web, Android, or iOS. Many tools run directly on your device; for connected features, review the tool-specific guidance and our Privacy page so you know when a server or external provider is involved.",
         ), titleSize = 20.sp)
         CompanyContactCard()
         SocialLinksSection("enV")
@@ -860,7 +860,7 @@ private fun CompanyContactCard() {
 @Composable
 private fun ContactInformation() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InformationSection("", listOf("Have a question, found something we can improve, or want to discuss working together? Choose the contact route that best fits your message."))
+        InformationSection("Contact the right team", listOf("Contact enV product support for help using the toolkit, bug reports, accessibility feedback, or suggestions. For business proposals, partnerships, and company matters, contact chAs Technologies LLC."))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             if (maxWidth >= 640.dp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -882,75 +882,67 @@ private fun ContactInformation() {
 
 private data class NativeSocialProfile(
     val platform: String,
-    val detail: String,
     val url: String?,
-    val glyph: String,
-    val background: Color,
-    val foreground: Color,
+    val iconRes: Int,
 )
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SocialLinksSection(brand: String) {
     val context = LocalContext.current
     val isEnv = brand == "enV"
+    val owner = if (isEnv) "enV" else "chAs Technologies LLC"
     val profiles = if (isEnv) listOf(
-        NativeSocialProfile("X", "@envtoolz", "https://x.com/envtoolz", "𝕏", Color(0xFF151515), Color.White),
-        NativeSocialProfile("Instagram", "@envtools.store", "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", "◎", Color(0xFFFCE7F3), Color(0xFFC13584)),
-        NativeSocialProfile("TikTok", "@envtools.store", "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", "♪", Color(0xFF151515), Color.White),
-        NativeSocialProfile("YouTube", "@envtoolz", "https://www.youtube.com/@envtoolz", "▶", Color(0xFFFF0033), Color.White),
-        NativeSocialProfile("Facebook", "Profile link coming soon", null, "f", Color(0xFFDBEAFE), Color(0xFF0866FF)),
+        NativeSocialProfile("X", "https://x.com/envtoolz", R.drawable.social_x),
+        NativeSocialProfile("Instagram", "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", R.drawable.social_instagram),
+        NativeSocialProfile("TikTok", "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", R.drawable.social_tiktok),
+        NativeSocialProfile("YouTube", "https://www.youtube.com/@envtoolz", R.drawable.social_youtube),
+        NativeSocialProfile("Facebook", null, R.drawable.social_facebook),
     ) else listOf(
-        NativeSocialProfile("Facebook", "chAs Technologies LLC", "https://www.facebook.com/share/1GfoVk8MZK/", "f", Color(0xFF0866FF), Color.White),
-        NativeSocialProfile("TikTok", "@chastechnologiesllc", "https://www.tiktok.com/@chastechnologiesllc", "♪", Color(0xFF151515), Color.White),
-        NativeSocialProfile("X", "@chAstechllc", "https://x.com/chAstechllc", "𝕏", Color(0xFF151515), Color.White),
-        NativeSocialProfile("WhatsApp", "Official channel", "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", "☎", Color(0xFF25D366), Color.White),
-        NativeSocialProfile("Instagram", "@chastechnologiesllc", "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", "◎", Color(0xFFFCE7F3), Color(0xFFC13584)),
-        NativeSocialProfile("LinkedIn", "chAs Technologies LLC", "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", "in", Color(0xFF0A66C2), Color.White),
-        NativeSocialProfile("Snapchat", "@chastechllc", "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", "👻", Color(0xFFFFFC00), Color(0xFF111111)),
-        NativeSocialProfile("YouTube", "@chAsTechnologiesLLC", "https://www.youtube.com/@chAsTechnologiesLLC", "▶", Color(0xFFFF0033), Color.White),
+        NativeSocialProfile("Facebook", "https://www.facebook.com/share/1GfoVk8MZK/", R.drawable.social_facebook),
+        NativeSocialProfile("TikTok", "https://www.tiktok.com/@chastechnologiesllc", R.drawable.social_tiktok),
+        NativeSocialProfile("X", "https://x.com/chAstechllc", R.drawable.social_x),
+        NativeSocialProfile("WhatsApp", "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", R.drawable.social_whatsapp),
+        NativeSocialProfile("Instagram", "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", R.drawable.social_instagram),
+        NativeSocialProfile("LinkedIn", "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", R.drawable.social_linkedin),
+        NativeSocialProfile("Snapchat", "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", R.drawable.social_snapchat),
+        NativeSocialProfile("YouTube", "https://www.youtube.com/@chAsTechnologiesLLC", R.drawable.social_youtube),
     )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                if (isEnv) "Product updates, new tools, tips, and announcements."
-                else "Company updates, partnerships, and news from the team behind enV.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            if (isEnv) "Follow enV" else "Follow chAs Technologies LLC",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             profiles.forEach { profile ->
-                TextButton(
+                androidx.compose.material3.IconButton(
                     onClick = {
                         profile.url?.let { url ->
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
                         }
                     },
                     enabled = profile.url != null,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.semantics {
+                        contentDescription = if (profile.url != null) {
+                            "Follow $owner on ${profile.platform}"
+                        } else {
+                            "The Facebook profile for $owner has not been linked yet"
+                        }
+                    },
                 ) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(
-                            Modifier.size(40.dp).background(profile.background, RoundedCornerShape(11.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(profile.glyph, fontSize = if (profile.platform == "LinkedIn") 14.sp else 19.sp, fontWeight = FontWeight.Normal, color = profile.foreground)
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp), horizontalAlignment = Alignment.Start) {
-                            Text(profile.platform, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface)
-                            Text(profile.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                        }
-                        if (profile.url != null) EnVIcon("ArrowUpRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(profile.iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
+                    )
                 }
             }
         }

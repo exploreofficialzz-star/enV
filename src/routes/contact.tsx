@@ -11,7 +11,7 @@ function Contact() {
       <div className="space-y-8">
         <section className="max-w-3xl">
           <p className="text-base leading-7 text-muted">
-            Have a question, spotted something we can improve, or want to discuss working together? Choose the contact route that best fits your message. We aim to make it clear where product feedback should go and where company inquiries belong.
+            Whether you need product support, want to share feedback, or would like to discuss working together, choose the contact route that best matches your message.
           </p>
         </section>
 
@@ -22,7 +22,7 @@ function Contact() {
             </span>
             <h2 className="mt-4 text-lg font-semibold text-fg">enV product support</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
-              For help using the toolkit, product feedback, accessibility concerns, bug reports, or ideas for improving enV.
+              For help using enV, bug reports, accessibility feedback, and suggestions about tools or workflows.
             </p>
             <a
               className="mt-4 inline-flex min-h-11 items-center gap-2 font-semibold text-accent underline underline-offset-4"
@@ -39,7 +39,7 @@ function Contact() {
             </span>
             <h2 className="mt-4 text-lg font-semibold text-fg">chAs Technologies LLC</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
-              For business proposals, partnerships, media inquiries, and other company-related correspondence.
+              For business proposals, partnership opportunities, media requests, and other company-related matters.
             </p>
             <a
               className="mt-4 inline-flex min-h-11 items-center gap-2 font-semibold text-accent underline underline-offset-4"
@@ -52,9 +52,9 @@ function Contact() {
         </section>
 
         <section className="rounded-xl border border-border bg-surface-2 p-4 sm:p-5">
-          <h2 className="font-semibold text-fg">A quick note before you write</h2>
+          <h2 className="font-semibold text-fg">Protect your information</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Please include enough non-sensitive context for us to understand your question. Do not send passwords, payment-card details, recovery codes, or other sensitive personal information by ordinary email.
+            Never send passwords, one-time verification codes, payment-card details, recovery codes, or other sensitive personal information by ordinary email. Include only the non-sensitive context needed to explain your question or issue.
           </p>
         </section>
 
