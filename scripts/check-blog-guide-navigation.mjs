@@ -33,6 +33,23 @@ try {
   assert.match(href, /^\/blog\/tool-[a-z0-9-]+$/i, "The guide link must target an individual tool reference.");
   const targetUrl = new URL(href, baseUrl);
 
+  // Open the same guide in a clean tab too. This separates a bad route render
+  // from any issue specific to tapping the link on the catalogue page.
+  const directPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const directResponse = await directPage.goto(targetUrl.href, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000,
+  });
+  const directProbe = {
+    status: directResponse?.status() ?? null,
+    url: directPage.url(),
+    title: await directPage.title().catch(() => ""),
+    headings: await directPage.locator("h1, h2, h3").allInnerTexts().catch(() => []),
+    visibleBody: (await directPage.locator("body").innerText().catch(() => "")).slice(0, 1_000),
+  };
+  console.log("Direct URL guide probe:", JSON.stringify(directProbe));
+  await directPage.close();
+
   const guideResponsePromise = page.waitForResponse(
     (response) => {
       const responseUrl = new URL(response.url());
