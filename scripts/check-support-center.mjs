@@ -21,6 +21,7 @@ const read = (path) => readFileSync(path, 'utf8');
 const header = read('src/components/layout/header.tsx');
 const footer = read('src/components/layout/footer.tsx');
 const articles = read('src/data/blog-articles.ts');
+const toolDocumentation = read('src/lib/tool-documentation.ts');
 const blogIndex = read('src/routes/blog.index.tsx');
 const blogDetail = read('src/routes/blog.$slug.tsx');
 const help = read('src/routes/help.tsx');
@@ -42,6 +43,9 @@ const filterMarkup = blogIndex.slice(filterStart, filterEnd);
 assert.ok(filterMarkup.includes('aria-label="Filter by status"'), 'The status filter must appear beside the category filter.');
 assert.ok(!filterMarkup.includes('ChevronDown'), 'Filter selects must not render duplicate custom dropdown arrows.');
 assert.ok(blogIndex.includes('href={"/blog/" + article.slug}'), 'Article links must use a direct article URL.');
+assert.ok(blogIndex.includes('toolDocumentationSummary(tool)'), 'Tool cards must use readable catalogue summaries.');
+assert.ok(toolDocumentation.includes('export function toolDocumentationSummary'), 'Generated guide summaries must repair short or fragmentary catalogue descriptions.');
+assert.ok(blogDetail.includes('toolDocumentationSummary(tool)') && blogDetail.includes('toolDocumentationSummary(item)'), 'Guide headers and related tools must use readable summaries.');
 assert.ok(blogDetail.includes('createFileRoute("/blog/$slug")') && blogDetail.includes('getBlogArticle(params.slug)'), 'The article and guide detail route must resolve its slug.');
 for (const [label, source] of [['blog index', blogIndex], ['blog detail', blogDetail], ['article data', articles]]) {
   assert.ok(!source.includes('readingMinutes'), `${label} must not define or render reading-time metadata.`);
