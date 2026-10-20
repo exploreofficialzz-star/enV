@@ -155,14 +155,14 @@ try {
     const url = new URL(response.url());
     return response.request().isNavigationRequest()
       && url.origin === baseUrl.origin
-      && url.pathname.replace(/\\/$/, "") === "/blog"
+      && url.pathname.replace(/\/$/, "") === "/blog"
       && url.searchParams.get("view") === "articles";
   }, { timeout: 20_000 });
   await page.getByRole("link", { name: "Browse product articles", exact: true }).click();
   const articleViewResponse = await articleViewResponsePromise;
   assert.equal(articleViewResponse.status(), 200, "The articles listing URL must return HTTP 200.");
   await page.waitForURL(
-    (url) => url.origin === baseUrl.origin && url.pathname.replace(/\\/$/, "") === "/blog" && url.searchParams.get("view") === "articles",
+    (url) => url.origin === baseUrl.origin && url.pathname.replace(/\/$/, "") === "/blog" && url.searchParams.get("view") === "articles",
     { timeout: 15_000 },
   );
   await page.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
