@@ -28,6 +28,7 @@ const settingsPage = requireText("src/routes/settings.tsx", ['createFileRoute("/
 const installPage = requireText("src/routes/install.tsx", ['createFileRoute("/install")', "Install enV", "Add to Home Screen", "Create shortcut", "promptEnVInstallation"], "Install and shortcut page");
 const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
 const installCapture = requireText("src/lib/pwa-install.ts", ["beforeinstallprompt", "appinstalled", "userChoice", "promptEnVInstallation"], "PWA install capture");
+if (!installCapture.includes("event.preventDefault()")) errors.push("PWA install prompt must preserve the browser-controlled installation flow.");
 const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode"], "Persistent display preferences");
 requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture"], "Root PWA installation capture");
 if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");

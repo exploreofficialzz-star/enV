@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 export type InstallChoice = "accepted" | "dismissed" | "unavailable";
 
 type InstallPromptEvent = Event & {
