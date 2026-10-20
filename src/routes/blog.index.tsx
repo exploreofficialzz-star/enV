@@ -13,7 +13,12 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 
-export const Route = createFileRoute("/blog/")({ component: BlogIndex });
+export const Route = createFileRoute("/blog/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: search.view === "articles" ? "articles" as const : undefined,
+  }),
+  component: BlogIndex,
+});
 
 type LibraryView = "tools" | "articles";
 const PAGE_SIZE = 24;
@@ -24,7 +29,8 @@ function compareToolNames(a: { name: string; id: string }, b: { name: string; id
 }
 
 function BlogIndex() {
-  const [view, setView] = useState<LibraryView>("tools");
+  const { view: requestedView } = Route.useSearch();
+  const view: LibraryView = requestedView === "articles" ? "articles" : "tools";
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
@@ -67,11 +73,6 @@ function BlogIndex() {
 
   const visibleTools = matchingTools.slice(0, visibleCount);
 
-  function changeView(next: LibraryView) {
-    setView(next);
-    setVisibleCount(PAGE_SIZE);
-  }
-
   function changeQuery(value: string) {
     setQuery(value);
     setVisibleCount(PAGE_SIZE);
@@ -108,13 +109,12 @@ function BlogIndex() {
         {view === "tools" ? (
           <section id="tool-documentation-panel" aria-label="Tool documentation" className="pt-6">
             <div className="mb-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => changeView("articles")}
+              <a
+                href="/blog?view=articles"
                 className="text-sm font-semibold text-accent underline underline-offset-4 hover:text-fg"
               >
                 Browse product articles
-              </button>
+              </a>
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_12rem] md:gap-3">
@@ -228,13 +228,12 @@ function BlogIndex() {
         ) : (
           <section id="articles-panel" aria-label="Articles and product guides" className="pt-6">
             <div className="mb-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => changeView("tools")}
+              <a
+                href="/blog"
                 className="text-sm font-semibold text-accent underline underline-offset-4 hover:text-fg"
               >
                 Back to tool guides
-              </button>
+              </a>
             </div>
             <div className="max-w-3xl">
               <h2 className="text-2xl font-semibold tracking-tight text-fg">Articles &amp; product guides</h2>
