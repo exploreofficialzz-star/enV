@@ -46,6 +46,11 @@ try {
     .filter({ hasText: /Read the full guide/i })
     .first();
   await guideLink.waitFor({ state: "visible", timeout: 15_000 });
+  assert.equal(
+    await page.getByText("math matrix determinant", { exact: true }).count(),
+    0,
+    "Tool cards must not show a raw keyword-fragment description.",
+  );
 
   const href = await guideLink.getAttribute("href");
   assert.ok(href, "A visible guide entry must expose a destination URL.");
@@ -69,6 +74,11 @@ try {
   console.log("Direct URL guide probe:", JSON.stringify(directProbe));
   assert.equal(directResponse?.status(), 200, `The direct guide route must return HTTP 200: ${href}`);
   await directPage.getByRole("heading", { name: /documentation and usage guide/i }).waitFor({ timeout: 15_000 });
+  assert.equal(
+    await directPage.getByText("math matrix determinant", { exact: true }).count(),
+    0,
+    "Tool guide content must not display a raw keyword-fragment description.",
+  );
   await directPage.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
   await directPage.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
   await directPage.close();
