@@ -35,6 +35,7 @@ for (const path of ['/blog', '/help', '/tokens']) assert.ok(!footer.includes(pat
 for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety', 'designing-tools-that-feel-simple']) {
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
 }
+assert.ok(blogIndex.includes('validateSearch') && blogIndex.includes('href="/blog?view=articles"'), 'The articles view must be addressable through a direct URL.');
 assert.ok(blogIndex.includes('grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_12rem] md:gap-3'), 'Category and status filters must share a row on mobile and desktop.');
 const filterStart = blogIndex.indexOf('aria-label="Filter by category"');
 const filterEnd = blogIndex.indexOf('Tool reference library', filterStart);
