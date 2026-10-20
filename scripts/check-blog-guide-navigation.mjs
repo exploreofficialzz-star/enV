@@ -22,6 +22,25 @@ try {
   });
   assert.equal(indexResponse?.status(), 200, "The Blogs & Guides index must load successfully.");
 
+  async function assertFiltersShareOneRow(width, label) {
+    await page.setViewportSize({ width, height: 844 });
+    const category = page.locator('select[aria-label="Filter by category"]');
+    const status = page.locator('select[aria-label="Filter by status"]');
+    await category.waitFor({ state: "visible" });
+    await status.waitFor({ state: "visible" });
+    const [categoryBox, statusBox] = await Promise.all([category.boundingBox(), status.boundingBox()]);
+    assert.ok(categoryBox && statusBox, `${label}: both filters must have a visible layout box.`);
+    assert.ok(Math.abs(categoryBox.y - statusBox.y) < 2, `${label}: category and status filters must stay on the same row.`);
+    const customArrows = await page.locator(
+      'label:has(select[aria-label="Filter by category"]) svg, label:has(select[aria-label="Filter by status"]) svg',
+    ).count();
+    assert.equal(customArrows, 0, `${label}: use the native dropdown arrow without a duplicate custom chevron.`);
+  }
+
+  await assertFiltersShareOneRow(390, "Mobile");
+  await assertFiltersShareOneRow(1280, "Desktop");
+  await page.setViewportSize({ width: 390, height: 844 });
+
   const guideLink = page
     .locator('a[href^="/blog/tool-"]')
     .filter({ hasText: /Read the full guide/i })
@@ -95,6 +114,53 @@ try {
   }
 
   console.log(`PASS: Read the full guide navigated to ${href} and rendered the complete tool guide.`);
+
+  // Verify article detail URLs both load directly and open through the visible action.
+  await page.goto(new URL("/blog", baseUrl).href, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000,
+  });
+  await page.getByRole("button", { name: "Browse product articles" }).click();
+  const articleLink = page.locator('a[href^="/blog/"]').filter({ hasText: /Read article/i }).first();
+  await articleLink.waitFor({ state: "visible", timeout: 15_000 });
+  const articleHref = await articleLink.getAttribute("href");
+  assert.ok(articleHref, "A published article must expose a destination URL.");
+  assert.match(articleHref, /^\/blog\/[a-z0-9-]+$/i, "The article action must target an individual article URL.");
+  assert.doesNotMatch(articleHref, /^\/blog\/tool-/, "Article actions must not point to a tool guide.");
+  assert.equal(await page.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "Article cards must not show estimated reading time.");
+
+  const articleUrl = new URL(articleHref, baseUrl);
+  const directArticlePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const directArticleResponse = await directArticlePage.goto(articleUrl.href, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000,
+  });
+  assert.equal(directArticleResponse?.status(), 200, `The direct article route must return HTTP 200: ${articleHref}`);
+  const articleTitle = await directArticlePage.locator("h1").innerText();
+  assert.ok(articleTitle.trim().length > 0, "The article route must render a visible page title.");
+  assert.equal(await directArticlePage.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "Article detail pages must not show estimated reading time.");
+  await directArticlePage.close();
+
+  const articleResponsePromise = page.waitForResponse(
+    (response) => {
+      const responseUrl = new URL(response.url());
+      return response.request().isNavigationRequest()
+        && responseUrl.origin === articleUrl.origin
+        && responseUrl.pathname === articleUrl.pathname;
+    },
+    { timeout: 20_000 },
+  );
+  const articleUrlPromise = page.waitForURL(
+    (url) => url.origin === articleUrl.origin && url.pathname === articleUrl.pathname,
+    { timeout: 20_000 },
+  );
+  await articleLink.click();
+  const [articleResponse] = await Promise.all([articleResponsePromise, articleUrlPromise]);
+  assert.equal(articleResponse.status(), 200, `The article action must return HTTP 200: ${articleHref}`);
+  await page.locator("h1").waitFor({ state: "visible", timeout: 15_000 });
+  assert.equal(await page.getByText(/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i).count(), 0, "The opened article must not display estimated reading time.");
+  assert.deepEqual(pageErrors, [], "Guide and article navigation must not trigger client-side page errors.");
+  console.log(`PASS: Read article navigated to ${articleHref} and rendered the article page.`);
 } finally {
   await browser.close();
 }
