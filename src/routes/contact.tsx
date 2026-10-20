@@ -17,15 +17,23 @@ function Contact() {
 
         <section className="grid gap-4 sm:grid-cols-2" aria-label="Contact options">
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0C0C14] p-1.5">
+            <div className="flex min-h-[56px] items-center sm:min-h-[64px]">
               <img
-                src="/env-brand-mark-transparent.webp"
-                alt="enV brand logo"
-                width={40}
-                height={40}
-                className="h-10 w-10 object-contain"
+                src="/logo-home-transparent.png"
+                alt="enV logo"
+                width={813}
+                height={317}
+                className="h-[56px] w-[142px] object-contain dark:hidden sm:h-[64px] sm:w-[163px]"
               />
-            </span>
+              <img
+                src="/logo-home-dark.png"
+                alt=""
+                aria-hidden="true"
+                width={813}
+                height={317}
+                className="hidden h-[56px] w-[142px] object-contain dark:block sm:h-[64px] sm:w-[163px]"
+              />
+            </div>
             <h2 className="mt-4 text-lg font-semibold text-fg">enV product support</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
               For help using enV, bug reports, accessibility feedback, and suggestions about tools or workflows.
@@ -40,13 +48,13 @@ function Contact() {
           </article>
 
           <article className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-            <div className="flex h-12 w-full max-w-[190px] items-center justify-center rounded-xl border border-border bg-white px-2">
+            <div className="flex h-12 w-12 items-center justify-center">
               <img
-                src="/chas-technologies-logo-transparent.webp"
-                alt="chAs Technologies LLC logo"
-                width={180}
-                height={52}
-                className="h-auto max-h-11 w-full object-contain"
+                src="/env-brand-mark-transparent.webp"
+                alt="enV brand mark"
+                width={48}
+                height={48}
+                className="h-12 w-12 object-contain"
               />
             </div>
             <h2 className="mt-4 text-lg font-semibold text-fg">chAs Technologies LLC</h2>

@@ -163,8 +163,9 @@ test("company pages use the supplied brand, distinct contact emails, and transpa
   assert.match(about, /chas-technologies-logo-transparent\.webp/);
   assert.match(about, /chAs Technologies LLC/);
   assert.match(about, /registered in Delaware, USA/);
+  assert.match(contact, /logo-home-transparent\.png/);
+  assert.match(contact, /logo-home-dark\.png/);
   assert.match(contact, /env-brand-mark-transparent\.webp/);
-  assert.match(contact, /chas-technologies-logo-transparent\.webp/);
   assert.match(contact, /mailto:envtoolkit@gmail\.com/);
   assert.match(contact, /mailto:chastechnologiesllc@gmail\.com/);
   assert.match(pricing, /Before a metered operation/);
