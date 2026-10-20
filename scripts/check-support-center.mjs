@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 const requiredFiles = [
   'src/routes/blog.tsx',
+  'src/routes/blog.index.tsx',
   'src/routes/blog.$slug.tsx',
   'src/routes/help.tsx',
   'src/routes/tokens.tsx',
@@ -20,6 +21,8 @@ const read = (path) => readFileSync(path, 'utf8');
 const header = read('src/components/layout/header.tsx');
 const footer = read('src/components/layout/footer.tsx');
 const articles = read('src/data/blog-articles.ts');
+const blogIndex = read('src/routes/blog.index.tsx');
+const blogDetail = read('src/routes/blog.$slug.tsx');
 const help = read('src/routes/help.tsx');
 const tokens = read('src/routes/tokens.guide.tsx');
 const detail = read('src/routes/tokens.$toolId.tsx');
@@ -28,8 +31,18 @@ const security = read('docs/billing-offline-wallet-security.md');
 
 for (const path of ['/blog', '/help', '/tokens', '/tokens/guide']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
 for (const path of ['/blog', '/help', '/tokens']) assert.ok(!footer.includes(path), `compact footer must not duplicate navigation to ${path}`);
-for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety']) {
+for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety', 'designing-tools-that-feel-simple']) {
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
+}
+assert.ok(blogIndex.includes('grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_12rem] md:gap-3'), 'Category and status filters must share a row on mobile and desktop.');
+const filterMarkup = blogIndex.slice(blogIndex.indexOf('aria-label="Filter documentation by category"'), blogIndex.indexOf('Tool reference library'));
+assert.ok(filterMarkup.length > 0, 'Category and status filter markup must be present.');
+assert.ok(!filterMarkup.includes('ChevronDown'), 'Filter selects must not render duplicate custom dropdown arrows.');
+assert.ok(blogIndex.includes('href={"/blog/" + article.slug}'), 'Article links must use a direct article URL.');
+assert.ok(blogDetail.includes('createFileRoute("/blog/$slug")') && blogDetail.includes('getBlogArticle(params.slug)'), 'The article and guide detail route must resolve its slug.');
+for (const [label, source] of [['blog index', blogIndex], ['blog detail', blogDetail], ['article data', articles]]) {
+  assert.ok(!source.includes('readingMinutes'), `${label} must not define or render reading-time metadata.`);
+  assert.ok(!/\\b\\d+\\s*min(?:ute)?s?\\s+read\\b/i.test(source), `${label} must not show estimated reading-time labels.`);
 }
 for (const phrase of ['clear storage before syncing', 'automatic token deductions', 'How does enV prevent fraud?']) {
   assert.ok(help.toLowerCase().includes(phrase.toLowerCase()), `Help center must explain: ${phrase}`);
