@@ -13,12 +13,20 @@ const requireText = (path, fragments, label = path) => {
 const footer = requireText("src/components/layout/footer.tsx", ["<footer", "chAs Technologies LLC", "<Logo />", "Privacy", "Terms", "Disclaimer", "Responsible use"], "Web footer");
 if (["Token guide", "Help center", "Blog & guides", "Product", "Resources"].some(item => footer.includes(item))) errors.push("Product and Resources groups must be moved out of the web footer.");
 const header = requireText("src/components/layout/header.tsx", ["/account", "/wallet", "/about", "/tools", "/pricing", "/tokens", "/help", "/blog", "/contact", 'title: "Product"', 'title: "Resources"'], "Web overflow menu");
-const webMenu = header.split('<details className="group relative">')[1]?.split("</details>")[0] ?? "";
+const webMenu = header.match(/<details className="group relative"[^>]*>[\s\S]*?<\/details>/)?.[0] ?? "";
 for (const removed of ["Explore enV", "Product, help, and account links", 'to="/agent"', "AI Agent", "Search tools", "Sign in", "Create account", "/privacy", "/terms", "/disclaimer", "/responsible-use"]) {
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
 }
 if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) errors.push("Account must appear before Wallet at the top of the overflow menu.");
-for (const item of ["Desktop view", "Tablet view", "Install and create shortcut", "Settings", "Help & feedback"]) {
+const mobileViewPosition = webMenu.indexOf("Mobile view");
+const tabletViewPosition = webMenu.indexOf("Tablet view");
+const desktopViewPosition = webMenu.indexOf("Desktop view");
+if (!(mobileViewPosition >= 0 && mobileViewPosition < tabletViewPosition && tabletViewPosition < desktopViewPosition)) errors.push("View modes must be ordered Mobile, Tablet, then Desktop.");
+if (webMenu.includes("Select an active mode again") || webMenu.includes("overflow-y-auto") || webMenu.includes("max-h-")) errors.push("Overflow card must not include its removed reset hint or internal vertical scrolling.");
+if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)')) errors.push("Overflow menu must close after an outside click.");
+if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
+
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Install and create shortcut", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
 for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
@@ -29,12 +37,12 @@ const installPage = requireText("src/routes/install.tsx", ['createFileRoute("/in
 const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
 const installCapture = requireText("src/lib/pwa-install.ts", ["beforeinstallprompt", "appinstalled", "userChoice", "promptEnVInstallation"], "PWA install capture");
 if (!installCapture.includes("event.preventDefault()")) errors.push("PWA install prompt must preserve the browser-controlled installation flow.");
-const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode"], "Persistent display preferences");
+const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode", 'ViewMode = "mobile" | "tablet" | "desktop"', 'viewMode: "mobile"'], "Persistent display preferences");
 requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture"], "Root PWA installation capture");
 if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");
 if (!installPage.includes("browser\'s permission")) errors.push("Installation must remain under browser control.");
 if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must disclose that feedback is prepared in the user\'s email app.");
-if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Automatic display mode must restore the responsive viewport.");
+if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Mobile view must restore the responsive viewport.");
 
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/tokens.guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
