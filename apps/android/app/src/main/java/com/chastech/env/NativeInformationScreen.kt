@@ -944,7 +944,6 @@ private fun SocialLinksSection(brand: String) {
                             } else {
                                 "The Facebook profile for $owner has not been linked yet"
                             }
-                            role = androidx.compose.ui.semantics.Role.Button
                         },
                     contentAlignment = Alignment.Center,
                 ) {
