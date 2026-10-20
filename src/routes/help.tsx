@@ -348,7 +348,7 @@ const quickLinks = [
     description: "Send product feedback or ask for help.",
     icon: LifeBuoy,
   },
-];
+] as const;
 
 function HelpCenter() {
   const [search, setSearch] = useState("");
