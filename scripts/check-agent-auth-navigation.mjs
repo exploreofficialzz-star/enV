@@ -49,7 +49,11 @@ if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("i
 if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
 if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");
 
-const blogPage = requireText("src/routes/blog.tsx", [
+const blogLayout = requireText("src/routes/blog.tsx", [
+  'createFileRoute("/blog")',
+  "<Outlet />",
+], "Blogs & Guides route outlet");
+const blogPage = requireText("src/routes/blog.index.tsx", [
   "Blogs &amp; Guides",
   'placeholder="Search blogs, guides, and tools…"',
   "md:flex-row md:items-center md:justify-between",
@@ -59,6 +63,7 @@ const blogPage = requireText("src/routes/blog.tsx", [
   "Browse product articles",
   "Back to tool guides",
 ], "Web Blogs & Guides");
+if (blogLayout.includes("Outlet") && !blogLayout.includes("<Outlet />")) errors.push("Blogs & Guides parent route must render the selected index or guide child.");
 if (blogPage.includes("enV knowledge centre")) errors.push("Web Blogs & Guides must not show the removed knowledge-centre badge.");
 if (blogPage.includes('aria-label="Knowledge centre sections"')
   || blogPage.includes("Find documentation for a tool")

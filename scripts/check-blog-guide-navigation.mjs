@@ -48,6 +48,10 @@ try {
     visibleBody: (await directPage.locator("body").innerText().catch(() => "")).slice(0, 1_000),
   };
   console.log("Direct URL guide probe:", JSON.stringify(directProbe));
+  assert.equal(directResponse?.status(), 200, `The direct guide route must return HTTP 200: ${href}`);
+  await directPage.getByRole("heading", { name: /documentation and usage guide/i }).waitFor({ timeout: 15_000 });
+  await directPage.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
+  await directPage.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
   await directPage.close();
 
   const guideResponsePromise = page.waitForResponse(
