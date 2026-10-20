@@ -2227,9 +2227,9 @@ private struct NativeAboutInformationPage: View {
                 .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
 
-            NativeInfoSectionView(title: "A practical toolkit for everyday digital work", paragraphs: [
-                "enV brings useful tools, calculators, converters, generators, and creator and developer utilities together in one searchable workspace. Browse by category or search by task to find a tool that fits the work in front of you.",
-                "enV is available on the web and through dedicated Android and iOS apps. Many tools work on your device; features that need a server or external provider should be reviewed alongside the relevant tool guidance and our Privacy page.",
+            NativeInfoSectionView(title: "Tools for everyday digital work", paragraphs: [
+                "enV brings practical calculators, converters, generators, and creator and developer utilities into one searchable workspace. Browse by category or search for the task you need to complete.",
+                "Use enV on the web, Android, or iOS. Many tools run directly on your device; for connected features, review the tool-specific guidance and our Privacy page before proceeding.",
             ], titleSize: 20)
 
             VStack(alignment: .leading, spacing: 10) {
@@ -2273,11 +2273,8 @@ private struct NativeAboutInformationPage: View {
 
 private struct NativeSocialProfile: Identifiable {
     let platform: String
-    let detail: String
     let url: String?
-    let glyph: String
-    let background: Color
-    let foreground: Color
+    let assetName: String
     var id: String { platform }
 }
 
@@ -2287,79 +2284,75 @@ private struct NativeSocialLinksSection: View {
     private var profiles: [NativeSocialProfile] {
         if brand == "enV" {
             return [
-                NativeSocialProfile(platform: "X", detail: "@envtoolz", url: "https://x.com/envtoolz", glyph: "𝕏", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
-                NativeSocialProfile(platform: "Instagram", detail: "@envtools.store", url: "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", glyph: "◎", background: Color(red: 0.99, green: 0.90, blue: 0.95), foreground: Color(red: 0.76, green: 0.21, blue: 0.49)),
-                NativeSocialProfile(platform: "TikTok", detail: "@envtools.store", url: "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", glyph: "♪", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
-                NativeSocialProfile(platform: "YouTube", detail: "@envtoolz", url: "https://www.youtube.com/@envtoolz", glyph: "▶", background: Color(red: 1.0, green: 0.0, blue: 0.2), foreground: .white),
-                NativeSocialProfile(platform: "Facebook", detail: "Profile link coming soon", url: nil, glyph: "f", background: Color(red: 0.86, green: 0.92, blue: 1.0), foreground: Color(red: 0.03, green: 0.40, blue: 0.96))
+                NativeSocialProfile(platform: "X", url: "https://x.com/envtoolz", assetName: "SocialX"),
+                NativeSocialProfile(platform: "Instagram", url: "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", assetName: "SocialInstagram"),
+                NativeSocialProfile(platform: "TikTok", url: "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", assetName: "SocialTikTok"),
+                NativeSocialProfile(platform: "YouTube", url: "https://www.youtube.com/@envtoolz", assetName: "SocialYouTube"),
+                NativeSocialProfile(platform: "Facebook", url: nil, assetName: "SocialFacebook")
             ]
         }
         return [
-            NativeSocialProfile(platform: "Facebook", detail: "chAs Technologies LLC", url: "https://www.facebook.com/share/1GfoVk8MZK/", glyph: "f", background: Color(red: 0.03, green: 0.40, blue: 0.96), foreground: .white),
-            NativeSocialProfile(platform: "TikTok", detail: "@chastechnologiesllc", url: "https://www.tiktok.com/@chastechnologiesllc", glyph: "♪", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
-            NativeSocialProfile(platform: "X", detail: "@chAstechllc", url: "https://x.com/chAstechllc", glyph: "𝕏", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
-            NativeSocialProfile(platform: "WhatsApp", detail: "Official channel", url: "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", glyph: "☎", background: Color(red: 0.15, green: 0.83, blue: 0.38), foreground: .white),
-            NativeSocialProfile(platform: "Instagram", detail: "@chastechnologiesllc", url: "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", glyph: "◎", background: Color(red: 0.99, green: 0.90, blue: 0.95), foreground: Color(red: 0.76, green: 0.21, blue: 0.49)),
-            NativeSocialProfile(platform: "LinkedIn", detail: "chAs Technologies LLC", url: "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", glyph: "in", background: Color(red: 0.04, green: 0.40, blue: 0.76), foreground: .white),
-            NativeSocialProfile(platform: "Snapchat", detail: "@chastechllc", url: "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", glyph: "👻", background: Color(red: 1.0, green: 0.99, blue: 0.0), foreground: Color(red: 0.08, green: 0.08, blue: 0.08)),
-            NativeSocialProfile(platform: "YouTube", detail: "@chAsTechnologiesLLC", url: "https://www.youtube.com/@chAsTechnologiesLLC", glyph: "▶", background: Color(red: 1.0, green: 0.0, blue: 0.2), foreground: .white)
+            NativeSocialProfile(platform: "Facebook", url: "https://www.facebook.com/share/1GfoVk8MZK/", assetName: "SocialFacebook"),
+            NativeSocialProfile(platform: "TikTok", url: "https://www.tiktok.com/@chastechnologiesllc", assetName: "SocialTikTok"),
+            NativeSocialProfile(platform: "X", url: "https://x.com/chAstechllc", assetName: "SocialX"),
+            NativeSocialProfile(platform: "WhatsApp", url: "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", assetName: "SocialWhatsApp"),
+            NativeSocialProfile(platform: "Instagram", url: "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", assetName: "SocialInstagram"),
+            NativeSocialProfile(platform: "LinkedIn", url: "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", assetName: "SocialLinkedIn"),
+            NativeSocialProfile(platform: "Snapchat", url: "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", assetName: "SocialSnapchat"),
+            NativeSocialProfile(platform: "YouTube", url: "https://www.youtube.com/@chAsTechnologiesLLC", assetName: "SocialYouTube")
         ]
     }
 
+    private var description: String {
+        brand == "enV"
+            ? "Follow the enV channels for product updates, new tools, tips, and announcements."
+            : "Connect with the team behind enV for company updates, partnerships, and news."
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             enVCharacterSpacedText(brand == "enV" ? "Follow enV" : "Follow chAs Technologies LLC")
                 .font(.envScaled(size: 17, weight: .semibold))
                 .foregroundStyle(Color.envInk)
-            enVCharacterSpacedText(brand == "enV" ? "Product updates, new tools, tips, and announcements." : "Company updates, partnerships, and news from the team behind enV.")
+            enVCharacterSpacedText(description)
                 .font(.envScaled(size: 14, weight: .regular))
                 .foregroundStyle(Color.envMuted)
-            VStack(spacing: 8) {
-                ForEach(profiles) { profile in
-                    if let rawURL = profile.url, let url = URL(string: rawURL) {
-                        Link(destination: url) {
-                            socialRow(profile)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(profiles) { profile in
+                        if let rawURL = profile.url, let url = URL(string: rawURL) {
+                            Link(destination: url) {
+                                socialIcon(profile)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Follow " + brand + " on " + profile.platform)
+                        } else {
+                            socialIcon(profile)
+                                .opacity(0.42)
+                                .accessibilityLabel("The Facebook profile for " + brand + " has not been linked yet")
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        socialRow(profile).opacity(0.72)
+                        if profile.id != profiles.last?.id {
+                            Spacer(minLength: 32)
+                        }
                     }
                 }
+                .frame(width: 736, alignment: .leading)
+                .padding(.horizontal, 32)
+                .frame(width: 800, alignment: .leading)
             }
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
     }
 
-    private func socialRow(_ profile: NativeSocialProfile) -> some View {
-        HStack(spacing: 12) {
-            Text(profile.glyph)
-                .font(.system(size: profile.platform == "LinkedIn" ? 14 : 19, weight: .bold))
-                .foregroundStyle(profile.foreground)
-                .frame(width: 40, height: 40)
-                .background(profile.background, in: RoundedRectangle(cornerRadius: 11))
-            VStack(alignment: .leading, spacing: 2) {
-                enVCharacterSpacedText(profile.platform)
-                    .font(.envScaled(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.envInk)
-                enVCharacterSpacedText(profile.detail)
-                    .font(.envScaled(size: 12, weight: .regular))
-                    .foregroundStyle(Color.envMuted)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            if profile.url != nil {
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.envMuted)
-            }
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    private func socialIcon(_ profile: NativeSocialProfile) -> some View {
+        Image(profile.assetName)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 48, height: 48)
+            .foregroundStyle(Color.envInk)
+            .frame(width: 64, height: 64)
+            .contentShape(Rectangle())
     }
 }
 
@@ -2429,8 +2422,8 @@ private struct NativePricingInformationPage: View {
 private struct NativeContactInformationPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            NativeInfoSectionView(title: nil, paragraphs: [
-                "Have a question, found something we can improve, or want to discuss working together? Choose the contact route that best fits your message."
+            NativeInfoSectionView(title: "Contact the right team", paragraphs: [
+                "Contact enV product support for help using the toolkit, bug reports, accessibility feedback, or suggestions. For business proposals, partnerships, and company matters, contact chAs Technologies LLC."
             ])
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 16) {
