@@ -44,7 +44,7 @@ function About() {
 
         <section className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
           <div className="grid items-center gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="rounded-xl border border-border bg-white p-3">
+            <div className="flex items-center">
               <img
                 src="/chas-technologies-logo-transparent.webp"
                 alt="chAs Technologies LLC logo"
