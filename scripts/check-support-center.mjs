@@ -35,8 +35,11 @@ for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
 }
 assert.ok(blogIndex.includes('grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_12rem] md:gap-3'), 'Category and status filters must share a row on mobile and desktop.');
-const filterMarkup = blogIndex.slice(blogIndex.indexOf('aria-label="Filter documentation by category"'), blogIndex.indexOf('Tool reference library'));
-assert.ok(filterMarkup.length > 0, 'Category and status filter markup must be present.');
+const filterStart = blogIndex.indexOf('aria-label="Filter by category"');
+const filterEnd = blogIndex.indexOf('Tool reference library', filterStart);
+assert.ok(filterStart >= 0 && filterEnd > filterStart, 'Category and status filter markup must be present.');
+const filterMarkup = blogIndex.slice(filterStart, filterEnd);
+assert.ok(filterMarkup.includes('aria-label="Filter by status"'), 'The status filter must appear beside the category filter.');
 assert.ok(!filterMarkup.includes('ChevronDown'), 'Filter selects must not render duplicate custom dropdown arrows.');
 assert.ok(blogIndex.includes('href={"/blog/" + article.slug}'), 'Article links must use a direct article URL.');
 assert.ok(blogDetail.includes('createFileRoute("/blog/$slug")') && blogDetail.includes('getBlogArticle(params.slug)'), 'The article and guide detail route must resolve its slug.');
