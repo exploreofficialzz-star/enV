@@ -563,9 +563,9 @@ function Account() {
         <p className="mb-4 text-sm leading-6 text-muted">Manage your balance, tokens, rewards and more.</p>
 
         <section className="space-y-2.5" aria-label="Wallet overview">
-          <div className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-5 text-white shadow-sm sm:p-6">
+          <div className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-6 text-white shadow-sm sm:p-7">
             <div className="relative flex items-center gap-2.5 sm:gap-3">
-              <span className="grid size-12 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-14"><Wallet size={25} aria-hidden="true"/></span>
+              <span className="grid size-13 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-16"><Wallet size={28} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
                   <span>Total balance</span>
