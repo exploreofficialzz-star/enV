@@ -8,6 +8,7 @@ import { searchTools } from "@/lib/search";
 import {
   toolCategoryLabel,
   toolDocumentationPath,
+  toolDocumentationSummary,
   toolExecutionLabel,
   toolStatusLabel,
 } from "@/lib/tool-documentation";
@@ -185,7 +186,7 @@ function BlogIndex() {
                         {tool.name}
                       </a>
                     </h4>
-                    <p className="mt-2 flex-1 text-sm leading-6 text-muted">{tool.description}</p>
+                    <p className="mt-2 flex-1 text-sm leading-6 text-muted">{toolDocumentationSummary(tool)}</p>
                     <p className="mt-3 text-xs leading-5 text-subtle">
                       Processing: {toolExecutionLabel(tool)}
                     </p>
