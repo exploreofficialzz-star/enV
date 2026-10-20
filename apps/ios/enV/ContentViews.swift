@@ -1918,11 +1918,11 @@ private struct NativeWalletDashboardView: View {
         onToggleVisibility: @escaping () -> Void,
         onAddFunds: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "wallet.pass.fill")
-                .font(.system(size: 26, weight: .medium))
+                .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(width: 48, height: 48)
                 .background(Color.white.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
@@ -1938,7 +1938,7 @@ private struct NativeWalletDashboardView: View {
                     .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
                 }
                 Text(showBalance ? available.map { tokenCurrency($0) } ?? "$0.000" : "••••••")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+                    .font(.system(size: 35, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
                     Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
                     styledEnVUnit(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV", unitSize: 9)
@@ -1949,7 +1949,7 @@ private struct NativeWalletDashboardView: View {
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 8) {
                 NativeWalletSparklineView(color: Color(red: 0.30, green: 1.0, blue: 0.80))
-                    .frame(width: 62, height: 32)
+                    .frame(width: 72, height: 38)
                 Button(action: onAddFunds) {
                     Label("Add funds", systemImage: "arrow.up.right")
                         .font(.caption.weight(.semibold))
@@ -1961,7 +1961,7 @@ private struct NativeWalletDashboardView: View {
                 .contentShape(Rectangle())
             }
         }
-        .padding(14)
+        .padding(17)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(LinearGradient(colors: [Color(red: 0.09, green: 0.27, blue: 0.69), Color(red: 0.02, green: 0.22, blue: 0.31), Color(red: 0.0, green: 0.59, blue: 0.42)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 23).stroke(Color(red: 0.22, green: 0.95, blue: 0.75).opacity(0.36), lineWidth: 1))
