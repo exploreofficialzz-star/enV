@@ -563,9 +563,9 @@ function Account() {
         <p className="mb-4 text-sm leading-6 text-muted">Manage your balance, tokens, rewards and more.</p>
 
         <section className="space-y-2.5" aria-label="Wallet overview">
-          <div className="relative overflow-hidden rounded-[20px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-3 text-white shadow-sm sm:p-4">
+          <div className="relative overflow-hidden rounded-[22px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-4 text-white shadow-sm sm:p-5">
             <div className="relative flex items-center gap-2.5 sm:gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-11"><Wallet size={21} aria-hidden="true"/></span>
+              <span className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-12"><Wallet size={23} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
                   <span>Total balance</span>
@@ -573,12 +573,12 @@ function Account() {
                     {showBalance ? <Eye size={16} aria-hidden="true"/> : <EyeOff size={16} aria-hidden="true"/>}
                   </button>
                 </div>
-                <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{showBalance ? tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "••••••"}</p>
+                <p className="mt-0.5 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{showBalance ? tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "••••••"}</p>
                 <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true"/><span>{tokenUnitDisplay(showBalance ? "≈ " + (visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " enV" : "•••• enV")}</span></p>
                 <p className="mt-0.5 text-[10px] text-white/75 sm:text-xs">{showBalance ? "Estimated token value " + ((visibleWallet?.availableTokens ?? 0) * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "Estimated token value ••••••"}</p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <svg viewBox="0 0 120 64" className="h-8 w-16 sm:h-10 sm:w-20" fill="none" aria-label="Upward token trend">
+                <svg viewBox="0 0 120 64" className="h-9 w-[4.5rem] sm:h-11 sm:w-24" fill="none" aria-label="Upward token trend">
                   <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } void startFundingCheckout(); }} disabled={fundingBusy} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-2.5 py-2 text-xs font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-3">

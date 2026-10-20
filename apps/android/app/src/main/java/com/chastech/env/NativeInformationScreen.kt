@@ -582,16 +582,16 @@ private fun NativeWalletHero(
     onToggleVisibility: () -> Unit,
     onAddFunds: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(22.dp)
     Box(
         Modifier.fillMaxWidth()
             .background(Brush.linearGradient(listOf(Color(0xFF1747AF), Color(0xFF07384D), Color(0xFF00A77D))), shape)
             .border(BorderStroke(1.dp, Color(0xFF3DEBC2).copy(alpha = 0.35f)), shape)
-            .padding(10.dp),
+            .padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(42.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                EnVIcon("Wallet", Modifier.size(24.dp), tint = Color.White)
+            Box(Modifier.size(46.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                EnVIcon("Wallet", Modifier.size(26.dp), tint = Color.White)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -619,7 +619,7 @@ private fun NativeWalletHero(
                 Text("Estimated token value " + (availableTokens?.let { (it * 0.01).formatWalletTokens() } ?: "0.000"), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                NativeWalletSparkline(Modifier.size(width = 64.dp, height = 34.dp), Color(0xFF52FFD0))
+                NativeWalletSparkline(Modifier.size(width = 76.dp, height = 40.dp), Color(0xFF52FFD0))
                 Button(onClick = onAddFunds, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp)) {
                     Text("Add funds", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 }
