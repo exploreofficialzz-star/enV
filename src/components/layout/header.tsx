@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   Check,
@@ -12,11 +12,14 @@ import {
   Monitor,
   MoreVertical,
   Settings as SettingsIcon,
-  Tablet,
+  Smartphone,
   UserRound,
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { usePrefs } from "@/lib/storage";
+
+const MENU_ITEM_CLASS = "flex min-h-8 w-full items-center gap-2.5 rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const MENU_HEADING_CLASS = "px-3 pb-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-accent";
 
 const MENU_GROUPS = [
   { title: "Product", links: [
@@ -38,12 +41,55 @@ export function Header() {
   const isWalletPage = pathname === "/wallet";
   const user = useCurrentUser();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuTop, setMenuTop] = useState(64);
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
   const viewMode = usePrefs((state) => state.viewMode);
   const setViewMode = usePrefs((state) => state.setViewMode);
 
-  function chooseViewMode(mode: "desktop" | "tablet") {
-    setViewMode(viewMode === mode ? "auto" : mode);
+  function chooseViewMode(mode: "mobile" | "tablet" | "desktop") {
+    setViewMode(mode);
   }
+
+  useEffect(() => {
+    const closeFromOutside = (event: PointerEvent) => {
+      const menu = menuRef.current;
+      if (menu?.open && !menu.contains(event.target as Node)) {
+        menu.removeAttribute("open");
+        setMenuOpen(false);
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const menu = menuRef.current;
+      if (!menu?.open) return;
+      menu.removeAttribute("open");
+      setMenuOpen(false);
+      menu.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const updatePosition = () => {
+      const anchor = menuRef.current?.querySelector("summary");
+      const panel = menuPanelRef.current;
+      if (!anchor || !panel) return;
+      const preferredTop = anchor.getBoundingClientRect().bottom + 8;
+      const maximumTop = window.innerHeight - panel.getBoundingClientRect().height - 8;
+      setMenuTop(Math.max(8, Math.min(preferredTop, maximumTop)));
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    return () => window.removeEventListener("resize", updatePosition);
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-30 bg-bg/95 backdrop-blur-md">
@@ -76,51 +122,43 @@ export function Header() {
               <Link to="/tools" search={{ q: "" }} aria-label="Tools" title="Tools" className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                 <LayoutGrid className="size-6" strokeWidth={2.4} />
               </Link>
-              <details className="group relative">
-                <summary aria-label="More options" title="More options" className="flex size-10 list-none cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+              <details ref={menuRef} className="group relative" onToggle={(event) => setMenuOpen(event.currentTarget.open)}>
+                <summary aria-label="More options" title="More options" aria-expanded={menuOpen} className="flex size-10 list-none cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
                   <MoreVertical className="size-6" strokeWidth={2.4} />
                 </summary>
-                <div role="group" aria-label="More navigation" className="absolute right-0 top-full z-50 mt-2 max-h-[min(78dvh,760px)] w-[min(88vw,520px)] overflow-y-auto rounded-[2rem] border border-border bg-surface p-4 shadow-2xl">
-                  <section className="border-b border-border px-1 py-2" aria-label="Account">
-                    <Link to="/account" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Account</Link>
-                    <Link to="/wallet" onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-fg transition-colors hover:bg-surface-2">Wallet</Link>
+                <div ref={menuPanelRef} role="group" aria-label="More navigation" style={{ top: menuTop }} className="fixed right-3 z-50 w-[min(calc(100vw-1.5rem),420px)] rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+                  <section className="border-b border-border px-1 py-1" aria-label="Account">
+                    <Link to="/account" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Account</Link>
+                    <Link to="/wallet" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Wallet</Link>
                   </section>
-
-                  <section className="border-b border-border px-1 py-3" aria-label="View mode">
-                    <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">View mode</h2>
-                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                      <Monitor size={19} aria-hidden="true" />
-                      <span className="min-w-0 flex-1">Desktop view</span>
-                      {viewMode === "desktop" ? <Check size={18} className="text-accent" aria-hidden="true" /> : null}
+                  <section className="border-b border-border px-1 py-1" aria-label="View mode">
+                    <h2 className={MENU_HEADING_CLASS}>View mode</h2>
+                    <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                      <Smartphone size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Mobile view</span>
+                      {viewMode === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                      <Tablet size={19} aria-hidden="true" />
-                      <span className="min-w-0 flex-1">Tablet view</span>
-                      {viewMode === "tablet" ? <Check size={18} className="text-accent" aria-hidden="true" /> : null}
+                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                      <Monitor size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Tablet view</span>
+                      {viewMode === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <p className="px-4 pt-1 text-xs leading-5 text-subtle">Select an active mode again to return to Automatic.</p>
+                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                      <Monitor size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Desktop view</span>
+                      {viewMode === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                    </button>
                   </section>
-
                   {MENU_GROUPS.map((group) => (
-                    <section key={group.title} className="border-b border-border px-1 py-3 last:border-b-0" aria-label={group.title}>
-                      <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">{group.title}</h2>
+                    <section key={group.title} className="border-b border-border px-1 py-1 last:border-b-0" aria-label={group.title}>
+                      <h2 className={MENU_HEADING_CLASS}>{group.title}</h2>
                       {group.links.map((link) => (
-                        <Link key={link.to} to={link.to} onClick={closeMenu} className="block min-h-12 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">{link.label}</Link>
+                        <Link key={link.to} to={link.to} onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>{link.label}</Link>
                       ))}
                     </section>
                   ))}
-
-                  <section className="border-b border-border px-1 py-3 last:border-b-0" aria-label="Preferences and support">
-                    <h2 className="px-4 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-subtle">Preferences & support</h2>
-                    <Link to="/install" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
-                      <Download size={18} aria-hidden="true" /><span>Install and create shortcut</span>
-                    </Link>
-                    <Link to="/settings" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
-                      <SettingsIcon size={18} aria-hidden="true" /><span>Settings</span>
-                    </Link>
-                    <Link to="/help-feedback" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-base text-muted transition-colors hover:bg-surface-2 hover:text-fg">
-                      <MessageCircle size={18} aria-hidden="true" /><span>Help & feedback</span>
-                    </Link>
+                  <section className="px-1 py-1" aria-label="Preferences and support">
+                    <h2 className={MENU_HEADING_CLASS}>Preferences &amp; support</h2>
+                    <Link to="/install" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><Download size={16} aria-hidden="true" /><span>Install and create shortcut</span></Link>
+                    <Link to="/settings" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><SettingsIcon size={16} aria-hidden="true" /><span>Settings</span></Link>
+                    <Link to="/help-feedback" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><MessageCircle size={16} aria-hidden="true" /><span>Help & feedback</span></Link>
                   </section>
                 </div>
               </details>

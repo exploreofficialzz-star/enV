@@ -13,7 +13,7 @@ const requireText = (path, fragments, label = path) => {
 const footer = requireText("src/components/layout/footer.tsx", ["<footer", "chAs Technologies LLC", "<Logo />", "Privacy", "Terms", "Disclaimer", "Responsible use"], "Web footer");
 if (["Token guide", "Help center", "Blog & guides", "Product", "Resources"].some(item => footer.includes(item))) errors.push("Product and Resources groups must be moved out of the web footer.");
 const header = requireText("src/components/layout/header.tsx", ["/account", "/wallet", "/about", "/tools", "/pricing", "/tokens", "/help", "/blog", "/contact", 'title: "Product"', 'title: "Resources"'], "Web overflow menu");
-const webMenu = header.match(/<details className="group relative"[^>]*>[\s\S]*?<\/details>/)?.[0] ?? "";
+const webMenu = header.match(/<details\b[^>]*className="group relative"[^>]*>[\s\S]*?<\/details>/)?.[0] ?? "";
 for (const removed of ["Explore enV", "Product, help, and account links", 'to="/agent"', "AI Agent", "Search tools", "Sign in", "Create account", "/privacy", "/terms", "/disclaimer", "/responsible-use"]) {
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
 }

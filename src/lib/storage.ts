@@ -9,7 +9,7 @@ const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1, viewport-fit=cove
 const MAX_RECENT = 24;
 
 export type ThemePreference = "system" | "light" | "dark";
-export type ViewMode = "auto" | "desktop" | "tablet";
+export type ViewMode = "mobile" | "tablet" | "desktop";
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
@@ -43,7 +43,7 @@ export function applyViewMode(mode: ViewMode): void {
   const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
   if (!viewport) return;
 
-  if (mode === "auto") {
+  if (mode === "mobile") {
     viewport.content = DEFAULT_VIEWPORT;
     return;
   }
@@ -147,7 +147,7 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   usageCounts: {},
   theme: "light",
   themePreference: "system",
-  viewMode: "auto",
+  viewMode: "mobile",
   hydrated: false,
   storageAvailable: false,
   storageError: null,
@@ -163,9 +163,10 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         : themePreference;
     const storedViewMode = storage?.getItem(VIEW_MODE_KEY);
     const viewMode: ViewMode =
-      storedViewMode === "desktop" || storedViewMode === "tablet" ? storedViewMode : "auto";
+      storedViewMode === "desktop" || storedViewMode === "tablet" || storedViewMode === "mobile" ? storedViewMode : "mobile";
 
     document.documentElement.classList.toggle("dark", theme === "dark");
+    if (storage && storedViewMode !== viewMode) writeSetting(VIEW_MODE_KEY, viewMode);
     applyViewMode(viewMode);
     set({
       favorites: readList(FAV_KEY),

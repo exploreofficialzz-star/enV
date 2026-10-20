@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check, Monitor, Moon, Settings as SettingsIcon, Sun, Tablet, RotateCcw } from "lucide-react";
+import { Check, Monitor, Moon, Settings as SettingsIcon, Smartphone, Sun, Tablet, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { usePrefs, type ThemePreference, type ViewMode } from "@/lib/storage";
 
@@ -12,7 +12,7 @@ const themeOptions: { value: ThemePreference; title: string; description: string
 ];
 
 const viewOptions: { value: ViewMode; title: string; description: string; icon: typeof Monitor }[] = [
-  { value: "auto", title: "Automatic", description: "Adapt to the size of your current screen.", icon: Monitor },
+  { value: "mobile", title: "Mobile view", description: "Use a compact, phone-width layout.", icon: Smartphone },
   { value: "tablet", title: "Tablet view", description: "Use a tablet-width layout where practical.", icon: Tablet },
   { value: "desktop", title: "Desktop view", description: "Request a desktop-width layout on smaller screens.", icon: Monitor },
 ];
@@ -27,7 +27,7 @@ function Settings() {
 
   function resetPreferences() {
     setThemePreference("system");
-    setViewMode("auto");
+    setViewMode("mobile");
   }
 
   return (
