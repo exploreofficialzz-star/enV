@@ -133,6 +133,16 @@ try {
 
   console.log(`PASS: Read the full guide navigated to ${href} and rendered the complete tool guide.`);
 
+  // The article listing must also be addressable directly and remain correct on refresh.
+  const directArticleIndex = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const directArticleIndexResponse = await directArticleIndex.goto(new URL("/blog?view=articles", baseUrl).href, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000,
+  });
+  assert.equal(directArticleIndexResponse?.status(), 200, "The direct article-listing URL must return HTTP 200.");
+  await directArticleIndex.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
+  await directArticleIndex.close();
+
   // Verify article detail URLs both load directly and open through the visible action.
   // Return through the guide's in-app navigation so the next interaction follows
   // the same hydrated client-side journey a reader uses.
@@ -141,7 +151,20 @@ try {
     (url) => url.origin === baseUrl.origin && (url.pathname === "/blog" || url.pathname === "/blog/"),
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Browse product articles" }).click();
+  const articleViewResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().isNavigationRequest()
+      && url.origin === baseUrl.origin
+      && url.pathname.replace(/\\/$/, "") === "/blog"
+      && url.searchParams.get("view") === "articles";
+  }, { timeout: 20_000 });
+  await page.getByRole("link", { name: "Browse product articles", exact: true }).click();
+  const articleViewResponse = await articleViewResponsePromise;
+  assert.equal(articleViewResponse.status(), 200, "The articles listing URL must return HTTP 200.");
+  await page.waitForURL(
+    (url) => url.origin === baseUrl.origin && url.pathname.replace(/\\/$/, "") === "/blog" && url.searchParams.get("view") === "articles",
+    { timeout: 15_000 },
+  );
   await page.getByRole("heading", { name: "Articles & product guides", exact: true }).waitFor({ timeout: 15_000 });
   const articleLink = page.getByRole("link", { name: /Read article/i }).first();
   await articleLink.waitFor({ state: "visible", timeout: 15_000 });
