@@ -136,8 +136,10 @@ try {
     timeout: 30_000,
   });
   assert.equal(directArticleResponse?.status(), 200, `The direct article route must return HTTP 200: ${articleHref}`);
-  const articleTitle = await directArticlePage.locator("h1").innerText();
-  assert.ok(articleTitle.trim().length > 0, "The article route must render a visible page title.");
+  await directArticlePage.getByRole("heading", {
+    name: "A privacy-first approach to everyday online tools",
+    exact: true,
+  }).waitFor({ timeout: 15_000 });
   assert.equal(await directArticlePage.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "Article detail pages must not show estimated reading time.");
   await directArticlePage.close();
 
@@ -157,7 +159,10 @@ try {
   await articleLink.click();
   const [articleResponse] = await Promise.all([articleResponsePromise, articleUrlPromise]);
   assert.equal(articleResponse.status(), 200, `The article action must return HTTP 200: ${articleHref}`);
-  await page.locator("h1").waitFor({ state: "visible", timeout: 15_000 });
+  await page.getByRole("heading", {
+    name: "A privacy-first approach to everyday online tools",
+    exact: true,
+  }).waitFor({ timeout: 15_000 });
   assert.equal(await page.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "The opened article must not display estimated reading time.");
   assert.deepEqual(pageErrors, [], "Guide and article navigation must not trigger client-side page errors.");
   console.log(`PASS: Read article navigated to ${articleHref} and rendered the article page.`);
