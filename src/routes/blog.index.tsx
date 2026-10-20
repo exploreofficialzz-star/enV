@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, ChevronDown, Clock3, Search } from "lucide-react";
+import { ArrowRight, ChevronDown, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { BLOG_ARTICLES } from "@/data/blog-articles";
 import { getSearchableTools, categoryLabel, toolPath } from "@/lib/registry";
@@ -116,8 +116,8 @@ function BlogIndex() {
               </button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
-              <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_12rem] md:gap-3">
+              <label className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border border-border bg-surface px-3">
                 <span className="sr-only">Filter documentation by category</span>
                 <select
                   aria-label="Filter by category"
@@ -130,9 +130,8 @@ function BlogIndex() {
                     <option key={item} value={item}>{categoryLabel(item)}</option>
                   ))}
                 </select>
-                <ChevronDown size={16} className="shrink-0 text-muted" aria-hidden="true" />
               </label>
-              <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface px-3">
+              <label className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border border-border bg-surface px-3">
                 <span className="sr-only">Filter tools by status</span>
                 <select
                   aria-label="Filter by status"
@@ -145,7 +144,6 @@ function BlogIndex() {
                   <option value="beta">Beta</option>
                   <option value="planned">Planned</option>
                 </select>
-                <ChevronDown size={16} className="shrink-0 text-muted" aria-hidden="true" />
               </label>
             </div>
 
@@ -252,16 +250,15 @@ function BlogIndex() {
                     <span>{article.publishedLabel}</span>
                   </div>
                   <h3 className="mt-4 text-xl font-semibold leading-snug text-fg">
-                    <Link to="/blog/$slug" params={{ slug: article.slug }} className="hover:text-accent">
+                    <a href={"/blog/" + article.slug} className="hover:text-accent">
                       {article.title}
-                    </Link>
+                    </a>
                   </h3>
                   <p className="mt-3 flex-1 text-sm leading-6 text-muted">{article.summary}</p>
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted">
-                    <span className="inline-flex items-center gap-1.5"><Clock3 size={14} aria-hidden="true" /> {article.readingMinutes} min read</span>
-                    <Link to="/blog/$slug" params={{ slug: article.slug }} className="inline-flex items-center gap-1.5 font-semibold text-accent">
+                  <div className="mt-5 flex justify-end border-t border-border pt-4">
+                    <a href={"/blog/" + article.slug} className="inline-flex items-center gap-1.5 font-semibold text-accent">
                       Read article <ArrowRight size={14} aria-hidden="true" />
-                    </Link>
+                    </a>
                   </div>
                 </article>
               ))}
