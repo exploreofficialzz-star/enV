@@ -35,24 +35,24 @@ export function SocialLinks({ brand }: { brand: "env" | "chas" }) {
         {isEnv ? "Follow enV" : "Follow chAs Technologies LLC"}
       </h2>
       <p className="max-w-3xl text-sm leading-6 text-muted">{description}</p>
-      <div className="overflow-x-auto" role="list" aria-label={`Social platforms for ${owner}`}>
-        <div className="flex h-20 w-[800px] max-w-none flex-nowrap items-center justify-between px-8">
+      <div className="w-full" role="list" aria-label={`Social platforms for ${owner}`}>
+        <div className="flex h-10 w-full flex-nowrap items-center">
           {items.map((item) => {
             const icon = (
               <img
                 src={`/social-icons/${item.platform}.svg`}
                 alt=""
                 aria-hidden="true"
-                width={48}
-                height={48}
+                width={20}
+                height={20}
                 loading="lazy"
-                className="h-12 w-12 object-contain dark:invert"
+                className="h-5 w-5 object-contain dark:invert"
               />
             );
             if (!item.href) {
               return (
                 <span key={item.platform} role="listitem"
-                  className="inline-flex h-16 w-16 shrink-0 cursor-not-allowed items-center justify-center opacity-40"
+                  className="inline-flex h-10 min-w-0 flex-1 items-center justify-center opacity-40"
                   aria-label={`The ${item.label} profile for ${owner} has not been linked yet`}
                   title={`${item.label} profile link coming soon`}>
                   {icon}
@@ -62,7 +62,7 @@ export function SocialLinks({ brand }: { brand: "env" | "chas" }) {
             return (
               <a key={item.platform} role="listitem" href={item.href} target="_blank" rel="noopener noreferrer"
                 aria-label={`Follow ${owner} on ${item.label}`} title={item.label}
-                className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-md text-fg outline-offset-4 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                className="inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-md text-fg outline-offset-2 transition-opacity hover:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
                 {icon}
               </a>
             );

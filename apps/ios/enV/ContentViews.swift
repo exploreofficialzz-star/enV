@@ -2317,9 +2317,9 @@ private struct NativeSocialLinksSection: View {
             enVCharacterSpacedText(description)
                 .font(.envScaled(size: 14, weight: .regular))
                 .foregroundStyle(Color.envMuted)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(profiles) { profile in
+            HStack(spacing: 0) {
+                ForEach(profiles) { profile in
+                    Group {
                         if let rawURL = profile.url, let url = URL(string: rawURL) {
                             Link(destination: url) {
                                 socialIcon(profile)
@@ -2331,15 +2331,11 @@ private struct NativeSocialLinksSection: View {
                                 .opacity(0.42)
                                 .accessibilityLabel("The Facebook profile for " + brand + " has not been linked yet")
                         }
-                        if profile.id != profiles.last?.id {
-                            Spacer(minLength: 32)
-                        }
                     }
+                    .frame(maxWidth: .infinity, minHeight: 40)
                 }
-                .frame(width: 736, alignment: .leading)
-                .padding(.horizontal, 32)
-                .frame(width: 800, alignment: .leading)
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -2349,9 +2345,9 @@ private struct NativeSocialLinksSection: View {
             .renderingMode(.template)
             .resizable()
             .scaledToFit()
-            .frame(width: 48, height: 48)
+            .frame(width: 20, height: 20)
             .foregroundStyle(Color.envInk)
-            .frame(width: 64, height: 64)
+            .frame(maxWidth: .infinity, minHeight: 40)
             .contentShape(Rectangle())
     }
 }
