@@ -2218,7 +2218,7 @@ private struct NativeInfoSectionView: View {
 
 private struct NativeAboutInformationPage: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 22) {
             ChasTechnologiesLogo()
                 .frame(maxWidth: 520)
                 .aspectRatio(3.2, contentMode: .fit)
@@ -2226,29 +2226,140 @@ private struct NativeAboutInformationPage: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
-            NativeInfoSectionView(title: "A focused toolkit for everyday work", paragraphs: [
-                "enV brings practical utilities together in one place across Web, Android, and iOS. Browse by category, search for a tool, and use the tools that fit your task.",
-                "enV is developed and operated by **chAs Technologies LLC**, a company registered in Delaware, USA. Some tools process information on your device; features that need a server or an external provider make that clear in their use and are described in our Privacy page.",
+
+            NativeInfoSectionView(title: "A practical toolkit for everyday digital work", paragraphs: [
+                "enV brings useful tools, calculators, converters, generators, and creator and developer utilities together in one searchable workspace. Browse by category or search by task to find a tool that fits the work in front of you.",
+                "enV is available on the web and through dedicated Android and iOS apps. Many tools work on your device; features that need a server or external provider should be reviewed alongside the relevant tool guidance and our Privacy page.",
             ], titleSize: 20)
+
             VStack(alignment: .leading, spacing: 10) {
-                enVCharacterSpacedText("Company").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                enVCharacterSpacedText("chAs Technologies LLC").font(.envScaled(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
-                HStack(spacing: 4) {
-                    enVCharacterSpacedText("Product inquiries:").font(.envScaled(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
-                    Link("envtoolkit@gmail.com", destination: URL(string: "mailto:envtoolkit@gmail.com")!)
-                        .font(.envScaled(size: 16, weight: .regular))
-                }
-                HStack(spacing: 4) {
-                    enVCharacterSpacedText("Company inquiries:").font(.envScaled(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
-                    Link("chastechnologiesllc@gmail.com", destination: URL(string: "mailto:chastechnologiesllc@gmail.com")!)
-                        .font(.envScaled(size: 16, weight: .regular))
+                enVCharacterSpacedText("The company behind enV")
+                    .font(.envScaled(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("chAs Technologies LLC")
+                    .font(.envScaled(size: 16, weight: .medium))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("enV is developed and operated by chAs Technologies LLC, a company registered in Delaware, USA.")
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        enVCharacterSpacedText("Product questions")
+                            .font(.envScaled(size: 13, weight: .medium))
+                            .foregroundStyle(Color.envMuted)
+                        Link("envtoolkit@gmail.com", destination: URL(string: "mailto:envtoolkit@gmail.com")!)
+                            .font(.envScaled(size: 15, weight: .semibold))
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        enVCharacterSpacedText("Company and partnership inquiries")
+                            .font(.envScaled(size: 13, weight: .medium))
+                            .foregroundStyle(Color.envMuted)
+                        Link("chastechnologiesllc@gmail.com", destination: URL(string: "mailto:chastechnologiesllc@gmail.com")!)
+                            .font(.envScaled(size: 15, weight: .semibold))
+                            .lineLimit(2)
+                    }
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+
+            NativeSocialLinksSection(brand: "enV")
+            NativeSocialLinksSection(brand: "chAs Technologies LLC")
         }
+    }
+}
+
+private struct NativeSocialProfile: Identifiable {
+    let platform: String
+    let detail: String
+    let url: String?
+    let glyph: String
+    let background: Color
+    let foreground: Color
+    var id: String { platform }
+}
+
+private struct NativeSocialLinksSection: View {
+    let brand: String
+
+    private var profiles: [NativeSocialProfile] {
+        if brand == "enV" {
+            return [
+                NativeSocialProfile(platform: "X", detail: "@envtoolz", url: "https://x.com/envtoolz", glyph: "𝕏", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
+                NativeSocialProfile(platform: "Instagram", detail: "@envtools.store", url: "https://www.instagram.com/envtools.store?dlrf=MWRreno0dTM1d3BhNw==", glyph: "◎", background: Color(red: 0.99, green: 0.90, blue: 0.95), foreground: Color(red: 0.76, green: 0.21, blue: 0.49)),
+                NativeSocialProfile(platform: "TikTok", detail: "@envtools.store", url: "https://www.tiktok.com/@envtools.store?_r=1&_t=ZS-9Ai1xRqMZjp", glyph: "♪", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
+                NativeSocialProfile(platform: "YouTube", detail: "@envtoolz", url: "https://www.youtube.com/@envtoolz", glyph: "▶", background: Color(red: 1.0, green: 0.0, blue: 0.2), foreground: .white),
+                NativeSocialProfile(platform: "Facebook", detail: "Profile link coming soon", url: nil, glyph: "f", background: Color(red: 0.86, green: 0.92, blue: 1.0), foreground: Color(red: 0.03, green: 0.40, blue: 0.96))
+            ]
+        }
+        return [
+            NativeSocialProfile(platform: "Facebook", detail: "chAs Technologies LLC", url: "https://www.facebook.com/share/1GfoVk8MZK/", glyph: "f", background: Color(red: 0.03, green: 0.40, blue: 0.96), foreground: .white),
+            NativeSocialProfile(platform: "TikTok", detail: "@chastechnologiesllc", url: "https://www.tiktok.com/@chastechnologiesllc", glyph: "♪", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
+            NativeSocialProfile(platform: "X", detail: "@chAstechllc", url: "https://x.com/chAstechllc", glyph: "𝕏", background: Color(red: 0.08, green: 0.08, blue: 0.08), foreground: .white),
+            NativeSocialProfile(platform: "WhatsApp", detail: "Official channel", url: "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L", glyph: "☎", background: Color(red: 0.15, green: 0.83, blue: 0.38), foreground: .white),
+            NativeSocialProfile(platform: "Instagram", detail: "@chastechnologiesllc", url: "https://www.instagram.com/chastechnologiesllc?rpxt=MTJ0a2lwM2oyNzRobw==", glyph: "◎", background: Color(red: 0.99, green: 0.90, blue: 0.95), foreground: Color(red: 0.76, green: 0.21, blue: 0.49)),
+            NativeSocialProfile(platform: "LinkedIn", detail: "chAs Technologies LLC", url: "https://www.linkedin.com/in/chas-technologies-llc?utm_source=share_via&utm_content=profile&utm_medium=member_android", glyph: "in", background: Color(red: 0.04, green: 0.40, blue: 0.76), foreground: .white),
+            NativeSocialProfile(platform: "Snapchat", detail: "@chastechllc", url: "https://www.snapchat.com/add/chastechllc?share_id=4ULXY20944Q&locale=en-US", glyph: "👻", background: Color(red: 1.0, green: 0.99, blue: 0.0), foreground: Color(red: 0.08, green: 0.08, blue: 0.08)),
+            NativeSocialProfile(platform: "YouTube", detail: "@chAsTechnologiesLLC", url: "https://www.youtube.com/@chAsTechnologiesLLC", glyph: "▶", background: Color(red: 1.0, green: 0.0, blue: 0.2), foreground: .white)
+        ]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            enVCharacterSpacedText(brand == "enV" ? "Follow enV" : "Follow chAs Technologies LLC")
+                .font(.envScaled(size: 17, weight: .semibold))
+                .foregroundStyle(Color.envInk)
+            enVCharacterSpacedText(brand == "enV" ? "Product updates, new tools, tips, and announcements." : "Company updates, partnerships, and news from the team behind enV.")
+                .font(.envScaled(size: 14, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+            VStack(spacing: 8) {
+                ForEach(profiles) { profile in
+                    if let rawURL = profile.url, let url = URL(string: rawURL) {
+                        Link(destination: url) {
+                            socialRow(profile)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        socialRow(profile).opacity(0.72)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func socialRow(_ profile: NativeSocialProfile) -> some View {
+        HStack(spacing: 12) {
+            Text(profile.glyph)
+                .font(.system(size: profile.platform == "LinkedIn" ? 14 : 19, weight: .bold))
+                .foregroundStyle(profile.foreground)
+                .frame(width: 40, height: 40)
+                .background(profile.background, in: RoundedRectangle(cornerRadius: 11))
+            VStack(alignment: .leading, spacing: 2) {
+                enVCharacterSpacedText(profile.platform)
+                    .font(.envScaled(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText(profile.detail)
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            if profile.url != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.envMuted)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 }
 
@@ -2317,34 +2428,58 @@ private struct NativePricingInformationPage: View {
 
 private struct NativeContactInformationPage: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            NativeInfoSectionView(title: nil, paragraphs: ["Choose the address that best matches your inquiry. We will use your message to respond to the request you send."])
+        VStack(alignment: .leading, spacing: 16) {
+            NativeInfoSectionView(title: nil, paragraphs: [
+                "Have a question, found something we can improve, or want to discuss working together? Choose the contact route that best fits your message."
+            ])
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 16) {
-                    contactCard(title: "enV product support", description: "Questions, feedback, accessibility concerns, or help using the toolkit.", address: "envtoolkit@gmail.com")
-                    contactCard(title: "Company inquiries", description: "Business, partnership, and company-related correspondence for chAs Technologies LLC.", address: "chastechnologiesllc@gmail.com")
+                    contactCard(title: "enV product support", description: "For help using the toolkit, product feedback, accessibility concerns, bug reports, or ideas for improving enV.", address: "envtoolkit@gmail.com")
+                    contactCard(title: "chAs Technologies LLC", description: "For business proposals, partnerships, media inquiries, and other company-related correspondence.", address: "chastechnologiesllc@gmail.com")
                 }
                 VStack(spacing: 16) {
-                    contactCard(title: "enV product support", description: "Questions, feedback, accessibility concerns, or help using the toolkit.", address: "envtoolkit@gmail.com")
-                    contactCard(title: "Company inquiries", description: "Business, partnership, and company-related correspondence for chAs Technologies LLC.", address: "chastechnologiesllc@gmail.com")
+                    contactCard(title: "enV product support", description: "For help using the toolkit, product feedback, accessibility concerns, bug reports, or ideas for improving enV.", address: "envtoolkit@gmail.com")
+                    contactCard(title: "chAs Technologies LLC", description: "For business proposals, partnerships, media inquiries, and other company-related correspondence.", address: "chastechnologiesllc@gmail.com")
                 }
             }
-            enVCharacterSpacedText("Please do not include passwords, payment-card details, or other highly sensitive information in ordinary email.")
-                .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+            VStack(alignment: .leading, spacing: 5) {
+                enVCharacterSpacedText("A quick note before you write")
+                    .font(.envScaled(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("Please include enough non-sensitive context for us to understand your question. Do not send passwords, payment-card details, recovery codes, or other sensitive personal information by ordinary email.")
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+
+            NativeSocialLinksSection(brand: "enV")
+            NativeSocialLinksSection(brand: "chAs Technologies LLC")
         }
     }
 
     private func contactCard(title: String, description: String, address: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             enVCharacterSpacedText(title).font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-            enVCharacterSpacedText(description).font(.envScaled(size: 16, weight: .regular)).foregroundStyle(Color.envMuted)
-            Link(address, destination: URL(string: "mailto:\(address)")!)
-                .font(.envScaled(size: 16, weight: .semibold))
+            enVCharacterSpacedText(description).font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+            Link(destination: URL(string: "mailto:\(address)")!) {
+                HStack(alignment: .center, spacing: 7) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(address)
+                        .font(.envScaled(size: 14, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .frame(minHeight: 40, alignment: .leading)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
     }
 }
 
