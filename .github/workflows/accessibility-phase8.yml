@@ -59,8 +59,16 @@ jobs:
         run: npm ci
       - name: Build real enV web app
         run: npm run build
-      - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+      - name: Configure Chromium for Playwright
+        run: |
+          browser_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -n "$browser_path" ]; then
+            echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
+            echo "Using runner-installed Chromium-compatible browser: $browser_path"
+          else
+            echo "No system Chrome found; installing the Playwright-managed Chromium build."
+            npx playwright install --with-deps chromium
+          fi
       - name: Start local audit server
         run: |
           npm run dev -- --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/env-preview.log" 2>&1 &

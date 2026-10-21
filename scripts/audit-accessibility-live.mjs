@@ -608,7 +608,11 @@ async function main() {
   };
   for (const route of opts.routes) enqueue(new URL(route, base));
 
-  const browser = await chromium.launch({ headless: true });
+  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  const browser = await chromium.launch({
+    headless: true,
+    ...(executablePath ? { executablePath } : {}),
+  });
   const context = await browser.newContext({
     viewport: { width: 1365, height: 900 },
     reducedMotion: 'reduce',
