@@ -159,4 +159,13 @@ await mkdir(resolve(outputPath, '..'), { recursive: true });
 await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 const failures = report.errors.length || report.networkLeaks.length || report.storageLeaks.length || report.axeViolations.length || report.routes.some((route) => !route.loaded || !route.actionWorked || route.mobileOverflow?.overflowing);
 console.log(`Developer browser audit: routes=${report.routes.length}, network leaks=${report.networkLeaks.length}, storage leaks=${report.storageLeaks.length}, serious/critical axe findings=${report.axeViolations.length}, errors=${report.errors.length}. Report: ${outputPath}`);
-if (failures) process.exitCode = 1;
+if (failures) {
+  console.error(JSON.stringify({
+    failedRoutes: report.routes.filter((route) => !route.loaded || !route.actionWorked || route.mobileOverflow?.overflowing || route.error),
+    errors: report.errors,
+    networkLeaks: report.networkLeaks,
+    storageLeaks: report.storageLeaks,
+    axeViolations: report.axeViolations,
+  }, null, 2));
+  process.exitCode = 1;
+}

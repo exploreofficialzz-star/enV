@@ -229,7 +229,7 @@ fun NativeUxUiStudioForm() {
                 }
                 Text("ARTBOARD · "+bw+" × "+bh+" px · "+elements.size+" layers",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->OutlinedButton(onClick->{target=if(id.startsWith("mobile"))"mobile" else "desktop";elements.clear();elements.addAll(uxNativePreset(target,id));selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label,maxLines=1)}}
+                    listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->OutlinedButton(onClick={target=if(id.startsWith("mobile"))"mobile" else "desktop";elements.clear();elements.addAll(uxNativePreset(target,id));selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label,maxLines=1)}}
                 }
                 Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Text("Artboard preview",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
