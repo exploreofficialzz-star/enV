@@ -10,7 +10,7 @@ import { runRegexStudio, buildRegexHighlightSegments, type RegexStudioMode } fro
 import { developerStudioExample } from "@/lib/engines/developer-studio-examples";
 import { decodeData as decodeSharedData, encodeData as encodeSharedData } from "@/lib/engines/developer-utils";
 import type { ToolMeta } from "@/types/tool";
-import { getAllTools, toolPath } from "@/lib/registry";
+
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
 type Props = { op: string; tool?: ToolMeta; initialInput?: string };
