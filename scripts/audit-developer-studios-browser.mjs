@@ -70,7 +70,7 @@ try {
       if (route.kind === 'regex') {
         await primaryInput.fill('ENV_PRIVACY_SENTINEL_[A-Z0-9]+');
         await page.getByLabel(/Test text or batch JSON/).fill(JSON.stringify([{ label: 'privacy sample', text: sampleMarker, expectMatch: true }]));
-        await page.getByLabel('Studio mode').selectOption('test');
+        await page.locator("#dev-regex-mode").selectOption("test");
         await page.getByRole('button', { name: /Run tests/i }).click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
@@ -79,7 +79,7 @@ try {
         routeReport.actionWorked = output.includes(sampleMarker) && /assertionPassed|matchCount|results/i.test(output);
       } else if (route.kind === 'javascript') {
         await primaryInput.fill('const greet=async(name)=>{return await Promise.resolve("hi "+name);};');
-        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
+        await page.getByRole("button", { name: /^(Format|Run)$/i }).last().click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
         const output = await outputRegion.innerText();
