@@ -6677,6 +6677,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var height: Int
     var text: String
     var iconName: String = ""
+    var iconSvg: String? = nil
     var color: String = "#111827"
     var fill: String = "transparent"
     var borderColor: String = "#E5E7EB"
@@ -6691,6 +6692,46 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var fontSize: Int = 16
     var fontWeight: Int = 400
     var lineHeight: Double = 1.35
+}
+
+
+private func uxUiSanitizeIconSVG(_ svg: String, tint: String) -> String {
+    let safeTint = tint.range(of: #"^#[0-9A-Fa-f]{3,8}$"#, options: .regularExpression) != nil ? tint : "#111827"
+    return svg
+        .replacingOccurrences(of: #"(?is)<script\b[^>]*>.*?</script\s*>"#, with: "", options: .regularExpression)
+        .replacingOccurrences(of: #"(?is)<foreignObject\b[^>]*>.*?</foreignObject\s*>"#, with: "", options: .regularExpression)
+        .replacingOccurrences(of: #"(?i)\s+on[a-z]+\s*=\s*(['"]).*?\1"#, with: "", options: .regularExpression)
+        .replacingOccurrences(of: "currentColor", with: safeTint, options: .caseInsensitive)
+}
+
+private struct UxUiNativeSVGIcon: UIViewRepresentable {
+    let svg: String
+    let tint: String
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let view = WKWebView(frame: .zero)
+        view.isOpaque = false
+        view.backgroundColor = .clear
+        view.scrollView.backgroundColor = .clear
+        view.scrollView.isScrollEnabled = false
+        view.isUserInteractionEnabled = false
+        view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        return view
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        let safeSVG = uxUiSanitizeIconSVG(svg, tint: tint)
+        let html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1\"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" + safeSVG + "</body></html>"
+        guard context.coordinator.lastHTML != html else { return }
+        context.coordinator.lastHTML = html
+        uiView.loadHTMLString(html, baseURL: nil)
+    }
+
+    final class Coordinator {
+        var lastHTML = ""
+    }
 }
 
 private struct UxUiNativeProject: Codable {
@@ -6895,6 +6936,29 @@ private struct NativeUxUiStudioView: View {
                     addButton("Card", icon: "rectangle.on.rectangle", kind: "card")
                     addButton("Input", icon: "rectangle.and.pencil.and.ellipsis", kind: "input")
                     addButton("Icon", icon: "square.grid.2x2", kind: "icon")
+                    addButton("Navbar", icon: "menubar.rectangle", kind: "navbar")
+                    addButton("Tab bar", icon: "rectangle.bottomthird.inset.filled", kind: "tabbar")
+                    addButton("Tabs", icon: "square.split.2x1", kind: "tabs")
+                    addButton("Row", icon: "list.bullet", kind: "row")
+                    addButton("Avatar", icon: "person.crop.circle", kind: "avatar")
+                    addButton("Badge", icon: "seal", kind: "badge")
+                    addButton("Switch", icon: "switch.2", kind: "switch")
+                    addButton("Progress", icon: "chart.bar.fill", kind: "progress")
+                    addButton("Slider", icon: "slider.horizontal.3", kind: "slider")
+                    addButton("Radio", icon: "circle.inset.filled", kind: "radio")
+                    addButton("Dropdown", icon: "chevron.down.square", kind: "dropdown")
+                    addButton("Search", icon: "magnifyingglass", kind: "search")
+                    addButton("Text area", icon: "text.alignleft", kind: "textarea")
+                    addButton("Table", icon: "tablecells", kind: "table")
+                    addButton("Chart", icon: "chart.bar", kind: "chart")
+                    addButton("Modal", icon: "rectangle.center.inset.filled", kind: "modal")
+                    addButton("Breadcrumb", icon: "chevron.right", kind: "breadcrumb")
+                    addButton("Tooltip", icon: "text.bubble", kind: "tooltip")
+                    addButton("List", icon: "list.bullet.rectangle", kind: "list")
+                    addButton("Video", icon: "video", kind: "video")
+                    addButton("Logo", icon: "signature", kind: "logo")
+                    addButton("Menu", icon: "line.3.horizontal", kind: "menu")
+                    addButton("Spacer", icon: "arrow.left.and.right", kind: "spacer")
                     addButton("Rectangle", icon: "rectangle", kind: "rect")
                     addButton("Circle", icon: "circle", kind: "ellipse")
                     addButton("Divider", icon: "minus", kind: "divider")
@@ -6985,9 +7049,11 @@ private struct NativeUxUiStudioView: View {
                 .overlay(RoundedRectangle(cornerRadius: CGFloat(item.radius) * scale).stroke(uxUiUIColor(item.borderColor), lineWidth: CGFloat(item.borderWidth) * scale))
             Group {
                 if item.kind == "icon" {
-                    VStack(alignment: .leading, spacing: 2) {
+                    if let svg = item.iconSvg, !svg.isEmpty {
+                        UxUiNativeSVGIcon(svg: svg, tint: item.color)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
                         Image(systemName: "square.grid.2x2").font(.system(size: max(9, CGFloat(item.fontSize) * scale)))
-                        Text(item.iconName).font(.system(size: max(5, 7 * scale))).lineLimit(2)
                     }
                 } else {
                     Text(item.text).font(.custom(item.fontFamily == "Inter" ? "System" : item.fontFamily, size: max(5, CGFloat(item.fontSize) * scale)).weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular))
@@ -7056,16 +7122,14 @@ private struct NativeUxUiStudioView: View {
                 }.disabled(isSearchingIcons)
                 ForEach(iconResults, id: \.self) { iconName in
                     Button {
-                        binding.wrappedValue.iconName = iconName
-                        binding.wrappedValue.name = iconName
-                        notice = "Recorded icon identifier \(iconName). Check the source collection licence before shipping."
+                        chooseIconArtwork(iconName, layerID: binding.wrappedValue.id)
                     } label: {
                         Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(8)
                             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
                     }.buttonStyle(.plain)
                 }
-                Text("The exact icon ID is saved in the export. Icon rendering in this native editor uses a system glyph; the web editor embeds the original vector path.")
+                Text("The selected SVG artwork is rendered in the canvas and included in the exported project. Check the source collection licence before shipping.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
@@ -7165,6 +7229,28 @@ private struct NativeUxUiStudioView: View {
         case "card": newItem = UxUiNativeLayer(kind: kind, name: "Content card", x: 24, y: 270, width: 300, height: 132, text: "Card title\nSupporting text", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
         case "input": newItem = UxUiNativeLayer(kind: kind, name: "Text input", x: 24, y: 420, width: 300, height: 48, text: "Enter your email", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "mdi:home", color: "#2563EB")
+        case "navbar": newItem = UxUiNativeLayer(kind: kind, name: "Navigation bar", x: 20, y: 22, width: 350, height: 56, text: "enV                         Menu", fill: "#FFFFFF", borderWidth: 1, fontWeight: 600)
+        case "tabbar", "tabs": newItem = UxUiNativeLayer(kind: kind, name: "Tab navigation", x: 20, y: 766, width: 350, height: 54, text: "Home       Explore       Saved       Profile", fill: "#FFFFFF", borderWidth: 1, fontSize: 12, fontWeight: 600)
+        case "row", "list": newItem = UxUiNativeLayer(kind: kind, name: "List row", x: 24, y: 330, width: 300, height: 64, text: "Account settings\nManage your profile", fill: "#FFFFFF", borderWidth: 1, radius: 10, padding: 14)
+        case "avatar": newItem = UxUiNativeLayer(kind: kind, name: "Avatar", x: 24, y: 540, width: 44, height: 44, text: "A", color: "#1D4ED8", fill: "#DBEAFE", radius: 22, fontWeight: 700)
+        case "badge": newItem = UxUiNativeLayer(kind: kind, name: "Status badge", x: 24, y: 540, width: 100, height: 28, text: "Active", color: "#1D4ED8", fill: "#DBEAFE", radius: 99, fontSize: 12, fontWeight: 600)
+        case "switch": newItem = UxUiNativeLayer(kind: kind, name: "Toggle switch", x: 24, y: 540, width: 46, height: 26, text: "ON", color: "#FFFFFF", fill: "#2563EB", radius: 13, fontSize: 10)
+        case "progress": newItem = UxUiNativeLayer(kind: kind, name: "Progress bar", x: 24, y: 540, width: 240, height: 10, text: "", color: "#2563EB", fill: "#DBEAFE", radius: 5, padding: 0)
+        case "slider": newItem = UxUiNativeLayer(kind: kind, name: "Range slider", x: 24, y: 540, width: 240, height: 24, text: "", color: "#2563EB", fill: "#E5E7EB", radius: 12, padding: 0)
+        case "radio": newItem = UxUiNativeLayer(kind: kind, name: "Radio button", x: 24, y: 540, width: 22, height: 22, text: "", color: "#2563EB", fill: "#FFFFFF", borderColor: "#2563EB", borderWidth: 2, radius: 11, padding: 0)
+        case "dropdown": newItem = UxUiNativeLayer(kind: kind, name: "Select menu", x: 24, y: 420, width: 300, height: 48, text: "Select an option", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
+        case "search": newItem = UxUiNativeLayer(kind: kind, name: "Search field", x: 24, y: 420, width: 300, height: 48, text: "Search…", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
+        case "textarea": newItem = UxUiNativeLayer(kind: kind, name: "Text area", x: 24, y: 420, width: 300, height: 96, text: "Enter your message", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
+        case "table": newItem = UxUiNativeLayer(kind: kind, name: "Data table", x: 24, y: 330, width: 320, height: 150, text: "Name       Status       Updated\nProject A  Active       Today\nProject B  Draft        Yesterday", fill: "#FFFFFF", borderWidth: 1, fontSize: 12)
+        case "chart": newItem = UxUiNativeLayer(kind: kind, name: "Bar chart", x: 24, y: 330, width: 300, height: 170, text: "Activity overview\nJan       Feb       Mar       Apr", fill: "#FFFFFF", borderWidth: 1, fontSize: 13)
+        case "modal": newItem = UxUiNativeLayer(kind: kind, name: "Dialog / modal", x: 24, y: 330, width: 310, height: 190, text: "Dialog title\nDescribe the action here.\nCancel          Confirm", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
+        case "breadcrumb": newItem = UxUiNativeLayer(kind: kind, name: "Breadcrumb trail", x: 24, y: 330, width: 300, height: 34, text: "Home / Workspace / Current", color: "#475569", fontSize: 12)
+        case "tooltip": newItem = UxUiNativeLayer(kind: kind, name: "Tooltip", x: 24, y: 330, width: 170, height: 38, text: "Helpful information", color: "#FFFFFF", fill: "#111827", radius: 8, fontSize: 12)
+        case "video": newItem = UxUiNativeLayer(kind: kind, name: "Video preview", x: 24, y: 330, width: 280, height: 158, text: "Video preview", color: "#FFFFFF", fill: "#0F172A", radius: 12)
+        case "logo": newItem = UxUiNativeLayer(kind: kind, name: "Brand wordmark", x: 24, y: 330, width: 180, height: 42, text: "Your brand", color: "#2563EB", fontSize: 26, fontWeight: 800)
+        case "menu": newItem = UxUiNativeLayer(kind: kind, name: "Menu bar", x: 20, y: 22, width: 350, height: 48, text: "File     Edit     View     Insert     Help", fill: "#F8FAFC", borderWidth: 1, fontSize: 13)
+        case "spacer": newItem = UxUiNativeLayer(kind: kind, name: "Layout spacer", x: 24, y: 540, width: 80, height: 24, text: "", fill: "transparent", radius: 0, padding: 0)
+        case "rect": newItem = UxUiNativeLayer(kind: kind, name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
         case "ellipse": newItem = UxUiNativeLayer(kind: kind, name: "Circle", x: 24, y: 540, width: 84, height: 84, text: "", fill: "#DBEAFE", radius: 42)
         case "divider": newItem = UxUiNativeLayer(kind: kind, name: "Divider", x: 24, y: 640, width: 300, height: 1, text: "", fill: "#CBD5E1")
         default: newItem = UxUiNativeLayer(kind: "rect", name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
@@ -7220,6 +7306,36 @@ private struct NativeUxUiStudioView: View {
                 await MainActor.run { iconResults = found; isSearchingIcons = false; notice = "\(found.count) icon identifiers found." }
             } catch {
                 await MainActor.run { isSearchingIcons = false; notice = "Icon search unavailable. Check your connection and retry." }
+            }
+        }
+    }
+
+    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
+        guard let url = URL(string: "https://api.iconify.design/" + iconName.replacingOccurrences(of: ":", with: "/") + ".svg") else {
+            notice = "Invalid icon identifier."
+            return
+        }
+        isSearchingIcons = true
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200,
+                      let sourceSVG = String(data: data, encoding: .utf8),
+                      sourceSVG.contains("<svg") else { throw URLError(.cannotDecodeContentData) }
+                await MainActor.run {
+                    if let index = elements.firstIndex(where: { $0.id == layerID }) {
+                        elements[index].iconName = iconName
+                        elements[index].name = iconName
+                        elements[index].iconSvg = uxUiSanitizeIconSVG(sourceSVG, tint: elements[index].color)
+                    }
+                    notice = "Loaded actual SVG artwork for \(iconName). Check the source collection licence before shipping."
+                    isSearchingIcons = false
+                }
+            } catch {
+                await MainActor.run {
+                    isSearchingIcons = false
+                    notice = "Could not load selected icon artwork. Check your connection and retry."
+                }
             }
         }
     }
