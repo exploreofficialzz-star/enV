@@ -87,7 +87,7 @@ try {
       } else {
         await primaryInput.fill("select a.id,a.name from accounts a left join orders o on o.account_id=a.id where a.note='FROM should stay in text' group by a.id,a.name having count(*)>0 order by a.name;");
         await page.getByLabel('SQL dialect').selectOption('postgresql');
-        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
+        await page.getByRole("button", { name: "Format", exact: true }).last().click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
         const output = await outputRegion.innerText();
