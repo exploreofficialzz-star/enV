@@ -7224,7 +7224,7 @@ private struct NativeUxUiStudioView: View {
             lines.append("padding=" + String(item.padding) + "px; margins top/right/bottom/left=" + String(item.marginTop) + "/" + String(item.marginRight) + "/" + String(item.marginBottom) + "/" + String(item.marginLeft) + "px")
             lines.append("font=" + item.fontFamily + "; size=" + String(item.fontSize) + "px; weight=" + String(item.fontWeight) + "; lineHeight=" + String(item.lineHeight))
             lines.append("horizontalConstraint=" + item.horizontalConstraint + "; verticalConstraint=" + item.verticalConstraint + "; minWidth=" + String(item.minWidth) + "; maxWidth=" + String(item.maxWidth))
-            lines.append("visibleOn=" + item.visibleOn.joined(separator: ",") + "; referenceViewport=" + String(item.referenceWidth) + "x" + String(item.referenceHeight) + "; componentKey=" + item.componentKey + "; iconViewBox=" + item.iconViewBox)
+            lines.append("visibleOn=\(item.visibleOn.joined(separator: ",")); referenceViewport=\(item.referenceWidth)x\(item.referenceHeight); componentKey=\(item.componentKey); iconViewBox=\(item.iconViewBox)")
         }
         lines.append("")
         lines.append("Acceptance: compare the implementation at the reference viewport. Do not replace exact geometry or icon IDs with approximate values.")
@@ -8037,7 +8037,7 @@ private struct NativeUxUiStudioView: View {
         }
     }
 
-    private func chooseIconArtwork(    private func chooseIconArtwork(    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
+    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
         guard let url = URL(string: "https://api.iconify.design/" + iconName.replacingOccurrences(of: ":", with: "/") + ".svg") else {
             notice = "Invalid icon identifier."
             return
