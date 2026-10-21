@@ -7345,9 +7345,10 @@ private struct NativeUxUiStudioView: View {
                     ZStack(alignment: .topLeading) {
                         uxUiUIColor(background)
                         ForEach(elements) { item in
-                            layerPreview(item, scale: scale)
-                                .frame(width: CGFloat(item.width) * scale, height: CGFloat(item.height) * scale)
-                                .position(x: (CGFloat(item.x) + CGFloat(item.width) / 2) * scale, y: (CGFloat(item.y) + CGFloat(item.height) / 2) * scale)
+                            let rendered = uxUiResolvedLayer(item, boardWidth: boardWidth, boardHeight: boardHeight)
+                            layerPreview(rendered, scale: scale)
+                                .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
                                 .onTapGesture { selectedID = item.id }
                                 .simultaneousGesture(
                                     DragGesture(minimumDistance: 2)
@@ -7382,6 +7383,69 @@ private struct NativeUxUiStudioView: View {
                 }
                 Text("Select a layer to edit its exact measurements and properties.")
                     .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Design system").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Edit named color, typography and spacing tokens. Tokens are saved with the project and included in exports.")
+                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                Text("Color tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                ForEach(tokens.colors.indices, id: \.self) { index in
+                    HStack(spacing: 6) {
+                        inspectorTextField("Token name", text: $tokens.colors[index].name)
+                        inspectorTextField("Hex value", text: $tokens.colors[index].value)
+                        Button("Text") {
+                            guard let selectedIndex else { return }
+                            checkpoint(); elements[selectedIndex].color = tokens.colors[index].value
+                        }.font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        Button("Fill") {
+                            guard let selectedIndex else { return }
+                            checkpoint(); elements[selectedIndex].fill = tokens.colors[index].value
+                        }.font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    }
+                }
+                HStack(spacing: 6) {
+                    inspectorTextField("New token name", text: $tokenNameDraft)
+                    inspectorTextField("Hex value", text: $tokenValueDraft)
+                    Button("Add") {
+                        let name = tokenNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !name.isEmpty, !tokens.colors.contains(where: { $0.name == name }) else { return }
+                        tokens.colors.append(UxUiNativeColorToken(name: name, value: tokenValueDraft))
+                        tokenNameDraft = "brand"
+                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                }
+                Text("Typography tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                ForEach(tokens.typography) { token in
+                    Button {
+                        guard let selectedIndex else { return }
+                        checkpoint()
+                        elements[selectedIndex].fontFamily = token.fontFamily
+                        elements[selectedIndex].fontSize = token.fontSize
+                        elements[selectedIndex].fontWeight = token.fontWeight
+                        elements[selectedIndex].lineHeight = token.lineHeight
+                    } label: {
+                        HStack { Text(token.name); Spacer(); Text("\(token.fontSize)px / \(token.fontWeight)").foregroundStyle(Color.envMuted) }
+                            .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+                            .padding(8).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 7))
+                    }.buttonStyle(.plain)
+                }
+                Text("Spacing tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                HStack(spacing: 6) {
+                    ForEach(tokens.spacing, id: \.self) { spacing in
+                        Button("\(spacing) px") {
+                            guard let selectedIndex else { return }
+                            checkpoint(); elements[selectedIndex].padding = spacing
+                        }.font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envAccent)
+                    }
+                }
+                HStack(spacing: 6) {
+                    inspectorTextField("New spacing px", text: $spacingDraft)
+                    Button("Add spacing") {
+                        guard let value = Int(spacingDraft), (1...256).contains(value), !tokens.spacing.contains(value) else { return }
+                        tokens.spacing.append(value); tokens.spacing.sort()
+                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                }
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
@@ -7442,12 +7506,54 @@ private struct NativeUxUiStudioView: View {
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
             if let index = selectedIndex { inspector(for: index) }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Reusable components · \(reusableComponents.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                    Spacer()
+                    Button("Save selected") {
+                        guard let selectedIndex else { return }
+                        checkpoint()
+                        var template = elements[selectedIndex]
+                        if template.componentKey.isEmpty { template.componentKey = template.id.uuidString }
+                        elements[selectedIndex].componentKey = template.componentKey
+                        reusableComponents.removeAll { $0.componentKey == template.componentKey }
+                        reusableComponents.append(template)
+                        notice = "Saved reusable template: \(template.name)"
+                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent).disabled(selectedIndex == nil)
+                }
+                if reusableComponents.isEmpty {
+                    Text("Select a layer and save it to reuse the same component in this design.").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                } else {
+                    ForEach(reusableComponents) { component in
+                        Button {
+                            checkpoint()
+                            var instance = component
+                            instance.id = UUID()
+                            instance.name += " instance"
+                            instance.x = min(max(0, boardWidth - instance.width), instance.x + 16)
+                            instance.y = min(max(0, boardHeight - instance.height), instance.y + 16)
+                            instance.referenceWidth = boardWidth; instance.referenceHeight = boardHeight
+                            elements.append(instance); selectedID = instance.id
+                            notice = "Added reusable component: \(component.name)"
+                        } label: {
+                            HStack { Image(systemName: "square.on.square"); Text(component.name).lineLimit(1); Spacer(); Image(systemName: "plus") }
+                                .font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                                .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+                        }.buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
             VStack(alignment: .leading, spacing: 10) {
                 Text("Design handoff").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 Text("PDF includes the rendered artboard, technical specifications, and an AI implementation prompt. JSON contains the editable project.")
                     .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
                 Button { exportPDF() } label: { exportButtonLabel("Export visual PDF + specifications", icon: "doc.richtext", primary: true) }.buttonStyle(.plain)
-                Button { exportJSON() } label: { exportButtonLabel("Export project JSON + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
+                Button { exportJSON() } label: { exportButtonLabel("Export JSON + generated code + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
+                Button { exportSource("html") } label: { exportButtonLabel("Export Web HTML", icon: "globe", primary: false) }.buttonStyle(.plain)
+                Button { exportSource("kotlin") } label: { exportButtonLabel("Export Android Kotlin", icon: "chevron.left.forwardslash.chevron.right", primary: false) }.buttonStyle(.plain)
+                Button { exportSource("swift") } label: { exportButtonLabel("Export iOS SwiftUI", icon: "swift", primary: false) }.buttonStyle(.plain)
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
         }
@@ -7567,6 +7673,40 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Width (px)", value: binding.width)
                 inspectorNumber("Height (px)", value: binding.height)
             }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Responsive constraints").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                HStack(spacing: 8) {
+                    Picker("Horizontal", selection: binding.horizontalConstraint) {
+                        Text("Left").tag("left"); Text("Center").tag("center"); Text("Right").tag("right"); Text("Stretch").tag("stretch")
+                    }.pickerStyle(.menu)
+                    Picker("Vertical", selection: binding.verticalConstraint) {
+                        Text("Top").tag("top"); Text("Center").tag("center"); Text("Bottom").tag("bottom"); Text("Stretch").tag("stretch")
+                    }.pickerStyle(.menu)
+                }
+                HStack(spacing: 8) {
+                    inspectorNumber("Min width", value: binding.minWidth)
+                    inspectorNumber("Max width (0 = none)", value: binding.maxWidth)
+                }
+                HStack(spacing: 8) {
+                    inspectorNumber("Reference width", value: binding.referenceWidth)
+                    inspectorNumber("Reference height", value: binding.referenceHeight)
+                }
+                Text("Visibility").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+                HStack(spacing: 8) {
+                    ForEach(["mobile", "tablet", "desktop"], id: \.self) { device in
+                        Toggle(device.capitalized, isOn: Binding(
+                            get: { binding.wrappedValue.visibleOn.contains(device) },
+                            set: { isVisible in
+                                var visible = binding.wrappedValue.visibleOn
+                                if isVisible && !visible.contains(device) { visible.append(device) }
+                                if !isVisible { visible.removeAll { $0 == device } }
+                                binding.wrappedValue.visibleOn = visible
+                            }
+                        )).toggleStyle(.switch)
+                    }
+                }
+            }
+            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
             HStack(spacing: 8) {
                 inspectorNumber("Font size (px)", value: binding.fontSize)
                 inspectorNumber("Font weight", value: binding.fontWeight)
