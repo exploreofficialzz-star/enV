@@ -324,10 +324,10 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
         appendLine("      if (listOf("+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+").contains(target)) Box(Modifier.offset(x=("+x+").dp,y=("+y+").dp).size(width=("+w+").dp,height=("+h+").dp).background(Color(android.graphics.Color.parseColor("+JSONObject.quote(fill)+")),RoundedCornerShape("+e.radius+".dp)).padding("+e.padding+".dp)) {")
         if(e.kind=="icon"&&e.iconSvg.isNotBlank()) {
             val html="<!doctype html><html><body style='margin:0'>"+e.iconSvg+"</body></html>"
-            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\\",\\"UTF-8\\",null) } },modifier=Modifier.fillMaxSize())")
+            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
         } else if(e.kind=="image"&&e.imageData.isNotBlank()) {
             val html="<!doctype html><html><body style='margin:0'><img style='width:100%;height:100%;object-fit:cover' src='"+e.imageData+"'></body></html>"
-            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\\",\\"UTF-8\\",null) } },modifier=Modifier.fillMaxSize())")
+            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
         } else {
             appendLine("        Text("+JSONObject.quote(e.text)+",color=Color(android.graphics.Color.parseColor("+JSONObject.quote(e.color)+")),fontSize="+e.fontSize+".sp,fontWeight=FontWeight("+e.fontWeight+"),modifier=Modifier.fillMaxSize())")
         }
@@ -346,7 +346,7 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
     appendLine("struct EnVStudioHTMLAsset: UIViewRepresentable {")
     appendLine("  let markup: String")
     appendLine("  func makeUIView(context: Context) -> WKWebView { let view=WKWebView(); view.isOpaque=false; view.backgroundColor = .clear; view.scrollView.isScrollEnabled=false; return view }")
-    appendLine("  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString(\"<html><body style='margin:0'>\\" + markup + \\"</body></html>\\",baseURL:nil) }")
+    appendLine("  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString(\"<html><body style='margin:0'>\" + markup + \"</body></html>\",baseURL:nil) }")
     appendLine("}")
     appendLine("struct "+uxNativeSafeIdentifier(name)+"DesignView: View {")
     appendLine("  let target: String = "+JSONObject.quote(target))
