@@ -525,15 +525,21 @@ export function UxUiStudioEngine() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as SavedProject;
+        const parsed = JSON.parse(stored) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
         if ((parsed.schemaVersion === 1 || parsed.schemaVersion === 2) && Array.isArray(parsed.elements) && parsed.viewport?.width) {
           const normalized = {
             ...parsed, schemaVersion: 2 as const,
             elements: parsed.elements.map((layer: Partial<DesignLayer>) => ({
-              horizontalConstraint: "left" as HorizontalConstraint, verticalConstraint: "top" as VerticalConstraint,
-              minWidth: 0, maxWidth: 0, visibleOn: ["mobile", "tablet", "desktop"] as DeviceTarget[],
-              referenceWidth: parsed.viewport.width, referenceHeight: parsed.viewport.height, componentKey: "", ...layer,
-            })),
+              ...layer,
+              horizontalConstraint: layer.horizontalConstraint || "left",
+              verticalConstraint: layer.verticalConstraint || "top",
+              minWidth: layer.minWidth ?? 0,
+              maxWidth: layer.maxWidth ?? 0,
+              visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
+              referenceWidth: layer.referenceWidth || parsed.viewport.width,
+              referenceHeight: layer.referenceHeight || parsed.viewport.height,
+              componentKey: layer.componentKey || "",
+            } as DesignLayer)),
             tokens: parsed.tokens || DEFAULT_TOKENS,
             breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
             reusableComponents: parsed.reusableComponents || [],
@@ -598,9 +604,15 @@ export function UxUiStudioEngine() {
     setTokens(savedProject.tokens || DEFAULT_TOKENS);
     setReusableComponents(savedProject.reusableComponents || []);
     setElements(savedProject.elements.map((layer) => ({
-      horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
-      visibleOn: ["mobile", "tablet", "desktop"], referenceWidth: savedProject.viewport.width,
-      referenceHeight: savedProject.viewport.height, componentKey: "", ...layer,
+      ...layer,
+      horizontalConstraint: layer.horizontalConstraint || "left",
+      verticalConstraint: layer.verticalConstraint || "top",
+      minWidth: layer.minWidth ?? 0,
+      maxWidth: layer.maxWidth ?? 0,
+      visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
+      referenceWidth: layer.referenceWidth || savedProject.viewport.width,
+      referenceHeight: layer.referenceHeight || savedProject.viewport.height,
+      componentKey: layer.componentKey || "",
     })));
     setSelectedId(savedProject.elements[0]?.id || "");
     setOnboarding(false);
