@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
+import { ArrowRight, ChevronDown, Heart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
-import { toolDocumentationPath } from "@/lib/tool-documentation";
+import { getToolDocumentation } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
@@ -13,7 +13,6 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
-import { ToolTokenEstimate } from "@/components/billing/tool-token-estimate";
 
 export function ToolShell({
   tool,
@@ -23,6 +22,7 @@ export function ToolShell({
   children: React.ReactNode;
 }) {
   const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
+  const documentation = useMemo(() => getToolDocumentation(tool), [tool]);
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
@@ -57,18 +57,18 @@ export function ToolShell({
         <span className="text-fg">{tool.name}</span>
       </nav>
 
-      <header className="mt-6 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 gap-3">
-          <ToolAppIcon tool={tool} className="size-11" />
-          <div>
+      <header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
+        <ToolAppIcon tool={tool} className="row-span-2 size-11 sm:row-span-1" />
+        <div className="col-start-2 row-start-1 min-w-0 sm:flex sm:min-w-0 sm:flex-1 sm:gap-3">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>{tool.status === "planned" ? <ComingSoonBadge /> : null}</div>
-            <p className="mt-1 max-w-2xl text-sm text-muted">{tool.description}</p>
+            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>
           </div>
         </div>
         <Button
           type="button"
           variant={saved ? "default" : "outline"}
-          className="shrink-0"
+          className="col-start-3 row-start-1 shrink-0"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -80,31 +80,41 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button>
+        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
       </header>
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
-      <div className="mt-3">
-        <a
-          href={toolDocumentationPath(tool)}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
-        >
-          <BookOpen className="size-4" aria-hidden="true" />
-          Read the full guide
-        </a>
-      </div>
-      <ToolTokenEstimate toolId={tool.id} />
-
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
         {children}
       </section>
 
       <AiAssistPanel toolId={tool.id} />
 
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold">What this tool does</h2>
-        <p className="mt-3 text-sm text-muted">{tool.description} Results can be copied or downloaded from this page.</p>
+      <section className="mt-10" aria-labelledby="tool-guide-heading">
+        <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
+        <p className="mt-3 text-sm leading-6 text-muted">{tool.description}</p>
+        <div className="mt-6 space-y-8">
+          {documentation.map((section) => (
+            <section key={section.id} aria-labelledby={section.id + "-tool-guide-heading"} className="space-y-3">
+              <h3 id={section.id + "-tool-guide-heading"} className="text-base font-semibold tracking-tight text-fg">{section.heading}</h3>
+              {section.paragraphs.map((paragraph, index) => (
+                <p key={section.id + "-paragraph-" + index} className="text-sm leading-6 text-muted">{paragraph}</p>
+              ))}
+              {section.steps?.length ? (
+                <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">
+                  {section.steps.map((step, index) => <li key={section.id + "-step-" + index}>{step}</li>)}
+                </ol>
+              ) : null}
+              {section.bullets?.length ? (
+                <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
+                  {section.bullets.map((item, index) => <li key={section.id + "-bullet-" + index}>{item}</li>)}
+                </ul>
+              ) : null}
+            </section>
+          ))}
+        </div>
       </section>
 
       {related.length > 0 ? (
