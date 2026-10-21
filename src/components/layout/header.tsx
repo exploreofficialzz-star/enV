@@ -1,12 +1,18 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  BadgeDollarSign,
   Bell,
+  BookOpen,
   Check,
+  Coins,
+  CreditCard,
   Heart,
   Home,
+  Info,
   LayoutGrid,
   LifeBuoy,
+  Mail,
   MessageCircle,
   Monitor,
   MoreVertical,
@@ -14,23 +20,28 @@ import {
   Smartphone,
   Tablet,
   UserRound,
+  Wallet,
+  Wrench,
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { usePrefs } from "@/lib/storage";
 
 const MENU_ITEM_BASE_CLASS = "flex min-h-8 w-full items-center rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 const MENU_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} gap-2.5`;
-const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-0`;
+const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-2.5`;
 const MENU_HEADING_CLASS = "px-3 pb-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-accent";
 
 const MENU_GROUPS = [
   { title: "Product", links: [
-    { to: "/about", label: "About" }, { to: "/tools", label: "Tools" },
-    { to: "/pricing", label: "Pricing" }, { to: "/tokens/guide", label: "Token guide" },
+    { to: "/about", label: "About", icon: Info },
+    { to: "/tools", label: "Tools", icon: Wrench },
+    { to: "/pricing", label: "Pricing", icon: CreditCard },
+    { to: "/tokens/guide", label: "Token guide", icon: Coins },
   ] },
   { title: "Resources", links: [
-    { to: "/help", label: "Help center" }, { to: "/blog", label: "Blog & guides" },
-    { to: "/contact", label: "Contact" },
+    { to: "/help", label: "Help center", icon: LifeBuoy },
+    { to: "/blog", label: "Blog & guides", icon: BookOpen },
+    { to: "/contact", label: "Contact", icon: Mail },
   ] },
 ] as const;
 
@@ -131,30 +142,36 @@ export function Header() {
                 </summary>
                 <div ref={menuPanelRef} role="group" aria-label="More navigation" style={{ top: menuTop }} className="fixed right-3 z-50 w-[15.5rem] max-w-[calc(100vw_-_5rem)] sm:w-80 sm:max-w-[calc(100vw_-_4rem)] rounded-2xl border border-border bg-surface p-2 shadow-2xl">
                   <section className="border-b border-border px-1 py-1" aria-label="Account">
-                    <Link to="/account" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Account</Link>
-                    <Link to="/wallet" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Wallet</Link>
+                    <Link to="/account" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><UserRound size={16} className="shrink-0" aria-hidden="true" /><span>Account</span></Link>
+                    <Link to="/wallet" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><Wallet size={16} className="shrink-0" aria-hidden="true" /><span>Wallet</span></Link>
                   </section>
                   <section className="border-b border-border px-1 py-1" aria-label="View mode">
                     <h2 className={MENU_HEADING_CLASS}>View mode</h2>
                     <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <span className="flex min-w-0 flex-1 items-center gap-0"><Smartphone size={16} className="shrink-0" aria-hidden="true" /><span>Mobile view</span></span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2.5"><Smartphone size={16} className="shrink-0" aria-hidden="true" /><span>Mobile view</span></span>
                       {viewMode === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                     <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <span className="flex min-w-0 flex-1 items-center gap-0"><Tablet size={16} className="shrink-0" aria-hidden="true" /><span>Tablet view</span></span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2.5"><Tablet size={16} className="shrink-0" aria-hidden="true" /><span>Tablet view</span></span>
                       {viewMode === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                     <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <span className="flex min-w-0 flex-1 items-center gap-0"><Monitor size={16} className="shrink-0" aria-hidden="true" /><span>Desktop view</span></span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2.5"><Monitor size={16} className="shrink-0" aria-hidden="true" /><span>Desktop view</span></span>
                       {viewMode === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                   </section>
                   {MENU_GROUPS.map((group) => (
                     <section key={group.title} className="border-b border-border px-1 py-1 last:border-b-0" aria-label={group.title}>
                       <h2 className={MENU_HEADING_CLASS}>{group.title}</h2>
-                      {group.links.map((link) => (
-                        <Link key={link.to} to={link.to} onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>{link.label}</Link>
-                      ))}
+                      {group.links.map((link) => {
+                        const Icon = link.icon;
+                        return (
+                          <Link key={link.to} to={link.to} onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                            <Icon size={16} className="shrink-0" aria-hidden="true" />
+                            <span>{link.label}</span>
+                          </Link>
+                        );
+                      })}
                     </section>
                   ))}
                   <section className="px-1 py-1" aria-label="Preferences and support">

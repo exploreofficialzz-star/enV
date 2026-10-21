@@ -27,8 +27,20 @@ if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)
 if (!webMenu.includes("fixed right-3") || !webMenu.includes("w-[15.5rem]") || !webMenu.includes("max-w-[calc(100vw_-_5rem)]")) errors.push("Overflow card must remain right-aligned and compact on mobile instead of spanning nearly the whole screen.");
 const viewModeBlock = webMenu.slice(webMenu.indexOf('aria-label="View mode"'), webMenu.indexOf("</section>", webMenu.indexOf('aria-label="View mode"')));
 if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Mobile, tablet, and desktop views must have distinct device icons.");
-if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-0"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must be grouped directly beside their labels, with the selected-state indicator aligned separately.");
+if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes('const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-2.5`;') || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-2.5"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must have consistent small spacing before their labels, matching Settings and Help & feedback.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
+for (const [label, iconMarkup] of [
+  ["Account", '<UserRound size={16}'], ["Wallet", '<Wallet size={16}'],
+  ["Settings", '<SettingsIcon size={16}'], ["Help & feedback", '<MessageCircle size={16}'],
+]) {
+  if (!webMenu.includes(iconMarkup)) errors.push("Overflow item is missing its icon: " + label);
+}
+for (const [label, iconName] of [
+  ["About", "Info"], ["Tools", "Wrench"], ["Pricing", "CreditCard"],
+  ["Token guide", "Coins"], ["Help center", "LifeBuoy"], ["Blog & guides", "BookOpen"], ["Contact", "Mail"],
+]) {
+  if (!header.includes('label: "' + label + '", icon: ' + iconName)) errors.push("Overflow link data is missing the expected icon for " + label);
+}
 
 for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
