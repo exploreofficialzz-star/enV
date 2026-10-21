@@ -245,7 +245,7 @@ fun NativeUxUiStudioForm() {
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)}
+    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     val selected=elements.firstOrNull{it.id==selectedId};val bw=if(target=="mobile")390 else 1440;val bh=if(target=="mobile")844 else 900
@@ -329,16 +329,18 @@ fun NativeUxUiStudioForm() {
             iconBusy=true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val offset=if(loadMore)iconStart else 0
+                    val append=loadMore&&query==iconLoadedQuery
+                    val offset=if(append)iconStart else 0
                     val q=URLEncoder.encode(query,"UTF-8")
                     val payload=JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24&start="+offset).readText())
                     val icons=payload.optJSONArray("icons")?.let{arr->(0 until arr.length()).map{arr.optString(it)}}?:emptyList()
                     Triple(payload.optInt("total",offset+icons.size),icons,offset)
                 }
             }.onSuccess { result ->
-                iconResults=if(loadMore)iconResults+result.second else result.second
+                iconResults=if(append)iconResults+result.second else result.second
                 iconStart=result.third+result.second.size
                 iconTotal=result.first
+                iconLoadedQuery=query
                 notice=iconResults.size.toString()+" of "+iconTotal+" icon IDs loaded."
             }.onFailure { notice=it.message?: "Icon catalogue unavailable." }
             iconBusy=false
@@ -398,10 +400,11 @@ fun NativeUxUiStudioForm() {
                                 elements.forEach{e->
                                     val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
                                     Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale){
+                                        val density=androidx.compose.ui.platform.LocalDensity.current.density
                                         detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
                                             change.consume()
                                             val index=elements.indexOfFirst{it.id==e.id}
-                                            if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+dragAmount.x.roundToInt()).coerceAtLeast(0),y=(current.y+dragAmount.y.roundToInt()).coerceAtLeast(0))}
+                                            if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
                                         }
                                     }){
                                         if(e.kind=="icon" && e.iconSvg.isNotBlank()) {
