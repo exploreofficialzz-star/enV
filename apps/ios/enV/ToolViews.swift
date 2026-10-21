@@ -214,7 +214,7 @@ struct ToolDetailView: View {
                 }
                 .padding(.top, 40)
 
-                if !allRelatedTools.isEmpty && !(tool.category == "developer" && tool.tags.contains("developer-studio")) {
+                if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envAccent)
