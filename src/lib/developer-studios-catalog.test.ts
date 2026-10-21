@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { tools } from "@/data/catalog";
-import { getToolByPath, getToolsByCategory } from "@/lib/registry";
+import { getSearchableTools, getToolByPath, getToolsByCategory } from "@/lib/registry";
 import {
   DEVELOPER_STUDIOS,
   developerActionForLegacySlug,
@@ -69,9 +69,15 @@ test("High-value legacy routes resolve to semantically relevant Studio modes", (
   assert.deepEqual(resolve("developer-sql-schema-generator"), { studio: "sql-studio", mode: "schema", action: "encode" });
 });
 
-test("Developer category discovery leads with twelve Studio cards and keeps all legacy entries", () => {
+test("Developer category shows only twelve Studios while legacy tools remain searchable", () => {
   const categoryTools = getToolsByCategory("developer");
-  assert.equal(categoryTools.filter((tool) => tool.tags.includes("developer-studio")).length, 12);
-  assert.equal(categoryTools.filter((tool) => !tool.tags.includes("developer-studio")).length, 474);
-  assert.deepEqual(categoryTools.slice(0, 12).map((tool) => tool.id), DEVELOPER_STUDIOS.map((studio) => studio.id), "the twelve Studio cards lead the category index");
+  assert.equal(categoryTools.length, 12);
+  assert.ok(categoryTools.every((tool) => tool.tags.includes("developer-studio")));
+  assert.deepEqual(categoryTools.map((tool) => tool.id), DEVELOPER_STUDIOS.map((studio) => studio.id), "category discovery contains only the twelve Studio cards");
+
+  const searchIndex = getSearchableTools().filter((tool) => tool.category === "developer");
+  assert.equal(searchIndex.filter((tool) => tool.tags.includes("developer-studio")).length, 12);
+  assert.equal(searchIndex.filter((tool) => !tool.tags.includes("developer-studio")).length, 474);
+  assert.ok(searchIndex.some((tool) => tool.slug === "json-diff"), "individual tools remain searchable");
+  assert.ok(getToolByPath("developer", "json-diff"), "legacy URLs remain resolvable and redirect at the route layer");
 });
