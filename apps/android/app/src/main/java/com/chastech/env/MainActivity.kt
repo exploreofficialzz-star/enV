@@ -1086,7 +1086,7 @@ private fun ToolDetail(
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text("${tool.description} Results can be copied or downloaded from this page.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
-            if (related.isNotEmpty()) {
+            if (related.isNotEmpty() && !(tool.category == "developer" && tool.tags.any { it == "developer-studio" })) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
                 Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
