@@ -4,10 +4,14 @@ import com.chastech.env.ui.CharacterSpacedText as Text
 
 import android.content.Intent
 import android.net.Uri
+import java.net.URL
+import java.util.Locale
+import org.json.JSONObject
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.chastech.env.billing.OfflineWalletJournal
 import com.chastech.env.billing.OfflineWalletNativeApi
 import androidx.compose.material3.CardDefaults
@@ -72,8 +78,125 @@ import androidx.compose.ui.unit.sp
 import com.chastech.env.ui.ChasTechnologiesLogo
 import com.chastech.env.ui.EnVIcon
 
+
 @Composable
-fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
+private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
+    val allTools = remember(catalog) {
+        (catalog.tools + catalog.relatedReferenceTools).distinctBy { it.id }.sortedBy { it.name.lowercase(Locale.ROOT) }
+    }
+    val categories = remember(allTools) { listOf("all") + allTools.map { it.category }.distinct().sorted() }
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("all") }
+    var visibleCount by remember { mutableStateOf(36) }
+    var selectedToolId by remember { mutableStateOf<String?>(null) }
+    var profile by remember { mutableStateOf<JSONObject?>(null) }
+    var profileError by remember { mutableStateOf<String?>(null) }
+    var loadingProfile by remember { mutableStateOf(false) }
+    val matches = remember(allTools, query, category) {
+        val q = query.trim().lowercase(Locale.ROOT)
+        allTools.filter { tool ->
+            (category == "all" || tool.category == category) &&
+            (q.isBlank() || (listOf(tool.name, tool.id, tool.description, tool.category, tool.subcategory.orEmpty()) + tool.keywords + tool.tags).any { it.lowercase(Locale.ROOT).contains(q) })
+        }
+    }
+    LaunchedEffect(query, category) { visibleCount = 36 }
+    LaunchedEffect(selectedToolId) {
+        profile = null
+        profileError = null
+        val toolId = selectedToolId ?: return@LaunchedEffect
+        loadingProfile = true
+        try {
+            val body = withContext(Dispatchers.IO) {
+                val connection = URL("https://envtools.store/api/billing/tool?toolId=${Uri.encode(toolId)}").openConnection().apply {
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                }
+                connection.getInputStream().bufferedReader().use { it.readText() }
+            }
+            val response = JSONObject(body)
+            profile = if (response.optBoolean("ok")) response.optJSONObject("data") else null
+            if (profile == null) profileError = "A current profile is not available for this tool."
+        } catch (_: Exception) {
+            profileError = "The estimate profile could not be loaded. Check the connection and try again."
+        } finally {
+            loadingProfile = false
+        }
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Estimated tokens across enV tools", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("This is the documentary reference for token estimates throughout the catalogue. Search for a tool to review its classification, stated unit, available rate hypothesis, and measurement limits.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Reference conversion: 100 tokens ≈ $1.00 USD", style = MaterialTheme.typography.titleSmall)
+                Text("Internal accounting uses 1,000 milli-token subunits per token. Divide a profile's provisional subunits per unit by 1,000 to express tokens per stated unit.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Profiles generated from catalogue metadata are provisional classifications, not necessarily measured costs or user-specific quotes. If no numeric rate is available, the guide must not present that unknown amount as zero cost.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        NativeGuideSection("How to read each profile", listOf(
+            "Unit label identifies what a rate would apply to; never compare a number without its unit. Pricing method indicates a provisional per-unit hypothesis or that measured provider cost is required.",
+            "Execution model describes the catalogue classification as local/tool-dependent or cloud/remote. Measurement dimensions describe the current factors that should be recorded. Pricing version and classification explanation provide context about the profile.",
+            "Premium and optional AI-assistance flags are catalogue metadata. They do not authorize a hidden charge; billable work needs a disclosed price and a verified charging flow.",
+        ))
+        NativeGuideSection("Factors that may affect usage", listOf(
+            "Local utilities differ from batch work, long media tasks, hosted document processing, and AI-assisted workflows in the resources they consume.",
+            "Relevant factors can include input size, page or item count, duration, resolution, output size, model input/output volume, retries, and provider charges. Which factors apply depends on the actual tool and must be measured rather than assumed.",
+            "Use the token button on the home page to review account usage recorded by tool. This guide explains estimate profiles; it is not a substitute for recorded account activity.",
+        ))
+        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Search the tool catalogue") }, placeholder = { Text("Name, category, keyword, or purpose") }, singleLine = true)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            categories.forEach { item ->
+                val label = if (item == "all") "All categories" else item.replace('-', ' ').replaceFirstChar { it.uppercase() }
+                if (category == item) Button(onClick = { category = item }) { Text(label) }
+                else OutlinedButton(onClick = { category = item }) { Text(label) }
+            }
+        }
+        Text("${matches.size} matching tools · ${allTools.size} catalogue entries", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (matches.isEmpty()) Text("No tools matched. Try a shorter search or select all categories.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        matches.take(visibleCount).forEach { tool ->
+            val selected = selectedToolId == tool.id
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { selectedToolId = if (selected) null else tool.id },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(tool.category.replace('-', ' ').replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tool.name, style = MaterialTheme.typography.titleSmall)
+                    Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(if (selected) "Hide estimate profile" else "View token estimate profile", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    if (selected) {
+                        when {
+                            loadingProfile -> Text("Loading estimate classification…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            profileError != null -> Text(profileError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            profile != null -> {
+                                val details = profile!!
+                                val unit = details.optString("unitLabel", "operation")
+                                val subunits = details.optDouble("provisionalSubunitsPerUnit", Double.NaN)
+                                Text("Pricing status: ${details.optString("priceStatus", "provisional")}", style = MaterialTheme.typography.labelMedium)
+                                if (!details.isNull("provisionalSubunitsPerUnit") && subunits.isFinite()) {
+                                    Text("Provisional rate: ${"%.3f".format(Locale.US, subunits / 1000.0)} tokens per $unit", style = MaterialTheme.typography.titleSmall)
+                                } else Text("Numeric estimate: not available until the applicable cost can be measured", style = MaterialTheme.typography.titleSmall)
+                                Text("Pricing method: ${details.optString("pricingMode", "not specified").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                Text("Execution model: ${details.optString("executionMode", "tool-dependent").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                Text("Measurement dimensions: ${details.optJSONArray("meteringDimensions")?.let { array -> (0 until array.length()).joinToString(", ") { array.optString(it) } } ?: unit}", style = MaterialTheme.typography.bodySmall)
+                                Text("Pricing version: ${details.optString("pricingVersion", "not specified")}", style = MaterialTheme.typography.bodySmall)
+                                Text(details.optString("classificationReason", "Generated from catalogue metadata; actual costs have not necessarily been measured."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (details.optBoolean("premiumRequired")) Text("Catalogued premium flag: enabled", style = MaterialTheme.typography.labelSmall)
+                                val aiProfile = details.optString("optionalAiAssistProfile", "")
+                                if (aiProfile.isNotBlank() && aiProfile != "null") Text("Optional AI-assistance profile: $aiProfile. This is separate from the underlying operation.", style = MaterialTheme.typography.bodySmall)
+                                Text("This is a provisional reference profile, not a guaranteed charge or a record of tokens used.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (visibleCount < matches.size) TextButton(onClick = { visibleCount = (visibleCount + 36).coerceAtMost(matches.size) }, modifier = Modifier.fillMaxWidth()) { Text("Show more tools (${matches.size - visibleCount} remaining)") }
+    }
+}
+
+@Composable
+fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit) {
     val context = LocalContext.current
     val title = when (pageId) {
         "about" -> "About enV"
@@ -124,7 +247,7 @@ fun NativeInformationScreen(pageId: String, onBack: () -> Unit) {
             when (pageId) {
                 "about" -> AboutInformation()
                 "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
-                "tokens" -> InformationSection("Understanding tokens", listOf("Token usage depends on the tool and the work being performed.", "Local utilities may use different rules from hosted AI, media processing, and multi-step workflows.", "Review relevant tool information and Wallet activity when evaluating token usage."))
+                "tokens" -> NativeTokenGuide(catalog)
                 "token-dashboard" -> NativeTokenDashboard()
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()

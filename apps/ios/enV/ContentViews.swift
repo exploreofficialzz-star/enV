@@ -1047,6 +1047,7 @@ private struct EmptyStateView: View {
 
 
 struct NativeInformationPageView: View {
+    @EnvironmentObject private var store: CatalogStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var showWalletNotifications = false
@@ -1134,7 +1135,7 @@ struct NativeInformationPageView: View {
         case "pricing": NativePricingInformationPage()
         case "contact": NativeContactInformationPage()
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
-        case "tokens": NativeInfoSectionView(title: "Understanding tokens", paragraphs: ["Token usage depends on the tool and the work being performed.", "Local utilities may use different rules from hosted AI, media processing, and multi-step workflows.", "Review relevant tool information and Wallet activity when evaluating token usage."])
+        case "tokens": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
         case "token-dashboard": NativeTokenDashboardView()
         case "account": VStack(alignment: .leading, spacing: 14) {
              NativeInfoSectionView(title: "Welcome back to enV", paragraphs: ["Sign in or create an account from the enV sign-in page."])
@@ -1148,6 +1149,175 @@ struct NativeInformationPageView: View {
         case "disclaimer": NativeDisclaimerInformationPage()
         case "responsible-use": NativeResponsibleUseInformationPage()
         default: NativeAboutInformationPage()
+        }
+    }
+}
+
+
+private struct NativeTokenGuideView: View {
+    let tools: [Tool]
+    @State private var query = ""
+    @State private var selectedCategory = "All categories"
+    @State private var visibleCount = 36
+    @State private var selectedToolID: String?
+    @State private var profile: [String: Any]?
+    @State private var isLoadingProfile = false
+    @State private var profileError: String?
+
+    init(tools: [Tool]) {
+        var unique: [String: Tool] = [:]
+        for tool in tools where unique[tool.id] == nil { unique[tool.id] = tool }
+        self.tools = unique.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var categories: [String] {
+        ["All categories"] + Array(Set(tools.map { $0.category.replacingOccurrences(of: "-", with: " ").capitalized })).sorted()
+    }
+
+    private var matches: [Tool] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return tools.filter { tool in
+            (selectedCategory == "All categories" || tool.category.replacingOccurrences(of: "-", with: " ").capitalized == selectedCategory) &&
+            (needle.isEmpty || tool.searchText.contains(needle))
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Estimated tokens across enV tools").font(.headline).foregroundStyle(Color.envInk)
+            Text("This is the documentary reference for token estimates throughout the catalogue. Search for a tool to review its classification, stated unit, available rate hypothesis, and measurement limits.")
+                .font(.subheadline).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Reference conversion: 100 tokens ≈ $1.00 USD").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                Text("Internal accounting uses 1,000 milli-token subunits per token. Divide a profile's provisional subunits per unit by 1,000 to express tokens per stated unit.")
+                    .font(.footnote).foregroundStyle(Color.envMuted)
+                Text("Profiles generated from catalogue metadata are provisional classifications, not necessarily measured costs or user-specific quotes. If no numeric rate is available, the guide must not present that unknown amount as zero cost.")
+                    .font(.footnote).foregroundStyle(Color.envMuted)
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+            NativeInfoSectionView(title: "How to read each profile", paragraphs: [
+                "Unit label identifies what a rate would apply to; never compare a number without its unit. Pricing method indicates a provisional per-unit hypothesis or that measured provider cost is required.",
+                "Execution model describes the catalogue classification as local/tool-dependent or cloud/remote. Measurement dimensions describe factors to record. Pricing version and classification explanation provide context about the profile's source and maturity.",
+                "Premium and optional AI-assistance flags are catalogue metadata; they do not authorize a hidden charge. Any billable workflow needs a clear price disclosure and a verified charging flow."
+            ])
+            NativeInfoSectionView(title: "Factors that may affect usage", paragraphs: [
+                "Local utilities differ from batch operations, long media tasks, hosted document processing, and AI-assisted workflows in the resources they consume.",
+                "Relevant factors can include input size, page or item count, duration, resolution, output size, model input/output volume, retries, and provider charges. Which factors apply depends on the actual tool and must be measured rather than assumed.",
+                "Use the token button on the home page to open the token dashboard and review account usage recorded by tool. This guide explains profile estimates and classifications; it is not a substitute for account activity."
+            ])
+            TextField("Search by tool, category, keyword, or purpose", text: $query)
+                .textFieldStyle(.roundedBorder).accessibilityLabel("Search token profiles")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(categories, id: \.self) { category in
+                        Button {
+                            selectedCategory = category
+                            visibleCount = 36
+                        } label: {
+                            Text(category).font(.caption.weight(.medium)).padding(.horizontal, 12).padding(.vertical, 8)
+                                .foregroundStyle(selectedCategory == category ? Color.white : Color.envInk)
+                                .background(selectedCategory == category ? Color.envAccent : Color.envSurface2, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Text("\(matches.count) matching tools · \(tools.count) catalogue entries").font(.caption).foregroundStyle(Color.envMuted)
+            ForEach(Array(matches.prefix(visibleCount))) { tool in
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        selectedToolID = selectedToolID == tool.id ? nil : tool.id
+                        profile = nil
+                        profileError = nil
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tool.category.replacingOccurrences(of: "-", with: " ").capitalized).font(.caption2).foregroundStyle(Color.envMuted)
+                                Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                Text(tool.description).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: selectedToolID == tool.id ? "chevron.up" : "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted).padding(.top, 8)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if selectedToolID == tool.id {
+                        if isLoadingProfile {
+                            ProgressView("Loading estimate classification…").font(.footnote)
+                        } else if let profileError {
+                            Text(profileError).font(.footnote).foregroundStyle(Color.envMuted)
+                        } else if let profile {
+                            NativeTokenProfileDetails(profile: profile)
+                        }
+                    }
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            }
+            if matches.isEmpty { Text("No tools matched. Try a shorter search or select all categories.").font(.footnote).foregroundStyle(Color.envMuted) }
+            if visibleCount < matches.count {
+                Button("Show more tools (\(matches.count - visibleCount) remaining)") { visibleCount = min(visibleCount + 36, matches.count) }
+                    .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 8)
+            }
+        }
+        .task(id: selectedToolID) {
+            profile = nil
+            profileError = nil
+            guard let toolID = selectedToolID else { return }
+            isLoadingProfile = true
+            defer { isLoadingProfile = false }
+            do {
+                var components = URLComponents(string: "https://envtools.store/api/billing/tool")!
+                components.queryItems = [URLQueryItem(name: "toolId", value: toolID)]
+                guard let url = components.url else { throw URLError(.badURL) }
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                guard let root, root["ok"] as? Bool == true, let payload = root["data"] as? [String: Any] else { throw URLError(.cannotParseResponse) }
+                profile = payload
+            } catch {
+                profileError = "This estimate profile could not be loaded. Check your connection and try again."
+            }
+        }
+    }
+}
+
+private struct NativeTokenProfileDetails: View {
+    let profile: [String: Any]
+    private var unitLabel: String { profile["unitLabel"] as? String ?? "operation" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Pricing status: \(profile["priceStatus"] as? String ?? "provisional")").font(.caption.weight(.semibold)).foregroundStyle(Color.envInk)
+            if let subunits = profile["provisionalSubunitsPerUnit"] as? NSNumber {
+                Text("Provisional rate: \(String(format: "%.3f", subunits.doubleValue / 1000.0)) tokens per \(unitLabel)").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            } else {
+                Text("Numeric estimate: not available until the applicable cost can be measured").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            }
+            detailRow("Pricing method", value: (profile["pricingMode"] as? String ?? "not specified").replacingOccurrences(of: "-", with: " "))
+            detailRow("Execution model", value: (profile["executionMode"] as? String ?? "tool-dependent").replacingOccurrences(of: "-", with: " "))
+            detailRow("Measurement dimensions", value: (profile["meteringDimensions"] as? [String] ?? [unitLabel]).joined(separator: ", "))
+            detailRow("Pricing version", value: profile["pricingVersion"] as? String ?? "not specified")
+            if let reason = profile["classificationReason"] as? String {
+                Text(reason).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            }
+            if profile["premiumRequired"] as? Bool == true { detailRow("Catalogue access flag", value: "Premium") }
+            if let aiProfile = profile["optionalAiAssistProfile"] as? String, !aiProfile.isEmpty {
+                detailRow("Optional AI-assistance profile", value: aiProfile + " (separate from the underlying operation)")
+            }
+            Text("This is a provisional reference profile, not a guaranteed charge or a record of tokens used.").font(.footnote).foregroundStyle(Color.envMuted)
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func detailRow(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption).foregroundStyle(Color.envMuted)
+            Text(value).font(.footnote.weight(.medium)).foregroundStyle(Color.envInk).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
