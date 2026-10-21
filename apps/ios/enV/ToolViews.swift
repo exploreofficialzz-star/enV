@@ -6693,6 +6693,15 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var fontSize: Int = 16
     var fontWeight: Int = 400
     var lineHeight: Double = 1.35
+    var horizontalConstraint: String = "left"
+    var verticalConstraint: String = "top"
+    var minWidth: Int = 0
+    var maxWidth: Int = 0
+    var visibleOn: [String] = ["mobile", "tablet", "desktop"]
+    var referenceWidth: Int = 390
+    var referenceHeight: Int = 844
+    var componentKey: String = ""
+    var iconViewBox: String = "0 0 24 24"
 }
 
 
@@ -6782,14 +6791,46 @@ private final class UxUiIconSnapshotDelegate: NSObject, WKNavigationDelegate {
     }
 }
 
+private struct UxUiNativeColorToken: Codable, Identifiable, Equatable {
+    var name: String
+    var value: String
+    var id: String { name }
+}
+private struct UxUiNativeTypographyToken: Codable, Identifiable, Equatable {
+    var name: String
+    var fontFamily: String
+    var fontSize: Int
+    var fontWeight: Int
+    var lineHeight: Double
+    var id: String { name }
+}
+private struct UxUiNativeTokens: Codable, Equatable {
+    var colors: [UxUiNativeColorToken] = [
+        .init(name: "primary", value: "#2563EB"),
+        .init(name: "surface", value: "#FFFFFF"),
+        .init(name: "text", value: "#111827"),
+        .init(name: "muted", value: "#64748B"),
+        .init(name: "border", value: "#E5E7EB")
+    ]
+    var typography: [UxUiNativeTypographyToken] = [
+        .init(name: "heading", fontFamily: "Inter", fontSize: 24, fontWeight: 700, lineHeight: 1.2),
+        .init(name: "body", fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.5),
+        .init(name: "label", fontFamily: "Inter", fontSize: 12, fontWeight: 600, lineHeight: 1.35)
+    ]
+    var spacing: [Int] = [4, 8, 12, 16, 24, 32, 48]
+}
 private struct UxUiNativeProject: Codable {
-    var schemaVersion = 1
+    var schemaVersion = 2
     var name: String
     var target: String
     var background: String
     var viewport: UxUiViewport
+    var breakpoints: [String: Int]? = nil
+    var tokens: UxUiNativeTokens? = nil
+    var reusableComponents: [UxUiNativeLayer]? = nil
     var elements: [UxUiNativeLayer]
     var aiPrompt: String
+    var generatedCode: [String: String]? = nil
     var updatedAt: String
 }
 private struct UxUiViewport: Codable { var width: Int; var height: Int }
@@ -6804,7 +6845,7 @@ private func uxUiPlatformColor(_ hex: String, fallback: UIColor = .white) -> UIC
 private func uxUiUIColor(_ hex: String) -> Color { Color(uiColor: uxUiPlatformColor(hex)) }
 
 private struct UxUiStudioExport: FileDocument {
-    static var readableContentTypes: [UTType] { [.pdf, .json] }
+    static var readableContentTypes: [UTType] { [.pdf, .json, .plainText] }
     var data: Data
     init(data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
@@ -6818,6 +6859,14 @@ private struct NativeUxUiStudioView: View {
     @State private var target = "mobile"
     @State private var projectName = "Mobile dashboard"
     @State private var background = "#F8FAFC"
+    @State private var customArtboard = false
+    @State private var customWidth = 390
+    @State private var customHeight = 844
+    @State private var tokens = UxUiNativeTokens()
+    @State private var tokenNameDraft = "brand"
+    @State private var tokenValueDraft = "#2563EB"
+    @State private var spacingDraft = "20"
+    @State private var reusableComponents: [UxUiNativeLayer] = []
     @State private var elements: [UxUiNativeLayer] = []
     @State private var undoHistory: [[UxUiNativeLayer]] = []
     @State private var redoHistory: [[UxUiNativeLayer]] = []
@@ -6834,11 +6883,16 @@ private struct NativeUxUiStudioView: View {
     @State private var imageTargetID: UUID?
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
+    @State private var isExportingSource = false
+    @State private var sourceFilename = "UXUIDesign.html"
     @State private var pdfDocument = UxUiStudioExport(data: Data())
     @State private var jsonDocument = UxUiStudioExport(data: Data())
+    @State private var sourceDocument = UxUiStudioExport(data: Data())
 
-    private var boardWidth: Int { target == "mobile" ? 390 : 1440 }
-    private var boardHeight: Int { target == "mobile" ? 844 : 900 }
+    private var defaultBoardWidth: Int { target == "mobile" ? 390 : target == "tablet" ? 768 : 1440 }
+    private var defaultBoardHeight: Int { target == "mobile" ? 844 : target == "tablet" ? 1024 : 900 }
+    private var boardWidth: Int { customArtboard ? customWidth : defaultBoardWidth }
+    private var boardHeight: Int { customArtboard ? customHeight : defaultBoardHeight }
     private var selectedIndex: Int? { elements.firstIndex(where: { $0.id == selectedID }) }
 
     private func checkpoint() {
@@ -7355,9 +7409,14 @@ private struct NativeUxUiStudioView: View {
 
     private func startDesign(_ nextTarget: String, preset: String) {
         target = nextTarget
+        customArtboard = false
+        customWidth = nextTarget == "mobile" ? 390 : nextTarget == "tablet" ? 768 : 1440
+        customHeight = nextTarget == "mobile" ? 844 : nextTarget == "tablet" ? 1024 : 900
         background = nextTarget == "mobile" ? "#F8FAFC" : "#FFFFFF"
-        projectName = preset == "mobile-login" ? "Mobile login" : preset == "desktop-dashboard" ? "Desktop dashboard" : preset == "desktop-settings" ? "Desktop settings" : preset == "desktop-landing" ? "Website landing" : "Mobile dashboard"
-        elements = starterElements(target: nextTarget, preset: preset)
+        projectName = preset == "mobile-login" ? "Mobile login" : preset == "tablet-dashboard" ? "Tablet dashboard" : preset == "tablet-settings" ? "Tablet settings" : preset == "desktop-dashboard" ? "Desktop dashboard" : preset == "desktop-settings" ? "Desktop settings" : preset == "desktop-landing" ? "Website landing" : "Mobile dashboard"
+        elements = starterElements(target: nextTarget, preset: preset).map { item in
+            var layer = item; layer.referenceWidth = customWidth; layer.referenceHeight = customHeight; return layer
+        }
         selectedID = elements.first?.id
         onboarding = false
         notice = "Design ready. Select a layer to adjust its exact specifications."
