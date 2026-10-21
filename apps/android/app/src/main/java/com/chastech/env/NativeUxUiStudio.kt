@@ -1,6 +1,7 @@
 package com.chastech.env
 
 import android.graphics.Paint
+import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
@@ -46,7 +47,7 @@ import kotlin.math.roundToInt
 
 private data class UxUiNativeLayer(
     val id: String, val kind: String, val name: String, val x: Int, val y: Int, val width: Int, val height: Int,
-    val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "",
+    val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "",
     val fontFamily: String = "sans-serif", val fontSize: Int = 16, val fontWeight: Int = 400,
     val radius: Int = 12, val borderColor: String = "#E5E7EB", val borderWidth: Int = 0, val padding: Int = 12,
     val marginTop: Int = 0, val marginRight: Int = 0, val marginBottom: Int = 0, val marginLeft: Int = 0
@@ -69,6 +70,12 @@ private fun uxNativeSafeIconSvg(svg: String, color: String): String {
 private fun uxNativeIconHtml(svg: String, color: String): String =
     "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" +
         uxNativeSafeIconSvg(svg, color) + "</body></html>"
+
+private fun uxNativeImageHtml(dataUrl: String): String {
+    val valid = Regex("^data:image/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$", RegexOption.IGNORE_CASE).matches(dataUrl)
+    val source = if (valid) dataUrl else ""
+    return "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{display:block;width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='" + source + "'></body></html>"
+}
 
 private fun uxNativeDrawSvgIcon(canvas: android.graphics.Canvas, element: UxUiNativeLayer) {
     if (element.iconSvg.isBlank()) return
@@ -105,7 +112,7 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
     elements.forEach { element -> put(JSONObject().apply {
         put("id", element.id); put("kind", element.kind); put("name", element.name)
         put("x", element.x); put("y", element.y); put("width", element.width); put("height", element.height)
-        put("text", element.text); put("color", element.color); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg)
+        put("text", element.text); put("color", element.color); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg); put("imageData", element.imageData)
         put("fontFamily", element.fontFamily); put("fontSize", element.fontSize); put("fontWeight", element.fontWeight)
         put("radius", element.radius); put("borderColor", element.borderColor); put("borderWidth", element.borderWidth); put("padding", element.padding)
         put("marginTop", element.marginTop); put("marginRight", element.marginRight); put("marginBottom", element.marginBottom); put("marginLeft", element.marginLeft)
@@ -118,7 +125,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
         add(UxUiNativeLayer(
             id=item.optString("id","layer-"+index),kind=item.optString("kind","text"),name=item.optString("name","Layer"),
             x=item.optInt("x"),y=item.optInt("y"),width=item.optInt("width",180).coerceAtLeast(1),height=item.optInt("height",48).coerceAtLeast(1),
-            text=item.optString("text"),color=item.optString("color","#111827"),fill=item.optString("fill","transparent"),iconName=item.optString("iconName"),iconSvg=item.optString("iconSvg"),
+            text=item.optString("text"),color=item.optString("color","#111827"),fill=item.optString("fill","transparent"),iconName=item.optString("iconName"),iconSvg=item.optString("iconSvg"),imageData=item.optString("imageData"),
             fontFamily=item.optString("fontFamily","sans-serif"),fontSize=item.optInt("fontSize",16).coerceAtLeast(1),fontWeight=item.optInt("fontWeight",400),
             radius=item.optInt("radius",12),borderColor=item.optString("borderColor","#E5E7EB"),borderWidth=item.optInt("borderWidth"),padding=item.optInt("padding",12),
             marginTop=item.optInt("marginTop"),marginRight=item.optInt("marginRight"),marginBottom=item.optInt("marginBottom"),marginLeft=item.optInt("marginLeft")
@@ -219,6 +226,19 @@ private object UxUiNativePdf {
                 val t=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=runCatching{android.graphics.Color.parseColor(e.color)}.getOrDefault(android.graphics.Color.BLACK);textSize=e.fontSize.toFloat();typeface=Typeface.create(e.fontFamily,if(e.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)}
                 if (e.kind == "icon" && e.iconSvg.isNotBlank()) {
                     uxNativeDrawSvgIcon(canvas, e)
+                } else if(e.kind=="image" && e.imageData.startsWith("data:image/")) {
+                    val payload=e.imageData.substringAfter(",", "")
+                    val bitmap=runCatching{val bytes=android.util.Base64.decode(payload,android.util.Base64.DEFAULT);BitmapFactory.decodeByteArray(bytes,0,bytes.size)}.getOrNull()
+                    if(bitmap!=null){
+                        canvas.save()
+                        val clipPath=android.graphics.Path().apply{addRoundRect(r,e.radius.toFloat(),e.radius.toFloat(),android.graphics.Path.Direction.CW)}
+                        canvas.clipPath(clipPath)
+                        canvas.drawBitmap(bitmap,null,r,Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                        canvas.restore()
+                        bitmap.recycle()
+                    } else {
+                        t.textSize=12f;canvas.drawText("Image unavailable",e.x.toFloat()+e.padding,e.y.toFloat()+e.padding+12f,t)
+                    }
                 } else {
                     val content=if(e.kind=="icon")e.iconName.substringAfterLast(":") else e.text;var y=e.y+e.padding+e.fontSize
                     content.lines().forEach { line -> if(line.isNotEmpty()){var remaining=line;var guard=0;while(remaining.isNotEmpty()&&guard<10){val count=t.breakText(remaining,true,(e.width-2*e.padding).toFloat(),null).coerceAtLeast(1);canvas.drawText(remaining.take(count),(e.x+e.padding).toFloat(),y.toFloat(),t);remaining=remaining.drop(count).trimStart();y+=e.fontSize+3;guard++}}else y+=e.fontSize }
@@ -294,6 +314,7 @@ fun NativeUxUiStudioForm() {
             "card"->UxUiNativeLayer(id,kind,"Card",24,270,300,132,"Card title\\nSupporting text",fill="#FFFFFF",borderWidth=1,radius=18,padding=18)
             "input"->UxUiNativeLayer(id,kind,"Text input",24,420,300,48,"Enter your email",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "icon"->UxUiNativeLayer(id,kind,"Icon",24,490,44,44,"",iconName="mdi:home",color="#2563EB")
+            "image"->UxUiNativeLayer(id,kind,"Image",24,330,280,160,"Import an image",color="#64748B",fill="#E5E7EB",radius=12)
             "circle","ellipse"->UxUiNativeLayer(id,"ellipse","Circle",24,540,84,84,"",fill="#DBEAFE",radius=42)
             "divider"->UxUiNativeLayer(id,kind,"Divider",24,640,300,1,"",fill="#CBD5E1")
             "row","list"->UxUiNativeLayer(id,kind,"List row",24,330,300,64,"Account settings\\nManage your profile",fill="#FFFFFF",borderWidth=1,radius=10,padding=14)
@@ -344,6 +365,27 @@ fun NativeUxUiStudioForm() {
                 notice=iconResults.size.toString()+" of "+iconTotal+" icon IDs loaded."
             }.onFailure { notice=it.message?: "Icon catalogue unavailable." }
             iconBusy=false
+        }
+    }
+
+    var imageTargetId by remember{mutableStateOf("")}
+    val imageLauncher=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri:Uri?->
+        if(uri!=null){
+            val layerId=imageTargetId
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val mime=context.contentResolver.getType(uri)?.lowercase() ?: "image/png"
+                        require(mime in setOf("image/png","image/jpeg","image/webp","image/gif")) { "Use a PNG, JPEG, WebP or GIF image." }
+                        val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()}?:error("Could not read the selected image.")
+                        require(bytes.size<=4*1024*1024) { "Images must be 4 MB or smaller for a portable project." }
+                        "data:"+mime+";base64,"+android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP)
+                    }
+                }.onSuccess { dataUrl ->
+                    val index=elements.indexOfFirst{it.id==layerId}
+                    if(index>=0){checkpoint();elements[index]=elements[index].copy(kind="image",name="Image",imageData=dataUrl);notice="Image imported and saved in the design project."}
+                }.onFailure { notice=it.message?:"Image import failed." }
+            }
         }
     }
 
@@ -408,7 +450,7 @@ fun NativeUxUiStudioForm() {
                                             if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
                                         }
                                     }){
-                                        if(e.kind=="icon" && e.iconSvg.isNotBlank()) {
+                                        if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
                                             AndroidView(
                                                 factory={ctx->WebView(ctx).apply{
                                                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -423,7 +465,7 @@ fun NativeUxUiStudioForm() {
                                                 }},
                                                 modifier=Modifier.fillMaxSize(),
                                                 update={view->
-                                                    val html=uxNativeIconHtml(e.iconSvg,e.color)
+                                                    val html=if(e.kind=="icon")uxNativeIconHtml(e.iconSvg,e.color) else uxNativeImageHtml(e.imageData)
                                                     if(view.tag != html){view.tag=html;view.loadDataWithBaseURL(null,html,"text/html","UTF-8",null)}
                                                 }
                                             )
@@ -438,7 +480,7 @@ fun NativeUxUiStudioForm() {
                     Text("Preview scales to fit. Coordinates remain design pixels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
                 Text("Add elements",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
+                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
                 Text("Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 elements.forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
                 selected?.let{e->
@@ -475,6 +517,10 @@ fun NativeUxUiStudioForm() {
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedTextField(e.marginBottom.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(marginBottom=n)}}},label={Text("Margin bottom")},modifier=Modifier.weight(1f),singleLine=true)
                             OutlinedTextField(e.marginLeft.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(marginLeft=n)}}},label={Text("Margin left")},modifier=Modifier.weight(1f),singleLine=true)
+                        }
+                        if(e.kind=="image"){
+                            Button(onClick={imageTargetId=e.id;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text(if(e.imageData.isBlank())"Import image (PNG, JPEG, WebP or GIF)" else "Replace image")}
+                            Text("Raster image assets up to 4 MB are embedded into JSON and rendered in the artboard.",style=MaterialTheme.typography.bodySmall)
                         }
                         if(e.kind=="icon"){
                             OutlinedTextField(iconQuery,{iconQuery=it},label={Text("Search icon library")},modifier=Modifier.fillMaxWidth(),singleLine=true)
