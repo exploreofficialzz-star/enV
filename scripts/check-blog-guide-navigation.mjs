@@ -10,7 +10,11 @@ const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const baseUrl = new URL(process.env.BLOG_GUIDE_BASE_URL || "http://127.0.0.1:8080");
 
-const browser = await chromium.launch({ headless: true });
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const browser = await chromium.launch({
+  headless: true,
+  ...(executablePath ? { executablePath } : {}),
+});
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const pageErrors = [];
