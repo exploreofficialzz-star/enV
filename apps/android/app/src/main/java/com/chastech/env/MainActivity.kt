@@ -1034,7 +1034,7 @@ private fun ToolDetail(
                         tool.description,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(start = if (compact) 56.dp else 0.dp),
                     )
                 }
             }
@@ -1242,7 +1242,14 @@ private fun NativeToolGuideContent(tool: ToolRecord) {
             processing,
             "Do not submit passwords, private keys, session cookies, payment details, confidential business records, or sensitive personal information until you have confirmed that the tool's actual processing path is appropriate.",
         ))
-        NativeGuideSection("Availability and limitations", listOfNotNull(availability, disclaimer))
+        NativeGuideSection("Availability and account requirements", listOf(
+            availability,
+            if (tool.requiresAuth) "This tool is marked as requiring an authenticated account for account-gated functionality." else "The catalogue does not declare a sign-in requirement for this tool; account and separate hosted services may have their own requirements.",
+        ))
+        NativeGuideSection("Limitations and responsible use", listOfNotNull(
+            disclaimer,
+            "The catalogue description is not proof that every format, device capability, output, or external service is supported. Treat generated content and estimates as outputs to review and independently verify consequential results before relying on them.",
+        ))
         NativeGuideSection("Troubleshooting", listOf(
             "Start with the exact status or error shown by the form. Try a small, non-sensitive known-good example to isolate input problems.",
             "If processing does not start, check connectivity when a backend is required and relevant device or file permissions. If output looks wrong, re-check units, selected options, source format, and assumptions.",
