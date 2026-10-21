@@ -3,12 +3,15 @@ package com.chastech.env
 import android.graphics.Paint
 import android.graphics.BitmapFactory
 import android.graphics.RectF
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -22,12 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
-import android.webkit.WebView
 import androidx.core.graphics.PathParser
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -83,50 +87,82 @@ private fun uxNativeCleanIconSvg(svg: String): String =
         .replace(Regex("(?is)<foreignObject\\b[^>]*>.*?</foreignObject\\s*>"), "")
         .replace(Regex("(?i)\\s+on[a-z]+\\s*=\\s*(['\\\"]).*?\\1"), "")
 
-private fun uxNativeSafeIconSvg(svg: String, color: String): String {
-    val safeColor = if (Regex("^#[0-9A-Fa-f]{3,8}$").matches(color)) color else "#111827"
-    return uxNativeCleanIconSvg(svg).replace(Regex("(?i)currentColor"), safeColor)
-}
+private fun uxNativeCleanIconSvg(svg: String): String =
+    svg
+        .replace(Regex("(?is)<script\\b[^>]*>.*?</script\\s*>"), "")
+        .replace(Regex("(?is)<foreignObject\\b[^>]*>.*?</foreignObject\\s*>"), "")
+        .replace(Regex("(?i)\\s+on[a-z]+\\s*=\\s*(['\\\"]).*?\\1"), "")
 
-private fun uxNativeIconHtml(svg: String, color: String): String =
-    "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" +
-        uxNativeSafeIconSvg(svg, color) + "</body></html>"
-
-private fun uxNativeImageHtml(dataUrl: String): String {
-    val valid = Regex("^data:image/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$", RegexOption.IGNORE_CASE).matches(dataUrl)
-    val source = if (valid) dataUrl else ""
-    return "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{display:block;width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='" + source + "'></body></html>"
-}
+private fun uxNativeSvgAttribute(source: String, name: String): String? =
+    Regex("(?is)\\b"+Regex.escape(name)+"\\s*=\\s*['\\\"]([^'\\\"]*)['\\\"]").find(source)?.groupValues?.getOrNull(1)
 
 private fun uxNativeDrawSvgIcon(canvas: android.graphics.Canvas, element: UxUiNativeLayer) {
     if (element.iconSvg.isBlank()) return
-    val viewBoxText = Regex("viewBox\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", RegexOption.IGNORE_CASE)
-        .find(element.iconSvg)?.groupValues?.getOrNull(1)
-    val viewBox = viewBoxText?.trim()?.split(Regex("\\s+"))?.mapNotNull { it.toFloatOrNull() }
-    val vx = viewBox?.getOrNull(0) ?: 0f
-    val vy = viewBox?.getOrNull(1) ?: 0f
-    val vw = (viewBox?.getOrNull(2) ?: 24f).takeIf { it > 0f } ?: 24f
-    val vh = (viewBox?.getOrNull(3) ?: 24f).takeIf { it > 0f } ?: 24f
-    val pathData = Regex("(?is)<path\\b([^>]*)>").findAll(element.iconSvg).mapNotNull { match ->
-        val attributes = match.groupValues[1]
-        val d = Regex("(?is)\\bd\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]").find(attributes)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
-        val fill = Regex("(?is)\\bfill\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]").find(attributes)?.groupValues?.getOrNull(1).orEmpty()
-        d to fill
-    }.toList()
-    if (pathData.isEmpty()) return
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val root=Regex("(?is)<svg\\b[^>]*>").find(element.iconSvg)?.value.orEmpty()
+    val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
+    val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
+    val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
+    val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
+    val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
+    val rootStroke=uxNativeSvgAttribute(root,"stroke")
+    val rootStrokeWidth=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:1.5f
+    val tags=Regex("(?is)<path\\b([^>]*)>").findAll(element.iconSvg)
     canvas.save()
-    canvas.translate(element.x.toFloat(), element.y.toFloat())
-    canvas.scale(element.width.toFloat() / vw, element.height.toFloat() / vh)
-    canvas.translate(-vx, -vy)
-    pathData.forEach { (d, svgFill) ->
-        if (svgFill.equals("none", ignoreCase=true)) return@forEach
-        val fill = if (svgFill.isBlank() || svgFill.equals("currentColor", ignoreCase=true)) element.color else svgFill
-        paint.color = runCatching { android.graphics.Color.parseColor(fill) }
-            .getOrDefault(runCatching { android.graphics.Color.parseColor(element.color) }.getOrDefault(android.graphics.Color.BLACK))
-        runCatching { PathParser.createPathFromPathData(d) }.getOrNull()?.let { path -> canvas.drawPath(path, paint) }
+    canvas.translate(element.x.toFloat(),element.y.toFloat())
+    canvas.scale(element.width.toFloat()/vw,element.height.toFloat()/vh)
+    canvas.translate(-vx,-vy)
+    tags.forEach{match->
+        val attrs=match.groupValues.getOrElse(1){""}
+        val d=uxNativeSvgAttribute(attrs,"d")?:return@forEach
+        val path=runCatching{PathParser.createPathFromPathData(d)}.getOrNull()?:return@forEach
+        val rawFill=uxNativeSvgAttribute(attrs,"fill")?:rootFill
+        if(!rawFill.equals("none",true)){
+            val fill=if(rawFill.equals("currentColor",true))element.color else rawFill
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{
+                style=Paint.Style.FILL
+                color=runCatching{android.graphics.Color.parseColor(fill)}.getOrDefault(runCatching{android.graphics.Color.parseColor(element.color)}.getOrDefault(android.graphics.Color.BLACK))
+            }
+            canvas.drawPath(path,paint)
+        }
+        val rawStroke=uxNativeSvgAttribute(attrs,"stroke")?:rootStroke
+        if(rawStroke!=null&&!rawStroke.equals("none",true)){
+            val stroke=if(rawStroke.equals("currentColor",true))element.color else rawStroke
+            val width=uxNativeSvgAttribute(attrs,"stroke-width")?.toFloatOrNull()?:rootStrokeWidth
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{
+                style=Paint.Style.STROKE
+                strokeWidth=width
+                strokeCap=when(uxNativeSvgAttribute(attrs,"stroke-linecap")){"round"->Paint.Cap.ROUND;"square"->Paint.Cap.SQUARE;else->Paint.Cap.BUTT}
+                strokeJoin=when(uxNativeSvgAttribute(attrs,"stroke-linejoin")){"round"->Paint.Join.ROUND;"bevel"->Paint.Join.BEVEL;else->Paint.Join.MITER}
+                color=runCatching{android.graphics.Color.parseColor(stroke)}.getOrDefault(runCatching{android.graphics.Color.parseColor(element.color)}.getOrDefault(android.graphics.Color.BLACK))
+            }
+            canvas.drawPath(path,paint)
+        }
     }
     canvas.restore()
+}
+
+@Composable
+private fun UxUiNativeArtworkPreview(element: UxUiNativeLayer, modifier: Modifier = Modifier) {
+    val bitmap=remember(element.imageData) {
+        if(element.kind!="image"||!element.imageData.startsWith("data:image/")) null
+        else runCatching {
+            val payload=element.imageData.substringAfter(",", "")
+            val bytes=android.util.Base64.decode(payload,android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+        }.getOrNull()
+    }
+    Canvas(modifier) {
+        val pixelWidth=size.width.roundToInt().coerceAtLeast(1)
+        val pixelHeight=size.height.roundToInt().coerceAtLeast(1)
+        drawIntoCanvas { composeCanvas ->
+            val nativeCanvas=composeCanvas.nativeCanvas
+            if(element.kind=="icon"&&element.iconSvg.isNotBlank()){
+                uxNativeDrawSvgIcon(nativeCanvas,element.copy(x=0,y=0,width=pixelWidth,height=pixelHeight))
+            } else if(bitmap!=null){
+                nativeCanvas.drawBitmap(bitmap,null,Rect(0,0,pixelWidth,pixelHeight),Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+            }
+        }
+    }
 }
 
 private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray().apply {
@@ -294,26 +330,34 @@ private fun uxNativeGenerateHtml(name:String,target:String,background:String,ele
 }
 
 private fun uxNativeGenerateKotlin(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,width:Int,height:Int):String = buildString {
-    appendLine("// Generated by enV UX/UI Studio. Review app theme and run platform tests before shipping.")
-    appendLine("import android.webkit.WebView")
+    appendLine("// Generated by enV UX/UI Studio. Uses native Compose, vector paths and embedded raster assets.")
+    appendLine("import android.graphics.Paint")
+    appendLine("import android.graphics.BitmapFactory")
+    appendLine("import android.util.Base64")
+    appendLine("import androidx.compose.foundation.Canvas")
+    appendLine("import androidx.compose.foundation.Image")
     appendLine("import androidx.compose.foundation.background")
     appendLine("import androidx.compose.foundation.layout.*")
     appendLine("import androidx.compose.foundation.shape.RoundedCornerShape")
     appendLine("import androidx.compose.material3.Text")
-    appendLine("import androidx.compose.runtime.Composable")
+    appendLine("import androidx.compose.runtime.*")
     appendLine("import androidx.compose.ui.Modifier")
     appendLine("import androidx.compose.ui.graphics.Color")
+    appendLine("import androidx.compose.ui.graphics.asImageBitmap")
+    appendLine("import androidx.compose.ui.graphics.drawscope.drawIntoCanvas")
+    appendLine("import androidx.compose.ui.graphics.nativeCanvas")
+    appendLine("import androidx.compose.ui.layout.ContentScale")
     appendLine("import androidx.compose.ui.text.font.FontWeight")
     appendLine("import androidx.compose.ui.unit.dp")
     appendLine("import androidx.compose.ui.unit.sp")
-    appendLine("import androidx.compose.ui.viewinterop.AndroidView")
+    appendLine("import androidx.core.graphics.PathParser")
     appendLine()
     appendLine("@Composable fun "+uxNativeSafeIdentifier(name)+"Design(target: String = "+JSONObject.quote(target)+") {")
     appendLine("  BoxWithConstraints(Modifier.fillMaxWidth().height("+height+".dp)) {")
     appendLine("    val widthDelta = maxWidth.value - "+width+".f")
     appendLine("    val heightDelta = maxHeight.value - "+height+".f")
     appendLine("    Box(Modifier.fillMaxSize().background(Color(android.graphics.Color.parseColor("+JSONObject.quote(background)+")))) {")
-    elements.forEach { e ->
+    elements.forEachIndexed { layerIndex,e ->
         val x=when(e.horizontalConstraint){"center"->"("+e.x+".f + widthDelta/2f)";"right"->"(maxWidth.value - "+(e.referenceWidth-e.x-e.width).coerceAtLeast(0)+".f - "+e.width+".f)";else->e.x.toString()+".f"}
         val y=when(e.verticalConstraint){"center"->"("+e.y+".f + heightDelta/2f)";"bottom"->"(maxHeight.value - "+(e.referenceHeight-e.y-e.height).coerceAtLeast(0)+".f - "+e.height+".f)";else->e.y.toString()+".f"}
         var w=if(e.horizontalConstraint=="stretch")"("+e.width+".f + widthDelta).coerceAtLeast("+e.minWidth.coerceAtLeast(1)+".f)" else e.width.toString()+".f"
@@ -322,12 +366,42 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
         val fill=if(e.fill=="transparent")background else e.fill
         appendLine("      // "+e.name.replace("\n"," ")+"; "+e.kind+"; anchors "+e.horizontalConstraint+"/"+e.verticalConstraint)
         appendLine("      if (listOf("+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+").contains(target)) Box(Modifier.offset(x=("+x+").dp,y=("+y+").dp).size(width=("+w+").dp,height=("+h+").dp).background(Color(android.graphics.Color.parseColor("+JSONObject.quote(fill)+")),RoundedCornerShape("+e.radius+".dp)).padding("+e.padding+".dp)) {")
-        if(e.kind=="icon"&&e.iconSvg.isNotBlank()) {
-            val html="<!doctype html><html><body style='margin:0'>"+e.iconSvg+"</body></html>"
-            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
+        if(e.kind=="icon"&&e.iconSvg.isNotBlank()){
+            val root=Regex("(?is)<svg\\b[^>]*>").find(e.iconSvg)?.value.orEmpty()
+            val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
+            val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
+            val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
+            val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
+            val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
+            val rootStroke=uxNativeSvgAttribute(root,"stroke")
+            val rootStrokeWidth=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:1.5f
+            appendLine("        Canvas(Modifier.fillMaxSize()) {")
+            appendLine("          drawIntoCanvas { drawingCanvas ->")
+            appendLine("            val native = drawingCanvas.nativeCanvas; native.save(); native.scale(size.width/"+vw+"f,size.height/"+vh+"f); native.translate("+(-vx)+"f,"+(-vy)+"f)")
+            Regex("(?is)<path\\b([^>]*)>").findAll(e.iconSvg).forEachIndexed { pathIndex,match->
+                val attrs=match.groupValues.getOrElse(1){""}
+                val d=uxNativeSvgAttribute(attrs,"d")?:return@forEachIndexed
+                val rawFill=uxNativeSvgAttribute(attrs,"fill")?:rootFill
+                val rawStroke=uxNativeSvgAttribute(attrs,"stroke")?:rootStroke
+                if(!rawFill.equals("none",true)){
+                    val fillColor=if(rawFill.equals("currentColor",true))e.color else rawFill
+                    appendLine("            val fillPaint"+layerIndex+"_"+pathIndex+" = Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.FILL; color=android.graphics.Color.parseColor("+JSONObject.quote(fillColor)+") }")
+                    appendLine("            PathParser.createPathFromPathData("+JSONObject.quote(d)+")?.let { native.drawPath(it,fillPaint"+layerIndex+"_"+pathIndex+") }")
+                }
+                if(rawStroke!=null&&!rawStroke.equals("none",true)){
+                    val strokeColor=if(rawStroke.equals("currentColor",true))e.color else rawStroke
+                    val sw=uxNativeSvgAttribute(attrs,"stroke-width")?.toFloatOrNull()?:rootStrokeWidth
+                    appendLine("            val strokePaint"+layerIndex+"_"+pathIndex+" = Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.STROKE; strokeWidth="+sw+"f; color=android.graphics.Color.parseColor("+JSONObject.quote(strokeColor)+") }")
+                    appendLine("            PathParser.createPathFromPathData("+JSONObject.quote(d)+")?.let { native.drawPath(it,strokePaint"+layerIndex+"_"+pathIndex+") }")
+                }
+            }
+            appendLine("            native.restore()")
+            appendLine("          }")
+            appendLine("        }")
         } else if(e.kind=="image"&&e.imageData.isNotBlank()) {
-            val html="<!doctype html><html><body style='margin:0'><img style='width:100%;height:100%;object-fit:cover' src='"+e.imageData+"'></body></html>"
-            appendLine("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,"+JSONObject.quote(html)+",\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
+            val payload=e.imageData.substringAfter(",", "")
+            appendLine("        val studioImage"+layerIndex+" = remember { Base64.decode("+JSONObject.quote(payload)+",Base64.DEFAULT).let { bytes -> BitmapFactory.decodeByteArray(bytes,0,bytes.size)?.asImageBitmap() } }")
+            appendLine("        if(studioImage"+layerIndex+" != null) Image(bitmap=studioImage"+layerIndex+"!!,contentDescription="+JSONObject.quote(e.name)+",contentScale=ContentScale.Crop,modifier=Modifier.fillMaxSize())")
         } else {
             appendLine("        Text("+JSONObject.quote(e.text)+",color=Color(android.graphics.Color.parseColor("+JSONObject.quote(e.color)+")),fontSize="+e.fontSize+".sp,fontWeight=FontWeight("+e.fontWeight+"),modifier=Modifier.fillMaxSize())")
         }
@@ -339,15 +413,9 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
 }
 
 private fun uxNativeGenerateSwift(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,width:Int,height:Int):String = buildString {
-    appendLine("// Generated by enV UX/UI Studio. Review asset handling and validate in your app target.")
+    appendLine("// Generated by enV UX/UI Studio. Native SwiftUI output with embedded raster assets and vector paths.")
     appendLine("import SwiftUI")
-    appendLine("import WebKit")
-    appendLine()
-    appendLine("struct EnVStudioHTMLAsset: UIViewRepresentable {")
-    appendLine("  let markup: String")
-    appendLine("  func makeUIView(context: Context) -> WKWebView { let view=WKWebView(); view.isOpaque=false; view.backgroundColor = .clear; view.scrollView.isScrollEnabled=false; return view }")
-    appendLine("  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString(\"<html><body style='margin:0'>\" + markup + \"</body></html>\",baseURL:nil) }")
-    appendLine("}")
+    appendLine("import UIKit")
     appendLine("struct "+uxNativeSafeIdentifier(name)+"DesignView: View {")
     appendLine("  let target: String = "+JSONObject.quote(target))
     appendLine("  var body: some View { GeometryReader { proxy in")
@@ -361,72 +429,156 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
         if(e.horizontalConstraint=="stretch"&&e.maxWidth>0)w="min("+w+",CGFloat("+e.maxWidth+"))"
         val h=if(e.verticalConstraint=="stretch")"max(1,CGFloat("+e.height+")+deltaHeight)" else "CGFloat("+e.height+")"
         val fill=if(e.fill=="transparent")background else e.fill
-        val text=JSONObject.quote(e.text);val color=JSONObject.quote(e.color);val back=JSONObject.quote(fill)
-        val contents=if(e.kind=="icon"&&e.iconSvg.isNotBlank())"EnVStudioHTMLAsset(markup:"+JSONObject.quote(e.iconSvg)+")" else if(e.kind=="image"&&e.imageData.isNotBlank())"EnVStudioHTMLAsset(markup:"+JSONObject.quote("<img style='width:100%;height:100%;object-fit:cover' src='"+e.imageData+"' />")+")" else "Text("+text+").font(.custom("+JSONObject.quote(e.fontFamily)+",size:"+e.fontSize+")).foregroundStyle(Color(hex:"+color+"))"
-        appendLine("      if ["+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+"].contains(target) {")
-        appendLine("        "+contents+".frame(width:"+w+",height:"+h+",alignment:.topLeading).background(Color(hex:"+back+")).clipShape(RoundedRectangle(cornerRadius:"+e.radius+")).position(x:CGFloat("+e.x+")+"+dx+"+("+w+")/2,y:CGFloat("+e.y+")+"+dy+"+("+h+")/2)")
+        val visible=e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}
+        val child=when {
+            e.kind=="icon"&&e.iconSvg.isNotBlank() -> {
+                val root=Regex("(?is)<svg\\b[^>]*>").find(e.iconSvg)?.value.orEmpty()
+                val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
+                val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
+                val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
+                val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
+                val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
+                val rootStroke=uxNativeSvgAttribute(root,"stroke")
+                val strokeMode=(rootStroke!=null&&!rootStroke.equals("none",true))||rootFill.equals("none",true)
+                val sw=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:2f
+                val paths=Regex("(?is)<path\\b([^>]*)>").findAll(e.iconSvg).mapNotNull{uxNativeSvgAttribute(it.groupValues.getOrElse(1){""},"d")}.toList()
+                val pathCode=paths.joinToString(","){JSONObject.quote(it)}
+                "EnVStudioNativeSVGIcon(paths:["+pathCode+"],viewBox:CGRect(x:"+vx+",y:"+vy+",width:"+vw+",height:"+vh+"),tint:Color(hex:"+JSONObject.quote(e.color)+"),stroked:"+strokeMode+",strokeWidth:"+sw+")"
+            }
+            e.kind=="image"&&e.imageData.isNotBlank() -> {
+                val payload=e.imageData.substringAfter(",", "")
+                "Group { if let data = Data(base64Encoded:"+JSONObject.quote(payload)+"), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFill() } else { Text("+JSONObject.quote(e.name+" image unavailable")+") } }"
+            }
+            else -> "Text("+JSONObject.quote(e.text)+").font(.custom("+JSONObject.quote(e.fontFamily)+",size:"+e.fontSize+")).foregroundStyle(Color(hex:"+JSONObject.quote(e.color)+"))"
+        }
+        appendLine("      if ["+visible+"].contains(target) {")
+        appendLine("        "+child+".frame(width:"+w+",height:"+h+",alignment:.topLeading).background(Color(hex:"+JSONObject.quote(fill)+")).clipShape(RoundedRectangle(cornerRadius:"+e.radius+")).position(x:CGFloat("+e.x+")+"+dx+"+("+w+")/2,y:CGFloat("+e.y+")+"+dy+"+("+h+")/2)")
         appendLine("      }")
     }
     appendLine("    }")
     appendLine("  } }.frame(maxWidth:.infinity,minHeight:"+height+")")
     appendLine("}")
     appendLine("extension Color { init(hex:String) { let value=UInt64(hex.trimmingCharacters(in:CharacterSet.alphanumerics.inverted),radix:16) ?? 0; self.init(.sRGB,red:Double((value>>16)&255)/255,green:Double((value>>8)&255)/255,blue:Double(value&255)/255,opacity:1) } }")
-}
-
-private object UxUiNativePdf {
-    fun build(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,spec:String,artboardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,artboardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900):ByteArray {
-        val pdf=PdfDocument();val pageW=595;val pageH=842
-        val body=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(38,43,51);textSize=9f;typeface=Typeface.create("sans-serif",Typeface.NORMAL)}
-        val title=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(37,99,235);textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)}
-        fun makePage(index:Int)=pdf.startPage(PdfDocument.PageInfo.Builder(pageW,pageH,index).create())
-        try {
-            val first=makePage(1);val canvas=first.canvas
-            canvas.drawText("enV UX/UI STUDIO",32f,34f,title);canvas.drawText(name.take(70),32f,60f,Paint(title).apply{textSize=18f})
-            canvas.drawText(target.uppercase()+" | "+artboardWidth+" x "+artboardHeight+" px | "+elements.size+" layers",32f,80f,body)
-            val bw=artboardWidth.toFloat();val bh=artboardHeight.toFloat();val scale=min(531f/bw,690f/bh)
-            canvas.save();canvas.translate((pageW-bw*scale)/2f,110f);canvas.scale(scale,scale)
-            canvas.drawColor(runCatching{android.graphics.Color.parseColor(background)}.getOrDefault(android.graphics.Color.WHITE))
-            val visibleElements=elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}
-            canvas.drawText(target.uppercase()+" | "+artboardWidth+" x "+artboardHeight+" px | "+visibleElements.size+" visible layers",32f,80f,body)
-            visibleElements.forEach { original ->
-                val e=original.copy(x=uxNativeLayerX(original,artboardWidth),y=uxNativeLayerY(original,artboardHeight),width=uxNativeLayerWidth(original,artboardWidth),height=uxNativeLayerHeight(original,artboardHeight))
-                val fill=if(e.fill=="transparent")null else runCatching{android.graphics.Color.parseColor(e.fill)}.getOrDefault(android.graphics.Color.WHITE)
-                val r=RectF(e.x.toFloat(),e.y.toFloat(),(e.x+e.width).toFloat(),(e.y+e.height).toFloat())
-                val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=fill?:android.graphics.Color.TRANSPARENT;style=if(fill==null)Paint.Style.STROKE else Paint.Style.FILL;strokeWidth=e.borderWidth.coerceAtLeast(1).toFloat()}
-                if(fill!=null||e.borderWidth>0)canvas.drawRoundRect(r,e.radius.toFloat(),e.radius.toFloat(),p)
-                if(e.borderWidth>0){p.color=runCatching{android.graphics.Color.parseColor(e.borderColor)}.getOrDefault(android.graphics.Color.LTGRAY);p.style=Paint.Style.STROKE;p.strokeWidth=e.borderWidth.toFloat();canvas.drawRoundRect(r,e.radius.toFloat(),e.radius.toFloat(),p)}
-                val t=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=runCatching{android.graphics.Color.parseColor(e.color)}.getOrDefault(android.graphics.Color.BLACK);textSize=e.fontSize.toFloat();typeface=Typeface.create(e.fontFamily,if(e.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)}
-                if (e.kind == "icon" && e.iconSvg.isNotBlank()) {
-                    uxNativeDrawSvgIcon(canvas, e)
-                } else if(e.kind=="image" && e.imageData.startsWith("data:image/")) {
-                    val payload=e.imageData.substringAfter(",", "")
-                    val bitmap=runCatching{val bytes=android.util.Base64.decode(payload,android.util.Base64.DEFAULT);BitmapFactory.decodeByteArray(bytes,0,bytes.size)}.getOrNull()
-                    if(bitmap!=null){
-                        canvas.save()
-                        val clipPath=android.graphics.Path().apply{addRoundRect(r,e.radius.toFloat(),e.radius.toFloat(),android.graphics.Path.Direction.CW)}
-                        canvas.clipPath(clipPath)
-                        canvas.drawBitmap(bitmap,null,r,Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-                        canvas.restore()
-                        bitmap.recycle()
-                    } else {
-                        t.textSize=12f;canvas.drawText("Image unavailable",e.x.toFloat()+e.padding,e.y.toFloat()+e.padding+12f,t)
-                    }
-                } else {
-                    val content=if(e.kind=="icon")e.iconName.substringAfterLast(":") else e.text;var y=e.y+e.padding+e.fontSize
-                    content.lines().forEach { line -> if(line.isNotEmpty()){var remaining=line;var guard=0;while(remaining.isNotEmpty()&&guard<10){val count=t.breakText(remaining,true,(e.width-2*e.padding).toFloat(),null).coerceAtLeast(1);canvas.drawText(remaining.take(count),(e.x+e.padding).toFloat(),y.toFloat(),t);remaining=remaining.drop(count).trimStart();y+=e.fontSize+3;guard++}}else y+=e.fontSize }
+    appendLine("""
+    private struct EnVStudioNativeSVGIcon: View {
+        let paths: [String]
+        let viewBox: CGRect
+        let tint: Color
+        let stroked: Bool
+        let strokeWidth: CGFloat
+        var body: some View {
+            Canvas { context, size in
+                let sx = size.width / max(1, viewBox.width)
+                let sy = size.height / max(1, viewBox.height)
+                let transform = CGAffineTransform(a:sx,b:0,c:0,d:sy,tx:-viewBox.minX*sx,ty:-viewBox.minY*sy)
+                for data in paths {
+                    let path = enVStudioSVGPath(data).applying(transform)
+                    if stroked { context.stroke(path,with:.color(tint),lineWidth:strokeWidth*(sx+sy)/2) }
+                    else { context.fill(path,with:.color(tint)) }
                 }
             }
-            canvas.restore();pdf.finishPage(first)
-            val lines=("AI IMPLEMENTATION PROMPT AND MACHINE-READABLE DESIGN SPECIFICATION\n\n"+spec).lines()
-            var pageIndex=2;var next=makePage(pageIndex);var y=42f;next.canvas.drawText("DESIGN HANDOFF - "+name.take(60),32f,28f,title)
-            lines.forEach { line -> var remaining=line;do{
-                if(y>800f){pdf.finishPage(next);pageIndex++;next=makePage(pageIndex);y=42f;next.canvas.drawText("DESIGN HANDOFF - "+name.take(60),32f,28f,title)}
-                val snippet=remaining.take(92);next.canvas.drawText(snippet,32f,y,body);y+=12f;remaining=remaining.drop(snippet.length)
-            }while(remaining.isNotEmpty()) }
-            pdf.finishPage(next)
-            return ByteArrayOutputStream().use{out->pdf.writeTo(out);out.toByteArray()}
-        }finally{pdf.close()}
+        }
     }
+
+    private func enVStudioSVGPath(_ data: String) -> Path {
+        let pattern = #"[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\\d*\\.\\d+|\\d+\\.?)(?:[eE][-+]?\\d+)?"#
+        let regex = try! NSRegularExpression(pattern: pattern)
+        let ns = data as NSString
+        let tokens = regex.matches(in:data,range:NSRange(location:0,length:ns.length)).map { ns.substring(with:$0.range) }
+        var i = 0
+        var command: Character?
+        var current = CGPoint.zero
+        var start = CGPoint.zero
+        var lastCubic: CGPoint?
+        var lastQuad: CGPoint?
+        var path = Path()
+        func isCommand(_ token:String)->Bool { token.count == 1 && token.first?.isLetter == true }
+        func number()->CGFloat? {
+            guard i < tokens.count, !isCommand(tokens[i]), let value = Double(tokens[i]) else { return nil }
+            i += 1
+            return CGFloat(value)
+        }
+        func point(_ x:CGFloat,_ y:CGFloat,_ relative:Bool)->CGPoint {
+            relative ? CGPoint(x:current.x+x,y:current.y+y) : CGPoint(x:x,y:y)
+        }
+        while i < tokens.count {
+            if isCommand(tokens[i]) { command = tokens[i].first; i += 1 }
+            guard let active=command else { break }
+            let relative=active.isLowercase
+            switch active.uppercased() {
+            case "Z":
+                path.closeSubpath(); current=start; lastCubic=nil; lastQuad=nil; command=nil
+            case "M":
+                guard let x=number(),let y=number() else { command=nil; continue }
+                let end=point(x,y,relative); path.move(to:end); current=end; start=end
+                command = relative ? "l" : "L"; lastCubic=nil; lastQuad=nil
+            case "L":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x=number(),let y=number() else { break }
+                    let end=point(x,y,relative); path.addLine(to:end); current=end; done=true
+                }
+                if !done { command=nil }; lastCubic=nil; lastQuad=nil
+            case "H":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x=number() else { break }
+                    let end=CGPoint(x:relative ? current.x+x : x,y:current.y); path.addLine(to:end); current=end; done=true
+                }
+                if !done { command=nil }; lastCubic=nil; lastQuad=nil
+            case "V":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let y=number() else { break }
+                    let end=CGPoint(x:current.x,y:relative ? current.y+y : y); path.addLine(to:end); current=end; done=true
+                }
+                if !done { command=nil }; lastCubic=nil; lastQuad=nil
+            case "C":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x1=number(),let y1=number(),let x2=number(),let y2=number(),let x=number(),let y=number() else { break }
+                    let c1=point(x1,y1,relative),c2=point(x2,y2,relative),end=point(x,y,relative)
+                    path.addCurve(to:end,control1:c1,control2:c2);current=end;lastCubic=c2;lastQuad=nil;done=true
+                }
+                if !done { command=nil }
+            case "S":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x2=number(),let y2=number(),let x=number(),let y=number() else { break }
+                    let c1=lastCubic.map{prior in CGPoint(x:2*current.x-prior.x,y:2*current.y-prior.y)} ?? current
+                    let c2=point(x2,y2,relative),end=point(x,y,relative)
+                    path.addCurve(to:end,control1:c1,control2:c2);current=end;lastCubic=c2;lastQuad=nil;done=true
+                }
+                if !done { command=nil }
+            case "Q":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x1=number(),let y1=number(),let x=number(),let y=number() else { break }
+                    let c=point(x1,y1,relative),end=point(x,y,relative)
+                    path.addQuadCurve(to:end,control:c);current=end;lastQuad=c;lastCubic=nil;done=true
+                }
+                if !done { command=nil }
+            case "T":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard let x=number(),let y=number() else { break }
+                    let c=lastQuad.map{prior in CGPoint(x:2*current.x-prior.x,y:2*current.y-prior.y)} ?? current
+                    let end=point(x,y,relative);path.addQuadCurve(to:end,control:c);current=end;lastQuad=c;lastCubic=nil;done=true
+                }
+                if !done { command=nil }
+            case "A":
+                var done=false
+                while i<tokens.count && !isCommand(tokens[i]) {
+                    guard number() != nil,number() != nil,number() != nil,number() != nil,number() != nil,let x=number(),let y=number() else { break }
+                    let end=point(x,y,relative);path.addLine(to:end);current=end;done=true
+                }
+                if !done { command=nil };lastCubic=nil;lastQuad=nil
+            default: command=nil
+            }
+        }
+        return path
+    }
+    """.trimIndent())
 }
 
 @Composable
@@ -659,24 +811,7 @@ fun NativeUxUiStudioForm() {
                                         }
                                     }){
                                         if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
-                                            AndroidView(
-                                                factory={ctx->WebView(ctx).apply{
-                                                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                                                    settings.javaScriptEnabled=false
-                                                    settings.domStorageEnabled=false
-                                                    isHorizontalScrollBarEnabled=false
-                                                    isVerticalScrollBarEnabled=false
-                                                    isFocusable=false
-                                                    isFocusableInTouchMode=false
-                                                    isEnabled=false
-                                                    isClickable=false
-                                                }},
-                                                modifier=Modifier.fillMaxSize(),
-                                                update={view->
-                                                    val html=if(e.kind=="icon")uxNativeIconHtml(e.iconSvg,e.color) else uxNativeImageHtml(e.imageData)
-                                                    if(view.tag != html){view.tag=html;view.loadDataWithBaseURL(null,html,"text/html","UTF-8",null)}
-                                                }
-                                            )
+                                            UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
                                         } else {
                                             Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=if(e.fontFamily.contains("serif",true))FontFamily.Serif else FontFamily.SansSerif,maxLines=5,overflow=TextOverflow.Clip)
                                         }
