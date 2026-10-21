@@ -506,4 +506,100 @@ extension Catalog {
         guard tool.category == "developer", !tool.tags.contains("developer-studio") else { return nil }
         return developerStudio(for: tool.slug)
     }
+
+    func developerModeForLegacySlug(_ rawSlug: String) -> String {
+        let slug = rawSlug.lowercased().replacingOccurrences(of: "^developer-", with: "", options: .regularExpression)
+        let studio = developerStudio(for: slug)
+        let selected: String
+        switch studio?.id {
+        case "json-studio":
+            if slug.hasPrefix("csv-") { selected = "csv" }
+            else if slug.contains("diff") { selected = "diff" }
+            else if slug.contains("path") || slug.contains("query") { selected = "path" }
+            else if ["inspector", "parser", "tree", "preview"].contains(where: { slug.contains($0) }) { selected = "tree" }
+            else if slug.contains("schema") { selected = "schema" }
+            else if slug.contains("to-csv") { selected = "convert" }
+            else if slug.contains("csv") { selected = "csv" }
+            else if slug.contains("validator") || slug.contains("tester") { selected = "validate" }
+            else if slug.contains("minifier") { selected = "minify" }
+            else { selected = "format" }
+        case "jwt-studio":
+            if slug.contains("expiration") || slug.contains("expiry") || slug.contains("exp-check") { selected = "expiration" }
+            else if slug.contains("payload") || slug.contains("builder") { selected = "payload" }
+            else if slug.contains("inspector") || slug.contains("claims") { selected = "claims" }
+            else { selected = "decode" }
+        case "regex-studio":
+            selected = slug.contains("replace") ? "replace" : (slug.contains("explain") ? "explain" : "match")
+        case "hash-studio":
+            selected = (slug.contains("file-hash") || slug.contains("file-hasher")) ? "file" : (slug.contains("compare") ? "compare" : "hash")
+        case "encoding-studio":
+            if slug.contains("data-uri") { selected = "data-uri" }
+            else if slug.contains("hex") { selected = "hex" }
+            else if slug.contains("binary") { selected = "binary" }
+            else if slug.contains("ascii") { selected = "ascii" }
+            else if slug.contains("unicode") { selected = "unicode" }
+            else if slug.hasPrefix("html-") { selected = "html" }
+            else if slug.contains("base64") || ["json-decoder", "json-encoder"].contains(slug) { selected = "base64" }
+            else { selected = "url" }
+        case "time-cron-studio":
+            if slug.contains("timestamp") || slug.contains("epoch") { selected = "timestamp" }
+            else if slug.contains("generator") || slug.contains("preset") { selected = "presets" }
+            else if slug.contains("explain") { selected = "explain" }
+            else { selected = "next-runs" }
+        case "uuid-studio":
+            selected = (slug.contains("validator") || slug.contains("tester")) ? "validate" : "generate"
+        case "sql-studio":
+            if slug.contains("query-builder") { selected = "query" }
+            else if slug.contains("schema-generator") { selected = "schema" }
+            else if slug.contains("minifier") { selected = "minify" }
+            else if slug.contains("parser") || slug.contains("validator") || slug.contains("tester") { selected = "parse" }
+            else { selected = "format" }
+        case "markup-studio":
+            if slug.hasPrefix("css-") { selected = "css" }
+            else if slug.hasPrefix("javascript-") || slug.hasPrefix("typescript-") { selected = "javascript" }
+            else if slug.hasPrefix("xml-") || slug.hasPrefix("svg-") { selected = "xml" }
+            else if slug.hasPrefix("yaml-") { selected = "yaml" }
+            else if slug.hasPrefix("lorem-ipsum") { selected = "samples" }
+            else if slug.hasPrefix("markdown") { selected = "markdown" }
+            else { selected = "html" }
+        case "http-api-studio":
+            if slug.contains("query") { selected = "query" }
+            else if slug.contains("mime") || slug.contains("content-type") { selected = "mime" }
+            else if slug.contains("cors") { selected = "cors" }
+            else if slug.contains("csp") { selected = "csp" }
+            else if slug.contains("cookie") { selected = "cookies" }
+            else if slug.contains("user-agent") { selected = "user-agent" }
+            else if slug.contains("header") { selected = "headers" }
+            else { selected = "status" }
+        case "devops-studio":
+            if slug.contains("dockerfile") { selected = "dockerfile" }
+            else if slug.contains("docker-compose") || slug.contains("compose") { selected = "compose" }
+            else if slug.contains("nginx") { selected = "nginx" }
+            else if slug.contains("editorconfig") { selected = "editorconfig" }
+            else if slug.contains("environment") || slug.contains(".env") { selected = "env" }
+            else if slug.contains("openapi") { selected = "openapi" }
+            else if slug.contains("graphql") { selected = "graphql" }
+            else if slug.contains("license") { selected = "license" }
+            else if slug.contains("readme") { selected = "readme" }
+            else if slug.contains("commit") { selected = "commit" }
+            else if slug.contains("branch") { selected = "branch" }
+            else if slug.contains("changelog") { selected = "changelog" }
+            else if slug.contains("semantic-version") || slug.contains("semver") { selected = "semver" }
+            else if slug.contains("api-mock") || slug.contains("webhook") { selected = "mock" }
+            else { selected = "gitignore" }
+        case "diff-inspect-studio":
+            if slug.hasPrefix("json-") { selected = slug.contains("diff") ? "json-diff" : (["inspector", "parser", "preview", "tester", "explainer"].contains(where: { slug.contains($0) }) ? "inspect" : "text-diff") }
+            else if slug.hasPrefix("yaml-") { selected = "yaml-diff" }
+            else if slug.hasPrefix("markdown") { selected = "preview" }
+            else if ["inspector", "parser", "tester"].contains(where: { slug.contains($0) }) { selected = "inspect" }
+            else { selected = "text-diff" }
+        default:
+            selected = studio?.id == "diff-inspect-studio" ? "text-diff" : (studio?.modes.first?.key ?? "format")
+        }
+        guard let spec = nativeDeveloperStudioSpecs.first(where: { $0.id == studio?.id }),
+              spec.modes.contains(where: { $0.key == selected }) else {
+            return nativeDeveloperStudioSpecs.first(where: { $0.id == studio?.id })?.modes.first?.key ?? "format"
+        }
+        return selected
+    }
 }
