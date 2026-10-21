@@ -30,9 +30,33 @@ if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes(
 if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-0"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must be grouped directly beside their labels, with the selected-state indicator aligned separately.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Install and create shortcut", "Settings", "Help & feedback"]) {
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Create home shortcut", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
+requireText("src/lib/home-shortcuts.ts", [
+  'STORAGE_KEY = "env:home-shortcuts"',
+  "MAX_HOME_SHORTCUTS = 24",
+  "addHomeShortcut",
+  "removeHomeShortcut",
+  "requestShortcutManager",
+  "HOME_SHORTCUTS_CHANGED_EVENT",
+], "Persistent homepage shortcuts");
+const shortcutDialog = requireText("src/components/layout/shortcut-manager-dialog.tsx", [
+  "Create a home shortcut",
+  "getCurrentPageShortcut(pathname)",
+  "getSearchableTools()",
+  "CATEGORY_MAP",
+  "addHomeShortcut(shortcut)",
+  "Save shortcut",
+], "Shortcut creation dialog");
+if (shortcutDialog.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must open an in-page shortcut dialog rather than navigating to an installation guide.");
+requireText("src/components/tools/home-shortcuts-tray.tsx", [
+  'aria-label="Your shortcuts"',
+  "readHomeShortcuts()",
+  "removeHomeShortcut(shortcut.id)",
+  "requestShortcutManager",
+  "href={shortcut.href}",
+], "Homepage shortcut tray");
 for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/install/support feature: " + path);
 }

@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/logo";
 import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
+import { HomeShortcutsTray } from "@/components/tools/home-shortcuts-tray";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
@@ -67,6 +68,7 @@ function Home() {
           <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
         </div>
         <MostUsedToolsTray tools={mostUsedTools} />
+        <HomeShortcutsTray />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for
           <br className="sm:hidden" />
