@@ -7700,18 +7700,51 @@ private struct NativeUxUiStudioView: View {
             }
         )
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Properties · \(binding.wrappedValue.kind)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                Spacer()
-                Button { moveLayer(binding.wrappedValue.id, by: -1) } label: { Image(systemName: "arrow.up").foregroundStyle(Color.envAccent) }
-                Button { moveLayer(binding.wrappedValue.id, by: 1) } label: { Image(systemName: "arrow.down").foregroundStyle(Color.envAccent) }
-                Button { duplicateLayer(binding.wrappedValue) } label: { Image(systemName: "plus.square.on.square").foregroundStyle(Color.envAccent) }
-                Button { deleteLayer(binding.wrappedValue) } label: { Image(systemName: "trash").foregroundStyle(.red) }
+            inspectorHeader(binding)
+            inspectorIdentityFields(binding)
+            inspectorGeometryFields(binding)
+            inspectorResponsiveFields(binding)
+            inspectorTypographyFields(binding)
+            inspectorVisualFields(binding)
+            inspectorImageFields(binding)
+            inspectorIconFields(binding)
+            inspectorSpecification(binding)
+        }
+        .padding(12)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func inspectorHeader(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        HStack {
+            Text("Properties · \(binding.wrappedValue.kind)")
+                .font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+            Spacer()
+            Button { moveLayer(binding.wrappedValue.id, by: -1) } label: {
+                Image(systemName: "arrow.up").foregroundStyle(Color.envAccent)
             }
-            inspectorTextField("Layer name", text: binding.name)
-            if !["icon", "ellipse", "rect", "divider"].contains(binding.wrappedValue.kind) {
-                inspectorTextField("Text content", text: binding.text, multiline: true)
+            Button { moveLayer(binding.wrappedValue.id, by: 1) } label: {
+                Image(systemName: "arrow.down").foregroundStyle(Color.envAccent)
             }
+            Button { duplicateLayer(binding.wrappedValue) } label: {
+                Image(systemName: "plus.square.on.square").foregroundStyle(Color.envAccent)
+            }
+            Button { deleteLayer(binding.wrappedValue) } label: {
+                Image(systemName: "trash").foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func inspectorIdentityFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        inspectorTextField("Layer name", text: binding.name)
+        if !["icon", "image", "ellipse", "rect", "divider"].contains(binding.wrappedValue.kind) {
+            inspectorTextField("Text content", text: binding.text, multiline: true)
+        }
+    }
+
+    private func inspectorGeometryFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 inspectorNumber("X position (px)", value: binding.x)
                 inspectorNumber("Y position (px)", value: binding.y)
@@ -7720,45 +7753,65 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Width (px)", value: binding.width)
                 inspectorNumber("Height (px)", value: binding.height)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Responsive constraints").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
-                HStack(spacing: 8) {
-                    Picker("Horizontal", selection: binding.horizontalConstraint) {
-                        Text("Left").tag("left"); Text("Center").tag("center"); Text("Right").tag("right"); Text("Stretch").tag("stretch")
-                    }.pickerStyle(.menu)
-                    Picker("Vertical", selection: binding.verticalConstraint) {
-                        Text("Top").tag("top"); Text("Center").tag("center"); Text("Bottom").tag("bottom"); Text("Stretch").tag("stretch")
-                    }.pickerStyle(.menu)
-                }
-                HStack(spacing: 8) {
-                    inspectorNumber("Min width", value: binding.minWidth)
-                    inspectorNumber("Max width (0 = none)", value: binding.maxWidth)
-                }
-                HStack(spacing: 8) {
-                    inspectorNumber("Reference width", value: binding.referenceWidth)
-                    inspectorNumber("Reference height", value: binding.referenceHeight)
-                }
-                Text("Visibility").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
-                HStack(spacing: 8) {
-                    ForEach(["mobile", "tablet", "desktop"], id: \.self) { device in
-                        Toggle(device.capitalized, isOn: Binding(
-                            get: { binding.wrappedValue.visibleOn.contains(device) },
-                            set: { isVisible in
-                                var visible = binding.wrappedValue.visibleOn
-                                if isVisible && !visible.contains(device) { visible.append(device) }
-                                if !isVisible { visible.removeAll { $0 == device } }
-                                binding.wrappedValue.visibleOn = visible
-                            }
-                        )).toggleStyle(.switch)
-                    }
+        }
+    }
+
+    private func inspectorResponsiveFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Responsive constraints").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            HStack(spacing: 8) {
+                Picker("Horizontal", selection: binding.horizontalConstraint) {
+                    Text("Left").tag("left")
+                    Text("Center").tag("center")
+                    Text("Right").tag("right")
+                    Text("Stretch").tag("stretch")
+                }.pickerStyle(.menu)
+                Picker("Vertical", selection: binding.verticalConstraint) {
+                    Text("Top").tag("top")
+                    Text("Center").tag("center")
+                    Text("Bottom").tag("bottom")
+                    Text("Stretch").tag("stretch")
+                }.pickerStyle(.menu)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Min width", value: binding.minWidth)
+                inspectorNumber("Max width (0 = none)", value: binding.maxWidth)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Reference width", value: binding.referenceWidth)
+                inspectorNumber("Reference height", value: binding.referenceHeight)
+            }
+            Text("Visibility").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                ForEach(["mobile", "tablet", "desktop"], id: \.self) { device in
+                    Toggle(device.capitalized, isOn: Binding(
+                        get: { binding.wrappedValue.visibleOn.contains(device) },
+                        set: { isVisible in
+                            var visible = binding.wrappedValue.visibleOn
+                            if isVisible && !visible.contains(device) { visible.append(device) }
+                            if !isVisible { visible.removeAll { $0 == device } }
+                            binding.wrappedValue.visibleOn = visible
+                        }
+                    )).toggleStyle(.switch)
                 }
             }
-            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(10)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func inspectorTypographyFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 inspectorNumber("Font size (px)", value: binding.fontSize)
                 inspectorNumber("Font weight", value: binding.fontWeight)
             }
             inspectorTextField("Font family", text: binding.fontFamily)
+        }
+    }
+
+    private func inspectorVisualFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 inspectorTextField("Text / icon color", text: binding.color)
                 inspectorTextField("Fill (hex or transparent)", text: binding.fill)
@@ -7777,7 +7830,13 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Bottom", value: binding.marginBottom)
                 inspectorNumber("Left", value: binding.marginLeft)
             }
-            if binding.wrappedValue.kind == "image" {
+        }
+    }
+
+    @ViewBuilder
+    private func inspectorImageFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        if binding.wrappedValue.kind == "image" {
+            VStack(alignment: .leading, spacing: 6) {
                 Button {
                     imageTargetID = binding.wrappedValue.id
                     isImportingImage = true
@@ -7788,11 +7847,19 @@ private struct NativeUxUiStudioView: View {
                 Text("Embed PNG, JPEG, WebP or GIF assets up to 4 MB. The editable JSON keeps the image; the PDF contains the visual asset without duplicating the base64 bytes in its spec.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
-            if binding.wrappedValue.kind == "icon" {
+        }
+    }
+
+    @ViewBuilder
+    private func inspectorIconFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        if binding.wrappedValue.kind == "icon" {
+            VStack(alignment: .leading, spacing: 8) {
                 inspectorTextField("Search icon library", text: $iconQuery)
                 Button { searchIconLibrary() } label: {
-                    HStack { Image(systemName: "magnifyingglass"); Text(isSearchingIcons ? "Searching…" : "Search open-source icons") }
-                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                        Text(isSearchingIcons ? "Searching…" : "Search open-source icons")
+                    }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
                 }.disabled(isSearchingIcons)
                 ForEach(iconResults, id: \.self) { iconName in
                     Button {
@@ -7805,19 +7872,27 @@ private struct NativeUxUiStudioView: View {
                 }
                 if iconResults.count < iconTotal {
                     Button { searchIconLibrary(loadMore: true) } label: {
-                        HStack { Image(systemName: "arrow.down.circle"); Text(isSearchingIcons ? "Loading icons…" : "Load more icons · \(iconResults.count) / \(iconTotal)") }
-                            .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                            Text(isSearchingIcons ? "Loading icons…" : "Load more icons · \(iconResults.count) / \(iconTotal)")
+                        }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
                     }.disabled(isSearchingIcons)
                 }
                 Text("Iconify results are paginated; the selected SVG artwork is rendered in the canvas and included in the export. Check source collection licences before shipping.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
-            Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
-            Text(String(data: (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data(), encoding: .utf8) ?? "{}")
-                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.envMuted).textSelection(.enabled)
         }
-        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            let encoded = (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data()
+            Text(String(data: encoded, encoding: .utf8) ?? "{}")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Color.envMuted)
+                .textSelection(.enabled)
+        }
     }
 
     private func inspectorTextField(_ label: String, text: Binding<String>, multiline: Bool = false) -> some View {
