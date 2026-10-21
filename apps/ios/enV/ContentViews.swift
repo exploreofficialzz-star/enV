@@ -1059,7 +1059,7 @@ struct NativeInformationPageView: View {
         case "pricing": return "Pricing"
         case "contact": return "Contact"
         case "help": return "Help center"
-        case "tokens": return "Token guide"
+        case "token-guide": return "Token guide"
         case "token-dashboard": return "Token dashboard"
         case "wallet": return "Wallet"
         case "account": return "Account"
@@ -1135,7 +1135,7 @@ struct NativeInformationPageView: View {
         case "pricing": NativePricingInformationPage()
         case "contact": NativeContactInformationPage()
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
-        case "tokens": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
+        case "token-guide": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
         case "token-dashboard": NativeTokenDashboardView()
         case "account": VStack(alignment: .leading, spacing: 14) {
              NativeInfoSectionView(title: "Welcome back to enV", paragraphs: ["Sign in or create an account from the enV sign-in page."])

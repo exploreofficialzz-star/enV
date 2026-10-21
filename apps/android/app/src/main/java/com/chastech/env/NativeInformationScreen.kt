@@ -215,7 +215,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
     val title = when (pageId) {
         "about" -> "About enV"
         "help" -> "Help center"
-        "tokens" -> "Token guide"
+        "token-guide" -> "Token guide"
         "token-dashboard" -> "Token dashboard"
         "wallet" -> "Wallet"
         "pricing" -> "Pricing"
@@ -261,7 +261,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
             when (pageId) {
                 "about" -> AboutInformation()
                 "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
-                "tokens" -> NativeTokenGuide(catalog)
+                "token-guide" -> NativeTokenGuide(catalog)
                 "token-dashboard" -> NativeTokenDashboard()
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()

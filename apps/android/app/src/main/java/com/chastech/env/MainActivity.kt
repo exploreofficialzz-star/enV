@@ -353,7 +353,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("About") }, onClick = { informationReturnTab = tab; informationPage = "about"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Tools") }, onClick = { tab = AppTab.Tools.name; detailStack = emptyList(); category = null; showExchange = false; showInformation = false; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Pricing") }, onClick = { informationReturnTab = tab; informationPage = "pricing"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
-                            DropdownMenuItem(text = { Text("Token guide") }, onClick = { informationReturnTab = tab; informationPage = "tokens"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Token guide") }, onClick = { informationReturnTab = tab; informationPage = "token-guide"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             Text("RESOURCES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp))
                             DropdownMenuItem(text = { Text("Help center") }, onClick = { informationReturnTab = tab; informationPage = "help"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse("https://envtools.store/blog")); overflowExpanded = false })
@@ -1105,7 +1105,6 @@ private fun ToolDetail(
                 },
                 modifier = Modifier.padding(top = 2.dp),
             ) { Text("Read the full guide") }
-            NativeToolGuideContent(tool)
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
@@ -1173,92 +1172,6 @@ private fun NativeGuideSection(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NativeToolGuideContent(tool: ToolRecord) {
-    val engine = tool.engine.type.lowercase(Locale.ROOT)
-    val engineLabel = when (engine) {
-        "calculator" -> "calculator"
-        "converter" -> "conversion"
-        "text" -> "text processing"
-        "image" -> "image processing"
-        "document", "document-backend", "file-converter", "pdf" -> "document processing"
-        "audio" -> "audio processing"
-        "video", "url-media" -> "video or media processing"
-        "ai" -> "AI-assisted"
-        "backend" -> "connected-service"
-        else -> if (engine.isBlank()) "catalogued" else engine.replace('-', ' ')
-    }
-    val availability = when (tool.status.lowercase(Locale.ROOT)) {
-        "planned" -> "This tool is marked as planned. Its final controls and execution behavior may not yet be available."
-        "beta" -> "This tool is marked as beta. Behavior and supported options may change; review results carefully."
-        else -> "This tool is marked as active in the catalogue. Its actual availability can still depend on configuration, device capability, and connected services."
-    }
-    val processing = when {
-        tool.requiresBackend -> "The catalogue marks this tool as requiring a backend or connected service. Processing may fail if the service is unavailable, unconfigured, rate-limited, or unable to accept the input."
-        tool.clientSide -> "The catalogue marks this tool for client-side execution. This does not guarantee every mode works offline or that no separate feature makes a network request."
-        else -> "The catalogue does not explicitly mark this tool as client-side or backend-required. Check the active form and its disclosure for the processing path before submitting sensitive material."
-    }
-    val disclaimer = when (tool.disclaimer) {
-        "health" -> "This tool provides estimates or information, not medical advice."
-        "finance" -> "Outputs depend on your inputs and assumptions; this is not financial advice."
-        "earnings" -> "Treat outputs as estimates based on editable assumptions, not predictions of actual payouts."
-        "mockup" -> "Mockup output is fictional/demo material, not authentic evidence."
-        "estimate" -> "Results are approximate; review assumptions before relying on them."
-        else -> null
-    }
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        NativeGuideSection("Purpose and scope", listOf(
-            "This entry belongs to the ${tool.category.replace('-', ' ')} category and follows enV's $engineLabel workflow. The description defines the intended job; the live interface defines the exact controls available in this version.",
-        ))
-        NativeGuideSection("When to use this tool", listOf(
-            "Use this tool when its stated purpose and input requirements match the task. Do not assume it replaces a different operation with a similar name or covers features not listed in the interface.",
-            "For consequential work, test with a small example and compare the result with an independent reference before using it in production.",
-        ))
-        NativeGuideSection("Before you begin", listOf(
-            "Identify the intended input, expected output, unit or format, and what would make the result correct. Keep an original copy when the operation transforms or overwrites content.",
-            if (tool.requiresAuth) "This tool is marked as requiring an authenticated account. Sign in before using account-gated features." else "The catalogue does not mark this tool as requiring sign-in; account, wallet, or separate hosted features may still have their own requirements.",
-        ))
-        NativeGuideSection("How to use the tool", listOf(
-            "Follow the controls and validation messages shown by the current tool form. These steps describe a general safe workflow and do not imply extra controls that are absent.",
-        ), steps = listOf(
-            "Read the description, safety notice, and field labels.",
-            "Provide only requested inputs and choose from options the current form actually exposes.",
-            "Run the operation and wait for completion or an explicit error.",
-            "Review the complete output, then copy or export it using the available controls.",
-        ))
-        NativeGuideSection("Inputs, options, and validation", listOf(
-            "The visible form is the authority for required fields, accepted types, supported options, and limits. The catalogue description is not proof that an unlisted format is supported.",
-            if (tool.keywords.isNotEmpty()) "Related discovery terms: ${tool.keywords.take(10).joinToString(", ")}. These keywords help find the tool; they are not a list of accepted input fields." else "No separate input keyword list is published. Use field names, the description, and any in-tool examples to identify valid inputs.",
-            "Correct the field named by a validation message instead of repeatedly trying unrelated input formats.",
-        ))
-        NativeGuideSection("Results and output checks", listOf(
-            "Check that the output corresponds to the intended input and that content, units, dimensions, encoding, ordering, timing, or formatting remain correct where relevant.",
-            "A completed operation or downloadable file alone does not prove every result is correct. Independently verify important calculations, generated text, conversions, and files before relying on them.",
-        ))
-        NativeGuideSection("Processing, privacy, and connectivity", listOf(
-            processing,
-            "Do not submit passwords, private keys, session cookies, payment details, confidential business records, or sensitive personal information until you have confirmed that the tool's actual processing path is appropriate.",
-        ))
-        NativeGuideSection("Availability and account requirements", listOf(
-            availability,
-            if (tool.requiresAuth) "This tool is marked as requiring an authenticated account for account-gated functionality." else "The catalogue does not declare a sign-in requirement for this tool; account and separate hosted services may have their own requirements.",
-        ))
-        NativeGuideSection("Limitations and responsible use", listOfNotNull(
-            disclaimer,
-            "The catalogue description is not proof that every format, device capability, output, or external service is supported. Treat generated content and estimates as outputs to review and independently verify consequential results before relying on them.",
-        ))
-        NativeGuideSection("Troubleshooting", listOf(
-            "Start with the exact status or error shown by the form. Try a small, non-sensitive known-good example to isolate input problems.",
-            "If processing does not start, check connectivity when a backend is required and relevant device or file permissions. If output looks wrong, re-check units, selected options, source format, and assumptions.",
-            "When contacting support, provide the tool name, action attempted, platform, approximate time, and non-sensitive error details. Do not send passwords, keys, or confidential source files.",
-        ), bullets = listOf(
-            "Input rejected: verify required fields, supported format, separators, units, and listed constraints.",
-            "Processing fails: review the connection and visible service status, then retry safely with a smaller input if appropriate.",
-            "Output differs from expectations: compare source and result and inspect the options that affect this operation.",
-        ))
     }
 }
 

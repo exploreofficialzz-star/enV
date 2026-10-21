@@ -198,7 +198,7 @@ struct EnVBrandNavigationStyle: ViewModifier {
                             Button("About") { informationRouter.open("about") }
                             Button("Tools") { selectedTab = NativeTab.tools.rawValue }
                             Button("Pricing") { informationRouter.open("pricing") }
-                            Button("Token guide") { informationRouter.open("tokens") }
+                            Button("Token guide") { informationRouter.open("token-guide") }
                         }
                         Section("RESOURCES") {
                             Button("Help center") { informationRouter.open("help") }
