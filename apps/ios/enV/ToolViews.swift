@@ -355,7 +355,9 @@ struct ToolDestinationView: View {
     let tool: Tool
 
     @ViewBuilder var body: some View {
-        if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
+        if tool.id == "ux-ui-studio" {
+            NativeUxUiStudioView()
+        } else if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
             ToolDetailView(
                 tool: studio,
                 initialDeveloperMode: store.catalog.developerModeForLegacySlug(tool.slug),
@@ -6662,3 +6664,642 @@ private struct NativeIOSTrackRow: View {
         }.padding(10).foregroundStyle(enabled ? .white : .secondary).overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(enabled ? 0.6 : 0.25)))
     }
 }
+
+
+
+private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var kind: String
+    var name: String
+    var x: Int
+    var y: Int
+    var width: Int
+    var height: Int
+    var text: String
+    var iconName: String = ""
+    var color: String = "#111827"
+    var fill: String = "transparent"
+    var borderColor: String = "#E5E7EB"
+    var borderWidth: Int = 0
+    var radius: Int = 12
+    var padding: Int = 12
+    var marginTop: Int = 0
+    var marginRight: Int = 0
+    var marginBottom: Int = 0
+    var marginLeft: Int = 0
+    var fontFamily: String = "Inter"
+    var fontSize: Int = 16
+    var fontWeight: Int = 400
+    var lineHeight: Double = 1.35
+}
+
+private struct UxUiNativeProject: Codable {
+    var schemaVersion = 1
+    var name: String
+    var target: String
+    var background: String
+    var viewport: UxUiViewport
+    var elements: [UxUiNativeLayer]
+    var aiPrompt: String
+    var updatedAt: String
+}
+private struct UxUiViewport: Codable { var width: Int; var height: Int }
+
+private func uxUiPlatformColor(_ hex: String, fallback: UIColor = .white) -> UIColor {
+    if hex == "transparent" { return .clear }
+    var value = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+    if value.count == 3 { value = value.map { "\($0)\($0)" }.joined() }
+    guard value.count == 6, let rgb = UInt64(value, radix: 16) else { return fallback }
+    return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
+}
+private func uxUiUIColor(_ hex: String) -> Color { Color(uiColor: uxUiPlatformColor(hex)) }
+
+private struct UxUiStudioExport: FileDocument {
+    static var readableContentTypes: [UTType] { [.pdf, .json] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws { FileWrapper(regularFileWithContents: data) }
+}
+
+/** Native SwiftUI design workspace with on-device project storage and PDF/JSON handoff. */
+private struct NativeUxUiStudioView: View {
+    private let storageKey = "env.ux-ui-studio.project.v1"
+    @State private var onboarding = true
+    @State private var target = "mobile"
+    @State private var projectName = "Mobile dashboard"
+    @State private var background = "#F8FAFC"
+    @State private var elements: [UxUiNativeLayer] = []
+    @State private var selectedID: UUID?
+    @State private var notice = ""
+    @State private var hasSavedDraft = false
+    @State private var iconQuery = "home"
+    @State private var iconResults: [String] = []
+    @State private var isSearchingIcons = false
+    @State private var isExportingPDF = false
+    @State private var isExportingJSON = false
+    @State private var pdfDocument = UxUiStudioExport(data: Data())
+    @State private var jsonDocument = UxUiStudioExport(data: Data())
+
+    private var boardWidth: Int { target == "mobile" ? 390 : 1440 }
+    private var boardHeight: Int { target == "mobile" ? 844 : 900 }
+    private var selectedIndex: Int? { elements.firstIndex(where: { $0.id == selectedID }) }
+
+    private var aiPrompt: String {
+        var lines = [
+            "Implement this interface faithfully. Numeric values and named assets are authoritative.",
+            "Project: \(projectName)", "Target: \(target)",
+            "Artboard: \(boardWidth) x \(boardHeight) CSS pixels",
+            "Canvas background: \(background)",
+            "Keep exact text, geometry, fonts, weights, colors, margins, padding, borders, radii and icon IDs. Coordinates start at the artboard top-left.",
+            "", "ELEMENT SPECIFICATIONS"
+        ]
+        for (index, item) in elements.enumerated() {
+            lines.append("\(index + 1). \(item.name) [\(item.kind)]")
+            lines.append("id=\(item.id.uuidString); x=\(item.x)px; y=\(item.y)px; width=\(item.width)px; height=\(item.height)px")
+            lines.append("text=\(String(data: (try? JSONEncoder().encode(item.text)) ?? Data(), encoding: .utf8) ?? "\"\""); icon=\(item.iconName)")
+            lines.append("color=\(item.color); fill=\(item.fill); border=\(item.borderColor) \(item.borderWidth)px; radius=\(item.radius)px")
+            lines.append("padding=\(item.padding)px; margins top/right/bottom/left=\(item.marginTop)/\(item.marginRight)/\(item.marginBottom)/\(item.marginLeft)px")
+            lines.append("font=\(item.fontFamily); size=\(item.fontSize)px; weight=\(item.fontWeight); lineHeight=\(item.lineHeight)")
+        }
+        lines.append(""); lines.append("Acceptance: compare the implementation at the reference viewport. Do not replace exact geometry or icon IDs with approximate values.")
+        return lines.joined(separator: "\n")
+    }
+
+    private var projectJSON: Data {
+        let project = UxUiNativeProject(
+            name: projectName, target: target, background: background,
+            viewport: UxUiViewport(width: boardWidth, height: boardHeight),
+            elements: elements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date())
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return (try? encoder.encode(project)) ?? Data("{}".utf8)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "square.and.pencil").font(.system(size: 23, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("UX/UI Studio").font(.envScaled(size: 22, weight: .bold)).foregroundStyle(Color.envInk)
+                        Text("Native editor · exact pixel geometry and design handoff").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                    }
+                }
+                if onboarding {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("What are you designing?").font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Choose the reference artboard. You can add and edit layers, preserve exact specifications, and export a visual PDF with the complete AI prompt.")
+                            .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
+                        Button { startDesign("mobile", preset: "mobile-dashboard") } label: {
+                            labelForChoice("Mobile interface", subtitle: "390 × 844 px · app screens", icon: "iphone")
+                        }.buttonStyle(.plain)
+                        Button { startDesign("desktop", preset: "desktop-landing") } label: {
+                            labelForChoice("Desktop website", subtitle: "1440 × 900 px · website layouts", icon: "laptopcomputer")
+                        }.buttonStyle(.plain)
+                        if hasSavedDraft {
+                            Button { restoreDraft() } label: {
+                                HStack { Image(systemName: "arrow.counterclockwise"); Text("Continue saved design") }
+                                    .font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envAccent)
+                                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                } else {
+                    editorContent
+                }
+                if !notice.isEmpty {
+                    Text(notice).font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envAccent)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .padding(16)
+        }
+        .background(Color.envSurface.ignoresSafeArea())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { loadSavedDraftStatus() }
+        .fileExporter(isPresented: $isExportingPDF, document: pdfDocument, contentType: .pdf, defaultFilename: safeFileName + "-design-spec") { result in
+            switch result { case .success(let url): notice = "PDF exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $isExportingJSON, document: jsonDocument, contentType: .json, defaultFilename: safeFileName + "-design-spec") { result in
+            switch result { case .success(let url): notice = "JSON exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
+        }
+        .onChange(of: projectName) { _ in saveDraft() }
+        .onChange(of: target) { _ in saveDraft() }
+        .onChange(of: background) { _ in saveDraft() }
+        .onChange(of: elements) { _ in saveDraft() }
+    }
+
+    private var safeFileName: String {
+        let cleaned = projectName.lowercased().replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
+        return cleaned.isEmpty ? "env-design" : cleaned
+    }
+
+    private var editorContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Project name", text: $projectName)
+                .font(.envScaled(size: 14, weight: .medium)).padding(12)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+            HStack(spacing: 8) {
+                targetButton("Mobile", icon: "iphone", value: "mobile")
+                targetButton("Desktop", icon: "laptopcomputer", value: "desktop")
+                Button("Workflow") { onboarding = true }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+            }
+            Text("ARTBOARD  ·  \(boardWidth) × \(boardHeight) px  ·  \(elements.count) layers")
+                .font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    presetButton("Mobile dashboard", target: "mobile", preset: "mobile-dashboard")
+                    presetButton("Mobile login", target: "mobile", preset: "mobile-login")
+                    presetButton("Website landing", target: "desktop", preset: "desktop-landing")
+                    presetButton("Desktop dashboard", target: "desktop", preset: "desktop-dashboard")
+                    presetButton("Desktop settings", target: "desktop", preset: "desktop-settings")
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Artboard preview").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                GeometryReader { proxy in
+                    let scale = min(CGFloat(1), proxy.size.width / CGFloat(boardWidth))
+                    ZStack(alignment: .topLeading) {
+                        uxUiUIColor(background)
+                        ForEach(elements) { item in
+                            layerPreview(item, scale: scale)
+                                .frame(width: CGFloat(item.width) * scale, height: CGFloat(item.height) * scale)
+                                .position(x: (CGFloat(item.x) + CGFloat(item.width) / 2) * scale, y: (CGFloat(item.y) + CGFloat(item.height) / 2) * scale)
+                                .onTapGesture { selectedID = item.id }
+                        }
+                    }
+                    .frame(width: CGFloat(boardWidth) * scale, height: CGFloat(boardHeight) * scale, alignment: .topLeading)
+                    .clipped()
+                    .overlay(Rectangle().stroke(Color.envBorder, lineWidth: 1))
+                }
+                .frame(height: max(CGFloat(290), min(CGFloat(560), CGFloat(boardHeight) * min(CGFloat(1), UIScreen.main.bounds.width / CGFloat(boardWidth)))))
+                Text("Select a layer to edit its exact measurements and properties.")
+                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Add elements").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    addButton("Text", icon: "textformat", kind: "text")
+                    addButton("Button", icon: "rectangle.roundedtop", kind: "button")
+                    addButton("Card", icon: "rectangle.on.rectangle", kind: "card")
+                    addButton("Input", icon: "rectangle.and.pencil.and.ellipsis", kind: "input")
+                    addButton("Icon", icon: "square.grid.2x2", kind: "icon")
+                    addButton("Rectangle", icon: "rectangle", kind: "rect")
+                    addButton("Circle", icon: "circle", kind: "ellipse")
+                    addButton("Divider", icon: "minus", kind: "divider")
+                }
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                ForEach(elements) { item in
+                    Button { selectedID = item.id } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: item.kind == "text" ? "textformat" : item.kind == "icon" ? "square.grid.2x2" : "rectangle")
+                                .foregroundStyle(Color.envAccent)
+                            Text(item.name).lineLimit(1).font(.envScaled(size: 13, weight: .medium))
+                            Spacer(minLength: 0)
+                            if selectedID == item.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.envAccent) }
+                        }
+                        .foregroundStyle(Color.envInk).padding(10)
+                        .background(selectedID == item.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedID == item.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                    }.buttonStyle(.plain)
+                }
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            if let index = selectedIndex { inspector(for: index) }
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Design handoff").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("PDF includes the rendered artboard, technical specifications, and an AI implementation prompt. JSON contains the editable project.")
+                    .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                Button { exportPDF() } label: { exportButtonLabel("Export visual PDF + specifications", icon: "doc.richtext", primary: true) }.buttonStyle(.plain)
+                Button { exportJSON() } label: { exportButtonLabel("Export project JSON + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
+            }
+            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private func labelForChoice(_ title: String, subtitle: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.system(size: 22)).frame(width: 48, height: 48).foregroundStyle(Color.envAccent)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.envScaled(size: 15, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(subtitle).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            Spacer()
+            Image(systemName: "arrow.right").foregroundStyle(Color.envAccent)
+        }
+        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func targetButton(_ label: String, icon: String, value: String) -> some View {
+        Button {
+            target = value
+            notice = "Viewport set to \(value == "mobile" ? "390 × 844" : "1440 × 900") px. Review spacing at the selected size."
+        } label: {
+            HStack(spacing: 5) { Image(systemName: icon); Text(label) }
+                .font(.envScaled(size: 12, weight: .semibold)).padding(.horizontal, 11).padding(.vertical, 9)
+                .foregroundStyle(target == value ? Color.white : Color.envInk)
+                .background(target == value ? Color.envAccent : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(target == value ? Color.envAccent : Color.envBorder, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private func presetButton(_ label: String, target nextTarget: String, preset: String) -> some View {
+        Button { startDesign(nextTarget, preset: preset) } label: {
+            Text(label).font(.envScaled(size: 11, weight: .semibold)).padding(.horizontal, 10).padding(.vertical, 8)
+                .foregroundStyle(Color.envInk).background(Color.envSurface2, in: Capsule())
+                .overlay(Capsule().stroke(Color.envBorder, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private func addButton(_ label: String, icon: String, kind: String) -> some View {
+        Button { addLayer(kind) } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 18)).foregroundStyle(Color.envAccent)
+                Text(label).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+            }.frame(maxWidth: .infinity).frame(height: 62)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+        }.buttonStyle(.plain)
+    }
+
+    private func layerPreview(_ item: UxUiNativeLayer, scale: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: CGFloat(item.radius) * scale)
+                .fill(uxUiUIColor(item.fill))
+                .overlay(RoundedRectangle(cornerRadius: CGFloat(item.radius) * scale).stroke(uxUiUIColor(item.borderColor), lineWidth: CGFloat(item.borderWidth) * scale))
+            Group {
+                if item.kind == "icon" {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Image(systemName: "square.grid.2x2").font(.system(size: max(9, CGFloat(item.fontSize) * scale)))
+                        Text(item.iconName).font(.system(size: max(5, 7 * scale))).lineLimit(2)
+                    }
+                } else {
+                    Text(item.text).font(.custom(item.fontFamily == "Inter" ? "System" : item.fontFamily, size: max(5, CGFloat(item.fontSize) * scale)).weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular))
+                        .foregroundStyle(uxUiUIColor(item.color)).multilineTextAlignment(.leading).lineLimit(6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+            .foregroundStyle(uxUiUIColor(item.color))
+            .padding(max(2, CGFloat(item.padding) * scale))
+            if selectedID == item.id {
+                RoundedRectangle(cornerRadius: 2).stroke(Color.envAccent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 2]))
+            }
+        }
+        .opacity(1)
+    }
+
+    @ViewBuilder
+    private func inspector(for index: Int) -> some View {
+        let binding = $elements[index]
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Properties · \(binding.wrappedValue.kind)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Spacer()
+                Button { duplicateLayer(binding.wrappedValue) } label: { Image(systemName: "plus.square.on.square").foregroundStyle(Color.envAccent) }
+                Button { deleteLayer(binding.wrappedValue) } label: { Image(systemName: "trash").foregroundStyle(.red) }
+            }
+            inspectorTextField("Layer name", text: binding.name)
+            if !["icon", "ellipse", "rect", "divider"].contains(binding.wrappedValue.kind) {
+                inspectorTextField("Text content", text: binding.text, multiline: true)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("X position (px)", value: binding.x)
+                inspectorNumber("Y position (px)", value: binding.y)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Width (px)", value: binding.width)
+                inspectorNumber("Height (px)", value: binding.height)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Font size (px)", value: binding.fontSize)
+                inspectorNumber("Font weight", value: binding.fontWeight)
+            }
+            inspectorTextField("Font family", text: binding.fontFamily)
+            HStack(spacing: 8) {
+                inspectorTextField("Text / icon color", text: binding.color)
+                inspectorTextField("Fill (hex or transparent)", text: binding.fill)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Corner radius (px)", value: binding.radius)
+                inspectorNumber("Border width (px)", value: binding.borderWidth)
+            }
+            inspectorNumber("Padding (px)", value: binding.padding)
+            Text("Margins (px)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            HStack(spacing: 8) {
+                inspectorNumber("Top", value: binding.marginTop)
+                inspectorNumber("Right", value: binding.marginRight)
+            }
+            HStack(spacing: 8) {
+                inspectorNumber("Bottom", value: binding.marginBottom)
+                inspectorNumber("Left", value: binding.marginLeft)
+            }
+            if binding.wrappedValue.kind == "icon" {
+                inspectorTextField("Search icon library", text: $iconQuery)
+                Button { searchIconLibrary() } label: {
+                    HStack { Image(systemName: "magnifyingglass"); Text(isSearchingIcons ? "Searching…" : "Search open-source icons") }
+                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                }.disabled(isSearchingIcons)
+                ForEach(iconResults, id: \.self) { iconName in
+                    Button {
+                        binding.wrappedValue.iconName = iconName
+                        binding.wrappedValue.name = iconName
+                        notice = "Recorded icon identifier \(iconName). Check the source collection licence before shipping."
+                    } label: {
+                        Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                    }.buttonStyle(.plain)
+                }
+                Text("The exact icon ID is saved in the export. Icon rendering in this native editor uses a system glyph; the web editor embeds the original vector path.")
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+            Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            Text(String(data: (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data(), encoding: .utf8) ?? "{}")
+                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.envMuted).textSelection(.enabled)
+        }
+        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func inspectorTextField(_ label: String, text: Binding<String>, multiline: Bool = false) -> some View {
+        Group {
+            if multiline {
+                TextField(label, text: text, axis: .vertical).lineLimit(2...5)
+            } else {
+                TextField(label, text: text)
+            }
+        }
+        .font(.envScaled(size: 12, weight: .regular)).textInputAutocapitalization(.never)
+        .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func inspectorNumber(_ label: String, value: Binding<Int>) -> some View {
+        TextField(label, value: value, format: .number)
+            .keyboardType(.numbersAndPunctuation).font(.envScaled(size: 12, weight: .regular))
+            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func exportButtonLabel(_ title: String, icon: String, primary: Bool) -> some View {
+        HStack(spacing: 8) { Image(systemName: icon); Text(title); Spacer(); Image(systemName: "arrow.down.to.line") }
+            .font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(primary ? Color.white : Color.envInk)
+            .padding(13).background(primary ? Color.envAccent : Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.envAccent : Color.envBorder, lineWidth: 1))
+    }
+
+    private func startDesign(_ nextTarget: String, preset: String) {
+        target = nextTarget
+        background = nextTarget == "mobile" ? "#F8FAFC" : "#FFFFFF"
+        projectName = preset == "mobile-login" ? "Mobile login" : preset == "desktop-dashboard" ? "Desktop dashboard" : preset == "desktop-settings" ? "Desktop settings" : preset == "desktop-landing" ? "Website landing" : "Mobile dashboard"
+        elements = starterElements(target: nextTarget, preset: preset)
+        selectedID = elements.first?.id
+        onboarding = false
+        notice = "Design ready. Select a layer to adjust its exact specifications."
+        saveDraft()
+    }
+
+    private func starterElements(target: String, preset: String) -> [UxUiNativeLayer] {
+        func item(_ kind: String, _ name: String, _ x: Int, _ y: Int, _ w: Int, _ h: Int, _ text: String, color: String = "#111827", fill: String = "transparent", size: Int = 16, weight: Int = 400, radius: Int = 12) -> UxUiNativeLayer {
+            UxUiNativeLayer(kind: kind, name: name, x: x, y: y, width: w, height: h, text: text, color: color, fill: fill, radius: radius, fontSize: size, fontWeight: weight)
+        }
+        switch preset {
+        case "mobile-login":
+            return [item("text", "Brand", 28, 70, 334, 38, "enV", color: "#2563EB", size: 28, weight: 700),
+                    item("text", "Welcome", 28, 150, 334, 40, "Welcome back", size: 26, weight: 700),
+                    item("text", "Subtitle", 28, 194, 334, 44, "Sign in to continue to your workspace.", color: "#64748B", size: 14),
+                    item("input", "Email field", 28, 270, 334, 48, "name@example.com", color: "#64748B", fill: "#FFFFFF", size: 14),
+                    item("input", "Password field", 28, 338, 334, 48, "Enter your password", color: "#64748B", fill: "#FFFFFF", size: 14),
+                    item("button", "Sign in", 28, 414, 334, 50, "Sign in", color: "#FFFFFF", fill: "#2563EB", size: 15, weight: 600)]
+        case "desktop-dashboard":
+            return [item("navbar", "Navigation", 20, 20, 1396, 66, "enV                         Search projects                         Help   Profile", fill: "#FFFFFF", weight: 600),
+                    item("text", "Overview", 60, 118, 700, 42, "Overview", size: 30, weight: 700),
+                    item("card", "Monthly usage", 60, 220, 310, 136, "Monthly usage\n12,840 events", fill: "#FFFFFF", weight: 600, radius: 18),
+                    item("card", "Active projects", 396, 220, 310, 136, "Active projects\n24 in progress", fill: "#FFFFFF", weight: 600, radius: 18),
+                    item("card", "Completion rate", 732, 220, 310, 136, "Completion rate\n86.4%", fill: "#FFFFFF", weight: 600, radius: 18)]
+        case "desktop-settings":
+            return [item("navbar", "Navigation", 20, 20, 1400, 60, "enV                         Search settings                         Help   Profile", fill: "#FFFFFF", weight: 600),
+                    item("text", "Settings", 60, 114, 600, 42, "Settings", size: 30, weight: 700),
+                    item("row", "Profile and account", 60, 224, 850, 64, "Profile and account\nName, email and profile details", fill: "#FFFFFF", weight: 600),
+                    item("row", "Appearance", 60, 302, 850, 64, "Appearance\nTheme and interface preferences", fill: "#FFFFFF", weight: 600),
+                    item("row", "Notifications", 60, 380, 850, 64, "Notifications\nEmail and product updates", fill: "#FFFFFF", weight: 600)]
+        case "desktop-landing":
+            return [item("navbar", "Navigation", 44, 26, 1352, 68, "NOVA               Product   Solutions   Resources                Sign in   Get started", fill: "#FFFFFF", weight: 600),
+                    item("text", "Hero headline", 95, 160, 780, 110, "Design better experiences, faster.", size: 48, weight: 700),
+                    item("text", "Hero copy", 98, 288, 690, 68, "A flexible workspace for teams to shape, test and ship thoughtful digital products.", color: "#64748B", size: 18),
+                    item("button", "Primary action", 98, 386, 180, 52, "Start designing", color: "#FFFFFF", fill: "#2563EB", size: 15, weight: 600),
+                    item("card", "Preview panel", 875, 166, 420, 290, "Your next big idea\n\nBuild interfaces with a clear design system.", fill: "#F8FAFC", size: 22, weight: 600, radius: 24)]
+        default:
+            return [item("navbar", "App header", 20, 22, 350, 56, "enV                                  ◉", fill: "#FFFFFF", weight: 600),
+                    item("text", "Greeting", 24, 100, 340, 30, "Good morning", color: "#64748B", size: 14),
+                    item("text", "Dashboard title", 24, 130, 340, 44, "Your workspace", size: 27, weight: 700),
+                    item("card", "Balance card", 24, 202, 342, 146, "TOTAL ACTIVITY\n\n12,840\n12.8% from last month", color: "#FFFFFF", fill: "#1D4ED8", weight: 600, radius: 20),
+                    item("card", "Create project", 24, 414, 160, 110, "＋\nCreate project", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("card", "View reports", 202, 414, 164, 110, "▤\nView reports", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("row", "Website refresh", 24, 602, 342, 64, "Website refresh\nUpdated 12 minutes ago", fill: "#FFFFFF", size: 14),
+                    item("row", "Mobile onboarding", 24, 676, 342, 64, "Mobile onboarding\nUpdated yesterday", fill: "#FFFFFF", size: 14),
+                    item("tabbar", "Bottom navigation", 20, 766, 350, 54, "Home       Search       Activity       Profile", fill: "#FFFFFF", size: 12, weight: 600)]
+        }
+    }
+
+    private func addLayer(_ kind: String) {
+        let newItem: UxUiNativeLayer
+        switch kind {
+        case "text": newItem = UxUiNativeLayer(kind: kind, name: "Heading", x: 24, y: 120, width: 260, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700)
+        case "button": newItem = UxUiNativeLayer(kind: kind, name: "Primary button", x: 24, y: 200, width: 180, height: 48, text: "Continue", color: "#FFFFFF", fill: "#2563EB", fontWeight: 600)
+        case "card": newItem = UxUiNativeLayer(kind: kind, name: "Content card", x: 24, y: 270, width: 300, height: 132, text: "Card title\nSupporting text", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
+        case "input": newItem = UxUiNativeLayer(kind: kind, name: "Text input", x: 24, y: 420, width: 300, height: 48, text: "Enter your email", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
+        case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "mdi:home", color: "#2563EB")
+        case "ellipse": newItem = UxUiNativeLayer(kind: kind, name: "Circle", x: 24, y: 540, width: 84, height: 84, text: "", fill: "#DBEAFE", radius: 42)
+        case "divider": newItem = UxUiNativeLayer(kind: kind, name: "Divider", x: 24, y: 640, width: 300, height: 1, text: "", fill: "#CBD5E1")
+        default: newItem = UxUiNativeLayer(kind: "rect", name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
+        }
+        elements.append(newItem); selectedID = newItem.id; notice = "\(newItem.name) added."
+    }
+
+    private func duplicateLayer(_ element: UxUiNativeLayer) {
+        var copy = element
+        copy.id = UUID(); copy.name += " copy"; copy.x += 16; copy.y += 16
+        elements.append(copy); selectedID = copy.id
+    }
+
+    private func deleteLayer(_ element: UxUiNativeLayer) {
+        elements.removeAll { $0.id == element.id }
+        selectedID = elements.first?.id
+    }
+
+    private func loadSavedDraftStatus() {
+        hasSavedDraft = UserDefaults.standard.data(forKey: storageKey) != nil
+    }
+
+    private func saveDraft() {
+        guard !onboarding, !elements.isEmpty else { return }
+        let project = UxUiNativeProject(name: projectName, target: target, background: background,
+                                        viewport: UxUiViewport(width: boardWidth, height: boardHeight),
+                                        elements: elements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date()))
+        if let data = try? JSONEncoder().encode(project) {
+            UserDefaults.standard.set(data, forKey: storageKey)
+            hasSavedDraft = true
+        }
+    }
+
+    private func restoreDraft() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let project = try? JSONDecoder().decode(UxUiNativeProject.self, from: data) else {
+            notice = "No valid local draft was found."; return
+        }
+        projectName = project.name; target = project.target; background = project.background
+        elements = project.elements; selectedID = elements.first?.id; onboarding = false
+        notice = "Local design restored."
+    }
+
+    private func searchIconLibrary() {
+        guard let encoded = iconQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32") else { return }
+        isSearchingIcons = true
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let found = result?["icons"] as? [String] ?? []
+                await MainActor.run { iconResults = found; isSearchingIcons = false; notice = "\(found.count) icon identifiers found." }
+            } catch {
+                await MainActor.run { isSearchingIcons = false; notice = "Icon search unavailable. Check your connection and retry." }
+            }
+        }
+    }
+
+    private func exportJSON() {
+        jsonDocument = UxUiStudioExport(data: projectJSON)
+        isExportingJSON = true
+    }
+
+    private func exportPDF() {
+        pdfDocument = UxUiStudioExport(data: makePDF())
+        isExportingPDF = true
+    }
+
+    private func makePDF() -> Data {
+        let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
+        return renderer.pdfData { context in
+            context.beginPage()
+            let heading: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 11), .foregroundColor: UIColor.systemBlue]
+            let title: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 18), .foregroundColor: UIColor.label]
+            "enV UX/UI STUDIO".draw(at: CGPoint(x: 32, y: 26), withAttributes: heading)
+            projectName.draw(in: CGRect(x: 32, y: 48, width: 530, height: 26), withAttributes: title)
+            "\(target.uppercased())  |  \(boardWidth) × \(boardHeight) px  |  \(elements.count) layers".draw(at: CGPoint(x: 32, y: 80), withAttributes: [.font: UIFont.systemFont(ofSize: 9), .foregroundColor: UIColor.secondaryLabel])
+            let scale = min(531 / CGFloat(boardWidth), 680 / CGFloat(boardHeight))
+            let xOffset = (595 - CGFloat(boardWidth) * scale) / 2
+            let yOffset: CGFloat = 112
+            context.cgContext.saveGState()
+            context.cgContext.translateBy(x: xOffset, y: yOffset)
+            context.cgContext.scaleBy(x: scale, y: scale)
+            uxUiPlatformColor(background).setFill()
+            UIRectFill(CGRect(x: 0, y: 0, width: boardWidth, height: boardHeight))
+            for item in elements {
+                let rect = CGRect(x: item.x, y: item.y, width: item.width, height: item.height)
+                let path = UIBezierPath(roundedRect: rect, cornerRadius: CGFloat(item.radius))
+                if item.fill != "transparent" { uxUiPlatformColor(item.fill).setFill(); path.fill() }
+                if item.borderWidth > 0 { uxUiPlatformColor(item.borderColor).setStroke(); path.lineWidth = CGFloat(item.borderWidth); path.stroke() }
+                let font = UIFont(name: item.fontFamily, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
+                let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: uxUiPlatformColor(item.color)]
+                let content = item.kind == "icon" ? item.iconName : item.text
+                content.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)), withAttributes: attributes)
+            }
+            context.cgContext.restoreGState()
+            "Visual interface preview rendered from the design layers.".draw(at: CGPoint(x: 32, y: 817), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.secondaryLabel])
+
+            let specString = String(data: projectJSON, encoding: .utf8) ?? "{}"
+            let lines = ("AI IMPLEMENTATION PROMPT\n\n" + aiPrompt + "\n\nMACHINE-READABLE JSON DESIGN SPECIFICATION\n\n" + specString).components(separatedBy: .newlines)
+            var y: CGFloat = 42
+            let titleOnPage = "DESIGN HANDOFF · \(projectName)"
+            context.beginPage()
+            func drawHeader() {
+                titleOnPage.draw(at: CGPoint(x: 32, y: 20), withAttributes: heading)
+            }
+            drawHeader()
+            for line in lines {
+                let fragments = wrapPDFLine(line, maximum: 92)
+                for fragment in fragments {
+                    if y > 800 {
+                        context.beginPage(); y = 42; drawHeader()
+                    }
+                    fragment.draw(at: CGPoint(x: 32, y: y), withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 7.5, weight: .regular), .foregroundColor: UIColor.label])
+                    y += 11
+                }
+            }
+        }
+    }
+
+    private func wrapPDFLine(_ value: String, maximum: Int) -> [String] {
+        guard value.count > maximum else { return [value] }
+        var words = value.split(separator: " ").map(String.init)
+        var lines: [String] = []
+        var current = ""
+        while let word = words.first {
+            words.removeFirst()
+            if current.isEmpty { current = word }
+            else if current.count + word.count + 1 <= maximum { current += " " + word }
+            else { lines.append(current); current = word }
+        }
+        if !current.isEmpty { lines.append(current) }
+        return lines.isEmpty ? [""] : lines
+    }
+}
+

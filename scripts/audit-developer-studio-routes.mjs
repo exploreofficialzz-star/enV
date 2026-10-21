@@ -35,7 +35,7 @@ for (const tool of allDeveloper) {
   if (!DEVELOPER_STUDIOS.some((entry) => entry.id === studio.id) || !studio.modes.some((entry) => entry.key === mode)) mappingFailures.push({ slug: tool.slug, studio: studio.slug, mode, error: 'Invalid legacy route-to-Studio mapping.' });
 }
 const virtualStudioTools = makeDeveloperStudioTools(catalog);
-if (virtualStudioTools.length !== 12) mappingFailures.push({ expectedStudios: 12, actualStudios: virtualStudioTools.length, error: 'Virtual Studio routes missing.' });
+if (virtualStudioTools.length !== 13) mappingFailures.push({ expectedStudios: 13, actualStudios: virtualStudioTools.length, error: 'Virtual Studio routes missing.' });
 const legacyRouteMap = allDeveloper.map((tool) => {
   const studio = developerStudioForLegacySlug(tool.slug);
   const mode = developerModeForLegacySlug(studio, tool.slug);

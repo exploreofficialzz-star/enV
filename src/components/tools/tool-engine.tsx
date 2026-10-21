@@ -13,6 +13,7 @@ import { DocumentEngine } from "@/components/engines/document-engine";
 import { FileConverterEngine } from "@/components/engines/file-converter-engine";
 import { DeveloperEngine } from "@/components/engines/developer-engine";
 import { DeveloperStudioEngine } from "@/components/engines/developer-studio-engine";
+import { UxUiStudioEngine } from "@/components/engines/ux-ui-studio-engine";
 import { PdfEngine } from "@/components/engines/pdf-engine";
 import { MimeEngine } from "@/components/engines/mime-engine";
 import { SecurityEngine } from "@/components/engines/security-engine";
@@ -70,7 +71,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   // Accessibility Studios must override legacy per-tool engine metadata (for example,
   // contrast-checker was historically a generic color tool).
   if (tool.category === "accessibility") return <AccessibilityEngine toolId={tool.id} />;
-  if (tool.category === "developer" && tool.tags.includes("developer-studio")) return <DeveloperStudioEngine tool={tool} initialMode={initialMode} initialAction={initialAction} initialOp={initialOp} />;
+  if (tool.category === "developer" && tool.tags.includes("developer-studio")) return tool.slug === "ux-ui-studio" ? <UxUiStudioEngine /> : <DeveloperStudioEngine tool={tool} initialMode={initialMode} initialAction={initialAction} initialOp={initialOp} />;
   if (tool.category === "audio" && ["audio-bitrate-calculator", "audio-file-size-calculator"].includes(tool.id)) return <AudioEngine op={tool.id} toolId={tool.id} initialMode={initialMode} />;
 
   switch (tool.engine.type) {
