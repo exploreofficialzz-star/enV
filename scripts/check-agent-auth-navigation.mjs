@@ -27,7 +27,7 @@ if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)
 if (!webMenu.includes("fixed right-3") || !webMenu.includes("w-[15.5rem]") || !webMenu.includes("max-w-[calc(100vw_-_5rem)]")) errors.push("Overflow card must remain right-aligned and compact on mobile instead of spanning nearly the whole screen.");
 const viewModeBlock = webMenu.slice(webMenu.indexOf('aria-label="View mode"'), webMenu.indexOf("</section>", webMenu.indexOf('aria-label="View mode"')));
 if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Mobile, tablet, and desktop views must have distinct device icons.");
-if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/style=\{\{ marginRight: "-4px" \}\}/g) ?? []).length !== 1 || (viewModeBlock.match(/style=\{\{ marginRight: "-2px" \}\}/g) ?? []).length !== 1 || (viewModeBlock.match(/style=\{\{ marginRight: "-1px" \}\}/g) ?? []).length !== 1) errors.push("Mobile, tablet, and desktop labels must be visually tight to their respective device glyphs, with inline-enforced icon spacing.");
+if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-0"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must be grouped directly beside their labels, with the selected-state indicator aligned separately.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 
 for (const item of ["Mobile view", "Tablet view", "Desktop view", "Install and create shortcut", "Settings", "Help & feedback"]) {
@@ -42,7 +42,10 @@ const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRou
 const installCapture = requireText("src/lib/pwa-install.ts", ["beforeinstallprompt", "appinstalled", "userChoice", "promptEnVInstallation"], "PWA install capture");
 if (!installCapture.includes("event.preventDefault()")) errors.push("PWA install prompt must preserve the browser-controlled installation flow.");
 const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode", 'ViewMode = "mobile" | "tablet" | "desktop"', 'viewMode: "mobile"'], "Persistent display preferences");
-requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture"], "Root PWA installation capture");
+const rootRoute = requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture", "INITIAL_THEME_SCRIPT", 'localStorage.getItem("env:theme")', "prefers-color-scheme: dark", 'classList.toggle("dark", dark)'], "Root PWA/theme initialization");
+const themeBootstrapPosition = rootRoute.indexOf("<script dangerouslySetInnerHTML");
+const headContentPosition = rootRoute.indexOf("<HeadContent />");
+if (themeBootstrapPosition < 0 || headContentPosition < 0 || themeBootstrapPosition > headContentPosition) errors.push("Saved/system theme must be applied before HeadContent loads the stylesheet.");
 if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");
 if (!installPage.includes("browser\'s permission")) errors.push("Installation must remain under browser control.");
 if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must disclose that feedback is prepared in the user\'s email app.");

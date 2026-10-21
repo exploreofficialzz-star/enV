@@ -6,6 +6,19 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "enV — Browser Toolkit";
 
+// Apply the saved or system theme before the stylesheet can paint the page.
+const INITIAL_THEME_SCRIPT = `(() => {
+  let preference = null;
+  try {
+    preference = window.localStorage.getItem("env:theme");
+  } catch {}
+  const systemPrefersDark =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = preference === "dark" || (preference !== "light" && systemPrefersDark);
+  document.documentElement.classList.toggle("dark", dark);
+})();`;
+
 function PwaInstallCapture() {
   useEffect(() => startPwaInstallCapture(), []);
   return null;
@@ -29,7 +42,10 @@ export const Route = createRootRoute({
   }),
   component: () => (
     <html lang="en" suppressHydrationWarning>
-      <head><HeadContent /></head>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: INITIAL_THEME_SCRIPT }} />
+        <HeadContent />
+      </head>
       <body>
         <AssistantStateProvider>
           <PwaInstallCapture />
