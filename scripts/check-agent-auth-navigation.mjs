@@ -33,34 +33,35 @@ if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) err
 for (const item of ["Mobile view", "Tablet view", "Desktop view", "Add to phone home screen", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
-const shortcutDialog = requireText("src/components/layout/shortcut-manager-dialog.tsx", [
-  "Add to phone home screen",
+const shortcutAction = requireText("src/components/layout/shortcut-manager-dialog.tsx", [
+  "export function requestPhoneShortcut(pathname: string)",
   "getCurrentPageShortcut(pathname)",
-  "getSearchableTools()",
-  "CATEGORY_MAP",
   "buildPhoneShortcutIntent",
-  "envShortcutFallback",
-  "Add to phone",
-], "Phone home-screen shortcut dialog");
-if (shortcutDialog.includes("localStorage") || shortcutDialog.includes("Your shortcuts on enV Home")) errors.push("Phone shortcuts must not be saved as tiles on the enV website homepage.");
-if (shortcutDialog.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must not navigate to the installation guide.");
+  "window.location.assign(buildPhoneShortcutIntent",
+  "S.browser_fallback_url",
+  "promptEnVInstallation",
+], "Direct native shortcut action");
+if (shortcutAction.includes('role="dialog"') || header.includes("ShortcutManagerDialog") || header.includes("ShortcutFallbackDialog")) errors.push("Shortcut action must not show a custom picker or fallback dialog.");
+if (shortcutAction.includes("envShortcutFallback") || header.includes("envShortcutFallback")) errors.push("Shortcut action must not append custom fallback-dialog query parameters.");
+if (!header.includes("requestPhoneShortcut(pathname)")) errors.push("Shortcut menu action must directly request the current page shortcut.");
+if (shortcutAction.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must not navigate to the installation guide.");
 const shortcutHome = requireText("src/routes/index.tsx", ["<AppShell>"], "Homepage shortcut removal check");
 if (shortcutHome.includes("HomeShortcutsTray") || shortcutHome.includes('aria-label="Your shortcuts"')) errors.push("The website homepage must not render the removed in-site shortcut tiles.");
 for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/install/support feature: " + path);
 }
 const settingsPage = requireText("src/routes/settings.tsx", ['createFileRoute("/settings")', "themePreference", "setThemePreference", "setViewMode", "Reset appearance and display mode"], "Settings page");
-const installPage = requireText("src/routes/install.tsx", ['createFileRoute("/install")', "Install enV", "Add to Home Screen", "Create shortcut", "promptEnVInstallation"], "Install and shortcut page");
+const installPage = requireText("src/routes/install.tsx", ['createFileRoute("/install")', 'redirect({ to: "/" })'], "Retired installation-guide route");
 const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
 const installCapture = requireText("src/lib/pwa-install.ts", ["beforeinstallprompt", "appinstalled", "userChoice", "promptEnVInstallation"], "PWA install capture");
 if (!installCapture.includes("event.preventDefault()")) errors.push("PWA install prompt must preserve the browser-controlled installation flow.");
+if (installPage.includes("Install enV or create a shortcut") || installPage.includes("Add to Home Screen")) errors.push("The custom installation-guide design must stay removed.");
 const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode", 'ViewMode = "mobile" | "tablet" | "desktop"', 'viewMode: "mobile"'], "Persistent display preferences");
 const rootRoute = requireText("src/routes/__root.tsx", ["PwaInstallCapture", "startPwaInstallCapture", "INITIAL_THEME_SCRIPT", 'localStorage.getItem("env:theme")', "prefers-color-scheme: dark", 'classList.toggle("dark", dark)'], "Root PWA/theme initialization");
 const themeBootstrapPosition = rootRoute.indexOf("<script dangerouslySetInnerHTML");
 const headContentPosition = rootRoute.indexOf("<HeadContent />");
 if (themeBootstrapPosition < 0 || headContentPosition < 0 || themeBootstrapPosition > headContentPosition) errors.push("Saved/system theme must be applied before HeadContent loads the stylesheet.");
 if (!settingsPage.includes('value: "system"')) errors.push("Settings must support following the operating-system theme.");
-if (!installPage.includes("browser\'s permission")) errors.push("Installation must remain under browser control.");
 if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must disclose that feedback is prepared in the user\'s email app.");
 if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Mobile view must restore the responsive viewport.");
 
