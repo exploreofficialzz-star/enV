@@ -6702,6 +6702,53 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var referenceHeight: Int = 844
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
+
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData
+        case color, fill, borderColor, borderWidth, radius, padding
+        case marginTop, marginRight, marginBottom, marginLeft
+        case fontFamily, fontSize, fontWeight, lineHeight
+        case horizontalConstraint, verticalConstraint, minWidth, maxWidth, visibleOn
+        case referenceWidth, referenceHeight, componentKey, iconViewBox
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? "text"
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Layer"
+        x = try c.decodeIfPresent(Int.self, forKey: .x) ?? 0
+        y = try c.decodeIfPresent(Int.self, forKey: .y) ?? 0
+        width = try c.decodeIfPresent(Int.self, forKey: .width) ?? 180
+        height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 48
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        iconName = try c.decodeIfPresent(String.self, forKey: .iconName) ?? ""
+        iconSvg = try c.decodeIfPresent(String.self, forKey: .iconSvg)
+        imageData = try c.decodeIfPresent(String.self, forKey: .imageData)
+        color = try c.decodeIfPresent(String.self, forKey: .color) ?? "#111827"
+        fill = try c.decodeIfPresent(String.self, forKey: .fill) ?? "transparent"
+        borderColor = try c.decodeIfPresent(String.self, forKey: .borderColor) ?? "#E5E7EB"
+        borderWidth = try c.decodeIfPresent(Int.self, forKey: .borderWidth) ?? 0
+        radius = try c.decodeIfPresent(Int.self, forKey: .radius) ?? 12
+        padding = try c.decodeIfPresent(Int.self, forKey: .padding) ?? 12
+        marginTop = try c.decodeIfPresent(Int.self, forKey: .marginTop) ?? 0
+        marginRight = try c.decodeIfPresent(Int.self, forKey: .marginRight) ?? 0
+        marginBottom = try c.decodeIfPresent(Int.self, forKey: .marginBottom) ?? 0
+        marginLeft = try c.decodeIfPresent(Int.self, forKey: .marginLeft) ?? 0
+        fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily) ?? "Inter"
+        fontSize = try c.decodeIfPresent(Int.self, forKey: .fontSize) ?? 16
+        fontWeight = try c.decodeIfPresent(Int.self, forKey: .fontWeight) ?? 400
+        lineHeight = try c.decodeIfPresent(Double.self, forKey: .lineHeight) ?? 1.35
+        horizontalConstraint = try c.decodeIfPresent(String.self, forKey: .horizontalConstraint) ?? "left"
+        verticalConstraint = try c.decodeIfPresent(String.self, forKey: .verticalConstraint) ?? "top"
+        minWidth = try c.decodeIfPresent(Int.self, forKey: .minWidth) ?? 0
+        maxWidth = try c.decodeIfPresent(Int.self, forKey: .maxWidth) ?? 0
+        visibleOn = try c.decodeIfPresent([String].self, forKey: .visibleOn) ?? ["mobile", "tablet", "desktop"]
+        referenceWidth = try c.decodeIfPresent(Int.self, forKey: .referenceWidth) ?? 390
+        referenceHeight = try c.decodeIfPresent(Int.self, forKey: .referenceHeight) ?? 844
+        componentKey = try c.decodeIfPresent(String.self, forKey: .componentKey) ?? ""
+        iconViewBox = try c.decodeIfPresent(String.self, forKey: .iconViewBox) ?? "0 0 24 24"
+    }
 }
 
 
@@ -6853,6 +6900,33 @@ private struct UxUiStudioExport: FileDocument {
 }
 
 /** Native SwiftUI design workspace with on-device project storage and PDF/JSON handoff. */
+
+private func uxUiResolvedLayer(_ original: UxUiNativeLayer, boardWidth: Int, boardHeight: Int) -> UxUiNativeLayer {
+    var layer = original
+    let refW = max(1, original.referenceWidth)
+    let refH = max(1, original.referenceHeight)
+    switch original.horizontalConstraint {
+    case "center": layer.x = original.x + (boardWidth - refW) / 2
+    case "right": layer.x = boardWidth - (refW - original.x)
+    default: layer.x = original.x
+    }
+    switch original.verticalConstraint {
+    case "center": layer.y = original.y + (boardHeight - refH) / 2
+    case "bottom": layer.y = boardHeight - (refH - original.y)
+    default: layer.y = original.y
+    }
+    if original.horizontalConstraint == "stretch" {
+        let stretched = original.width + boardWidth - refW
+        layer.width = min(original.maxWidth > 0 ? original.maxWidth : Int.max, max(original.minWidth, stretched))
+    }
+    if original.verticalConstraint == "stretch" {
+        layer.height = max(1, original.height + boardHeight - refH)
+    }
+    layer.width = max(1, layer.width)
+    layer.height = max(1, layer.height)
+    return layer
+}
+
 private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
