@@ -106,6 +106,7 @@ struct ToolDetailView: View {
     @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
     @State private var visibleRelatedCount = 6
     let tool: Tool
+    var initialDeveloperMode: String? = nil
 
     private var compact: Bool { horizontalSizeClass != .regular }
     private var backend: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool) }
@@ -212,7 +213,7 @@ struct ToolDetailView: View {
                 }
                 .padding(.top, 40)
 
-                if !allRelatedTools.isEmpty {
+                if !allRelatedTools.isEmpty && !(tool.category == "developer" && tool.tags.contains("developer-studio")) {
                     enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envAccent)
@@ -323,10 +324,13 @@ private struct RelatedToolDetailCard: View {
 }
 
 struct ToolDestinationView: View {
+    @EnvironmentObject private var store: CatalogStore
     let tool: Tool
 
     @ViewBuilder var body: some View {
-        if tool.isUnderProduction {
+        if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
+            ToolDetailView(tool: studio, initialDeveloperMode: store.catalog.developerModeForLegacySlug(tool.slug))
+        } else if tool.isUnderProduction {
             UnderProductionDestinationView(tool: tool)
         } else {
             ToolDetailView(tool: tool)
@@ -434,7 +438,7 @@ struct NativeFamilyToolView: View {
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
@@ -973,6 +977,7 @@ private struct NativeDeveloperToolView: View {
     @State private var isExporting=false
     @State private var isImporting=false
     @State private var selectedFileName=""
+    let initialMode: String?
     private var studioSpec: NativeDeveloperStudioSpec? { nativeDeveloperStudioSpecs.first { $0.id == tool.id || $0.slug == tool.slug } }
     private var selectedStudioMode: NativeDeveloperStudioMode? { studioSpec?.modes.first { $0.key == studioModeKey } ?? studioSpec?.modes.first }
     private var op:String {
@@ -992,22 +997,26 @@ private struct NativeDeveloperToolView: View {
     private var isSQLFormatter:Bool { op.localizedCaseInsensitiveContains("sql") && (op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier")) }
     private var isDevopsPresetMode:Bool { studioSpec?.id == "devops-studio" && ["gitignore", "dockerfile"].contains(studioModeKey) }
 
-    init(tool: Tool) {
+    init(tool: Tool, initialMode: String? = nil) {
         self.tool = tool
+        self.initialMode = initialMode
         let operation = tool.engine.op ?? tool.engine.id ?? tool.id
         _regexMode = State(initialValue: operation.localizedCaseInsensitiveContains("explainer") ? "flavors" : "test")
         let spec = nativeDeveloperStudioSpecs.first(where: { $0.id == tool.id || $0.slug == tool.slug })
         let storedMode = spec.flatMap { UserDefaults.standard.string(forKey: "env.developer.mode.\($0.id)") }
-        let initialMode = spec?.modes.first(where: { $0.key == storedMode })?.key ?? spec?.modes.first?.key ?? ""
-        _studioModeKey = State(initialValue: initialMode)
+        let modeToUse = spec?.modes.first(where: { $0.key == initialMode })?.key
+            ?? spec?.modes.first(where: { $0.key == storedMode })?.key
+            ?? spec?.modes.first?.key ?? ""
+        _studioModeKey = State(initialValue: modeToUse)
     }
 
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
-            Text("Runs entirely on this device. Nothing is uploaded.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(Color.envSurface2,in:RoundedRectangle(cornerRadius:10))
+            if studioSpec == nil {
+                Text("Runs entirely on this device. Nothing is uploaded.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(Color.envSurface2,in:RoundedRectangle(cornerRadius:10))
+            }
             if let studioSpec {
-                Text(studioSpec.name).font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
-                Text(studioSpec.description).font(.footnote).foregroundStyle(.secondary)
+                Text("Choose a mode").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(studioSpec.modes) { mode in
