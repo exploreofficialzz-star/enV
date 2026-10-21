@@ -386,7 +386,10 @@ private object UxUiNativePdf {
             val bw=artboardWidth.toFloat();val bh=artboardHeight.toFloat();val scale=min(531f/bw,690f/bh)
             canvas.save();canvas.translate((pageW-bw*scale)/2f,110f);canvas.scale(scale,scale)
             canvas.drawColor(runCatching{android.graphics.Color.parseColor(background)}.getOrDefault(android.graphics.Color.WHITE))
-            elements.forEach { e ->
+            val visibleElements=elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}
+            canvas.drawText(target.uppercase()+" | "+artboardWidth+" x "+artboardHeight+" px | "+visibleElements.size+" visible layers",32f,80f,body)
+            visibleElements.forEach { original ->
+                val e=original.copy(x=uxNativeLayerX(original,artboardWidth),y=uxNativeLayerY(original,artboardHeight),width=uxNativeLayerWidth(original,artboardWidth),height=uxNativeLayerHeight(original,artboardHeight))
                 val fill=if(e.fill=="transparent")null else runCatching{android.graphics.Color.parseColor(e.fill)}.getOrDefault(android.graphics.Color.WHITE)
                 val r=RectF(e.x.toFloat(),e.y.toFloat(),(e.x+e.width).toFloat(),(e.y+e.height).toFloat())
                 val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=fill?:android.graphics.Color.TRANSPARENT;style=if(fill==null)Paint.Style.STROKE else Paint.Style.FILL;strokeWidth=e.borderWidth.coerceAtLeast(1).toFloat()}
@@ -448,8 +451,9 @@ fun NativeUxUiStudioForm() {
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
     val tokenJson=remember(colorTokens.toList(),spacingTokens.toList()){JSONObject().put("colors",JSONArray().apply{colorTokens.forEach{(name,value)->put(JSONObject().put("name",name).put("value",value))}}).put("spacing",JSONArray().apply{spacingTokens.forEach{put(it)}}).put("typography",JSONArray().apply{put(JSONObject().put("name","heading").put("fontFamily","sans-serif").put("fontSize",24).put("fontWeight",700).put("lineHeight",1.2));put(JSONObject().put("name","body").put("fontFamily","sans-serif").put("fontSize",16).put("fontWeight",400).put("lineHeight",1.5))})}
-    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.horizontalConstraint+":"+it.verticalConstraint}
+    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
+    val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()}
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
@@ -458,7 +462,7 @@ fun NativeUxUiStudioForm() {
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
             reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
             elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
-    LaunchedEffect(projectName,target,background,signature,tokenSignature,bw,bh,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
+    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
@@ -644,7 +648,7 @@ fun NativeUxUiStudioForm() {
                         Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(8.dp)).background(uxNativeColor(background))){
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
-                        elements.forEach{e->
+                        elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
                                     val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
                                     Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
                                         val density=dragDensity

@@ -7297,6 +7297,11 @@ private struct NativeUxUiStudioView: View {
         .onChange(of: projectName) { _ in saveDraft() }
         .onChange(of: target) { _ in saveDraft() }
         .onChange(of: background) { _ in saveDraft() }
+        .onChange(of: customArtboard) { _ in saveDraft() }
+        .onChange(of: customWidth) { _ in saveDraft() }
+        .onChange(of: customHeight) { _ in saveDraft() }
+        .onChange(of: tokens) { _ in saveDraft() }
+        .onChange(of: reusableComponents) { _ in saveDraft() }
         .onChange(of: elements) { _ in saveDraft() }
     }
 
@@ -7344,7 +7349,7 @@ private struct NativeUxUiStudioView: View {
                     let scale = min(CGFloat(1), proxy.size.width / CGFloat(boardWidth))
                     ZStack(alignment: .topLeading) {
                         uxUiUIColor(background)
-                        ForEach(elements) { item in
+                        ForEach(elements.filter { $0.visibleOn.contains(target) }) { item in
                             let rendered = uxUiResolvedLayer(item, boardWidth: boardWidth, boardHeight: boardHeight)
                             layerPreview(rendered, scale: scale)
                                 .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
@@ -8071,7 +8076,7 @@ private struct NativeUxUiStudioView: View {
             let title: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 18), .foregroundColor: UIColor.label]
             "enV UX/UI STUDIO".draw(at: CGPoint(x: 32, y: 26), withAttributes: heading)
             projectName.draw(in: CGRect(x: 32, y: 48, width: 530, height: 26), withAttributes: title)
-            "\(target.uppercased())  |  \(boardWidth) × \(boardHeight) px  |  \(elements.count) layers".draw(at: CGPoint(x: 32, y: 80), withAttributes: [.font: UIFont.systemFont(ofSize: 9), .foregroundColor: UIColor.secondaryLabel])
+            "\(target.uppercased())  |  \(boardWidth) × \(boardHeight) px  |  \(elements.filter { $0.visibleOn.contains(target) }.count) visible layers".draw(at: CGPoint(x: 32, y: 80), withAttributes: [.font: UIFont.systemFont(ofSize: 9), .foregroundColor: UIColor.secondaryLabel])
             let scale = min(531 / CGFloat(boardWidth), 680 / CGFloat(boardHeight))
             let xOffset = (595 - CGFloat(boardWidth) * scale) / 2
             let yOffset: CGFloat = 112
@@ -8080,7 +8085,7 @@ private struct NativeUxUiStudioView: View {
             context.cgContext.scaleBy(x: scale, y: scale)
             uxUiPlatformColor(background).setFill()
             UIRectFill(CGRect(x: 0, y: 0, width: boardWidth, height: boardHeight))
-            for original in elements {
+            for original in elements where original.visibleOn.contains(target) {
                 let item = uxUiResolvedLayer(original, boardWidth: boardWidth, boardHeight: boardHeight)
                 let rect = CGRect(x: item.x, y: item.y, width: item.width, height: item.height)
                 let path = UIBezierPath(roundedRect: rect, cornerRadius: CGFloat(item.radius))
