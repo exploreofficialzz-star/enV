@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  ArrowLeft, ArrowRight, Check, Copy, Download, FileJson,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Copy, Download, FileJson, Redo2, Undo2,
   Grid2X2, Layers, Laptop, LayoutTemplate, Monitor, Palette, Plus, Search, Smartphone,
   Trash2, WandSparkles, X, ZoomIn, ZoomOut,
 } from "lucide-react";
@@ -429,6 +429,8 @@ export function UxUiStudioEngine() {
   const [projectName, setProjectName] = useState("Untitled interface");
   const [background, setBackground] = useState("#F8FAFC");
   const [elements, setElements] = useState<DesignLayer[]>([]);
+  const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
+  const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [leftTab, setLeftTab] = useState<PanelTab>("components");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
@@ -494,6 +496,7 @@ export function UxUiStudioEngine() {
   function startDesign(nextTarget: DeviceTarget, presetId?: string) {
     const id = presetId || (nextTarget === "mobile" ? "mobile-dashboard" : "desktop-landing");
     const created = createPreset(nextTarget, id);
+    if (elements.length) checkpoint();
     setTarget(nextTarget);
     setProjectName(created.name);
     setBackground(created.background);
@@ -515,13 +518,52 @@ export function UxUiStudioEngine() {
     setNotice("Your locally saved design has been restored.");
   }
 
-  function updateLayer(id: string, patch: Partial<DesignLayer>) {
+  function checkpoint() {
+    setUndoStack((previous) => [...previous.slice(-39), elements]);
+    setRedoStack([]);
+  }
+
+  function undoLayout() {
+    if (!undoStack.length) return;
+    const previous = undoStack[undoStack.length - 1];
+    setRedoStack((stack) => [...stack.slice(-39), elements]);
+    setUndoStack((stack) => stack.slice(0, -1));
+    setElements(previous);
+    if (!previous.some((item) => item.id === selectedId)) setSelectedId(previous[0]?.id || "");
+    setNotice("Undo complete.");
+  }
+
+  function redoLayout() {
+    if (!redoStack.length) return;
+    const next = redoStack[redoStack.length - 1];
+    setUndoStack((stack) => [...stack.slice(-39), elements]);
+    setRedoStack((stack) => stack.slice(0, -1));
+    setElements(next);
+    if (!next.some((item) => item.id === selectedId)) setSelectedId(next[0]?.id || "");
+    setNotice("Redo complete.");
+  }
+
+  function moveLayer(id: string, offset: number) {
+    const index = elements.findIndex((item) => item.id === id);
+    const destination = index + offset;
+    if (index < 0 || destination < 0 || destination >= elements.length) return;
+    checkpoint();
+    setElements((previous) => {
+      const next = [...previous];
+      [next[index], next[destination]] = [next[destination], next[index]];
+      return next;
+    });
+  }
+
+  function updateLayer(id: string, patch: Partial<DesignLayer>, recordHistory = true) {
+    if (recordHistory) checkpoint();
     setElements((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
   function addLayer(kind: LayerKind) {
     const x = Math.max(8, Math.round((board.width - Math.min(kind === "text" ? 250 : 180, board.width - 24)) / 2));
     const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)));
+    checkpoint();
     setElements((previous) => [...previous, layer]);
     setSelectedId(layer.id);
     setInspectorTab("design");
@@ -532,6 +574,7 @@ export function UxUiStudioEngine() {
     const preset = PRESETS.find((item) => item.id === presetId);
     if (!preset) return;
     const created = createPreset(preset.target, preset.id);
+    checkpoint();
     setTarget(preset.target);
     setProjectName(created.name);
     setBackground(created.background);
@@ -546,6 +589,7 @@ export function UxUiStudioEngine() {
     const nextBoard = boardSize(next);
     const scaleX = nextBoard.width / board.width;
     const scaleY = nextBoard.height / board.height;
+    checkpoint();
     setElements((previous) => previous.map((item) => ({
       ...item,
       x: Math.round(item.x * scaleX), y: Math.round(item.y * scaleY),
@@ -567,7 +611,7 @@ export function UxUiStudioEngine() {
     const step = event.shiftKey ? 1 : 4;
     const nextX = Math.max(0, Math.min(board.width - 1, Math.round((drag.startX + dx) / step) * step));
     const nextY = Math.max(0, Math.min(board.height - 1, Math.round((drag.startY + dy) / step) * step));
-    updateLayer(drag.id, { x: nextX, y: nextY });
+    updateLayer(drag.id, { x: nextX, y: nextY }, false);
   }
 
   function onArtboardPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -577,6 +621,7 @@ export function UxUiStudioEngine() {
     const found = elements.find((item) => item.id === id);
     if (!found) return;
     setSelectedId(id);
+    checkpoint();
     const rect = event.currentTarget.getBoundingClientRect();
     dragRef.current = {
       id, pointerX: (event.clientX - rect.left) * board.width / Math.max(1, rect.width),
@@ -606,6 +651,7 @@ export function UxUiStudioEngine() {
         setNotice("Updated icon: " + iconName);
       } else {
         const icon = { ...makeLayer("icon", Math.round(board.width / 2 - 20), Math.round(board.height / 3)), ...metadata, name: iconName };
+        checkpoint();
         setElements((previous) => [...previous, icon]);
         setSelectedId(icon.id);
         setInspectorTab("design");
@@ -652,12 +698,14 @@ export function UxUiStudioEngine() {
   function duplicateSelected() {
     if (!selected) return;
     const duplicate = { ...selected, id: layerId(), name: selected.name + " copy", x: Math.min(board.width - selected.width, selected.x + 16), y: Math.min(board.height - selected.height, selected.y + 16) };
+    checkpoint();
     setElements((previous) => [...previous, duplicate]);
     setSelectedId(duplicate.id);
   }
 
   function deleteSelected() {
     if (!selected) return;
+    checkpoint();
     setElements((previous) => previous.filter((item) => item.id !== selected.id));
     setSelectedId("");
   }
@@ -708,6 +756,8 @@ export function UxUiStudioEngine() {
             <p className="mt-1 text-[11px] text-muted">Draft saved locally when supported · {elements.length} layers · {board.width} × {board.height} px</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo last design change" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-fg disabled:opacity-40"><Undo2 size={16} /> Undo</button>
+            <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo design change" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-fg disabled:opacity-40"><Redo2 size={16} /> Redo</button>
             <button type="button" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={"inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium " + (target === "mobile" ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}><Smartphone size={16} /> Mobile</button>
             <button type="button" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={"inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium " + (target === "desktop" ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}><Laptop size={16} /> Desktop</button>
             <button type="button" onClick={exportProject} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2"><FileJson size={16} /> JSON</button>
@@ -730,7 +780,7 @@ export function UxUiStudioEngine() {
             <div className="mt-5 border-t border-border pt-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers <span className="ml-auto font-normal text-muted">{elements.length}</span></div>
               <div className="max-h-64 space-y-1 overflow-y-auto">
-                {[...elements].reverse().map((item) => <div key={item.id} className={"flex items-center gap-1 rounded-md border px-1.5 py-1 " + (selectedId === item.id ? "border-accent bg-accent/10" : "border-transparent hover:bg-surface-2")}><button type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} className="min-w-0 flex-1 truncate py-1 text-left text-xs text-fg">{item.name}</button><button type="button" aria-label={"Duplicate " + item.name} onClick={() => { setSelectedId(item.id); const dup = { ...item, id: layerId(), name: item.name + " copy", x: item.x + 12, y: item.y + 12 }; setElements((old) => [...old, dup]); setSelectedId(dup.id); }} className="rounded p-1 text-muted hover:text-fg"><Copy size={12} /></button></div>)}
+                {[...elements].reverse().map((item) => <div key={item.id} className={"flex items-center gap-1 rounded-md border px-1.5 py-1 " + (selectedId === item.id ? "border-accent bg-accent/10" : "border-transparent hover:bg-surface-2")}><button type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} className="min-w-0 flex-1 truncate py-1 text-left text-xs text-fg">{item.name}</button><button type="button" aria-label={"Move " + item.name + " up in layer stack"} onClick={() => moveLayer(item.id, 1)} disabled={elements.findIndex((layer) => layer.id === item.id) === elements.length - 1} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowUp size={12} /></button><button type="button" aria-label={"Move " + item.name + " down in layer stack"} onClick={() => moveLayer(item.id, -1)} disabled={elements.findIndex((layer) => layer.id === item.id) === 0} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowDown size={12} /></button><button type="button" aria-label={"Duplicate " + item.name} onClick={() => { checkpoint(); const dup = { ...item, id: layerId(), name: item.name + " copy", x: item.x + 12, y: item.y + 12 }; setElements((old) => [...old, dup]); setSelectedId(dup.id); }} className="rounded p-1 text-muted hover:text-fg"><Copy size={12} /></button></div>)}
               </div>
               {selected && <button type="button" onClick={deleteSelected} className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-500/10"><Trash2 size={13} /> Delete selected</button>}
             </div>
