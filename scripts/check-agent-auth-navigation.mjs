@@ -44,7 +44,8 @@ const shortcutDialog = requireText("src/components/layout/shortcut-manager-dialo
 ], "Phone home-screen shortcut dialog");
 if (shortcutDialog.includes("localStorage") || shortcutDialog.includes("Your shortcuts on enV Home")) errors.push("Phone shortcuts must not be saved as tiles on the enV website homepage.");
 if (shortcutDialog.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must not navigate to the installation guide.");
-if (home.includes("HomeShortcutsTray") || home.includes('aria-label="Your shortcuts"')) errors.push("The website homepage must not render the removed in-site shortcut tiles.");
+const shortcutHome = requireText("src/routes/index.tsx", ["<AppShell>"], "Homepage shortcut removal check");
+if (shortcutHome.includes("HomeShortcutsTray") || shortcutHome.includes('aria-label="Your shortcuts"')) errors.push("The website homepage must not render the removed in-site shortcut tiles.");
 for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/install/support feature: " + path);
 }
