@@ -6744,7 +6744,7 @@ private final class UxUiIconSnapshotWebView: WKWebView {
 
 private final class UxUiIconSnapshotDelegate: NSObject, WKNavigationDelegate {
     private var completion: ((UIImage?) -> Void)?
-    weak var owner: UxUiIconSnapshotWebView?
+    var owner: UxUiIconSnapshotWebView?
 
     init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
 
@@ -6766,6 +6766,8 @@ private final class UxUiIconSnapshotDelegate: NSObject, WKNavigationDelegate {
         guard let callback = completion else { return }
         completion = nil
         owner?.iconSnapshotDelegate = nil
+        owner?.navigationDelegate = nil
+        owner = nil
         callback(image)
     }
 }
@@ -6816,6 +6818,7 @@ private struct NativeUxUiStudioView: View {
     @State private var iconQuery = "home"
     @State private var iconResults: [String] = []
     @State private var iconTotal = 0
+    @State private var iconLoadedQuery = ""
     @State private var isSearchingIcons = false
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
@@ -7405,8 +7408,11 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func searchIconLibrary(loadMore: Bool = false) {
-        guard let encoded = iconQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32&start=\(loadMore ? iconResults.count : 0)") else { return }
+        let query = iconQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return }
+        let append = loadMore && query == iconLoadedQuery
+        let offset = append ? iconResults.count : 0
+        guard let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32&start=\(offset)") else { return }
         isSearchingIcons = true
         Task {
             do {
@@ -7414,10 +7420,11 @@ private struct NativeUxUiStudioView: View {
                 guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
                 let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                 let found = result?["icons"] as? [String] ?? []
-                let total = result?["total"] as? Int ?? found.count
+                let total = result?["total"] as? Int ?? (offset + found.count)
                 await MainActor.run {
-                    iconResults = loadMore ? iconResults + found : found
+                    iconResults = append ? iconResults + found : found
                     iconTotal = total
+                    iconLoadedQuery = query
                     isSearchingIcons = false
                     notice = "\(iconResults.count) of \(iconTotal) icon identifiers loaded."
                 }
@@ -7427,7 +7434,7 @@ private struct NativeUxUiStudioView: View {
         }
     }
 
-    private func chooseIconArtwork(    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
+    private func chooseIconArtwork(    private func chooseIconArtwork(    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
         guard let url = URL(string: "https://api.iconify.design/" + iconName.replacingOccurrences(of: ":", with: "/") + ".svg") else {
             notice = "Invalid icon identifier."
             return
