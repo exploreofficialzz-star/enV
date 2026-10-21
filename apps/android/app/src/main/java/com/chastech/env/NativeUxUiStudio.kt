@@ -433,7 +433,7 @@ fun NativeUxUiStudioForm() {
     var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
     var customArtboard by remember{mutableStateOf(false)};var customWidth by remember{mutableIntStateOf(390)};var customHeight by remember{mutableIntStateOf(844)}
-    var tokenNameDraft by remember{mutableStateOf("brand")};var tokenValueDraft by remember{mutableStateOf("#2563EB")}
+    var tokenNameDraft by remember{mutableStateOf("brand")};var tokenValueDraft by remember{mutableStateOf("#2563EB")};var spacingDraft by remember{mutableStateOf("20")}
     val colorTokens=remember{mutableStateListOf<Pair<String,String>>("primary" to "#2563EB","surface" to "#FFFFFF","text" to "#111827","muted" to "#64748B","border" to "#E5E7EB")}
     val spacingTokens=remember{mutableStateListOf(4,8,12,16,24,32,48)}
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
@@ -456,6 +456,7 @@ fun NativeUxUiStudioForm() {
     LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);customWidth=p.optJSONObject("viewport")?.optInt("width",customWidth)?:customWidth;customHeight=p.optJSONObject("viewport")?.optInt("height",customHeight)?:customHeight;customArtboard=true
             colorTokens.clear();val savedColors=p.optJSONObject("tokens")?.optJSONArray("colors");if(savedColors!=null){for(index in 0 until savedColors.length()){val t=savedColors.optJSONObject(index)?:continue;colorTokens.add(t.optString("name") to t.optString("value","#2563EB"))}}
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
+            reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
             elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
     LaunchedEffect(projectName,target,background,signature,tokenSignature,bw,bh,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
     fun checkpoint(){
@@ -736,6 +737,8 @@ fun NativeUxUiStudioForm() {
                             OutlinedTextField(e.referenceHeight.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(referenceHeight=n.coerceAtLeast(1))}}},label={Text("Reference height")},modifier=Modifier.weight(1f),singleLine=true)
                         }
                         OutlinedTextField(e.componentKey,{v->edit(e.id){it.copy(componentKey=v)}},label={Text("Reusable component key")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Button(onClick={checkpoint();val key=e.componentKey.ifBlank{e.id};reusable.removeAll{it.componentKey==key};reusable.add(e.copy(componentKey=key));notice="Reusable component saved: "+e.name},modifier=Modifier.fillMaxWidth()){Text("Save selected as reusable component")}
+                        reusable.forEach{component->OutlinedButton(onClick={checkpoint();val copy=component.copy(id="layer-"+System.nanoTime(),name=component.name+" instance",x=(component.x+16).coerceAtMost((bw-component.width).coerceAtLeast(0)),y=(component.y+16).coerceAtMost((bh-component.height).coerceAtLeast(0)),referenceWidth=bw,referenceHeight=bh);elements.add(copy);selectedId=copy.id;notice="Reusable component added: "+component.name},modifier=Modifier.fillMaxWidth()){Text("Add reusable · "+component.name,maxLines=1)}}
                         if(e.kind=="image"){
                             Button(onClick={imageTargetId=e.id;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text(if(e.imageData.isBlank())"Import image (PNG, JPEG, WebP or GIF)" else "Replace image")}
                             Text("Raster image assets up to 4 MB are embedded into JSON and rendered in the artboard.",style=MaterialTheme.typography.bodySmall)
@@ -760,8 +763,28 @@ fun NativeUxUiStudioForm() {
                 Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Export and handoff",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     OutlinedTextField(background,{background=it},label={Text("Canvas background hex")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}});jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export project JSON + AI prompt")}
+                    Text("Named colour tokens",style=MaterialTheme.typography.labelLarge)
+                    colorTokens.forEachIndexed{index,token->Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+                        OutlinedTextField(token.first,{v->colorTokens[index]=v to token.second},label={Text("Name")},modifier=Modifier.weight(1f),singleLine=true)
+                        OutlinedTextField(token.second,{v->colorTokens[index]=token.first to v},label={Text("Hex")},modifier=Modifier.weight(1f),singleLine=true)
+                        OutlinedButton(onClick={selected?.let{sel->edit(sel.id){layer->if(token.first.contains("background")||token.first.contains("surface"))layer.copy(fill=token.second)else layer.copy(color=token.second)}}},enabled=selected!=null){Text("Apply")}
+                    }}
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedTextField(tokenNameDraft,{tokenNameDraft=it},label={Text("New token name")},modifier=Modifier.weight(1f),singleLine=true)
+                        OutlinedTextField(tokenValueDraft,{tokenValueDraft=it},label={Text("Value")},modifier=Modifier.weight(1f),singleLine=true)
+                        Button(onClick={val name=tokenNameDraft.trim();if(name.isNotBlank()&&colorTokens.none{it.first==name}){colorTokens.add(name to tokenValueDraft);tokenNameDraft="brand"}},enabled=tokenNameDraft.isNotBlank()){Text("Add")}
+                    }
+                    Text("Spacing tokens",style=MaterialTheme.typography.labelLarge)
+                    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){spacingTokens.forEach{space->OutlinedButton(onClick={selected?.let{sel->edit(sel.id){layer->layer.copy(padding=space)}}}){Text(space.toString()+" px")}}}
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedTextField(spacingDraft,{spacingDraft=it},label={Text("New spacing px")},modifier=Modifier.weight(1f),singleLine=true)
+                        Button(onClick={val value=spacingDraft.toIntOrNull();if(value!=null&&value in 1..256&&value !in spacingTokens){spacingTokens.add(value);spacingTokens.sort()}},enabled=spacingDraft.toIntOrNull() in 1..256){Text("Add spacing")}
+                    }
+                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}});jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export JSON + generated code + AI prompt")}
                     Button(onClick={pdfBytes=UxUiNativePdf.build(projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}}),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
+                    Button(onClick={sourceText=uxNativeGenerateHtml(projectName,target,background,elements,bw,bh,tokenJson,JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024));sourceLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+".html")},modifier=Modifier.fillMaxWidth()){Text("Export Web HTML")}
+                    Button(onClick={sourceText=uxNativeGenerateKotlin(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+".kt")},modifier=Modifier.fillMaxWidth()){Text("Export Android Kotlin")}
+                    Button(onClick={sourceText=uxNativeGenerateSwift(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+"View.swift")},modifier=Modifier.fillMaxWidth()){Text("Export iOS SwiftUI")}
                 }}
             }
             if(notice.isNotBlank())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
