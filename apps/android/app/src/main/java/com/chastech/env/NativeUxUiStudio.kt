@@ -245,7 +245,7 @@ fun NativeUxUiStudioForm() {
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())}
+    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     val selected=elements.firstOrNull{it.id==selectedId};val bw=if(target=="mobile")390 else 1440;val bh=if(target=="mobile")844 else 900
@@ -320,6 +320,29 @@ fun NativeUxUiStudioForm() {
             else->UxUiNativeLayer(id,"rect","Rectangle",24,540,140,90,"",fill="#DBEAFE")
         }
         checkpoint();elements.add(e);selectedId=id;notice=e.name+" added."
+    }
+
+    fun searchIcons(loadMore:Boolean=false){
+        val query=iconQuery.trim()
+        if(query.isBlank()){notice="Enter a term to search the icon catalogue.";return}
+        scope.launch {
+            iconBusy=true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val offset=if(loadMore)iconStart else 0
+                    val q=URLEncoder.encode(query,"UTF-8")
+                    val payload=JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24&start="+offset).readText())
+                    val icons=payload.optJSONArray("icons")?.let{arr->(0 until arr.length()).map{arr.optString(it)}}?:emptyList()
+                    Triple(payload.optInt("total",offset+icons.size),icons,offset)
+                }
+            }.onSuccess { result ->
+                iconResults=if(loadMore)iconResults+result.second else result.second
+                iconStart=result.third+result.second.size
+                iconTotal=result.first
+                notice=iconResults.size.toString()+" of "+iconTotal+" icon IDs loaded."
+            }.onFailure { notice=it.message?: "Icon catalogue unavailable." }
+            iconBusy=false
+        }
     }
 
     fun chooseIcon(layerId:String, icon:String){
@@ -451,9 +474,10 @@ fun NativeUxUiStudioForm() {
                         }
                         if(e.kind=="icon"){
                             OutlinedTextField(iconQuery,{iconQuery=it},label={Text("Search icon library")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                            Button(onClick={scope.launch{iconBusy=true;runCatching{withContext(Dispatchers.IO){val q=URLEncoder.encode(iconQuery.trim(),"UTF-8");JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24").readText()).optJSONArray("icons")?.let{a->(0 until a.length()).map{a.optString(it)}}?:emptyList()}}.onSuccess{iconResults=it;notice=it.size.toString()+" icon IDs found."}.onFailure{notice=it.message?:"Icon catalogue unavailable."};iconBusy=false}},enabled=!iconBusy&&iconQuery.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search icons")}
-                            iconResults.forEach{icon->OutlinedButton(onClick={edit(e.id){it.copy(iconName=icon,name=icon)};notice="Saved exact icon identifier "+icon+". Verify its source licence."},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}}
-                            Text("Icon identifiers are recorded exactly; check the source collection licence before shipping.",style=MaterialTheme.typography.bodySmall)
+                            Button(onClick={searchIcons(false)},enabled=!iconBusy&&iconQuery.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search icons")}
+                            iconResults.forEach{icon->OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}}
+                            if(iconResults.size<iconTotal)OutlinedButton(onClick={searchIcons(true)},enabled=!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Loading…" else "Load more icons · "+iconResults.size+" / "+iconTotal)}
+                            Text("Icon IDs are searched in pages; selected SVG artwork is embedded into the project. Check collection licences before shipping.",style=MaterialTheme.typography.bodySmall)
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
