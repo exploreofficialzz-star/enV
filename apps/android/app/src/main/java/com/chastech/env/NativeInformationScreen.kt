@@ -80,6 +80,72 @@ import com.chastech.env.ui.EnVIcon
 
 
 @Composable
+private fun NativeFeedbackRequestPage(isBugReport: Boolean) {
+    val context = LocalContext.current
+    var message by remember { mutableStateOf("") }
+    var replyEmail by remember { mutableStateOf("") }
+    val topic = if (isBugReport) "Report a bug" else "Tool suggestion"
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            if (isBugReport) "Tell us what went wrong" else "Tell us what tool enV should add",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            if (isBugReport) "Include the tool or page, what you expected, and what happened instead."
+            else "Describe the tool or task, the key features it should have, and why it would be useful.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = replyEmail,
+            onValueChange = { replyEmail = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Email for a reply (optional)") },
+        )
+        OutlinedTextField(
+            value = message,
+            onValueChange = { if (it.length <= 3000) message = it },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 6,
+            maxLines = 10,
+            label = { Text(if (isBugReport) "Bug details" else "Suggested tool and use case") },
+            placeholder = { Text(if (isBugReport) "Steps to reproduce and expected vs actual result…" else "Tool idea, features, and use case…") },
+            supportingText = { Text(message.length.toString() + "/3000 characters") },
+        )
+        Text(
+            "Your email app opens with a draft. Nothing is sent until you review and send it. Do not include passwords, verification codes, payment secrets, or confidential files.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(
+            onClick = {
+                val body = listOf(
+                    "Topic: " + topic,
+                    "Reply email: " + replyEmail.trim().ifBlank { "(not provided)" },
+                    "",
+                    if (isBugReport) "Bug report:" else "Suggested tool and use case:",
+                    message.trim(),
+                    "",
+                    "Please review before sending. Do not include passwords or confidential information.",
+                ).joinToString(System.lineSeparator())
+                val uri = Uri.parse(
+                    "mailto:envtoolkit@gmail.com?subject=" + Uri.encode("[enV] " + topic) +
+                        "&body=" + Uri.encode(body),
+                )
+                try {
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, uri))
+                } catch (_: Exception) {
+                    Toast.makeText(context, "No email app is available on this device.", Toast.LENGTH_LONG).show()
+                }
+            },
+            enabled = message.trim().length >= 10,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Prepare email") }
+    }
+}
+
+@Composable
 private fun NativeTokenGuideSection(heading: String, paragraphs: List<String>) {
     Column(Modifier.fillMaxWidth().padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(heading, style = MaterialTheme.typography.titleSmall)
@@ -220,6 +286,8 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
         "wallet" -> "Wallet"
         "pricing" -> "Pricing"
         "contact" -> "Contact"
+        "report-bugs" -> "Report bugs"
+        "suggest-tool" -> "Suggest a tool"
         "account" -> "Account"
         "history" -> "History"
         "privacy" -> "Privacy"
@@ -265,6 +333,8 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 "token-dashboard" -> NativeTokenDashboard()
                 "pricing" -> PricingInformation()
                 "contact" -> ContactInformation()
+                "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
+                "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
                 "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
                     Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }

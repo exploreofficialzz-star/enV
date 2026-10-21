@@ -1058,6 +1058,8 @@ struct NativeInformationPageView: View {
         case "about": return "About enV"
         case "pricing": return "Pricing"
         case "contact": return "Contact"
+        case "report-bugs": return "Report bugs"
+        case "suggest-tool": return "Suggest a tool"
         case "help": return "Help center"
         case "token-guide": return "Token guide"
         case "token-dashboard": return "Token dashboard"
@@ -1134,6 +1136,8 @@ struct NativeInformationPageView: View {
         case "about": NativeAboutInformationPage()
         case "pricing": NativePricingInformationPage()
         case "contact": NativeContactInformationPage()
+        case "report-bugs": NativeFeedbackRequestView(isBugReport: true)
+        case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
         case "token-guide": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
         case "token-dashboard": NativeTokenDashboardView()
@@ -2739,6 +2743,91 @@ private struct NativeResponsibleUseInformationPage: View {
                 "Keep a human in control: review outputs, verify important facts, and use qualified professionals for legal, medical, financial, tax, and safety-critical matters.",
             ])
             NativeInfoSectionView(title: "Reporting a concern", paragraphs: ["If you believe enV is being used unlawfully or encounter a safety or privacy issue, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company-related correspondence may be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com)."])
+        }
+    }
+}
+
+private struct NativeFeedbackRequestView: View {
+    @Environment(\.openURL) private var openURL
+    @State private var message = ""
+    @State private var replyEmail = ""
+    @State private var notice = ""
+    let isBugReport: Bool
+
+    private var topic: String { isBugReport ? "Report a bug" : "Tool suggestion" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(isBugReport ? "Tell us what went wrong" : "Tell us what tool enV should add")
+                .font(.envScaled(size: 17, weight: .semibold))
+                .foregroundStyle(Color.envInk)
+            Text(isBugReport
+                 ? "Include the tool or page, what you expected, and what happened instead."
+                 : "Describe the tool or task, key features, and why it would be useful.")
+                .font(.envScaled(size: 14))
+                .foregroundStyle(Color.envMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("Email for a reply (optional)", text: $replyEmail)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .padding(12)
+                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(isBugReport ? "Bug details" : "Suggested tool and use case")
+                    .font(.envScaled(size: 14, weight: .medium))
+                    .foregroundStyle(Color.envInk)
+                TextEditor(text: $message)
+                    .frame(minHeight: 150)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                Text("\(message.count)/3000 characters")
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(Color.envMuted)
+            }
+            Text("Your email app opens with a draft. Nothing is sent until you review and send it. Do not include passwords, verification codes, payment secrets, or confidential files.")
+                .font(.envScaled(size: 12))
+                .foregroundStyle(Color.envMuted)
+            Button {
+                prepareEmail()
+            } label: {
+                Label("Prepare email", systemImage: "paperplane")
+                    .font(.envScaled(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
+            if !notice.isEmpty {
+                Text(notice).font(.envScaled(size: 12)).foregroundStyle(Color.envMuted)
+            }
+        }
+    }
+
+    private func prepareEmail() {
+        let body = [
+            "Topic: " + topic,
+            "Reply email: " + (replyEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(not provided)" : replyEmail),
+            "",
+            isBugReport ? "Bug report:" : "Suggested tool and use case:",
+            message.trimmingCharacters(in: .whitespacesAndNewlines),
+            "",
+            "Please review before sending. Do not include passwords or confidential information."
+        ].joined(separator: "\n")
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "envtoolkit@gmail.com"
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "[enV] " + topic),
+            URLQueryItem(name: "body", value: body)
+        ]
+        if let url = components.url {
+            openURL(url)
+            notice = "Draft prepared. Review it in your email app before sending."
+        } else {
+            notice = "Unable to prepare the email link on this device."
         }
     }
 }

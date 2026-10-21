@@ -358,6 +358,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                             DropdownMenuItem(text = { Text("Help center") }, onClick = { informationReturnTab = tab; informationPage = "help"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Blog & guides") }, onClick = { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse("https://envtools.store/blog")); overflowExpanded = false })
                             DropdownMenuItem(text = { Text("Contact") }, onClick = { informationReturnTab = tab; informationPage = "contact"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Report bugs") }, onClick = { informationReturnTab = tab; informationPage = "report-bugs"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
+                            DropdownMenuItem(text = { Text("Suggest a tool") }, onClick = { informationReturnTab = tab; informationPage = "suggest-tool"; tab = AppTab.Account.name; detailStack = emptyList(); showExchange = false; showInformation = true; overflowExpanded = false })
                     }
                     }
                 },

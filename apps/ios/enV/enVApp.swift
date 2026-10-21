@@ -204,6 +204,8 @@ struct EnVBrandNavigationStyle: ViewModifier {
                             Button("Help center") { informationRouter.open("help") }
                             Button("Blog & guides") { isShowingBlogGuides = true }
                             Button("Contact") { informationRouter.open("contact") }
+                            Button("Report bugs") { informationRouter.open("report-bugs") }
+                            Button("Suggest a tool") { informationRouter.open("suggest-tool") }
                         }
                     } label: {
                         VStack(spacing: 3) {
