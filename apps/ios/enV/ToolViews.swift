@@ -173,7 +173,6 @@ private struct NativeToolGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             NativeToolGuideSectionView(heading: "Purpose and scope", paragraphs: [
-                tool.description,
                 "This entry belongs to the \(tool.category.replacingOccurrences(of: "-", with: " ")) category and follows enV's \(engineLabel) workflow. The description states the intended job; the current form defines controls available in this release."
             ])
             NativeToolGuideSectionView(heading: "When to use this tool", paragraphs: [
@@ -343,15 +342,19 @@ struct ToolDetailView: View {
                     enVCharacterSpacedText("What this tool does")
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
-                    NativeToolGuideView(tool: tool)
+                    enVCharacterSpacedText(tool.description)
+                        .font(.envScaled(size: 14, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
                         Link(destination: guideURL) {
                             Label("Read the full guide", systemImage: "book")
                                 .font(.envScaled(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.envAccent)
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 2)
                     }
+                    NativeToolGuideView(tool: tool)
                 }
                 .padding(.top, 40)
 
