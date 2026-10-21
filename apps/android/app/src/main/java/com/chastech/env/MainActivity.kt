@@ -267,11 +267,22 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var productionTool by remember { mutableStateOf<ToolRecord?>(null) }
     val openTool: (String) -> Unit = { id ->
         val candidate = catalog.displayTool(id)
-        if (candidate?.isUnderProduction() == true) {
-            productionTool = candidate
+        val routeId = if (candidate?.category == "developer" && candidate.tags.none { it == "developer-studio" }) {
+            val spec = NativeDeveloperStudios.forLegacySlug(candidate.slug)
+            val mode = NativeDeveloperStudios.modeForLegacySlug(spec, candidate.slug)
+            context.getSharedPreferences("env.developer-studio-modes", android.content.Context.MODE_PRIVATE)
+                .edit().putString(spec.id, mode).apply()
+            val decode = candidate.slug.endsWith("-decoder") || candidate.slug == "data-uri-decoder"
+            context.getSharedPreferences("env.developer-studio-directions", android.content.Context.MODE_PRIVATE)
+                .edit().putString(spec.id, if (decode) "decode" else "encode").apply()
+            spec.id
+        } else id
+        val routeCandidate = catalog.displayTool(routeId) ?: candidate
+        if (routeCandidate?.isUnderProduction() == true) {
+            productionTool = routeCandidate
         } else {
             productionTool = null
-            detailStack = listOf(id)
+            detailStack = listOf(routeId)
         }
     }
     val openRelatedTool: (String) -> Unit = { id ->
@@ -757,7 +768,8 @@ private fun CategoryScreen(catalog: Catalog, categoryId: String, onBack: () -> U
     val tools = remember(catalog, categoryId) {
         val source = when (categoryId) {
             "accessibility" -> catalog.accessibilityDiscoveryTools()
-            "developer" -> catalog.tools + catalog.relatedReferenceTools + catalog.developerStudioTools()
+            // The full Developer catalog remains searchable; category browsing shows Studios only.
+            "developer" -> catalog.developerStudioTools()
             else -> catalog.tools + catalog.relatedReferenceTools
         }
         source.filter { it.category == categoryId }
@@ -2444,7 +2456,10 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
         if (target.modes.any { it.key == hint.modeKey }) modePreferences.edit().putString(target.id, hint.modeKey).apply()
         onRelatedTool(target.id)
     }
-    var encodingDirection by rememberSaveable(tool.id) { mutableStateOf("encode") }
+    val directionPreferences = remember { context.getSharedPreferences("env.developer-studio-directions", android.content.Context.MODE_PRIVATE) }
+    var encodingDirection by rememberSaveable(tool.id) {
+        mutableStateOf(studio?.let { directionPreferences.getString(it.id, null) }?.takeIf { it == "encode" || it == "decode" } ?: "encode")
+    }
     var devopsPreset by rememberSaveable(tool.id) { mutableStateOf("node") }
     val selectedStudioMode = studio?.modes?.firstOrNull { it.key == studioModeKey } ?: studio?.modes?.firstOrNull()
     val op = when {
@@ -2506,21 +2521,28 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
         return JSONObject().put("input", recipeSource).put("steps", steps).toString()
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
-            Text("Runs entirely on this device. Nothing is uploaded.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (studio == null) {
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Text("Runs entirely on this device. Nothing is uploaded.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         if (studio != null) {
-            Text(studio.name, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            Text(studio.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Choose a mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 studio.modes.forEach { mode ->
-                    FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = { studioModeKey = mode.key; modePreferences.edit().putString(studio.id, mode.key).apply(); encodingDirection = "encode"; output = ""; error = "" }, label = { Text(mode.label) })
+                    FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = {
+                        studioModeKey = mode.key
+                        modePreferences.edit().putString(studio.id, mode.key).apply()
+                        encodingDirection = "encode"
+                        directionPreferences.edit().putString(studio.id, "encode").apply()
+                        output = ""; error = ""
+                    }, label = { Text(mode.label) })
                 }
             }
             if (selectedStudioMode?.decodeOp != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = encodingDirection == "encode", onClick = { encodingDirection = "encode"; output = ""; error = "" }, label = { Text("Encode") })
-                    FilterChip(selected = encodingDirection == "decode", onClick = { encodingDirection = "decode"; output = ""; error = "" }, label = { Text("Decode") })
+                    FilterChip(selected = encodingDirection == "encode", onClick = { encodingDirection = "encode"; directionPreferences.edit().putString(studio.id, "encode").apply(); output = ""; error = "" }, label = { Text("Encode") })
+                    FilterChip(selected = encodingDirection == "decode", onClick = { encodingDirection = "decode"; directionPreferences.edit().putString(studio.id, "decode").apply(); output = ""; error = "" }, label = { Text("Decode") })
                 }
             }
         }
