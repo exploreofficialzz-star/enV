@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, ChevronDown, Heart } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
-import { getToolDocumentation } from "@/lib/tool-documentation";
+import { getToolDocumentation, toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
@@ -115,6 +115,13 @@ export function ToolShell({
             </section>
           ))}
         </div>
+        <a
+          href={toolDocumentationPath(tool)}
+          className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
+        >
+          <BookOpen className="size-4" aria-hidden="true" />
+          Read the full guide
+        </a>
       </section>
 
       {related.length > 0 ? (
