@@ -1,3 +1,4 @@
+import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject } from "@/lib/engines/ux-ui-studio-codegen";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
@@ -6,11 +7,14 @@ import {
   Trash2, WandSparkles, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 
-type DeviceTarget = "mobile" | "desktop";
+type DeviceTarget = "mobile" | "tablet" | "desktop";
 type PanelTab = "components" | "icons" | "presets" | "tokens";
 type InspectorTab = "design" | "spec";
 type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer";
 type Align = "left" | "center" | "right";
+type HorizontalConstraint = "left" | "center" | "right" | "stretch";
+type VerticalConstraint = "top" | "center" | "bottom" | "stretch";
+type DesignTokens = { colors: Array<{ name: string; value: string }>; typography: Array<{ name: string; fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number }>; spacing: number[] };
 
 type DesignLayer = {
   id: string; kind: LayerKind; name: string; x: number; y: number; width: number; height: number;
@@ -20,12 +24,33 @@ type DesignLayer = {
   padding: number; marginTop: number; marginRight: number; marginBottom: number; marginLeft: number;
   fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number; letterSpacing: number;
   textAlign: Align; opacity: number; shadow: boolean;
+  horizontalConstraint: HorizontalConstraint; verticalConstraint: VerticalConstraint;
+  minWidth: number; maxWidth: number; visibleOn: DeviceTarget[];
+  referenceWidth: number; referenceHeight: number; componentKey: string;
 };
 
 type SavedProject = {
-  schemaVersion: 1; name: string; target: DeviceTarget; background: string;
-  viewport: { width: number; height: number }; elements: DesignLayer[]; updatedAt: string;
+  schemaVersion: 2; name: string; target: DeviceTarget; background: string;
+  viewport: { width: number; height: number };
+  breakpoints: { mobile: number; tablet: number; desktop: number };
+  tokens: DesignTokens; reusableComponents: DesignLayer[];
+  elements: DesignLayer[]; updatedAt: string;
 };
+
+const DEFAULT_TOKENS: DesignTokens = {
+  colors: [
+    { name: "primary", value: "#2563EB" }, { name: "surface", value: "#FFFFFF" },
+    { name: "text", value: "#111827" }, { name: "muted", value: "#64748B" },
+    { name: "border", value: "#E5E7EB" },
+  ],
+  typography: [
+    { name: "heading", fontFamily: "Inter", fontSize: 24, fontWeight: 700, lineHeight: 1.2 },
+    { name: "body", fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.5 },
+    { name: "label", fontFamily: "Inter", fontSize: 12, fontWeight: 600, lineHeight: 1.35 },
+  ],
+  spacing: [4, 8, 12, 16, 24, 32, 48],
+};
+const DESIGN_BREAKPOINTS = { mobile: 480, tablet: 768, desktop: 1024 };
 
 const STORAGE_KEY = "env-ux-ui-studio-project-v1";
 const FONT_OPTIONS = ["Inter", "Roboto", "SF Pro Display", "Arial", "system-ui", "Georgia", "Times New Roman", "Courier New"];
@@ -73,6 +98,8 @@ const PRESETS: Array<{ id: string; label: string; target: DeviceTarget; descript
   { id: "desktop-landing", label: "Website landing", target: "desktop", description: "Hero, call to action and feature cards" },
   { id: "desktop-dashboard", label: "Desktop dashboard", target: "desktop", description: "Sidebar, metrics and data panels" },
   { id: "desktop-settings", label: "Desktop settings", target: "desktop", description: "Settings layout and preference rows" },
+  { id: "tablet-dashboard", label: "Tablet dashboard", target: "tablet", description: "Tablet-first dashboard with balanced columns" },
+  { id: "tablet-settings", label: "Tablet settings", target: "tablet", description: "Tablet settings and preference layout" },
 ];
 
 function layerId(): string {
@@ -80,10 +107,12 @@ function layerId(): string {
 }
 
 function boardSize(target: DeviceTarget) {
-  return target === "mobile" ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+  if (target === "mobile") return { width: 390, height: 844 };
+  if (target === "tablet") return { width: 768, height: 1024 };
+  return { width: 1440, height: 900 };
 }
 
-function makeLayer(kind: LayerKind, x: number, y: number): DesignLayer {
+function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, referenceHeight = 844): DesignLayer {
   const shared: DesignLayer = {
     id: layerId(), kind, name: kind.charAt(0).toUpperCase() + kind.slice(1), x, y, width: 180, height: 64,
     text: "", iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "", iconLicense: "", iconAuthor: "",
@@ -91,6 +120,8 @@ function makeLayer(kind: LayerKind, x: number, y: number): DesignLayer {
     padding: 12, marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
     fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.35, letterSpacing: 0,
     textAlign: "left", opacity: 1, shadow: false,
+    horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
+    visibleOn: ["mobile", "tablet", "desktop"], referenceWidth, referenceHeight, componentKey: "",
   };
   switch (kind) {
     case "text": return { ...shared, name: "Text", width: 250, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700 };
@@ -131,8 +162,9 @@ function makeLayer(kind: LayerKind, x: number, y: number): DesignLayer {
 }
 
 function createPreset(target: DeviceTarget, presetId?: string): { name: string; background: string; elements: DesignLayer[] } {
-  const id = presetId || (target === "mobile" ? "mobile-dashboard" : "desktop-landing");
-  const add = (kind: LayerKind, x: number, y: number, patch: Partial<DesignLayer> = {}) => ({ ...makeLayer(kind, x, y), ...patch });
+  const id = presetId || (target === "mobile" ? "mobile-dashboard" : target === "tablet" ? "tablet-dashboard" : "desktop-landing");
+  const reference = boardSize(target);
+  const add = (kind: LayerKind, x: number, y: number, patch: Partial<DesignLayer> = {}) => ({ ...makeLayer(kind, x, y, reference.width, reference.height), ...patch });
   if (id === "mobile-login") return {
     name: "Mobile sign-in",
     background: "#F8FAFC",
@@ -172,6 +204,27 @@ function createPreset(target: DeviceTarget, presetId?: string): { name: string; 
       add("card", 732, 220, { width: 310, height: 136, name: "Completion rate", text: "Completion rate\n86.4%", fontSize: 16 }),
       add("card", 60, 386, { width: 890, height: 340, name: "Activity panel", text: "Recent activity\n\nYour timeline and data visualisation can be built here.", fontSize: 16 }),
       add("button", 1090, 126, { width: 240, height: 46, name: "Create action", text: "＋  Create project" }),
+    ],
+  };
+  if (id === "tablet-dashboard") return {
+    name: "Tablet dashboard", background: "#F8FAFC",
+    elements: [
+      add("navbar", 24, 24, { width: 720, text: "enV                         Search                         Profile", height: 64 }),
+      add("text", 32, 112, { width: 680, text: "Overview", fontSize: 28, fontWeight: 700 }),
+      add("card", 32, 180, { width: 215, height: 130, text: "Monthly usage\\n12,840 events" }),
+      add("card", 268, 180, { width: 215, height: 130, text: "Active projects\\n24 in progress" }),
+      add("card", 504, 180, { width: 232, height: 130, text: "Completion rate\\n86.4%" }),
+      add("card", 32, 334, { width: 450, height: 300, text: "Recent activity\\n\\nYour timeline and data visualization." }),
+      add("card", 500, 334, { width: 236, height: 300, text: "Quick actions\\n\\nCreate project\\nReview activity" }),
+    ],
+  };
+  if (id === "tablet-settings") return {
+    name: "Tablet settings", background: "#F8FAFC",
+    elements: [
+      add("navbar", 24, 24, { width: 720, text: "enV                         Settings                         Profile", height: 64 }),
+      add("text", 32, 112, { width: 680, text: "Settings", fontSize: 28, fontWeight: 700 }),
+      add("card", 32, 176, { width: 215, height: 420, text: "Preferences\\n\\nProfile\\nNotifications\\nAppearance\\nSecurity" }),
+      add("card", 268, 176, { width: 468, height: 420, text: "Account preferences\\n\\nManage your personal details and app settings." }),
     ],
   };
   if (id === "desktop-settings") return {
@@ -276,8 +329,8 @@ function sanitizeIconMarkup(source: string): { body: string; viewBox: string } {
   return { body: Array.from(root.children).map((node) => new XMLSerializer().serializeToString(node)).join(""), viewBox };
 }
 
-function buildProjectSpec(name: string, target: DeviceTarget, background: string, elements: DesignLayer[]): SavedProject {
-  return { schemaVersion: 1, name, target, background, viewport: boardSize(target), elements, updatedAt: new Date().toISOString() };
+function buildProjectSpec(name: string, target: DeviceTarget, background: string, viewport: { width: number; height: number }, elements: DesignLayer[], tokens: DesignTokens, reusableComponents: DesignLayer[]): SavedProject {
+  return { schemaVersion: 2, name, target, background, viewport, breakpoints: DESIGN_BREAKPOINTS, tokens, reusableComponents, elements, updatedAt: new Date().toISOString() };
 }
 
 function buildAiPrompt(project: SavedProject): string {
@@ -286,6 +339,8 @@ function buildAiPrompt(project: SavedProject): string {
     "Project: " + project.name,
     "Target: " + project.target + " interface",
     "Artboard: " + project.viewport.width + " x " + project.viewport.height + " CSS pixels",
+    "Responsive breakpoints: mobile <= " + project.breakpoints.mobile + "px; tablet " + (project.breakpoints.mobile + 1) + "–" + (project.breakpoints.desktop - 1) + "px; desktop >= " + project.breakpoints.desktop + "px.",
+    "Honor each layer's horizontal/vertical constraint, min/max width and visibleOn device list. Reusable templates retain componentKey.",
     "Canvas background: " + project.background,
     "Positioning model: absolute artboard coordinates; x/y are measured from the artboard top-left. Preserve element order as z-order.",
     "Preserve exact colors, icon identifiers, typeface names, text sizes, font weights, line heights, letter spacing, radii, borders, padding and per-side margins. Do not substitute icons or rewrite copy.",
@@ -294,6 +349,9 @@ function buildAiPrompt(project: SavedProject): string {
     "DESIGN TOKENS",
     "Colors: " + Array.from(new Set([project.background, ...project.elements.flatMap((item) => [item.color, item.background, item.borderColor])].filter((v) => v && v !== "transparent"))).join(", "),
     "Font families: " + Array.from(new Set(project.elements.map((item) => item.fontFamily))).join(", "),
+    "Named color tokens: " + project.tokens.colors.map((token) => token.name + "=" + token.value).join(", "),
+    "Typography tokens: " + project.tokens.typography.map((token) => token.name + "=" + token.fontFamily + " " + token.fontSize + "px/" + token.lineHeight + " weight " + token.fontWeight).join("; "),
+    "Spacing tokens: " + project.tokens.spacing.map((value) => value + "px").join(", "),
     "Spacing values: " + Array.from(new Set(project.elements.flatMap((item) => [item.padding, item.marginTop, item.marginRight, item.marginBottom, item.marginLeft]))).sort((a, b) => a - b).join(", ") + " px",
     "",
     "ELEMENT SPECIFICATIONS",
@@ -307,6 +365,8 @@ function buildAiPrompt(project: SavedProject): string {
       "   radius=" + item.radius + "px; padding=" + item.padding + "px; margins top/right/bottom/left=" + [item.marginTop, item.marginRight, item.marginBottom, item.marginLeft].join("/") + "px",
       "   font=" + item.fontFamily + "; size=" + item.fontSize + "px; weight=" + item.fontWeight + "; lineHeight=" + item.lineHeight + "; letterSpacing=" + item.letterSpacing + "px; align=" + item.textAlign,
       "   opacity=" + item.opacity + "; shadow=" + item.shadow,
+      "   responsive horizontal=" + item.horizontalConstraint + "; vertical=" + item.verticalConstraint + "; minWidth=" + item.minWidth + "; maxWidth=" + item.maxWidth + "; visibleOn=" + (item.visibleOn || []).join(","),
+      "   referenceViewport=" + item.referenceWidth + "x" + item.referenceHeight + "; componentKey=" + item.componentKey,
       item.iconName ? "   icon=" + item.iconName + "; license=" + (item.iconLicense || "metadata unavailable") + "; author=" + (item.iconAuthor || "metadata unavailable") : "",
     );
   });
@@ -428,6 +488,13 @@ export function UxUiStudioEngine() {
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
   const [projectName, setProjectName] = useState("Untitled interface");
   const [background, setBackground] = useState("#F8FAFC");
+  const [customArtboard, setCustomArtboard] = useState(false);
+  const [customWidth, setCustomWidth] = useState(390);
+  const [customHeight, setCustomHeight] = useState(844);
+  const [tokens, setTokens] = useState<DesignTokens>(DEFAULT_TOKENS);
+  const [reusableComponents, setReusableComponents] = useState<DesignLayer[]>([]);
+  const [tokenNameDraft, setTokenNameDraft] = useState("brand");
+  const [tokenValueDraft, setTokenValueDraft] = useState("#2563EB");
   const [elements, setElements] = useState<DesignLayer[]>([]);
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
@@ -448,10 +515,10 @@ export function UxUiStudioEngine() {
   const artboardRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
 
-  const board = boardSize(target);
+  const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
-  const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor])].filter((color) => color && color !== "transparent"))), [background, elements]);
-  const project = useMemo(() => buildProjectSpec(projectName, target, background, elements), [projectName, target, background, elements]);
+  const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
+  const project = useMemo(() => buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
 
   useEffect(() => {
@@ -459,7 +526,20 @@ export function UxUiStudioEngine() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as SavedProject;
-        if (parsed.schemaVersion === 1 && Array.isArray(parsed.elements) && parsed.viewport?.width) setSavedProject(parsed);
+        if ((parsed.schemaVersion === 1 || parsed.schemaVersion === 2) && Array.isArray(parsed.elements) && parsed.viewport?.width) {
+          const normalized = {
+            ...parsed, schemaVersion: 2 as const,
+            elements: parsed.elements.map((layer: Partial<DesignLayer>) => ({
+              horizontalConstraint: "left" as HorizontalConstraint, verticalConstraint: "top" as VerticalConstraint,
+              minWidth: 0, maxWidth: 0, visibleOn: ["mobile", "tablet", "desktop"] as DeviceTarget[],
+              referenceWidth: parsed.viewport.width, referenceHeight: parsed.viewport.height, componentKey: "", ...layer,
+            })),
+            tokens: parsed.tokens || DEFAULT_TOKENS,
+            breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
+            reusableComponents: parsed.reusableComponents || [],
+          } as SavedProject;
+          setSavedProject(normalized);
+        }
       }
     } catch { /* A corrupt local draft does not block the studio. */ }
   }, []);
@@ -497,6 +577,8 @@ export function UxUiStudioEngine() {
     const id = presetId || (nextTarget === "mobile" ? "mobile-dashboard" : "desktop-landing");
     const created = createPreset(nextTarget, id);
     if (elements.length) checkpoint();
+    const size = boardSize(nextTarget);
+    setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
     setTarget(nextTarget);
     setProjectName(created.name);
     setBackground(created.background);
@@ -512,7 +594,14 @@ export function UxUiStudioEngine() {
     setProjectName(savedProject.name);
     setTarget(savedProject.target);
     setBackground(savedProject.background);
-    setElements(savedProject.elements);
+    setCustomArtboard(true); setCustomWidth(savedProject.viewport.width); setCustomHeight(savedProject.viewport.height);
+    setTokens(savedProject.tokens || DEFAULT_TOKENS);
+    setReusableComponents(savedProject.reusableComponents || []);
+    setElements(savedProject.elements.map((layer) => ({
+      horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
+      visibleOn: ["mobile", "tablet", "desktop"], referenceWidth: savedProject.viewport.width,
+      referenceHeight: savedProject.viewport.height, componentKey: "", ...layer,
+    })));
     setSelectedId(savedProject.elements[0]?.id || "");
     setOnboarding(false);
     setNotice("Your locally saved design has been restored.");
@@ -562,7 +651,7 @@ export function UxUiStudioEngine() {
 
   function addLayer(kind: LayerKind) {
     const x = Math.max(8, Math.round((board.width - Math.min(kind === "text" ? 250 : 180, board.width - 24)) / 2));
-    const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)));
+    const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)), board.width, board.height);
     checkpoint();
     setElements((previous) => [...previous, layer]);
     setSelectedId(layer.id);
@@ -575,6 +664,8 @@ export function UxUiStudioEngine() {
     if (!preset) return;
     const created = createPreset(preset.target, preset.id);
     checkpoint();
+    const size = boardSize(preset.target);
+    setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
     setTarget(preset.target);
     setProjectName(created.name);
     setBackground(created.background);
@@ -594,7 +685,9 @@ export function UxUiStudioEngine() {
       ...item,
       x: Math.round(item.x * scaleX), y: Math.round(item.y * scaleY),
       width: Math.max(1, Math.round(item.width * scaleX)), height: Math.max(1, Math.round(item.height * scaleY)),
+      referenceWidth: nextBoard.width, referenceHeight: nextBoard.height,
     })));
+    setCustomArtboard(false); setCustomWidth(nextBoard.width); setCustomHeight(nextBoard.height);
     setTarget(next);
     setZoom(100);
     setNotice("The artboard was resized proportionally. Review spacing at the new viewport.");
@@ -650,7 +743,7 @@ export function UxUiStudioEngine() {
         updateLayer(selected.id, metadata);
         setNotice("Updated icon: " + iconName);
       } else {
-        const icon = { ...makeLayer("icon", Math.round(board.width / 2 - 20), Math.round(board.height / 3)), ...metadata, name: iconName };
+        const icon = { ...makeLayer("icon", Math.round(board.width / 2 - 20), Math.round(board.height / 3), board.width, board.height), ...metadata, name: iconName };
         checkpoint();
         setElements((previous) => [...previous, icon]);
         setSelectedId(icon.id);
@@ -663,7 +756,12 @@ export function UxUiStudioEngine() {
   }
 
   function exportProject() {
-    const content = JSON.stringify({ ...project, aiPrompt }, null, 2);
+    const content = JSON.stringify({ ...project, aiPrompt, generatedCode: {
+      html: generateHtmlProject(project),
+      react: generateReactProject(project),
+      kotlin: generateKotlinProject(project),
+      swift: generateSwiftProject(project),
+    } }, null, 2);
     downloadText((projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "env-design") + ".json", content, "application/json;charset=utf-8");
     setNotice("Project JSON downloaded with the full design specification and AI prompt.");
   }
