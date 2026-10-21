@@ -17,7 +17,7 @@ export type UxCodegenProject = {
   elements: UxCodegenLayer[];
 };
 const safe = (value: unknown) => JSON.stringify(value);
-const sourceName = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("") || "EnVDesign";
+export const sourceName = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("") || "EnVDesign";
 const esc = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const visibility = (layer: UxCodegenLayer) => layer.visibleOn?.length ? layer.visibleOn : ["mobile", "tablet", "desktop"];
 const refW = (layer: UxCodegenLayer, project: UxCodegenProject) => Math.max(1, layer.referenceWidth || project.viewport.width);
