@@ -137,15 +137,15 @@ export function Header() {
                   <section className="border-b border-border px-1 py-1" aria-label="View mode">
                     <h2 className={MENU_HEADING_CLASS}>View mode</h2>
                     <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <Smartphone size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Mobile view</span>
+                      <Smartphone size={16} className="shrink-0 -mr-0.5" aria-hidden="true" /><span className="min-w-0 flex-1">Mobile view</span>
                       {viewMode === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                     <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <Tablet size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Tablet view</span>
+                      <Tablet size={16} className="shrink-0 -mr-0.5" aria-hidden="true" /><span className="min-w-0 flex-1">Tablet view</span>
                       {viewMode === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                     <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
-                      <Monitor size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Desktop view</span>
+                      <Monitor size={16} className="shrink-0 -mr-0.5" aria-hidden="true" /><span className="min-w-0 flex-1">Desktop view</span>
                       {viewMode === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                   </section>
