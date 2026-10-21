@@ -57,6 +57,23 @@ private data class UxUiNativeLayer(
     val iconViewBox: String = "0 0 24 24"
 )
 
+private fun uxNativeLayerX(layer: UxUiNativeLayer, boardWidth: Int): Int = when(layer.horizontalConstraint) {
+    "center" -> layer.x + (boardWidth - layer.referenceWidth) / 2
+    "right" -> boardWidth - (layer.referenceWidth - layer.x)
+    else -> layer.x
+}
+private fun uxNativeLayerY(layer: UxUiNativeLayer, boardHeight: Int): Int = when(layer.verticalConstraint) {
+    "center" -> layer.y + (boardHeight - layer.referenceHeight) / 2
+    "bottom" -> boardHeight - (layer.referenceHeight - layer.y)
+    else -> layer.y
+}
+private fun uxNativeLayerWidth(layer: UxUiNativeLayer, boardWidth: Int): Int {
+    val width = if(layer.horizontalConstraint=="stretch") layer.width + (boardWidth-layer.referenceWidth) else layer.width
+    return width.coerceAtLeast(layer.minWidth.coerceAtLeast(1)).let{if(layer.maxWidth>0)it.coerceAtMost(layer.maxWidth)else it}
+}
+private fun uxNativeLayerHeight(layer: UxUiNativeLayer, boardHeight: Int): Int =
+    (if(layer.verticalConstraint=="stretch")layer.height+(boardHeight-layer.referenceHeight)else layer.height).coerceAtLeast(1)
+
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
 
@@ -628,7 +645,7 @@ fun NativeUxUiStudioForm() {
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.forEach{e->
                                     val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
-                                    Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
                                         val density=dragDensity
                                         detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
                                             change.consume()
@@ -704,6 +721,21 @@ fun NativeUxUiStudioForm() {
                             OutlinedTextField(e.marginBottom.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(marginBottom=n)}}},label={Text("Margin bottom")},modifier=Modifier.weight(1f),singleLine=true)
                             OutlinedTextField(e.marginLeft.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(marginLeft=n)}}},label={Text("Margin left")},modifier=Modifier.weight(1f),singleLine=true)
                         }
+                        Text("Responsive constraints",style=MaterialTheme.typography.labelLarge)
+                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                            OutlinedTextField(e.horizontalConstraint,{v->edit(e.id){it.copy(horizontalConstraint=v)}},label={Text("Horizontal anchor")},modifier=Modifier.weight(1f),singleLine=true)
+                            OutlinedTextField(e.verticalConstraint,{v->edit(e.id){it.copy(verticalConstraint=v)}},label={Text("Vertical anchor")},modifier=Modifier.weight(1f),singleLine=true)
+                        }
+                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                            OutlinedTextField(e.minWidth.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(minWidth=n.coerceAtLeast(0))}}},label={Text("Min width px")},modifier=Modifier.weight(1f),singleLine=true)
+                            OutlinedTextField(e.maxWidth.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(maxWidth=n.coerceAtLeast(0))}}},label={Text("Max width 0=none")},modifier=Modifier.weight(1f),singleLine=true)
+                        }
+                        OutlinedTextField(e.visibleOn,{v->edit(e.id){it.copy(visibleOn=v)}},label={Text("Visible on: mobile,tablet,desktop")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                            OutlinedTextField(e.referenceWidth.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(referenceWidth=n.coerceAtLeast(1))}}},label={Text("Reference width")},modifier=Modifier.weight(1f),singleLine=true)
+                            OutlinedTextField(e.referenceHeight.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(referenceHeight=n.coerceAtLeast(1))}}},label={Text("Reference height")},modifier=Modifier.weight(1f),singleLine=true)
+                        }
+                        OutlinedTextField(e.componentKey,{v->edit(e.id){it.copy(componentKey=v)}},label={Text("Reusable component key")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         if(e.kind=="image"){
                             Button(onClick={imageTargetId=e.id;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text(if(e.imageData.isBlank())"Import image (PNG, JPEG, WebP or GIF)" else "Replace image")}
                             Text("Raster image assets up to 4 MB are embedded into JSON and rendered in the artboard.",style=MaterialTheme.typography.bodySmall)
