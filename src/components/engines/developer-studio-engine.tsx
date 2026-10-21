@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronRight, ShieldCheck, Sparkles, ScanSearch } from "lucide-react";
+import { ChevronRight, ScanSearch } from "lucide-react";
 import { DeveloperEngine } from "@/components/engines/developer-engine";
 import { DeveloperRecipeWorkbench } from "@/components/engines/developer-recipe-workbench";
 import { Button } from "@/components/ui/button";
@@ -69,24 +69,8 @@ export function DeveloperStudioEngine({ tool, initialMode, initialAction, initia
 
   return (
     <section className="space-y-5" aria-labelledby="developer-studio-heading">
-      <div className="rounded-xl border border-border bg-surface p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Sparkles className="size-5" aria-hidden="true" /></span>
-          <div className="min-w-0 flex-1">
-            <h2 id="developer-studio-heading" className="text-xl font-semibold">{studio.name}</h2>
-            <p className="mt-1 text-sm leading-6 text-muted">{studio.description}</p>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted" role="note">
-          <ShieldCheck className="size-4 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
-          <span className="font-medium text-foreground">Local-first processing</span>
-          <span aria-hidden="true">·</span>
-          <span>Text and file inputs are processed in this app; no tool input is intentionally uploaded.</span>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Choose a mode</h3>
+      <div className="space-y-2" aria-labelledby="developer-studio-heading">
+        <h2 id="developer-studio-heading" className="text-sm font-semibold">Choose a mode</h2>
         {/* Horizontal scroll on narrow screens; wrap on sm+ — Accessibility-style touch-friendly modes */}
         <div
           className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible touch-pan-x"
@@ -202,7 +186,7 @@ export function DeveloperStudioEngine({ tool, initialMode, initialAction, initia
 
       {activeOp === "developer-recipe-runner"
         ? <DeveloperRecipeWorkbench />
-        : <DeveloperEngine key={`${studio.id}:${activeOp}:${presetInput ?? "default"}`} op={activeOp} tool={tool} initialInput={presetInput} />}
+        : <DeveloperEngine key={studio.id} op={activeOp} tool={tool} initialInput={presetInput} />}
     </section>
   );
 }
