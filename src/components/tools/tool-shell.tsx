@@ -95,6 +95,13 @@ export function ToolShell({
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
         <p className="mt-3 text-sm leading-6 text-muted">{tool.description}</p>
+        <a
+          href={toolDocumentationPath(tool)}
+          className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
+        >
+          <BookOpen className="size-4" aria-hidden="true" />
+          Read the full guide
+        </a>
         <div className="mt-6 space-y-8">
           {documentation.map((section) => (
             <section key={section.id} aria-labelledby={section.id + "-tool-guide-heading"} className="space-y-3">
@@ -115,13 +122,7 @@ export function ToolShell({
             </section>
           ))}
         </div>
-        <a
-          href={toolDocumentationPath(tool)}
-          className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
-        >
-          <BookOpen className="size-4" aria-hidden="true" />
-          Read the full guide
-        </a>
+
       </section>
 
       {related.length > 0 ? (
