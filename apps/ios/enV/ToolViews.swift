@@ -7218,7 +7218,7 @@ private struct NativeUxUiStudioView: View {
         for (index, item) in elements.enumerated() {
             lines.append(String(index + 1) + ". " + item.name + " [" + item.kind + "]")
             lines.append("id=" + item.id.uuidString + "; x=" + String(item.x) + "px; y=" + String(item.y) + "px; width=" + String(item.width) + "px; height=" + String(item.height) + "px")
-            let encodedText = (try? JSONEncoder().encode(item.text)).flatMap { String(data: $0, encoding: .utf8) } ?? """"
+            let encodedText = (try? JSONEncoder().encode(item.text)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
             lines.append("text=" + encodedText + "; icon=" + item.iconName)
             lines.append("color=" + item.color + "; fill=" + item.fill + "; border=" + item.borderColor + " " + String(item.borderWidth) + "px; radius=" + String(item.radius) + "px")
             lines.append("padding=" + String(item.padding) + "px; margins top/right/bottom/left=" + String(item.marginTop) + "/" + String(item.marginRight) + "/" + String(item.marginBottom) + "/" + String(item.marginLeft) + "px")
