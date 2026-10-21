@@ -85,7 +85,7 @@ const iosMenuStart = ios.indexOf("Menu {", ios.indexOf("ToolbarItemGroup(placeme
 const iosMenuEnd = ios.indexOf("} label: {", iosMenuStart);
 const iosMenu = iosMenuStart >= 0 && iosMenuEnd > iosMenuStart ? ios.slice(iosMenuStart, iosMenuEnd) : "";
 for (const removed of ['Button("AI Agent")', 'Button("Sign in")', 'Button("Create account")', 'Button("Search tools")', 'Section("LEGAL")']) if (iosMenu.includes(removed)) errors.push(`iOS overflow menu still contains ${removed}`);
-const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Understanding tokens"]);
+const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Estimated tokens across enV tools"]);
 if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("iOS footer still renders the moved Product/Resources groups.");
 if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
 if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");
@@ -171,9 +171,12 @@ const guideRenderer = requireText("src/routes/blog.$slug.tsx", [
 if (!existsSync(resolve("scripts/check-blog-guide-navigation.mjs"))) errors.push("Missing browser regression test for Read the full guide navigation.");
 if (!guideRenderer.includes("section.bullets ?")) errors.push("Tool guides must render their troubleshooting and validation lists.");
 const toolShell = requireText("src/components/tools/tool-shell.tsx", [
-  "href={toolDocumentationPath(tool)}",
-  "Read the full guide",
-], "Tool-to-guide links");
+  "getToolDocumentation(tool)",
+  "What this tool does",
+  "section.steps?.length",
+  "section.bullets?.length",
+], "Embedded tool guide");
+if (toolShell.includes("href={toolDocumentationPath(tool)}") || toolShell.includes("Read the full guide")) errors.push("Tool detail pages must embed the full guide instead of linking away from the tool.");
 
 if (errors.length) { console.error(`Account/Wallet navigation audit failed with ${errors.length} error(s):`); for (const error of errors) console.error(`- ${error}`); process.exit(1); }
 console.log("Account/Wallet navigation audit passed: Product/Resources groups, separate Wallet page, direct shared Account sign-in, password controls, Google/Apple actions, token guide, and Legal footer are present.");

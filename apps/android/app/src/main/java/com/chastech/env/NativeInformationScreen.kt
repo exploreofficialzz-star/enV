@@ -80,6 +80,20 @@ import com.chastech.env.ui.EnVIcon
 
 
 @Composable
+private fun NativeTokenGuideSection(heading: String, paragraphs: List<String>) {
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(heading, style = MaterialTheme.typography.titleSmall)
+        paragraphs.forEach { paragraph ->
+            Text(
+                paragraph,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
 private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
     val allTools = remember(catalog) {
         (catalog.tools + catalog.relatedReferenceTools).distinctBy { it.id }.sortedBy { it.name.lowercase(Locale.ROOT) }
@@ -132,12 +146,12 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
                 Text("Profiles generated from catalogue metadata are provisional classifications, not necessarily measured costs or user-specific quotes. If no numeric rate is available, the guide must not present that unknown amount as zero cost.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        NativeGuideSection("How to read each profile", listOf(
+        NativeTokenGuideSection("How to read each profile", listOf(
             "Unit label identifies what a rate would apply to; never compare a number without its unit. Pricing method indicates a provisional per-unit hypothesis or that measured provider cost is required.",
             "Execution model describes the catalogue classification as local/tool-dependent or cloud/remote. Measurement dimensions describe the current factors that should be recorded. Pricing version and classification explanation provide context about the profile.",
             "Premium and optional AI-assistance flags are catalogue metadata. They do not authorize a hidden charge; billable work needs a disclosed price and a verified charging flow.",
         ))
-        NativeGuideSection("Factors that may affect usage", listOf(
+        NativeTokenGuideSection("Factors that may affect usage", listOf(
             "Local utilities differ from batch work, long media tasks, hosted document processing, and AI-assisted workflows in the resources they consume.",
             "Relevant factors can include input size, page or item count, duration, resolution, output size, model input/output volume, retries, and provider charges. Which factors apply depends on the actual tool and must be measured rather than assumed.",
             "Use the token button on the home page to review account usage recorded by tool. This guide explains estimate profiles; it is not a substitute for recorded account activity.",
