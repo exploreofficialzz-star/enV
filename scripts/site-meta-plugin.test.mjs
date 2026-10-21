@@ -50,11 +50,12 @@ test("All Tools groups results by category and progressively expands without glo
   assert.doesNotMatch(tools, /Tool availability filter|Coming Soon \(|PAGE_SIZE|Showing \d+–|Page \{safePage\}/);
 });
 
-test("tool detail Save action stays in the title row on compact screens", () => {
+test("tool detail Save action stays in the title row and the description wraps below it on compact screens", () => {
   const shell = readFileSync(join(PROJECT_ROOT, "src/components/tools/tool-shell.tsx"), "utf8");
-  assert.match(shell, /<header className="mt-6 flex items-start justify-between gap-3">/);
-  assert.match(shell, /className="flex min-w-0 flex-1 gap-3"/);
-  assert.match(shell, /className="shrink-0"/);
+  assert.ok(shell.includes('<header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto]'), "responsive grid title/save row must be present");
+  assert.ok(shell.includes('className="col-start-3 row-start-1 shrink-0"'), "Save must stay in the first row");
+  assert.ok(shell.includes("col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden"), "mobile description must occupy the row beneath Save");
+  assert.ok(shell.includes("Read the full guide") && shell.includes("toolDocumentationPath(tool)"), "the full-guide link must remain after inline guide content");
 });
 
 test("tool cards use distinct app-icon tiles while category cards retain theme-aware icons", () => {

@@ -104,6 +104,7 @@ assert.match(toolShell, /getToolDocumentation\(tool\)/, "tool detail screens mus
 assert.match(toolShell, /What this tool does/, "the embedded guide must be grouped under the tool purpose heading");
 assert.match(toolShell, /section\.steps\?\.length/, "the embedded guide must render procedural steps");
 assert.match(toolShell, /section\.bullets\?\.length/, "the embedded guide must render full guide lists");
+assert.match(toolShell, /href=\{toolDocumentationPath\(tool\)\}[\s\S]*?Read the full guide/, "the full-guide link must remain after the inline documentation");
 assert.equal(profiles.toolCount, 10_025, "full catalogue must be profiled");
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
 assert.equal(new Set(profiles.profiles.map((profile) => profile.toolId)).size, profiles.toolCount, "tool billing profiles must have unique IDs");

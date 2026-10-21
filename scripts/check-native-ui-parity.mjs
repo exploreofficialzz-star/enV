@@ -112,7 +112,7 @@ const iosSearchSuggestion = iosContent.split("private struct WebHomeSearchSugges
 const webRelated = webToolShell.split('<h2 className="text-lg font-semibold text-accent">Related tools</h2>')[1]?.split("</section>")[0] ?? "";
 const androidToolDetail = android.split("private fun ToolDetail(")[1]?.split("@Composable\nprivate fun NativeToolHeader")[0] ?? "";
 const androidRelatedCard = android.split("private fun RelatedToolCard(")[1]?.split("@Composable\nprivate fun NativeToolForm")[0] ?? "";
-const iosToolDetail = iosTools.split("struct ToolDetailView: View")[1]?.split("private var toolHeading")[0] ?? "";
+const iosToolDetail = iosTools.split("struct ToolDetailView: View")[1]?.split("private func toolHeading")[0] ?? "";
 const iosRelatedCard = iosTools.split("private struct RelatedToolDetailCard: View")[1]?.split("/// The native surface")[0] ?? "";
 assert.match(webHome, /gap-4 rounded-full/, "Web branded search should use a fully rounded capsule");
 assert.match(webHome, /inputClassName="min-w-0 flex-1 bg-transparent text-left/);
@@ -120,9 +120,9 @@ assert.match(androidHome, /Box\(Modifier\.weight\(1f\)\.padding\(horizontal = 16
 assert.match(androidHome, /textAlign = TextAlign\.Start/);
 assert.match(iosHome, /HStack\(spacing: 16\)/, "iOS branded search should keep a deliberate logo-to-field gap");
 assert.match(iosHome, /\.multilineTextAlignment\(\.leading\)/);
-assert.match(webToolShell, /<header className="mt-6 flex items-start justify-between gap-3">[\s\S]*?<Button[\s\S]*?className="shrink-0"/);
-assert.match(androidToolDetail, /Row\(\s*Modifier\.fillMaxWidth\(\),\s*verticalAlignment = Alignment\.Top,\s*horizontalArrangement = Arrangement\.spacedBy\(if \(compact\) 8\.dp else 16\.dp\),\s*\)[\s\S]*?NativeToolHeader\(tool, compact, Modifier\.weight\(1f\)\)[\s\S]*?NativeToolSaveButton\(isFavorite, onToggleFavorite\)/);
-assert.match(iosToolDetail, /HStack\(alignment: \.top, spacing: compact \? 8 : 16\)[\s\S]*?toolHeading\.frame\(maxWidth: \.infinity, alignment: \.leading\)[\s\S]*?saveButton/);
+assert.ok(webToolShell.includes('<header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto]') && webToolShell.includes("col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden") && webToolShell.includes("Read the full guide"), "Web tool details must keep Save in the heading row, wrap the mobile description below it, and retain the full-guide link.");
+assert.ok(androidToolDetail.includes("NativeToolHeader(tool, compact, Modifier.weight(1f), showDescription = !compact)") && androidToolDetail.includes("if (compact)") && androidToolDetail.includes("NativeToolSaveButton(isFavorite, onToggleFavorite)") && androidToolDetail.includes('Text("Read the full guide")'), "Android tool details must wrap the mobile description below the heading/save row and retain the full-guide link.");
+assert.ok(iosToolDetail.includes("toolHeading(showsDescription: !compact)") && iosToolDetail.includes("if compact") && iosToolDetail.includes("saveButton") && iosToolDetail.includes('Label("Read the full guide", systemImage: "book")'), "iOS tool details must wrap the mobile description below the heading/save row and retain the full-guide link.");
 assert.match(androidHome, /Popup\(alignment = Alignment\.TopStart, offset = IntOffset\(0, with\(LocalDensity\.current\)/);
 assert.match(iosHome, /\.overlay\(alignment: \.top\)[\s\S]*?if isHomeSearchFocused && hasSearchText[\s\S]*?\.zIndex\(isHomeSearchFocused && hasSearchText/);
 assert.match(webSearchBox, /className="absolute z-20 mt-2 w-full/);
