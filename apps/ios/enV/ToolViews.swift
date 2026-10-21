@@ -6678,6 +6678,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var text: String
     var iconName: String = ""
     var iconSvg: String? = nil
+    var imageData: String? = nil
     var color: String = "#111827"
     var fill: String = "transparent"
     var borderColor: String = "#E5E7EB"
@@ -6694,6 +6695,15 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var lineHeight: Double = 1.35
 }
 
+
+private func uxUiNativeImage(fromDataURL dataURL: String) -> UIImage? {
+    guard let comma = dataURL.firstIndex(of: ",") else { return nil }
+    let header = String(dataURL[..<comma]).lowercased()
+    guard header.hasPrefix("data:image/"), header.hasSuffix(";base64") else { return nil }
+    let encoded = String(dataURL[dataURL.index(after: comma)...])
+    guard let data = Data(base64Encoded: encoded) else { return nil }
+    return UIImage(data: data)
+}
 
 private func uxUiCleanIconSVG(_ svg: String) -> String {
     return svg
@@ -6820,6 +6830,8 @@ private struct NativeUxUiStudioView: View {
     @State private var iconTotal = 0
     @State private var iconLoadedQuery = ""
     @State private var isSearchingIcons = false
+    @State private var isImportingImage = false
+    @State private var imageTargetID: UUID?
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
     @State private var pdfDocument = UxUiStudioExport(data: Data())
@@ -6946,6 +6958,49 @@ private struct NativeUxUiStudioView: View {
         .fileExporter(isPresented: $isExportingJSON, document: jsonDocument, contentType: .json, defaultFilename: safeFileName + "-design-spec") { result in
             switch result { case .success(let url): notice = "JSON exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
         }
+        .fileImporter(isPresented: $isImportingImage, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first, let targetID = imageTargetID else {
+                    notice = "Select an image layer before importing an asset."
+                    return
+                }
+                do {
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 4 * 1024 * 1024 {
+                        throw NSError(domain: "enV.UxUiStudio", code: 1, userInfo: [NSLocalizedDescriptionKey: "Images must be 4 MB or smaller."])
+                    }
+                    let fileData = try Data(contentsOf: url)
+                    guard fileData.count <= 4 * 1024 * 1024 else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 2, userInfo: [NSLocalizedDescriptionKey: "Images must be 4 MB or smaller."])
+                    }
+                    let ext = url.pathExtension.lowercased()
+                    let mime: String
+                    switch ext {
+                    case "png": mime = "image/png"
+                    case "jpg", "jpeg": mime = "image/jpeg"
+                    case "webp": mime = "image/webp"
+                    case "gif": mime = "image/gif"
+                    default:
+                        throw NSError(domain: "enV.UxUiStudio", code: 3, userInfo: [NSLocalizedDescriptionKey: "Use a PNG, JPEG, WebP or GIF image."])
+                    }
+                    guard let index = elements.firstIndex(where: { $0.id == targetID }) else {
+                        notice = "The selected image layer no longer exists."
+                        return
+                    }
+                    checkpoint()
+                    elements[index].kind = "image"
+                    elements[index].imageData = "data:\(mime);base64,\(fileData.base64EncodedString())"
+                    elements[index].text = ""
+                    notice = "Image imported and embedded in your design project."
+                } catch {
+                    notice = error.localizedDescription
+                }
+            case .failure(let error):
+                notice = error.localizedDescription
+            }
+        }
         .onChange(of: projectName) { _ in saveDraft() }
         .onChange(of: target) { _ in saveDraft() }
         .onChange(of: background) { _ in saveDraft() }
@@ -7034,6 +7089,7 @@ private struct NativeUxUiStudioView: View {
                     addButton("Card", icon: "rectangle.on.rectangle", kind: "card")
                     addButton("Input", icon: "rectangle.and.pencil.and.ellipsis", kind: "input")
                     addButton("Icon", icon: "square.grid.2x2", kind: "icon")
+                    addButton("Image", icon: "photo", kind: "image")
                     addButton("Navbar", icon: "menubar.rectangle", kind: "navbar")
                     addButton("Tab bar", icon: "rectangle.bottomthird.inset.filled", kind: "tabbar")
                     addButton("Tabs", icon: "square.split.2x1", kind: "tabs")
@@ -7153,13 +7209,21 @@ private struct NativeUxUiStudioView: View {
                     } else {
                         Image(systemName: "square.grid.2x2").font(.system(size: max(9, CGFloat(item.fontSize) * scale)))
                     }
+                } else if item.kind == "image" {
+                    if let dataURL = item.imageData, let image = uxUiNativeImage(fromDataURL: dataURL) {
+                        Image(uiImage: image).resizable().scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                    } else {
+                        Text(item.text).font(.system(size: max(5, CGFloat(item.fontSize) * scale)))
+                            .foregroundStyle(uxUiUIColor(item.color)).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     Text(item.text).font(.custom(item.fontFamily == "Inter" ? "System" : item.fontFamily, size: max(5, CGFloat(item.fontSize) * scale)).weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular))
                         .foregroundStyle(uxUiUIColor(item.color)).multilineTextAlignment(.leading).lineLimit(6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
             .foregroundStyle(uxUiUIColor(item.color))
-            .padding(max(2, CGFloat(item.padding) * scale))
+            .padding(item.kind == "image" ? 0 : max(2, CGFloat(item.padding) * scale))
             if selectedID == item.id {
                 RoundedRectangle(cornerRadius: 2).stroke(Color.envAccent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 2]))
             }
@@ -7219,6 +7283,17 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Bottom", value: binding.marginBottom)
                 inspectorNumber("Left", value: binding.marginLeft)
             }
+            if binding.wrappedValue.kind == "image" {
+                Button {
+                    imageTargetID = binding.wrappedValue.id
+                    isImportingImage = true
+                } label: {
+                    Label(binding.wrappedValue.imageData?.isEmpty == false ? "Replace image" : "Import image", systemImage: "photo")
+                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                }
+                Text("Embed PNG, JPEG, WebP or GIF assets up to 4 MB. The editable JSON keeps the image; the PDF contains the visual asset without duplicating the base64 bytes in its spec.")
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
             if binding.wrappedValue.kind == "icon" {
                 inspectorTextField("Search icon library", text: $iconQuery)
                 Button { searchIconLibrary() } label: {
@@ -7236,7 +7311,7 @@ private struct NativeUxUiStudioView: View {
                 }
                 if iconResults.count < iconTotal {
                     Button { searchIconLibrary(loadMore: true) } label: {
-                        HStack { Image(systemName: "arrow.down.circle"); Text(isSearchingIcons ? "Loading icons…" : "Load more icons · (iconResults.count) / (iconTotal)") }
+                        HStack { Image(systemName: "arrow.down.circle"); Text(isSearchingIcons ? "Loading icons…" : "Load more icons · \(iconResults.count) / \(iconTotal)") }
                             .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
                     }.disabled(isSearchingIcons)
                 }
@@ -7340,6 +7415,7 @@ private struct NativeUxUiStudioView: View {
         case "card": newItem = UxUiNativeLayer(kind: kind, name: "Content card", x: 24, y: 270, width: 300, height: 132, text: "Card title\nSupporting text", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
         case "input": newItem = UxUiNativeLayer(kind: kind, name: "Text input", x: 24, y: 420, width: 300, height: 48, text: "Enter your email", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "mdi:home", color: "#2563EB")
+        case "image": newItem = UxUiNativeLayer(kind: kind, name: "Image", x: 24, y: 330, width: 280, height: 160, text: "Import an image", color: "#64748B", fill: "#E5E7EB", radius: 12)
         case "navbar": newItem = UxUiNativeLayer(kind: kind, name: "Navigation bar", x: 20, y: 22, width: 350, height: 56, text: "enV                         Menu", fill: "#FFFFFF", borderWidth: 1, fontWeight: 600)
         case "tabbar", "tabs": newItem = UxUiNativeLayer(kind: kind, name: "Tab navigation", x: 20, y: 766, width: 350, height: 54, text: "Home       Explore       Saved       Profile", fill: "#FFFFFF", borderWidth: 1, fontSize: 12, fontWeight: 600)
         case "row", "list": newItem = UxUiNativeLayer(kind: kind, name: "List row", x: 24, y: 330, width: 300, height: 64, text: "Account settings\nManage your profile", fill: "#FFFFFF", borderWidth: 1, radius: 10, padding: 14)
@@ -7531,6 +7607,9 @@ private struct NativeUxUiStudioView: View {
                 let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: uxUiPlatformColor(item.color)]
                 if item.kind == "icon", let image = iconImages[item.id] {
                     image.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)))
+                } else if item.kind == "image", let dataURL = item.imageData, let image = uxUiNativeImage(fromDataURL: dataURL) {
+                    let inset = CGFloat(item.padding + item.borderWidth)
+                    image.draw(in: rect.insetBy(dx: inset, dy: inset))
                 } else {
                     let content = item.kind == "icon" ? item.iconName : item.text
                     content.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)), withAttributes: attributes)
@@ -7539,7 +7618,19 @@ private struct NativeUxUiStudioView: View {
             context.cgContext.restoreGState()
             "Visual interface preview rendered from the design layers.".draw(at: CGPoint(x: 32, y: 817), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.secondaryLabel])
 
-            let specString = String(data: projectJSON, encoding: .utf8) ?? "{}"
+            var pdfElements = elements
+            for index in pdfElements.indices where pdfElements[index].kind == "image" {
+                pdfElements[index].imageData = nil
+            }
+            let pdfProject = UxUiNativeProject(
+                name: projectName, target: target, background: background,
+                viewport: UxUiViewport(width: boardWidth, height: boardHeight),
+                elements: pdfElements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+            let pdfEncoder = JSONEncoder()
+            pdfEncoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            let pdfSpecData = (try? pdfEncoder.encode(pdfProject)) ?? Data("{}".utf8)
+            let specString = String(data: pdfSpecData, encoding: .utf8) ?? "{}"
             let lines = ("AI IMPLEMENTATION PROMPT\n\n" + aiPrompt + "\n\nMACHINE-READABLE JSON DESIGN SPECIFICATION\n\n" + specString).components(separatedBy: .newlines)
             var y: CGFloat = 42
             let titleOnPage = "DESIGN HANDOFF · \(projectName)"
