@@ -7402,6 +7402,18 @@ private struct NativeUxUiStudioView: View {
                     presetButton("Desktop settings", target: "desktop", preset: "desktop-settings")
                 }
             }
+
+            artboardPreview
+            designSystemPanel
+            componentPalette
+            layerListPanel
+            if let index = selectedIndex { inspector(for: index) }
+            designHandoffPanel
+        }
+    }
+
+
+    private var artboardPreview: some View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Artboard preview").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 GeometryReader { proxy in
@@ -7450,6 +7462,9 @@ private struct NativeUxUiStudioView: View {
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private var designSystemPanel: some View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Design system").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 Text("Edit named color, typography and spacing tokens. Tokens are saved with the project and included in exports.")
@@ -7513,6 +7528,9 @@ private struct NativeUxUiStudioView: View {
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private var componentPalette: some View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Add elements").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -7551,6 +7569,9 @@ private struct NativeUxUiStudioView: View {
                 }
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var layerListPanel: some View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 ForEach(elements) { item in
@@ -7569,46 +7590,9 @@ private struct NativeUxUiStudioView: View {
                 }
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-            if let index = selectedIndex { inspector(for: index) }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Reusable components · \(reusableComponents.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                    Spacer()
-                    Button("Save selected") {
-                        guard let selectedIndex else { return }
-                        checkpoint()
-                        var template = elements[selectedIndex]
-                        if template.componentKey.isEmpty { template.componentKey = template.id.uuidString }
-                        elements[selectedIndex].componentKey = template.componentKey
-                        reusableComponents.removeAll { $0.componentKey == template.componentKey }
-                        reusableComponents.append(template)
-                        notice = "Saved reusable template: \(template.name)"
-                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent).disabled(selectedIndex == nil)
-                }
-                if reusableComponents.isEmpty {
-                    Text("Select a layer and save it to reuse the same component in this design.").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
-                } else {
-                    ForEach(reusableComponents) { component in
-                        Button {
-                            checkpoint()
-                            var instance = component
-                            instance.id = UUID()
-                            instance.name += " instance"
-                            instance.x = min(max(0, boardWidth - instance.width), instance.x + 16)
-                            instance.y = min(max(0, boardHeight - instance.height), instance.y + 16)
-                            instance.referenceWidth = boardWidth; instance.referenceHeight = boardHeight
-                            elements.append(instance); selectedID = instance.id
-                            notice = "Added reusable component: \(component.name)"
-                        } label: {
-                            HStack { Image(systemName: "square.on.square"); Text(component.name).lineLimit(1); Spacer(); Image(systemName: "plus") }
-                                .font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
-                                .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
-                        }.buttonStyle(.plain)
-                    }
-                }
-            }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private var designHandoffPanel: some View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Design handoff").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 Text("PDF includes the rendered artboard, technical specifications, and an AI implementation prompt. JSON contains the editable project.")
@@ -7620,7 +7604,6 @@ private struct NativeUxUiStudioView: View {
                 Button { exportSource("swift") } label: { exportButtonLabel("Export iOS SwiftUI", icon: "swift", primary: false) }.buttonStyle(.plain)
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        }
     }
 
     private func labelForChoice(_ title: String, subtitle: String, icon: String) -> some View {
