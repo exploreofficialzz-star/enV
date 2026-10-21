@@ -6812,84 +6812,282 @@ private func uxUiNativeImage(fromDataURL dataURL: String) -> UIImage? {
     return UIImage(data: data)
 }
 
-private func uxUiCleanIconSVG(_ svg: String) -> String {
-    return svg
-        .replacingOccurrences(of: #"(?is)<script\b[^>]*>.*?</script\s*>"#, with: "", options: .regularExpression)
-        .replacingOccurrences(of: #"(?is)<foreignObject\b[^>]*>.*?</foreignObject\s*>"#, with: "", options: .regularExpression)
-        .replacingOccurrences(of: #"(?i)\s+on[a-z]+\s*=\s*(['"]).*?\1"#, with: "", options: .regularExpression)
+private struct UxUiNativeSVGPath {
+    let path: Path
+    let fill: String?
+    let stroke: String?
+    let strokeWidth: CGFloat
 }
 
-private func uxUiSanitizeIconSVG(_ svg: String, tint: String) -> String {
-    let safeTint = tint.range(of: #"^#[0-9A-Fa-f]{3,8}$"#, options: .regularExpression) != nil ? tint : "#111827"
-    return uxUiCleanIconSVG(svg).replacingOccurrences(of: "currentColor", with: safeTint, options: .caseInsensitive)
+private func uxUiSvgAttribute(_ name: String, in source: String) -> String? {
+    let pattern = #"(?is)\b"# + NSRegularExpression.escapedPattern(for: name) + #"\s*=\s*['"]([^'"]*)['"]"#
+    guard let expression = try? NSRegularExpression(pattern: pattern),
+          let match = expression.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+          let range = Range(match.range(at: 1), in: source) else { return nil }
+    return String(source[range])
 }
 
-private struct UxUiNativeSVGIcon: UIViewRepresentable {
+private func uxUiSVGViewBox(_ svg: String) -> CGRect {
+    let root = (try? NSRegularExpression(pattern: #"(?is)<svg\b[^>]*>"#))
+        .flatMap { $0.firstMatch(in: svg, range: NSRange(svg.startIndex..., in: svg)) }
+        .flatMap { Range($0.range, in: svg).map { String(svg[$0]) } } ?? ""
+    let values = (uxUiSvgAttribute("viewBox", in: root) ?? "0 0 24 24")
+        .split(whereSeparator: { $0 == " " || $0 == "," || $0 == "\t" || $0 == "\n" })
+        .compactMap { Double($0) }
+    guard values.count == 4, values[2] > 0, values[3] > 0 else {
+        return CGRect(x: 0, y: 0, width: 24, height: 24)
+    }
+    return CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
+}
+
+private func uxUiParseSVGPath(_ data: String) -> Path {
+    let pattern = #"[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?"#
+    let tokens: [String] = (try? NSRegularExpression(pattern: pattern))
+        .map { expression in
+            expression.matches(in: data, range: NSRange(data.startIndex..., in: data)).compactMap {
+                Range($0.range, in: data).map { String(data[$0]) }
+            }
+        } ?? []
+    var output = Path()
+    var index = 0
+    var command: Character?
+    var current = CGPoint.zero
+    var subpathStart = CGPoint.zero
+    var lastCubicControl: CGPoint?
+    var lastQuadControl: CGPoint?
+
+    func isCommand(_ token: String) -> Bool {
+        token.count == 1 && token.first?.isLetter == true
+    }
+    func nextNumber() -> CGFloat? {
+        guard index < tokens.count, !isCommand(tokens[index]), let number = Double(tokens[index]) else { return nil }
+        index += 1
+        return CGFloat(number)
+    }
+    func hasNumber() -> Bool {
+        index < tokens.count && !isCommand(tokens[index]) && Double(tokens[index]) != nil
+    }
+    func point(_ x: CGFloat, _ y: CGFloat, relative: Bool) -> CGPoint {
+        relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+    }
+
+    while index < tokens.count {
+        if isCommand(tokens[index]) {
+            command = tokens[index].first
+            index += 1
+        }
+        guard let active = command else { break }
+        let relative = active.isLowercase
+        switch active.uppercased() {
+        case "Z":
+            output.closeSubpath()
+            current = subpathStart
+            lastCubicControl = nil
+            lastQuadControl = nil
+            command = nil
+        case "M":
+            guard let x = nextNumber(), let y = nextNumber() else { command = nil; continue }
+            let end = point(x, y, relative: relative)
+            output.move(to: end)
+            current = end
+            subpathStart = end
+            lastCubicControl = nil
+            lastQuadControl = nil
+            command = relative ? "l" : "L"
+        case "L":
+            var consumed = false
+            while hasNumber() {
+                guard let x = nextNumber(), let y = nextNumber() else { break }
+                let end = point(x, y, relative: relative)
+                output.addLine(to: end)
+                current = end
+                consumed = true
+            }
+            if !consumed { command = nil }
+            lastCubicControl = nil
+            lastQuadControl = nil
+        case "H":
+            var consumed = false
+            while hasNumber() {
+                guard let x = nextNumber() else { break }
+                let end = CGPoint(x: relative ? current.x + x : x, y: current.y)
+                output.addLine(to: end)
+                current = end
+                consumed = true
+            }
+            if !consumed { command = nil }
+            lastCubicControl = nil
+            lastQuadControl = nil
+        case "V":
+            var consumed = false
+            while hasNumber() {
+                guard let y = nextNumber() else { break }
+                let end = CGPoint(x: current.x, y: relative ? current.y + y : y)
+                output.addLine(to: end)
+                current = end
+                consumed = true
+            }
+            if !consumed { command = nil }
+            lastCubicControl = nil
+            lastQuadControl = nil
+        case "C":
+            var consumed = false
+            while hasNumber() {
+                guard let x1 = nextNumber(), let y1 = nextNumber(),
+                      let x2 = nextNumber(), let y2 = nextNumber(),
+                      let x = nextNumber(), let y = nextNumber() else { break }
+                let c1 = point(x1, y1, relative: relative)
+                let c2 = point(x2, y2, relative: relative)
+                let end = point(x, y, relative: relative)
+                output.addCurve(to: end, control1: c1, control2: c2)
+                current = end
+                lastCubicControl = c2
+                lastQuadControl = nil
+                consumed = true
+            }
+            if !consumed { command = nil }
+        case "S":
+            var consumed = false
+            while hasNumber() {
+                guard let x2 = nextNumber(), let y2 = nextNumber(),
+                      let x = nextNumber(), let y = nextNumber() else { break }
+                let c1: CGPoint
+                if let prior = lastCubicControl {
+                    c1 = CGPoint(x: 2 * current.x - prior.x, y: 2 * current.y - prior.y)
+                } else { c1 = current }
+                let c2 = point(x2, y2, relative: relative)
+                let end = point(x, y, relative: relative)
+                output.addCurve(to: end, control1: c1, control2: c2)
+                current = end
+                lastCubicControl = c2
+                lastQuadControl = nil
+                consumed = true
+            }
+            if !consumed { command = nil }
+        case "Q":
+            var consumed = false
+            while hasNumber() {
+                guard let x1 = nextNumber(), let y1 = nextNumber(),
+                      let x = nextNumber(), let y = nextNumber() else { break }
+                let control = point(x1, y1, relative: relative)
+                let end = point(x, y, relative: relative)
+                output.addQuadCurve(to: end, control: control)
+                current = end
+                lastQuadControl = control
+                lastCubicControl = nil
+                consumed = true
+            }
+            if !consumed { command = nil }
+        case "T":
+            var consumed = false
+            while hasNumber() {
+                guard let x = nextNumber(), let y = nextNumber() else { break }
+                let control: CGPoint
+                if let prior = lastQuadControl {
+                    control = CGPoint(x: 2 * current.x - prior.x, y: 2 * current.y - prior.y)
+                } else { control = current }
+                let end = point(x, y, relative: relative)
+                output.addQuadCurve(to: end, control: control)
+                current = end
+                lastQuadControl = control
+                lastCubicControl = nil
+                consumed = true
+            }
+            if !consumed { command = nil }
+        case "A":
+            var consumed = false
+            while hasNumber() {
+                guard nextNumber() != nil, nextNumber() != nil, nextNumber() != nil,
+                      nextNumber() != nil, nextNumber() != nil,
+                      let x = nextNumber(), let y = nextNumber() else { break }
+                let end = point(x, y, relative: relative)
+                // Degenerate arcs are uncommon in icon glyphs; preserve the endpoint natively.
+                output.addLine(to: end)
+                current = end
+                consumed = true
+            }
+            if !consumed { command = nil }
+            lastCubicControl = nil
+            lastQuadControl = nil
+        default:
+            command = nil
+        }
+    }
+    return output
+}
+
+private func uxUiSVGPaths(_ svg: String, tint: String) -> [UxUiNativeSVGPath] {
+    let root = (try? NSRegularExpression(pattern: #"(?is)<svg\b[^>]*>"#))
+        .flatMap { $0.firstMatch(in: svg, range: NSRange(svg.startIndex..., in: svg)) }
+        .flatMap { Range($0.range, in: svg).map { String(svg[$0]) } } ?? ""
+    let rootFill = uxUiSvgAttribute("fill", in: root) ?? "black"
+    let rootStroke = uxUiSvgAttribute("stroke", in: root)
+    let rootStrokeWidth = CGFloat(Double(uxUiSvgAttribute("stroke-width", in: root) ?? "1.5") ?? 1.5)
+    guard let regex = try? NSRegularExpression(pattern: #"(?is)<path\b[^>]*>"#) else { return [] }
+    return regex.matches(in: svg, range: NSRange(svg.startIndex..., in: svg)).compactMap { match in
+        guard let tagRange = Range(match.range, in: svg) else { return nil }
+        let tag = String(svg[tagRange])
+        guard let d = uxUiSvgAttribute("d", in: tag), !d.isEmpty else { return nil }
+        let path = uxUiParseSVGPath(d)
+        let rawFill = uxUiSvgAttribute("fill", in: tag) ?? rootFill
+        let rawStroke = uxUiSvgAttribute("stroke", in: tag) ?? rootStroke
+        let fill = rawFill.lowercased() == "none" ? nil : (rawFill.lowercased() == "currentcolor" ? tint : rawFill)
+        let stroke = rawStroke.flatMap { $0.lowercased() == "none" ? nil : ($0.lowercased() == "currentcolor" ? tint : $0) }
+        let strokeWidth = CGFloat(Double(uxUiSvgAttribute("stroke-width", in: tag) ?? "") ?? rootStrokeWidth)
+        return UxUiNativeSVGPath(path: path, fill: fill, stroke: stroke, strokeWidth: strokeWidth)
+    }
+}
+
+private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rect: CGRect) {
+    let viewBox = uxUiSVGViewBox(svg)
+    guard viewBox.width > 0, viewBox.height > 0 else { return }
+    context.saveGState()
+    context.translateBy(x: rect.minX - viewBox.minX * rect.width / viewBox.width,
+                        y: rect.minY - viewBox.minY * rect.height / viewBox.height)
+    context.scaleBy(x: rect.width / viewBox.width, y: rect.height / viewBox.height)
+    for drawable in uxUiSVGPaths(svg, tint: tint) {
+        context.addPath(drawable.path.cgPath)
+        if let fill = drawable.fill {
+            context.setFillColor(uxUiPlatformColor(fill).cgColor)
+            context.drawPath(using: .fill)
+        }
+        if let stroke = drawable.stroke {
+            context.addPath(drawable.path.cgPath)
+            context.setStrokeColor(uxUiPlatformColor(stroke).cgColor)
+            context.setLineWidth(drawable.strokeWidth)
+            context.drawPath(using: .stroke)
+        }
+    }
+    context.restoreGState()
+}
+
+private struct UxUiNativeSVGIcon: View {
     let svg: String
     let tint: String
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
-        view.isOpaque = false
-        view.backgroundColor = .clear
-        view.scrollView.backgroundColor = .clear
-        view.scrollView.isScrollEnabled = false
-        view.isUserInteractionEnabled = false
-        view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        return view
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        let safeSVG = uxUiSanitizeIconSVG(svg, tint: tint)
-        let html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1\"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" + safeSVG + "</body></html>"
-        guard context.coordinator.lastHTML != html else { return }
-        context.coordinator.lastHTML = html
-        uiView.loadHTMLString(html, baseURL: nil)
-    }
-
-    final class Coordinator {
-        var lastHTML = ""
-    }
-}
-
-
-private final class UxUiIconSnapshotWebView: WKWebView {
-    var iconSnapshotDelegate: UxUiIconSnapshotDelegate?
-}
-
-private final class UxUiIconSnapshotDelegate: NSObject, WKNavigationDelegate {
-    private var completion: ((UIImage?) -> Void)?
-    var owner: UxUiIconSnapshotWebView?
-
-    init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        webView.takeSnapshot(with: nil) { image, error in
-            self.finish(error == nil ? image : nil)
+    var body: some View {
+        Canvas { context, size in
+            let viewBox = uxUiSVGViewBox(svg)
+            guard viewBox.width > 0, viewBox.height > 0 else { return }
+            let sx = size.width / viewBox.width
+            let sy = size.height / viewBox.height
+            let transform = CGAffineTransform(a: sx, b: 0, c: 0, d: sy,
+                                              tx: -viewBox.minX * sx, ty: -viewBox.minY * sy)
+            for drawable in uxUiSVGPaths(svg, tint: tint) {
+                let path = drawable.path.applying(transform)
+                if let fill = drawable.fill {
+                    context.fill(path, with: .color(uxUiUIColor(fill)))
+                }
+                if let stroke = drawable.stroke {
+                    context.stroke(path, with: .color(uxUiUIColor(stroke)),
+                                   lineWidth: drawable.strokeWidth * (sx + sy) / 2)
+                }
+            }
         }
     }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        finish(nil)
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        finish(nil)
-    }
-
-    private func finish(_ image: UIImage?) {
-        guard let callback = completion else { return }
-        completion = nil
-        owner?.iconSnapshotDelegate = nil
-        owner?.navigationDelegate = nil
-        owner = nil
-        callback(image)
-    }
 }
 
-private struct UxUiNativeColorToken: Codable, Identifiable, Equatable {
+private struct UxUiNativeColorTokenprivate struct UxUiNativeColorToken: Codable, Identifiable, Equatable {
     var name: String
     var value: String
     var id: String { name }
@@ -8151,40 +8349,11 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func exportPDF() {
-        Task { @MainActor in
-            var iconImages: [UUID: UIImage] = [:]
-            for item in elements where item.kind == "icon" {
-                guard let svg = item.iconSvg, !svg.isEmpty else { continue }
-                let keySize = CGSize(width: max(1, item.width), height: max(1, item.height))
-                if let image = await renderIconSnapshot(svg: svg, tint: item.color, size: keySize) {
-                    iconImages[item.id] = image
-                }
-            }
-            pdfDocument = UxUiStudioExport(data: makePDF(iconImages: iconImages))
-            isExportingPDF = true
-        }
+        pdfDocument = UxUiStudioExport(data: makePDF())
+        isExportingPDF = true
     }
 
-    private func renderIconSnapshot(svg: String, tint: String, size: CGSize) async -> UIImage? {
-        await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
-            let view = UxUiIconSnapshotWebView(frame: CGRect(origin: .zero, size: size))
-            view.isOpaque = false
-            view.backgroundColor = .clear
-            view.scrollView.backgroundColor = .clear
-            view.scrollView.isScrollEnabled = false
-            view.isUserInteractionEnabled = false
-            view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-            let delegate = UxUiIconSnapshotDelegate { image in continuation.resume(returning: image) }
-            delegate.owner = view
-            view.iconSnapshotDelegate = delegate
-            view.navigationDelegate = delegate
-            let safeSVG = uxUiSanitizeIconSVG(svg, tint: tint)
-            let html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1\"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" + safeSVG + "</body></html>"
-            view.loadHTMLString(html, baseURL: nil)
-        }
-    }
-
-    private func makePDF(iconImages: [UUID: UIImage]) -> Data {
+    private func makePDF() -> Data {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
         return renderer.pdfData { context in
@@ -8210,8 +8379,8 @@ private struct NativeUxUiStudioView: View {
                 if item.borderWidth > 0 { uxUiPlatformColor(item.borderColor).setStroke(); path.lineWidth = CGFloat(item.borderWidth); path.stroke() }
                 let font = UIFont(name: item.fontFamily, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: uxUiPlatformColor(item.color)]
-                if item.kind == "icon", let image = iconImages[item.id] {
-                    image.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)))
+                if item.kind == "icon", let svg = item.iconSvg, !svg.isEmpty {
+                    uxUiDrawSVG(svg, tint: item.color, in: context.cgContext, rect: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)))
                 } else if item.kind == "image", let dataURL = item.imageData, let image = uxUiNativeImage(fromDataURL: dataURL) {
                     let inset = CGFloat(item.padding + item.borderWidth)
                     image.draw(in: rect.insetBy(dx: inset, dy: inset))
