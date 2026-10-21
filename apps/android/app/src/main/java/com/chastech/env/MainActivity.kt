@@ -203,8 +203,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-
+}
 
 @Composable
 private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
