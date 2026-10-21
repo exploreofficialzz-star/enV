@@ -314,11 +314,11 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
     appendLine("    val heightDelta = maxHeight.value - "+height+".f")
     appendLine("    Box(Modifier.fillMaxSize().background(Color(android.graphics.Color.parseColor("+JSONObject.quote(background)+")))) {")
     elements.forEach { e ->
-        val x=when(e.horizontalConstraint){"center"->"("+e.x+".f + widthDelta/2f)";"right"->"(maxWidth.value - "+(e.referenceWidth-e.x-e.width).coerceAtLeast(0)+".f - "+e.width+".f)";else->e.x+".f"}
-        val y=when(e.verticalConstraint){"center"->"("+e.y+".f + heightDelta/2f)";"bottom"->"(maxHeight.value - "+(e.referenceHeight-e.y-e.height).coerceAtLeast(0)+".f - "+e.height+".f)";else->e.y+".f"}
-        var w=if(e.horizontalConstraint=="stretch")"("+e.width+".f + widthDelta).coerceAtLeast("+e.minWidth.coerceAtLeast(1)+".f)" else e.width+".f"
+        val x=when(e.horizontalConstraint){"center"->"("+e.x+".f + widthDelta/2f)";"right"->"(maxWidth.value - "+(e.referenceWidth-e.x-e.width).coerceAtLeast(0)+".f - "+e.width+".f)";else->e.x.toString()+".f"}
+        val y=when(e.verticalConstraint){"center"->"("+e.y+".f + heightDelta/2f)";"bottom"->"(maxHeight.value - "+(e.referenceHeight-e.y-e.height).coerceAtLeast(0)+".f - "+e.height+".f)";else->e.y.toString()+".f"}
+        var w=if(e.horizontalConstraint=="stretch")"("+e.width+".f + widthDelta).coerceAtLeast("+e.minWidth.coerceAtLeast(1)+".f)" else e.width.toString()+".f"
         if(e.horizontalConstraint=="stretch"&&e.maxWidth>0)w+=".coerceAtMost("+e.maxWidth+".f)"
-        val h=if(e.verticalConstraint=="stretch")"("+e.height+".f + heightDelta).coerceAtLeast(1f)" else e.height+".f"
+        val h=if(e.verticalConstraint=="stretch")"("+e.height+".f + heightDelta).coerceAtLeast(1f)" else e.height.toString()+".f"
         val fill=if(e.fill=="transparent")background else e.fill
         appendLine("      // "+e.name.replace("\n"," ")+"; "+e.kind+"; anchors "+e.horizontalConstraint+"/"+e.verticalConstraint)
         appendLine("      if (listOf("+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+").contains(target)) Box(Modifier.offset(x=("+x+").dp,y=("+y+").dp).size(width=("+w+").dp,height=("+h+").dp).background(Color(android.graphics.Color.parseColor("+JSONObject.quote(fill)+")),RoundedCornerShape("+e.radius+".dp)).padding("+e.padding+".dp)) {")
