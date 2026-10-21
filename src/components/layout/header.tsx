@@ -35,7 +35,7 @@ const MENU_GROUPS = [
     { to: "/about", label: "About", icon: Info },
     { to: "/tools", label: "Tools", icon: Wrench },
     { to: "/pricing", label: "Pricing", icon: CreditCard },
-    { to: "/tokens/guide", label: "Token guide", icon: Coins },
+    { to: "/token-guide", label: "Token guide", icon: Coins },
   ] },
   { title: "Resources", links: [
     { to: "/help", label: "Help center", icon: LifeBuoy },

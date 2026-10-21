@@ -24,7 +24,7 @@ function Pricing() {
             enV uses token accounting to explain usage across local tools, cloud processing, media, and AI workflows. Rates depend on the operation and measured work, so metered tasks should show their applicable rate, estimate, and limits before you start.
           </p>
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-            <Link to="/tokens" className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"><BookOpen size={16} aria-hidden="true" /> Explore token guide <ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link to="/token-guide" className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"><BookOpen size={16} aria-hidden="true" /> Explore token guide <ArrowRight size={15} aria-hidden="true" /></Link>
             <Link to="/wallet" className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"><Wallet size={16} aria-hidden="true" /> Open Wallet <ArrowRight size={15} aria-hidden="true" /></Link>
           </div>
         </header>

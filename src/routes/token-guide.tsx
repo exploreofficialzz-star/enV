@@ -6,7 +6,7 @@ import { getSearchableTools } from "@/lib/registry";
 import { categoryLabel } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 
-export const Route = createFileRoute("/tokens/guide")({ component: TokenGuide });
+export const Route = createFileRoute("/token-guide")({ component: TokenGuide });
 
 function TokenGuide() {
   const [query, setQuery] = useState("");

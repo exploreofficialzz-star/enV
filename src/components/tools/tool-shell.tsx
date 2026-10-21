@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { disclaimerText } from "@/lib/content";
-import { getToolDocumentation, toolDocumentationPath } from "@/lib/tool-documentation";
+import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
@@ -22,7 +22,6 @@ export function ToolShell({
   children: React.ReactNode;
 }) {
   const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
-  const documentation = useMemo(() => getToolDocumentation(tool), [tool]);
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
@@ -102,26 +101,7 @@ export function ToolShell({
           <BookOpen className="size-4" aria-hidden="true" />
           Read the full guide
         </a>
-        <div className="mt-6 space-y-8">
-          {documentation.map((section) => (
-            <section key={section.id} aria-labelledby={section.id + "-tool-guide-heading"} className="space-y-3">
-              <h3 id={section.id + "-tool-guide-heading"} className="text-base font-semibold tracking-tight text-fg">{section.heading}</h3>
-              {section.paragraphs.map((paragraph, index) => (
-                <p key={section.id + "-paragraph-" + index} className="text-sm leading-6 text-muted">{paragraph}</p>
-              ))}
-              {section.steps?.length ? (
-                <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted">
-                  {section.steps.map((step, index) => <li key={section.id + "-step-" + index}>{step}</li>)}
-                </ol>
-              ) : null}
-              {section.bullets?.length ? (
-                <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
-                  {section.bullets.map((item, index) => <li key={section.id + "-bullet-" + index}>{item}</li>)}
-                </ul>
-              ) : null}
-            </section>
-          ))}
-        </div>
+
 
       </section>
 

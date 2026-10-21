@@ -319,7 +319,7 @@ const quickLinks = [
     icon: Wrench,
   },
   {
-    to: "/tokens/guide",
+    to: "/token-guide",
     title: "Token Guide",
     description: "Understand proposed usage and cost factors.",
     icon: Coins,
