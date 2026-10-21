@@ -581,14 +581,16 @@ fun NativeUxUiStudioForm() {
                 Card{Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                     Text("What are you designing?",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
                     Text("Choose an exact target-size artboard, edit elements and export PDF or JSON handoff.")
-                    Button(onClick={target="mobile";background="#F8FAFC";projectName="Mobile dashboard";elements.clear();elements.addAll(uxNativePreset("mobile","mobile-dashboard"));selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Mobile · 390 × 844 px")}
-                    OutlinedButton(onClick={target="desktop";background="#FFFFFF";projectName="Website landing";elements.clear();elements.addAll(uxNativePreset("desktop","desktop-landing"));selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Desktop · 1440 × 900 px")}
+                    Button(onClick={target="mobile";customArtboard=false;background="#F8FAFC";projectName="Mobile dashboard";elements.clear();elements.addAll(uxNativePreset("mobile","mobile-dashboard").map{it.copy(referenceWidth=390,referenceHeight=844)});customWidth=390;customHeight=844;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Mobile · 390 × 844 px")}
+                    OutlinedButton(onClick={target="tablet";customArtboard=false;background="#F8FAFC";projectName="Tablet dashboard";elements.clear();elements.addAll(uxNativePreset("tablet","tablet-dashboard").map{it.copy(referenceWidth=768,referenceHeight=1024)});customWidth=768;customHeight=1024;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Tablet · 768 × 1024 px")}
+                    OutlinedButton(onClick={target="desktop";customArtboard=false;background="#FFFFFF";projectName="Website landing";elements.clear();elements.addAll(uxNativePreset("desktop","desktop-landing").map{it.copy(referenceWidth=1440,referenceHeight=900)});customWidth=1440;customHeight=900;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Desktop · 1440 × 900 px")}
                 }}
             }else{
                 OutlinedTextField(projectName,{projectName=it},label={Text("Project name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    FilterChip(selected=target=="mobile",onClick={target="mobile"},label={Text("Mobile")})
-                    FilterChip(selected=target=="desktop",onClick={target="desktop"},label={Text("Desktop")})
+                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
+                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
+                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")})
                     OutlinedButton(onClick={onboarding=true}){Text("Workflow")}
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
@@ -597,8 +599,25 @@ fun NativeUxUiStudioForm() {
                     Text("Drag layers to reposition.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("ARTBOARD · "+bw+" × "+bh+" px · "+elements.size+" layers",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+                    Checkbox(checked=customArtboard,onCheckedChange={customArtboard=it},modifier=Modifier.size(28.dp))
+                    Text("Custom",style=MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(customWidth.toString(),{v->v.toIntOrNull()?.let{customWidth=it.coerceIn(160,4096)}},label={Text("Width px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
+                    OutlinedTextField(customHeight.toString(),{v->v.toIntOrNull()?.let{customHeight=it.coerceIn(240,4096)}},label={Text("Height px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
+                }
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->OutlinedButton(onClick={target=if(id.startsWith("mobile"))"mobile" else "desktop";elements.clear();elements.addAll(uxNativePreset(target,id));selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label,maxLines=1)}}
+                    listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","tablet-dashboard" to "Tablet dashboard","tablet-settings" to "Tablet settings","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->
+                        OutlinedButton(onClick={
+                            checkpoint()
+                            target=when{ id.startsWith("mobile")->"mobile";id.startsWith("tablet")->"tablet";else->"desktop"}
+                            customArtboard=false
+                            customWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
+                            customHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
+                            elements.clear()
+                            elements.addAll(uxNativePreset(target,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)})
+                            selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."
+                        }){Text(label,maxLines=1)}
+                    }
                 }
                 Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Text("Artboard preview",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
