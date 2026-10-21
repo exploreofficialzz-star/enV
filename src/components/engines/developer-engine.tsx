@@ -285,20 +285,7 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
   const parentStudioUrl = parentStudio && tool
     ? `/tools/developer/${parentStudio.slug}?mode=${encodeURIComponent(parentMode ?? parentStudio.modes[0]?.key ?? "format")}${legacyEngineOp ? `&op=${encodeURIComponent(legacyEngineOp)}` : ""}${parentAction === "decode" ? "&action=decode" : ""}`
     : undefined;
-  const relatedTools = useMemo(() => {
-    if (!toolSlug) return [];
-    const family = studioFamily(toolSlug);
-    const rank = (slug: string) => {
-      const ending = slug.split("-").at(-1) ?? "";
-      const ordered = ["formatter", "validator", "minifier", "diff", "inspector", "parser", "generator", "decoder", "encoder", "explainer", "tester", "preview", "calculator", "builder", "lookup", "helper"];
-      const index = ordered.indexOf(ending);
-      return index < 0 ? ordered.length : index;
-    };
-    return getAllTools()
-      .filter((candidate) => candidate.category === "developer" && candidate.slug !== toolSlug && candidate.status !== "planned" && studioFamily(candidate.slug) === family)
-      .sort((a, b) => rank(a.slug) - rank(b.slug) || a.name.localeCompare(b.name))
-      .slice(0, 6);
-  }, [toolSlug]);
+
   const run = async () => {
     setBusy(true);
     try {
@@ -401,9 +388,5 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
       }
     })() : null}
     <CodeResult code={out} filename={`env-${op}.txt`} />
-    {relatedTools.length ? <nav aria-label="Related Developer Studio tools" className="space-y-2 border-t border-border pt-3">
-      <h2 className="text-sm font-medium">Related tools in this Studio</h2>
-      <div className="flex flex-wrap gap-2">{relatedTools.map((related) => <a key={related.id} href={toolPath(related)} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2">{related.name}</a>)}</div>
-    </nav> : null}
   </div>;
 }
