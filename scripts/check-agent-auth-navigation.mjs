@@ -43,7 +43,8 @@ for (const [label, iconName] of [
   if (!header.includes('label: "' + label + '", icon: ' + iconName)) errors.push("Overflow link data is missing the expected icon for " + label);
 }
 
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback", "Report bugs", "Suggest a tool"]) {
+if (!header.includes('label: "Report bugs", icon: Bug') || !header.includes('label: "Suggest a tool", icon: Lightbulb')) errors.push("Overflow menu must expose Report bugs and Suggest a tool through the shared menu link configuration.");
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
 for (const path of ["src/routes/settings.tsx", "src/routes/help-feedback.tsx", "src/routes/report-bugs.tsx", "src/routes/suggest-tool.tsx", "src/components/feedback/feedback-request-page.tsx"]) {
