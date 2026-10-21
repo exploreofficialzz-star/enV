@@ -204,7 +204,14 @@ private struct NativeToolGuideView: View {
                 processing,
                 "Do not submit passwords, private keys, session cookies, payment details, confidential business records, or sensitive personal information until you have confirmed that the tool's actual processing path is appropriate."
             ])
-            NativeToolGuideSectionView(heading: "Availability and limitations", paragraphs: [availability] + (caution.map { [$0] } ?? []))
+            NativeToolGuideSectionView(heading: "Availability and account requirements", paragraphs: [
+                availability,
+                tool.requiresAuth ? "This tool is marked as requiring an authenticated account for account-gated functionality." : "The catalogue does not declare a sign-in requirement for this tool; account and separate hosted services may have their own requirements."
+            ])
+            NativeToolGuideSectionView(heading: "Limitations and responsible use", paragraphs: [
+                caution ?? "The catalogue description is not proof that every format, device capability, output, or external service is supported.",
+                "Treat generated content and estimates as outputs to review. Independently verify consequential results before relying on them."
+            ])
             NativeToolGuideSectionView(heading: "Troubleshooting", paragraphs: [
                 "Start with the exact status or error shown by the form. Try a small, non-sensitive, known-good example to isolate input problems.",
                 "If processing does not start, check connectivity when a backend is required and check relevant device or file permissions. If output looks wrong, re-check units, selected options, source format, and assumptions.",
@@ -266,6 +273,7 @@ struct ToolDetailView: View {
                             .font(.envScaled(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, compact ? 56 : 0)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
