@@ -134,8 +134,8 @@ test("AI Agent uses the secured backend task, while overflow navigation prioriti
   const task = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/assistant.ts"), "utf8");
   const registry = readFileSync(join(PROJECT_ROOT, "src/lib/ai/server/tasks/index.ts"), "utf8");
   assert.match(home, /<Link to="\/agent"[^>]*>AI Agent<\/Link>/);
-  assert.match(header, /to="\\/account"[\\s\\S]*?>Account<\\/Link>/);
-  assert.match(header, /to="\\/wallet"[\\s\\S]*?>Wallet<\\/Link>/);
+  assert.match(header, /to="\/account"[\s\S]*?>Account<\/Link>/);
+  assert.match(header, /to="\/wallet"[\s\S]*?>Wallet<\/Link>/);
   assert.match(header, /title: "Product"/);
   assert.match(header, /title: "Resources"/);
   assert.doesNotMatch(header, /Explore enV|AI Agent|Search tools|Sign in|Create account/);
