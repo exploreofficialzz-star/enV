@@ -1,7 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  BadgeDollarSign,
   Bell,
   BookOpen,
   Check,
