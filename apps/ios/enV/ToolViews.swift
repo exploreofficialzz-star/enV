@@ -7150,7 +7150,12 @@ private struct NativeUxUiStudioView: View {
             "Project: \(projectName)", "Target: \(target)",
             "Artboard: \(boardWidth) x \(boardHeight) CSS pixels",
             "Canvas background: \(background)",
+            "Responsive breakpoints: mobile <= 480px; tablet 481–1023px; desktop >= 1024px.",
+            "Named color tokens: " + tokens.colors.map { "\($0.name)=\($0.value)" }.joined(separator: ", "),
+            "Typography tokens: " + tokens.typography.map { "\($0.name)=\($0.fontFamily) \($0.fontSize)px weight \($0.fontWeight) lineHeight \($0.lineHeight)" }.joined(separator: "; "),
+            "Spacing tokens: " + tokens.spacing.map(String.init).joined(separator: ", ") + " px",
             "Keep exact text, geometry, fonts, weights, colors, margins, padding, borders, radii and icon IDs. Coordinates start at the artboard top-left.",
+            "Preserve responsive anchors, min/max dimensions, reference artboard size and device-specific visibility.",
             "", "ELEMENT SPECIFICATIONS"
         ]
         for (index, item) in elements.enumerated() {
@@ -7160,16 +7165,26 @@ private struct NativeUxUiStudioView: View {
             lines.append("color=\(item.color); fill=\(item.fill); border=\(item.borderColor) \(item.borderWidth)px; radius=\(item.radius)px")
             lines.append("padding=\(item.padding)px; margins top/right/bottom/left=\(item.marginTop)/\(item.marginRight)/\(item.marginBottom)/\(item.marginLeft)px")
             lines.append("font=\(item.fontFamily); size=\(item.fontSize)px; weight=\(item.fontWeight); lineHeight=\(item.lineHeight)")
+            lines.append("horizontalConstraint=\(item.horizontalConstraint); verticalConstraint=\(item.verticalConstraint); minWidth=\(item.minWidth); maxWidth=\(item.maxWidth)")
+            lines.append("visibleOn=\(item.visibleOn.joined(separator: ",")); referenceViewport=\(item.referenceWidth)x\(item.referenceHeight); componentKey=\(item.componentKey); iconViewBox=\(item.iconViewBox)")
         }
         lines.append(""); lines.append("Acceptance: compare the implementation at the reference viewport. Do not replace exact geometry or icon IDs with approximate values.")
         return lines.joined(separator: "\n")
     }
 
     private var projectJSON: Data {
+        let generated = [
+            "html": uxUiGenerateHTML(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens),
+            "kotlin": uxUiGenerateKotlin(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens),
+            "swift": uxUiGenerateSwift(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens)
+        ]
         let project = UxUiNativeProject(
             name: projectName, target: target, background: background,
             viewport: UxUiViewport(width: boardWidth, height: boardHeight),
-            elements: elements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date())
+            breakpoints: ["mobile": 480, "tablet": 768, "desktop": 1024],
+            tokens: tokens, reusableComponents: reusableComponents,
+            elements: elements, aiPrompt: aiPrompt, generatedCode: generated,
+            updatedAt: ISO8601DateFormatter().string(from: Date())
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -7232,6 +7247,9 @@ private struct NativeUxUiStudioView: View {
         }
         .fileExporter(isPresented: $isExportingJSON, document: jsonDocument, contentType: .json, defaultFilename: safeFileName + "-design-spec") { result in
             switch result { case .success(let url): notice = "JSON exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $isExportingSource, document: sourceDocument, contentType: .plainText, defaultFilename: sourceFilename) { result in
+            switch result { case .success(let url): notice = "Implementation source exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
         }
         .fileImporter(isPresented: $isImportingImage, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
             switch result {
@@ -7851,6 +7869,25 @@ private struct NativeUxUiStudioView: View {
         isExportingJSON = true
     }
 
+    private func exportSource(_ format: String) {
+        let contents: String
+        let ext: String
+        switch format {
+        case "kotlin":
+            contents = uxUiGenerateKotlin(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens)
+            ext = ".kt"
+        case "swift":
+            contents = uxUiGenerateSwift(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens)
+            ext = "View.swift"
+        default:
+            contents = uxUiGenerateHTML(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens)
+            ext = ".html"
+        }
+        sourceDocument = UxUiStudioExport(data: Data(contents.utf8))
+        sourceFilename = safeFileName + (ext.hasPrefix(".") ? ext : "-" + ext)
+        isExportingSource = true
+    }
+
     private func exportPDF() {
         Task { @MainActor in
             var iconImages: [UUID: UIImage] = [:]
@@ -7903,7 +7940,8 @@ private struct NativeUxUiStudioView: View {
             context.cgContext.scaleBy(x: scale, y: scale)
             uxUiPlatformColor(background).setFill()
             UIRectFill(CGRect(x: 0, y: 0, width: boardWidth, height: boardHeight))
-            for item in elements {
+            for original in elements {
+                let item = uxUiResolvedLayer(original, boardWidth: boardWidth, boardHeight: boardHeight)
                 let rect = CGRect(x: item.x, y: item.y, width: item.width, height: item.height)
                 let path = UIBezierPath(roundedRect: rect, cornerRadius: CGFloat(item.radius))
                 if item.fill != "transparent" { uxUiPlatformColor(item.fill).setFill(); path.fill() }
@@ -7930,7 +7968,10 @@ private struct NativeUxUiStudioView: View {
             let pdfProject = UxUiNativeProject(
                 name: projectName, target: target, background: background,
                 viewport: UxUiViewport(width: boardWidth, height: boardHeight),
-                elements: pdfElements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date())
+                breakpoints: ["mobile": 480, "tablet": 768, "desktop": 1024],
+                tokens: tokens, reusableComponents: reusableComponents,
+                elements: pdfElements, aiPrompt: aiPrompt, generatedCode: nil,
+                updatedAt: ISO8601DateFormatter().string(from: Date())
             )
             let pdfEncoder = JSONEncoder()
             pdfEncoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
