@@ -22,12 +22,7 @@ export function ToolShell({
   tool: ToolMeta;
   children: React.ReactNode;
 }) {
-  const related = useMemo(
-    () => tool.category === "developer" && tool.tags.includes("developer-studio")
-      ? []
-      : getRelatedTools(tool, Number.MAX_SAFE_INTEGER),
-    [tool],
-  );
+  const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
