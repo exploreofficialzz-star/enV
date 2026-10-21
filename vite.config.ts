@@ -7,7 +7,7 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 // @ts-expect-error JavaScript plugin alongside the TypeScript Vite config
-import { pwaPlugin } from "./scripts/pwa-plugin.mjs";
+import { siteMetaPlugin } from "./scripts/site-meta-plugin.mjs";
 // @ts-expect-error JavaScript plugin alongside the TypeScript Vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
@@ -44,7 +44,7 @@ export default defineConfig(({ command, isPreview }) => ({
   plugins: [
     pgliteBootstrapPlugin(),
     appEnvPlugin(),
-    pwaPlugin(),
+    siteMetaPlugin(),
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview

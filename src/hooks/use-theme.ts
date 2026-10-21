@@ -18,7 +18,6 @@ export function useHydratePrefs() {
     if (!hydrated || typeof document === "undefined") return;
     const dark = theme === "dark";
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", dark ? "#000000" : "#ffffff");
-    document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute("content", dark ? "black-translucent" : "default");
   }, [hydrated, theme]);
 
   useEffect(() => {

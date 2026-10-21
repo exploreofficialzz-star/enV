@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export const DEFAULT_APP_NAME = "enV — Browser Toolkit";
+export const DEFAULT_SITE_NAME = "enV — Browser Toolkit";
 export const OG_SITE_REL_PATH = "src/lib/og/site.json";
 
 const SHARE_META_KEYS = new Set([
@@ -60,42 +60,14 @@ export function resolvePublicHost(hostHeader) {
   return publicAppHost(process.env?.VITE_PUBLIC_HOSTNAME) || publicAppHost(hostHeader);
 }
 
-export function isInstallQuery(url) {
-  const query = String(url ?? "").split("?", 2)[1] ?? "";
-  const params = new URLSearchParams(query);
-  return ["1", "true"].includes(params.get("install") ?? "") &&
-    (params.get("platform") ?? "").toLowerCase() === "ios";
-}
-
 export function isDocumentPath(pathname) {
   const path = String(pathname ?? "");
   return (
-    !path.startsWith("/pwa/") &&
     !path.startsWith("/api/") &&
     !path.startsWith("/@") &&
     !path.startsWith("/node_modules") &&
     !/\.[a-z0-9]+$/i.test(path)
   );
-}
-
-export function acceptsHtml(accept) {
-  const value = String(accept ?? "");
-  return value === "" || value.includes("text/html") || value.includes("*/*");
-}
-
-export function stripInstallParams(url) {
-  const [path = "/", query = ""] = String(url ?? "/").split("?", 2);
-  const params = new URLSearchParams(query);
-  params.delete("install");
-  params.delete("platform");
-  const rest = params.toString();
-  return rest ? `${path}?${rest}` : path;
-}
-
-export function renderInstallPageHtml(template, { url = "/", appName = DEFAULT_APP_NAME } = {}) {
-  return String(template)
-    .replaceAll("{{APP_NAME}}", escapeHtml(appName))
-    .replaceAll("{{APP_URL}}", escapeHtml(stripInstallParams(url)));
 }
 
 export function readOgSite(cwd = process.cwd()) {
@@ -109,40 +81,7 @@ export function readOgSite(cwd = process.cwd()) {
 }
 
 function siteTitle(site = {}) {
-  return String(site.title ?? "").trim() || DEFAULT_APP_NAME;
-}
-
-export function renderWebManifest(_hostHeader = "", site = readOgSite()) {
-  const name = siteTitle(site);
-  const shortName = String(site.shortName ?? "enV").trim() || "enV";
-  return JSON.stringify(
-    {
-      name,
-      short_name: shortName,
-      id: "/",
-      start_url: "/",
-      scope: "/",
-      display: "standalone",
-      background_color: "#ffffff",
-      theme_color: "#ffffff",
-      icons: [
-        { src: "/pwa/icon-180.png", sizes: "180x180", type: "image/png" },
-        { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png" },
-      ],
-    },
-    null,
-    2,
-  );
-}
-
-export function pwaHeadTags(appName = DEFAULT_APP_NAME) {
-  return [
-    ["manifest", '<link rel="manifest" href="/pwa/manifest.webmanifest">'],
-    ["apple-touch-icon", '<link rel="apple-touch-icon" href="/pwa/icon-180.png">'],
-    ["apple-mobile-web-app-title", `<meta name="apple-mobile-web-app-title" content="${escapeHtml(appName)}">`],
-    ["apple-mobile-web-app-status-bar-style", '<meta name="apple-mobile-web-app-status-bar-style" content="default">'],
-    ["theme-color", '<meta name="theme-color" content="#ffffff">'],
-  ];
+  return String(site.title ?? "").trim() || DEFAULT_SITE_NAME;
 }
 
 export function readXCreator() {
@@ -192,12 +131,12 @@ export function titleFromDocument(html) {
   return match ? unescapeHtml(match[1]).trim() : "";
 }
 
-export function resolveOgTitle(site = {}, appName = DEFAULT_APP_NAME, _host = "", documentTitle = "") {
+export function resolveOgTitle(site = {}, appName = DEFAULT_SITE_NAME, _host = "", documentTitle = "") {
   return (
     String(site.title ?? "").trim() ||
     String(documentTitle ?? "").trim() ||
     String(appName ?? "").trim() ||
-    DEFAULT_APP_NAME
+    DEFAULT_SITE_NAME
   );
 }
 
@@ -211,7 +150,7 @@ export function ogServiceUrl() {
   return String(process.env?.VITE_OG_SERVICE_URL ?? "").trim().replace(/\/+$/, "");
 }
 
-export function ogHeadTags({ host = "", appName = DEFAULT_APP_NAME, site = {}, documentTitle = "", cwd = process.cwd() } = {}) {
+export function ogHeadTags({ host = "", appName = DEFAULT_SITE_NAME, site = {}, documentTitle = "", cwd = process.cwd() } = {}) {
   const title = resolveOgTitle(site, appName, host, documentTitle);
   const publicHost = resolvePublicHost(host);
   const tags = [
@@ -268,7 +207,7 @@ export function normalizeHeadContext(ctx = {}) {
   const cwd = ctx.cwd ?? process.cwd();
   const site = ctx.site !== undefined ? ctx.site : snapshotOgIdentity(cwd).site;
   return {
-    appName: resolveOgTitle(site, ctx.appName ?? DEFAULT_APP_NAME, ctx.host ?? ""),
+    appName: resolveOgTitle(site, ctx.appName ?? DEFAULT_SITE_NAME, ctx.host ?? ""),
     creator: ctx.creator ?? readXCreator(),
     creatorId: ctx.creatorId ?? readXCreatorId(),
     host: ctx.host ?? "",
@@ -277,30 +216,21 @@ export function normalizeHeadContext(ctx = {}) {
   };
 }
 
-export function injectPwaHead(html, ctx = {}) {
+
+export function injectSiteMetadata(html, ctx = {}) {
   if (typeof html !== "string") return html;
   const normalized = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(normalized.site, normalized.appName, normalized.host, documentTitle);
-  let next = stripShareMetaTags(html);
-  const missing = pwaHeadTags(appName)
-    .filter(([key]) => {
-      if (key === "manifest") return !next.includes('href="/pwa/manifest.webmanifest"');
-      if (key === "apple-touch-icon") return !next.includes('href="/pwa/icon-180.png"');
-      return !next.includes(`name="${key}"`);
-    })
-    .map(([, tag]) => tag);
-
-  next = insertAfterHeadOpen(
-    next,
-    ogHeadTags({ ...normalized, appName, documentTitle }).join(""),
-  );
+  const next = stripShareMetaTags(html);
+  const withSharing = insertAfterHeadOpen(next, ogHeadTags({ ...normalized, appName, documentTitle }).join(""));
   const creatorTags = xCreatorHeadTags(normalized.creator, normalized.creatorId);
+  const missing = [];
   if (creatorTags.length) {
-    if (!next.includes('property="x:creator"')) missing.push(creatorTags[0]);
-    if (!next.includes('property="x:creator:id"')) missing.push(creatorTags[1]);
+    if (!withSharing.includes('property="x:creator"')) missing.push(creatorTags[0]);
+    if (!withSharing.includes('property="x:creator:id"')) missing.push(creatorTags[1]);
   }
-  return missing.length ? insertBeforeHeadClose(next, missing.join("")) : next;
+  return missing.length ? insertBeforeHeadClose(withSharing, missing.join("")) : withSharing;
 }
 
 function findHeadClose(buffer) {
@@ -311,7 +241,7 @@ export function createHeadInjector(ctx = {}) {
   const normalized = normalizeHeadContext(ctx);
   let pending = [];
   let done = false;
-  const apply = (html) => injectPwaHead(html, normalized);
+  const apply = (html) => injectSiteMetadata(html, normalized);
   return {
     push(chunk) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);

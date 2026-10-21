@@ -2,7 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { OG_SITE_REL_PATH, readOgSite, siteHasCustomCard } from "./pwa-shared.mjs";
+import { OG_SITE_REL_PATH, readOgSite, siteHasCustomCard } from "./site-meta-shared.mjs";
 
 export const MAX_CARD_BYTES = 600 * 1024;
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

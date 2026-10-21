@@ -4,24 +4,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import {
-  acceptsHtml,
-  createHeadInjector,
-  injectPwaHead,
-  isDocumentPath,
-  isInstallQuery,
-  ogHeadTags,
-  publicAppHost,
-  renderInstallPageHtml,
-  renderWebManifest,
-  snapshotOgIdentity,
-  stripInstallParams,
-} from "./pwa-shared.mjs";
-import { pwaPlugin, renderInstallPage, SITE_IDENTITY_ID } from "./pwa-plugin.mjs";
+import { createHeadInjector, injectSiteMetadata, isDocumentPath, ogHeadTags, publicAppHost, snapshotOgIdentity } from "./site-meta-shared.mjs";
+import { siteMetaPlugin, SITE_IDENTITY_ID } from "./site-meta-plugin.mjs";
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 function workspace({ card = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "env-pwa-"));
+  const root = mkdtempSync(join(tmpdir(), "env-site-meta-"));
   mkdirSync(join(root, "src/lib/og"), { recursive: true });
   mkdirSync(join(root, "public"), { recursive: true });
   writeFileSync(join(root, "src/lib/og/site.json"), JSON.stringify({ title: "enV — Browser Toolkit", shortName: "enV", card: "custom", color: "#0d9f8a" }));
@@ -37,36 +25,11 @@ test("host validation accepts Vercel/custom domains and rejects untrusted host s
   }
 });
 
-test("install query is limited to iOS document requests and clean links", () => {
-  assert.equal(isInstallQuery("/?install=1&platform=ios"), true);
-  assert.equal(isInstallQuery("/?install=true&platform=IOS"), true);
-  assert.equal(isInstallQuery("/?install=1&platform=android"), false);
-  assert.equal(isDocumentPath("/tools/color-picker"), true);
-  assert.equal(isDocumentPath("/pwa/manifest.webmanifest"), false);
-  assert.equal(isDocumentPath("/api/auth/session"), false);
-  assert.equal(acceptsHtml("text/html,application/xhtml+xml"), true);
-  assert.equal(acceptsHtml("application/json"), false);
-  assert.equal(stripInstallParams("/tools?a=1&install=1&platform=ios"), "/tools?a=1");
-});
-
-test("manifest identifies enV and serves the canonical app icon", () => {
-  const manifest = JSON.parse(renderWebManifest("env-toolkit.vercel.app", { title: "enV — Browser Toolkit", shortName: "enV", color: "#0d9f8a" }));
-  assert.equal(manifest.name, "enV — Browser Toolkit");
-  assert.equal(manifest.short_name, "enV");
-  assert.equal(manifest.icons[0].src, "/pwa/icon-180.png");
-  assert.equal(manifest.icons[1].src, "/pwa/icon-512.png");
-  assert.ok(manifest.icons.every((icon) => icon.type === "image/png"));
-  assert.equal(manifest.background_color, "#ffffff");
-  assert.equal(manifest.theme_color, "#ffffff");
-  assert.equal(manifest.display, "standalone");
-});
-
 test("browser chrome metadata follows the active light or dark theme", () => {
   const root = readFileSync(join(PROJECT_ROOT, "src/routes/__root.tsx"), "utf8");
   const theme = readFileSync(join(PROJECT_ROOT, "src/hooks/use-theme.ts"), "utf8");
   assert.match(root, /name: "theme-color", content: "#ffffff"/);
   assert.match(theme, /dark \? "#000000" : "#ffffff"/);
-  assert.match(theme, /dark \? "black-translucent" : "default"/);
 });
 
 test("All Tools groups results by category and progressively expands without global filters or counts", () => {
@@ -216,7 +179,6 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   const shell = readFileSync(join(PROJECT_ROOT, "src/components/layout/app-shell.tsx"), "utf8");
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const footer = readFileSync(join(PROJECT_ROOT, "src/components/layout/footer.tsx"), "utf8");
-  const install = readFileSync(join(PROJECT_ROOT, "scripts/install-page.html"), "utf8");
   assert.match(logo, /logo-header-transparent\.png/);
   assert.match(logo, /logo-header-dark\.png/);
   assert.match(logo, /logo-home-transparent\.png/);
@@ -252,7 +214,6 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /<br className="sm:hidden"\s*\/>/);
   assert.doesNotMatch(shell, /MobileNav/);
   assert.match(footer, /<Logo\s*\/>/);
-  assert.match(install, /src="\/logo-header-transparent\.png"/);
 });
 
 test("share metadata is generated from the project card without third-party defaults", () => {
@@ -269,15 +230,13 @@ test("share metadata is generated from the project card without third-party defa
 test("head injection escapes values, removes stale share tags, and is idempotent", () => {
   const root = workspace();
   const input = '<!doctype html><html><head><title>enV</title><meta property="og:title" content="old"><meta name="description" content="Keep me"></head><body>ok</body></html>';
-  const once = injectPwaHead(input, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
+  const once = injectSiteMetadata(input, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
   assert.match(once, /content="enV &quot;safe&quot;"/);
   assert.match(once, /content="Keep me"/);
-  assert.match(once, /name="theme-color" content="#ffffff"/);
-  assert.match(once, /name="apple-mobile-web-app-status-bar-style" content="default"/);
   assert.equal((once.match(/property="og:title"/g) ?? []).length, 1);
-  const twice = injectPwaHead(once, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
-  assert.equal((twice.match(/rel="manifest"/g) ?? []).length, 1);
-  assert.equal((twice.match(/apple-touch-icon/g) ?? []).length, 1);
+  const twice = injectSiteMetadata(once, { host: "env-toolkit.vercel.app", cwd: root, site: { title: 'enV "safe"', card: "custom" } });
+  assert.equal((twice.match(/property="og:title"/g) ?? []).length, 1);
+  assert.doesNotMatch(twice, /manifest\\.webmanifest|apple-touch-icon|apple-mobile-web-app/);
 });
 
 test("streaming injector handles a head close split across chunks", () => {
@@ -289,29 +248,23 @@ test("streaming injector handles a head close split across chunks", () => {
     ...injector.flush(),
   ];
   const html = Buffer.concat(outputs).toString();
-  assert.match(html, /rel="manifest"/);
   assert.match(html, /\/og\.jpg/);
+  assert.doesNotMatch(html, /manifest\\.webmanifest|apple-touch-icon|apple-mobile-web-app/);
   assert.match(html, /<body>content/);
 });
 
-test("install guide uses escaped product copy and preserves a clean destination URL", () => {
-  assert.match(renderInstallPageHtml("<title>{{APP_NAME}}</title><a href=\"{{APP_URL}}\">Open</a>", { appName: "enV & tools", url: "/?install=1&platform=ios" }), /enV &amp; tools/);
-  const rendered = renderInstallPage("env-toolkit.vercel.app", "/?install=1&platform=ios", workspace());
-  assert.match(rendered, /enV/);
-  assert.match(rendered, /\/pwa\/icon-180\.png/);
-  assert.doesNotMatch(rendered, /\/\?install=1/);
-});
 
-test("Vite plugin exposes stable virtual identity and uses the generic PWA routes", () => {
+test("site metadata plugin exposes identity and preserves share metadata", () => {
   const root = workspace();
-  const plugin = pwaPlugin();
+  const plugin = siteMetaPlugin();
   plugin.configResolved({ root });
-  assert.equal(plugin.name, "env:pwa");
-  assert.equal(plugin.resolveId(SITE_IDENTITY_ID), `\0${SITE_IDENTITY_ID}`);
-  assert.match(plugin.load(`\0${SITE_IDENTITY_ID}`), /siteIdentity/);
-  assert.match(plugin.transformIndexHtml("<html><head></head><body></body></html>"), /\/pwa\/manifest.webmanifest/);
-  const middleware = readFileSync(join(PROJECT_ROOT, "server/middleware/pwa.ts"), "utf8");
-  assert.match(middleware, /\/pwa\/manifest\.webmanifest/);
-  assert.doesNotMatch(middleware, /virtual:.*app-og/);
+  assert.equal(plugin.name, "env:site-meta");
+  assert.equal(plugin.resolveId(SITE_IDENTITY_ID), `\\0${SITE_IDENTITY_ID}`);
+  assert.match(plugin.load(`\\0${SITE_IDENTITY_ID}`), /siteIdentity/);
+  assert.equal(isDocumentPath("/tools/color-picker"), true);
+  assert.equal(isDocumentPath("/api/auth/session"), false);
+  const transformed = plugin.transformIndexHtml("<html><head></head><body></body></html>");
+  assert.match(transformed, /property="og:title"/);
+  assert.doesNotMatch(transformed, /manifest\\.webmanifest|apple-touch-icon|apple-mobile-web-app/);
   rmSync(root, { recursive: true, force: true });
 });

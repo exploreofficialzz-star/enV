@@ -1,7 +1,5 @@
-import { useEffect } from "react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
-import { startPwaInstallCapture } from "@/lib/pwa-install";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "enV — Browser Toolkit";
@@ -19,10 +17,6 @@ const INITIAL_THEME_SCRIPT = `(() => {
   document.documentElement.classList.toggle("dark", dark);
 })();`;
 
-function PwaInstallCapture() {
-  useEffect(() => startPwaInstallCapture(), []);
-  return null;
-}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -30,14 +24,11 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "theme-color", content: "#ffffff" },
     ],
     links: [
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/pwa/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/pwa/icon-180.png" },
     ],
   }),
   component: () => (
@@ -48,7 +39,6 @@ export const Route = createRootRoute({
       </head>
       <body>
         <AssistantStateProvider>
-          <PwaInstallCapture />
           <Outlet />
         </AssistantStateProvider>
         <Scripts />
