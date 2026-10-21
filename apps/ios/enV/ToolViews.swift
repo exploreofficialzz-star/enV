@@ -307,7 +307,11 @@ struct ToolDetailView: View {
                     if backend {
                         NativeBackendToolView(tool: tool)
                     } else if local {
-                        NativeFamilyToolView(tool: tool)
+                        NativeFamilyToolView(
+                            tool: tool,
+                            initialDeveloperMode: initialDeveloperMode,
+                            initialDeveloperAction: initialDeveloperAction,
+                        )
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
@@ -340,6 +344,14 @@ struct ToolDetailView: View {
                         .font(.envScaled(size: 18, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                     NativeToolGuideView(tool: tool)
+                    if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
+                        Link(destination: guideURL) {
+                            Label("Read the full guide", systemImage: "book")
+                                .font(.envScaled(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.envAccent)
+                        }
+                        .padding(.top, 8)
+                    }
                 }
                 .padding(.top, 40)
 
@@ -557,6 +569,9 @@ enum NativeCoverage {
 
 struct NativeFamilyToolView: View {
     let tool: Tool
+    var initialDeveloperMode: String? = nil
+    var initialDeveloperAction: String? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
