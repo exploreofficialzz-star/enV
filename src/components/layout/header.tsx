@@ -18,8 +18,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { usePrefs } from "@/lib/storage";
-import { ShortcutManagerDialog } from "@/components/layout/shortcut-manager-dialog";
-import { OPEN_SHORTCUT_MANAGER_EVENT } from "@/lib/home-shortcuts";
+import { ShortcutManagerDialog, ShortcutFallbackDialog } from "@/components/layout/shortcut-manager-dialog";
 
 const MENU_ITEM_BASE_CLASS = "flex min-h-8 w-full items-center rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 const MENU_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} gap-2.5`;
@@ -49,6 +48,7 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTop, setMenuTop] = useState(64);
   const [shortcutManagerOpen, setShortcutManagerOpen] = useState(false);
+  const [shortcutFallbackOpen, setShortcutFallbackOpen] = useState(false);
   const menuRef = useRef<HTMLDetailsElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const viewMode = usePrefs((state) => state.viewMode);
@@ -59,9 +59,8 @@ export function Header() {
   }
 
   useEffect(() => {
-    const openShortcutManager = () => setShortcutManagerOpen(true);
-    window.addEventListener(OPEN_SHORTCUT_MANAGER_EVENT, openShortcutManager);
-    return () => window.removeEventListener(OPEN_SHORTCUT_MANAGER_EVENT, openShortcutManager);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("envShortcutFallback") === "1") setShortcutFallbackOpen(true);
   }, []);
 
   useEffect(() => {
@@ -169,7 +168,7 @@ export function Header() {
                   ))}
                   <section className="px-1 py-1" aria-label="Preferences and support">
                     <h2 className={MENU_HEADING_CLASS}>Preferences &amp; support</h2>
-                    <button type="button" onClick={(event) => { closeMenu(event); setMenuOpen(false); setShortcutManagerOpen(true); }} className={MENU_ITEM_CLASS}><Download size={16} aria-hidden="true" /><span>Create home shortcut</span></button>
+                    <button type="button" onClick={(event) => { closeMenu(event); setMenuOpen(false); setShortcutManagerOpen(true); }} className={MENU_ITEM_CLASS}><Download size={16} aria-hidden="true" /><span>Add to phone home screen</span></button>
                     <Link to="/settings" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><SettingsIcon size={16} aria-hidden="true" /><span>Settings</span></Link>
                     <Link to="/help-feedback" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}><MessageCircle size={16} aria-hidden="true" /><span>Help & feedback</span></Link>
                   </section>
@@ -181,6 +180,7 @@ export function Header() {
       </div>
       </header>
       <ShortcutManagerDialog open={shortcutManagerOpen} onClose={() => setShortcutManagerOpen(false)} pathname={pathname} />
+      <ShortcutFallbackDialog open={shortcutFallbackOpen} onClose={() => setShortcutFallbackOpen(false)} />
     </>
   );
 }

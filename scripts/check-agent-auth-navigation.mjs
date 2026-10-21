@@ -30,33 +30,21 @@ if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes(
 if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-0"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must be grouped directly beside their labels, with the selected-state indicator aligned separately.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Create home shortcut", "Settings", "Help & feedback"]) {
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Add to phone home screen", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
-requireText("src/lib/home-shortcuts.ts", [
-  'STORAGE_KEY = "env:home-shortcuts"',
-  "MAX_HOME_SHORTCUTS = 24",
-  "addHomeShortcut",
-  "removeHomeShortcut",
-  "requestShortcutManager",
-  "HOME_SHORTCUTS_CHANGED_EVENT",
-], "Persistent homepage shortcuts");
 const shortcutDialog = requireText("src/components/layout/shortcut-manager-dialog.tsx", [
-  "Create a home shortcut",
+  "Add to phone home screen",
   "getCurrentPageShortcut(pathname)",
   "getSearchableTools()",
   "CATEGORY_MAP",
-  "addHomeShortcut(shortcut)",
-  "Save shortcut",
-], "Shortcut creation dialog");
-if (shortcutDialog.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must open an in-page shortcut dialog rather than navigating to an installation guide.");
-requireText("src/components/tools/home-shortcuts-tray.tsx", [
-  'aria-label="Your shortcuts"',
-  "readHomeShortcuts()",
-  "removeHomeShortcut(shortcut.id)",
-  "requestShortcutManager",
-  "href={shortcut.href}",
-], "Homepage shortcut tray");
+  "buildPhoneShortcutIntent",
+  "envShortcutFallback",
+  "Add to phone",
+], "Phone home-screen shortcut dialog");
+if (shortcutDialog.includes("localStorage") || shortcutDialog.includes("Your shortcuts on enV Home")) errors.push("Phone shortcuts must not be saved as tiles on the enV website homepage.");
+if (shortcutDialog.includes('createFileRoute("/install")') || header.includes('to="/install"')) errors.push("The overflow shortcut action must not navigate to the installation guide.");
+if (home.includes("HomeShortcutsTray") || home.includes('aria-label="Your shortcuts"')) errors.push("The website homepage must not render the removed in-site shortcut tiles.");
 for (const path of ["src/routes/settings.tsx", "src/routes/install.tsx", "src/routes/help-feedback.tsx", "src/lib/pwa-install.ts"]) {
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/install/support feature: " + path);
 }
@@ -139,6 +127,16 @@ if (!blogPage.includes('href={toolDocumentationPath(tool)}')) errors.push("Tool 
 if (!blogPage.includes('sensitivity: "base", numeric: true')) errors.push("Tool guides on the Blogs & Guides page must be sorted alphabetically.");
 if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
 if (!blogPage.includes('md:flex-row md:items-center md:justify-between') || !blogPage.includes('md:w-[24rem] md:shrink-0')) errors.push("Blogs & Guides heading and search must share one aligned header row at desktop widths.");
+
+for (const item of ["ShortcutManagerCompat.requestPinShortcut", "ShortcutManagerCompat.isRequestPinShortcutSupported", 'data.host != "pin-shortcut"', "setShortLabel(title.take(25))"]) {
+  if (!nativeAndroid.includes(item)) errors.push("Android must support real launcher pin requests for validated enV pages: " + item);
+}
+requireText("apps/android/app/src/main/AndroidManifest.xml", [
+  'android:scheme="env"',
+  'android:host="pin-shortcut"',
+  'android.intent.action.VIEW',
+  'android.intent.category.BROWSABLE',
+], "Android phone shortcut bridge");
 
 const androidGradle = requireText("apps/android/app/build.gradle.kts", ['androidx.browser:browser:1.8.0'], "Android in-app browser dependency");
 const androidBlogBrowser = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", [

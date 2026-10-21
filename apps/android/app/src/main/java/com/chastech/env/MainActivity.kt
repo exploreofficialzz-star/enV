@@ -22,6 +22,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.OpenableColumns
+import android.widget.Toast
 import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -123,6 +124,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.chastech.env.data.Catalog
 import com.chastech.env.data.NativeDeveloperStudios
 import com.chastech.env.data.developerStudioTools
@@ -175,6 +179,7 @@ import java.time.Year
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handlePhoneShortcutIntent(intent)
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -202,6 +207,51 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * Receives the website's explicit request to pin a selected enV URL to the Android launcher.
+     * Android owns the confirmation prompt; this does not silently add a launcher icon.
+     */
+    private fun handlePhoneShortcutIntent(request: Intent?) {
+        val data = request?.data ?: return
+        if (request.action != Intent.ACTION_VIEW || data.scheme != "env" || data.host != "pin-shortcut") return
+
+        val targetText = data.getQueryParameter("target").orEmpty()
+        val target = runCatching { Uri.parse(targetText) }.getOrNull()
+        val allowedHosts = setOf("envtools.store", "www.envtools.store")
+        val host = target?.host?.lowercase(Locale.ROOT).orEmpty()
+        if (target == null || !target.scheme.equals("https", ignoreCase = true) || host !in allowedHosts) {
+            Toast.makeText(this, "That enV shortcut destination is not valid.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
+            Toast.makeText(this, "This launcher does not support pinned shortcuts.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val requestedTitle = data.getQueryParameter("title")?.trim().orEmpty()
+        val title = requestedTitle.ifBlank { "enV shortcut" }.take(80)
+        val shortcutId = "env-page-" + Integer.toHexString(targetText.hashCode())
+        val openTarget = Intent(Intent.ACTION_VIEW, target).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shortcut = ShortcutInfoCompat.Builder(this, shortcutId)
+            .setShortLabel(title.take(25))
+            .setLongLabel(title)
+            .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher))
+            .setIntent(openTarget)
+            .build()
+
+        val requested = runCatching {
+            ShortcutManagerCompat.requestPinShortcut(this, shortcut, null)
+        }.getOrDefault(false)
+        Toast.makeText(
+            this,
+            if (requested) "Confirm the shortcut on your Home screen." else "The Home screen shortcut could not be requested.",
+            Toast.LENGTH_LONG,
+        ).show()
     }
 }
 
