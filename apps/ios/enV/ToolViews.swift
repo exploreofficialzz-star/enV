@@ -6807,6 +6807,9 @@ private struct NativeUxUiStudioView: View {
     @State private var projectName = "Mobile dashboard"
     @State private var background = "#F8FAFC"
     @State private var elements: [UxUiNativeLayer] = []
+    @State private var undoHistory: [[UxUiNativeLayer]] = []
+    @State private var redoHistory: [[UxUiNativeLayer]] = []
+    @State private var dragOrigins: [UUID: CGPoint] = [:]
     @State private var selectedID: UUID?
     @State private var notice = ""
     @State private var hasSavedDraft = false
@@ -6821,6 +6824,37 @@ private struct NativeUxUiStudioView: View {
     private var boardWidth: Int { target == "mobile" ? 390 : 1440 }
     private var boardHeight: Int { target == "mobile" ? 844 : 900 }
     private var selectedIndex: Int? { elements.firstIndex(where: { $0.id == selectedID }) }
+
+    private func checkpoint() {
+        undoHistory.append(elements)
+        if undoHistory.count > 40 { undoHistory.removeFirst(undoHistory.count - 40) }
+        redoHistory.removeAll()
+    }
+
+    private func undoLayout() {
+        guard let previous = undoHistory.popLast() else { return }
+        redoHistory.append(elements)
+        elements = previous
+        if !elements.contains(where: { $0.id == selectedID }) { selectedID = elements.first?.id }
+        notice = "Undo complete."
+    }
+
+    private func redoLayout() {
+        guard let next = redoHistory.popLast() else { return }
+        undoHistory.append(elements)
+        if undoHistory.count > 40 { undoHistory.removeFirst(undoHistory.count - 40) }
+        elements = next
+        if !elements.contains(where: { $0.id == selectedID }) { selectedID = elements.first?.id }
+        notice = "Redo complete."
+    }
+
+    private func moveLayer(_ id: UUID, by offset: Int) {
+        guard let index = elements.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard elements.indices.contains(destination) else { return }
+        checkpoint()
+        elements.swapAt(index, destination)
+    }
 
     private var aiPrompt: String {
         var lines = [
@@ -6952,6 +6986,21 @@ private struct NativeUxUiStudioView: View {
                                 .frame(width: CGFloat(item.width) * scale, height: CGFloat(item.height) * scale)
                                 .position(x: (CGFloat(item.x) + CGFloat(item.width) / 2) * scale, y: (CGFloat(item.y) + CGFloat(item.height) / 2) * scale)
                                 .onTapGesture { selectedID = item.id }
+                                .simultaneousGesture(
+                                    DragGesture(minimumDistance: 2)
+                                        .onChanged { value in
+                                            selectedID = item.id
+                                            if dragOrigins[item.id] == nil {
+                                                checkpoint()
+                                                dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
+                                            }
+                                            guard let origin = dragOrigins[item.id],
+                                                  let index = elements.firstIndex(where: { $0.id == item.id }) else { return }
+                                            elements[index].x = max(0, Int((origin.x + value.translation.width / scale).rounded()))
+                                            elements[index].y = max(0, Int((origin.y + value.translation.height / scale).rounded()))
+                                        }
+                                        .onEnded { _ in dragOrigins[item.id] = nil }
+                                )
                         }
                     }
                     .frame(width: CGFloat(boardWidth) * scale, height: CGFloat(boardHeight) * scale, alignment: .topLeading)
@@ -6959,6 +7008,15 @@ private struct NativeUxUiStudioView: View {
                     .overlay(Rectangle().stroke(Color.envBorder, lineWidth: 1))
                 }
                 .frame(height: max(CGFloat(290), min(CGFloat(560), CGFloat(boardHeight) * min(CGFloat(1), UIScreen.main.bounds.width / CGFloat(boardWidth)))))
+                HStack(spacing: 8) {
+                    Button { undoLayout() } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                    }.disabled(undoHistory.isEmpty)
+                    Button { redoLayout() } label: {
+                        Label("Redo", systemImage: "arrow.uturn.forward")
+                    }.disabled(redoHistory.isEmpty)
+                    Text("Drag layers to reposition.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                }
                 Text("Select a layer to edit its exact measurements and properties.")
                     .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
@@ -7107,11 +7165,18 @@ private struct NativeUxUiStudioView: View {
 
     @ViewBuilder
     private func inspector(for index: Int) -> some View {
-        let binding = $elements[index]
+        let binding = Binding<UxUiNativeLayer>(
+            get: { elements[index] },
+            set: { nextValue in
+                if elements[index] != nextValue { checkpoint(); elements[index] = nextValue }
+            }
+        )
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Properties · \(binding.wrappedValue.kind)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 Spacer()
+                Button { moveLayer(binding.wrappedValue.id, by: -1) } label: { Image(systemName: "arrow.up").foregroundStyle(Color.envAccent) }
+                Button { moveLayer(binding.wrappedValue.id, by: 1) } label: { Image(systemName: "arrow.down").foregroundStyle(Color.envAccent) }
                 Button { duplicateLayer(binding.wrappedValue) } label: { Image(systemName: "plus.square.on.square").foregroundStyle(Color.envAccent) }
                 Button { deleteLayer(binding.wrappedValue) } label: { Image(systemName: "trash").foregroundStyle(.red) }
             }
@@ -7291,16 +7356,18 @@ private struct NativeUxUiStudioView: View {
         case "divider": newItem = UxUiNativeLayer(kind: kind, name: "Divider", x: 24, y: 640, width: 300, height: 1, text: "", fill: "#CBD5E1")
         default: newItem = UxUiNativeLayer(kind: "rect", name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
         }
-        elements.append(newItem); selectedID = newItem.id; notice = "\(newItem.name) added."
+        checkpoint(); elements.append(newItem); selectedID = newItem.id; notice = "\(newItem.name) added."
     }
 
     private func duplicateLayer(_ element: UxUiNativeLayer) {
+        checkpoint()
         var copy = element
         copy.id = UUID(); copy.name += " copy"; copy.x += 16; copy.y += 16
         elements.append(copy); selectedID = copy.id
     }
 
     private func deleteLayer(_ element: UxUiNativeLayer) {
+        checkpoint()
         elements.removeAll { $0.id == element.id }
         selectedID = elements.first?.id
     }
@@ -7360,6 +7427,7 @@ private struct NativeUxUiStudioView: View {
                       sourceSVG.contains("<svg") else { throw URLError(.cannotDecodeContentData) }
                 await MainActor.run {
                     if let index = elements.firstIndex(where: { $0.id == layerID }) {
+                        checkpoint()
                         elements[index].iconName = iconName
                         elements[index].name = iconName
                         elements[index].iconSvg = uxUiCleanIconSVG(sourceSVG)

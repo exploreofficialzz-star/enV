@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,10 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import android.webkit.WebView
@@ -39,6 +42,7 @@ import java.io.ByteArrayOutputStream
 import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private data class UxUiNativeLayer(
     val id: String, val kind: String, val name: String, val x: Int, val y: Int, val width: Int, val height: Int,
@@ -63,7 +67,7 @@ private fun uxNativeSafeIconSvg(svg: String, color: String): String {
 }
 
 private fun uxNativeIconHtml(svg: String, color: String): String =
-    "<!doctype html><html><head><meta name=\\\"viewport\\\" content=\\\"width=device-width,initial-scale=1,maximum-scale=1\\\"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" +
+    "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" +
         uxNativeSafeIconSvg(svg, color) + "</body></html>"
 
 private fun uxNativeDrawSvgIcon(canvas: android.graphics.Canvas, element: UxUiNativeLayer) {
@@ -240,6 +244,7 @@ fun NativeUxUiStudioForm() {
     var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
+    val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
     var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
@@ -249,7 +254,38 @@ fun NativeUxUiStudioForm() {
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
     LaunchedEffect(projectName,target,background,signature,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements)).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
-    fun edit(id:String,change:(UxUiNativeLayer)->UxUiNativeLayer){val idx=elements.indexOfFirst{it.id==id};if(idx>=0)elements[idx]=change(elements[idx])}
+    fun checkpoint(){
+        undoHistory.add(elements.toList())
+        if(undoHistory.size>40)undoHistory.removeAt(0)
+        redoHistory.clear()
+    }
+    fun undo(){
+        if(undoHistory.isEmpty())return
+        redoHistory.add(elements.toList())
+        val previous=undoHistory.removeAt(undoHistory.lastIndex)
+        elements.clear();elements.addAll(previous)
+        if(elements.none{it.id==selectedId})selectedId=elements.firstOrNull()?.id.orEmpty()
+        notice="Undo complete."
+    }
+    fun redo(){
+        if(redoHistory.isEmpty())return
+        undoHistory.add(elements.toList())
+        if(undoHistory.size>40)undoHistory.removeAt(0)
+        val next=redoHistory.removeAt(redoHistory.lastIndex)
+        elements.clear();elements.addAll(next)
+        if(elements.none{it.id==selectedId})selectedId=elements.firstOrNull()?.id.orEmpty()
+        notice="Redo complete."
+    }
+    fun moveLayer(id:String,delta:Int){
+        val from=elements.indexOfFirst{it.id==id};val to=from+delta
+        if(from<0||to !in elements.indices)return
+        checkpoint()
+        val moving=elements.removeAt(from);elements.add(to,moving)
+    }
+    fun edit(id:String,change:(UxUiNativeLayer)->UxUiNativeLayer){
+        val idx=elements.indexOfFirst{it.id==id}
+        if(idx>=0){val updated=change(elements[idx]);if(updated!=elements[idx]){checkpoint();elements[idx]=updated}}
+    }
     fun add(kind:String){
         val id="layer-"+System.nanoTime().toString()
         val e=when(kind){
@@ -283,7 +319,7 @@ fun NativeUxUiStudioForm() {
             "spacer"->UxUiNativeLayer(id,kind,"Layout spacer",24,540,80,24,"",fill="transparent",radius=0,padding=0)
             else->UxUiNativeLayer(id,"rect","Rectangle",24,540,140,90,"",fill="#DBEAFE")
         }
-        elements.add(e);selectedId=id;notice=e.name+" added."
+        checkpoint();elements.add(e);selectedId=id;notice=e.name+" added."
     }
 
     fun chooseIcon(layerId:String, icon:String){
@@ -321,6 +357,11 @@ fun NativeUxUiStudioForm() {
                     FilterChip(selected=target=="desktop",onClick={target="desktop"},label={Text("Desktop")})
                     OutlinedButton(onClick={onboarding=true}){Text("Workflow")}
                 }
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
+                    OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("Undo")}
+                    OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("Redo")}
+                    Text("Drag layers to reposition.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text("ARTBOARD · "+bw+" × "+bh+" px · "+elements.size+" layers",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
                     listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->OutlinedButton(onClick={target=if(id.startsWith("mobile"))"mobile" else "desktop";elements.clear();elements.addAll(uxNativePreset(target,id));selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label,maxLines=1)}}
@@ -333,7 +374,13 @@ fun NativeUxUiStudioForm() {
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
                                 elements.forEach{e->
                                     val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
-                                    Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp)){
+                                    Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale){
+                                        detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
+                                            change.consume()
+                                            val index=elements.indexOfFirst{it.id==e.id}
+                                            if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+dragAmount.x.roundToInt()).coerceAtLeast(0),y=(current.y+dragAmount.y.roundToInt()).coerceAtLeast(0))}
+                                        }
+                                    }){
                                         if(e.kind=="icon" && e.iconSvg.isNotBlank()) {
                                             AndroidView(
                                                 factory={ctx->WebView(ctx).apply{
@@ -344,6 +391,8 @@ fun NativeUxUiStudioForm() {
                                                     isVerticalScrollBarEnabled=false
                                                     isFocusable=false
                                                     isFocusableInTouchMode=false
+                                                    isEnabled=false
+                                                    isClickable=false
                                                 }},
                                                 modifier=Modifier.fillMaxSize(),
                                                 update={view->
@@ -407,8 +456,10 @@ fun NativeUxUiStudioForm() {
                             Text("Icon identifiers are recorded exactly; check the source collection licence before shipping.",style=MaterialTheme.typography.bodySmall)
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
-                            OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
-                            OutlinedButton(onClick={elements.removeAll{it.id==e.id};selectedId=elements.firstOrNull()?.id.orEmpty()},modifier=Modifier.weight(1f)){Text("Delete")}
+                            OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
+                            OutlinedButton(onClick={moveLayer(e.id,-1)},modifier=Modifier.weight(1f)){Text("Move up")}
+                            OutlinedButton(onClick={moveLayer(e.id,1)},modifier=Modifier.weight(1f)){Text("Move down")}
+                            OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==e.id};selectedId=elements.firstOrNull()?.id.orEmpty()},modifier=Modifier.weight(1f)){Text("Delete")}
                         }
                         Text("Exact specification",style=MaterialTheme.typography.labelLarge)
                         Text(uxNativeJson(listOf(e)).toString(2),style=MaterialTheme.typography.bodySmall)
