@@ -6703,6 +6703,57 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
 
+    init(
+        id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
+        width: Int, height: Int, text: String, iconName: String = "",
+        iconSvg: String? = nil, imageData: String? = nil,
+        color: String = "#111827", fill: String = "transparent",
+        borderColor: String = "#E5E7EB", borderWidth: Int = 0,
+        radius: Int = 12, padding: Int = 12,
+        marginTop: Int = 0, marginRight: Int = 0, marginBottom: Int = 0, marginLeft: Int = 0,
+        fontFamily: String = "Inter", fontSize: Int = 16, fontWeight: Int = 400, lineHeight: Double = 1.35,
+        horizontalConstraint: String = "left", verticalConstraint: String = "top",
+        minWidth: Int = 0, maxWidth: Int = 0,
+        visibleOn: [String] = ["mobile", "tablet", "desktop"],
+        referenceWidth: Int = 390, referenceHeight: Int = 844,
+        componentKey: String = "", iconViewBox: String = "0 0 24 24"
+    ) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.text = text
+        self.iconName = iconName
+        self.iconSvg = iconSvg
+        self.imageData = imageData
+        self.color = color
+        self.fill = fill
+        self.borderColor = borderColor
+        self.borderWidth = borderWidth
+        self.radius = radius
+        self.padding = padding
+        self.marginTop = marginTop
+        self.marginRight = marginRight
+        self.marginBottom = marginBottom
+        self.marginLeft = marginLeft
+        self.fontFamily = fontFamily
+        self.fontSize = fontSize
+        self.fontWeight = fontWeight
+        self.lineHeight = lineHeight
+        self.horizontalConstraint = horizontalConstraint
+        self.verticalConstraint = verticalConstraint
+        self.minWidth = minWidth
+        self.maxWidth = maxWidth
+        self.visibleOn = visibleOn
+        self.referenceWidth = referenceWidth
+        self.referenceHeight = referenceHeight
+        self.componentKey = componentKey
+        self.iconViewBox = iconViewBox
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData
         case color, fill, borderColor, borderWidth, radius, padding
@@ -7145,30 +7196,38 @@ private struct NativeUxUiStudioView: View {
     }
 
     private var aiPrompt: String {
-        var lines = [
-            "Implement this interface faithfully. Numeric values and named assets are authoritative.",
-            "Project: \(projectName)", "Target: \(target)",
-            "Artboard: \(boardWidth) x \(boardHeight) CSS pixels",
-            "Canvas background: \(background)",
-            "Responsive breakpoints: mobile <= 480px; tablet 481–1023px; desktop >= 1024px.",
-            "Named color tokens: " + tokens.colors.map { "\($0.name)=\($0.value)" }.joined(separator: ", "),
-            "Typography tokens: " + tokens.typography.map { "\($0.name)=\($0.fontFamily) \($0.fontSize)px weight \($0.fontWeight) lineHeight \($0.lineHeight)" }.joined(separator: "; "),
-            "Spacing tokens: " + tokens.spacing.map(String.init).joined(separator: ", ") + " px",
-            "Keep exact text, geometry, fonts, weights, colors, margins, padding, borders, radii and icon IDs. Coordinates start at the artboard top-left.",
-            "Preserve responsive anchors, min/max dimensions, reference artboard size and device-specific visibility.",
-            "", "ELEMENT SPECIFICATIONS"
-        ]
+        var lines: [String] = []
+        lines.append("Implement this interface faithfully. Numeric values and named assets are authoritative.")
+        lines.append("Project: \(projectName)")
+        lines.append("Target: \(target)")
+        lines.append("Artboard: \(boardWidth) x \(boardHeight) CSS pixels")
+        lines.append("Canvas background: \(background)")
+        lines.append("Responsive breakpoints: mobile <= 480px; tablet 481-1023px; desktop >= 1024px.")
+        let colorTokenText = tokens.colors.map { token in token.name + "=" + token.value }.joined(separator: ", ")
+        let typographyTokenText = tokens.typography.map { token in
+            token.name + "=" + token.fontFamily + " " + String(token.fontSize) + "px weight " + String(token.fontWeight) + " lineHeight " + String(token.lineHeight)
+        }.joined(separator: "; ")
+        let spacingTokenText = tokens.spacing.map { String($0) }.joined(separator: ", ")
+        lines.append("Named color tokens: " + colorTokenText)
+        lines.append("Typography tokens: " + typographyTokenText)
+        lines.append("Spacing tokens: " + spacingTokenText + " px")
+        lines.append("Keep exact text, geometry, fonts, weights, colors, margins, padding, borders, radii and icon IDs. Coordinates start at the artboard top-left.")
+        lines.append("Preserve responsive anchors, min/max dimensions, reference artboard size and device-specific visibility.")
+        lines.append("")
+        lines.append("ELEMENT SPECIFICATIONS")
         for (index, item) in elements.enumerated() {
-            lines.append("\(index + 1). \(item.name) [\(item.kind)]")
-            lines.append("id=\(item.id.uuidString); x=\(item.x)px; y=\(item.y)px; width=\(item.width)px; height=\(item.height)px")
-            lines.append("text=\(String(data: (try? JSONEncoder().encode(item.text)) ?? Data(), encoding: .utf8) ?? "\"\""); icon=\(item.iconName)")
-            lines.append("color=\(item.color); fill=\(item.fill); border=\(item.borderColor) \(item.borderWidth)px; radius=\(item.radius)px")
-            lines.append("padding=\(item.padding)px; margins top/right/bottom/left=\(item.marginTop)/\(item.marginRight)/\(item.marginBottom)/\(item.marginLeft)px")
-            lines.append("font=\(item.fontFamily); size=\(item.fontSize)px; weight=\(item.fontWeight); lineHeight=\(item.lineHeight)")
-            lines.append("horizontalConstraint=\(item.horizontalConstraint); verticalConstraint=\(item.verticalConstraint); minWidth=\(item.minWidth); maxWidth=\(item.maxWidth)")
-            lines.append("visibleOn=\(item.visibleOn.joined(separator: ",")); referenceViewport=\(item.referenceWidth)x\(item.referenceHeight); componentKey=\(item.componentKey); iconViewBox=\(item.iconViewBox)")
+            lines.append(String(index + 1) + ". " + item.name + " [" + item.kind + "]")
+            lines.append("id=" + item.id.uuidString + "; x=" + String(item.x) + "px; y=" + String(item.y) + "px; width=" + String(item.width) + "px; height=" + String(item.height) + "px")
+            let encodedText = (try? JSONEncoder().encode(item.text)).flatMap { String(data: $0, encoding: .utf8) } ?? """"
+            lines.append("text=" + encodedText + "; icon=" + item.iconName)
+            lines.append("color=" + item.color + "; fill=" + item.fill + "; border=" + item.borderColor + " " + String(item.borderWidth) + "px; radius=" + String(item.radius) + "px")
+            lines.append("padding=" + String(item.padding) + "px; margins top/right/bottom/left=" + String(item.marginTop) + "/" + String(item.marginRight) + "/" + String(item.marginBottom) + "/" + String(item.marginLeft) + "px")
+            lines.append("font=" + item.fontFamily + "; size=" + String(item.fontSize) + "px; weight=" + String(item.fontWeight) + "; lineHeight=" + String(item.lineHeight))
+            lines.append("horizontalConstraint=" + item.horizontalConstraint + "; verticalConstraint=" + item.verticalConstraint + "; minWidth=" + String(item.minWidth) + "; maxWidth=" + String(item.maxWidth))
+            lines.append("visibleOn=" + item.visibleOn.joined(separator: ",") + "; referenceViewport=" + String(item.referenceWidth) + "x" + String(item.referenceHeight) + "; componentKey=" + item.componentKey + "; iconViewBox=" + item.iconViewBox)
         }
-        lines.append(""); lines.append("Acceptance: compare the implementation at the reference viewport. Do not replace exact geometry or icon IDs with approximate values.")
+        lines.append("")
+        lines.append("Acceptance: compare the implementation at the reference viewport. Do not replace exact geometry or icon IDs with approximate values.")
         return lines.joined(separator: "\n")
     }
 
