@@ -6812,6 +6812,13 @@ private func uxUiNativeImage(fromDataURL dataURL: String) -> UIImage? {
     return UIImage(data: data)
 }
 
+private func uxUiCleanIconSVG(_ svg: String) -> String {
+    svg
+        .replacingOccurrences(of: #"(?is)<script\b[^>]*>.*?</script\s*>"#, with: "", options: .regularExpression)
+        .replacingOccurrences(of: #"(?is)<foreignObject\b[^>]*>.*?</foreignObject\s*>"#, with: "", options: .regularExpression)
+        .replacingOccurrences(of: #"(?i)\s+on[a-z]+\s*=\s*(['"]).*?\1"#, with: "", options: .regularExpression)
+}
+
 private struct UxUiNativeSVGPath {
     let path: Path
     let fill: String?
@@ -7087,7 +7094,7 @@ private struct UxUiNativeSVGIcon: View {
     }
 }
 
-private struct UxUiNativeColorTokenprivate struct UxUiNativeColorToken: Codable, Identifiable, Equatable {
+private struct UxUiNativeColorToken: Codable, Identifiable, Equatable {
     var name: String
     var value: String
     var id: String { name }
