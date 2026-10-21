@@ -46,6 +46,110 @@ object NativeDeveloperStudios {
         return specs[11]
     }
 
+    /** Resolve an old tool slug to the matching visible mode inside its canonical Studio. */
+    fun modeForLegacySlug(studio: NativeDeveloperStudioSpec, rawSlug: String): String {
+        val slug = rawSlug.lowercase().removePrefix("developer-")
+        val selected = when (studio.id) {
+            "json-studio" -> when {
+                slug.startsWith("csv-") -> "csv"
+                slug.contains("diff") -> "diff"
+                slug.contains("path") || slug.contains("query") -> "path"
+                slug.contains("inspector") || slug.contains("parser") || slug.contains("tree") || slug.contains("preview") -> "tree"
+                slug.contains("schema") -> "schema"
+                slug.contains("to-csv") -> "convert"
+                slug.contains("csv") -> "csv"
+                slug.contains("validator") || slug.contains("tester") -> "validate"
+                slug.contains("minifier") -> "minify"
+                else -> "format"
+            }
+            "jwt-studio" -> when {
+                slug.contains("expiration") || slug.contains("expiry") || slug.contains("exp-check") -> "expiration"
+                slug.contains("payload") || slug.contains("builder") -> "payload"
+                slug.contains("inspector") || slug.contains("claims") -> "claims"
+                else -> "decode"
+            }
+            "regex-studio" -> when {
+                slug.contains("replace") -> "replace"
+                slug.contains("explain") -> "explain"
+                else -> "match"
+            }
+            "hash-studio" -> when {
+                slug.contains("file-hash") || slug.contains("file-hasher") -> "file"
+                slug.contains("compare") -> "compare"
+                else -> "hash"
+            }
+            "encoding-studio" -> when {
+                slug.contains("data-uri") -> "data-uri"
+                slug.contains("hex") -> "hex"
+                slug.contains("binary") -> "binary"
+                slug.contains("ascii") -> "ascii"
+                slug.contains("unicode") -> "unicode"
+                slug.startsWith("html-") -> "html"
+                slug.contains("base64") || slug in setOf("json-decoder", "json-encoder") -> "base64"
+                else -> "url"
+            }
+            "time-cron-studio" -> when {
+                slug.contains("timestamp") || slug.contains("epoch") -> "timestamp"
+                slug.contains("generator") || slug.contains("preset") -> "presets"
+                slug.contains("explain") -> "explain"
+                else -> "next-runs"
+            }
+            "uuid-studio" -> if (slug.contains("validator") || slug.contains("tester")) "validate" else "generate"
+            "sql-studio" -> when {
+                slug.contains("query-builder") -> "query"
+                slug.contains("schema-generator") -> "schema"
+                slug.contains("minifier") -> "minify"
+                slug.contains("parser") || slug.contains("validator") || slug.contains("tester") -> "parse"
+                else -> "format"
+            }
+            "markup-studio" -> when {
+                slug.startsWith("css-") -> "css"
+                slug.startsWith("javascript-") || slug.startsWith("typescript-") -> "javascript"
+                slug.startsWith("xml-") || slug.startsWith("svg-") -> "xml"
+                slug.startsWith("yaml-") -> "yaml"
+                slug.startsWith("lorem-ipsum") -> "samples"
+                slug.startsWith("markdown") -> "markdown"
+                else -> "html"
+            }
+            "http-api-studio" -> when {
+                slug.contains("query") -> "query"
+                slug.contains("mime") || slug.contains("content-type") -> "mime"
+                slug.contains("cors") -> "cors"
+                slug.contains("csp") -> "csp"
+                slug.contains("cookie") -> "cookies"
+                slug.contains("user-agent") -> "user-agent"
+                slug.contains("header") -> "headers"
+                else -> "status"
+            }
+            "devops-studio" -> when {
+                slug.contains("dockerfile") -> "dockerfile"
+                slug.contains("docker-compose") || slug.contains("compose") -> "compose"
+                slug.contains("nginx") -> "nginx"
+                slug.contains("editorconfig") -> "editorconfig"
+                slug.contains("environment") || slug.contains(".env") -> "env"
+                slug.contains("openapi") -> "openapi"
+                slug.contains("graphql") -> "graphql"
+                slug.contains("license") -> "license"
+                slug.contains("readme") -> "readme"
+                slug.contains("commit") -> "commit"
+                slug.contains("branch") -> "branch"
+                slug.contains("changelog") -> "changelog"
+                slug.contains("semantic-version") || slug.contains("semver") -> "semver"
+                slug.contains("api-mock") || slug.contains("webhook") -> "mock"
+                else -> "gitignore"
+            }
+            "diff-inspect-studio" -> when {
+                slug.startsWith("json-") -> if (slug.contains("diff")) "json-diff" else if (Regex("(inspector|parser|preview|tester|explainer)").containsMatchIn(slug)) "inspect" else "text-diff"
+                slug.startsWith("yaml-") -> "yaml-diff"
+                slug.startsWith("markdown") -> "preview"
+                slug.contains("inspector") || slug.contains("parser") || slug.contains("tester") -> "inspect"
+                else -> "text-diff"
+            }
+            else -> studio.modes.firstOrNull()?.key.orEmpty()
+        }
+        return selected.takeIf { key -> studio.modes.any { it.key == key } } ?: studio.modes.firstOrNull()?.key.orEmpty()
+    }
+
     fun tools(catalog: Catalog): List<ToolRecord> = specs.mapNotNull { spec ->
         val source = (catalog.tools + catalog.relatedReferenceTools).firstOrNull { it.id == spec.sourceId } ?: return@mapNotNull null
         val firstOp = spec.modes.firstOrNull()?.op ?: source.engine.extras["op"].orEmpty()
