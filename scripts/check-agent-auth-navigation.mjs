@@ -12,7 +12,7 @@ const requireText = (path, fragments, label = path) => {
 
 const footer = requireText("src/components/layout/footer.tsx", ["<footer", "chAs Technologies LLC", "<Logo />", "Privacy", "Terms", "Disclaimer", "Responsible use"], "Web footer");
 if (["Token guide", "Help center", "Blog & guides", "Product", "Resources"].some(item => footer.includes(item))) errors.push("Product and Resources groups must be moved out of the web footer.");
-const header = requireText("src/components/layout/header.tsx", ["/account", "/wallet", "/about", "/tools", "/pricing", "/token-guide", "/help", "/blog", "/contact", 'title: "Product"', 'title: "Resources"'], "Web overflow menu");
+const header = requireText("src/components/layout/header.tsx", ["/account", "/wallet", "/about", "/tools", "/pricing", "/token-guide", "/help", "/blog", "/contact", "/report-bugs", "/suggest-tool", 'title: "Product"', 'title: "Resources"'], "Web overflow menu");
 const webMenu = header.match(/<details\b[^>]*className="group relative"[^>]*>[\s\S]*?<\/details>/)?.[0] ?? "";
 for (const removed of ["Explore enV", "Product, help, and account links", 'to="/agent"', "AI Agent", "Search tools", "Sign in", "Create account", "/privacy", "/terms", "/disclaimer", "/responsible-use"]) {
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
@@ -38,18 +38,22 @@ for (const [label, iconMarkup] of [
 for (const [label, iconName] of [
   ["About", "Info"], ["Tools", "Wrench"], ["Pricing", "CreditCard"],
   ["Token guide", "Coins"], ["Help center", "LifeBuoy"], ["Blog & guides", "BookOpen"], ["Contact", "Mail"],
+  ["Report bugs", "Bug"], ["Suggest a tool", "Lightbulb"],
 ]) {
   if (!header.includes('label: "' + label + '", icon: ' + iconName)) errors.push("Overflow link data is missing the expected icon for " + label);
 }
 
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback"]) {
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback", "Report bugs", "Suggest a tool"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
-for (const path of ["src/routes/settings.tsx", "src/routes/help-feedback.tsx"]) {
+for (const path of ["src/routes/settings.tsx", "src/routes/help-feedback.tsx", "src/routes/report-bugs.tsx", "src/routes/suggest-tool.tsx", "src/components/feedback/feedback-request-page.tsx"]) {
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/support feature: " + path);
 }
 const settingsPage = requireText("src/routes/settings.tsx", ['createFileRoute("/settings")', "themePreference", "setThemePreference", "setViewMode", "Reset appearance and display mode"], "Settings page");
 const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
+const focusedFeedbackPages = requireText("src/components/feedback/feedback-request-page.tsx", ["Report bugs", "Suggest a tool", "mailto:envtoolkit@gmail.com", "Nothing is sent until you review it", "maxLength={3000}"], "Report bugs and suggest a tool pages");
+requireText("src/routes/report-bugs.tsx", ['createFileRoute("/report-bugs")', 'kind="bug"'], "Report bugs route");
+requireText("src/routes/suggest-tool.tsx", ['createFileRoute("/suggest-tool")', 'kind="suggestion"'], "Suggest a tool route");
 const preferences = requireText("src/lib/storage.ts", ["env:view-mode", "themePreference", "setThemePreference", "setViewMode", "applyViewMode", 'ViewMode = "mobile" | "tablet" | "desktop"', 'viewMode: "mobile"'], "Persistent display preferences");
 const rootRoute = requireText("src/routes/__root.tsx", ["INITIAL_THEME_SCRIPT", 'localStorage.getItem("env:theme")', "prefers-color-scheme: dark", 'classList.toggle("dark", dark)'], "Root theme initialization");
 const themeBootstrapPosition = rootRoute.indexOf("<script dangerouslySetInnerHTML");
@@ -74,18 +78,18 @@ const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword", "socialProviders", "googleConfigured", "appleConfigured"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 
-const nativeAndroid = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ['Text("Account")', 'Text("Wallet")', 'Text("PRODUCT"', 'Text("RESOURCES"', 'Text("Token guide")', 'informationPage = "token-guide"', "FooterLegalLinks"], "Android menu/footer");
+const nativeAndroid = requireText("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", ['Text("Account")', 'Text("Wallet")', 'Text("PRODUCT"', 'Text("RESOURCES"', 'Text("Token guide")', 'Text("Report bugs")', 'Text("Suggest a tool")', 'informationPage = "token-guide"', 'informationPage = "report-bugs"', 'informationPage = "suggest-tool"', "FooterLegalLinks"], "Android menu/footer");
 const androidMenu = nativeAndroid.split("DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false })")[1]?.split("colors = TopAppBarDefaults.topAppBarColors")[0] ?? "";
 for (const removed of ['Text("AI Agent")', 'Text("Sign in")', 'Text("Create account")', 'Text("Search tools")', 'Text("LEGAL")']) if (androidMenu.includes(removed)) errors.push(`Android overflow menu still contains ${removed}`);
-requireText("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", ['"help" -> "Help center"', '"token-guide" -> "Token guide"', 'Text("Continue to sign in")', 'https://envtools.store/account'], "Android Account/token pages");
+requireText("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt", ['"help" -> "Help center"', '"token-guide" -> "Token guide"', '"report-bugs" -> "Report bugs"', '"suggest-tool" -> "Suggest a tool"', 'NativeFeedbackRequestPage(isBugReport = true)', 'NativeFeedbackRequestPage(isBugReport = false)', 'Text("Continue to sign in")', 'https://envtools.store/account'], "Android Account/token/feedback pages");
 if (!androidMenu.includes('Uri.parse("https://envtools.store/account")')) errors.push("Android Account must open the unified enV sign-in page directly.");
 
-const ios = requireText("apps/ios/enV/enVApp.swift", ['Button("Account")', 'Button("Wallet")', 'Section("PRODUCT")', 'Section("RESOURCES")'], "iOS overflow menu");
+const ios = requireText("apps/ios/enV/enVApp.swift", ['Button("Account")', 'Button("Wallet")', 'Section("PRODUCT")', 'Section("RESOURCES")', 'Button("Report bugs")', 'Button("Suggest a tool")'], "iOS overflow menu");
 const iosMenuStart = ios.indexOf("Menu {", ios.indexOf("ToolbarItemGroup(placement: .topBarTrailing)"));
 const iosMenuEnd = ios.indexOf("} label: {", iosMenuStart);
 const iosMenu = iosMenuStart >= 0 && iosMenuEnd > iosMenuStart ? ios.slice(iosMenuStart, iosMenuEnd) : "";
 for (const removed of ['Button("AI Agent")', 'Button("Sign in")', 'Button("Create account")', 'Button("Search tools")', 'Section("LEGAL")']) if (iosMenu.includes(removed)) errors.push(`iOS overflow menu still contains ${removed}`);
-const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Estimated tokens across enV tools"]);
+const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Estimated tokens across enV tools", 'case "report-bugs": NativeFeedbackRequestView(isBugReport: true)', 'case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)', 'private struct NativeFeedbackRequestView: View']);
 if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("iOS footer still renders the moved Product/Resources groups.");
 if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
 if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");

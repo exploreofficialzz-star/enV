@@ -8,6 +8,9 @@ const requiredFiles = [
   'src/routes/help.tsx',
   'src/routes/tokens.tsx',
   'src/routes/token-guide.tsx',
+  'src/routes/report-bugs.tsx',
+  'src/routes/suggest-tool.tsx',
+  'src/components/feedback/feedback-request-page.tsx',
   'src/routes/tokens.$toolId.tsx',
   'src/data/blog-articles.ts',
   'server/routes/api/billing/tool.get.ts',
@@ -30,7 +33,9 @@ const detail = read('src/routes/tokens.$toolId.tsx');
 const migration = read('migrations/0003_offline_wallet.sql');
 const security = read('docs/billing-offline-wallet-security.md');
 
-for (const path of ['/blog', '/help', '/token-guide']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
+for (const path of ['/blog', '/help', '/token-guide', '/report-bugs', '/suggest-tool']) assert.ok(header.includes(path), `overflow header menu is missing ${path}`);
+const feedbackRequest = read('src/components/feedback/feedback-request-page.tsx');
+assert.ok(feedbackRequest.includes('Report bugs') && feedbackRequest.includes('Suggest a tool') && feedbackRequest.includes('mailto:envtoolkit@gmail.com'), 'Bug-report and tool-suggestion pages must be actionable and prepare support email drafts.');
 for (const path of ['/blog', '/help', '/tokens']) assert.ok(!footer.includes(path), `compact footer must not duplicate navigation to ${path}`);
 for (const phrase of ['a-more-private-way-to-use-online-tools', 'how-env-tokens-are-designed-to-work', 'offline-tools-and-wallet-safety', 'designing-tools-that-feel-simple']) {
   assert.ok(articles.includes(phrase), `Missing required starter article: ${phrase}`);
