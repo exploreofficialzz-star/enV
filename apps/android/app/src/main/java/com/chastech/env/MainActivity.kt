@@ -1096,6 +1096,15 @@ private fun ToolDetail(
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             NativeToolGuideContent(tool)
+            TextButton(
+                onClick = {
+                    CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(
+                        context,
+                        Uri.parse("https://envtools.store/blog/tool-${tool.id}"),
+                    )
+                },
+                modifier = Modifier.padding(top = 8.dp),
+            ) { Text("Read the full guide") }
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
