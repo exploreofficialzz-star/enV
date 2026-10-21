@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   BookOpen,
+  Bug,
   Check,
   Coins,
   CreditCard,
@@ -11,6 +12,7 @@ import {
   Info,
   LayoutGrid,
   LifeBuoy,
+  Lightbulb,
   Mail,
   MessageCircle,
   Monitor,
@@ -41,6 +43,8 @@ const MENU_GROUPS = [
     { to: "/help", label: "Help center", icon: LifeBuoy },
     { to: "/blog", label: "Blog & guides", icon: BookOpen },
     { to: "/contact", label: "Contact", icon: Mail },
+    { to: "/report-bugs", label: "Report bugs", icon: Bug },
+    { to: "/suggest-tool", label: "Suggest a tool", icon: Lightbulb },
   ] },
 ] as const;
 
