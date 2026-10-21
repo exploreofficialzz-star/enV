@@ -511,7 +511,7 @@ extension Catalog {
         let slug = rawSlug.lowercased().replacingOccurrences(of: "^developer-", with: "", options: .regularExpression)
         let studio = developerStudio(for: slug)
         let selected: String
-        switch studio?.id {
+        switch studio?.id ?? "" {
         case "json-studio":
             if slug.hasPrefix("csv-") { selected = "csv" }
             else if slug.contains("diff") { selected = "diff" }
