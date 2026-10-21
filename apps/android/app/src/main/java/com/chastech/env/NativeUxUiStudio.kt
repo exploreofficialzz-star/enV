@@ -50,7 +50,11 @@ private data class UxUiNativeLayer(
     val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "",
     val fontFamily: String = "sans-serif", val fontSize: Int = 16, val fontWeight: Int = 400,
     val radius: Int = 12, val borderColor: String = "#E5E7EB", val borderWidth: Int = 0, val padding: Int = 12,
-    val marginTop: Int = 0, val marginRight: Int = 0, val marginBottom: Int = 0, val marginLeft: Int = 0
+    val marginTop: Int = 0, val marginRight: Int = 0, val marginBottom: Int = 0, val marginLeft: Int = 0,
+    val horizontalConstraint: String = "left", val verticalConstraint: String = "top",
+    val minWidth: Int = 0, val maxWidth: Int = 0, val visibleOn: String = "mobile,tablet,desktop",
+    val referenceWidth: Int = 390, val referenceHeight: Int = 844, val componentKey: String = "",
+    val iconViewBox: String = "0 0 24 24"
 )
 
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
@@ -116,6 +120,10 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
         put("fontFamily", element.fontFamily); put("fontSize", element.fontSize); put("fontWeight", element.fontWeight)
         put("radius", element.radius); put("borderColor", element.borderColor); put("borderWidth", element.borderWidth); put("padding", element.padding)
         put("marginTop", element.marginTop); put("marginRight", element.marginRight); put("marginBottom", element.marginBottom); put("marginLeft", element.marginLeft)
+        put("horizontalConstraint", element.horizontalConstraint); put("verticalConstraint", element.verticalConstraint)
+        put("minWidth", element.minWidth); put("maxWidth", element.maxWidth); put("visibleOn", element.visibleOn)
+        put("referenceWidth", element.referenceWidth); put("referenceHeight", element.referenceHeight); put("componentKey", element.componentKey)
+        put("iconViewBox", element.iconViewBox)
     }) }
 }
 
@@ -128,7 +136,11 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
             text=item.optString("text"),color=item.optString("color","#111827"),fill=item.optString("fill","transparent"),iconName=item.optString("iconName"),iconSvg=item.optString("iconSvg"),imageData=item.optString("imageData"),
             fontFamily=item.optString("fontFamily","sans-serif"),fontSize=item.optInt("fontSize",16).coerceAtLeast(1),fontWeight=item.optInt("fontWeight",400),
             radius=item.optInt("radius",12),borderColor=item.optString("borderColor","#E5E7EB"),borderWidth=item.optInt("borderWidth"),padding=item.optInt("padding",12),
-            marginTop=item.optInt("marginTop"),marginRight=item.optInt("marginRight"),marginBottom=item.optInt("marginBottom"),marginLeft=item.optInt("marginLeft")
+            marginTop=item.optInt("marginTop"),marginRight=item.optInt("marginRight"),marginBottom=item.optInt("marginBottom"),marginLeft=item.optInt("marginLeft"),
+            horizontalConstraint=item.optString("horizontalConstraint","left"),verticalConstraint=item.optString("verticalConstraint","top"),
+            minWidth=item.optInt("minWidth"),maxWidth=item.optInt("maxWidth"),visibleOn=item.optString("visibleOn","mobile,tablet,desktop"),
+            referenceWidth=item.optInt("referenceWidth",390),referenceHeight=item.optInt("referenceHeight",844),componentKey=item.optString("componentKey"),
+            iconViewBox=item.optString("iconViewBox","0 0 24 24")
         ))
     }
 }
@@ -144,6 +156,21 @@ private fun uxNativePreset(target: String, preset: String): List<UxUiNativeLayer
             el("email","input","Email field",28,270,334,48,"name@example.com","#64748B","#FFFFFF",14),
             el("password","input","Password field",28,338,334,48,"Enter your password","#64748B","#FFFFFF",14),
             el("button","button","Sign in",28,414,334,50,"Sign in","#FFFFFF","#2563EB",15,600)
+        )
+        "tablet-dashboard" -> listOf(
+            el("nav","navbar","Navigation",24,24,720,64,"enV                        Search                         Profile",fill="#FFFFFF",weight=600),
+            el("heading","text","Overview",32,112,680,42,"Overview",size=28,weight=700),
+            el("metric1","card","Monthly usage",32,180,215,130,"Monthly usage\\n12,840 events",fill="#FFFFFF",size=15,weight=600,radius=16),
+            el("metric2","card","Active projects",268,180,215,130,"Active projects\\n24 in progress",fill="#FFFFFF",size=15,weight=600,radius=16),
+            el("metric3","card","Completion rate",504,180,232,130,"Completion rate\\n86.4%",fill="#FFFFFF",size=15,weight=600,radius=16),
+            el("activity","card","Activity",32,334,450,300,"Recent activity\\n\\nYour timeline and data visualization.",fill="#FFFFFF",size=16,weight=600,radius=18),
+            el("actions","card","Quick actions",500,334,236,300,"Quick actions\\n\\nCreate project\\nReview activity",fill="#FFFFFF",size=15,weight=600,radius=18)
+        )
+        "tablet-settings" -> listOf(
+            el("nav","navbar","Navigation",24,24,720,64,"enV                         Settings                         Profile",fill="#FFFFFF",weight=600),
+            el("heading","text","Settings",32,112,680,42,"Settings",size=28,weight=700),
+            el("preferences","card","Preferences",32,176,215,420,"Preferences\\n\\nProfile\\nNotifications\\nAppearance\\nSecurity",fill="#FFFFFF",size=15,weight=600,radius=16),
+            el("details","card","Account preferences",268,176,468,420,"Account preferences\\n\\nManage personal details and app settings.",fill="#FFFFFF",size=15,weight=600,radius=16)
         )
         "desktop-dashboard" -> listOf(
             el("nav","navbar","Navigation",20,20,1396,66,"enV                           Search projects                         Help  Profile",fill="#FFFFFF",weight=600),
@@ -181,31 +208,51 @@ private fun uxNativePreset(target: String, preset: String): List<UxUiNativeLayer
     }
 }
 
-private fun uxNativePrompt(name:String,target:String,background:String,elements:List<UxUiNativeLayer>):String = buildString {
+private fun uxNativePrompt(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokenSpec:JSONObject=JSONObject(),breakpoints:JSONObject=JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024)):String = buildString {
     appendLine("Implement this interface faithfully; numeric values and named assets are authoritative.")
     appendLine("Project: "+name);appendLine("Target: "+target)
-    appendLine("Artboard: "+(if(target=="mobile")"390 x 844" else "1440 x 900")+" CSS pixels")
+    appendLine("Artboard: "+boardWidth+" x "+boardHeight+" CSS pixels")
+    appendLine("Responsive breakpoints: "+breakpoints.toString())
     appendLine("Canvas background: "+background)
+    appendLine("Design tokens: "+tokenSpec.toString())
     appendLine("Keep exact text, coordinates, dimensions, font, weight, colors, margins, padding, borders, radius, and icon IDs. Coordinates start at the artboard top-left.")
+    appendLine("Preserve per-layer horizontal/vertical constraints, min/max width, reference viewport and target visibility.")
     appendLine();appendLine("ELEMENT SPECIFICATIONS")
     elements.forEachIndexed { index,e ->
         appendLine((index+1).toString()+". "+e.name+" ["+e.kind+"]")
         appendLine("id="+e.id+"; x="+e.x+"px; y="+e.y+"px; width="+e.width+"px; height="+e.height+"px")
-        appendLine("text="+JSONObject.quote(e.text)+"; icon="+e.iconName+"; color="+e.color+"; fill="+e.fill)
+        appendLine("text="+JSONObject.quote(e.text)+"; icon="+e.iconName+"; iconViewBox="+e.iconViewBox+"; color="+e.color+"; fill="+e.fill)
         appendLine("font="+e.fontFamily+"; size="+e.fontSize+"px; weight="+e.fontWeight+"; radius="+e.radius+"px; border="+e.borderColor+" "+e.borderWidth+"px")
         appendLine("padding="+e.padding+"px; margins top/right/bottom/left="+e.marginTop+"/"+e.marginRight+"/"+e.marginBottom+"/"+e.marginLeft+"px")
+        appendLine("constraints horizontal="+e.horizontalConstraint+"; vertical="+e.verticalConstraint+"; minWidth="+e.minWidth+"; maxWidth="+e.maxWidth+"; visibleOn="+e.visibleOn+"; referenceViewport="+e.referenceWidth+"x"+e.referenceHeight+"; componentKey="+e.componentKey)
     }
     appendLine();appendLine("Acceptance: match the reference viewport; do not replace exact measurements or icons with generic alternatives.")
 }
 
-private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>):String =
-    JSONObject().put("schemaVersion",1).put("name",name).put("target",target).put("background",background)
-        .put("viewport",JSONObject().put("width",if(target=="mobile")390 else 1440).put("height",if(target=="mobile")844 else 900))
-        .put("elements",uxNativeJson(elements)).put("aiPrompt",uxNativePrompt(name,target,background,elements))
+private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray()):String {
+    val breakpoints=JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024)
+    val normalized=JSONArray().apply {
+        elements.forEach { item ->
+            val json=uxNativeJson(listOf(item)).optJSONObject(0) ?: JSONObject()
+            json.put("background",item.fill)
+            json.put("imageDataUrl",item.imageData)
+            json.put("schemaElementVersion",2)
+            put(json)
+        }
+    }
+    return JSONObject().put("schemaVersion",2).put("name",name).put("target",target).put("background",background)
+        .put("viewport",JSONObject().put("width",boardWidth).put("height",boardHeight))
+        .put("breakpoints",breakpoints).put("tokens",tokens).put("reusableComponents",reusable)
+        .put("elements",normalized).put("aiPrompt",uxNativePrompt(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
+        .put("generatedCode",JSONObject()
+            .put("html",uxNativeGenerateHtml(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
+            .put("kotlin",uxNativeGenerateKotlin(name,target,background,elements,boardWidth,boardHeight))
+            .put("swift",uxNativeGenerateSwift(name,target,background,elements,boardWidth,boardHeight)))
         .put("updatedAt",System.currentTimeMillis()).toString(2)
+}
 
 private object UxUiNativePdf {
-    fun build(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,spec:String):ByteArray {
+    fun build(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,spec:String,artboardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,artboardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900):ByteArray {
         val pdf=PdfDocument();val pageW=595;val pageH=842
         val body=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(38,43,51);textSize=9f;typeface=Typeface.create("sans-serif",Typeface.NORMAL)}
         val title=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(37,99,235);textSize=12f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)}
@@ -213,8 +260,8 @@ private object UxUiNativePdf {
         try {
             val first=makePage(1);val canvas=first.canvas
             canvas.drawText("enV UX/UI STUDIO",32f,34f,title);canvas.drawText(name.take(70),32f,60f,Paint(title).apply{textSize=18f})
-            canvas.drawText(target.uppercase()+" | "+(if(target=="mobile")"390 x 844" else "1440 x 900")+" px | "+elements.size+" layers",32f,80f,body)
-            val bw=if(target=="mobile")390f else 1440f;val bh=if(target=="mobile")844f else 900f;val scale=min(531f/bw,690f/bh)
+            canvas.drawText(target.uppercase()+" | "+artboardWidth+" x "+artboardHeight+" px | "+elements.size+" layers",32f,80f,body)
+            val bw=artboardWidth.toFloat();val bh=artboardHeight.toFloat();val scale=min(531f/bw,690f/bh)
             canvas.save();canvas.translate((pageW-bw*scale)/2f,110f);canvas.scale(scale,scale)
             canvas.drawColor(runCatching{android.graphics.Color.parseColor(background)}.getOrDefault(android.graphics.Color.WHITE))
             elements.forEach { e ->
@@ -263,17 +310,32 @@ fun NativeUxUiStudioForm() {
     val scope=rememberCoroutineScope()
     var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
+    var customArtboard by remember{mutableStateOf(false)};var customWidth by remember{mutableIntStateOf(390)};var customHeight by remember{mutableIntStateOf(844)}
+    var tokenNameDraft by remember{mutableStateOf("brand")};var tokenValueDraft by remember{mutableStateOf("#2563EB")}
+    val colorTokens=remember{mutableStateListOf<Pair<String,String>>("primary" to "#2563EB","surface" to "#FFFFFF","text" to "#111827","muted" to "#64748B","border" to "#E5E7EB")}
+    val spacingTokens=remember{mutableStateListOf(4,8,12,16,24,32,48)}
+    val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
     var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
-    val selected=elements.firstOrNull{it.id==selectedId};val bw=if(target=="mobile")390 else 1440;val bh=if(target=="mobile")844 else 900
-    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName}
+    var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
+    val selected=elements.firstOrNull{it.id==selectedId}
+    val presetWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
+    val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
+    val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
+    val tokenJson=remember(colorTokens.toList(),spacingTokens.toList()){JSONObject().put("colors",JSONArray().apply{colorTokens.forEach{(name,value)->put(JSONObject().put("name",name).put("value",value))}}).put("spacing",JSONArray().apply{spacingTokens.forEach{put(it)}}).put("typography",JSONArray().apply{put(JSONObject().put("name","heading").put("fontFamily","sans-serif").put("fontSize",24).put("fontWeight",700).put("lineHeight",1.2));put(JSONObject().put("name","body").put("fontFamily","sans-serif").put("fontSize",16).put("fontWeight",400).put("lineHeight",1.5))})}
+    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.horizontalConstraint+":"+it.verticalConstraint}
+    val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
-    LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
-    LaunchedEffect(projectName,target,background,signature,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements)).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
+    val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
+    LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);customWidth=p.optJSONObject("viewport")?.optInt("width",customWidth)?:customWidth;customHeight=p.optJSONObject("viewport")?.optInt("height",customHeight)?:customHeight;customArtboard=true
+            colorTokens.clear();val savedColors=p.optJSONObject("tokens")?.optJSONArray("colors");if(savedColors!=null){for(index in 0 until savedColors.length()){val t=savedColors.optJSONObject(index)?:continue;colorTokens.add(t.optString("name") to t.optString("value","#2563EB"))}}
+            spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
+            elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
+    LaunchedEffect(projectName,target,background,signature,tokenSignature,bw,bh,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
@@ -542,8 +604,8 @@ fun NativeUxUiStudioForm() {
                 Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Export and handoff",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     OutlinedTextField(background,{background=it},label={Text("Canvas background hex")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements);jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export project JSON + AI prompt")}
-                    Button(onClick={pdfBytes=UxUiNativePdf.build(projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements));pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
+                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}});jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export project JSON + AI prompt")}
+                    Button(onClick={pdfBytes=UxUiNativePdf.build(projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}}),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
                 }}
             }
             if(notice.isNotBlank())Text(notice,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
