@@ -7050,6 +7050,9 @@ private struct NativeUxUiStudioView: View {
                         Button { startDesign("mobile", preset: "mobile-dashboard") } label: {
                             labelForChoice("Mobile interface", subtitle: "390 × 844 px · app screens", icon: "iphone")
                         }.buttonStyle(.plain)
+                        Button { startDesign("tablet", preset: "tablet-dashboard") } label: {
+                            labelForChoice("Tablet interface", subtitle: "768 × 1024 px · tablet layouts", icon: "ipad")
+                        }.buttonStyle(.plain)
                         Button { startDesign("desktop", preset: "desktop-landing") } label: {
                             labelForChoice("Desktop website", subtitle: "1440 × 900 px · website layouts", icon: "laptopcomputer")
                         }.buttonStyle(.plain)
@@ -7148,15 +7151,26 @@ private struct NativeUxUiStudioView: View {
                 .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
             HStack(spacing: 8) {
                 targetButton("Mobile", icon: "iphone", value: "mobile")
+                targetButton("Tablet", icon: "ipad", value: "tablet")
                 targetButton("Desktop", icon: "laptopcomputer", value: "desktop")
                 Button("Workflow") { onboarding = true }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
             }
             Text("ARTBOARD  ·  \(boardWidth) × \(boardHeight) px  ·  \(elements.count) layers")
                 .font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                Toggle("Custom artboard", isOn: $customArtboard).labelsHidden()
+                Text("Custom").font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                inspectorNumber("Width px", value: $customWidth)
+                inspectorNumber("Height px", value: $customHeight)
+            }
+            .onChange(of: customWidth) { customWidth = min(4096, max(160, $0)) }
+            .onChange(of: customHeight) { customHeight = min(4096, max(240, $0)) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     presetButton("Mobile dashboard", target: "mobile", preset: "mobile-dashboard")
                     presetButton("Mobile login", target: "mobile", preset: "mobile-login")
+                    presetButton("Tablet dashboard", target: "tablet", preset: "tablet-dashboard")
+                    presetButton("Tablet settings", target: "tablet", preset: "tablet-settings")
                     presetButton("Website landing", target: "desktop", preset: "desktop-landing")
                     presetButton("Desktop dashboard", target: "desktop", preset: "desktop-dashboard")
                     presetButton("Desktop settings", target: "desktop", preset: "desktop-settings")
@@ -7295,7 +7309,10 @@ private struct NativeUxUiStudioView: View {
     private func targetButton(_ label: String, icon: String, value: String) -> some View {
         Button {
             target = value
-            notice = "Viewport set to \(value == "mobile" ? "390 × 844" : "1440 × 900") px. Review spacing at the selected size."
+            customArtboard = false
+            customWidth = value == "mobile" ? 390 : value == "tablet" ? 768 : 1440
+            customHeight = value == "mobile" ? 844 : value == "tablet" ? 1024 : 900
+            notice = "Viewport set to \(value == "mobile" ? "390 × 844" : value == "tablet" ? "768 × 1024" : "1440 × 900") px. Review spacing at the selected size."
         } label: {
             HStack(spacing: 5) { Image(systemName: icon); Text(label) }
                 .font(.envScaled(size: 12, weight: .semibold)).padding(.horizontal, 11).padding(.vertical, 9)
@@ -7509,6 +7526,19 @@ private struct NativeUxUiStudioView: View {
                     item("input", "Email field", 28, 270, 334, 48, "name@example.com", color: "#64748B", fill: "#FFFFFF", size: 14),
                     item("input", "Password field", 28, 338, 334, 48, "Enter your password", color: "#64748B", fill: "#FFFFFF", size: 14),
                     item("button", "Sign in", 28, 414, 334, 50, "Sign in", color: "#FFFFFF", fill: "#2563EB", size: 15, weight: 600)]
+        case "tablet-dashboard":
+            return [item("navbar", "Navigation", 24, 24, 720, 64, "enV                         Search                         Profile", fill: "#FFFFFF", weight: 600),
+                    item("text", "Overview", 32, 112, 680, 42, "Overview", size: 28, weight: 700),
+                    item("card", "Monthly usage", 32, 180, 215, 130, "Monthly usage\n12,840 events", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("card", "Active projects", 268, 180, 215, 130, "Active projects\n24 in progress", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("card", "Completion rate", 504, 180, 232, 130, "Completion rate\n86.4%", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("card", "Recent activity", 32, 334, 450, 300, "Recent activity\n\nYour timeline and data visualization.", fill: "#FFFFFF", weight: 600, radius: 18),
+                    item("card", "Quick actions", 500, 334, 236, 300, "Quick actions\n\nCreate project\nReview activity", fill: "#FFFFFF", weight: 600, radius: 18)]
+        case "tablet-settings":
+            return [item("navbar", "Navigation", 24, 24, 720, 64, "enV                         Settings                         Profile", fill: "#FFFFFF", weight: 600),
+                    item("text", "Settings", 32, 112, 680, 42, "Settings", size: 28, weight: 700),
+                    item("card", "Preferences", 32, 176, 215, 420, "Preferences\n\nProfile\nNotifications\nAppearance\nSecurity", fill: "#FFFFFF", weight: 600, radius: 16),
+                    item("card", "Account preferences", 268, 176, 468, 420, "Account preferences\n\nManage personal details and app settings.", fill: "#FFFFFF", weight: 600, radius: 18)]
         case "desktop-dashboard":
             return [item("navbar", "Navigation", 20, 20, 1396, 66, "enV                         Search projects                         Help   Profile", fill: "#FFFFFF", weight: 600),
                     item("text", "Overview", 60, 118, 700, 42, "Overview", size: 30, weight: 700),
@@ -7597,13 +7627,8 @@ private struct NativeUxUiStudioView: View {
 
     private func saveDraft() {
         guard !onboarding, !elements.isEmpty else { return }
-        let project = UxUiNativeProject(name: projectName, target: target, background: background,
-                                        viewport: UxUiViewport(width: boardWidth, height: boardHeight),
-                                        elements: elements, aiPrompt: aiPrompt, updatedAt: ISO8601DateFormatter().string(from: Date()))
-        if let data = try? JSONEncoder().encode(project) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-            hasSavedDraft = true
-        }
+        UserDefaults.standard.set(projectJSON, forKey: storageKey)
+        hasSavedDraft = true
     }
 
     private func restoreDraft() {
@@ -7612,6 +7637,9 @@ private struct NativeUxUiStudioView: View {
             notice = "No valid local draft was found."; return
         }
         projectName = project.name; target = project.target; background = project.background
+        customWidth = project.viewport.width; customHeight = project.viewport.height; customArtboard = true
+        tokens = project.tokens ?? UxUiNativeTokens()
+        reusableComponents = project.reusableComponents ?? []
         elements = project.elements; selectedID = elements.first?.id; onboarding = false
         notice = "Local design restored."
     }
