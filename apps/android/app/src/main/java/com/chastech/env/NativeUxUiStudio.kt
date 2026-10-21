@@ -348,10 +348,10 @@ fun NativeUxUiStudioForm() {
         if(query.isBlank()){notice="Enter a term to search the icon catalogue.";return}
         scope.launch {
             iconBusy=true
+            val append=loadMore&&query==iconLoadedQuery
+            val offset=if(append)iconStart else 0
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val append=loadMore&&query==iconLoadedQuery
-                    val offset=if(append)iconStart else 0
                     val q=URLEncoder.encode(query,"UTF-8")
                     val payload=JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24&start="+offset).readText())
                     val icons=payload.optJSONArray("icons")?.let{arr->(0 until arr.length()).map{arr.optString(it)}}?:emptyList()
