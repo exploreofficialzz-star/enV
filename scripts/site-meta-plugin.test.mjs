@@ -259,8 +259,8 @@ test("site metadata plugin exposes identity and preserves share metadata", () =>
   const plugin = siteMetaPlugin();
   plugin.configResolved({ root });
   assert.equal(plugin.name, "env:site-meta");
-  assert.equal(plugin.resolveId(SITE_IDENTITY_ID), `\\0${SITE_IDENTITY_ID}`);
-  assert.match(plugin.load(`\\0${SITE_IDENTITY_ID}`), /siteIdentity/);
+  assert.equal(plugin.resolveId(SITE_IDENTITY_ID), "\0" + SITE_IDENTITY_ID);
+  assert.match(plugin.load("\0" + SITE_IDENTITY_ID), /siteIdentity/);
   assert.equal(isDocumentPath("/tools/color-picker"), true);
   assert.equal(isDocumentPath("/api/auth/session"), false);
   const transformed = plugin.transformIndexHtml("<html><head></head><body></body></html>");

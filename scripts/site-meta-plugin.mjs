@@ -49,9 +49,9 @@ export function siteMetaPlugin() {
   return {
     name: "env:site-meta",
     configResolved(config) { root = config.root; },
-    resolveId(id) { if (id === SITE_IDENTITY_ID) return \`\0\${SITE_IDENTITY_ID}\`; },
+    resolveId(id) { if (id === SITE_IDENTITY_ID) return "\0" + SITE_IDENTITY_ID; },
     load(id) {
-      if (id === \`\0\${SITE_IDENTITY_ID}\`) return \`export const siteIdentity = \${JSON.stringify(snapshotOgIdentity(root))};\`;
+      if (id === "\0" + SITE_IDENTITY_ID) return "export const siteIdentity = " + JSON.stringify(snapshotOgIdentity(root)) + ";";
     },
     transformIndexHtml(html) { return injectSiteMetadata(html, { host: process.env.VITE_PUBLIC_HOSTNAME ?? "", cwd: root }); },
     configureServer(server) { wrapHtmlResponses(server.middlewares, root); },
