@@ -188,22 +188,13 @@ try {
   assert.equal(await directArticlePage.getByText(/\b\d+\s*min(?:ute)?s?\s+read\b/i).count(), 0, "Article detail pages must not show estimated reading time.");
   await directArticlePage.close();
 
-  const articleResponsePromise = page.waitForResponse(
-    (response) => {
-      const responseUrl = new URL(response.url());
-      return response.request().isNavigationRequest()
-        && responseUrl.origin === articleUrl.origin
-        && responseUrl.pathname === articleUrl.pathname;
-    },
-    { timeout: 20_000 },
-  );
+  // This is a client-side route, so verify the URL change rather than requiring a document-navigation response.
   const articleUrlPromise = page.waitForURL(
     (url) => url.origin === articleUrl.origin && url.pathname === articleUrl.pathname,
     { timeout: 20_000 },
   );
   await articleLink.click();
-  const [articleResponse] = await Promise.all([articleResponsePromise, articleUrlPromise]);
-  assert.equal(articleResponse.status(), 200, `The article action must return HTTP 200: ${articleHref}`);
+  await articleUrlPromise;
   await page.getByRole("heading", {
     name: "A privacy-first approach to everyday online tools",
     exact: true,
