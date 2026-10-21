@@ -661,7 +661,11 @@ struct CategoryView: View {
     @EnvironmentObject private var store: CatalogStore
     @State private var visibleCount = 6
     let categoryID: String
-    private var categoryTools: [Tool] { store.tools(category: categoryID) }
+    // The Developer category is a Studio directory; legacy records remain in global search.
+    private var categoryTools: [Tool] {
+        let tools = store.tools(category: categoryID)
+        return categoryID == "developer" ? tools.filter { $0.tags.contains("developer-studio") } : tools
+    }
 
     var body: some View {
         ScrollView {
