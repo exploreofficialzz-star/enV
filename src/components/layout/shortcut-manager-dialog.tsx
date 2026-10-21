@@ -5,8 +5,8 @@ type PageShortcut = { title: string; href: string };
 
 /** Build the shortcut from the page the user is already viewing. */
 function getCurrentPageShortcut(pathname: string): PageShortcut {
-  const cleanPath = pathname.replace(/\\/+$/, "") || "/";
-  const toolMatch = cleanPath.match(/^\\/tools\\/([^/]+)\\/([^/]+)$/);
+  const cleanPath = pathname.replace(/\/+$/, "") || "/";
+  const toolMatch = cleanPath.match(/^\/tools\/([^/]+)\/([^/]+)$/);
   if (toolMatch) {
     const tool = getToolByPath(toolMatch[1], toolMatch[2]);
     if (tool) return { title: tool.name, href: toolPath(tool) };
@@ -20,7 +20,7 @@ function getCurrentPageShortcut(pathname: string): PageShortcut {
   const lastPart = cleanPath.split("/").filter(Boolean).pop() ?? "Home";
   const title = usableDocumentTitle
     ? documentTitle
-    : lastPart.replace(/[-_]/g, " ").replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+    : lastPart.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   return { title: title || "enV", href };
 }
 

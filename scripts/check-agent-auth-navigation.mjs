@@ -30,7 +30,7 @@ if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes(
 if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes("gap-0") || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-0"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must be grouped directly beside their labels, with the selected-state indicator aligned separately.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Add to phone home screen", "Settings", "Help & feedback"]) {
+for (const item of ["Mobile view", "Tablet view", "Desktop view", "Install or create shortcut", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
 const shortcutAction = requireText("src/components/layout/shortcut-manager-dialog.tsx", [
