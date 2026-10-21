@@ -176,7 +176,7 @@ const toolShell = requireText("src/components/tools/tool-shell.tsx", [
   "section.steps?.length",
   "section.bullets?.length",
 ], "Embedded tool guide");
-if (toolShell.includes("href={toolDocumentationPath(tool)}") || toolShell.includes("Read the full guide")) errors.push("Tool detail pages must embed the full guide instead of linking away from the tool.");
+if (!toolShell.includes("getToolDocumentation(tool)") || !toolShell.includes("href={toolDocumentationPath(tool)}") || !toolShell.includes("Read the full guide")) errors.push("Tool detail pages must embed the full guide and keep the separate guide link after the tool description.");
 
 if (errors.length) { console.error(`Account/Wallet navigation audit failed with ${errors.length} error(s):`); for (const error of errors) console.error(`- ${error}`); process.exit(1); }
 console.log("Account/Wallet navigation audit passed: Product/Resources groups, separate Wallet page, direct shared Account sign-in, password controls, Google/Apple actions, token guide, and Legal footer are present.");

@@ -20,7 +20,7 @@ function TokenGuide() {
     <AppShell>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="max-w-4xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted"><Coins size={14} aria-hidden="true" /> Platform-wide token documentation</div>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted"><Coins size={14} aria-hidden="true" /> Token guide · platform-wide documentation</div>
           <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">Estimated token guide for every enV tool</h1>
           <p className="mt-4 text-base leading-7 text-muted">Use this document to understand how every catalogue tool is classified for token estimation, which usage unit applies, where a numeric rate is provisional or unavailable, and what must be measured before a price can be confirmed. For actual account usage recorded by tool, open the token dashboard using the token button on the home page.</p>
         </header>
