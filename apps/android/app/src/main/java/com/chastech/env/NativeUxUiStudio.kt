@@ -51,13 +51,15 @@ private data class UxUiNativeLayer(
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
 
-private fun uxNativeSafeIconSvg(svg: String, color: String): String {
-    val safeColor = if (Regex("^#[0-9A-Fa-f]{3,8}$").matches(color)) color else "#111827"
-    return svg
+private fun uxNativeCleanIconSvg(svg: String): String =
+    svg
         .replace(Regex("(?is)<script\\b[^>]*>.*?</script\\s*>"), "")
         .replace(Regex("(?is)<foreignObject\\b[^>]*>.*?</foreignObject\\s*>"), "")
         .replace(Regex("(?i)\\s+on[a-z]+\\s*=\\s*(['\\\"]).*?\\1"), "")
-        .replace(Regex("(?i)currentColor"), safeColor)
+
+private fun uxNativeSafeIconSvg(svg: String, color: String): String {
+    val safeColor = if (Regex("^#[0-9A-Fa-f]{3,8}$").matches(color)) color else "#111827"
+    return uxNativeCleanIconSvg(svg).replace(Regex("(?i)currentColor"), safeColor)
 }
 
 private fun uxNativeIconHtml(svg: String, color: String): String =
@@ -74,19 +76,22 @@ private fun uxNativeDrawSvgIcon(canvas: android.graphics.Canvas, element: UxUiNa
     val vw = (viewBox?.getOrNull(2) ?: 24f).takeIf { it > 0f } ?: 24f
     val vh = (viewBox?.getOrNull(3) ?: 24f).takeIf { it > 0f } ?: 24f
     val pathData = Regex("(?is)<path\\b([^>]*)>").findAll(element.iconSvg).mapNotNull { match ->
-        Regex("(?is)\\bd\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]")
-            .find(match.groupValues[1])?.groupValues?.getOrNull(1)
+        val attributes = match.groupValues[1]
+        val d = Regex("(?is)\\bd\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]").find(attributes)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
+        val fill = Regex("(?is)\\bfill\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]").find(attributes)?.groupValues?.getOrNull(1).orEmpty()
+        d to fill
     }.toList()
     if (pathData.isEmpty()) return
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = runCatching { android.graphics.Color.parseColor(element.color) }.getOrDefault(android.graphics.Color.BLACK)
-    }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     canvas.save()
     canvas.translate(element.x.toFloat(), element.y.toFloat())
     canvas.scale(element.width.toFloat() / vw, element.height.toFloat() / vh)
     canvas.translate(-vx, -vy)
-    pathData.forEach { d ->
+    pathData.forEach { (d, svgFill) ->
+        if (svgFill.equals("none", ignoreCase=true)) return@forEach
+        val fill = if (svgFill.isBlank() || svgFill.equals("currentColor", ignoreCase=true)) element.color else svgFill
+        paint.color = runCatching { android.graphics.Color.parseColor(fill) }
+            .getOrDefault(runCatching { android.graphics.Color.parseColor(element.color) }.getOrDefault(android.graphics.Color.BLACK))
         runCatching { PathParser.createPathFromPathData(d) }.getOrNull()?.let { path -> canvas.drawPath(path, paint) }
     }
     canvas.restore()
@@ -291,7 +296,7 @@ fun NativeUxUiStudioForm() {
                     svg
                 }
             }.onSuccess { svg ->
-                edit(layerId){it.copy(iconName=icon,name=icon,iconSvg=uxNativeSafeIconSvg(svg,it.color))}
+                edit(layerId){it.copy(iconName=icon,name=icon,iconSvg=uxNativeCleanIconSvg(svg))}
                 notice="Loaded actual SVG artwork for "+icon+". Check its source licence before shipping."
             }.onFailure { notice=it.message ?: "Could not load selected icon artwork." }
             iconBusy=false

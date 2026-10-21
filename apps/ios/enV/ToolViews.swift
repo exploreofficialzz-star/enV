@@ -6695,13 +6695,16 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
 }
 
 
-private func uxUiSanitizeIconSVG(_ svg: String, tint: String) -> String {
-    let safeTint = tint.range(of: #"^#[0-9A-Fa-f]{3,8}$"#, options: .regularExpression) != nil ? tint : "#111827"
+private func uxUiCleanIconSVG(_ svg: String) -> String {
     return svg
         .replacingOccurrences(of: #"(?is)<script\b[^>]*>.*?</script\s*>"#, with: "", options: .regularExpression)
         .replacingOccurrences(of: #"(?is)<foreignObject\b[^>]*>.*?</foreignObject\s*>"#, with: "", options: .regularExpression)
         .replacingOccurrences(of: #"(?i)\s+on[a-z]+\s*=\s*(['"]).*?\1"#, with: "", options: .regularExpression)
-        .replacingOccurrences(of: "currentColor", with: safeTint, options: .caseInsensitive)
+}
+
+private func uxUiSanitizeIconSVG(_ svg: String, tint: String) -> String {
+    let safeTint = tint.range(of: #"^#[0-9A-Fa-f]{3,8}$"#, options: .regularExpression) != nil ? tint : "#111827"
+    return uxUiCleanIconSVG(svg).replacingOccurrences(of: "currentColor", with: safeTint, options: .caseInsensitive)
 }
 
 private struct UxUiNativeSVGIcon: UIViewRepresentable {
@@ -6731,6 +6734,39 @@ private struct UxUiNativeSVGIcon: UIViewRepresentable {
 
     final class Coordinator {
         var lastHTML = ""
+    }
+}
+
+
+private final class UxUiIconSnapshotWebView: WKWebView {
+    var iconSnapshotDelegate: UxUiIconSnapshotDelegate?
+}
+
+private final class UxUiIconSnapshotDelegate: NSObject, WKNavigationDelegate {
+    private var completion: ((UIImage?) -> Void)?
+    weak var owner: UxUiIconSnapshotWebView?
+
+    init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        webView.takeSnapshot(with: nil) { image, error in
+            self.finish(error == nil ? image : nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(nil)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(nil)
+    }
+
+    private func finish(_ image: UIImage?) {
+        guard let callback = completion else { return }
+        completion = nil
+        owner?.iconSnapshotDelegate = nil
+        callback(image)
     }
 }
 
@@ -7326,7 +7362,7 @@ private struct NativeUxUiStudioView: View {
                     if let index = elements.firstIndex(where: { $0.id == layerID }) {
                         elements[index].iconName = iconName
                         elements[index].name = iconName
-                        elements[index].iconSvg = uxUiSanitizeIconSVG(sourceSVG, tint: elements[index].color)
+                        elements[index].iconSvg = uxUiCleanIconSVG(sourceSVG)
                     }
                     notice = "Loaded actual SVG artwork for \(iconName). Check the source collection licence before shipping."
                     isSearchingIcons = false
@@ -7346,11 +7382,40 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func exportPDF() {
-        pdfDocument = UxUiStudioExport(data: makePDF())
-        isExportingPDF = true
+        Task { @MainActor in
+            var iconImages: [UUID: UIImage] = [:]
+            for item in elements where item.kind == "icon" {
+                guard let svg = item.iconSvg, !svg.isEmpty else { continue }
+                let keySize = CGSize(width: max(1, item.width), height: max(1, item.height))
+                if let image = await renderIconSnapshot(svg: svg, tint: item.color, size: keySize) {
+                    iconImages[item.id] = image
+                }
+            }
+            pdfDocument = UxUiStudioExport(data: makePDF(iconImages: iconImages))
+            isExportingPDF = true
+        }
     }
 
-    private func makePDF() -> Data {
+    private func renderIconSnapshot(svg: String, tint: String, size: CGSize) async -> UIImage? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
+            let view = UxUiIconSnapshotWebView(frame: CGRect(origin: .zero, size: size))
+            view.isOpaque = false
+            view.backgroundColor = .clear
+            view.scrollView.backgroundColor = .clear
+            view.scrollView.isScrollEnabled = false
+            view.isUserInteractionEnabled = false
+            view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+            let delegate = UxUiIconSnapshotDelegate { image in continuation.resume(returning: image) }
+            delegate.owner = view
+            view.iconSnapshotDelegate = delegate
+            view.navigationDelegate = delegate
+            let safeSVG = uxUiSanitizeIconSVG(svg, tint: tint)
+            let html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1\"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}</style></head><body>" + safeSVG + "</body></html>"
+            view.loadHTMLString(html, baseURL: nil)
+        }
+    }
+
+    private func makePDF(iconImages: [UUID: UIImage]) -> Data {
         let pageBounds = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
         return renderer.pdfData { context in
@@ -7375,8 +7440,12 @@ private struct NativeUxUiStudioView: View {
                 if item.borderWidth > 0 { uxUiPlatformColor(item.borderColor).setStroke(); path.lineWidth = CGFloat(item.borderWidth); path.stroke() }
                 let font = UIFont(name: item.fontFamily, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: uxUiPlatformColor(item.color)]
-                let content = item.kind == "icon" ? item.iconName : item.text
-                content.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)), withAttributes: attributes)
+                if item.kind == "icon", let image = iconImages[item.id] {
+                    image.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)))
+                } else {
+                    let content = item.kind == "icon" ? item.iconName : item.text
+                    content.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)), withAttributes: attributes)
+                }
             }
             context.cgContext.restoreGState()
             "Visual interface preview rendered from the design layers.".draw(at: CGPoint(x: 32, y: 817), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.secondaryLabel])
