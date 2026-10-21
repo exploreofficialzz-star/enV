@@ -204,7 +204,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     "struct GeneratedHTMLAsset: UIViewRepresentable {",
     "  let markup: String",
     "  func makeUIView(context: Context) -> WKWebView { let view = WKWebView(); view.isOpaque = false; view.backgroundColor = .clear; view.scrollView.isScrollEnabled = false; return view }",
-    '  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString("<html><body style=\\'margin:0\\'>" + markup + "</body></html>", baseURL: nil) }',
+    '  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString("<html><body style=\'margin:0\'>" + markup + "</body></html>", baseURL: nil) }',
     "}",
     "extension Color {",
     '  init(hex: String) { let value = UInt64(hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted), radix: 16) ?? 0; self.init(.sRGB, red: Double((value >> 16) & 255)/255, green: Double((value >> 8) & 255)/255, blue: Double(value & 255)/255, opacity: 1) }',
