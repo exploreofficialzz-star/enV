@@ -45,6 +45,7 @@ const localNetworkRoute = await read("server/routes/api/backend/network.post.ts"
 const localMockupRoute = await read("server/routes/api/backend/mockups.post.ts");
 const localTemplateRoute = await read("server/routes/api/backend/tool.post.ts");
 const toolShell = await read("src/components/tools/tool-shell.tsx");
+const tokenGuidePage = await read("src/routes/tokens.guide.tsx");
 const profilesText = await read("src/data/billing-profiles.json");
 const profileIndexText = await read("src/data/billing-profile-index.json");
 const nativeInventoryText = await read("apps/shared/native-engine-inventory.json");
@@ -104,7 +105,16 @@ assert.match(toolShell, /getToolDocumentation\(tool\)/, "tool detail screens mus
 assert.match(toolShell, /What this tool does/, "the embedded guide must be grouped under the tool purpose heading");
 assert.match(toolShell, /section\.steps\?\.length/, "the embedded guide must render procedural steps");
 assert.match(toolShell, /section\.bullets\?\.length/, "the embedded guide must render full guide lists");
-assert.match(toolShell, /href=\{toolDocumentationPath\(tool\)\}[\s\S]*?Read the full guide/, "the full-guide link must remain after the inline documentation");
+assert.match(toolShell, /href=\{toolDocumentationPath\(tool\)\}[\s\S]*?Read the full guide/, "the full-guide link must remain beside the tool purpose");
+assert.ok(toolShell.indexOf("Read the full guide") > toolShell.indexOf("{tool.description}") && toolShell.indexOf("Read the full guide") < toolShell.indexOf("documentation.map"), "the link must follow the tool description and precede the inline full guide");
+assert.match(androidToolScreens, /padding\(start = if \(compact\) 56\.dp else 0\.dp\)/, "Android mobile descriptions should align beneath the tool title");
+assert.match(iosToolScreens, /\.padding\(\.leading, compact \? 56 : 0\)/, "iOS mobile descriptions should align beneath the tool title");
+assert.match(androidPricing, /NativeGuideSection\("Limitations and responsible use"/, "Android tool guide must disclose limitations and responsible-use guidance");
+assert.match(iosPricing, /NativeToolGuideSectionView\(heading: "Limitations and responsible use"/, "iOS tool guide must disclose limitations and responsible-use guidance");
+assert.match(tokenGuidePage, /Estimated token guide for every enV tool/, "the overflow Token guide must identify itself as platform-wide documentation");
+assert.match(tokenGuidePage, /Number\.MAX_SAFE_INTEGER/, "token guide search must cover the full catalogue");
+assert.match(tokenGuidePage, /Show more tools \(/, "token guide must allow users to browse beyond the first results");
+assert.match(tokenGuidePage, /token button on the home page/, "guide must direct account-usage reviews to the Home token button");
 assert.equal(profiles.toolCount, 10_025, "full catalogue must be profiled");
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
 assert.equal(new Set(profiles.profiles.map((profile) => profile.toolId)).size, profiles.toolCount, "tool billing profiles must have unique IDs");
