@@ -7065,10 +7065,10 @@ private func uxUiGenerateKotlin(name: String, target: String, background: String
         lines.append("      if (listOf(\(visible)).contains(target)) Box(Modifier.offset(x=(\(x)).dp,y=(\(y)).dp).size(width=(\(w)).dp,height=(\(heightCode)).dp).background(Color(android.graphics.Color.parseColor(\(uxUiSourceString(fill)))),RoundedCornerShape(\(layer.radius).dp)).padding(\(layer.padding).dp)) {")
         if layer.kind == "icon", let svg = layer.iconSvg {
             let html = "<html><body style='margin:0'>\(svg)</body></html>"
-            lines.append("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,\(uxUiSourceString(html)),\\"text/html\\",\\"UTF-8\\",null) } },modifier=Modifier.fillMaxSize())")
+            lines.append("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,\(uxUiSourceString(html)),\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
         } else if layer.kind == "image", let data = layer.imageData {
             let html = "<html><body style='margin:0'><img style='width:100%;height:100%;object-fit:cover' src='\(data)'></body></html>"
-            lines.append("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,\(uxUiSourceString(html)),\\"text/html\\",\\"UTF-8\\",null) } },modifier=Modifier.fillMaxSize())")
+            lines.append("        AndroidView(factory={ context -> WebView(context).apply { settings.javaScriptEnabled=false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null,\(uxUiSourceString(html)),\"text/html\",\"UTF-8\",null) } },modifier=Modifier.fillMaxSize())")
         } else {
             lines.append("        Text(\(uxUiSourceString(layer.text)),color=Color(android.graphics.Color.parseColor(\(uxUiSourceString(layer.color)))),fontSize=\(layer.fontSize).sp,fontWeight=FontWeight(\(layer.fontWeight)),modifier=Modifier.fillMaxSize())")
         }
@@ -7087,7 +7087,7 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
         "struct EnVStudioHTMLAsset: UIViewRepresentable {",
         "  let markup: String",
         "  func makeUIView(context: Context) -> WKWebView { let view=WKWebView(); view.isOpaque=false; view.backgroundColor = .clear; view.scrollView.isScrollEnabled=false; return view }",
-        "  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString(\\"<html><body style='margin:0'>\\" + markup + \\"</body></html>\\",baseURL:nil) }",
+        "  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString(\"<html><body style='margin:0'>\" + markup + \"</body></html>\",baseURL:nil) }",
         "}",
         "struct \(uxUiSourceIdentifier(name))DesignView: View {",
         "  let target: String = \(uxUiSourceString(target))",
