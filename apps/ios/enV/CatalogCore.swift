@@ -594,7 +594,9 @@ extension Catalog {
             else if ["inspector", "parser", "tester"].contains(where: { slug.contains($0) }) { selected = "inspect" }
             else { selected = "text-diff" }
         default:
-            selected = studio?.id == "diff-inspect-studio" ? "text-diff" : (studio?.modes.first?.key ?? "format")
+            selected = studio?.id == "diff-inspect-studio"
+                ? "text-diff"
+                : (nativeDeveloperStudioSpecs.first(where: { $0.id == studio?.id })?.modes.first?.key ?? "format")
         }
         guard let spec = nativeDeveloperStudioSpecs.first(where: { $0.id == studio?.id }),
               spec.modes.contains(where: { $0.key == selected }) else {
