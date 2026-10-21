@@ -6815,6 +6815,7 @@ private struct NativeUxUiStudioView: View {
     @State private var hasSavedDraft = false
     @State private var iconQuery = "home"
     @State private var iconResults: [String] = []
+    @State private var iconTotal = 0
     @State private var isSearchingIcons = false
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
@@ -7230,7 +7231,13 @@ private struct NativeUxUiStudioView: View {
                             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
                     }.buttonStyle(.plain)
                 }
-                Text("The selected SVG artwork is rendered in the canvas and included in the exported project. Check the source collection licence before shipping.")
+                if iconResults.count < iconTotal {
+                    Button { searchIconLibrary(loadMore: true) } label: {
+                        HStack { Image(systemName: "arrow.down.circle"); Text(isSearchingIcons ? "Loading icons…" : "Load more icons · (iconResults.count) / (iconTotal)") }
+                            .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    }.disabled(isSearchingIcons)
+                }
+                Text("Iconify results are paginated; the selected SVG artwork is rendered in the canvas and included in the export. Check source collection licences before shipping.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
@@ -7397,23 +7404,30 @@ private struct NativeUxUiStudioView: View {
         notice = "Local design restored."
     }
 
-    private func searchIconLibrary() {
+    private func searchIconLibrary(loadMore: Bool = false) {
         guard let encoded = iconQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32") else { return }
+              let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32&start=\(loadMore ? iconResults.count : 0)") else { return }
         isSearchingIcons = true
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
                 let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                 let found = result?["icons"] as? [String] ?? []
-                await MainActor.run { iconResults = found; isSearchingIcons = false; notice = "\(found.count) icon identifiers found." }
+                let total = result?["total"] as? Int ?? found.count
+                await MainActor.run {
+                    iconResults = loadMore ? iconResults + found : found
+                    iconTotal = total
+                    isSearchingIcons = false
+                    notice = "\(iconResults.count) of \(iconTotal) icon identifiers loaded."
+                }
             } catch {
                 await MainActor.run { isSearchingIcons = false; notice = "Icon search unavailable. Check your connection and retry." }
             }
         }
     }
 
-    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
+    private func chooseIconArtwork(    private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
         guard let url = URL(string: "https://api.iconify.design/" + iconName.replacingOccurrences(of: ":", with: "/") + ".svg") else {
             notice = "Invalid icon identifier."
             return
