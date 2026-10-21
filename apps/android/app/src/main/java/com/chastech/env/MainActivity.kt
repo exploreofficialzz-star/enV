@@ -1095,7 +1095,7 @@ private fun ToolDetail(
             }
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
-            NativeToolGuideContent(tool)
+            Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             TextButton(
                 onClick = {
                     CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(
@@ -1103,8 +1103,9 @@ private fun ToolDetail(
                         Uri.parse("https://envtools.store/blog/tool-${tool.id}"),
                     )
                 },
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 2.dp),
             ) { Text("Read the full guide") }
+            NativeToolGuideContent(tool)
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
@@ -1210,7 +1211,6 @@ private fun NativeToolGuideContent(tool: ToolRecord) {
     }
     Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         NativeGuideSection("Purpose and scope", listOf(
-            tool.description,
             "This entry belongs to the ${tool.category.replace('-', ' ')} category and follows enV's $engineLabel workflow. The description defines the intended job; the live interface defines the exact controls available in this version.",
         ))
         NativeGuideSection("When to use this tool", listOf(
