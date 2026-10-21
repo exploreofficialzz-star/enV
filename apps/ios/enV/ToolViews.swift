@@ -107,6 +107,7 @@ struct ToolDetailView: View {
     @State private var visibleRelatedCount = 6
     let tool: Tool
     var initialDeveloperMode: String? = nil
+    var initialDeveloperAction: String? = nil
 
     private var compact: Bool { horizontalSizeClass != .regular }
     private var backend: Bool { !NativeCopy.isWebRuntimeOnly(tool.id) && NativeBackendEngine.supports(tool) }
@@ -329,7 +330,11 @@ struct ToolDestinationView: View {
 
     @ViewBuilder var body: some View {
         if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
-            ToolDetailView(tool: studio, initialDeveloperMode: store.catalog.developerModeForLegacySlug(tool.slug))
+            ToolDetailView(
+                tool: studio,
+                initialDeveloperMode: store.catalog.developerModeForLegacySlug(tool.slug),
+                initialDeveloperAction: (tool.slug.hasSuffix("-decoder") || tool.slug == "data-uri-decoder") ? "decode" : "encode"
+            )
         } else if tool.isUnderProduction {
             UnderProductionDestinationView(tool: tool)
         } else {
@@ -438,7 +443,7 @@ struct NativeFamilyToolView: View {
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
@@ -978,6 +983,7 @@ private struct NativeDeveloperToolView: View {
     @State private var isImporting=false
     @State private var selectedFileName=""
     let initialMode: String?
+    let initialAction: String?
     private var studioSpec: NativeDeveloperStudioSpec? { nativeDeveloperStudioSpecs.first { $0.id == tool.id || $0.slug == tool.slug } }
     private var selectedStudioMode: NativeDeveloperStudioMode? { studioSpec?.modes.first { $0.key == studioModeKey } ?? studioSpec?.modes.first }
     private var op:String {
@@ -997,11 +1003,13 @@ private struct NativeDeveloperToolView: View {
     private var isSQLFormatter:Bool { op.localizedCaseInsensitiveContains("sql") && (op.localizedCaseInsensitiveContains("formatter") || op.localizedCaseInsensitiveContains("beautifier")) }
     private var isDevopsPresetMode:Bool { studioSpec?.id == "devops-studio" && ["gitignore", "dockerfile"].contains(studioModeKey) }
 
-    init(tool: Tool, initialMode: String? = nil) {
+    init(tool: Tool, initialMode: String? = nil, initialAction: String? = nil) {
         self.tool = tool
         self.initialMode = initialMode
+        self.initialAction = initialAction
         let operation = tool.engine.op ?? tool.engine.id ?? tool.id
         _regexMode = State(initialValue: operation.localizedCaseInsensitiveContains("explainer") ? "flavors" : "test")
+        _encodingDirection = State(initialValue: initialAction == "decode" ? "decode" : "encode")
         let spec = nativeDeveloperStudioSpecs.first(where: { $0.id == tool.id || $0.slug == tool.slug })
         let storedMode = spec.flatMap { UserDefaults.standard.string(forKey: "env.developer.mode.\($0.id)") }
         let modeToUse = spec?.modes.first(where: { $0.key == initialMode })?.key
