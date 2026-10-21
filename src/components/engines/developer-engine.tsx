@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -269,6 +269,22 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
   const [busy, setBusy] = useState(false);
   const [regexMode, setRegexMode] = useState<RegexStudioMode>(() => op.toLowerCase().includes("explainer") ? "flavors" : "test");
   const [sqlDialect, setSqlDialect] = useState("postgresql");
+  const previousConfigRef = useRef({ op, initialInput });
+  useEffect(() => {
+    const previous = previousConfigRef.current;
+    if (previous.op === op && previous.initialInput === initialInput) return;
+    previousConfigRef.current = { op, initialInput };
+    // Change the operation's form state without unmounting the Studio workspace.
+    setInput(initialInput ?? "");
+    setSecondary("");
+    setFlags("g");
+    setReplacement("");
+    setSelectedFile(null);
+    setOut("");
+    setError(null);
+    setRegexMode(op.toLowerCase().includes("explainer") ? "flavors" : "test");
+    setSqlDialect("postgresql");
+  }, [op, initialInput]);
   const regexAbort = useRef<AbortController | null>(null);
   // Keep generator routes on their established starter-pattern behavior; tester/replace/builder/
   // explainer routes use the advanced Studio. The native forms mirror this routing rule.
