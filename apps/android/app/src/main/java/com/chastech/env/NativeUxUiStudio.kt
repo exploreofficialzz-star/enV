@@ -397,10 +397,11 @@ fun NativeUxUiStudioForm() {
                         val width=maxWidth.value.coerceAtMost(if(target=="mobile")390f else 900f);val scale=width/bw.toFloat()
                         Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(8.dp)).background(uxNativeColor(background))){
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
-                                elements.forEach{e->
+                                val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
+                        elements.forEach{e->
                                     val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
-                                    Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale){
-                                        val density=androidx.compose.ui.platform.LocalDensity.current.density
+                                    Box(Modifier.offset(e.x.dp,e.y.dp).size(e.width.dp,e.height.dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
+                                        val density=dragDensity
                                         detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
                                             change.consume()
                                             val index=elements.indexOfFirst{it.id==e.id}
