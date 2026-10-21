@@ -87,12 +87,6 @@ private fun uxNativeCleanIconSvg(svg: String): String =
         .replace(Regex("(?is)<foreignObject\\b[^>]*>.*?</foreignObject\\s*>"), "")
         .replace(Regex("(?i)\\s+on[a-z]+\\s*=\\s*(['\\\"]).*?\\1"), "")
 
-private fun uxNativeCleanIconSvg(svg: String): String =
-    svg
-        .replace(Regex("(?is)<script\\b[^>]*>.*?</script\\s*>"), "")
-        .replace(Regex("(?is)<foreignObject\\b[^>]*>.*?</foreignObject\\s*>"), "")
-        .replace(Regex("(?i)\\s+on[a-z]+\\s*=\\s*(['\\\"]).*?\\1"), "")
-
 private fun uxNativeSvgAttribute(source: String, name: String): String? =
     Regex("(?is)\\b"+Regex.escape(name)+"\\s*=\\s*['\\\"]([^'\\\"]*)['\\\"]").find(source)?.groupValues?.getOrNull(1)
 
@@ -280,6 +274,191 @@ private fun uxNativePrompt(name:String,target:String,background:String,elements:
         appendLine("constraints horizontal="+e.horizontalConstraint+"; vertical="+e.verticalConstraint+"; minWidth="+e.minWidth+"; maxWidth="+e.maxWidth+"; visibleOn="+e.visibleOn+"; referenceViewport="+e.referenceWidth+"x"+e.referenceHeight+"; componentKey="+e.componentKey)
     }
     appendLine();appendLine("Acceptance: match the reference viewport; do not replace exact measurements or icons with generic alternatives.")
+}
+
+
+private object UxUiNativePdf {
+    fun build(
+        projectName: String,
+        target: String,
+        background: String,
+        elements: List<UxUiNativeLayer>,
+        projectJson: String,
+        boardWidth: Int,
+        boardHeight: Int
+    ): ByteArray {
+        val safeWidth = boardWidth.coerceIn(320, 4096)
+        val safeHeight = boardHeight.coerceIn(320, 4096)
+        val document = PdfDocument()
+        try {
+            val artboardInfo = PdfDocument.PageInfo.Builder(safeWidth, safeHeight, 1).create()
+            val artboardPage = document.startPage(artboardInfo)
+            val canvas = artboardPage.canvas
+            canvas.drawColor(runCatching { android.graphics.Color.parseColor(background) }
+                .getOrDefault(android.graphics.Color.WHITE))
+            val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(100, 116, 139)
+                textSize = 11f
+            }
+            elements.filter { it.visibleOn.split(",").map(String::trim).contains(target) || it.visibleOn.isBlank() }.forEach { original ->
+                val layer = original.copy(
+                    x = uxNativeLayerX(original, safeWidth),
+                    y = uxNativeLayerY(original, safeHeight),
+                    width = uxNativeLayerWidth(original, safeWidth),
+                    height = uxNativeLayerHeight(original, safeHeight)
+                )
+                val rect = RectF(layer.x.toFloat(), layer.y.toFloat(),
+                    (layer.x + layer.width).toFloat(), (layer.y + layer.height).toFloat())
+                val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = runCatching { android.graphics.Color.parseColor(layer.fill) }
+                        .getOrDefault(android.graphics.Color.TRANSPARENT)
+                    style = Paint.Style.FILL
+                }
+                if (!layer.fill.equals("transparent", true) && shapePaint.color != android.graphics.Color.TRANSPARENT) {
+                    canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
+                }
+                if (layer.borderWidth > 0) {
+                    shapePaint.color = runCatching { android.graphics.Color.parseColor(layer.borderColor) }
+                        .getOrDefault(android.graphics.Color.LTGRAY)
+                    shapePaint.style = Paint.Style.STROKE
+                    shapePaint.strokeWidth = layer.borderWidth.toFloat()
+                    canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
+                }
+                when {
+                    layer.kind == "icon" && layer.iconSvg.isNotBlank() -> uxNativeDrawSvgIcon(canvas, layer)
+                    layer.kind == "image" && layer.imageData.startsWith("data:image/") -> {
+                        val payload = layer.imageData.substringAfter(",", "")
+                        val bitmap = runCatching {
+                            val bytes = android.util.Base64.decode(payload, android.util.Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        }.getOrNull()
+                        if (bitmap != null) {
+                            val save = canvas.save()
+                            val clip = android.graphics.Path().apply {
+                                addRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), android.graphics.Path.Direction.CW)
+                            }
+                            canvas.clipPath(clip)
+                            canvas.drawBitmap(bitmap, null, rect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                            canvas.restoreToCount(save)
+                            bitmap.recycle()
+                        } else {
+                            footerPaint.color = android.graphics.Color.DKGRAY
+                            canvas.drawText("Image unavailable", layer.x + layer.padding.toFloat(), layer.y + 16f, footerPaint)
+                        }
+                    }
+                    else -> {
+                        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = runCatching { android.graphics.Color.parseColor(layer.color) }
+                                .getOrDefault(android.graphics.Color.BLACK)
+                            textSize = layer.fontSize.coerceIn(1, 256).toFloat()
+                            typeface = Typeface.create(layer.fontFamily, if (layer.fontWeight >= 600) Typeface.BOLD else Typeface.NORMAL)
+                        }
+                        val save = canvas.save()
+                        canvas.clipRect(rect)
+                        var baseline = layer.y + layer.padding + textPaint.textSize
+                        val maxWidth = (layer.width - layer.padding * 2).coerceAtLeast(1).toFloat()
+                        layer.text.lines().forEach { sourceLine ->
+                            if (sourceLine.isEmpty()) {
+                                baseline += textPaint.textSize * 1.25f
+                            } else {
+                                var remaining = sourceLine
+                                var guard = 0
+                                while (remaining.isNotEmpty() && guard < 100 && baseline <= rect.bottom) {
+                                    val count = textPaint.breakText(remaining, true, maxWidth, null).coerceAtLeast(1)
+                                    canvas.drawText(remaining.take(count), layer.x + layer.padding.toFloat(), baseline, textPaint)
+                                    remaining = remaining.drop(count).trimStart()
+                                    baseline += textPaint.textSize * 1.25f
+                                    guard++
+                                }
+                            }
+                        }
+                        canvas.restoreToCount(save)
+                    }
+                }
+            }
+            footerPaint.color = android.graphics.Color.rgb(100, 116, 139)
+            canvas.drawText("enV UX/UI Studio · " + safeWidth + " × " + safeHeight + " px · " + elements.size + " layers",
+                16f, (safeHeight - 12).coerceAtLeast(16).toFloat(), footerPaint)
+            document.finishPage(artboardPage)
+
+            val root = runCatching { JSONObject(projectJson) }.getOrElse { JSONObject() }
+            val aiPrompt = root.optString("aiPrompt",
+                uxNativePrompt(projectName, target, background, elements, safeWidth, safeHeight))
+            root.remove("generatedCode")
+            fun removeRawAssets(array: JSONArray?) {
+                if (array == null) return
+                for (index in 0 until array.length()) {
+                    val element = array.optJSONObject(index) ?: continue
+                    element.remove("iconSvg")
+                    element.remove("imageData")
+                    element.remove("imageDataUrl")
+                }
+            }
+            removeRawAssets(root.optJSONArray("elements"))
+            removeRawAssets(root.optJSONArray("reusableComponents"))
+            root.put("pdfAssetNote", "The first page renders selected icon and image artwork. Full vector and image assets remain embedded in the editable JSON project; this PDF appendix keeps identifiers and exact measurements without duplicating large binary payloads.")
+            val specText = root.toString(2)
+            val appendixLines = mutableListOf<String>()
+            appendixLines.add("AI IMPLEMENTATION PROMPT")
+            appendixLines.add("")
+            appendixLines.addAll(aiPrompt.lines())
+            appendixLines.add("")
+            appendixLines.add("MACHINE-READABLE DESIGN SPECIFICATION")
+            appendixLines.add("")
+            appendixLines.addAll(specText.lines())
+
+            var pageNumber = 2
+            var page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+            var specCanvas = page.canvas
+            specCanvas.drawColor(android.graphics.Color.WHITE)
+            val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(37, 99, 235)
+                textSize = 13f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(31, 41, 55)
+                textSize = 7.2f
+                typeface = Typeface.create("monospace", Typeface.NORMAL)
+            }
+            specCanvas.drawText("DESIGN HANDOFF · " + projectName, 28f, 24f, headingPaint)
+            var y = 44f
+            appendixLines.forEach { line ->
+                val maxChars = 112
+                val wrapped = if (line.length <= maxChars) listOf(line) else {
+                    val pieces = mutableListOf<String>()
+                    var rest = line
+                    while (rest.length > maxChars) {
+                        var splitAt = rest.lastIndexOf(' ', maxChars)
+                        if (splitAt <= 0) splitAt = maxChars
+                        pieces.add(rest.substring(0, splitAt))
+                        rest = rest.substring(splitAt).trimStart()
+                    }
+                    pieces.add(rest)
+                    pieces
+                }
+                wrapped.forEach { piece ->
+                    if (y > 812f) {
+                        document.finishPage(page)
+                        pageNumber++
+                        page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+                        specCanvas = page.canvas
+                        specCanvas.drawColor(android.graphics.Color.WHITE)
+                        specCanvas.drawText("DESIGN HANDOFF · " + projectName + " · continued", 28f, 24f, headingPaint)
+                        y = 44f
+                    }
+                    specCanvas.drawText(piece.take(140), 28f, y, bodyPaint)
+                    y += 9f
+                }
+            }
+            document.finishPage(page)
+            val output = ByteArrayOutputStream()
+            document.writeTo(output)
+            return output.toByteArray()
+        } finally {
+            document.close()
+        }
+    }
 }
 
 private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray()):String {
