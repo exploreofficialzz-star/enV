@@ -123,7 +123,7 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
         }
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Estimated tokens across enV tools", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Estimated tokens across enV tools", style = MaterialTheme.typography.titleMedium)
         Text("This is the documentary reference for token estimates throughout the catalogue. Search for a tool to review its classification, stated unit, available rate hypothesis, and measurement limits.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

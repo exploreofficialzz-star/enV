@@ -1145,7 +1145,7 @@ private fun NativeGuideSection(
     bullets: List<String> = emptyList(),
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(heading, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(heading, style = MaterialTheme.typography.titleSmall)
         paragraphs.forEach { paragraph ->
             Text(paragraph, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -2648,7 +2648,7 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
             }
         }
         if (studio != null) {
-            Text("Choose a mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("Choose a mode", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 studio.modes.forEach { mode ->
                     FilterChip(selected = selectedStudioMode?.key == mode.key, onClick = {
