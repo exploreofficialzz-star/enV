@@ -110,7 +110,7 @@ assert.ok(toolShell.indexOf("Read the full guide") > toolShell.indexOf("{tool.de
 assert.match(androidToolScreens, /padding\(start = if \(compact\) 56\.dp else 0\.dp\)/, "Android mobile descriptions should align beneath the tool title");
 assert.match(iosToolScreens, /\.padding\(\.leading, compact \? 56 : 0\)/, "iOS mobile descriptions should align beneath the tool title");
 assert.match(androidToolScreens, /NativeGuideSection\("Limitations and responsible use"/, "Android tool guide must disclose limitations and responsible-use guidance");
-assert.match(iosToolScreens, /NativeToolGuideSectionView\(heading: "Limitations and responsible-use"/, "iOS tool guide must disclose limitations and responsible-use guidance");
+assert.match(iosToolScreens, /NativeToolGuideSectionView\(heading: "Limitations and responsible use"/, "iOS tool guide must disclose limitations and responsible-use guidance");
 assert.match(tokenGuidePage, /Estimated token guide for every enV tool/, "the overflow Token guide must identify itself as platform-wide documentation");
 assert.match(tokenGuidePage, /Number\.MAX_SAFE_INTEGER/, "token guide search must cover the full catalogue");
 assert.match(tokenGuidePage, /Show more tools \(/, "token guide must allow users to browse beyond the first results");
