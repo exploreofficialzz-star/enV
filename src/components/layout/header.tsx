@@ -13,12 +13,15 @@ import {
   MoreVertical,
   Settings as SettingsIcon,
   Smartphone,
+  Tablet,
   UserRound,
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { usePrefs } from "@/lib/storage";
 
-const MENU_ITEM_CLASS = "flex min-h-8 w-full items-center gap-2.5 rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const MENU_ITEM_BASE_CLASS = "flex min-h-8 w-full items-center rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const MENU_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} gap-2.5`;
+const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} gap-0`;
 const MENU_HEADING_CLASS = "px-3 pb-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-accent";
 
 const MENU_GROUPS = [
@@ -126,22 +129,22 @@ export function Header() {
                 <summary aria-label="More options" title="More options" aria-expanded={menuOpen} className="flex size-10 list-none cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
                   <MoreVertical className="size-6" strokeWidth={2.4} />
                 </summary>
-                <div ref={menuPanelRef} role="group" aria-label="More navigation" style={{ top: menuTop }} className="fixed right-3 z-50 w-[min(calc(100vw-1.5rem),420px)] rounded-2xl border border-border bg-surface p-2 shadow-2xl">
+                <div ref={menuPanelRef} role="group" aria-label="More navigation" style={{ top: menuTop }} className="fixed right-3 z-50 w-[15.5rem] max-w-[calc(100vw_-_5rem)] sm:w-80 sm:max-w-[calc(100vw_-_4rem)] rounded-2xl border border-border bg-surface p-2 shadow-2xl">
                   <section className="border-b border-border px-1 py-1" aria-label="Account">
                     <Link to="/account" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Account</Link>
                     <Link to="/wallet" onClick={(event) => { closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>Wallet</Link>
                   </section>
                   <section className="border-b border-border px-1 py-1" aria-label="View mode">
                     <h2 className={MENU_HEADING_CLASS}>View mode</h2>
-                    <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                    <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
                       <Smartphone size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Mobile view</span>
                       {viewMode === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
-                      <Monitor size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Tablet view</span>
+                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
+                      <Tablet size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Tablet view</span>
                       {viewMode === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_ITEM_CLASS}>
+                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
                       <Monitor size={16} aria-hidden="true" /><span className="min-w-0 flex-1">Desktop view</span>
                       {viewMode === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>

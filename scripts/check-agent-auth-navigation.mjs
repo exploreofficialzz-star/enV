@@ -24,6 +24,10 @@ const desktopViewPosition = webMenu.indexOf("Desktop view");
 if (!(mobileViewPosition >= 0 && mobileViewPosition < tabletViewPosition && tabletViewPosition < desktopViewPosition)) errors.push("View modes must be ordered Mobile, Tablet, then Desktop.");
 if (webMenu.includes("Select an active mode again") || webMenu.includes("overflow-y-auto") || webMenu.includes("max-h-")) errors.push("Overflow card must not include its removed reset hint or internal vertical scrolling.");
 if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)')) errors.push("Overflow menu must close after an outside click.");
+if (!webMenu.includes("fixed right-3") || !webMenu.includes("w-[15.5rem]") || !webMenu.includes("max-w-[calc(100vw_-_5rem)]")) errors.push("Overflow card must remain right-aligned and compact on mobile instead of spanning nearly the whole screen.");
+const viewModeBlock = webMenu.slice(webMenu.indexOf('aria-label="View mode"'), webMenu.indexOf("</section>", webMenu.indexOf('aria-label="View mode"')));
+if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Mobile, tablet, and desktop views must have distinct device icons.");
+if ((viewModeBlock.match(/className=\\{MENU_VIEW_ITEM_CLASS\\}/g) ?? []).length !== 3 || !header.includes("gap-0")) errors.push("View-mode icons must sit directly beside their labels without an extra gap.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 
 for (const item of ["Mobile view", "Tablet view", "Desktop view", "Install and create shortcut", "Settings", "Help & feedback"]) {
