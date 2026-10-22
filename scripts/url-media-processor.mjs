@@ -97,7 +97,37 @@ async function verifyDownloadedMedia(file, expectedMaxBytes, signal) {
 }
 
 async function commandExists() {
-  try { await runYtdlp(["--version"], os.tmpdir(), undefined); return true; } catch { return false; }
+  // Readiness should check the installed binary directly. runYtdlp prepends
+  // download-specific flags, which are not needed for a version probe and can
+  // make a healthy installation look unavailable.
+  return new Promise((resolve) => {
+    let child;
+    let settled = false;
+    const finish = (ready, reason) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!ready) {
+        console.error(`[url-media] Downloader readiness probe failed: ${reason}. Check YTDLP_BIN and downloader dependencies.`);
+      }
+      resolve(ready);
+    };
+    const timer = setTimeout(() => {
+      child?.kill("SIGTERM");
+      finish(false, "timed out after 5 seconds");
+    }, 5000);
+
+    try {
+      child = spawn(YTDLP_BIN, ["--version"], { cwd: os.tmpdir(), stdio: "ignore" });
+      child.once("error", (error) => finish(false, String(error?.code || error?.name || "spawn error")));
+      child.once("close", (code, signal) => finish(
+        code === 0,
+        `exit=${code ?? "null"}, signal=${signal ?? "none"}`,
+      ));
+    } catch (error) {
+      finish(false, String(error?.code || error?.name || "spawn error"));
+    }
+  });
 }
 
 async function readJson(req) {
