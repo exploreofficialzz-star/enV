@@ -6846,12 +6846,12 @@ private let uxUiIconCategories: [(String, [String])] = [
     ("Shapes",["lucide:circle","tabler:circle","mdi:circle-outline","lucide:square","tabler:square","lucide:triangle","tabler:triangle","lucide:star","tabler:star","lucide:heart","tabler:heart","lucide:hexagon","tabler:hexagon","lucide:diamond","tabler:diamond"])
 ]
 
-private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> Bool {
-    guard let comma = dataURL.firstIndex(of: ",") else { return false }
+private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> String? {
+    guard let comma = dataURL.firstIndex(of: ",") else { return nil }
     let header = String(dataURL[..<comma]).lowercased()
-    guard header == "data:font/ttf;base64" || header == "data:font/otf;base64" else { return false }
+    guard header == "data:font/ttf;base64" || header == "data:font/otf;base64" else { return nil }
     guard let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),
-          data.count <= 4 * 1024 * 1024 else { return false }
+          data.count <= 4 * 1024 * 1024 else { return nil }
     let ext = header.contains("otf") ? "otf" : "ttf"
     let safeName = family.replacingOccurrences(of: "[^a-zA-Z0-9-]+", with: "-", options: .regularExpression)
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-ux-font-\(safeName).\(ext)")
@@ -6859,8 +6859,14 @@ private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> Bool
         try data.write(to: url, options: .atomic)
         var error: Unmanaged<CFError>?
         let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
-        return ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil
-    } catch { return false }
+        guard ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil else { return nil }
+        let font = CTFontCreateWithURL(url as CFURL, 0, nil)
+        return CTFontCopyFamilyName(font) as String
+    } catch { return nil }
+}
+}
+
+private struct UxUiNativeShape
 }
 
 private struct UxUiNativeShape: Shape {
@@ -7160,6 +7166,43 @@ private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rec
         }
     }
     context.restoreGState()
+}
+
+
+private struct UxUiIconifyThumbnail: UIViewRepresentable {
+    let iconName: String
+    func makeUIView(context: Context) -> WKWebView {
+        let view = WKWebView(frame: .zero)
+        view.isOpaque = false
+        view.backgroundColor = .clear
+        view.scrollView.backgroundColor = .clear
+        view.scrollView.isScrollEnabled = false
+        view.isUserInteractionEnabled = false
+        view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        return view
+    }
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        let parts = iconName.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return }
+        let src = "https://api.iconify.design/\(parts[0])/\(parts[1]).svg"
+        let html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='\(src)'></body></html>"
+        if context.coordinator.lastHTML != html {
+            context.coordinator.lastHTML = html
+            uiView.loadHTMLString(html, baseURL: nil)
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    final class Coordinator { var lastHTML = "" }
+}
+
+private func uxUiFont(for item: UxUiNativeLayer, scale: CGFloat) -> Font {
+    if let data = item.fontData, let family = uxUiRegisterImportedFont(data, family: item.fontFamily), !family.isEmpty {
+        return .custom(family, size: max(5, CGFloat(item.fontSize) * scale))
+            .weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
+    }
+    let family = item.fontFamily == "Inter" || item.fontFamily == "System" ? "System" : item.fontFamily
+    return .custom(family, size: max(5, CGFloat(item.fontSize) * scale))
+        .weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
 }
 
 private struct UxUiNativeSVGIcon: View {
@@ -7845,6 +7888,12 @@ private struct NativeUxUiStudioView: View {
                     addButton("Input", icon: "rectangle.and.pencil.and.ellipsis", kind: "input")
                     addButton("Icon", icon: "square.grid.2x2", kind: "icon")
                     addButton("Image", icon: "photo", kind: "image")
+                    addButton("Triangle", icon: "triangle", kind: "triangle")
+                    addButton("Diamond", icon: "diamond", kind: "diamond")
+                    addButton("Hexagon", icon: "hexagon", kind: "hexagon")
+                    addButton("Star", icon: "star", kind: "star")
+                    addButton("Line", icon: "line.3.horizontal", kind: "line")
+                    addButton("Pill", icon: "capsule", kind: "pill")
                     addButton("Navbar", icon: "menubar.rectangle", kind: "navbar")
                     addButton("Tab bar", icon: "rectangle.bottomthird.inset.filled", kind: "tabbar")
                     addButton("Tabs", icon: "square.split.2x1", kind: "tabs")
@@ -7963,9 +8012,9 @@ private struct NativeUxUiStudioView: View {
 
     private func layerPreview(_ item: UxUiNativeLayer, scale: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: CGFloat(item.radius) * scale)
-                .fill(uxUiUIColor(item.fill))
-                .overlay(RoundedRectangle(cornerRadius: CGFloat(item.radius) * scale).stroke(uxUiUIColor(item.borderColor), lineWidth: CGFloat(item.borderWidth) * scale))
+            UxUiNativeShape(kind: item.kind, radius: CGFloat(item.radius) * scale)
+                .fill(item.kind == "line" ? .clear : uxUiUIColor(item.fill))
+                .overlay(UxUiNativeShape(kind: item.kind, radius: CGFloat(item.radius) * scale).stroke(item.kind == "line" ? uxUiUIColor(item.fill) : uxUiUIColor(item.borderColor), lineWidth: item.kind == "line" ? max(1, CGFloat(item.height) * scale) : CGFloat(item.borderWidth) * scale))
             Group {
                 if item.kind == "icon" {
                     if let svg = item.iconSvg, !svg.isEmpty {
@@ -7983,7 +8032,7 @@ private struct NativeUxUiStudioView: View {
                             .foregroundStyle(uxUiUIColor(item.color)).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
-                    Text(item.text).font(.custom(item.fontFamily == "Inter" ? "System" : item.fontFamily, size: max(5, CGFloat(item.fontSize) * scale)).weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular))
+                    Text(item.text).font(uxUiFont(for: item, scale: scale))
                         .foregroundStyle(uxUiUIColor(item.color)).multilineTextAlignment(.leading).lineLimit(6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
@@ -8308,6 +8357,12 @@ private struct NativeUxUiStudioView: View {
         case "input": newItem = UxUiNativeLayer(kind: kind, name: "Text input", x: 24, y: 420, width: 300, height: 48, text: "Enter your email", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "mdi:home", color: "#2563EB")
         case "image": newItem = UxUiNativeLayer(kind: kind, name: "Image", x: 24, y: 330, width: 280, height: 160, text: "Import an image", color: "#64748B", fill: "#E5E7EB", radius: 12)
+        case "triangle": newItem = UxUiNativeLayer(kind: kind, name: "Triangle", x: 24, y: 540, width: 96, height: 84, text: "", fill: "#DBEAFE", radius: 0, padding: 0)
+        case "diamond": newItem = UxUiNativeLayer(kind: kind, name: "Diamond", x: 24, y: 540, width: 92, height: 92, text: "", fill: "#DBEAFE", radius: 0, padding: 0)
+        case "hexagon": newItem = UxUiNativeLayer(kind: kind, name: "Hexagon", x: 24, y: 540, width: 112, height: 96, text: "", fill: "#DBEAFE", radius: 0, padding: 0)
+        case "star": newItem = UxUiNativeLayer(kind: kind, name: "Star", x: 24, y: 540, width: 100, height: 100, text: "", fill: "#FDE68A", radius: 0, padding: 0)
+        case "line": newItem = UxUiNativeLayer(kind: kind, name: "Line", x: 24, y: 540, width: 180, height: 3, text: "", fill: "#64748B", radius: 0, padding: 0)
+        case "pill": newItem = UxUiNativeLayer(kind: kind, name: "Pill shape", x: 24, y: 540, width: 150, height: 52, text: "", fill: "#DBEAFE", radius: 26, padding: 0)
         case "navbar": newItem = UxUiNativeLayer(kind: kind, name: "Navigation bar", x: 20, y: 22, width: 350, height: 56, text: "enV                         Menu", fill: "#FFFFFF", borderWidth: 1, fontWeight: 600)
         case "tabbar", "tabs": newItem = UxUiNativeLayer(kind: kind, name: "Tab navigation", x: 20, y: 766, width: 350, height: 54, text: "Home       Explore       Saved       Profile", fill: "#FFFFFF", borderWidth: 1, fontSize: 12, fontWeight: 600)
         case "row", "list": newItem = UxUiNativeLayer(kind: kind, name: "List row", x: 24, y: 330, width: 300, height: 64, text: "Account settings\nManage your profile", fill: "#FFFFFF", borderWidth: 1, radius: 10, padding: 14)
@@ -8482,7 +8537,8 @@ private struct NativeUxUiStudioView: View {
             for original in elements where original.visibleOn.contains(target) {
                 let item = uxUiResolvedLayer(original, boardWidth: boardWidth, boardHeight: boardHeight)
                 let rect = CGRect(x: item.x, y: item.y, width: item.width, height: item.height)
-                let path = UIBezierPath(roundedRect: rect, cornerRadius: CGFloat(item.radius))
+                if let fontData = item.fontData { _ = uxUiRegisterImportedFont(fontData, family: item.fontFamily) }
+                let path = UIBezierPath(cgPath: UxUiNativeShape(kind: item.kind, radius: CGFloat(item.radius)).path(in: rect).cgPath)
                 if item.fill != "transparent" { uxUiPlatformColor(item.fill).setFill(); path.fill() }
                 if item.borderWidth > 0 { uxUiPlatformColor(item.borderColor).setStroke(); path.lineWidth = CGFloat(item.borderWidth); path.stroke() }
                 let font = UIFont(name: item.fontFamily, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
