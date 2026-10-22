@@ -28,7 +28,11 @@ const routes = [
   { path: '/tools/developer/ux-ui-studio', label: 'UX/UI Studio', kind: 'ux-ui' },
 ];
 const report = { schemaVersion: 1, runAt: new Date().toISOString(), baseUrl, viewport: { width: 390, height: 844 }, sentinel: 'redacted', routes: [], networkLeaks: [], storageLeaks: [], axeViolations: [], errors: [] };
-const browser = await chromium.launch({ headless: true });
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const browser = await chromium.launch({
+  headless: true,
+  ...(executablePath ? { executablePath } : {}),
+});
 try {
   const context = await browser.newContext({ viewport: report.viewport, deviceScaleFactor: 1, serviceWorkers: 'block', acceptDownloads: true });
   await context.addInitScript(({ marker: sentinels }) => {

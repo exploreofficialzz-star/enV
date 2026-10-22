@@ -114,8 +114,16 @@ jobs:
           src/lib/engines/developer-studios.test.ts
           src/lib/engines/precise-formatters.test.ts
           src/lib/engines/regex-studio.test.ts
-      - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+      - name: Configure Chromium for Playwright
+        run: |
+          browser_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -n "$browser_path" ]; then
+            echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
+            echo "Using runner-installed Chromium-compatible browser: $browser_path"
+          else
+            echo "No system Chrome found; installing the Playwright-managed Chromium build."
+            npx playwright install --with-deps chromium
+          fi
       - name: Start app and run payload privacy, output correctness, mobile and axe audit
         run: npm run audit:developer:browser:ci
       - name: Run reproducible local formatter baseline
