@@ -8,6 +8,9 @@ export const authClient = createAuthClient({ plugins: [genericOAuthClient()] });
 export const authEnabled = import.meta.env.VITE_AUTH_ENABLED === "true";
 /** Public UI flag paired with the server-only AUTH_EMAIL_PASSWORD_ENABLED setting. */
 export const emailPasswordEnabled = import.meta.env.VITE_AUTH_EMAIL_ENABLED === "true";
+/** Public UI gates prevent links to providers that are not configured on the server. */
+export const googleAuthEnabled = import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true";
+export const appleAuthEnabled = import.meta.env.VITE_AUTH_APPLE_ENABLED === "true";
 export { OAUTH_PROVIDERS };
 
 export async function signIn(
