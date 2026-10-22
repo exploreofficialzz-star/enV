@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { defineHandler } from "nitro/h3";
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
-import { optionsResponse, jsonResponse, measureServerOperation } from "../../../../backend/http";
+import { optionsResponse, jsonResponse, measureServerOperation, safeFailureResponse } from "../../../../backend/http";
 function name(v:unknown,f:string){const x=String(v??f).replace(/[^A-Za-z0-9._-]/g,"_");return x||f}
 function pages(raw:string,count:number){if(!raw.trim())return [...Array(count).keys()];const out:number[]=[];for(const token of raw.split(",").map(x=>x.trim()).filter(Boolean)){const m=token.match(/^(\d+)\s*-\s*(\d+)$/);if(m){let a=+m[1],b=+m[2],step=a<=b?1:-1;for(;true;a+=step){if(a>=1&&a<=count)out.push(a-1);if(a===b)break}}else{const n=+token;if(Number.isInteger(n)&&n>=1&&n<=count)out.push(n-1)}}return [...new Set(out)]}
 async function formFiles(req:Request){const f=await req.formData();const files=f.getAll("files").filter((x):x is File=>x instanceof File);const one=f.get("file");if(one instanceof File)files.unshift(one);if(!files.length)throw new Error("At least one PDF or image file is required.");return {f,files}}
@@ -15,4 +15,4 @@ if(op==="rotate"){const a=Number(params.angle||90);source.getPages().forEach(p=>
 if(op==="number"){const font=await source.embedFont(StandardFonts.Helvetica);source.getPages().forEach((p,i)=>{const s=p.getSize();p.drawText(String(i+1),{x:s.width-40,y:18,size:9,font,color:rgb(.3,.3,.3)})})}
 if(op==="watermark"){const font=await source.embedFont(StandardFonts.HelveticaBold);const text=String(params.text||"enV");source.getPages().forEach(p=>{const s=p.getSize();p.drawText(text,{x:s.width/2-Math.min(160,text.length*3),y:s.height/2,size:Number(params.size||36),font,color:rgb(.45,.45,.45),opacity:Number(params.opacity||.18),rotate:degrees(Number(params.angle||30))})})}
 return new Response(await source.save(),{headers:{"content-type":"application/pdf","content-disposition":`attachment; filename="${name(f.get("outputName"),"env-output.pdf")}"`}})
-}catch(err){return jsonResponse({error:err instanceof Error?err.message:"PDF processing failed."},400)}}))
+}catch(err){return safeFailureResponse(e.req,err,"PDF_PROCESSING_FAILED","We couldn't process that PDF or image. Check the file and try again.",422)}}))

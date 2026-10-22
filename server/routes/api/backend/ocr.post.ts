@@ -1,6 +1,6 @@
 import { defineHandler } from "nitro/h3";
 import { backendConfig, joinUrl } from "../../../../backend/config";
-import { jsonResponse, optionsResponse, proxyRequest, measureServerOperation } from "../../../../backend/http";
+import { jsonResponse, optionsResponse, proxyRequest, measureServerOperation, safeFailureResponse } from "../../../../backend/http";
 import { spawn } from "node:child_process";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,7 +46,7 @@ export default defineHandler(async (event) => {
       }
       return jsonResponse({ text: results.join("\n\n"), language });
     } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : "OCR failed." }, 400);
+      return safeFailureResponse(event.req, error, "OCR_PROCESSING_FAILED", "We couldn't read text from this file. Try a clearer image or a text-based PDF.", 500);
     } finally {
       await rm(directory, { recursive: true, force: true }).catch(() => {});
     }

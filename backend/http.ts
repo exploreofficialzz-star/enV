@@ -23,6 +23,22 @@ export function optionsResponse() {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
 
+/** Return a stable public error while keeping exception details out of client responses. */
+export function safeFailureResponse(
+  request: Request,
+  cause: unknown,
+  code: string,
+  message: string,
+  status = 500,
+) {
+  const requestId = randomUUID();
+  let route = "/api/unknown";
+  try { route = new URL(request.url).pathname.slice(0, 180); } catch { /* retain safe fallback */ }
+  const causeType = cause instanceof Error ? cause.name : "UnknownError";
+  console.error(`[enV-api] ${code} requestId=${requestId} route=${route} causeType=${causeType}`);
+  return jsonResponse({ ok: false, error: message, code, requestId }, status);
+}
+
 async function captureProxyUsage(input: {
   request: Request;
   upstream: string;
@@ -208,7 +224,10 @@ export async function proxyRequest(request: Request, upstream: string, billingKe
     });
   } catch (error) {
     await captureProxyUsage({ request, upstream, billingKey, responseStatus: null, outputBytes: null, elapsedMs: Date.now() - startedAt, executionStatus: "failed" });
-    throw error;
+    return safeFailureResponse(
+      request, error, "PROCESSOR_UPSTREAM_UNAVAILABLE",
+      "The processing service is temporarily unavailable. Please try again shortly.", 502,
+    );
   }
 
   const outputHeaders = corsHeaders(response.headers.get("content-type") || undefined);

@@ -1,4 +1,5 @@
 import { defineHandler } from "nitro/h3";
+import { randomUUID } from "node:crypto";
 import { quoteOperation } from "../../../../src/lib/billing/catalog";
 import { hasActiveEntitlement } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
@@ -53,10 +54,14 @@ export default defineHandler(async (event) => {
       },
     });
   } catch (error) {
-    return jsonResponse({
-      ok: false,
-      error: "QUOTE_UNAVAILABLE",
-      message: error instanceof Error ? error.message : "The operation could not be quoted.",
-    }, 400);
+    const requestId = randomUUID();
+    const isUnknownOperation = error instanceof RangeError && error.message === "Unknown billing operation.";
+    const code = isUnknownOperation ? "UNKNOWN_OPERATION" : "QUOTE_UNAVAILABLE";
+    const status = isUnknownOperation ? 404 : 503;
+    const message = isUnknownOperation
+      ? "No usage estimate is available for that operation."
+      : "We couldn't prepare this usage estimate right now. No tokens were charged.";
+    console.error(`[billing-quote] ${code} requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`);
+    return jsonResponse({ ok: false, error: code, message, requestId }, status);
   }
 });
