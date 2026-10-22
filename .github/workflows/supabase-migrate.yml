@@ -1,0 +1,205 @@
+name: Supabase Migration Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: "Type APPLY to run the canonical migrations against SUPABASE_DATABASE_URL"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_apply == 'APPLY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Validate configured database secret
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          const raw = process.env.DATABASE_URL;
+          if (!raw) {
+            console.error('Missing GitHub Actions secret SUPABASE_DATABASE_URL. Add the Supabase Session Pooler URI in repository Settings → Secrets and variables → Actions.');
+            process.exit(1);
+          }
+          let url;
+          try { url = new URL(raw); } catch {
+            console.error('SUPABASE_DATABASE_URL is not a valid connection URL.');
+            process.exit(1);
+          }
+          if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+              !url.hostname || !url.username || !url.password) {
+            console.error('SUPABASE_DATABASE_URL must be a PostgreSQL URI with host and credentials.');
+            process.exit(1);
+          }
+          console.log('Database secret is configured; its value will not be printed.');
+          NODE
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Preflight connection and existing schema
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const pool = new pg.Pool({
+            connectionString: process.env.DATABASE_URL,
+            max: 1,
+            connectionTimeoutMillis: 10000,
+          });
+          const expectedTables = [
+            'user', 'session', 'account', 'verification',
+            'billing_accounts', 'billing_credit_ledger',
+            'billing_reservations', 'billing_purchase_intents',
+            'billing_entitlements', 'billing_entitlement_events',
+            'billing_webhook_events', 'billing_usage_events',
+            'billing_offline_allowances', 'billing_offline_transactions',
+            'billing_security_events', 'billing_offline_sync_batches',
+            'billing_security_rate_limits',
+            'billing_offline_finalization_proofs',
+            'billing_offline_pairing_codes', 'billing_offline_native_sessions',
+            'billing_referral_profiles', 'billing_referrals',
+            'billing_reward_events',
+          ];
+          try {
+            const connection = await pool.query('SELECT current_schema() AS schema');
+            if (connection.rows[0]?.schema !== 'public') {
+              throw new Error('Connection search path does not resolve to public. Stop and inspect the Supabase connection settings.');
+            }
+            const result = await pool.query(
+              'SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = $1 AND tablename = ANY($2::text[])',
+              ['public', expectedTables],
+            );
+            const found = new Set(result.rows.map((r) => r.tablename));
+            const missing = expectedTables.filter((name) => !found.has(name));
+            if (missing.length) {
+              throw new Error('Expected manually-created tables are missing: ' + missing.join(', ') + '. No migrations were run.');
+            }
+            const proof = await pool.query(`
+              SELECT
+                EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public'
+                    AND table_name = 'billing_offline_finalization_proofs'
+                    AND column_name = 'batch_digest'
+                    AND is_nullable = 'NO'
+                ) AS digest_not_null,
+                EXISTS (
+                  SELECT 1 FROM pg_constraint
+                  WHERE conrelid = 'public.billing_offline_finalization_proofs'::regclass
+                    AND conname = 'billing_offline_finalization_batch_digest_check'
+                    AND contype = 'c' AND convalidated
+                ) AS digest_check_validated,
+                (SELECT COUNT(*)::int FROM public.billing_offline_finalization_proofs
+                  WHERE batch_digest IS NULL) AS unbound_proofs
+            `);
+            const p = proof.rows[0];
+            if (!p.digest_not_null || !p.digest_check_validated || p.unbound_proofs !== 0) {
+              throw new Error('Part 3G preflight did not pass. No migrations were run; inspect batch_digest and proof records first.');
+            }
+            console.log('Preflight passed: database connection works, all 23 expected tables exist, and Part 3G is constrained with zero unbound proofs.');
+          } catch (error) {
+            console.error('[preflight] ' + (error?.message || 'Database preflight failed.'));
+            process.exitCode = 1;
+          } finally {
+            await pool.end();
+          }
+          NODE
+
+      - name: Apply canonical migrations
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: npm run db:migrate
+
+      - name: Verify migration tracker and RLS
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          const pool = new pg.Pool({
+            connectionString: process.env.DATABASE_URL,
+            max: 1,
+            connectionTimeoutMillis: 10000,
+          });
+          const expectedMigrations = [
+            '0001_auth.sql',
+            '0002_billing.sql',
+            '0003_offline_wallet.sql',
+            '0004_offline_wallet_hardening.sql',
+            '0005_offline_finalization_batch_binding.sql',
+            '0006_offline_native_pairing.sql',
+            '0007_wallet_rewards.sql',
+            '0008_supabase_rls.sql',
+          ];
+          const expectedTables = [
+            'user', 'session', 'account', 'verification',
+            'billing_accounts', 'billing_credit_ledger',
+            'billing_reservations', 'billing_purchase_intents',
+            'billing_entitlements', 'billing_entitlement_events',
+            'billing_webhook_events', 'billing_usage_events',
+            'billing_offline_allowances', 'billing_offline_transactions',
+            'billing_security_events', 'billing_offline_sync_batches',
+            'billing_security_rate_limits',
+            'billing_offline_finalization_proofs',
+            'billing_offline_pairing_codes', 'billing_offline_native_sessions',
+            'billing_referral_profiles', 'billing_referrals',
+            'billing_reward_events',
+          ];
+          try {
+            const applied = await pool.query(
+              'SELECT name FROM public._migrations WHERE name = ANY($1::text[])',
+              [expectedMigrations],
+            );
+            const names = new Set(applied.rows.map((r) => r.name));
+            const pending = expectedMigrations.filter((name) => !names.has(name));
+            if (pending.length) throw new Error('Migration tracker still missing: ' + pending.join(', '));
+            const rls = await pool.query(`
+              SELECT c.relname AS table_name, c.relrowsecurity AS enabled
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public' AND c.relname = ANY($1::text[])
+            `, [expectedTables]);
+            const off = rls.rows.filter((r) => !r.enabled).map((r) => r.table_name);
+            if (off.length) throw new Error('RLS is not enabled on: ' + off.join(', '));
+            const clientPolicies = await pool.query(`
+              SELECT DISTINCT tablename
+              FROM pg_policies
+              WHERE schemaname = 'public'
+                AND tablename = ANY($1::text[])
+                AND roles::text[] && ARRAY['anon', 'authenticated', 'public']::text[]
+            `, [expectedTables]);
+            if (clientPolicies.rows.length) {
+              throw new Error('Unexpected direct client-role policies found on: ' + clientPolicies.rows.map((r) => r.tablename).join(', ') + '. Review these policies before enabling client access.');
+            }
+            console.log('Verified: all 8 canonical migration filenames are tracked; RLS is enabled on all 23 tables; no direct anon/authenticated/public policies were found.');
+          } catch (error) {
+            console.error('[verification] ' + (error?.message || 'Post-migration verification failed.'));
+            process.exitCode = 1;
+          } finally {
+            await pool.end();
+          }
+          NODE
