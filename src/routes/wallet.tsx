@@ -217,8 +217,8 @@ function Account() {
         setFundingOptionsState({
           status: "unavailable",
           providers: [
-            { id: "paystack", label: "Card & local payments", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Secure card checkout could not be loaded. Refresh and try again." },
-            { id: "cryptomus", label: "Cryptocurrency", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "Secure crypto checkout could not be loaded. Refresh and try again." },
+            { id: "paystack", label: "Pay with cards", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Secure card checkout could not be loaded. Refresh and try again." },
+            { id: "cryptomus", label: "Pay with crypto", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "Secure crypto checkout could not be loaded. Refresh and try again." },
           ],
           message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
         });
