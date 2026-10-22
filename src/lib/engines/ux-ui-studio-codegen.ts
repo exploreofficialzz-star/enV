@@ -1,6 +1,6 @@
 export type UxCodegenLayer = {
   id: string; kind: string; name: string; x: number; y: number; width: number; height: number;
-  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string;
+  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl?: string;
   color: string; background: string; borderColor: string; borderWidth: number; radius: number;
   padding: number; marginTop: number; marginRight: number; marginBottom: number; marginLeft: number;
   fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number; letterSpacing: number;
@@ -38,6 +38,30 @@ const cssGeometry = (layer: UxCodegenLayer, project: UxCodegenProject) => {
   if (layer.maxWidth && layer.maxWidth > 0) declarations.push("max-width:" + layer.maxWidth + "px");
   return declarations.join(";");
 };
+
+const systemFonts = new Set(["System","system-ui","sans-serif","serif","monospace","Arial","Helvetica","Georgia","Times New Roman","Courier New","SF Pro Display","SF Pro Text","Avenir Next","Menlo"]);
+const shapeCss = (layer: UxCodegenLayer): string => {
+  if (layer.kind === "triangle") return "clip-path:polygon(50% 0%,100% 100%,0% 100%);border-radius:0";
+  if (layer.kind === "diamond") return "clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);border-radius:0";
+  if (layer.kind === "hexagon") return "clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);border-radius:0";
+  if (layer.kind === "star") return "clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);border-radius:0";
+  if (layer.kind === "line") return "border-radius:999px;padding:0";
+  if (layer.kind === "pill") return "border-radius:999px";
+  if (layer.kind === "ellipse" || layer.kind === "avatar") return "border-radius:50%";
+  return "";
+};
+const embeddedFontCss = (project: UxCodegenProject): string => {
+  const seen = new Set<string>();
+  return project.elements.filter((layer) => layer.fontDataUrl && layer.fontFamily).filter((layer) => {
+    if (seen.has(layer.fontFamily)) return false;
+    seen.add(layer.fontFamily); return true;
+  }).map((layer) => "@font-face{font-family:" + safe(layer.fontFamily) + ";src:url(" + safe(layer.fontDataUrl!) + ") format('" + (layer.fontDataUrl!.startsWith("data:font/otf") ? "opentype" : "truetype") + "');font-style:normal;font-weight:100 900;font-display:swap}").join("\\n");
+};
+const remoteFontFamilies = (project: UxCodegenProject): string[] => Array.from(new Set(project.elements
+  .filter((layer) => !layer.fontDataUrl && layer.fontFamily && !systemFonts.has(layer.fontFamily))
+  .map((layer) => layer.fontFamily)));
+const googleFontLink = (family: string): string => "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(family).replace(/%20/g, "+") + "&display=swap";
+
 const layerStyle = (l: UxCodegenLayer) => [
   "box-sizing:border-box","padding:" + l.padding + "px","color:" + l.color,
   "background:" + (l.background === "transparent" ? "transparent" : l.background),
@@ -48,6 +72,7 @@ const layerStyle = (l: UxCodegenLayer) => [
   "display:flex","align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
   "justify-content:" + (l.textAlign === "center" ? "center" : l.textAlign === "right" ? "flex-end" : "flex-start"),
   l.shadow ? "box-shadow:0 3px 10px #0f172a24" : "",
+  shapeCss(l),
 ].filter(Boolean).join(";");
 const layerHtml = (l: UxCodegenLayer, p: UxCodegenProject) => {
   const common = 'class="env-layer env-layer-' + esc(l.id) + '" data-visible-on="' + visibility(l).join(" ") + '" style="' + esc("position:absolute;" + cssGeometry(l,p) + ";" + layerStyle(l)) + '"';
@@ -68,13 +93,15 @@ export function generateHtmlProject(project: UxCodegenProject): string {
     ...project.tokens.typography.map((token) => "--env-type-" + token.name.replace(/[^a-z0-9-]/gi, "-") + ":" + token.fontSize + "px/" + token.lineHeight + " " + safe(token.fontFamily)),
   ].join(";\n");
   const mobileHidden = ".env-layer:not([data-visible-on~='mobile']){}";
+  const fontFaces = embeddedFontCss(project);
+  const fontLinks = remoteFontFamilies(project).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
   const rules = [
     "@media (max-width:" + project.breakpoints.mobile + "px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}",
     "@media (min-width:" + (project.breakpoints.mobile + 1) + "px) and (max-width:" + (project.breakpoints.desktop - 1) + "px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}",
     "@media (min-width:" + project.breakpoints.desktop + "px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}",
   ].join("\n");
   return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
-    esc(project.name) + '</title><style>:root{' + tokens + '}*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;width:min(100%,' +
+    esc(project.name) + '</title>' + fontLinks + '<style>' + fontFaces + ':root{' + tokens + '}*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;width:min(100%,' +
     project.viewport.width + 'px);aspect-ratio:' + project.viewport.width + '/' + project.viewport.height + ';margin:0 auto;background:' + project.background + ';overflow:hidden}.env-layer{min-width:0}' +
     rules + '</style></head><body><main class="env-artboard" role="img" aria-label="' + esc(project.name) + ' design">' +
     project.elements.map((layer) => layerHtml(layer, project)).join("\n") + '</main></body></html>';
@@ -83,10 +110,14 @@ export function generateHtmlProject(project: UxCodegenProject): string {
 export function generateReactProject(project: UxCodegenProject): string {
   const component = sourceName(project.name) + "Design";
   const json = JSON.stringify(project).replace(/</g, "\\u003c");
+  const fontCss = JSON.stringify(embeddedFontCss(project));
+  const googleLinks = remoteFontFamilies(project).map((family) => googleFontLink(family));
   return [
     'import React from "react";',
     "",
     "const project = " + json + " as const;",
+    "const embeddedFontCss = " + fontCss + ";",
+    "const googleFontLinks = " + JSON.stringify(googleLinks) + ";",
     "",
     "function positionX(layer: (typeof project.elements)[number]): React.CSSProperties {",
     "  const rw = layer.referenceWidth || project.viewport.width;",
@@ -102,6 +133,8 @@ export function generateReactProject(project: UxCodegenProject): string {
     "}",
     "export default function " + component + "() {",
     '  return <div style={{position:"relative",containerType:"size",width:"min(100%, ' + project.viewport.width + 'px)",aspectRatio:"' + project.viewport.width + '/' + project.viewport.height + '",overflow:"hidden",background:project.background}}>',
+    "    {googleFontLinks.map((href) => <link key={href} rel=\"stylesheet\" href={href} />)}",
+    "    <style>{embeddedFontCss}</style>",
     '    {project.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(project.target)).map((item) => {',
     '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px solid " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:item.radius,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:"flex",alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
     "      if (item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth > 0) style.maxWidth = item.maxWidth;",
