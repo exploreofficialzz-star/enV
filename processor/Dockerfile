@@ -18,6 +18,7 @@ COPY processor/server.mjs ./processor/server.mjs
 COPY processor/url-media-route.mjs ./processor/url-media-route.mjs
 COPY scripts/media-processor.mjs ./scripts/media-processor.mjs
 COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
+COPY scripts/media/processor-admission.mjs ./scripts/media/processor-admission.mjs
 COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
 COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
 COPY scripts/media/yt-dlp-output.mjs ./scripts/media/yt-dlp-output.mjs
