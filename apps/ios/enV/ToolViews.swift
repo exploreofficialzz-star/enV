@@ -7663,6 +7663,7 @@ private struct NativeUxUiStudioView: View {
     @State private var toolkitTab = "Icons"
     @State private var toolkitQuery = ""
     @State private var isImportingProjectJSON = false
+    @State private var isImportingSVGIcon = false
     @State private var showAllLayers = false
     @State private var showAdvancedInspector = false
     @State private var showAdvancedCanvas = false
@@ -8031,6 +8032,47 @@ private struct NativeUxUiStudioView: View {
                 notice = "Could not import that file: \(error.localizedDescription)"
             }
         }
+        .fileImporter(isPresented: $isImportingSVGIcon, allowedContentTypes: [UTType(filenameExtension: "svg") ?? .xml], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let data = try Data(contentsOf: url)
+                    guard data.count <= 1024 * 1024 else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 30, userInfo: [NSLocalizedDescriptionKey: "SVG icons must be 1 MB or smaller."])
+                    }
+                    guard let source = String(data: data, encoding: .utf8) else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 31, userInfo: [NSLocalizedDescriptionKey: "The SVG file could not be read as text."])
+                    }
+                    let cleaned = uxUiCleanIconSVG(source)
+                    guard cleaned.range(of: #"<svg\b"#, options: [.regularExpression, .caseInsensitive]) != nil else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 32, userInfo: [NSLocalizedDescriptionKey: "Choose a valid SVG icon file."])
+                    }
+                    if let existingIndex = selectedIndex, elements[existingIndex].kind == "icon" {
+                        checkpoint()
+                        elements[existingIndex].name = url.deletingPathExtension().lastPathComponent
+                        elements[existingIndex].iconName = "custom:" + elements[existingIndex].name
+                        elements[existingIndex].iconSvg = cleaned
+                    } else {
+                        addLayer("icon")
+                        if let index = selectedIndex {
+                            checkpoint()
+                            elements[index].name = url.deletingPathExtension().lastPathComponent
+                            elements[index].iconName = "custom:" + elements[index].name
+                            elements[index].iconSvg = cleaned
+                        }
+                    }
+                    showComponentPalette = false
+                    notice = "Imported SVG icon."
+                } catch {
+                    notice = "Could not import that icon: \(error.localizedDescription)"
+                }
+            case .failure(let error):
+                notice = "Could not import that icon: \(error.localizedDescription)"
+            }
+        }
         .onChange(of: projectName) { _ in saveDraft() }
         .onChange(of: target) { _ in saveDraft() }
         .onChange(of: background) { _ in saveDraft() }
@@ -8322,6 +8364,12 @@ private struct NativeUxUiStudioView: View {
                             .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
                         Button { addLayer("icon") } label: {
                             Label("Add icon", systemImage: "plus").font(.envScaled(size: 12, weight: .semibold))
+                                .frame(maxWidth: .infinity).padding(10)
+                                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                        }.buttonStyle(.plain)
+                        Button { isImportingSVGIcon = true } label: {
+                            Label("Import SVG icon", systemImage: "square.and.arrow.down").font(.envScaled(size: 12, weight: .semibold))
                                 .frame(maxWidth: .infinity).padding(10)
                                 .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
                                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
