@@ -240,7 +240,7 @@ assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedRefer
 assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
 assert.match(androidCatalog, /\(tools \+ relatedReferenceTools\)\.asSequence\(\)/);
 assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.includes('Text("Web only"'), "Android discovery labels retained browser-only tools");
-assert.match(android, /authority\("en-v\.vercel\.app"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
+assert.match(android, /authority\("envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
 assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
 assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
 assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
@@ -260,7 +260,7 @@ assert.match(androidAccessibility, /if \(colorTool && studioMode == "simulator"\
 assert.match(androidAccessibility, /if \(studioKind == "contrast" && studioMode == "simulator"\) "color-blindness-simulator"/);
 assert.match(androidAccessibility, /Text\("APCA · Web only"\)/);
 assert.match(androidAccessibility, /mutableStateOf\(if \(kind == "color-blindness"\) "simulator"/);
-assert.match(androidAccessibility, /APCA_WEB_URL = "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"/);
+assert.match(androidAccessibility, /APCA_WEB_URL = "https:\/\/envtools\.store\/tools\/accessibility\/color-contrast-studio"/);
 assert.match(androidAccessibility, /target\.scheme == "https" && target\.host == APCA_WEB_HOST/);
 assert.match(iosTools, /private var modes: \[String\] \{ \["checker", "generator", "helper", "preview", "simulator"\] \}/);
 assert.match(iosTools, /if colorTool && studioMode == "simulator" \{ colorVisionPreview \}/);
@@ -269,9 +269,9 @@ assert.match(iosTools, /rawKind == "color-blindness" \? "simulator"/);
 assert.match(iosTools, /if colorTool \{\s*Button \{ showAPCAWebView = true \}[\s\S]*?APCA · Web only/);
 assert.doesNotMatch(androidAccessibility, /studioMode == "vision"|"vision"\s*,\s*"apca"/);
 assert.doesNotMatch(iosTools, /studioMode == "vision"|"vision"\s*,\s*"apca"/);
-assert.match(iosTools, /apcaStudioWebURL = URL\(string: "https:\/\/en-v\.vercel\.app\/tools\/accessibility\/color-contrast-studio"\)!/);
+assert.match(iosTools, /apcaStudioWebURL = URL\(string: "https:\/\/envtools\.store\/tools\/accessibility\/color-contrast-studio"\)!/);
 assert.match(iosTools, /private struct APCAWebView: UIViewRepresentable[\s\S]*?websiteDataStore = \.nonPersistent\(\)/);
-assert.match(iosTools, /target\.scheme == "https", target\.host == "en-v\.vercel\.app"/);
+assert.match(iosTools, /target\.scheme == "https", target\.host == "envtools\.store"/);
 assert.doesNotMatch(`${androidAccessibilityEngine}\n${iosAccessibilityEngine}`, /APCA-W3|APCAcontrast|APCAContrast/, "APCA scoring must not be implemented in a native engine");
 assert.doesNotMatch(`${android}\n${iosContent}`, /WebView|WKWebView/, "WebViews are restricted to the APCA Color Contrast Studio entry point");
 
