@@ -15,6 +15,9 @@ const env = (key: string): string | undefined => {
 };
 
 const authRequested = env("VITE_AUTH_ENABLED") === "true";
+const emailPasswordUiRequested = env("VITE_AUTH_EMAIL_ENABLED") === "true";
+const googleUiRequested = env("VITE_AUTH_GOOGLE_ENABLED") === "true";
+const appleUiRequested = env("VITE_AUTH_APPLE_ENABLED") === "true";
 const isVercel = env("VERCEL") === "1";
 const databaseUrl = env("DATABASE_URL");
 const oauthIssuer = env("AUTH_OAUTH_ISSUER")?.replace(/\/+$/, "");
@@ -51,6 +54,15 @@ if (authRequested && oauthPartiallyConfigured) {
 }
 if (authRequested && googlePartiallyConfigured) {
   throw new Error("Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+}
+if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) {
+  throw new Error("The email/password sign-in UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.");
+}
+if (authRequested && googleUiRequested && !googleConfigured) {
+  throw new Error("The Google sign-in UI is enabled but GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on the server.");
+}
+if (authRequested && appleUiRequested && !appleConfigured) {
+  throw new Error("The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.");
 }
 if (authRequested && applePartiallyConfigured) {
   throw new Error("Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.");
