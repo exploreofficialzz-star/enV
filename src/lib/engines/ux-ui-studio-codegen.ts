@@ -513,8 +513,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       child = "Rectangle().fill(Color(hex: " + safe(lineColor) + "))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
-      const base64 = layer.imageDataUrl.split(",").slice(1).join(",");
-      child = "Group { if let data = Data(base64Encoded: " + safe(base64) + "), let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() } else { Text(" + safe(layer.name) + ") } }";
+      child = "Group { if let image = generatedUxImage(dataURL: " + safe(layer.imageDataUrl) + ") { Image(uiImage: image).resizable().scaledToFill() } else { Text(" + safe(layer.name) + ") } }";
     } else {
       const weight = layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular";
       const fontFamily = layer.fontDataUrl
@@ -548,6 +547,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     '  init(hex: String) { let value = UInt64(hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted), radix: 16) ?? 0; self.init(.sRGB, red: Double((value >> 16) & 255)/255, green: Double((value >> 8) & 255)/255, blue: Double(value & 255)/255, opacity: 1) }',
     "}",
     generatedSwiftHelpers,
+    "private func generatedUxImage(dataURL: String) -> UIImage? { guard let comma = dataURL.firstIndex(of: \",\"), dataURL[..<comma].lowercased().hasPrefix(\"data:image/\") else { return nil }; let payload = String(dataURL[dataURL.index(after: comma)...]); guard let data = Data(base64Encoded: payload), data.count <= 4 * 1024 * 1024 else { return nil }; return UIImage(data: data) }",
     "struct " + viewName + ": View {",
     "  let target: String = " + safe(project.target),
     "  var body: some View {",
