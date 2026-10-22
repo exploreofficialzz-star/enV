@@ -441,6 +441,15 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-active-color > span { width: 17px; height: 17px; flex: 0 0 auto; border: 1px solid var(--color-border-strong); border-radius: 4px; }
 .uxui-active-color small { font-size: 9px; }
 .uxui-active-color code { min-width: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg); font-size: 9px; }
+.uxui-quick-style { margin-top: 14px; border-bottom: 1px solid var(--color-border); padding: 0 0 13px; }
+.uxui-quick-style-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.uxui-quick-style-heading strong { color: var(--color-fg); font-size: 12px; font-weight: 850; }
+.uxui-quick-style-heading span { color: var(--color-muted); font-size: 9px; }
+.uxui-radius-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.uxui-radius-buttons button { min-height: 33px; border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-fg); background: var(--color-surface); font-size: 10px; font-weight: 750; }
+.uxui-radius-buttons button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
+.uxui-quick-style-shadow { display: flex; min-height: 35px; align-items: center; justify-content: space-between; margin-top: 7px; color: var(--color-fg); font-size: 11px; font-weight: 650; }
+.uxui-quick-style-shadow input { width: 17px; height: 17px; accent-color: var(--color-accent); }
 .uxui-advanced-controls { margin-top: 15px; border-top: 1px solid var(--color-border); padding-top: 11px; }
 .uxui-advanced-controls > summary { cursor: pointer; color: var(--color-fg); font-size: 12px; font-weight: 800; }
 .uxui-advanced-body { padding-top: 11px; }

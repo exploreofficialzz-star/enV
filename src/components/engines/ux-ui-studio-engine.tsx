@@ -1131,7 +1131,7 @@ export function UxUiStudioEngine() {
           <div className="uxui-export-menu-title">Export your design</div>
           <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
           <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
-          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
+          <button type="button" aria-label="React TSX" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
@@ -1370,6 +1370,15 @@ export function UxUiStudioEngine() {
             </div>
             <div className="uxui-active-color"><span style={{ backgroundColor: selected ? (paletteMode === "fill" ? selected.background : selected.color) : background }} /><small>{paletteMode === "fill" ? "Fill colour" : "Text colour"}</small><code>{selected ? (paletteMode === "fill" ? selected.background : selected.color) : background}</code></div>
           </div>
+          {selected && <div className="uxui-quick-style">
+            <div className="uxui-quick-style-heading"><strong>Corner style</strong><span>Round the edges</span></div>
+            <div className="uxui-radius-buttons" role="group" aria-label="Corner style">
+              <button type="button" aria-pressed={selected.radius === 0} onClick={() => updateLayer(selected.id, { radius: 0 })}>Sharp</button>
+              <button type="button" aria-pressed={selected.radius === Math.min(14, Math.floor(Math.min(selected.width, selected.height) / 4))} onClick={() => updateLayer(selected.id, { radius: Math.min(14, Math.floor(Math.min(selected.width, selected.height) / 4)) })}>Soft</button>
+              <button type="button" aria-pressed={selected.radius >= Math.floor(Math.min(selected.width, selected.height) / 2)} onClick={() => updateLayer(selected.id, { radius: Math.floor(Math.min(selected.width, selected.height) / 2) })}>Round</button>
+            </div>
+            <label className="uxui-quick-style-shadow"><span>Soft shadow</span><input type="checkbox" checked={selected.shadow} onChange={(event) => updateLayer(selected.id, { shadow: event.target.checked })} /></label>
+          </div>}
           <details className="uxui-advanced-controls">
             <summary>Fine-tune design</summary>
             <div className="uxui-advanced-body">

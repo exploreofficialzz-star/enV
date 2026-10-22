@@ -80,7 +80,7 @@ try {
           page.waitForEvent('download'),
           (async () => {
             await page.getByRole('button', { name: 'Export', exact: true }).click();
-            await page.getByRole('button', { name: 'React TSX', exact: true }).click();
+            await page.getByRole('button', { name: /React TSX/ }).click();
           })(),
         ]);
         const downloadPath = await download.path();
