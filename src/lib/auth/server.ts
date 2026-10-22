@@ -172,7 +172,7 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: OAUTH_PROVIDERS.map((provider) => provider.providerId),
-      requireLocalEmailVerified: false,
+      requireLocalEmailVerified: true,
     },
   },
   session: { cookieCache: { enabled: true, maxAge: 300 } },
