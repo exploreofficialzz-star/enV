@@ -71,6 +71,7 @@ const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastec
 const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
 assert.match(androidUxStudio, /mutableStateOf\(false\)\};var target by remember\{mutableStateOf\("mobile"\)\}/, 'Android native studio should open directly into the mobile design');
 assert.match(androidUxStudio, /if\(showElementTray\)/, 'Android native tools palette should be collapsible');
+assert.ok(androidUxStudio.includes('var iconQuery by remember{mutableStateOf("")};var iconResults'), 'Android Compose state declarations must remain separated');
 assert.match(androidUxStudio, /Corner style/, 'Android native studio should expose quick rounded-corner styles');
 assert.match(androidUxStudio, /0xFF0B0C0E/, 'Android previews must use a device shell');
 assert.match(androidUxStudio, /Desktop mockup/, 'Android studio must label the selected device preview simply');
