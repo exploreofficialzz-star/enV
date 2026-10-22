@@ -65,6 +65,8 @@ try {
       await page.setViewportSize(report.viewport);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: 'domcontentloaded', timeout });
       if (route.kind === 'ux-ui') {
+        // Wait for the real React tool effect before clicking SSR markup; a pre-hydration click can be dropped.
+        await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
         await page.getByRole('heading', { name: 'UX/UI Studio', exact: true, level: 2 }).waitFor({ state: 'visible', timeout });
         await page.getByRole('button', { name: /Mobile interface/ }).click();
         const studio = page.locator('section.ux-ui-studio');
