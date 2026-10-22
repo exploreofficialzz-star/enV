@@ -53,7 +53,16 @@ const DEFAULT_TOKENS: DesignTokens = {
 const DESIGN_BREAKPOINTS = { mobile: 480, tablet: 768, desktop: 1024 };
 
 const STORAGE_KEY = "env-ux-ui-studio-project-v1";
-type FontLibraryItem = { family: string; category: "Sans serif" | "Serif" | "Monospace" | "Display" | "Handwriting" | "System"; provider: "google" | "system" };
+type FontLibraryItem = { family: string; category: "Sans serif" | "Serif" | "Monospace" | "Display" | "Handwriting" | "System"; provider: "google" | "system"; id?: string; weights?: number[]; styles?: string[]; variable?: boolean };
+type FontsourceFontRecord = { id?: string; family?: string; category?: string; weights?: number[]; styles?: string[]; variable?: boolean };
+function fontsourceCategory(value: string | undefined): FontLibraryItem["category"] {
+  const category = (value || "").toLowerCase();
+  if (category.includes("serif") && !category.includes("sans")) return "Serif";
+  if (category.includes("mono")) return "Monospace";
+  if (category.includes("display")) return "Display";
+  if (category.includes("hand") || category.includes("script")) return "Handwriting";
+  return "Sans serif";
+}
 const FONT_LIBRARY: FontLibraryItem[] = [
   ...["Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Source Sans 3","Work Sans","DM Sans","Manrope","Plus Jakarta Sans","Urbanist","Outfit","IBM Plex Sans","Noto Sans","Ubuntu","Rubik","Mulish","Quicksand","Barlow","Karla","Assistant","Fira Sans","Cabin","Raleway","Oxygen","PT Sans","Titillium Web"].map((family)=>({family,category:"Sans serif" as const,provider:"google" as const})),
   ...["Merriweather","Playfair Display","Lora","PT Serif","Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","Crimson Text","Bitter","DM Serif Display","Source Serif 4"].map((family)=>({family,category:"Serif" as const,provider:"google" as const})),
@@ -572,6 +581,12 @@ export function UxUiStudioEngine() {
   const [iconPrefix, setIconPrefix] = useState("all");
   const [fontQuery, setFontQuery] = useState("");
   const [fontCategory, setFontCategory] = useState("All");
+  const [remoteFonts, setRemoteFonts] = useState<FontLibraryItem[]>([]);
+  const [fontCatalogLoading, setFontCatalogLoading] = useState(false);
+  const [fontCatalogError, setFontCatalogError] = useState("");
+  const [fontCatalogReload, setFontCatalogReload] = useState(0);
+  const fontCatalogRequested = useRef(false);
+  const [fontDownloadId, setFontDownloadId] = useState("");
   const [iconResults, setIconResults] = useState<string[]>([]);
   const [iconTotal, setIconTotal] = useState(0);
   const [iconStart, setIconStart] = useState(0);
@@ -587,6 +602,15 @@ export function UxUiStudioEngine() {
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
+  const fontChoices = useMemo(() => {
+    const byFamily = new Map<string, FontLibraryItem>();
+    for (const font of FONT_LIBRARY) {
+      const id = font.provider === "google" ? font.family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : undefined;
+      byFamily.set(font.family.toLowerCase(), { ...font, id });
+    }
+    for (const font of remoteFonts) byFamily.set(font.family.toLowerCase(), font);
+    return Array.from(byFamily.values()).sort((a,b) => a.family.localeCompare(b.family));
+  }, [remoteFonts]);
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
   const project = useMemo(() => buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
@@ -631,6 +655,34 @@ export function UxUiStudioEngine() {
     if (onboarding || elements.length === 0) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
   }, [project, onboarding, elements.length]);
+
+  useEffect(() => {
+    if (leftTab !== "fonts" || fontCatalogRequested.current) return;
+    fontCatalogRequested.current = true;
+    const controller = new AbortController();
+    setFontCatalogLoading(true);
+    setFontCatalogError("");
+    fetch("https://api.fontsource.org/v1/fonts?type=google", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("The open font catalogue is temporarily unavailable.");
+        const payload = await response.json() as unknown;
+        if (!Array.isArray(payload)) throw new Error("The font catalogue returned an unexpected response.");
+        const mapped = (payload as FontsourceFontRecord[])
+          .filter((font) => typeof font.family === "string" && typeof font.id === "string")
+          .map((font): FontLibraryItem => ({
+            family: font.family!, id: font.id!, category: fontsourceCategory(font.category), provider: "google",
+            weights: Array.isArray(font.weights) ? font.weights.filter((weight): weight is number => Number.isFinite(weight)) : [],
+            styles: Array.isArray(font.styles) ? font.styles.filter((style): style is string => typeof style === "string") : [],
+            variable: font.variable === true,
+          }));
+        setRemoteFonts(mapped);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setFontCatalogError(error instanceof Error ? error.message : "Could not load the font catalogue.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setFontCatalogLoading(false); });
+    return () => controller.abort();
+  }, [leftTab, fontCatalogReload]);
 
   useEffect(() => {
     if (leftTab !== "icons" || iconQuery.trim().length < 2) return;
@@ -868,6 +920,45 @@ export function UxUiStudioEngine() {
     } finally { setIconLoading(false); }
   }
 
+  async function downloadAndEmbedFont(font: FontLibraryItem) {
+    if (!selected || font.provider !== "google") return;
+    const fontId = font.id || font.family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    setFontDownloadId(fontId);
+    setNotice("Downloading " + font.family + " for this project…");
+    try {
+      const metaResponse = await fetch("https://api.fontsource.org/v1/fonts/" + encodeURIComponent(fontId));
+      if (!metaResponse.ok) throw new Error("Font metadata could not be retrieved for " + font.family + ".");
+      const metadata = await metaResponse.json() as { variants?: unknown };
+      const candidates: Array<{url:string; score:number}> = [];
+      const visit = (value: unknown, path: string[]) => {
+        if (!value || typeof value !== "object") return;
+        const object = value as Record<string, unknown>;
+        const url = object.url;
+        if (url && typeof url === "object") {
+          const ttf = (url as Record<string, unknown>).ttf;
+          if (typeof ttf === "string" && /^https:\/\//i.test(ttf)) {
+            const context = path.join("/").toLowerCase();
+            candidates.push({ url: ttf, score: (context.includes("latin") ? 8 : 0) + (context.includes("400") ? 4 : 0) + (context.includes("normal") ? 2 : 0) });
+          }
+        }
+        for (const [key, child] of Object.entries(object)) visit(child, [...path, key]);
+      };
+      visit(metadata.variants, []);
+      const assetUrl = candidates.sort((a,b)=>b.score-a.score)[0]?.url;
+      if (!assetUrl) throw new Error("No TTF asset was listed for " + font.family + ".");
+      const response = await fetch(assetUrl);
+      if (!response.ok) throw new Error("The font file download failed.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length === 0 || bytes.length > 4 * 1024 * 1024) throw new Error("Font files must be between 1 byte and 4 MB.");
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+      updateLayer(selected.id, { fontFamily: font.family, fontDataUrl: "data:font/ttf;base64," + btoa(binary) });
+      setNotice(font.family + " downloaded and embedded in this layer. Check the font licence before distributing the design.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Font download failed. You can import a licensed local font.");
+    } finally { setFontDownloadId(""); }
+  }
+
   function exportProject() {
     const content = JSON.stringify({ ...project, aiPrompt, generatedCode: {
       html: generateHtmlProject(project),
@@ -1024,28 +1115,42 @@ export function UxUiStudioEngine() {
           </div>}
 
           {leftTab === "fonts" && <div className="mt-3">
-            <h3 className="text-xs font-semibold text-fg">Font library</h3>
-            <p className="mt-1 text-[11px] leading-4 text-muted">Browse 50+ system and open Google Font families by typography role. Selected Google Fonts download on demand when online; imported font files are embedded in the editable project.</p>
+            <h3 className="text-xs font-semibold text-fg">Font library · full catalogue</h3>
+            <p className="mt-1 text-[11px] leading-4 text-muted">Browse the online Fontsource catalogue, preview families, and download a selected TTF into the layer for portable native code and JSON exports.</p>
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
+              <span>{fontCatalogLoading ? "Loading catalogue…" : remoteFonts.length ? remoteFonts.length.toLocaleString() + " online font families" : "Curated fonts available"}</span>
+              {fontCatalogError && <button type="button" onClick={() => { fontCatalogRequested.current = false; setFontCatalogReload((value) => value + 1); }} className="font-semibold text-accent">Retry</button>}
+            </div>
+            {fontCatalogError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-[10px] text-red-600">{fontCatalogError} The curated list remains available.</p>}
             <input aria-label="Search fonts" value={fontQuery} onChange={(event)=>setFontQuery(event.target.value)} placeholder="Search font families…" className={fieldClass()} />
             <div className="mt-2 flex flex-wrap gap-1">
               {["All","Sans serif","Serif","Monospace","Display","Handwriting","System"].map((category)=><button key={category} type="button" onClick={()=>setFontCategory(category)} aria-pressed={fontCategory===category} className={"rounded-full border px-2 py-1 text-[10px] font-medium "+(fontCategory===category?"border-accent bg-accent text-white":"border-border text-fg")}>{category}</button>)}
             </div>
             {selected && <div className="mt-3 rounded-lg border border-border p-2">
-              <div className="text-[10px] text-muted">Apply font to selected layer</div>
+              <div className="text-[10px] text-muted">Selected layer</div>
               <div className="mt-1 truncate text-sm font-semibold text-fg" style={{fontFamily:selected.fontFamily}}>{selected.fontFamily}</div>
               <div className="mt-1 text-xs text-muted" style={{fontFamily:selected.fontFamily}}>Aa Bb Cc 123 — The quick brown fox.</div>
+              {selected.fontDataUrl && <p className="mt-2 text-[10px] font-medium text-emerald-600">Font asset embedded in this project.</p>}
               <label className="mt-3 block text-[10px] font-medium text-muted">Import local font (TTF, OTF, WOFF, WOFF2 · up to 4 MB)
-                <input type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" className="mt-1 block w-full text-[10px] text-muted" onChange={(event)=>{const file=event.target.files?.[0];if(!file)return;if(file.size>4*1024*1024){setNotice("Font files must be 4 MB or smaller.");event.target.value="";return;}const reader=new FileReader();reader.onload=()=>{if(typeof reader.result!=="string")return;const family=(file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9 -]/g,"").trim()||"Imported Font")+" (local)";updateLayer(selected.id,{fontFamily:family,fontDataUrl:reader.result});setNotice("Imported "+file.name+" into this design. The font bytes are preserved in JSON export.");};reader.onerror=()=>setNotice("Could not read the font file.");reader.readAsDataURL(file);event.target.value="";}} />
+                <input type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" className="mt-1 block w-full text-[10px] text-muted" onChange={(event)=>{const file=event.target.files?.[0];if(!file)return;if(file.size>4*1024*1024){setNotice("Font files must be 4 MB or smaller.");event.target.value="";return;}const reader=new FileReader();reader.onload=()=>{if(typeof reader.result!=="string")return;const family=(file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9 -]/g,"").trim()||"Imported Font")+" (local)";updateLayer(selected.id,{fontFamily:family,fontDataUrl:reader.result});setNotice("Imported "+file.name+" into this design. The font bytes are preserved in project JSON.");};reader.onerror=()=>setNotice("Could not read the font file.");reader.readAsDataURL(file);event.target.value="";}} />
               </label>
             </div>}
             <div className="mt-3 space-y-1.5">
-              {FONT_LIBRARY.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)).map((font)=><button key={font.family} type="button" disabled={!selected} onClick={()=>{if(selected)updateLayer(selected.id,{fontFamily:font.family,fontDataUrl:""});setNotice("Applied "+font.family+". "+(font.provider==="google"?"The open Google Font is fetched for preview when online.":"This family uses an installed system font if available."));}} className={"block w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2 disabled:opacity-40 "+(selected?.fontFamily===font.family?"border-accent bg-accent/10":"")}>
-                <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{font.family}</span><span className="text-[9px] text-muted">{font.provider==="google"?"Google Fonts · OFL":"System"}</span></div>
-                <div className="mt-1 truncate text-lg text-fg" style={{fontFamily:font.family}}>Design systems that scale 012345</div>
-                <div className="mt-1 text-[9px] text-muted">{font.category} · 300–900 weights where supplied</div>
-              </button>)}
+              {fontChoices.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)).map((font)=>{
+                const fontId=font.id || font.family.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+                const weights=font.weights?.length ? font.weights.join(" · ") : "300–900 where supplied";
+                return <div key={font.family} className={"rounded-lg border p-2.5 "+(selected?.fontFamily===font.family?"border-accent bg-accent/10":"border-border")}>
+                  <button type="button" disabled={!selected} onClick={()=>{if(selected)updateLayer(selected.id,{fontFamily:font.family,fontDataUrl:""});setNotice("Applied "+font.family+". Use Download & embed for offline native asset portability.");}} className="block w-full text-left disabled:opacity-40">
+                    <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{font.family}</span><span className="text-[9px] text-muted">{font.provider==="google"?"Google Fonts":"System"}</span></div>
+                    <div className="mt-1 truncate text-lg text-fg" style={{fontFamily:font.family}}>Design systems that scale 012345</div>
+                    <div className="mt-1 text-[9px] text-muted">{font.category} · weights {weights}{font.variable?" · variable":""}</div>
+                  </button>
+                  {font.provider==="google" && <button type="button" disabled={!selected||fontDownloadId===fontId} onClick={()=>void downloadAndEmbedFont(font)} className="mt-2 rounded-md border border-border px-2 py-1.5 text-[10px] font-semibold text-fg hover:bg-surface-2 disabled:opacity-40">{fontDownloadId===fontId?"Downloading…":"Download & embed TTF"}</button>}
+                </div>;
+              })}
+              {!fontChoices.some((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)) && <p className="mt-3 text-xs text-muted">No font matched this filter.</p>}
             </div>
-            <p className="mt-3 text-[10px] leading-4 text-muted">The font library includes common open font families plus custom-font import. Retain each font’s licence when redistributing a project.</p>
+            <p className="mt-3 text-[10px] leading-4 text-muted">Font binaries are fetched when selected instead of shipping the entire multi-gigabyte font archive inside enV. Check each font licence before redistribution.</p>
           </div>}
 
           {leftTab === "presets" && <div className="mt-3">
