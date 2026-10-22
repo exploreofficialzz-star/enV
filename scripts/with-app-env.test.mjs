@@ -60,7 +60,12 @@ test("an explicit process-env override wins over the file", () => {
 });
 
 test("the project ships auth off", () => {
-  assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "false" });
+  assert.deepEqual(readAppEnv(projectRoot()), {
+    VITE_AUTH_ENABLED: "false",
+    VITE_AUTH_EMAIL_ENABLED: "false",
+    VITE_AUTH_GOOGLE_ENABLED: "false",
+    VITE_AUTH_APPLE_ENABLED: "false",
+  });
 });
 
 test("vite loadEnv resolves the wrapped value", () => {
