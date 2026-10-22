@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { importPKCS8, SignJWT } from "jose";
 import { betterAuth } from "better-auth";
 import { genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
@@ -27,14 +28,18 @@ const googleClientId = env("GOOGLE_CLIENT_ID");
 const googleClientSecret = env("GOOGLE_CLIENT_SECRET");
 const appleClientId = env("APPLE_CLIENT_ID");
 const appleClientSecret = env("APPLE_CLIENT_SECRET");
+const appleTeamId = env("APPLE_TEAM_ID");
+const appleKeyId = env("APPLE_KEY_ID");
+const applePrivateKey = env("APPLE_PRIVATE_KEY");
 const secureCookies = env("NODE_ENV") === "production" || isVercel;
 const emailPasswordAuthEnabled = authRequested && emailAndPasswordEnabled;
 const oauthConfigured = Boolean(oauthIssuer && oauthClientId && oauthClientSecret);
 const oauthPartiallyConfigured = Boolean(oauthIssuer || oauthClientId || oauthClientSecret) && !oauthConfigured;
 const googleConfigured = Boolean(googleClientId && googleClientSecret);
 const googlePartiallyConfigured = Boolean(googleClientId || googleClientSecret) && !googleConfigured;
-const appleConfigured = Boolean(appleClientId && appleClientSecret);
-const applePartiallyConfigured = Boolean(appleClientId || appleClientSecret) && !appleConfigured;
+const appleGeneratedSecretConfigured = Boolean(appleTeamId && appleKeyId && applePrivateKey);
+const appleConfigured = Boolean(appleClientId && (appleClientSecret || appleGeneratedSecretConfigured));
+const applePartiallyConfigured = Boolean(appleClientId || appleClientSecret || appleTeamId || appleKeyId || applePrivateKey) && !appleConfigured;
 const socialProviderConfigured = googleConfigured || appleConfigured;
 
 export const authConfigured = authRequested;
@@ -116,6 +121,31 @@ function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
+/**
+ * Apple client secrets are signed JWTs with a maximum six-month lifetime.
+ * Prefer generating them from server-only signing material so deployments do
+ * not depend on an operator remembering to rotate a pre-generated JWT.
+ * APPLE_CLIENT_SECRET remains supported for deployments that manage rotation
+ * externally; do not configure it when using the generated-secret variables.
+ */
+async function getAppleClientSecret(): Promise<string> {
+  if (appleClientSecret) return appleClientSecret;
+  if (!appleClientId || !appleTeamId || !appleKeyId || !applePrivateKey) {
+    throw new Error("Apple sign-in is missing its client ID or signing credentials.");
+  }
+
+  const privateKey = await importPKCS8(applePrivateKey.replaceAll("\\n", "\n"), "ES256");
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({})
+    .setProtectedHeader({ alg: "ES256", kid: appleKeyId })
+    .setIssuer(appleTeamId)
+    .setSubject(appleClientId)
+    .setAudience("https://appleid.apple.com")
+    .setIssuedAt(now)
+    .setExpirationTime(now + 180 * 24 * 60 * 60)
+    .sign(privateKey);
+}
+
 export const auth = betterAuth({
   baseURL: explicitBaseURL ?? "http://localhost:8080",
   secret,
@@ -123,7 +153,7 @@ export const auth = betterAuth({
   trustedOrigins,
   socialProviders: {
     ...(googleConfigured ? { google: { clientId: googleClientId!, clientSecret: googleClientSecret! } } : {}),
-    ...(appleConfigured ? { apple: { clientId: appleClientId!, clientSecret: appleClientSecret! } } : {}),
+    ...(appleConfigured ? { apple: async () => ({ clientId: appleClientId!, clientSecret: await getAppleClientSecret() }) } : {}),
   },
   account: {
     encryptOAuthTokens: true,
