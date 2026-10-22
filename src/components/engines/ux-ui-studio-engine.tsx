@@ -2,9 +2,9 @@ import { generateHtmlProject, generateKotlinProject, generateReactProject, gener
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Paintbrush, Redo2, Undo2,
-  Grid2X2, Layers, Laptop, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
-  Trash2, WandSparkles, X, ZoomIn, ZoomOut, RotateCw,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Redo2, Undo2,
+  Grid2X2, Layers, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
+  Trash2, X, ZoomIn, ZoomOut, RotateCw,
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
