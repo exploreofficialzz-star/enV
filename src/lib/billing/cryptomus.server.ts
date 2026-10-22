@@ -332,10 +332,10 @@ export async function handleCryptomusWebhook(request: Request) {
     });
   }
   const status = typeof body.status === "string" ? body.status : "";
-  if (status === "paid_over" || status === "locked" || status === "wrong_amount") {
-    await setIntentStatus(reference, "disputed");
-    return { status: "requires-review" as const };
+  if (["paid", "paid_over", "locked", "wrong_amount", "cancel", "fail", "system_fail"].includes(status)) {
+    // Even signed non-success/fraud-review callbacks must match the stored order,
+    // invoice UUID, amount and currency from the provider's own invoice lookup.
+    return verifyAndCreditCryptomusReference(reference, invoiceUuid);
   }
-  if (status !== "paid") return { ignored: true };
-  return verifyAndCreditCryptomusReference(reference, invoiceUuid);
+  return { ignored: true };
 }
