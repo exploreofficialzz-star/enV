@@ -7803,26 +7803,44 @@ private struct NativeUxUiStudioView: View {
                     }
                 }
                 if onboarding {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("What are you designing?").font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text("Choose the reference artboard. You can add and edit layers, preserve exact specifications, and export a visual PDF with the complete AI prompt.")
-                            .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
-                        Button { startDesign("mobile", preset: "mobile-dashboard") } label: {
-                            labelForChoice("Mobile interface", subtitle: "390 × 844 px · app screens", icon: "iphone")
-                        }.buttonStyle(.plain)
-                        Button { startDesign("tablet", preset: "tablet-dashboard") } label: {
-                            labelForChoice("Tablet interface", subtitle: "768 × 1024 px · tablet layouts", icon: "ipad")
-                        }.buttonStyle(.plain)
-                        Button { startDesign("desktop", preset: "desktop-landing") } label: {
-                            labelForChoice("Desktop website", subtitle: "1440 × 900 px · website layouts", icon: "laptopcomputer")
-                        }.buttonStyle(.plain)
-                        if hasSavedDraft {
-                            Button { restoreDraft() } label: {
-                                HStack { Image(systemName: "arrow.counterclockwise"); Text("Continue saved design") }
-                                    .font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envAccent)
-                                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
-                            }.buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 18) {
+                        Button { createNewProject() } label: {
+                            VStack(spacing: 12) {
+                                Image(systemName: "plus").font(.system(size: 34, weight: .regular))
+                                    .frame(width: 76, height: 76)
+                                    .overlay(Circle().stroke(Color.envInk, lineWidth: 2))
+                                Text("New project").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.envInk)
+                                Text("Start with a blank design").font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
+                            }
+                            .frame(maxWidth: .infinity).padding(.vertical, 20).contentShape(Rectangle())
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
+                        }.buttonStyle(.plain).accessibilityLabel("New project")
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Drafts").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.envInk)
+                            if hasSavedDraft {
+                                Button { restoreDraft() } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "square.and.pencil").font(.system(size: 22)).foregroundStyle(Color.envAccent)
+                                            .frame(width: 46, height: 46).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Continue saved design").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                                            Text("Your latest project").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right").foregroundStyle(Color.envMuted)
+                                    }.padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                                }.buttonStyle(.plain)
+                            } else {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "square.stack.3d.up").font(.system(size: 22)).foregroundStyle(Color.envMuted)
+                                    Text("No drafts yet").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                                    Text("Your designs will appear here as you work.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                                }.frame(maxWidth: .infinity).padding(.vertical, 22)
+                                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                            }
                         }
                     }
                     .padding(16)
@@ -7846,11 +7864,7 @@ private struct NativeUxUiStudioView: View {
             guard !didInitialize else { return }
             didInitialize = true
             loadSavedDraftStatus()
-            if UserDefaults.standard.data(forKey: storageKey) != nil {
-                restoreDraft()
-            } else {
-                startDesign("mobile", preset: "mobile-dashboard")
-            }
+            // Keep the project home visible on launch. A saved design is opened only when selected from Drafts.
         }
         .fileExporter(isPresented: $isExportingPDF, document: pdfDocument, contentType: .pdf, defaultFilename: safeFileName + "-design-spec") { result in
             switch result { case .success(let url): notice = "PDF exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
@@ -7979,7 +7993,7 @@ private struct NativeUxUiStudioView: View {
                 targetButton("Desktop", icon: "laptopcomputer", value: "desktop")
                 Spacer(minLength: 0)
             }
-            Text("\(boardWidth) × \(boardHeight) px  ·  \(elements.count) layers")
+            Text(elements.isEmpty ? "Add your first element using +" : "Design elements: \(elements.count)")
                 .font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
 
             DisclosureGroup("Fine-tune canvas", isExpanded: $showAdvancedCanvas) {
@@ -8207,7 +8221,14 @@ private struct NativeUxUiStudioView: View {
 
     private var layerListPanel: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(elements.isEmpty ? "Layers" : "Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                if elements.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "square.stack.3d.up").font(.system(size: 20)).foregroundStyle(Color.envMuted)
+                        Text("No layers yet").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Tap + to add an element.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                    }.frame(maxWidth: .infinity).padding(.vertical, 18)
+                }
                 ForEach(showAllLayers ? elements : Array(elements.prefix(6))) { item in
                     Button { selectedID = item.id } label: {
                         HStack(spacing: 8) {
@@ -8700,6 +8721,28 @@ private struct NativeUxUiStudioView: View {
             .font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(primary ? Color.white : Color.envInk)
             .padding(13).background(primary ? Color.envAccent : Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.envAccent : Color.envBorder, lineWidth: 1))
+    }
+
+    private func createNewProject() {
+        target = "mobile"
+        customArtboard = false
+        customWidth = 390
+        customHeight = 844
+        background = "#FFFFFF"
+        projectName = "Untitled design"
+        tokens = UxUiNativeTokens()
+        reusableComponents = []
+        elements = []
+        selectedID = nil
+        undoHistory = []
+        redoHistory = []
+        showComponentPalette = false
+        showAllLayers = false
+        showAdvancedInspector = false
+        showAdvancedCanvas = false
+        showDesignSystem = false
+        onboarding = false
+        notice = "Your blank canvas is ready. Tap + to add your first element."
     }
 
     private func startDesign(_ nextTarget: String, preset: String) {
