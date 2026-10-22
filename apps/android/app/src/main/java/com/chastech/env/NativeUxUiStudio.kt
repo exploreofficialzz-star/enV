@@ -947,7 +947,7 @@ fun NativeUxUiStudioForm() {
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
             reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
             elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
-    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding)runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onFailure{notice="Could not save locally; export a JSON backup."}}
+    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding&&elements.isNotEmpty())runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}}
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
@@ -1137,6 +1137,10 @@ fun NativeUxUiStudioForm() {
                 }
             }else{
                 OutlinedTextField(projectName,{projectName=it},label={Text("Project title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    TextButton(onClick={onboarding=true;showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;selectedId=""}) { Text("← Projects") }
+                    Spacer(Modifier.weight(1f))
+                }
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
                     FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
