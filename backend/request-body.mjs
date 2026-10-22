@@ -1,4 +1,9 @@
 export class RequestBodyError extends Error {
+  /**
+   * @param {string} code
+   * @param {number} status
+   * @param {string} message
+   */
   constructor(code, status, message) {
     super(message);
     this.name = "RequestBodyError";
@@ -11,6 +16,12 @@ const INVALID_JSON_MESSAGE = "The request body must be valid JSON.";
 const OBJECT_REQUIRED_MESSAGE = "Send a JSON object containing the tool request.";
 const TOO_LARGE_MESSAGE = "This request is too large. Keep the input under the allowed size and try again.";
 
+/**
+ * Parse a size-bounded JSON object from a Fetch API request.
+ * @param {Request} request
+ * @param {number} [maxBytes]
+ * @returns {Promise<Record<string, unknown>>}
+ */
 export async function readJsonObject(request, maxBytes = 128 * 1024) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
     throw new TypeError("maxBytes must be a positive safe integer");
