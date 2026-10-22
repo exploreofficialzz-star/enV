@@ -7415,13 +7415,13 @@ private func uxUiSwiftPathExpression(_ path: Path) -> String {
         let p = element.points
         switch element.type {
         case .moveToPoint:
-            commands.append("generatedPath.move(to: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y)))")
+            commands.append("generatedPath.move(to: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y))))")
         case .addLineToPoint:
-            commands.append("generatedPath.addLine(to: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y)))")
+            commands.append("generatedPath.addLine(to: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y))))")
         case .addQuadCurveToPoint:
-            commands.append("generatedPath.addQuadCurve(to: CGPoint(x: \(uxUiCodegenFloat(p[1].x)), y: \(uxUiCodegenFloat(p[1].y))), control: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y)))")
+            commands.append("generatedPath.addQuadCurve(to: CGPoint(x: \(uxUiCodegenFloat(p[1].x)), y: \(uxUiCodegenFloat(p[1].y))), control: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y))))")
         case .addCurveToPoint:
-            commands.append("generatedPath.addCurve(to: CGPoint(x: \(uxUiCodegenFloat(p[2].x)), y: \(uxUiCodegenFloat(p[2].y))), control1: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y))), control2: CGPoint(x: \(uxUiCodegenFloat(p[1].x)), y: \(uxUiCodegenFloat(p[1].y)))")
+            commands.append("generatedPath.addCurve(to: CGPoint(x: \(uxUiCodegenFloat(p[2].x)), y: \(uxUiCodegenFloat(p[2].y))), control1: CGPoint(x: \(uxUiCodegenFloat(p[0].x)), y: \(uxUiCodegenFloat(p[0].y))), control2: CGPoint(x: \(uxUiCodegenFloat(p[1].x)), y: \(uxUiCodegenFloat(p[1].y))))")
         case .closeSubpath:
             commands.append("generatedPath.closeSubpath()")
         @unknown default:
@@ -7431,7 +7431,6 @@ private func uxUiSwiftPathExpression(_ path: Path) -> String {
     commands.append("}")
     return commands.joined(separator: " ")
 }
-
 
 private func uxUiCodegenFloat(_ value: CGFloat) -> String {
     String(format: "%.4f", locale: Locale(identifier: "en_US_POSIX"), Double(value))
