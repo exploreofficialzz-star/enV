@@ -276,7 +276,7 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
 }
 
 @Composable
-fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit) {
+fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit, onOpenWallet: () -> Unit) {
     val context = LocalContext.current
     val title = when (pageId) {
         "about" -> "About enV"
@@ -330,8 +330,8 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 "about" -> AboutInformation()
                 "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
                 "token-guide" -> NativeTokenGuide(catalog)
-                "token-dashboard" -> NativeTokenDashboard()
-                "pricing" -> PricingInformation()
+                "token-dashboard" -> NativeTokenDashboard(onOpenWallet)
+                "pricing" -> PricingInformation(onOpenWallet)
                 "contact" -> ContactInformation()
                 "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
                 "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
@@ -353,7 +353,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
 }
 
 @Composable
-private fun NativeTokenDashboard() {
+private fun NativeTokenDashboard(onOpenWallet: () -> Unit) {
     val context = LocalContext.current
     var dashboard by remember { mutableStateOf<OfflineWalletNativeApi.WalletDashboard?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -380,7 +380,7 @@ private fun NativeTokenDashboard() {
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }) {
+            TextButton(onClick = onOpenWallet) {
                 EnVIcon("Wallet", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.size(4.dp))
                 Text("Open wallet")
@@ -596,7 +596,7 @@ private fun NativeWalletDashboard() {
             subtitle = "enV tokens · available to use",
             showBalance = showBalance,
             onToggleVisibility = { showBalance = !showBalance },
-            onAddFunds = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) },
+            onAddFunds = { Toast.makeText(context, "In-app token purchases are not available in this release. No payment was taken.", Toast.LENGTH_LONG).show() },
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -751,8 +751,8 @@ private fun NativeWalletDashboard() {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text("Link your enV account", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                     OutlinedButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Open enV web wallet") }
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/pair-native?platform=android")))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Create pairing code") }
                     OutlinedTextField(value = code, onValueChange = { code = it.trim().take(80) }, modifier = Modifier.fillMaxWidth(), label = { Text("One-time pairing code") }, singleLine = true, enabled = !busy)
                     Button(onClick = {
                         scope.launch {
@@ -1190,7 +1190,7 @@ private fun EmailAction(address: String, context: android.content.Context, label
 }
 
 @Composable
-private fun PricingInformation() {
+private fun PricingInformation(onOpenWallet: () -> Unit) {
     val surface2 = informationSurface2()
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -1246,7 +1246,7 @@ private fun PricingInformation() {
                 Text("Review the applicable rate, usage estimate, maximum budget, and provider details before starting metered work. Usage may vary with input size, duration, output, retries, and provider fees.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open Wallet") }
+        Button(onClick = onOpenWallet, modifier = Modifier.fillMaxWidth()) { Text("Open Wallet") }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Questions about enV pricing can be sent to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             EmailAction("envtoolkit@gmail.com", LocalContext.current)
