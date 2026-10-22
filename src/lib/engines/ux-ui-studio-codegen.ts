@@ -264,13 +264,25 @@ function svgViewBox(value: string | undefined): [number, number, number, number]
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
+function normalizeSvgColor(value: string | undefined, fallback: string): string | null {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "none" || normalized === "transparent") return null;
+  if (normalized === "currentcolor") return fallback;
+  if (normalized === "black") return "#000000";
+  if (normalized === "white") return "#FFFFFF";
+  if (/^#[0-9a-f]{3}$/i.test(value)) return "#" + value.slice(1).split("").map((part) => part + part).join("");
+  if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)) return value;
+  return fallback;
+}
+
 function svgStyle(drawable: UxSvgDrawable, layer: UxCodegenLayer): { fill: string | null; stroke: string | null; strokeWidth: number } {
   const attrs = drawable.attrs;
   const lineShape = drawable.tag === "line" || drawable.tag === "polyline";
-  const rawFill = attrs.fill ?? (lineShape ? "none" : layer.color);
-  const rawStroke = attrs.stroke ?? (lineShape ? layer.color : "none");
-  const fill = rawFill.toLowerCase() === "none" ? null : rawFill.toLowerCase() === "currentcolor" ? layer.color : rawFill;
-  const stroke = rawStroke.toLowerCase() === "none" ? null : rawStroke.toLowerCase() === "currentcolor" ? layer.color : rawStroke;
+  const defaultFill = lineShape ? "none" : layer.color;
+  const defaultStroke = lineShape ? layer.color : "none";
+  const fill = normalizeSvgColor(attrs.fill ?? defaultFill, layer.color);
+  const stroke = normalizeSvgColor(attrs.stroke ?? defaultStroke, layer.color);
   return { fill, stroke, strokeWidth: Math.max(0.1, Number(attrs["stroke-width"] || "1.5") || 1.5) };
 }
 

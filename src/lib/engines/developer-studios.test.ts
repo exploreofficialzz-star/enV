@@ -504,7 +504,7 @@ test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and 
       },
       {
         id: "icon-1", kind: "icon", name: "Home icon", x: 64, y: 24, width: 24, height: 24,
-        text: "", iconName: "lucide:house", iconSvg: "<path d='M2 12 L12 2 L22 12 V22 H2 Z'/>",
+        text: "", iconName: "lucide:house", iconSvg: "<path d='M2 12 L12 2 L22 12 V22 H2 Z'/><circle cx='12' cy='12' r='2' fill='#FFFFFF'/>",
         iconViewBox: "0 0 24 24", imageDataUrl: "", fontDataUrl: "",
         color: "#2563EB", background: "transparent", borderColor: "#CBD5E1", borderWidth: 0,
         radius: 0, padding: 0, marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
@@ -541,9 +541,11 @@ test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and 
   assert.match(kotlin, /generatedUxFontFamily/);
   assert.ok(kotlin.includes("data:image/png;base64"));
   assert.match(kotlin, /androidx\.core\.graphics\.PathParser/);
+  assert.match(kotlin, /addCircle/);
   assert.doesNotMatch(kotlin, /AndroidView|WebView\(/, "Kotlin exports must render assets natively");
   assert.match(swift, /GeneratedUxShape/);
   assert.match(swift, /generatedUxRegisterFont/);
   assert.ok(swift.includes("data:image/png;base64"));
+  assert.match(swift, /ellipseIn/);
   assert.doesNotMatch(swift, /WKWebView|WebKit|GeneratedHTMLAsset/, "Swift exports must render assets natively");
 });
