@@ -144,9 +144,14 @@ private fun uxNativeComposeShape(kind: String, radius: Int): Shape = when (kind)
 }
 
 private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path? {
-    if (kind !in setOf("triangle","diamond","hexagon","star")) return null
+    if (kind !in setOf("triangle","diamond","hexagon","star","ellipse","avatar","pill","line")) return null
     val path = android.graphics.Path()
     val x=rect.left; val y=rect.top; val w=rect.width(); val h=rect.height()
+    when(kind) {
+        "ellipse", "avatar" -> { path.addOval(rect, android.graphics.Path.Direction.CW); return path }
+        "pill" -> { path.addRoundRect(rect, minOf(w,h)/2, minOf(w,h)/2, android.graphics.Path.Direction.CW); return path }
+        "line" -> { path.moveTo(rect.left,rect.centerY()); path.lineTo(rect.right,rect.centerY()); return path }
+    }
     val points = when(kind) {
         "triangle" -> listOf(x+w/2 to y, x+w to y+h, x to y+h)
         "diamond" -> listOf(x+w/2 to y, x+w to y+h/2, x+w/2 to y+h, x to y+h/2)
@@ -162,7 +167,7 @@ private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path?
     return path
 }
 
-private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
+private fun uxNativeTypefaceprivate fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
     val data = layer.fontData
     if (data.startsWith("data:font/") && data.contains(",")) {
         runCatching {
@@ -419,15 +424,23 @@ private object UxUiNativePdf {
                         .getOrDefault(android.graphics.Color.TRANSPARENT)
                     style = Paint.Style.FILL
                 }
-                if (!layer.fill.equals("transparent", true) && shapePaint.color != android.graphics.Color.TRANSPARENT) {
-                    canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
+                val vectorShape = uxNativeShapePath(layer.kind, rect)
+                if (layer.kind == "line") {
+                    shapePaint.color = runCatching { android.graphics.Color.parseColor(layer.fill) }.getOrDefault(android.graphics.Color.DKGRAY)
+                    shapePaint.style = Paint.Style.STROKE
+                    shapePaint.strokeWidth = maxOf(1f, layer.height.toFloat(), layer.borderWidth.toFloat())
+                    canvas.drawLine(rect.left, rect.centerY(), rect.right, rect.centerY(), shapePaint)
+                } else if (!layer.fill.equals("transparent", true) && shapePaint.color != android.graphics.Color.TRANSPARENT) {
+                    if (vectorShape != null) canvas.drawPath(vectorShape, shapePaint)
+                    else canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
                 }
-                if (layer.borderWidth > 0) {
+                if (layer.borderWidth > 0 && layer.kind != "line") {
                     shapePaint.color = runCatching { android.graphics.Color.parseColor(layer.borderColor) }
                         .getOrDefault(android.graphics.Color.LTGRAY)
                     shapePaint.style = Paint.Style.STROKE
                     shapePaint.strokeWidth = layer.borderWidth.toFloat()
-                    canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
+                    if (vectorShape != null) canvas.drawPath(vectorShape, shapePaint)
+                    else canvas.drawRoundRect(rect, layer.radius.toFloat(), layer.radius.toFloat(), shapePaint)
                 }
                 when {
                     layer.kind == "icon" && layer.iconSvg.isNotBlank() -> uxNativeDrawSvgIcon(canvas, layer)
