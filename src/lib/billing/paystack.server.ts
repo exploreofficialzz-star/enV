@@ -60,7 +60,7 @@ export function getFundingOptions() {
     providers: [
       {
         id: "paystack",
-        label: "Card & local payments",
+        label: "Pay with cards",
         enabled,
         currency: "NGN",
         pricePerTokenMinor: pricePerTokenMinor ?? null,
@@ -69,7 +69,7 @@ export function getFundingOptions() {
       },
       {
         id: "cryptomus",
-        label: "Cryptocurrency",
+        label: "Pay with crypto",
         enabled: cryptomusEnabled,
         currency: "USD",
         pricePerTokenMinor: cryptoPricePerTokenMinor ?? null,
