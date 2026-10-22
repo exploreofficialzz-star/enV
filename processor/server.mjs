@@ -33,12 +33,23 @@ function failSafely(req, res, status, code, message, cause) {
 function authorized(req) { return SHARED_SECRET ? req.headers["x-processor-key"] === SHARED_SECRET : process.env.NODE_ENV !== "production"; }
 async function childServiceReadiness() {
   const checks = await Promise.all([...services.entries()].map(async ([name, { child, port }]) => {
-    if (child.exitCode !== null || child.signalCode !== null) return [name, false];
+    if (child.exitCode !== null || child.signalCode !== null) {
+      console.error(`[health] processor=${name} is not running exitCode=${child.exitCode ?? "null"} signalCode=${child.signalCode ?? "null"}`);
+      return [name, false];
+    }
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1500) });
+      // The URL media health check may run yt-dlp's first Python startup. Give
+      // the child enough time to finish its cached readiness probe on cold starts.
+      const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(8000) });
       const body = await response.json().catch(() => ({}));
-      return [name, response.ok && body?.ok === true && body?.ready !== false];
-    } catch {
+      const ready = response.ok && body?.ok === true && body?.ready !== false;
+      if (!ready) {
+        console.error(`[health] processor=${name} reported not-ready status=${response.status} bodyOk=${String(body?.ok)} bodyReady=${String(body?.ready)}`);
+      }
+      return [name, ready];
+    } catch (error) {
+      const causeType = error instanceof Error ? error.name : "UnknownError";
+      console.error(`[health] processor=${name} check failed causeType=${causeType}`);
       return [name, false];
     }
   }));
