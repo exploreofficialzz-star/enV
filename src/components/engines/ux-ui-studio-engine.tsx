@@ -634,7 +634,7 @@ export function UxUiStudioEngine() {
       setIconLoading(true);
       setIconError("");
       try {
-        const url = "https://api.iconify.design/search?query=" + encodeURIComponent(iconQuery.trim()) + "&limit=32&start=" + iconStart;
+        const url = "https://api.iconify.design/search?query=" + encodeURIComponent(iconQuery.trim()) + "&limit=32&start=" + iconStart + (iconPrefix !== "all" ? "&prefix=" + encodeURIComponent(iconPrefix) : "");
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("The icon catalogue is temporarily unavailable.");
         const payload = await response.json() as { icons?: string[]; total?: number; collections?: typeof iconCollections };
@@ -879,6 +879,7 @@ export function UxUiStudioEngine() {
     setExporting(true);
     setNotice("");
     try {
+      await document.fonts.ready;
       const bytes = await buildPdf(project, artboardRef.current, aiPrompt);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -1042,7 +1043,7 @@ export function UxUiStudioEngine() {
             <p className="mt-3 text-[10px] leading-4 text-muted">The font library includes common open font families plus custom-font import. Retain each font’s licence when redistributing a project.</p>
           </div>}
 
-          {leftTab === "presets" && <div className="mt-3">{leftTab === "presets" && <div className="mt-3">
+          {leftTab === "presets" && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Starter layouts</h3><p className="mt-1 text-[11px] leading-4 text-muted">Curated responsive starting points, then customise every layer.</p>
             <div className="mt-3 space-y-2">{PRESETS.map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2"><span className="block text-xs font-semibold text-fg">{preset.label}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{preset.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas</span></button>)}</div>
           </div>}
