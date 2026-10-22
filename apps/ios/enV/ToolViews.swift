@@ -4,6 +4,7 @@ import AVKit
 import AudioToolbox
 import UIKit
 import WebKit
+import CoreText
 import CoreImage
 import UniformTypeIdentifiers
 
@@ -6679,6 +6680,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var iconName: String = ""
     var iconSvg: String? = nil
     var imageData: String? = nil
+    var fontData: String? = nil
     var color: String = "#111827"
     var fill: String = "transparent"
     var borderColor: String = "#E5E7EB"
@@ -6702,11 +6704,12 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var referenceHeight: Int = 844
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
+    var fontData: String? = nil
 
     init(
         id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
         width: Int, height: Int, text: String, iconName: String = "",
-        iconSvg: String? = nil, imageData: String? = nil,
+        iconSvg: String? = nil, imageData: String? = nil, fontData: String? = nil,
         color: String = "#111827", fill: String = "transparent",
         borderColor: String = "#E5E7EB", borderWidth: Int = 0,
         radius: Int = 12, padding: Int = 12,
@@ -6716,7 +6719,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         minWidth: Int = 0, maxWidth: Int = 0,
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
-        componentKey: String = "", iconViewBox: String = "0 0 24 24"
+        componentKey: String = "", iconViewBox: String = "0 0 24 24", fontData: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -6729,6 +6732,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.iconName = iconName
         self.iconSvg = iconSvg
         self.imageData = imageData
+        self.fontData = fontData
         self.color = color
         self.fill = fill
         self.borderColor = borderColor
@@ -6752,10 +6756,11 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.referenceHeight = referenceHeight
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
+        self.fontData = fontData
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData
+        case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData, fontData, fontData
         case color, fill, borderColor, borderWidth, radius, padding
         case marginTop, marginRight, marginBottom, marginLeft
         case fontFamily, fontSize, fontWeight, lineHeight
@@ -6776,6 +6781,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         iconName = try c.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         iconSvg = try c.decodeIfPresent(String.self, forKey: .iconSvg)
         imageData = try c.decodeIfPresent(String.self, forKey: .imageData)
+        fontData = try c.decodeIfPresent(String.self, forKey: .fontData)
+        fontData = try c.decodeIfPresent(String.self, forKey: .fontData)
         color = try c.decodeIfPresent(String.self, forKey: .color) ?? "#111827"
         fill = try c.decodeIfPresent(String.self, forKey: .fill) ?? "transparent"
         borderColor = try c.decodeIfPresent(String.self, forKey: .borderColor) ?? "#E5E7EB"
@@ -6802,6 +6809,93 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     }
 }
 
+
+
+private let uxUiFontFamilies: [(String, String)] = [
+    ("Inter","Sans serif"),("Roboto","Sans serif"),("Open Sans","Sans serif"),("Lato","Sans serif"),
+    ("Montserrat","Sans serif"),("Poppins","Sans serif"),("Nunito","Sans serif"),("Source Sans 3","Sans serif"),
+    ("Work Sans","Sans serif"),("DM Sans","Sans serif"),("Manrope","Sans serif"),("Plus Jakarta Sans","Sans serif"),
+    ("Urbanist","Sans serif"),("Outfit","Sans serif"),("IBM Plex Sans","Sans serif"),("Noto Sans","Sans serif"),
+    ("Ubuntu","Sans serif"),("Rubik","Sans serif"),("Mulish","Sans serif"),("Quicksand","Sans serif"),
+    ("Barlow","Sans serif"),("Karla","Sans serif"),("Merriweather","Serif"),("Playfair Display","Serif"),
+    ("Lora","Serif"),("PT Serif","Serif"),("Libre Baskerville","Serif"),("Roboto Slab","Serif"),
+    ("Fraunces","Serif"),("Cormorant Garamond","Serif"),("Crimson Text","Serif"),("Bitter","Serif"),
+    ("JetBrains Mono","Monospace"),("Fira Code","Monospace"),("IBM Plex Mono","Monospace"),
+    ("Source Code Pro","Monospace"),("Space Mono","Monospace"),("Inconsolata","Monospace"),
+    ("Oswald","Display"),("Bebas Neue","Display"),("Archivo Black","Display"),("Anton","Display"),
+    ("Space Grotesk","Display"),("Syne","Display"),("Caveat","Handwriting"),("Pacifico","Handwriting"),
+    ("Dancing Script","Handwriting"),("Satisfy","Handwriting"),("System","System"),("Georgia","System"),
+    ("Times New Roman","System"),("Menlo","System"),("Avenir Next","System")
+]
+private let uxUiIconSets: [(String, String)] = [
+    ("all","All styles"),("lucide","Lucide · line"),("tabler","Tabler · outline"),
+    ("material-symbols","Material Symbols"),("mdi","Material Design"),("ph","Phosphor"),
+    ("solar","Solar"),("carbon","Carbon"),("fa6-solid","Font Awesome"),("heroicons","Heroicons"),
+    ("fluent","Fluent"),("iconamoon","Iconamoon"),("mingcute","MingCute")
+]
+private let uxUiIconCategories: [(String, [String])] = [
+    ("Navigation",["lucide:house","tabler:home","material-symbols:home-rounded","mdi:home","ph:house","solar:home-linear","lucide:menu","tabler:menu-2","mdi:menu","ph:list","lucide:arrow-left","tabler:arrow-left","lucide:chevron-down","tabler:chevron-down"]),
+    ("Actions",["lucide:plus","tabler:plus","material-symbols:add-rounded","mdi:plus","ph:plus-bold","lucide:check","tabler:check","mdi:check-bold","lucide:x","tabler:x","lucide:pencil","tabler:edit","lucide:trash-2","tabler:trash","lucide:copy","tabler:copy"]),
+    ("Forms",["lucide:mail","tabler:mail","mdi:email-outline","ph:envelope","lucide:lock","tabler:lock","lucide:eye","tabler:eye","lucide:calendar","tabler:calendar","lucide:clock","tabler:clock","lucide:sliders-horizontal","tabler:adjustments"]),
+    ("Communication",["lucide:message-circle","tabler:message-circle","mdi:message-outline","lucide:bell","tabler:bell","mdi:bell-outline","lucide:phone","tabler:phone","lucide:send","tabler:send","lucide:users","tabler:users"]),
+    ("Media",["lucide:image","tabler:photo","mdi:image-outline","lucide:camera","tabler:camera","lucide:video","tabler:video","lucide:music","tabler:music","lucide:mic","tabler:microphone","lucide:play","tabler:player-play"]),
+    ("Commerce",["lucide:shopping-cart","tabler:shopping-cart","mdi:cart-outline","lucide:credit-card","tabler:credit-card","mdi:credit-card-outline","lucide:wallet","tabler:wallet","lucide:package","tabler:package","lucide:tag","tabler:tag"]),
+    ("Data",["lucide:chart-column","tabler:chart-bar","mdi:chart-bar","lucide:chart-line","tabler:chart-line","lucide:pie-chart","tabler:chart-pie","lucide:database","tabler:database","lucide:table","tabler:table","lucide:activity"]),
+    ("Devices",["lucide:smartphone","tabler:device-mobile","mdi:cellphone","lucide:tablet","tabler:device-tablet","mdi:tablet","lucide:laptop","tabler:device-laptop","lucide:monitor","tabler:device-desktop","lucide:wifi","tabler:wifi"]),
+    ("Files",["lucide:file-text","tabler:file-text","mdi:file-document-outline","lucide:folder","tabler:folder","lucide:cloud","tabler:cloud","lucide:code","tabler:code","lucide:terminal","tabler:terminal-2"]),
+    ("Shapes",["lucide:circle","tabler:circle","mdi:circle-outline","lucide:square","tabler:square","lucide:triangle","tabler:triangle","lucide:star","tabler:star","lucide:heart","tabler:heart","lucide:hexagon","tabler:hexagon","lucide:diamond","tabler:diamond"])
+]
+
+private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> Bool {
+    guard let comma = dataURL.firstIndex(of: ",") else { return false }
+    let header = String(dataURL[..<comma]).lowercased()
+    guard header == "data:font/ttf;base64" || header == "data:font/otf;base64" else { return false }
+    guard let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),
+          data.count <= 4 * 1024 * 1024 else { return false }
+    let ext = header.contains("otf") ? "otf" : "ttf"
+    let safeName = family.replacingOccurrences(of: "[^a-zA-Z0-9-]+", with: "-", options: .regularExpression)
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-ux-font-\(safeName).\(ext)")
+    do {
+        try data.write(to: url, options: .atomic)
+        var error: Unmanaged<CFError>?
+        let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
+        return ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil
+    } catch { return false }
+}
+
+private struct UxUiNativeShape: Shape {
+    let kind: String
+    let radius: CGFloat
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w=rect.width, h=rect.height, x=rect.minX, y=rect.minY
+        switch kind {
+        case "ellipse", "avatar": path.addEllipse(in: rect)
+        case "triangle":
+            path.move(to: CGPoint(x:x+w/2,y:y)); path.addLine(to: CGPoint(x:x+w,y:y+h)); path.addLine(to: CGPoint(x:x,y:y+h)); path.closeSubpath()
+        case "diamond":
+            path.move(to: CGPoint(x:x+w/2,y:y)); path.addLine(to: CGPoint(x:x+w,y:y+h/2)); path.addLine(to: CGPoint(x:x+w/2,y:y+h)); path.addLine(to: CGPoint(x:x,y:y+h/2)); path.closeSubpath()
+        case "hexagon":
+            path.move(to: CGPoint(x:x+w*0.25,y:y)); path.addLine(to: CGPoint(x:x+w*0.75,y:y)); path.addLine(to: CGPoint(x:x+w,y:y+h/2)); path.addLine(to: CGPoint(x:x+w*0.75,y:y+h)); path.addLine(to: CGPoint(x:x+w*0.25,y:y+h)); path.addLine(to: CGPoint(x:x,y:y+h/2)); path.closeSubpath()
+        case "star":
+            for index in 0..<10 {
+                let r: CGFloat = index % 2 == 0 ? 0.5 : 0.21
+                let angle = -Double.pi/2 + Double(index)*Double.pi/5
+                let point = CGPoint(x:x+w/2+CGFloat(cos(angle))*w*r,y:y+h/2+CGFloat(sin(angle))*h*r)
+                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            path.closeSubpath()
+        case "line":
+            path.move(to: CGPoint(x:rect.minX,y:rect.midY)); path.addLine(to: CGPoint(x:rect.maxX,y:rect.midY))
+        case "pill":
+            let side = min(rect.width,rect.height)/2
+            path.addRoundedRect(in: rect, cornerSize: CGSize(width: side,height: side))
+        default:
+            path.addRoundedRect(in: rect, cornerSize: CGSize(width: radius,height: radius))
+        }
+        return path
+    }
+}
 
 private func uxUiNativeImage(fromDataURL dataURL: String) -> UIImage? {
     guard let comma = dataURL.firstIndex(of: ",") else { return nil }
@@ -7348,13 +7442,19 @@ private struct NativeUxUiStudioView: View {
     @State private var selectedID: UUID?
     @State private var notice = ""
     @State private var hasSavedDraft = false
-    @State private var iconQuery = "home"
+    @State private var iconQuery = ""
+    @State private var iconCategory = "Navigation"
+    @State private var iconPrefix = "all"
+    @State private var fontQuery = ""
+    @State private var fontCategory = "All"
     @State private var iconResults: [String] = []
     @State private var iconTotal = 0
     @State private var iconLoadedQuery = ""
     @State private var isSearchingIcons = false
     @State private var isImportingImage = false
     @State private var imageTargetID: UUID?
+    @State private var isImportingFont = false
+    @State private var fontTargetID: UUID?
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
     @State private var isExportingSource = false
@@ -8278,7 +8378,8 @@ private struct NativeUxUiStudioView: View {
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return }
         let append = loadMore && query == iconLoadedQuery
         let offset = append ? iconResults.count : 0
-        guard let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32&start=\(offset)") else { return }
+        let prefixParam = iconPrefix == "all" ? "" : "&prefix=\(iconPrefix.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? iconPrefix)"
+        guard let url = URL(string: "https://api.iconify.design/search?query=\(encoded)&limit=32&start=\(offset)\(prefixParam)") else { return }
         isSearchingIcons = true
         Task {
             do {
