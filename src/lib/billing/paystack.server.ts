@@ -21,23 +21,64 @@ function publicOrigin(): string | null {
 }
 
 export function getFundingOptions() {
+  const launchChecksPassed = process.env.BILLING_LAUNCH_ENABLED === "true" &&
+    process.env.BILLING_ENFORCEMENT_ENABLED === "true" && Boolean(publicOrigin());
   const pricePerTokenMinor = positiveSafeInteger(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO);
-  const enabled = process.env.BILLING_LAUNCH_ENABLED === "true" &&
-    process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
-    Boolean(process.env.PAYSTACK_SECRET_KEY) && pricePerTokenMinor !== null && Boolean(publicOrigin());
+  const paystackApproved = process.env.PAYSTACK_PROVIDER_APPROVED === "true";
+  const enabled = launchChecksPassed && paystackApproved &&
+    Boolean(process.env.PAYSTACK_SECRET_KEY) && pricePerTokenMinor !== null;
+
+  const cryptoPricePerTokenMinor = positiveSafeInteger(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS);
+  const cryptomusEnabled = launchChecksPassed &&
+    process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
+    Boolean(process.env.CRYPTOMUS_MERCHANT_ID) &&
+    Boolean(process.env.CRYPTOMUS_PAYMENT_API_KEY) &&
+    cryptoPricePerTokenMinor !== null;
+
+  const packsFor = (price: number | null, currency: string) => TOKEN_PACKS.map((tokens) => ({
+    tokens,
+    amountMinor: price !== null ? tokens * price : null,
+    currency,
+  }));
+  const paystackMessage = enabled
+    ? "Choose a token pack. Payment is verified by enV before tokens are added."
+    : !paystackApproved
+      ? "Card and local payments are unavailable until Paystack has explicitly approved enV's token-wallet business model."
+      : "Secure card checkout is not configured for this deployment. No payment was taken.";
+  const cryptomusMessage = cryptomusEnabled
+    ? "Choose a token pack. enV verifies the final crypto invoice with Cryptomus before crediting your wallet."
+    : process.env.CRYPTOMUS_PROVIDER_APPROVED !== "true"
+      ? "Crypto payments are unavailable until Cryptomus onboarding and the required compliance review are approved."
+      : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
+
   return {
     enabled,
     provider: "paystack",
     currency: "NGN",
     pricePerTokenMinor: pricePerTokenMinor ?? null,
-    packs: TOKEN_PACKS.map((tokens) => ({
-      tokens,
-      amountMinor: pricePerTokenMinor !== null ? tokens * pricePerTokenMinor : null,
-      currency: "NGN",
-    })),
-    message: enabled
-      ? "Choose a token pack. Payment is verified by enV before tokens are added."
-      : "No payment was taken. Wallet funding is not live yet. Provider credentials, an approved NGN token price, persistent database, and billing launch checks must all be configured first.",
+    packs: packsFor(pricePerTokenMinor, "NGN"),
+    providers: [
+      {
+        id: "paystack",
+        label: "Card & local payments",
+        enabled,
+        currency: "NGN",
+        pricePerTokenMinor: pricePerTokenMinor ?? null,
+        packs: packsFor(pricePerTokenMinor, "NGN"),
+        message: paystackMessage,
+      },
+      {
+        id: "cryptomus",
+        label: "Cryptocurrency",
+        enabled: cryptomusEnabled,
+        currency: "USD",
+        pricePerTokenMinor: cryptoPricePerTokenMinor ?? null,
+        packs: packsFor(cryptoPricePerTokenMinor, "USD"),
+        message: cryptomusMessage,
+      },
+    ],
+    anyEnabled: enabled || cryptomusEnabled,
+    message: paystackMessage,
   };
 }
 
