@@ -71,7 +71,7 @@ test("gateway and media processor fail safely and report actual readiness", asyn
   assert.match(gateway, /servicesReady \? 200 : 503/);
   assert.match(gateway, /await childServiceReadiness\(\)/);
   assert.match(gateway, /APPLICATION_API_UNAVAILABLE/);
-  assert.doesNotMatch(gateway, /Application API unavailable: \\${error/);
+  assert.equal(gateway.includes("Application API unavailable:"), false);
   assert.match(media, /MEDIA_PROCESSING_FAILED/);
   assert.doesNotMatch(media, /json\(res, 500, \{ error: error instanceof Error \? error\.message/);
 });
