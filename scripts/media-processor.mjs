@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFormDataBounded, RequestBodyError } from "../backend/request-body.mjs";
 import { createMediaJobAdmission } from "./media/processor-admission.mjs";
 
 const HOST = process.env.MEDIA_HOST || "0.0.0.0";
@@ -64,7 +65,7 @@ function contentHeaders(mime, disposition) {
 
 async function readForm(req) {
   const request = new Request(`http://${req.headers.host || "localhost"}${req.url || "/"}`, { method: req.method, headers: req.headers, body: req, duplex: "half" });
-  return request.formData();
+  return readFormDataBounded(request, MAX_BYTES);
 }
 
 function runFfmpeg(args, duration, signal) {
@@ -168,7 +169,7 @@ const server = http.createServer(async (req, res) => {
     // while this response still retains its result buffer. Release is idempotent for all exits.
     res.once("finish", release);
     res.once("close", release);
-    try { await handleMedia(req, res); } catch (error) { const requestId = randomUUID(); console.error(`[media] MEDIA_PROCESSING_FAILED requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, 500, { ok: false, error: "We couldn’t complete this media operation. Check the file format and try again.", code: "MEDIA_PROCESSING_FAILED", message: "We couldn’t complete this media operation. Check the file format and try again.", requestId }); }
+    try { await handleMedia(req, res); } catch (error) { const requestId = randomUUID(); console.error(`[media] MEDIA_PROCESSING_FAILED requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) { if (error instanceof RequestBodyError) { json(res, error.status, { ok: false, error: error.message, code: error.code, message: error.message, requestId }); } else { json(res, 500, { ok: false, error: "We couldn’t complete this media operation. Check the file format and try again.", code: "MEDIA_PROCESSING_FAILED", message: "We couldn’t complete this media operation. Check the file format and try again.", requestId }); } } }
     finally {
       if (res.writableFinished || res.destroyed || !res.headersSent) release();
       else { res.once("finish", release); res.once("close", release); }

@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFormDataBounded, RequestBodyError } from "../backend/request-body.mjs";
 
 const HOST = process.env.TRANSCRIBE_HOST || "0.0.0.0";
 const PORT = Number(process.env.TRANSCRIBE_PORT || 8788);
@@ -30,7 +31,7 @@ function headers(mime, disposition) {
 }
 async function readForm(req) {
   const request = new Request(`http://${req.headers.host || "localhost"}${req.url || "/"}`, { method: req.method, headers: req.headers, body: req, duplex: "half" });
-  return request.formData();
+  return readFormDataBounded(request, MAX_BYTES);
 }
 async function commandAvailable() {
   if (TRANSCRIBE_ENGINE === "faster-whisper") return pythonAvailable();
@@ -121,7 +122,7 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: available && (TRANSCRIBE_ENGINE === "faster-whisper" || Boolean(WHISPER_MODEL)), service: "enV transcription processor", engine: TRANSCRIBE_ENGINE, whisper: WHISPER_BIN, executableAvailable: available, modelConfigured: TRANSCRIBE_ENGINE === "faster-whisper" ? Boolean(FASTER_WHISPER_MODEL) : Boolean(WHISPER_MODEL), formats: ["txt", "srt", "vtt"] });
   }
   if (req.method === "POST" && req.url === "/transcribe") {
-    try { await handleTranscription(req, res); } catch (error) { console.error(error); if (!res.headersSent) json(res, 500, { error: error instanceof Error ? error.message : "Transcription failed." }); }
+    try { await handleTranscription(req, res); } catch (error) { const requestId = randomUUID(); if (error instanceof RequestBodyError) { if (!res.headersSent) json(res, error.status, { ok: false, error: error.message, code: error.code, message: error.message, requestId }); } else { console.error(`[transcription] TRANSCRIPTION_FAILED requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, 500, { ok: false, error: "We couldn’t complete transcription. Check the media file and try again later.", code: "TRANSCRIPTION_FAILED", message: "We couldn’t complete transcription. Check the media file and try again later.", requestId }); } }
     return;
   }
   json(res, 404, { error: "Not found." });

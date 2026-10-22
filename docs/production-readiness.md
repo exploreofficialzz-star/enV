@@ -43,6 +43,17 @@ Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) an
 
 Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design. Email verification, password reset, OIDC callbacks, account recovery, and session revocation still require staging sign-off before enabling a public launch.
 
+## Processor gateway and media uploads
+
+The Render blueprint is defined in `render.yaml`. Before enabling server-dependent tools in a production deployment:
+
+1. Deploy the processor service and confirm its `/health` endpoint reports ready.
+2. Render generates `PROCESSOR_SHARED_SECRET` for the processor service. Copy that exact value into the Vercel server-side `PROCESSOR_SHARED_SECRET` environment setting. The two values must match; do not expose this secret through a `VITE_` variable or commit it.
+3. Configure Vercel `MEDIA_PROCESSOR_URL=https://env-q3mq.onrender.com/media`, `URL_MEDIA_PROCESSOR_URL=https://env-q3mq.onrender.com`, and `BACKEND_ALLOWED_ORIGIN=https://envtools.store` for the canonical production site. Keep processor URLs and credentials server-side.
+4. Verify media and URL-media health, upload-size rejection, a successful safe test operation, and temporary-upstream-failure handling from the deployed web API.
+
+The Render service has an aggregate request-body limit as well as per-file validation. The web document, image, screenshot, PDF and local OCR handlers enforce a 100 MB combined request-body cap before parsing multipart uploads. The standalone transcription service remains disabled until a supported runtime/model is deployed.
+
 ## Security headers
 
 `vercel.json` applies these baseline headers to application responses:

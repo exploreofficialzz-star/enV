@@ -1,6 +1,17 @@
 import { defineHandler } from "nitro/h3";
+import { randomUUID } from "node:crypto";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
 import { initializePaystackCheckout } from "../../../../src/lib/billing/paystack.server";
+
+const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
+  PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
+  INVALID_PURCHASE: { status: 400, message: "Choose a valid token pack and try again." },
+  INVALID_PRICE_CONFIGURATION: { status: 503, message: "Token pricing is temporarily unavailable. No payment was taken." },
+  IDEMPOTENCY_CONFLICT: { status: 409, message: "This checkout key was already used for another purchase. Start a new checkout." },
+  CHECKOUT_ALREADY_USED: { status: 409, message: "This checkout attempt has already been used. Start a new checkout." },
+  ACCOUNT_EMAIL_REQUIRED: { status: 400, message: "Add a valid email address to your enV account before funding the wallet." },
+  PAYSTACK_INITIALIZATION_FAILED: { status: 502, message: "Checkout could not be initialized. No wallet tokens were added and no confirmed payment was recorded." },
+};
 
 /** Checkout is opened server-side and remains closed until launch, enforcement, auth, and pricing are configured. */
 export default defineHandler(async (event) => {
@@ -22,10 +33,18 @@ export default defineHandler(async (event) => {
     });
     return jsonResponse({ ok: true, data: checkout }, 201);
   } catch (error) {
-    const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
-    const status = typeof candidate.status === "number" ? candidate.status : 503;
-    const code = typeof candidate.code === "string" ? candidate.code : "PAYMENTS_UNAVAILABLE";
-    const message = typeof candidate.message === "string" ? candidate.message : "Checkout is unavailable. No payment was taken.";
-    return jsonResponse({ ok: false, error: code, message }, status);
+    const candidate = error as { code?: unknown };
+    const candidateCode = typeof candidate.code === "string" ? candidate.code : "";
+    const knownFailure = SAFE_CHECKOUT_FAILURES[candidateCode];
+    const requestId = randomUUID();
+    if (!knownFailure) {
+      console.error(`[billing-purchase] PAYMENTS_UNAVAILABLE requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`);
+    }
+    return jsonResponse({
+      ok: false,
+      error: knownFailure ? candidateCode : "PAYMENTS_UNAVAILABLE",
+      message: knownFailure?.message ?? "Checkout is temporarily unavailable. No payment was recorded. Please try again shortly.",
+      requestId,
+    }, knownFailure?.status ?? 503);
   }
 });

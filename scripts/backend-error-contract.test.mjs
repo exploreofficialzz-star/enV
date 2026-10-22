@@ -154,3 +154,28 @@ test("file-processing routes enforce the shared multipart byte cap", async () =>
     assert.match(source, /RequestBodyError/, path);
   }
 });
+
+
+test("standalone processors apply bounded multipart parsing and safe failures", async () => {
+  const media = await readFile(new URL("./media-processor.mjs", import.meta.url), "utf8");
+  const transcription = await readFile(new URL("./transcription-processor.mjs", import.meta.url), "utf8");
+  const docker = await readFile(new URL("../processor/Dockerfile", import.meta.url), "utf8");
+  assert.match(media, /readFormDataBounded\(request, MAX_BYTES\)/);
+  assert.match(media, /error instanceof RequestBodyError/);
+  assert.match(transcription, /readFormDataBounded\(request, MAX_BYTES\)/);
+  assert.match(transcription, /TRANSCRIPTION_FAILED/);
+  assert.match(docker, /COPY backend\/request-body\.mjs \.\/backend\/request-body\.mjs/);
+});
+
+test("unexpected checkout errors cannot leak provider or database exception messages", async () => {
+  const source = await readFile(new URL("../server/routes/api/billing/purchases.post.ts", import.meta.url), "utf8");
+  assert.match(source, /SAFE_CHECKOUT_FAILURES/);
+  assert.match(source, /PAYMENTS_UNAVAILABLE/);
+  assert.match(source, /requestId/);
+  assert.doesNotMatch(source, /candidate\.message/);
+});
+
+test("production API CORS defaults to the canonical app origin", async () => {
+  const source = await readFile(new URL("../backend/config.ts", import.meta.url), "utf8");
+  assert.match(source, /process\.env\.NODE_ENV === "production" \? "https:\/\/envtools\.store" : "\*"/);
+});

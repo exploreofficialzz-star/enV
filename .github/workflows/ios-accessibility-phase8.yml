@@ -37,7 +37,6 @@ jobs:
           xcrun simctl list devices available
       - name: Run native UI and system accessibility audits
         id: ui-tests
-        continue-on-error: true
         run: |
           xcodebuild test \
             -project apps/ios/enV.xcodeproj \

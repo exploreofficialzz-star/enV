@@ -13,6 +13,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY backend/request-body.mjs ./backend/request-body.mjs
 COPY processor/server.mjs ./processor/server.mjs
 COPY processor/url-media-route.mjs ./processor/url-media-route.mjs
 COPY scripts/media-processor.mjs ./scripts/media-processor.mjs

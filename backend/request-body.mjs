@@ -88,7 +88,7 @@ export async function readJsonObject(request, maxBytes = 128 * 1024) {
 
 
 const INVALID_MULTIPART_MESSAGE = "The uploaded form is invalid. Check the files and try again.";
-const MULTIPART_TOO_LARGE_MESSAGE = "The combined upload is too large. Keep the files under the 100 MB limit and try again.";
+const MULTIPART_TOO_LARGE_MESSAGE = "The upload is too large. Reduce the combined file size and try again.";
 
 /**
  * Parse a bounded multipart upload before allocating File objects.

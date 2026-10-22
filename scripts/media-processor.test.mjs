@@ -5,7 +5,7 @@ import { once } from "node:events";
 import fs from "node:fs/promises";
 
 const PORT = 8791;
-const server = spawn(process.execPath, ["scripts/media-processor.mjs"], { env: { ...process.env, MEDIA_PORT: String(PORT) }, cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn(process.execPath, ["scripts/media-processor.mjs"], { env: { ...process.env, MEDIA_PORT: String(PORT), MEDIA_MAX_BYTES: String(2 * 1024 * 1024) }, cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] });
 await new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error("media processor did not start")), 5000);
   server.stdout.on("data", (chunk) => { if (chunk.toString().includes("listening")) { clearTimeout(timer); resolve(); } });
@@ -22,6 +22,18 @@ try {
     assert.ok(body.operations.includes("video-merge"));
     assert.ok(body.operations.includes("audio-merge"));
     assert.ok(body.operations.includes("video-replace-audio"));
+  });
+
+  await test("rejects oversized uploads before multipart parsing", async () => {
+    const form = new FormData();
+    form.append("file", new Blob([Buffer.alloc(3 * 1024 * 1024)], { type: "video/mp4" }), "oversized.mp4");
+    form.append("operation", "video-to-mp4");
+    form.append("params", "{}");
+    const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
+    const body = await response.json();
+    assert.equal(response.status, 413);
+    assert.equal(body.code, "REQUEST_TOO_LARGE");
+    assert.match(body.message, /upload is too large/i);
   });
 
   await test("FFmpeg media processor converts real video and audio formats", async () => {

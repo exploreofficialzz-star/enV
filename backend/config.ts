@@ -17,7 +17,7 @@ export function backendConfig() {
     documents: firstEnv("DOCUMENT_PROCESSOR_URL", "VITE_DOCUMENT_PROCESSOR_URL"),
     websiteScreenshot: firstEnv("WEBSITE_SCREENSHOT_API_URL", "VITE_WEBSITE_SCREENSHOT_API_URL"),
     processorSecret: trim(process.env.PROCESSOR_SHARED_SECRET),
-    allowedOrigin: trim(process.env.BACKEND_ALLOWED_ORIGIN) || "*",
+    allowedOrigin: trim(process.env.BACKEND_ALLOWED_ORIGIN) || (process.env.NODE_ENV === "production" ? "https://envtools.store" : "*"),
   };
 }
 
