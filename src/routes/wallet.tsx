@@ -181,7 +181,7 @@ function Account() {
   const [showFundingOptions, setShowFundingOptions] = useState(false);
   const [selectedFundingProvider, setSelectedFundingProvider] = useState<FundingProviderId | null>(null);
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", providers: [] });
-  const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [showVideoDetails, setShowVideoDetails] = useState(false);
@@ -254,9 +254,45 @@ function Account() {
     const params = new URLSearchParams(window.location.search);
     const paymentState = params.get("payment");
     if (paymentState === "crypto-pending") {
-      setFundingFeedback({ kind: "success", message: "You returned from crypto checkout. Your balance changes only after the provider confirms and enV verifies the payment." });
+      const reference = params.get("reference") ?? "";
+      setFundingFeedback({ kind: "info", message: "Checking the crypto invoice with the payment provider. enV will add tokens only after the payment is confirmed." });
       setReloadKey(value => value + 1);
       window.history.replaceState({}, "", "/wallet");
+      if (/^[a-f0-9-]{36}$/i.test(reference)) {
+        void fetch("/api/billing/cryptomus/verify", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ reference }),
+        }).then(async (response) => {
+          const payload = await response.json().catch(() => null) as {
+            ok?: boolean;
+            data?: { status?: string; credited?: boolean };
+            message?: string;
+          } | null;
+          if (!response.ok || !payload?.ok || !payload.data?.status) {
+            throw new Error(payload?.message ?? "The crypto payment could not be checked yet.");
+          }
+          const status = payload.data.status;
+          if (payload.data.credited || status === "credited" || status === "already-processed") {
+            setFundingFeedback({ kind: "success", message: "Crypto payment verified by enV. Your wallet has been refreshed." });
+          } else if (status === "pending") {
+            setFundingFeedback({ kind: "info", message: "The crypto payment is still processing. No tokens have been added yet; your wallet will update after provider verification." });
+          } else if (status === "requires-review") {
+            setFundingFeedback({ kind: "error", message: "The crypto provider flagged this invoice for review. No additional tokens were credited. Contact enV support before making another payment." });
+          } else if (status === "cancelled" || status === "failed") {
+            setFundingFeedback({ kind: "error", message: "The crypto payment was not completed, so no tokens were added." });
+          } else {
+            setFundingFeedback({ kind: "info", message: "The crypto invoice has not reached a final paid state. No tokens were added yet." });
+          }
+          setReloadKey(value => value + 1);
+        }).catch(() => {
+          setFundingFeedback({ kind: "info", message: "The crypto invoice could not be checked just now. No tokens were added by the return page; the verified provider callback can still update your wallet." });
+          setReloadKey(value => value + 1);
+        });
+      } else {
+        setFundingFeedback({ kind: "info", message: "The crypto payment reference was not provided. Your wallet will change only after the payment provider confirms a matching invoice." });
+      }
     } else if (paymentState === "success") {
       setFundingFeedback({ kind: "success", message: "Payment verified by enV. Your wallet has been refreshed." });
       setReloadKey(value => value + 1);
@@ -848,7 +884,7 @@ function Account() {
           </article>
         </section>
 
-        {fundingFeedback ? <p className={`rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : "border-rose-500/30 bg-rose-500/5 text-fg"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
+        {fundingFeedback ? <p className={`rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : fundingFeedback.kind === "error" ? "border-rose-500/30 bg-rose-500/5 text-fg" : "border-border bg-surface-2 text-muted"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
 
         <section className="mt-3 rounded-[20px] border border-border bg-surface p-3 shadow-sm sm:p-4" aria-labelledby="recent-transactions-title">
           <div className="flex items-center justify-between gap-3">
