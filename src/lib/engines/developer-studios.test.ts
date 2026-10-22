@@ -533,7 +533,8 @@ test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and 
   assert.match(html, /clip-path:polygon/);
   assert.match(html, /@font-face/);
   assert.ok(html.includes("data:image/png;base64"));
-  assert.match(html, /lucide:house/);
+  assert.ok(html.includes("aria-label=\"Home icon\""));
+  assert.ok(html.includes("M2 12 L12 2 L22 12 V22 H2 Z"));
   assert.match(react, /embeddedFontCss/);
   assert.ok(react.includes("data:image/png;base64"));
   assert.match(kotlin, /generatedUxShape/);
