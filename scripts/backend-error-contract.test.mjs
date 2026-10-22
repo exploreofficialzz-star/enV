@@ -50,8 +50,8 @@ test("bounded JSON reader caps streaming bodies without a content-length header"
 });
 
 test("bounded JSON reader rejects invalid JSON and non-object JSON", async () => {
-  await assert.rejects(readJsonObject(request("{"), (error) => error.code === "INVALID_JSON" && error.status === 400);
-  await assert.rejects(readJsonObject(request("[]"), (error) => error.code === "JSON_OBJECT_REQUIRED" && error.status === 400);
+  await assert.rejects(readJsonObject(request("{")), (error) => error.code === "INVALID_JSON" && error.status === 400);
+  await assert.rejects(readJsonObject(request("[]")), (error) => error.code === "JSON_OBJECT_REQUIRED" && error.status === 400);
 });
 
 test("backend tool route uses bounded request parsing and sanitized internal failures", async () => {
