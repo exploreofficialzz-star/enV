@@ -72,3 +72,13 @@ assert.equal(parseYtDlpJson(JSON.stringify({ title: "large", description: "x".re
 assert.throws(() => parseYtDlpJson("not metadata"), /invalid metadata/);
 
 console.log("URL media shared-engine regressions passed");
+
+
+assert.match(source, /const PUBLIC_ERROR_MESSAGES =/);
+assert.match(source, /We couldn’t reach this source\. Check the URL and try again later\./);
+assert.match(source, /PUBLIC_ERROR_MESSAGES\[code\]/);
+assert.doesNotMatch(source, /const clean = message\.startsWith/);
+assert.doesNotMatch(source, /catch \(error\) \{ console\.error\(error\)/);
+assert.match(source, /route=\/info causeType=/);
+assert.match(source, /route=\/download causeType=/);
+assert.match(source, /REQUEST_TOO_LARGE/);

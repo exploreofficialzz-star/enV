@@ -113,6 +113,33 @@ function providerForUrl(raw) {
   return { url, provider: detectProvider(url) };
 }
 
+const PUBLIC_ERROR_MESSAGES = {
+  INVALID_URL: "Enter a valid public HTTP or HTTPS URL.",
+  UNSUPPORTED_SOURCE: "This media source is not supported yet.",
+  SOURCE_UNAVAILABLE: "We couldn’t reach this source. Check the URL and try again later.",
+  PRIVATE_CONTENT: "This content is private. enV can process only content that is publicly accessible.",
+  AUTH_REQUIRED: "This source requires sign-in. Use publicly accessible content or configure supported provider access.",
+  DOWNLOAD_NOT_PERMITTED: "This source does not permit downloading through enV.",
+  NO_DOWNLOADABLE_FORMAT: "No downloadable format is available for this content.",
+  FORMAT_UNAVAILABLE: "The selected media format is unavailable for this source.",
+  MANIFEST_PARSE_FAILED: "We couldn’t read the media details from this source. Try again later.",
+  SEGMENT_FAILED: "A media segment could not be downloaded. Please try again.",
+  RANGE_UNSUPPORTED: "This source does not support resuming a partial download. Start the download again.",
+  RESUME_INVALID: "The saved download state is no longer valid. Start the download again.",
+  NETWORK_TIMEOUT: "The source took too long to respond. Please try again.",
+  RATE_LIMITED: "The source is receiving too many requests. Try again later.",
+  PROVIDER_ERROR: "The media source could not complete this request. Check the URL and try again.",
+  FFMPEG_UNAVAILABLE: "Media conversion is temporarily unavailable. Please try again later.",
+  FFMPEG_FAILED: "We couldn’t convert this media. Try another supported format.",
+  DISK_FULL: "The processing service is temporarily out of space. Please try again later.",
+  FILE_TOO_LARGE: "This media exceeds the supported file-size limit.",
+  DURATION_TOO_LONG: "This media exceeds the supported duration limit.",
+  JOB_TIMEOUT: "This media task took too long. Try a shorter file or try again later.",
+  SERVER_CAPACITY: "The media service is busy. Please try again shortly.",
+  OUTPUT_VERIFICATION_FAILED: "We couldn’t verify the downloaded file. Please try again.",
+  REQUEST_TOO_LARGE: "This request is too large. Reduce the request size and try again.",
+  INVALID_REQUEST_BODY: "The request could not be read. Check the submitted details and try again.",
+};
 function errorPayload(error) {
   const message = error instanceof Error ? error.message : String(error);
   const known = [
@@ -122,18 +149,21 @@ function errorPayload(error) {
     "RANGE_UNSUPPORTED", "RESUME_INVALID", "NETWORK_TIMEOUT", "RATE_LIMITED",
     "PROVIDER_ERROR", "FFMPEG_UNAVAILABLE", "FFMPEG_FAILED", "DISK_FULL",
     "FILE_TOO_LARGE", "DURATION_TOO_LONG", "JOB_TIMEOUT", "SERVER_CAPACITY",
-    "OUTPUT_VERIFICATION_FAILED",
+    "OUTPUT_VERIFICATION_FAILED", "REQUEST_TOO_LARGE", "INVALID_REQUEST_BODY",
   ];
-  const code = known.find((item) => message.startsWith(`${item}:`)) || "PROVIDER_ERROR";
-  const clean = message.startsWith(`${code}:`) ? message.slice(code.length + 1).trim() : message;
+  const prefixedCode = known.find((item) => message.startsWith(`${item}:`));
+  const code = prefixedCode ||
+    (/request body is too large/i.test(message) ? "REQUEST_TOO_LARGE" :
+      error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
   const retryable = ["SOURCE_UNAVAILABLE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
-  return { code, message: clean, retryable };
+  return { code, message: PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR, retryable };
 }
 
 function errorStatus(code) {
   if (code === "PRIVATE_CONTENT" || code === "AUTH_REQUIRED" || code === "DOWNLOAD_NOT_PERMITTED") return 403;
   if (code === "RATE_LIMITED") return 429;
-  if (["FILE_TOO_LARGE", "DURATION_TOO_LONG", "JOB_TIMEOUT"].includes(code)) return 413;
+  if (["FILE_TOO_LARGE", "DURATION_TOO_LONG", "REQUEST_TOO_LARGE"].includes(code)) return 413;
+  if (code === "JOB_TIMEOUT") return 504;
   if (["SOURCE_UNAVAILABLE", "SERVER_CAPACITY", "NETWORK_TIMEOUT"].includes(code)) return 503;
   return 400;
 }
@@ -352,11 +382,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
   if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV URL media processor", downloader: YTDLP_BIN, providers: Object.keys(PROVIDERS), ready: await commandExists() });
   if (req.method === "POST" && req.url === "/info") {
-    try { await handleInfo(req, res); } catch (error) { console.error(error); if (!res.headersSent) { const failure = errorPayload(error); json(res, errorStatus(failure.code), { error: failure.message, ...failure }); } }
+    try { await handleInfo(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/info causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   if (req.method === "POST" && req.url === "/download") {
-    try { await handleDownload(req, res); } catch (error) { console.error(error); if (!res.headersSent) { const failure = errorPayload(error); json(res, errorStatus(failure.code), { error: failure.message, ...failure }); } }
+    try { await handleDownload(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/download causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   json(res, 404, { error: "Not found." });

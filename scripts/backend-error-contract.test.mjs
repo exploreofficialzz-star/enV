@@ -179,3 +179,18 @@ test("production API CORS defaults to the canonical app origin", async () => {
   const source = await readFile(new URL("../backend/config.ts", import.meta.url), "utf8");
   assert.match(source, /process\.env\.NODE_ENV === "production" \? "https:\/\/envtools\.store" : "\*"/);
 });
+
+
+test("production app error boundary hides raw exception messages", async () => {
+  const source = await readFile(new URL("../src/lib/error-component.tsx", import.meta.url), "utf8");
+  assert.match(source, /if \(!import\.meta\.env\.DEV\) return FALLBACK_MESSAGE/);
+  assert.match(source, /We couldn’t load this page\. Refresh and try again\./);
+});
+
+test("URL-media public errors use stable messages and opaque request IDs", async () => {
+  const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
+  assert.match(source, /PUBLIC_ERROR_MESSAGES\[code\]/);
+  assert.match(source, /requestId = randomUUID\(\)/);
+  assert.match(source, /causeType=\$\{error instanceof Error \? error\.name : "UnknownError"\}/);
+  assert.doesNotMatch(source, /catch \(error\) \{ console\.error\(error\)/);
+});

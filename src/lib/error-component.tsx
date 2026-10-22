@@ -1,9 +1,12 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
-const FALLBACK_MESSAGE = "An unexpected error occurred. Try reloading the page.";
+const FALLBACK_MESSAGE = "We couldn’t load this page. Refresh and try again. If the problem continues, contact enV support.";
 
 function errorMessage(error: unknown): string {
+  // Runtime exception details are useful to developers but can expose implementation
+  // details, provider messages, or internal URLs in a production UI.
+  if (!import.meta.env.DEV) return FALLBACK_MESSAGE;
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;
   return FALLBACK_MESSAGE;
