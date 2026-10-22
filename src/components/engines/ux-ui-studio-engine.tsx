@@ -2,8 +2,8 @@ import { generateHtmlProject, generateKotlinProject, generateReactProject, gener
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Copy, Download, FileJson, Redo2, Undo2,
-  Grid2X2, Layers, Laptop, LayoutTemplate, Monitor, Palette, Plus, Search, Smartphone, Tablet,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Paintbrush, Redo2, Undo2,
+  Grid2X2, Layers, Laptop, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
   Trash2, WandSparkles, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 
@@ -457,7 +457,7 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function svgToPng(svg: SVGSVGElement, scale = 3): Promise<Uint8Array> {
+function svgToPng(svg: SVGSVGElement, scale = 3, target: DeviceTarget = "mobile"): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const source = new XMLSerializer().serializeToString(svg);
     const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
@@ -465,15 +465,56 @@ function svgToPng(svg: SVGSVGElement, scale = 3): Promise<Uint8Array> {
     const image = new Image();
     image.onload = () => {
       try {
+        const screenWidth = svg.viewBox.baseVal.width;
+        const screenHeight = svg.viewBox.baseVal.height;
+        const bezel = target === "mobile" ? 18 : target === "tablet" ? 22 : 12;
+        const stand = target === "desktop" ? 64 : 0;
+        const frameWidth = screenWidth + bezel * 2;
+        const frameHeight = screenHeight + bezel * 2 + stand;
         const canvas = document.createElement("canvas");
-        canvas.width = svg.viewBox.baseVal.width * scale;
-        canvas.height = svg.viewBox.baseVal.height * scale;
+        canvas.width = Math.ceil(frameWidth * scale);
+        canvas.height = Math.ceil(frameHeight * scale);
         const context = canvas.getContext("2d");
         if (!context) throw new Error("The browser could not create an export canvas.");
-        context.fillStyle = "#FFFFFF";
-        context.fillRect(0, 0, canvas.width, canvas.height);
         context.scale(scale, scale);
-        context.drawImage(image, 0, 0);
+        context.fillStyle = "#FFFFFF";
+        context.fillRect(0, 0, frameWidth, frameHeight);
+        context.fillStyle = "#111315";
+        context.shadowColor = "rgba(15, 23, 42, 0.22)";
+        context.shadowBlur = target === "desktop" ? 18 : 24;
+        context.shadowOffsetY = 8;
+        const radius = target === "mobile" ? 52 : target === "tablet" ? 26 : 10;
+        context.beginPath();
+        context.roundRect(0, 0, frameWidth, screenHeight + bezel * 2, radius);
+        context.fill();
+        context.shadowColor = "transparent";
+        context.shadowBlur = 0;
+        context.shadowOffsetY = 0;
+        context.save();
+        context.beginPath();
+        context.roundRect(bezel, bezel, screenWidth, screenHeight, target === "mobile" ? 40 : target === "tablet" ? 18 : 2);
+        context.clip();
+        context.drawImage(image, bezel, bezel, screenWidth, screenHeight);
+        context.restore();
+        if (target === "mobile") {
+          context.fillStyle = "#050506";
+          context.beginPath();
+          context.roundRect(frameWidth / 2 - 54, 15, 108, 21, 12);
+          context.fill();
+        } else if (target === "tablet") {
+          context.fillStyle = "#050506";
+          context.beginPath();
+          context.arc(frameWidth / 2, 10, 3, 0, Math.PI * 2);
+          context.fill();
+        } else {
+          context.fillStyle = "#27292C";
+          context.beginPath();
+          context.roundRect(frameWidth * 0.4, screenHeight + bezel * 2 - 1, frameWidth * 0.2, 45, 5);
+          context.fill();
+          context.beginPath();
+          context.roundRect(frameWidth * 0.25, screenHeight + bezel * 2 + 38, frameWidth * 0.5, 8, 4);
+          context.fill();
+        }
         canvas.toBlob((png) => {
           URL.revokeObjectURL(url);
           if (!png) { reject(new Error("Could not render the design into a PNG for the PDF.")); return; }
@@ -505,12 +546,12 @@ function wrapPdfLine(value: string, width: number): string[] {
   return result;
 }
 
-async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: string) {
+async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: string, target: DeviceTarget) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(project.name + " - enV UX/UI Studio");
   pdf.setSubject("Visual interface and machine-readable design specification");
   pdf.setCreator("enV UX/UI Studio");
-  const previewPng = await svgToPng(svg, 3);
+  const previewPng = await svgToPng(svg, 3, target);
   const image = await pdf.embedPng(previewPng);
   const first = pdf.addPage(project.target === "desktop" ? [842, 595] : [595, 842]);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -557,12 +598,19 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function UxUiStudioEngine() {
+  const initialDesign = useMemo(() => createPreset("mobile", "mobile-dashboard"), []);
   const [target, setTarget] = useState<DeviceTarget>("mobile");
-  const [onboarding, setOnboarding] = useState(true);
+  const [onboarding, setOnboarding] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [showToolsPanel, setShowToolsPanel] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [showMoreLayers, setShowMoreLayers] = useState(false);
+  const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
+  const [helpOpen, setHelpOpen] = useState(false);
   const [startupPreset, setStartupPreset] = useState("mobile-dashboard");
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
-  const [projectName, setProjectName] = useState("Untitled interface");
-  const [background, setBackground] = useState("#F8FAFC");
+  const [projectName, setProjectName] = useState(initialDesign.name);
+  const [background, setBackground] = useState(initialDesign.background);
   const [customArtboard, setCustomArtboard] = useState(false);
   const [customWidth, setCustomWidth] = useState(390);
   const [customHeight, setCustomHeight] = useState(844);
@@ -570,10 +618,10 @@ export function UxUiStudioEngine() {
   const [reusableComponents, setReusableComponents] = useState<DesignLayer[]>([]);
   const [tokenNameDraft, setTokenNameDraft] = useState("brand");
   const [tokenValueDraft, setTokenValueDraft] = useState("#2563EB");
-  const [elements, setElements] = useState<DesignLayer[]>([]);
+  const [elements, setElements] = useState<DesignLayer[]>(initialDesign.elements);
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
   const [leftTab, setLeftTab] = useState<PanelTab>("components");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
@@ -598,6 +646,7 @@ export function UxUiStudioEngine() {
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const artboardRef = useRef<SVGSVGElement | null>(null);
+  const quickImageInputRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
@@ -646,15 +695,26 @@ export function UxUiStudioEngine() {
             reusableComponents: parsed.reusableComponents || [],
           } as SavedProject;
           setSavedProject(normalized);
+          setProjectName(normalized.name);
+          setTarget(normalized.target);
+          setBackground(normalized.background);
+          setCustomArtboard(true);
+          setCustomWidth(normalized.viewport.width);
+          setCustomHeight(normalized.viewport.height);
+          setTokens(normalized.tokens);
+          setReusableComponents(normalized.reusableComponents);
+          setElements(normalized.elements);
+          setSelectedId(normalized.elements[0]?.id || "");
         }
       }
     } catch { /* A corrupt local draft does not block the studio. */ }
+    finally { setDraftLoaded(true); }
   }, []);
 
   useEffect(() => {
-    if (onboarding || elements.length === 0) return;
+    if (!draftLoaded || onboarding || elements.length === 0) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
-  }, [project, onboarding, elements.length]);
+  }, [project, onboarding, elements.length, draftLoaded]);
 
   useEffect(() => {
     if (leftTab !== "fonts" || fontCatalogRequested.current) return;
@@ -976,7 +1036,7 @@ export function UxUiStudioEngine() {
     setNotice("");
     try {
       await document.fonts.ready;
-      const bytes = await buildPdf(project, artboardRef.current, aiPrompt);
+      const bytes = await buildPdf(project, artboardRef.current, aiPrompt, project.target);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -1051,27 +1111,35 @@ export function UxUiStudioEngine() {
 
   return (
     <section className="ux-ui-studio min-w-0 space-y-3">
-      <header className="rounded-xl border border-border bg-surface p-3 sm:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-[180px] flex-1">
-            <div className="flex items-center gap-2 text-sm font-semibold text-fg"><WandSparkles size={17} className="text-accent" /> UX/UI Studio</div>
-            <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="mt-2 w-full max-w-md rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg outline-none focus:border-accent" />
-            <p className="mt-1 text-[11px] text-muted">Draft saved locally when supported · {elements.length} layers · {board.width} × {board.height} px</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo last design change" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-fg disabled:opacity-40"><Undo2 size={16} /> Undo</button>
-            <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo design change" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-fg disabled:opacity-40"><Redo2 size={16} /> Redo</button>
-            <button type="button" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={"inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium " + (target === "mobile" ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}><Smartphone size={16} /> Mobile</button>
-            <button type="button" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={"inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium " + (target === "tablet" ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}><Tablet size={16} /> Tablet</button>
-            <button type="button" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={"inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium " + (target === "desktop" ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}><Laptop size={16} /> Desktop</button>
-            <button type="button" onClick={exportProject} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2"><FileJson size={16} /> JSON + code</button><button type="button" onClick={() => downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8")} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2">React TSX</button><button type="button" onClick={() => downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8")} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2">Kotlin</button><button type="button" onClick={() => downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8")} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2">SwiftUI</button><button type="button" onClick={() => downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8")} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-2">HTML</button>
-            <button type="button" disabled={exporting || elements.length === 0} onClick={() => void exportPdf()} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"><Download size={16} /> {exporting ? "Exporting…" : "Export PDF"}</button>
+      <header className="uxui-topbar">
+        <div className="uxui-topbar-left">
+          <div className="uxui-brand-mark" aria-hidden="true">enV</div>
+          <div className="uxui-target-switch" role="group" aria-label="Preview device">
+            <button type="button" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
+            <button type="button" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
+            <button type="button" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
           </div>
         </div>
+        <div className="uxui-topbar-actions">
+          <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
+          <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
+          <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
+          <button type="button" onClick={() => setShowExportPanel((value) => !value)} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
+        </div>
+        {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
+          <div className="uxui-export-menu-title">Export your design</div>
+          <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
+          <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React · TypeScript</strong><small>Web implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
+        </div>}
       </header>
 
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[205px_minmax(0,1fr)_245px]">
-        <aside className="min-w-0 rounded-xl border border-border bg-surface p-3">
+      <div className="uxui-workspace grid min-w-0 gap-3">
+        {showToolsPanel && <aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3">
+          <div className="uxui-drawer-heading"><span>Add to your design</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close elements panel"><X size={17} /></button></div>
           <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface-2 p-1">
             {([{ id: "components", label: "Elements" }, { id: "icons", label: "Icons" }, { id: "fonts", label: "Fonts" }, { id: "presets", label: "Presets" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={"rounded-md px-2 py-2 text-xs font-semibold " + (leftTab === tab.id ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg")}>{tab.label}</button>)}
           </div>
@@ -1183,20 +1251,23 @@ export function UxUiStudioEngine() {
             <h4 className="mt-4 text-[11px] font-semibold text-muted">Spacing scale</h4>
             <p className="mt-1 text-xs leading-5 text-fg">{Array.from(new Set(elements.flatMap((item) => [item.padding, item.marginTop, item.marginRight, item.marginBottom, item.marginLeft]))).sort((a,b)=>a-b).join(" · ") || "No spacing values yet"} px</p>
           </div>}
-        </aside>
+        </aside>}
 
-        <main className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted"><Grid2X2 size={14} /><span>{target === "mobile" ? "Mobile artboard" : target === "tablet" ? "Tablet artboard" : "Desktop artboard"}</span><span className="rounded bg-surface-2 px-2 py-1 font-mono">{board.width} × {board.height}</span><label className="inline-flex items-center gap-1"><input type="checkbox" checked={customArtboard} onChange={(event)=>setCustomArtboard(event.target.checked)} /> Custom</label><label className="inline-flex items-center gap-1">W <input aria-label="Custom artboard width" type="number" min="160" max="4096" disabled={!customArtboard} value={customWidth} onChange={(event)=>setCustomWidth(Math.min(4096,Math.max(160,Number(event.target.value)||160)))} className="w-16 rounded border border-border bg-surface px-1 py-1 text-fg disabled:opacity-40" /></label><label className="inline-flex items-center gap-1">H <input aria-label="Custom artboard height" type="number" min="240" max="4096" disabled={!customArtboard} value={customHeight} onChange={(event)=>setCustomHeight(Math.min(4096,Math.max(240,Number(event.target.value)||240)))} className="w-16 rounded border border-border bg-surface px-1 py-1 text-fg disabled:opacity-40" /></label></div>
-            <div className="flex items-center gap-1">
-              <button type="button" title="Zoom out" aria-label="Zoom out" onClick={() => setZoom((value) => Math.max(50, value - 10))} className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-fg"><ZoomOut size={15} /></button><span className="w-10 text-center text-[11px] text-muted">{zoom}%</span><button type="button" title="Zoom in" aria-label="Zoom in" onClick={() => setZoom((value) => Math.min(150, value + 10))} className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-fg"><ZoomIn size={15} /></button>
-              <button type="button" aria-pressed={showGrid} onClick={() => setShowGrid((value) => !value)} title="Toggle 8 px layout grid" className={"ml-1 rounded-md border p-2 " + (showGrid ? "border-accent text-accent" : "border-border text-muted")}><Grid2X2 size={15} /></button>
+        <main className="uxui-canvas-panel min-w-0 overflow-hidden">
+          <div className="uxui-canvas-heading">
+            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{board.width} × {board.height} px</span></div>
+            <div className="uxui-canvas-zoom">
+              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
+              <span>{zoom}%</span>
+              <button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
+              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
             </div>
           </div>
-          <div className="flex min-h-[520px] min-w-0 items-start justify-center overflow-auto p-3 sm:p-6">
-            <div className="max-w-full shrink-0">
+          <div className="uxui-canvas-stage">
+            <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
+              <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
-                style={{ width: Math.min(board.width * zoom / 100, target === "mobile" ? 520 : 1000) + "px", maxWidth: "100%", height: "auto", display: "block", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
+                style={{ width: Math.min(board.width * zoom / 100, target === "mobile" ? 430 : target === "tablet" ? 700 : 940) + "px", maxWidth: "100%", height: "auto", display: "block", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
                 <rect width={board.width} height={board.height} fill={background} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
@@ -1229,12 +1300,83 @@ export function UxUiStudioEngine() {
                   </g>;
                 })}
               </svg>
-              <p className="mt-2 text-center text-[10px] leading-4 text-muted">Click or drag a layer to position it. Hold Shift while dragging for 1 px movement; default snapping is 4 px.</p>
+              <div className="uxui-device-neck" aria-hidden="true" /><div className="uxui-device-base" aria-hidden="true" />
+              <p className="uxui-canvas-hint">Move anything with your finger or mouse. Select a layer to style it.</p>
             </div>
           </div>
+          <div className="uxui-bottom-toolbar">
+            <div className="uxui-bottom-group">
+              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-label="Toggle grid" title="Toggle grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={20} /></button>
+              <button type="button" onClick={() => quickImageInputRef.current?.click()} aria-label="Add an image" title="Add image"><ImagePlus size={21} /></button>
+              <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
+              <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
+            </div>
+            <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
+            <div className="uxui-bottom-group">
+              <button type="button" onClick={() => setShowMoreLayers((value) => !value)} aria-label="Show more layers" title="Layers" className={showMoreLayers ? "is-active" : ""}><Layers size={20} /></button>
+              <button type="button" onClick={() => addLayer("text")} aria-label="Add text" title="Add text"><Type size={20} /></button>
+              <button type="button" onClick={() => addLayer("rect")} aria-label="Add shape" title="Add shape"><Shapes size={20} /></button>
+              <button type="button" onClick={() => { setPaletteMode((mode) => mode === "fill" ? "text" : "fill"); }} aria-label="Switch palette color mode" title="Switch fill/text colour"><Paintbrush size={20} /></button>
+              <button type="button" onClick={() => setZoom(100)} aria-label="Reset zoom" title="Fit preview"><Maximize2 size={20} /></button>
+            </div>
+          </div>
+          <input ref={quickImageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" aria-label="Choose an image" onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            if (!file.type.startsWith("image/") || file.size > 4 * 1024 * 1024) { setNotice("Choose a supported image up to 4 MB."); event.target.value = ""; return; }
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result !== "string") return;
+              const layer = { ...makeLayer("image", Math.round(board.width / 2 - 125), Math.round(board.height * 0.28), board.width, board.height), name: file.name.replace(/\\.[^.]+$/, "") || "Image", text: file.name, imageDataUrl: reader.result };
+              checkpoint();
+              setElements((previous) => [...previous, layer]);
+              setSelectedId(layer.id);
+              setNotice("Image added to your mockup.");
+            };
+            reader.onerror = () => setNotice("Could not read the selected image.");
+            reader.readAsDataURL(file);
+            event.target.value = "";
+          }} />
         </main>
 
-        <aside className="min-w-0 rounded-xl border border-border bg-surface p-3">
+        <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
+          <div className="uxui-project-heading">
+            <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
+            <input aria-label="Project title" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
+            <p>{elements.length} layers · {board.width} × {board.height} px</p>
+          </div>
+          {helpOpen && <div className="uxui-help-note" role="status"><strong>Make it by eye.</strong><span>Drag and style your layers on the mockup. enV quietly records exact measurements, type, spacing, colours and icon identity for developer or AI handoff.</span></div>}
+          <div className="uxui-layer-heading"><strong>Layers</strong><span>{elements.length}</span></div>
+          <div className="uxui-layer-list">
+            {[...elements].reverse().slice(0, showMoreLayers ? elements.length : 6).map((item, index) => {
+              const outlines = ["#8EC8E7", "#D48D91", "#A8CE79", "#D8C87D", "#C8C8C8", "#8FC6B3"];
+              return <button key={item.id} type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} aria-pressed={selectedId === item.id} className={"uxui-layer-chip " + (selectedId === item.id ? "is-selected" : "")} style={{ "--layer-tint": outlines[index % outlines.length] } as CSSProperties}>
+                <span className="uxui-layer-number">{index + 1}.</span><span className="uxui-layer-name">{item.name || item.kind}</span><span className="uxui-layer-kind">{item.kind}</span>
+              </button>;
+            })}
+            {elements.length > 6 && <button type="button" className="uxui-see-more" onClick={() => setShowMoreLayers((value) => !value)}>{showMoreLayers ? "see less" : "see more"}</button>}
+          </div>
+          <div className="uxui-palette-panel">
+            <div className="uxui-palette-heading"><strong>Colours</strong><div role="group" aria-label="Apply colour to"><button type="button" onClick={() => setPaletteMode("fill")} aria-pressed={paletteMode === "fill"} className={paletteMode === "fill" ? "is-active" : ""}>Fill</button><button type="button" onClick={() => setPaletteMode("text")} aria-pressed={paletteMode === "text"} className={paletteMode === "text" ? "is-active" : ""}>Text</button></div></div>
+            <div className="uxui-color-grid">
+              {Array.from({ length: 96 }, (_, index) => {
+                const row = Math.floor(index / 12);
+                const column = index % 12;
+                const gray = Math.round(column / 11 * 255).toString(16).padStart(2, "0");
+                const color = row === 0 ? "#" + gray.repeat(3) : "hsl(" + (column * 30) + " 76% " + (88 - (row - 1) * 10) + "%)";
+                return <button key={index} type="button" style={{ backgroundColor: color }} onClick={() => { if (selected) updateLayer(selected.id, paletteMode === "fill" ? { background: color } : { color }); else setBackground(color); }} title={color.toUpperCase()} aria-label={"Apply " + color + " to " + paletteMode} />;
+              })}
+            </div>
+            <div className="uxui-active-color"><span style={{ backgroundColor: selected ? (paletteMode === "fill" ? selected.background : selected.color) : background }} /><small>{paletteMode === "fill" ? "Fill colour" : "Text colour"}</small><code>{selected ? (paletteMode === "fill" ? selected.background : selected.color) : background}</code></div>
+          </div>
+          <details className="uxui-advanced-controls">
+            <summary>Fine-tune design</summary>
+            <div className="uxui-advanced-body">
+              <div className="uxui-artboard-settings">
+                <label>Custom canvas<input type="checkbox" checked={customArtboard} onChange={(event) => setCustomArtboard(event.target.checked)} /></label>
+                <label>Width<input aria-label="Custom canvas width" type="number" min="160" max="4096" disabled={!customArtboard} value={customWidth} onChange={(event) => setCustomWidth(Math.min(4096, Math.max(160, Number(event.target.value) || 160)))} /></label>
+                <label>Height<input aria-label="Custom canvas height" type="number" min="240" max="4096" disabled={!customArtboard} value={customHeight} onChange={(event) => setCustomHeight(Math.min(4096, Math.max(240, Number(event.target.value) || 240)))} /></label>
+              </div>
           <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1">
             <button type="button" onClick={() => setInspectorTab("design")} className={"rounded-md px-2 py-2 text-xs font-semibold " + (inspectorTab === "design" ? "bg-surface text-fg shadow-sm" : "text-muted")}>Properties</button>
             <button type="button" onClick={() => setInspectorTab("spec")} className={"rounded-md px-2 py-2 text-xs font-semibold " + (inspectorTab === "spec" ? "bg-surface text-fg shadow-sm" : "text-muted")}>Specs</button>
@@ -1306,10 +1448,12 @@ export function UxUiStudioEngine() {
             <button type="button" onClick={() => void copyPrompt()} className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2.5 text-xs font-semibold text-fg hover:bg-surface-2"><Copy size={14} /> Copy full AI prompt</button>
             <p className="mt-2 text-[10px] leading-4 text-muted">PDF export includes the visual artboard, a written implementation prompt and the complete JSON specification.</p>
           </div>
+            </div>
+          </details>
         </aside>
       </div>
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> <span className="min-w-0 flex-1">{notice}</span><button aria-label="Dismiss notice" type="button" onClick={() => setNotice("")} className="rounded p-0.5 text-muted hover:text-fg"><X size={13} /></button></div>}
-      <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-[11px] leading-5 text-muted"><span>Local-first editor · Exact pixel dimensions · Layer-level specification records</span><button type="button" onClick={() => setOnboarding(true)} className="inline-flex items-center gap-1 font-semibold text-accent"><ArrowLeft size={13} /> Switch workflow</button></footer>
+      <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-[11px] leading-5 text-muted"><span>Local-first editor · Exact pixel dimensions · Layer-level specification records</span><button type="button" onClick={() => setShowToolsPanel(true)} className="inline-flex items-center gap-1 font-semibold text-accent"><Plus size={13} /> Add elements</button></footer>
     </section>
   );
 }
