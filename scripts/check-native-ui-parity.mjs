@@ -80,7 +80,7 @@ assert.match(android, /contentPadding = PaddingValues\(horizontal = 16\.dp, vert
 assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Normal, color = MaterialTheme\.colorScheme\.primary/);
 
 // Information-page back and legal email actions remain actionable and return to the source tab.
-assert.match(android, /showInformation -> NativeInformationScreen\(informationPage, catalog\) \{ showInformation = false; tab = informationReturnTab \}/);
+assert.match(android, /showInformation\s*->\s*NativeInformationScreen\(\s*informationPage,\s*catalog,\s*onBack\s*=\s*\{\s*showInformation\s*=\s*false;\s*tab\s*=\s*informationReturnTab\s*\}/, "Android information page must return to its originating tab through the explicit onBack callback.");
 assert.match(androidInfo, /private fun InformationParagraph\(text: String\)/);
 assert.match(androidInfo, /pushStringAnnotation\(tag = "mailto"/);
 assert.match(androidInfo, /No email app is available/);
