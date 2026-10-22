@@ -877,7 +877,7 @@ fun NativeUxUiStudioForm() {
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("home")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")}
+    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -983,7 +983,8 @@ fun NativeUxUiStudioForm() {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val q=URLEncoder.encode(query,"UTF-8")
-                    val payload=JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24&start="+offset).readText())
+                    val prefixArg=if(iconPrefix=="all")"" else "&prefix="+URLEncoder.encode(iconPrefix,"UTF-8")
+                    val payload=JSONObject(URL("https://api.iconify.design/search?query="+q+"&limit=24&start="+offset+prefixArg).readText())
                     val icons=payload.optJSONArray("icons")?.let{arr->(0 until arr.length()).map{arr.optString(it)}}?:emptyList()
                     Triple(payload.optInt("total",offset+icons.size),icons,offset)
                 }
@@ -1015,6 +1016,28 @@ fun NativeUxUiStudioForm() {
                     val index=elements.indexOfFirst{it.id==layerId}
                     if(index>=0){checkpoint();elements[index]=elements[index].copy(kind="image",name="Image",imageData=dataUrl);notice="Image imported and saved in the design project."}
                 }.onFailure { notice=it.message?:"Image import failed." }
+            }
+        }
+    }
+
+    val fontLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->
+        if(uri!=null){
+            val layerId=fontTargetId
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val displayName=context.contentResolver.query(uri,arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->if(cursor.moveToFirst())cursor.getString(0) else ""}.orEmpty()
+                        val extension=displayName.substringAfterLast(".","").lowercase()
+                        require(extension in setOf("ttf","otf")){"Choose a TrueType (.ttf) or OpenType (.otf) font."}
+                        val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()}?:error("Could not read the selected font.")
+                        require(bytes.size<=4*1024*1024){"Font files must be 4 MB or smaller."}
+                        val mime=if(extension=="otf")"font/otf" else "font/ttf"
+                        Pair(displayName,"data:"+mime+";base64,"+android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP))
+                    }
+                }.onSuccess { pair ->
+                    val idx=elements.indexOfFirst{it.id==layerId}
+                    if(idx>=0){checkpoint();elements[idx]=elements[idx].copy(fontFamily=pair.first.substringBeforeLast(".")+" (local)",fontData=pair.second);notice="Imported "+pair.first+" into this design."}
+                }.onFailure{notice=it.message?:"Font import failed."}
             }
         }
     }
@@ -1132,7 +1155,12 @@ fun NativeUxUiStudioForm() {
                             OutlinedTextField(e.fontSize.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(fontSize=n.coerceIn(1,240))}}},label={Text("Font px")},modifier=Modifier.weight(1f),singleLine=true)
                             OutlinedTextField(e.fontWeight.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(fontWeight=n.coerceIn(100,900))}}},label={Text("Font weight")},modifier=Modifier.weight(1f),singleLine=true)
                         }
-                        OutlinedTextField(e.fontFamily,{v->edit(e.id){it.copy(fontFamily=v)}},label={Text("Font family")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        OutlinedTextField(e.fontFamily,{v->edit(e.id){it.copy(fontFamily=v,fontData="")}},label={Text("Font family")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            uxNativeFontFamilies.take(22).forEach{family->FilterChip(selected=e.fontFamily==family,onClick={edit(e.id){it.copy(fontFamily=family,fontData="")}},label={Text(family,maxLines=1)})}
+                        }
+                        OutlinedButton(onClick={fontTargetId=e.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text(if(e.fontData.isBlank())"Import local TTF / OTF font" else "Replace local font file")}
+                        Text("Choose common families above or import a licensed TTF/OTF. Imported font data is preserved in project JSON and native preview/PDF.",style=MaterialTheme.typography.bodySmall)
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedTextField(e.color,{v->edit(e.id){it.copy(color=v)}},label={Text("Text color hex")},modifier=Modifier.weight(1f),singleLine=true)
                             OutlinedTextField(e.fill,{v->edit(e.id){it.copy(fill=v)}},label={Text("Fill / transparent")},modifier=Modifier.weight(1f),singleLine=true)
@@ -1172,13 +1200,26 @@ fun NativeUxUiStudioForm() {
                             Text("Raster image assets up to 4 MB are embedded into JSON and rendered in the artboard.",style=MaterialTheme.typography.bodySmall)
                         }
                         if(e.kind=="icon"){
-                            OutlinedTextField(iconQuery,{iconQuery=it},label={Text("Search icon library")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                            Button(onClick={searchIcons(false)},enabled=!iconBusy&&iconQuery.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search icons")}
+                            Text("Browse icons by category and visual style",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                uxNativeIconCategories.keys.forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category},label={Text(category)})}
+                            }
+                            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                uxNativeIconStyles.forEach{(prefix,label)->FilterChip(selected=iconPrefix==prefix,onClick={iconPrefix=prefix;iconStart=0;iconResults=emptyList();iconTotal=0},label={Text(label)})}
+                            }
+                            if(iconQuery.isBlank()){
+                                uxNativeIconCategories[iconCategory].orEmpty().filter{iconPrefix=="all"||it.startsWith(iconPrefix+":")}.forEach{icon->
+                                    OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}
+                                }
+                            }
+                            OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0;iconResults=emptyList()},label={Text("Search icon catalogue")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                            Button(onClick={searchIcons(false)},enabled=!iconBusy&&iconQuery.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search catalogue")}
                             iconResults.forEach{icon->OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}}
-                            if(iconResults.size<iconTotal)OutlinedButton(onClick={searchIcons(true)},enabled=!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Loading…" else "Load more icons · "+iconResults.size+" / "+iconTotal)}
-                            Text("Icon IDs are searched in pages; selected SVG artwork is embedded into the project. Check collection licences before shipping.",style=MaterialTheme.typography.bodySmall)
+                            if(iconQuery.isNotBlank()&&iconResults.size<iconTotal)OutlinedButton(onClick={searchIcons(true)},enabled=!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Loading…" else "Load more icons · "+iconResults.size+" / "+iconTotal)}
+                            Text("The category browser shows curated icon variants immediately. Search pages the online Iconify catalog; selected SVG artwork is embedded in the project. Check each icon set's licence.",style=MaterialTheme.typography.bodySmall)
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                            OutlinedButton(onClick={val copy=e.copy                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
                             OutlinedButton(onClick={moveLayer(e.id,-1)},modifier=Modifier.weight(1f)){Text("Move up")}
                             OutlinedButton(onClick={moveLayer(e.id,1)},modifier=Modifier.weight(1f)){Text("Move down")}
