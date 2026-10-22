@@ -1092,6 +1092,57 @@ fun NativeUxUiStudioForm() {
         }
     }
 
+    val presetImportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->
+        if(uri!=null)scope.launch{
+            runCatching{
+                withContext(Dispatchers.IO){
+                    val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()}?:error("Could not read the selected project file.")
+                    require(bytes.size<=8*1024*1024){"Project files must be 8 MB or smaller."}
+                    val root=org.json.JSONTokener(String(bytes,Charsets.UTF_8)).nextValue()
+                    val project=root as? JSONObject
+                    val raw=project?.optJSONArray("elements") ?: (root as? JSONArray) ?: error("Choose a project JSON or an element-list JSON file.")
+                    val viewport=project?.optJSONObject("viewport")
+                    val importedTarget=project?.optString("target","mobile")?.takeIf{it in setOf("mobile","tablet","desktop")}?:"mobile"
+                    val width=viewport?.optInt("width",if(importedTarget=="mobile")390 else if(importedTarget=="tablet")768 else 1440)?:bw
+                    val height=viewport?.optInt("height",if(importedTarget=="mobile")844 else if(importedTarget=="tablet")1024 else 900)?:bh
+                    val compatible=JSONArray()
+                    for(i in 0 until raw.length()){
+                        val original=raw.optJSONObject(i)?:continue
+                        val layer=JSONObject(original.toString())
+                        layer.remove("id")
+                        if(!layer.has("fill"))layer.put("fill",layer.optString("background","transparent"))
+                        if(!layer.has("imageData"))layer.put("imageData",layer.optString("imageDataUrl",""))
+                        if(!layer.has("fontData"))layer.put("fontData",layer.optString("fontDataUrl",""))
+                        val visible=layer.opt("visibleOn")
+                        if(visible is JSONArray)layer.put("visibleOn",(0 until visible.length()).joinToString(","){visible.optString(it)})
+                        layer.put("referenceWidth",layer.optInt("referenceWidth",width))
+                        layer.put("referenceHeight",layer.optInt("referenceHeight",height))
+                        compatible.put(layer)
+                    }
+                    val imported=uxNativeReadJson(compatible)
+                    require(imported.isNotEmpty()){"No usable design elements were found in this file."}
+                    Triple(project,imported,Pair(width,height))
+                }
+            }.onSuccess{(project,imported,viewport)->
+                checkpoint()
+                if(project!=null){
+                    target=project.optString("target","mobile").takeIf{it in setOf("mobile","tablet","desktop")}?:"mobile"
+                    projectName=project.optString("name","Imported design").ifBlank{"Imported design"}
+                    background=project.optString("background","#FFFFFF")
+                    customWidth=viewport.first.coerceIn(160,4096);customHeight=viewport.second.coerceIn(240,4096)
+                    customArtboard=project.has("viewport")
+                    elements.clear()
+                    elements.addAll(imported.map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)})
+                }else{
+                    elements.addAll(imported.map{it.copy(referenceWidth=bw,referenceHeight=bh)})
+                }
+                selectedId=imported.lastOrNull()?.id.orEmpty()
+                showElementTray=false;onboarding=false
+                notice="Imported "+imported.size+" design element(s)."
+            }.onFailure{notice=it.message?:"Project import failed."}
+        }
+    }
+
     fun chooseIcon(layerId:String, icon:String){
         scope.launch {
             iconBusy=true
@@ -1266,6 +1317,7 @@ fun NativeUxUiStudioForm() {
                                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
                                     listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
                                 }
+                                OutlinedButton(onClick={presetImportLauncher.launch(arrayOf("application/json"))},modifier=Modifier.fillMaxWidth()){Text("Import preset / project JSON")}
                                 Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             "Fonts" -> {
