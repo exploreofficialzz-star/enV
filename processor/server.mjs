@@ -1,4 +1,5 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { spawn } from "node:child_process";
 import { urlMediaProcessorPath } from "./url-media-route.mjs";
@@ -10,12 +11,41 @@ const ALLOWED_ORIGIN = String(process.env.PROCESSOR_ALLOWED_ORIGIN || "*").trim(
 const APPLICATION_API_ORIGIN = String(process.env.APPLICATION_API_ORIGIN || "https://en-v.vercel.app").trim().replace(/\/+$/, "");
 const services = new Map();
 
+if (process.env.NODE_ENV === "production" && !SHARED_SECRET) {
+  console.error("[startup] Missing required security configuration: PROCESSOR_SHARED_SECRET must be configured in production.");
+  process.exit(1);
+}
+if (process.env.NODE_ENV === "production" && ALLOWED_ORIGIN === "*") {
+  console.error("[startup] Missing required security configuration: PROCESSOR_ALLOWED_ORIGIN must be an explicit production origin.");
+  process.exit(1);
+}
+
 function corsOrigin(req) { const requested = String(req.headers.origin || "").trim(); return ALLOWED_ORIGIN === "*" ? (requested || "*") : ALLOWED_ORIGIN; }
 function responseHeaders(req, extra = {}) { return { "access-control-allow-origin": corsOrigin(req), "access-control-allow-credentials": "true", "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS", "access-control-allow-headers": "accept,authorization,content-type,cookie,x-requested-with", "access-control-expose-headers": "content-disposition,content-length,content-type,set-cookie", "vary": "Origin", ...extra }; }
 function json(req, res, status, body) { res.writeHead(status, { ...responseHeaders(req), "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(body)); }
-function authorized(req) { return !SHARED_SECRET || req.headers["x-processor-key"] === SHARED_SECRET; }
+function failSafely(req, res, status, code, message, cause) {
+  const requestId = randomUUID();
+  const route = String(req.url || "/").split("?")[0].slice(0, 180);
+  const causeType = cause instanceof Error ? cause.name : "UnknownError";
+  console.error(`[gateway] ${code} requestId=${requestId} route=${route} causeType=${causeType}`);
+  json(req, res, status, { ok: false, error: code, message, requestId });
+}
+function authorized(req) { return SHARED_SECRET ? req.headers["x-processor-key"] === SHARED_SECRET : process.env.NODE_ENV !== "production"; }
+async function childServiceReadiness() {
+  const checks = await Promise.all([...services.entries()].map(async ([name, { child, port }]) => {
+    if (child.exitCode !== null || child.signalCode !== null) return [name, false];
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1500) });
+      const body = await response.json().catch(() => ({}));
+      return [name, response.ok && body?.ok === true && body?.ready !== false];
+    } catch {
+      return [name, false];
+    }
+  }));
+  return Object.fromEntries(checks);
+}
 function spawnService(name, script, port, extraEnv = {}) { const child = spawn(process.execPath, [script], { cwd: process.cwd(), env: { ...process.env, ...extraEnv, PORT: String(port), MEDIA_PORT: String(port), URL_MEDIA_PORT: String(port), TRANSCRIBE_PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] }); child.stdout.on("data", (chunk) => process.stdout.write(`[${name}] ${chunk}`)); child.stderr.on("data", (chunk) => process.stderr.write(`[${name}] ${chunk}`)); child.on("exit", (code, signal) => console.error(`[${name}] exited code=${code ?? "null"} signal=${signal ?? "none"}`)); services.set(name, { child, port }); }
-function proxyProcessor(req, res, port, pathname) { const headers = { ...req.headers, host: `127.0.0.1:${port}`, "x-processor-key": "" }; delete headers.connection; const upstream = http.request({ hostname: "127.0.0.1", port, method: req.method, path: pathname, headers }, (upstreamResponse) => { res.writeHead(upstreamResponse.statusCode || 502, responseHeaders(req, { ...upstreamResponse.headers, "cache-control": "no-store" })); upstreamResponse.pipe(res); }); upstream.on("error", (error) => { if (!res.headersSent) json(req, res, 503, { error: `Processor service unavailable: ${error.message}` }); else res.destroy(error); }); req.pipe(upstream); }
+function proxyProcessor(req, res, port, pathname) { const headers = { ...req.headers, host: `127.0.0.1:${port}`, "x-processor-key": "" }; delete headers.connection; const upstream = http.request({ hostname: "127.0.0.1", port, method: req.method, path: pathname, headers }, (upstreamResponse) => { res.writeHead(upstreamResponse.statusCode || 502, responseHeaders(req, { ...upstreamResponse.headers, "cache-control": "no-store" })); upstreamResponse.pipe(res); }); upstream.on("error", (error) => { if (!res.headersSent) failSafely(req, res, 503, "PROCESSOR_UNAVAILABLE", "This processing service is temporarily unavailable. Please try again shortly.", error); else res.destroy(error); }); req.pipe(upstream); }
 
 async function proxyApplication(req, res, pathname, search) {
   try {
@@ -30,7 +60,7 @@ async function proxyApplication(req, res, pathname, search) {
     if (setCookies.length) output["set-cookie"] = setCookies.map((value) => value.replace(/SameSite=Lax/gi, "SameSite=None"));
     Object.assign(output, responseHeaders(req)); res.writeHead(upstream.status, output);
     if (upstream.body) Readable.fromWeb(upstream.body).pipe(res); else res.end();
-  } catch (error) { json(req, res, 502, { error: `Application API unavailable: ${error instanceof Error ? error.message : String(error)}` }); }
+  } catch (error) { failSafely(req, res, 502, "APPLICATION_API_UNAVAILABLE", "enV could not complete this request right now. Please try again shortly.", error); }
 }
 
 spawnService("media", "scripts/media-processor.mjs", 8787, { MEDIA_HOST: "127.0.0.1", MEDIA_PORT: "8787", MEDIA_ALLOWED_ORIGIN: ALLOWED_ORIGIN, MEDIA_MAX_BYTES: process.env.MEDIA_MAX_BYTES || String(100 * 1024 * 1024) });
@@ -40,7 +70,20 @@ if (process.env.TRANSCRIBE_ENABLED === "true") spawnService("transcription", "sc
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`); const { pathname, search } = url;
   if (req.method === "OPTIONS") return json(req, res, 204, {});
-  if (pathname === "/health" && req.method === "GET") { const servicesReady = [...services.values()].every(({ child }) => child.exitCode === null); return json(req, res, 200, { ok: servicesReady, service: "enV Render API", applicationApiOrigin: APPLICATION_API_ORIGIN, authentication: Boolean(SHARED_SECRET), ready: servicesReady, routes: ["/api/*", "/media", "/info", "/download", ...(services.has("transcription") ? ["/transcribe"] : [])], limits: { maxMediaBytes: Number(process.env.MEDIA_MAX_BYTES || 100 * 1024 * 1024) } }); }
+  if (pathname === "/health" && req.method === "GET") {
+    const processors = await childServiceReadiness();
+    const servicesReady = Object.keys(processors).length > 0 && Object.values(processors).every(Boolean);
+    return json(req, res, servicesReady ? 200 : 503, {
+      ok: servicesReady,
+      ready: servicesReady,
+      service: "enV Render API",
+      applicationApiOrigin: APPLICATION_API_ORIGIN,
+      authentication: Boolean(SHARED_SECRET),
+      processors,
+      routes: ["/api/*", "/media", "/info", "/download", ...(services.has("transcription") ? ["/transcribe"] : [])],
+      limits: { maxMediaBytes: Number(process.env.MEDIA_MAX_BYTES || 100 * 1024 * 1024) }
+    });
+  }
   const urlMediaPath = urlMediaProcessorPath(req.method || "GET", pathname);
   if (urlMediaPath && services.has("url-media")) return proxyProcessor(req, res, services.get("url-media").port, urlMediaPath);
   if (pathname.startsWith("/api/")) return proxyApplication(req, res, pathname, search);

@@ -168,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     // while this response still retains its result buffer. Release is idempotent for all exits.
     res.once("finish", release);
     res.once("close", release);
-    try { await handleMedia(req, res); } catch (error) { console.error(error); if (!res.headersSent) json(res, 500, { error: error instanceof Error ? error.message : "Media processing failed." }); }
+    try { await handleMedia(req, res); } catch (error) { const requestId = randomUUID(); console.error(`[media] MEDIA_PROCESSING_FAILED requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, 500, { ok: false, error: "MEDIA_PROCESSING_FAILED", message: "We couldn’t complete this media operation. Check the file format and try again.", requestId }); }
     finally {
       if (res.writableFinished || res.destroyed || !res.headersSent) release();
       else { res.once("finish", release); res.once("close", release); }
