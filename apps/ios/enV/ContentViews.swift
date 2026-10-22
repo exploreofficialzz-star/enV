@@ -2117,6 +2117,9 @@ private struct NativeWalletDashboardView: View {
                     .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
                 }
                 Text(showBalance ? available.map { tokenCurrency($0) } ?? "$0.000" : "••••••")
+                    .accessibilityLabel(showBalance
+                        ? "Available balance, \(tokenCurrency(available ?? 0).replacingOccurrences(of: "$", with: "")) US dollars"
+                        : "Balance hidden")
                     .font(.system(size: 37, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
                     Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
