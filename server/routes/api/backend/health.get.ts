@@ -12,9 +12,10 @@ export default defineHandler(() => {
     documents: Boolean(config.documents),
     websiteScreenshot: Boolean(config.websiteScreenshot),
   };
+  const ready = processors.media && processors.urlMedia;
   return jsonResponse({
-    ok: true,
-    ready: processors.media && processors.urlMedia,
+    ok: ready,
+    ready,
     service: "enV backend gateway",
     processors,
     requiredEnvironment: {
@@ -24,6 +25,6 @@ export default defineHandler(() => {
       ocr: "OCR_PROCESSOR_URL (or local TESSERACT_BIN/PDFTOPPM_BIN)",
       documents: "DOCUMENT_PROCESSOR_URL (or local PDFTOTEXT_BIN)",
       websiteScreenshot: "WEBSITE_SCREENSHOT_API_URL",
-      },
-  });
+    },
+  }, ready ? 200 : 503);
 });
