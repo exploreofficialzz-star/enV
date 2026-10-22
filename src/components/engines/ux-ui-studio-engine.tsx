@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
-type PanelTab = "components" | "icons" | "presets" | "tokens";
+type PanelTab = "components" | "icons" | "fonts" | "presets" | "tokens";
 type InspectorTab = "design" | "spec";
-type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer";
+type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer" | "triangle" | "diamond" | "hexagon" | "star" | "line" | "pill";
 type Align = "left" | "center" | "right";
 type HorizontalConstraint = "left" | "center" | "right" | "stretch";
 type VerticalConstraint = "top" | "center" | "bottom" | "stretch";
@@ -18,7 +18,7 @@ type DesignTokens = { colors: Array<{ name: string; value: string }>; typography
 
 type DesignLayer = {
   id: string; kind: LayerKind; name: string; x: number; y: number; width: number; height: number;
-  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string;
+  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl: string;
   iconLicense: string; iconAuthor: string;
   color: string; background: string; borderColor: string; borderWidth: number; radius: number;
   padding: number; marginTop: number; marginRight: number; marginBottom: number; marginLeft: number;
@@ -53,7 +53,43 @@ const DEFAULT_TOKENS: DesignTokens = {
 const DESIGN_BREAKPOINTS = { mobile: 480, tablet: 768, desktop: 1024 };
 
 const STORAGE_KEY = "env-ux-ui-studio-project-v1";
-const FONT_OPTIONS = ["Inter", "Roboto", "SF Pro Display", "Arial", "system-ui", "Georgia", "Times New Roman", "Courier New"];
+type FontLibraryItem = { family: string; category: "Sans serif" | "Serif" | "Monospace" | "Display" | "Handwriting" | "System"; provider: "google" | "system" };
+const FONT_LIBRARY: FontLibraryItem[] = [
+  ...["Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Source Sans 3","Work Sans","DM Sans","Manrope","Plus Jakarta Sans","Urbanist","Outfit","IBM Plex Sans","Noto Sans","Ubuntu","Rubik","Mulish","Quicksand","Barlow","Karla","Assistant","Fira Sans","Cabin","Raleway","Oxygen","PT Sans","Titillium Web"].map((family)=>({family,category:"Sans serif" as const,provider:"google" as const})),
+  ...["Merriweather","Playfair Display","Lora","PT Serif","Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","Crimson Text","Bitter","DM Serif Display","Source Serif 4"].map((family)=>({family,category:"Serif" as const,provider:"google" as const})),
+  ...["JetBrains Mono","Fira Code","IBM Plex Mono","Source Code Pro","Space Mono","Inconsolata","Roboto Mono","Noto Sans Mono"].map((family)=>({family,category:"Monospace" as const,provider:"google" as const})),
+  ...["Oswald","Bebas Neue","Archivo Black","Anton","Space Grotesk","Syne","Bodoni Moda","Abril Fatface"].map((family)=>({family,category:"Display" as const,provider:"google" as const})),
+  ...["Caveat","Pacifico","Dancing Script","Satisfy"].map((family)=>({family,category:"Handwriting" as const,provider:"google" as const})),
+  ...["system-ui","Arial","Helvetica","Georgia","Times New Roman","Courier New","SF Pro Display","SF Pro Text","Avenir Next","Menlo"].map((family)=>({family,category:"System" as const,provider:"system" as const})),
+];
+const FONT_OPTIONS = FONT_LIBRARY.map((font)=>font.family);
+const ICON_SET_OPTIONS = [
+  {prefix:"all",label:"All styles"},
+  {prefix:"lucide",label:"Lucide · clean line"},
+  {prefix:"tabler",label:"Tabler · outline"},
+  {prefix:"material-symbols",label:"Material Symbols"},
+  {prefix:"mdi",label:"Material Design"},
+  {prefix:"ph",label:"Phosphor"},
+  {prefix:"solar",label:"Solar"},
+  {prefix:"carbon",label:"Carbon"},
+  {prefix:"fa6-solid",label:"Font Awesome Solid"},
+  {prefix:"heroicons",label:"Heroicons"},
+  {prefix:"fluent",label:"Fluent"},
+  {prefix:"iconamoon",label:"Iconamoon"},
+  {prefix:"mingcute",label:"MingCute"},
+] as const;
+const ICON_BROWSE_CATEGORIES: Array<{name:string;description:string;icons:string[]}> = [
+  {name:"Navigation",description:"Headers, menus, routes and wayfinding",icons:["lucide:house","tabler:home","material-symbols:home-rounded","mdi:home","ph:house","solar:home-linear","carbon:home","fa6-solid:house","heroicons:home","fluent:home-24-regular","iconamoon:home-light","mingcute:home-4-line","lucide:menu","tabler:menu-2","mdi:menu","ph:list","lucide:arrow-left","tabler:arrow-left","material-symbols:arrow-back-rounded","solar:alt-arrow-right-linear","lucide:chevron-down","tabler:chevron-down","mdi:chevron-down","ph:caret-down","lucide:layout-grid","tabler:apps","material-symbols:dashboard-rounded","solar:widget-2-linear"]},
+  {name:"Actions",description:"Primary actions, editing, status and utilities",icons:["lucide:plus","tabler:plus","material-symbols:add-rounded","mdi:plus","ph:plus-bold","solar:add-square-linear","lucide:check","tabler:check","material-symbols:check-rounded","mdi:check-bold","ph:check-bold","lucide:x","tabler:x","material-symbols:close-rounded","mdi:close","lucide:pencil","tabler:edit","material-symbols:edit-rounded","mdi:pencil","ph:pencil-simple","lucide:trash-2","tabler:trash","material-symbols:delete-rounded","mdi:delete","lucide:copy","tabler:copy","material-symbols:content-copy-rounded","lucide:download","tabler:download","material-symbols:download-rounded"]},
+  {name:"Forms",description:"Inputs, validation, passwords and settings",icons:["lucide:mail","tabler:mail","material-symbols:mail-rounded","mdi:email-outline","ph:envelope","lucide:lock","tabler:lock","material-symbols:lock-rounded","mdi:lock-outline","ph:lock-key","lucide:eye","tabler:eye","material-symbols:visibility-rounded","mdi:eye-outline","lucide:eye-off","tabler:eye-off","material-symbols:visibility-off-rounded","mdi:eye-off-outline","lucide:calendar","tabler:calendar","material-symbols:calendar-month-rounded","mdi:calendar-month","lucide:clock","tabler:clock","material-symbols:schedule-rounded","mdi:clock-outline","lucide:sliders-horizontal","tabler:adjustments","material-symbols:tune-rounded","mdi:tune-variant"]},
+  {name:"Communication",description:"Chat, notifications, contact and collaboration",icons:["lucide:message-circle","tabler:message-circle","material-symbols:chat-bubble-rounded","mdi:message-outline","ph:chat-circle","lucide:bell","tabler:bell","material-symbols:notifications-rounded","mdi:bell-outline","lucide:phone","tabler:phone","material-symbols:call-rounded","mdi:phone-outline","lucide:send","tabler:send","material-symbols:send-rounded","mdi:send","lucide:users","tabler:users","material-symbols:group-rounded","mdi:account-group-outline","lucide:at-sign","tabler:at","material-symbols:alternate-email-rounded","mdi:at"]},
+  {name:"Media",description:"Photos, video, audio and visual creation",icons:["lucide:image","tabler:photo","material-symbols:image-rounded","mdi:image-outline","ph:image","lucide:camera","tabler:camera","material-symbols:photo-camera-rounded","mdi:camera-outline","lucide:video","tabler:video","material-symbols:videocam-rounded","mdi:video-outline","lucide:music","tabler:music","material-symbols:music-note-rounded","mdi:music-note","lucide:mic","tabler:microphone","material-symbols:mic-rounded","mdi:microphone-outline","lucide:play","tabler:player-play","material-symbols:play-arrow-rounded","mdi:play"]},
+  {name:"Commerce",description:"Shopping, payment, delivery and inventory",icons:["lucide:shopping-cart","tabler:shopping-cart","material-symbols:shopping-cart-rounded","mdi:cart-outline","ph:shopping-cart","lucide:credit-card","tabler:credit-card","material-symbols:credit-card-rounded","mdi:credit-card-outline","lucide:wallet","tabler:wallet","material-symbols:wallet-rounded","mdi:wallet-outline","lucide:package","tabler:package","material-symbols:inventory-2-rounded","mdi:package-variant","lucide:tag","tabler:tag","material-symbols:sell-rounded","mdi:tag-outline","lucide:truck","tabler:truck","material-symbols:local-shipping-rounded","mdi:truck-outline"]},
+  {name:"Data",description:"Charts, analytics, tables and metrics",icons:["lucide:chart-column","tabler:chart-bar","material-symbols:bar-chart-rounded","mdi:chart-bar","ph:chart-bar","lucide:chart-line","tabler:chart-line","material-symbols:show-chart-rounded","mdi:chart-line","lucide:pie-chart","tabler:chart-pie","material-symbols:pie-chart-rounded","mdi:chart-pie","lucide:database","tabler:database","material-symbols:database-rounded","mdi:database-outline","lucide:table","tabler:table","material-symbols:table-chart-rounded","mdi:table","lucide:activity","tabler:activity","material-symbols:monitoring-rounded","mdi:chart-areaspline"]},
+  {name:"Devices",description:"Phones, computers, connectivity and hardware",icons:["lucide:smartphone","tabler:device-mobile","material-symbols:smartphone-rounded","mdi:cellphone","lucide:tablet","tabler:device-tablet","material-symbols:tablet-rounded","mdi:tablet","lucide:laptop","tabler:device-laptop","material-symbols:laptop-rounded","mdi:laptop","lucide:monitor","tabler:device-desktop","material-symbols:desktop-windows-rounded","mdi:monitor","lucide:wifi","tabler:wifi","material-symbols:wifi-rounded","mdi:wifi","lucide:bluetooth","tabler:bluetooth","material-symbols:bluetooth-rounded","mdi:bluetooth","lucide:battery","tabler:battery","material-symbols:battery-full-rounded","mdi:battery"]},
+  {name:"Files",description:"Documents, folders, cloud and development",icons:["lucide:file-text","tabler:file-text","material-symbols:description-rounded","mdi:file-document-outline","ph:file-text","lucide:folder","tabler:folder","material-symbols:folder-rounded","mdi:folder-outline","lucide:cloud","tabler:cloud","material-symbols:cloud-rounded","mdi:cloud-outline","lucide:code","tabler:code","material-symbols:code-rounded","mdi:code-tags","lucide:terminal","tabler:terminal-2","material-symbols:terminal-rounded","mdi:console","lucide:database","tabler:database","mdi:database-outline"]},
+  {name:"Shapes",description:"Geometric marks and decorative symbols",icons:["lucide:circle","tabler:circle","material-symbols:circle-rounded","mdi:circle-outline","lucide:square","tabler:square","material-symbols:square-rounded","mdi:square-outline","lucide:triangle","tabler:triangle","material-symbols:change-history-rounded","mdi:triangle-outline","lucide:star","tabler:star","material-symbols:star-rounded","mdi:star-outline","lucide:heart","tabler:heart","material-symbols:favorite-rounded","mdi:heart-outline","lucide:hexagon","tabler:hexagon","mdi:hexagon-outline","lucide:diamond","tabler:diamond","mdi:diamond-outline"]}
+];
 const SWATCHES = ["#111827", "#374151", "#6B7280", "#F9FAFB", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2777", "#059669", "#D97706", "#DC2626", "#0F766E"];
 const COMPONENTS: Array<{ kind: LayerKind; label: string; description: string }> = [
   { kind: "text", label: "Text", description: "Heading or paragraph" },
@@ -89,6 +125,12 @@ const COMPONENTS: Array<{ kind: LayerKind; label: string; description: string }>
   { kind: "divider", label: "Divider", description: "Hairline separator" },
   { kind: "rect", label: "Rectangle", description: "Basic shape" },
   { kind: "ellipse", label: "Circle", description: "Round shape" },
+  { kind: "triangle", label: "Triangle", description: "Three-sided geometric shape" },
+  { kind: "diamond", label: "Diamond", description: "Four-point geometric shape" },
+  { kind: "hexagon", label: "Hexagon", description: "Six-sided geometric shape" },
+  { kind: "star", label: "Star", description: "Five-point decorative shape" },
+  { kind: "line", label: "Line", description: "Straight connector or rule" },
+  { kind: "pill", label: "Pill", description: "Capsule or lozenge shape" },
 ];
 
 const PRESETS: Array<{ id: string; label: string; target: DeviceTarget; description: string }> = [
@@ -101,6 +143,19 @@ const PRESETS: Array<{ id: string; label: string; target: DeviceTarget; descript
   { id: "tablet-dashboard", label: "Tablet dashboard", target: "tablet", description: "Tablet-first dashboard with balanced columns" },
   { id: "tablet-settings", label: "Tablet settings", target: "tablet", description: "Tablet settings and preference layout" },
 ];
+
+function shapePoints(kind: string, x: number, y: number, width: number, height: number): string {
+  if (kind === "triangle") return (x+width/2)+","+(y)+" "+(x+width)+","+(y+height)+" "+x+","+(y+height);
+  if (kind === "diamond") return (x+width/2)+","+y+" "+(x+width)+","+(y+height/2)+" "+(x+width/2)+","+(y+height)+" "+x+","+(y+height/2);
+  if (kind === "hexagon") return (x+width*0.25)+","+y+" "+(x+width*0.75)+","+y+" "+(x+width)+","+(y+height/2)+" "+(x+width*0.75)+","+(y+height)+" "+(x+width*0.25)+","+(y+height)+" "+x+","+(y+height/2);
+  const points: string[] = [];
+  for (let index=0; index<10; index++) {
+    const radius = index % 2 === 0 ? 0.5 : 0.21;
+    const angle = -Math.PI/2 + index*Math.PI/5;
+    points.push((x+width/2+Math.cos(angle)*width*radius)+","+(y+height/2+Math.sin(angle)*height*radius));
+  }
+  return points.join(" ");
+}
 
 function layerId(): string {
   return "layer-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
@@ -115,7 +170,7 @@ function boardSize(target: DeviceTarget) {
 function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, referenceHeight = 844): DesignLayer {
   const shared: DesignLayer = {
     id: layerId(), kind, name: kind.charAt(0).toUpperCase() + kind.slice(1), x, y, width: 180, height: 64,
-    text: "", iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "", iconLicense: "", iconAuthor: "",
+    text: "", iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "", fontDataUrl: "", iconLicense: "", iconAuthor: "",
     color: "#111827", background: "transparent", borderColor: "#E5E7EB", borderWidth: 0, radius: 12,
     padding: 12, marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
     fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.35, letterSpacing: 0,
@@ -157,6 +212,12 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     case "divider": return { ...shared, name: "Divider", width: 300, height: 1, text: "", background: "#E5E7EB", borderWidth: 0, radius: 0 };
     case "rect": return { ...shared, name: "Rectangle", width: 120, height: 90, text: "", background: "#DBEAFE", color: "#1D4ED8", radius: 12 };
     case "ellipse": return { ...shared, name: "Circle", width: 84, height: 84, text: "", background: "#DBEAFE", color: "#1D4ED8", radius: 42 };
+    case "triangle": return { ...shared, name: "Triangle", width: 96, height: 84, background: "#DBEAFE", color: "#1D4ED8", radius: 0, padding: 0 };
+    case "diamond": return { ...shared, name: "Diamond", width: 92, height: 92, background: "#DBEAFE", color: "#1D4ED8", radius: 0, padding: 0 };
+    case "hexagon": return { ...shared, name: "Hexagon", width: 112, height: 96, background: "#DBEAFE", color: "#1D4ED8", radius: 0, padding: 0 };
+    case "star": return { ...shared, name: "Star", width: 100, height: 100, background: "#FDE68A", color: "#B45309", radius: 0, padding: 0 };
+    case "line": return { ...shared, name: "Line", width: 180, height: 2, background: "#64748B", borderWidth: 0, radius: 0, padding: 0 };
+    case "pill": return { ...shared, name: "Pill shape", width: 150, height: 52, background: "#DBEAFE", color: "#1D4ED8", radius: 99, padding: 0 };
     default: return shared;
   }
 }
@@ -501,7 +562,11 @@ export function UxUiStudioEngine() {
   const [selectedId, setSelectedId] = useState("");
   const [leftTab, setLeftTab] = useState<PanelTab>("components");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
-  const [iconQuery, setIconQuery] = useState("home");
+  const [iconQuery, setIconQuery] = useState("");
+  const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
+  const [iconPrefix, setIconPrefix] = useState("all");
+  const [fontQuery, setFontQuery] = useState("");
+  const [fontCategory, setFontCategory] = useState("All");
   const [iconResults, setIconResults] = useState<string[]>([]);
   const [iconTotal, setIconTotal] = useState(0);
   const [iconStart, setIconStart] = useState(0);
@@ -520,6 +585,12 @@ export function UxUiStudioEngine() {
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
   const project = useMemo(() => buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
+  const quickIconResults = (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons)
+    .filter((name)=>iconPrefix==="all" || name.startsWith(iconPrefix+":"))
+    .filter((name)=>!iconQuery.trim() || name.toLowerCase().includes(iconQuery.trim().toLowerCase()));
+  const visibleIconResults = iconQuery.trim().length >= 2 ? iconResults : quickIconResults;
+  const fontsInUse = useMemo(()=>Array.from(new Set(elements.map((layer)=>layer.fontFamily).filter((family)=>FONT_LIBRARY.some((font)=>font.family===family&&font.provider==="google")))),[elements]);
+  const customFontSignature = useMemo(()=>elements.filter((layer)=>layer.fontDataUrl).map((layer)=>layer.fontFamily+"|"+layer.fontDataUrl.length+"|"+layer.fontDataUrl.slice(0,48)).join("\n"),[elements]);
 
   useEffect(() => {
     try {
@@ -539,6 +610,7 @@ export function UxUiStudioEngine() {
               referenceWidth: layer.referenceWidth || parsed.viewport.width,
               referenceHeight: layer.referenceHeight || parsed.viewport.height,
               componentKey: layer.componentKey || "",
+              fontDataUrl: layer.fontDataUrl || "",
             } as DesignLayer)),
             tokens: parsed.tokens || DEFAULT_TOKENS,
             breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
@@ -577,7 +649,31 @@ export function UxUiStudioEngine() {
       }
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [leftTab, iconQuery, iconStart]);
+  }, [leftTab, iconQuery, iconStart, iconPrefix]);
+
+  useEffect(() => {
+    for (const family of fontsInUse) {
+      const id = "env-ux-font-" + family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      if (document.getElementById(id)) continue;
+      const link = document.createElement("link");
+      link.id = id; link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(family).replace(/%20/g, "+") + ":wght@300;400;500;600;700;800;900&display=swap";
+      document.head.appendChild(link);
+    }
+  }, [fontsInUse.join("|")]);
+
+  useEffect(() => {
+    const assets = elements.filter((layer)=>layer.fontDataUrl && layer.fontFamily);
+    let cancelled = false;
+    for (const layer of assets) {
+      if (document.fonts.check('16px "' + layer.fontFamily.replace(/"/g,"") + '"')) continue;
+      try {
+        const face = new FontFace(layer.fontFamily, "url(" + JSON.stringify(layer.fontDataUrl) + ")");
+        void face.load().then((loaded)=>{ if (!cancelled) document.fonts.add(loaded); }).catch(()=>{ if (!cancelled) setNotice("A custom font could not be loaded. Re-import a valid TTF, OTF, WOFF or WOFF2 file."); });
+      } catch { setNotice("A custom font could not be loaded. Check the imported font file."); }
+    }
+    return () => { cancelled = true; };
+  }, [customFontSignature]);
 
   function startDesign(nextTarget: DeviceTarget, presetId?: string) {
     const id = presetId || (nextTarget === "mobile" ? "mobile-dashboard" : "desktop-landing");
@@ -879,8 +975,8 @@ export function UxUiStudioEngine() {
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-[205px_minmax(0,1fr)_245px]">
         <aside className="min-w-0 rounded-xl border border-border bg-surface p-3">
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1">
-            {([{ id: "components", label: "Elements" }, { id: "icons", label: "Icons" }, { id: "presets", label: "Presets" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={"rounded-md px-2 py-2 text-xs font-semibold " + (leftTab === tab.id ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg")}>{tab.label}</button>)}
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface-2 p-1">
+            {([{ id: "components", label: "Elements" }, { id: "icons", label: "Icons" }, { id: "fonts", label: "Fonts" }, { id: "presets", label: "Presets" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={"rounded-md px-2 py-2 text-xs font-semibold " + (leftTab === tab.id ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg")}>{tab.label}</button>)}
           </div>
 
           {leftTab === "components" && <div className="mt-3">
@@ -899,20 +995,54 @@ export function UxUiStudioEngine() {
           </div>}
 
           {leftTab === "icons" && <div className="mt-3">
-            <h3 className="text-xs font-semibold text-fg">Icon catalogue</h3>
-            <p className="mt-1 text-[11px] leading-4 text-muted">Search open-source icon sets. The full icon name and license metadata are attached to the layer.</p>
-            <div className="relative mt-3"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event) => { setIconQuery(event.target.value); setIconStart(0); setIconResults([]); }} placeholder="Search home, menu, chart…" className={"w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent"} /></div>
-            <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconLoading ? "Searching…" : iconTotal.toLocaleString() + " matches"}</span><span>Iconify</span></div>
-            {iconError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600">{iconError}</p>}
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {iconResults.map((name) => <button key={name} type="button" onClick={() => void chooseIcon(name)} title={"Add icon " + name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 " + (selected?.iconName === name ? "border-accent bg-accent/10" : "")}><img loading="lazy" alt="" src={"https://api.iconify.design/" + name.replace(":", "/") + ".svg"} className="mx-auto size-6" /><span className="mt-1 block truncate text-[9px] text-muted">{name}</span></button>)}
+            <h3 className="text-xs font-semibold text-fg">Icon library</h3>
+            <p className="mt-1 text-[11px] leading-4 text-muted">Browse immediate examples by interface category and visual style, or search the online Iconify catalogue. Selected SVGs and collection identifiers are stored in the project.</p>
+            <div className="mt-3 relative"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event)=>{setIconQuery(event.target.value);setIconStart(0);setIconResults([]);}} placeholder="Search icons: home, charts, payment…" className="w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent" /></div>
+            <label className="mt-2 block text-[10px] font-medium text-muted">Visual style / icon family
+              <select value={iconPrefix} onChange={(event)=>{setIconPrefix(event.target.value);setIconStart(0);setIconResults([]);}} className={fieldClass()}>{ICON_SET_OPTIONS.map((set)=><option key={set.prefix} value={set.prefix}>{set.label}</option>)}</select>
+            </label>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {ICON_BROWSE_CATEGORIES.map((category)=><button key={category.name} type="button" onClick={()=>{setIconBrowseCategory(category.name);setIconQuery("");setIconStart(0);setIconResults([]);}} aria-pressed={iconBrowseCategory===category.name} className={"rounded-full border px-2.5 py-1.5 text-[10px] font-semibold "+(iconBrowseCategory===category.name?"border-accent bg-accent text-white":"border-border text-fg hover:bg-surface-2")}>{category.name}</button>)}
             </div>
-            {iconResults.length < iconTotal && <button type="button" disabled={iconLoading} onClick={() => setIconStart((current) => current + 32)} className="mt-3 w-full rounded-lg border border-border px-2 py-2 text-xs font-semibold text-fg disabled:opacity-50">Load more icons</button>}
-            {!iconResults.length && !iconLoading && !iconError && <p className="mt-3 text-xs text-muted">Enter a search term to browse matching icons.</p>}
-            <p className="mt-3 text-[10px] leading-4 text-muted">Source: <a className="underline underline-offset-2" href="https://iconify.design/docs/api/search.html" target="_blank" rel="noreferrer">Iconify search API</a>. Check the selected collection’s license for the project’s usage.</p>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconQuery.trim().length>=2?(iconLoading?"Searching…":iconTotal.toLocaleString()+" matching online icons"):iconBrowseCategory+" · curated examples by style"}</span><span>Iconify · SVG</span></div>
+            {iconError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600">{iconError}</p>}
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
+              {visibleIconResults.map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
+                <img loading="lazy" alt="" src={"https://api.iconify.design/"+name.replace(":","/")+".svg"} className="mx-auto size-7" />
+                <span className="mt-1 block truncate text-[9px] text-muted">{name}</span>
+              </button>)}
+            </div>
+            {iconQuery.trim().length>=2 && iconResults.length<iconTotal && <button type="button" disabled={iconLoading} onClick={()=>setIconStart((current)=>current+32)} className="mt-3 w-full rounded-lg border border-border px-2 py-2 text-xs font-semibold text-fg disabled:opacity-50">{iconLoading?"Searching…":"Load more results"}</button>}
+            {!visibleIconResults.length && !iconLoading && <p className="mt-3 text-xs text-muted">No icons match this filter. Choose All styles, another category, or search a broader term.</p>}
+            <p className="mt-3 text-[10px] leading-4 text-muted">The quick picker covers common UI categories and outline, filled, rounded and platform icon sets. The full online catalogue remains searchable. Check each collection’s licence; <a className="underline underline-offset-2" href="https://iconify.design/docs/api/search.html" target="_blank" rel="noreferrer">Iconify supports set filters and paging</a>.</p>
           </div>}
 
-          {leftTab === "presets" && <div className="mt-3">
+          {leftTab === "fonts" && <div className="mt-3">
+            <h3 className="text-xs font-semibold text-fg">Font library</h3>
+            <p className="mt-1 text-[11px] leading-4 text-muted">Browse 50+ system and open Google Font families by typography role. Selected Google Fonts download on demand when online; imported font files are embedded in the editable project.</p>
+            <input aria-label="Search fonts" value={fontQuery} onChange={(event)=>setFontQuery(event.target.value)} placeholder="Search font families…" className={fieldClass()} />
+            <div className="mt-2 flex flex-wrap gap-1">
+              {["All","Sans serif","Serif","Monospace","Display","Handwriting","System"].map((category)=><button key={category} type="button" onClick={()=>setFontCategory(category)} aria-pressed={fontCategory===category} className={"rounded-full border px-2 py-1 text-[10px] font-medium "+(fontCategory===category?"border-accent bg-accent text-white":"border-border text-fg")}>{category}</button>)}
+            </div>
+            {selected && <div className="mt-3 rounded-lg border border-border p-2">
+              <div className="text-[10px] text-muted">Apply font to selected layer</div>
+              <div className="mt-1 truncate text-sm font-semibold text-fg" style={{fontFamily:selected.fontFamily}}>{selected.fontFamily}</div>
+              <div className="mt-1 text-xs text-muted" style={{fontFamily:selected.fontFamily}}>Aa Bb Cc 123 — The quick brown fox.</div>
+              <label className="mt-3 block text-[10px] font-medium text-muted">Import local font (TTF, OTF, WOFF, WOFF2 · up to 4 MB)
+                <input type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" className="mt-1 block w-full text-[10px] text-muted" onChange={(event)=>{const file=event.target.files?.[0];if(!file)return;if(file.size>4*1024*1024){setNotice("Font files must be 4 MB or smaller.");event.target.value="";return;}const reader=new FileReader();reader.onload=()=>{if(typeof reader.result!=="string")return;const family=(file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9 -]/g,"").trim()||"Imported Font")+" (local)";updateLayer(selected.id,{fontFamily:family,fontDataUrl:reader.result});setNotice("Imported "+file.name+" into this design. The font bytes are preserved in JSON export.");};reader.onerror=()=>setNotice("Could not read the font file.");reader.readAsDataURL(file);event.target.value="";}} />
+              </label>
+            </div>}
+            <div className="mt-3 space-y-1.5">
+              {FONT_LIBRARY.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)).map((font)=><button key={font.family} type="button" disabled={!selected} onClick={()=>{if(selected)updateLayer(selected.id,{fontFamily:font.family,fontDataUrl:""});setNotice("Applied "+font.family+". "+(font.provider==="google"?"The open Google Font is fetched for preview when online.":"This family uses an installed system font if available."));}} className={"block w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2 disabled:opacity-40 "+(selected?.fontFamily===font.family?"border-accent bg-accent/10":"")}>
+                <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{font.family}</span><span className="text-[9px] text-muted">{font.provider==="google"?"Google Fonts · OFL":"System"}</span></div>
+                <div className="mt-1 truncate text-lg text-fg" style={{fontFamily:font.family}}>Design systems that scale 012345</div>
+                <div className="mt-1 text-[9px] text-muted">{font.category} · 300–900 weights where supplied</div>
+              </button>)}
+            </div>
+            <p className="mt-3 text-[10px] leading-4 text-muted">The font library includes common open font families plus custom-font import. Retain each font’s licence when redistributing a project.</p>
+          </div>}
+
+          {leftTab === "presets" && <div className="mt-3">{leftTab === "presets" && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Starter layouts</h3><p className="mt-1 text-[11px] leading-4 text-muted">Curated responsive starting points, then customise every layer.</p>
             <div className="mt-3 space-y-2">{PRESETS.map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2"><span className="block text-xs font-semibold text-fg">{preset.label}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{preset.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas</span></button>)}</div>
           </div>}
@@ -968,13 +1098,18 @@ export function UxUiStudioEngine() {
                   return <g key={layer.id} data-layer-id={layer.id} style={style}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
+                    {["triangle","diamond","hexagon","star"].includes(layer.kind) ? <polygon
+                      points={shapePoints(layer.kind,layer.x,layer.y,layer.width,layer.height)}
+                      fill={boxFill==="none"?"#DBEAFE":boxFill} stroke={stroke} strokeWidth={layer.borderWidth}
+                      strokeLinejoin="round" /> : null}
+                    {layer.kind === "line" ? <line x1={layer.x} y1={layer.y+layer.height/2} x2={layer.x+layer.width} y2={layer.y+layer.height/2} stroke={layer.background==="transparent"?"#64748B":layer.background} strokeWidth={Math.max(1,layer.borderWidth||layer.height)} strokeLinecap="round" /> : null}
                     {layer.kind === "ellipse" || layer.kind === "avatar" ? <ellipse cx={layer.x + layer.width / 2} cy={layer.y + layer.height / 2} rx={layer.width / 2} ry={layer.height / 2} fill={boxFill === "none" ? "#DBEAFE" : boxFill} stroke={stroke} strokeWidth={layer.borderWidth} /> : null}
                     {layer.kind === "checkbox" ? <><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={layer.radius} fill={boxFill === "none" ? "#FFFFFF" : boxFill} stroke={layer.borderColor} strokeWidth={Math.max(1, layer.borderWidth)} /><path d={"M " + (layer.x + 5) + " " + (layer.y + 12) + " l 4 4 l 9 -10"} fill="none" stroke={layer.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></> : null}
                     {layer.kind === "radio" ? <><circle cx={layer.x + layer.width / 2} cy={layer.y + layer.height / 2} r={Math.min(layer.width, layer.height) / 2 - 1} fill="#FFFFFF" stroke={layer.borderColor} strokeWidth={Math.max(1, layer.borderWidth)} /><circle cx={layer.x + layer.width / 2} cy={layer.y + layer.height / 2} r={Math.min(layer.width, layer.height) / 4} fill={layer.color} /></> : null}
                     {layer.kind === "switch" || layer.kind === "toggle" ? <><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={layer.height / 2} fill={boxFill === "none" ? "#2563EB" : boxFill} /><circle cx={layer.x + layer.width - layer.height / 2} cy={layer.y + layer.height / 2} r={layer.height / 2 - 3} fill="#FFFFFF" /></> : null}
                     {layer.kind === "progress" ? <><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={layer.radius} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y} width={layer.width * 0.72} height={layer.height} rx={layer.radius} fill={layer.color} /></> : null}
                     {layer.kind === "slider" ? <><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width} height={4} rx={2} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width * 0.62} height={4} rx={2} fill={layer.color} /><circle cx={layer.x + layer.width * 0.62} cy={layer.y + layer.height / 2} r={7} fill={layer.color} /></> : null}
-                    {["text", "icon", "divider", "ellipse", "avatar", "checkbox", "radio", "switch", "toggle", "progress", "slider"].includes(layer.kind) ? null : baseBox()}
+                    {["text", "icon", "divider", "ellipse", "avatar", "checkbox", "radio", "switch", "toggle", "progress", "slider", "triangle", "diamond", "hexagon", "star", "line"].includes(layer.kind) ? null : baseBox()}
                     {layer.kind === "chart" ? <g>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={layer.x+layer.padding} y1={layer.y+layer.height-layer.padding-22-grid*22} x2={layer.x+layer.width-layer.padding} y2={layer.y+layer.height-layer.padding-22-grid*22} stroke="#E5E7EB" strokeWidth="1" />)}{[0.36,0.62,0.46,0.82,0.67].map((ratio,index)=><rect key={"bar-"+index} x={layer.x+layer.padding+18+index*30} y={layer.y+layer.height-layer.padding-24-ratio*76} width="16" height={ratio*76} rx="3" fill={layer.color} opacity={index===4?1:0.72} />)}</g> : null}
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
                     {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
