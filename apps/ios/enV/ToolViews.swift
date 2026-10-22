@@ -6704,7 +6704,6 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var referenceHeight: Int = 844
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
-    var fontData: String? = nil
 
     init(
         id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
@@ -6719,7 +6718,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         minWidth: Int = 0, maxWidth: Int = 0,
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
-        componentKey: String = "", iconViewBox: String = "0 0 24 24", fontData: String? = nil
+        componentKey: String = "", iconViewBox: String = "0 0 24 24"
     ) {
         self.id = id
         self.kind = kind
@@ -6756,11 +6755,10 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.referenceHeight = referenceHeight
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
-        self.fontData = fontData
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData, fontData, fontData
+        case id, kind, name, x, y, width, height, text, iconName, iconSvg, imageData, fontData
         case color, fill, borderColor, borderWidth, radius, padding
         case marginTop, marginRight, marginBottom, marginLeft
         case fontFamily, fontSize, fontWeight, lineHeight
@@ -6781,7 +6779,6 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         iconName = try c.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         iconSvg = try c.decodeIfPresent(String.self, forKey: .iconSvg)
         imageData = try c.decodeIfPresent(String.self, forKey: .imageData)
-        fontData = try c.decodeIfPresent(String.self, forKey: .fontData)
         fontData = try c.decodeIfPresent(String.self, forKey: .fontData)
         color = try c.decodeIfPresent(String.self, forKey: .color) ?? "#111827"
         fill = try c.decodeIfPresent(String.self, forKey: .fill) ?? "transparent"
@@ -6863,10 +6860,6 @@ private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> Stri
         let font = CTFontCreateWithURL(url as CFURL, 0, nil)
         return CTFontCopyFamilyName(font) as String
     } catch { return nil }
-}
-}
-
-private struct UxUiNativeShape
 }
 
 private struct UxUiNativeShape: Shape {
@@ -7169,33 +7162,36 @@ private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rec
 }
 
 
-private struct UxUiIconifyThumbnail: UIViewRepresentable {
+private struct UxUiIconifyThumbnail: View {
     let iconName: String
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
-        view.isOpaque = false
-        view.backgroundColor = .clear
-        view.scrollView.backgroundColor = .clear
-        view.scrollView.isScrollEnabled = false
-        view.isUserInteractionEnabled = false
-        view.configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        return view
-    }
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        let parts = iconName.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return }
-        let src = "https://api.iconify.design/\(parts[0])/\(parts[1]).svg"
-        let html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='\(src)'></body></html>"
-        if context.coordinator.lastHTML != html {
-            context.coordinator.lastHTML = html
-            uiView.loadHTMLString(html, baseURL: nil)
+    @State private var svg = ""
+
+    var body: some View {
+        Canvas { context, size in
+            guard !svg.isEmpty else { return }
+            uxUiDrawSVG(svg, tint: "#475569", in: context.cgContext, rect: CGRect(origin: .zero, size: size))
+        }
+        .task(id: iconName) {
+            let parts = iconName.split(separator: ":", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { svg = ""; return }
+            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+            let prefix = parts[0].addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+            let name = parts[1].addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+            guard let url = URL(string: "https://api.iconify.design/\(prefix)/\(name).svg") else { svg = ""; return }
+            do {
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200,
+                      let source = String(data: data, encoding: .utf8),
+                      source.contains("<svg") else { svg = ""; return }
+                svg = uxUiCleanIconSVG(source)
+            } catch {
+                svg = ""
+            }
         }
     }
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator { var lastHTML = "" }
 }
 
-private func uxUiFont(for item: UxUiNativeLayer, scale: CGFloat) -> Font {
+private func uxUiFont(for item: UxUiNativeLayerprivate func uxUiFont(for item: UxUiNativeLayer, scale: CGFloat) -> Font {
     if let data = item.fontData, let family = uxUiRegisterImportedFont(data, family: item.fontFamily), !family.isEmpty {
         return .custom(family, size: max(5, CGFloat(item.fontSize) * scale))
             .weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
@@ -8287,9 +8283,25 @@ private struct NativeUxUiStudioView: View {
     }
 
     @ViewBuilder
-    private func inspectorImageFields(    @ViewBuilder
+    private func inspectorImageFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        if binding.wrappedValue.kind == "image" {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    imageTargetID = binding.wrappedValue.id
+                    isImportingImage = true
+                } label: {
+                    Label(binding.wrappedValue.imageData?.isEmpty == false ? "Replace image" : "Import image", systemImage: "photo")
+                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                }
+                Text("Imported image assets are embedded in the editable project. Use licensed images and keep source files where your team can maintain them.")
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func inspectorIconFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
-        if binding.wrappedValue.kind == "icon" {
+        if binding.wrappedValue.kind == "icon" {        if binding.wrappedValue.kind == "icon" {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Browse icon categories").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -8365,7 +8377,7 @@ private struct NativeUxUiStudioView: View {
         }
     }
 
-    private func inspectorSpecification(    private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
+    private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
             let encoded = (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data()
