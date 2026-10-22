@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { cronNextRuns, parseCron, hashText, runDeveloperStudio, validateJsonDetailed } from "./developer-studios.ts";
 import { developerStudioGolden } from "./developer-studio-golden.ts";
-import { generateHtmlProject, generateReactProject, generateKotlinProject, generateSwiftProject } from "./ux-ui-studio-codegen.ts";
+import { generateHtmlProject, generateReactProject, generateKotlinProject, generateSwiftProject, type UxCodegenProject } from "./ux-ui-studio-codegen.ts";
 
 const fixedNow = new Date("2026-01-01T00:00:00.000Z");
 
@@ -483,7 +483,7 @@ test("Recipe configuration rejects duplicate top-level keys consistently instead
 
 
 test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and custom fonts", () => {
-  const project = {
+  const project: UxCodegenProject = {
     name: "Interface Asset QA",
     target: "mobile",
     background: "#F8FAFC",

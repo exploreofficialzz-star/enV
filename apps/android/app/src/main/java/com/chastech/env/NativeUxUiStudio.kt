@@ -90,38 +90,32 @@ private fun uxNativeLayerHeight(layer: UxUiNativeLayer, boardHeight: Int): Int =
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
 
-private fun uxNativeIconThumbnailHtml(iconName: String): String {
-    val parts = iconName.split(":", limit = 2)
-    if (parts.size != 2 || !Regex("^[A-Za-z0-9-]+$").matches(parts[0]) || !Regex("^[A-Za-z0-9-]+$").matches(parts[1])) {
-        return "<!doctype html><html><body style='margin:0;background:transparent'></body></html>"
-    }
-    val src = "https://api.iconify.design/" + parts[0] + "/" + parts[1] + ".svg"
-    return "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{display:block;width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='" + src + "'></body></html>"
-}
-
 @Composable
 private fun UxNativeIconThumbnail(iconName: String) {
-    val html = remember(iconName) { uxNativeIconThumbnailHtml(iconName) }
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                settings.javaScriptEnabled = false
-                settings.domStorageEnabled = false
-                isHorizontalScrollBarEnabled = false
-                isVerticalScrollBarEnabled = false
-                isFocusable = false
-                isFocusableInTouchMode = false
-            }
-        },
-        modifier = Modifier.size(28.dp),
-        update = { view ->
-            if (view.tag != html) {
-                view.tag = html
-                view.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
-            }
+    var svg by remember(iconName) { mutableStateOf("") }
+    LaunchedEffect(iconName) {
+        val parts = iconName.split(":", limit = 2)
+        if (parts.size == 2 && Regex("^[A-Za-z0-9-]+$").matches(parts[0]) && Regex("^[A-Za-z0-9-]+$").matches(parts[1])) {
+            svg = runCatching {
+                withContext(Dispatchers.IO) {
+                    URL("https://api.iconify.design/" + parts[0] + "/" + parts[1] + ".svg").readText()
+                }
+            }.map { uxNativeCleanIconSvg(it) }.getOrDefault("")
+        } else {
+            svg = ""
         }
-    )
+    }
+    Canvas(modifier = Modifier.size(28.dp)) {
+        if (svg.isNotBlank()) {
+            val layer = UxUiNativeLayer(
+                id = "icon-thumb", kind = "icon", name = iconName, x = 0, y = 0,
+                width = size.width.roundToInt().coerceAtLeast(1),
+                height = size.height.roundToInt().coerceAtLeast(1),
+                text = "", color = "#475569", iconName = iconName, iconSvg = svg
+            )
+            drawIntoCanvas { canvas -> uxNativeDrawSvgIcon(canvas.nativeCanvas, layer) }
+        }
+    }
 }
 
 private val uxNativeFontFamilies = listOf(
@@ -209,7 +203,7 @@ private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path?
     return path
 }
 
-private fun uxNativeTypefaceprivate fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
+private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
     val data = layer.fontData
     if (data.startsWith("data:font/") && data.contains(",")) {
         runCatching {
