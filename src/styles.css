@@ -263,3 +263,209 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 @media (prefers-reduced-motion: reduce) {
   .tool-app-icon { transform: none; }
 }
+
+
+/* Mockup-first UX/UI Studio — visual controls stay simple while the design model retains exact values. */
+.ux-ui-studio { position: relative; }
+.uxui-topbar {
+  position: relative; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--color-border); border-radius: 16px;
+  background: var(--color-surface); box-shadow: var(--shadow-border);
+}
+.uxui-topbar-left, .uxui-topbar-actions, .uxui-target-switch { display: flex; align-items: center; gap: 8px; }
+.uxui-brand-mark {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
+  border-radius: 11px; background: var(--color-fg); color: var(--color-surface);
+  font-size: 12px; font-weight: 900; letter-spacing: -.06em;
+}
+.uxui-target-switch { padding: 3px; border-radius: 12px; background: var(--color-surface-2); gap: 2px; }
+.uxui-target-switch button {
+  display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid transparent; border-radius: 9px; padding: 0 10px;
+  color: var(--color-muted); font-size: 12px; font-weight: 700;
+}
+.uxui-target-switch button.is-active { background: var(--color-surface); border-color: var(--color-border); color: var(--color-fg); box-shadow: var(--shadow-border); }
+.uxui-topbar-actions { gap: 5px; }
+.uxui-icon-button, .uxui-canvas-zoom button {
+  display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 10px; color: var(--color-fg);
+}
+.uxui-icon-button:hover, .uxui-canvas-zoom button:hover { background: var(--color-surface-2); }
+.uxui-icon-button:disabled { opacity: .3; }
+.uxui-export-trigger {
+  display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 11px; padding: 0 13px; background: var(--color-fg); color: var(--color-surface);
+  font-size: 12px; font-weight: 750;
+}
+.uxui-export-menu {
+  position: absolute; z-index: 20; top: calc(100% + 8px); right: 8px; width: min(330px, calc(100vw - 28px));
+  padding: 8px; border: 1px solid var(--color-border); border-radius: 15px;
+  background: var(--color-surface); box-shadow: 0 16px 42px rgb(15 23 42 / 18%);
+}
+.uxui-export-menu-title { padding: 7px 10px 9px; color: var(--color-fg); font-size: 13px; font-weight: 800; }
+.uxui-export-menu > button {
+  display: flex; width: 100%; min-height: 48px; align-items: center; gap: 10px;
+  border-radius: 9px; padding: 8px 10px; text-align: left; color: var(--color-fg);
+}
+.uxui-export-menu > button:hover { background: var(--color-surface-2); }
+.uxui-export-menu > button:disabled { opacity: .45; }
+.uxui-export-menu > button > span { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.uxui-export-menu strong { font-size: 12px; font-weight: 750; }
+.uxui-export-menu small { color: var(--color-muted); font-size: 10px; line-height: 1.4; }
+.uxui-workspace {
+  position: relative; grid-template-columns: minmax(0, 1fr) minmax(255px, 310px);
+  align-items: start; gap: 12px;
+}
+.uxui-tools-drawer {
+  position: absolute; z-index: 18; top: 8px; left: 8px; width: min(350px, calc(100% - 16px));
+  max-height: min(76vh, 850px); overflow: auto; border-radius: 17px;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 22%);
+}
+.uxui-drawer-heading {
+  display: flex; align-items: center; justify-content: space-between; margin: -2px 0 12px;
+  color: var(--color-fg); font-size: 13px; font-weight: 800;
+}
+.uxui-drawer-heading button { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; }
+.uxui-drawer-heading button:hover { background: var(--color-surface-2); }
+.uxui-canvas-panel { min-width: 0; border: 1px solid var(--color-border); border-radius: 17px; background: var(--color-surface); box-shadow: var(--shadow-border); }
+.uxui-canvas-heading {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 49px; border-bottom: 1px solid var(--color-border); padding: 6px 12px;
+}
+.uxui-canvas-heading > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.uxui-canvas-heading strong { color: var(--color-fg); font-size: 12px; font-weight: 800; }
+.uxui-canvas-heading span { color: var(--color-muted); font-family: var(--font-mono); font-size: 10px; }
+.uxui-canvas-zoom { display: flex; align-items: center; gap: 2px; }
+.uxui-canvas-zoom span { width: 36px; text-align: center; font-family: var(--font-sans); }
+.uxui-canvas-zoom button.is-active { background: var(--color-accent-soft); color: var(--color-accent); }
+.uxui-canvas-stage {
+  display: flex; min-width: 0; min-height: 540px; align-items: center; justify-content: center; flex-direction: column;
+  gap: 10px; overflow: auto; padding: 28px 16px 18px;
+  background-color: #f4f5f2;
+  background-image: linear-gradient(45deg, #dfe2de 25%, transparent 25%),
+    linear-gradient(-45deg, #dfe2de 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #dfe2de 75%),
+    linear-gradient(-45deg, transparent 75%, #dfe2de 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+.uxui-device-shell {
+  position: relative; width: max-content; max-width: 100%; flex: 0 0 auto;
+  line-height: 0; background: #0b0c0e; box-shadow: 0 15px 34px rgb(15 23 42 / 23%), inset 0 0 0 1px rgb(255 255 255 / 12%);
+}
+.uxui-device-shell > svg { display: block; max-width: 100%; height: auto; background: white; }
+.uxui-device-mobile { padding: 8px; border: 4px solid #08090a; border-radius: 54px; }
+.uxui-device-mobile > svg { border-radius: 40px; }
+.uxui-device-tablet { padding: 11px; border: 5px solid #08090a; border-radius: 29px; }
+.uxui-device-tablet > svg { border-radius: 17px; }
+.uxui-device-desktop {
+  padding: 9px 9px 28px; border: 2px solid #08090a; border-radius: 12px;
+  margin-bottom: 47px; box-shadow: 0 16px 35px rgb(15 23 42 / 24%), inset 0 0 0 1px rgb(255 255 255 / 13%);
+}
+.uxui-device-desktop > svg { border-radius: 2px; }
+.uxui-device-cutout { display: none; position: absolute; z-index: 4; pointer-events: none; background: #030304; }
+.uxui-device-mobile .uxui-device-cutout { display: block; top: 13px; left: 50%; width: 108px; height: 21px; border-radius: 999px; transform: translateX(-50%); }
+.uxui-device-tablet .uxui-device-cutout { display: block; top: 8px; left: 50%; width: 6px; height: 6px; border-radius: 50%; transform: translateX(-50%); }
+.uxui-device-neck, .uxui-device-base { display: none; position: absolute; z-index: -1; background: linear-gradient(90deg, #92969b, #e2e4e6 40%, #7b7f84); }
+.uxui-device-desktop .uxui-device-neck {
+  display: block; bottom: -42px; left: 40%; width: 20%; height: 42px;
+  clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%);
+}
+.uxui-device-desktop .uxui-device-base { display: block; bottom: -49px; left: 24%; width: 52%; height: 8px; border-radius: 99px; }
+.uxui-canvas-hint { margin: 1px 0 0; color: #626963; font-size: 10px; line-height: 1.4; text-align: center; }
+.uxui-bottom-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 7px;
+  min-height: 74px; border-top: 1px solid var(--color-border); padding: 8px 10px;
+  border-radius: 0 0 17px 17px; background: var(--color-surface);
+}
+.uxui-bottom-group { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.uxui-bottom-group button { display: grid; width: 33px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--color-fg); }
+.uxui-bottom-group button:hover, .uxui-bottom-group button.is-active { background: var(--color-surface-2); color: var(--color-accent); }
+.uxui-bottom-group button:disabled { opacity: .28; }
+.uxui-add-button {
+  display: grid; width: 66px; height: 66px; flex: 0 0 auto; place-items: center;
+  border: 4px solid var(--color-fg); border-radius: 50%; background: var(--color-surface);
+  color: var(--color-fg); box-shadow: 0 2px 0 rgb(15 23 42 / 8%);
+}
+.uxui-add-button:hover { background: var(--color-surface-2); }
+.uxui-inspector { min-width: 0; border-radius: 17px; box-shadow: var(--shadow-border); }
+.uxui-project-heading { border-bottom: 1px solid var(--color-border); padding: 2px 0 11px; }
+.uxui-project-heading h2 { margin: 0; color: var(--color-fg); font-size: 17px; font-weight: 850; letter-spacing: -.02em; }
+.uxui-project-heading > div > button { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; color: var(--color-fg); }
+.uxui-project-heading > div > button:hover { background: var(--color-surface-2); }
+.uxui-project-title-input {
+  width: 100%; margin-top: 8px; border: 1px solid var(--color-border); border-radius: 9px;
+  padding: 8px 10px; outline: none; color: var(--color-fg); background: var(--color-surface);
+  font-size: 13px; font-weight: 750;
+}
+.uxui-project-title-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.uxui-project-heading p { margin: 5px 0 0; color: var(--color-muted); font-size: 10px; }
+.uxui-help-note { display: flex; flex-direction: column; gap: 4px; margin: 9px 0 14px; border-radius: 10px; padding: 10px; background: var(--color-surface-2); color: var(--color-fg); }
+.uxui-help-note strong { font-size: 11px; }
+.uxui-help-note span { font-size: 10px; line-height: 1.5; color: var(--color-muted); }
+.uxui-layer-heading { display: flex; align-items: center; justify-content: space-between; margin: 13px 0 8px; color: var(--color-fg); font-size: 12px; }
+.uxui-layer-heading strong { font-weight: 850; }
+.uxui-layer-heading span { color: var(--color-muted); font-size: 10px; }
+.uxui-layer-list { display: flex; flex-direction: column; gap: 7px; }
+.uxui-layer-chip {
+  display: flex; min-height: 39px; width: 100%; align-items: center; gap: 6px;
+  border: 1.5px solid var(--layer-tint); border-radius: 15px; padding: 5px 9px;
+  background: var(--color-surface); color: var(--color-fg); text-align: left;
+  box-shadow: 2px 3px 0 rgb(15 23 42 / 6%);
+}
+.uxui-layer-chip:hover { background: var(--color-surface-2); }
+.uxui-layer-chip.is-selected { border-width: 2px; background: var(--color-surface-2); box-shadow: 0 0 0 2px color-mix(in srgb, var(--layer-tint) 22%, transparent); }
+.uxui-layer-number { flex: 0 0 auto; font-size: 12px; font-weight: 850; }
+.uxui-layer-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 750; }
+.uxui-layer-kind { flex: 0 0 auto; max-width: 52px; overflow: hidden; text-overflow: ellipsis; color: var(--color-muted); font-size: 9px; text-transform: lowercase; }
+.uxui-see-more { display: block; margin: 5px 0 0 auto; padding: 3px 0; color: var(--color-muted); font-size: 12px; }
+.uxui-see-more:hover { color: var(--color-fg); text-decoration: underline; }
+.uxui-palette-panel { margin-top: 18px; border-top: 1px solid var(--color-border); padding-top: 11px; }
+.uxui-palette-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.uxui-palette-heading > strong { color: var(--color-fg); font-size: 12px; font-weight: 850; }
+.uxui-palette-heading > div { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--color-surface-2); }
+.uxui-palette-heading button { border-radius: 6px; padding: 3px 8px; color: var(--color-muted); font-size: 10px; font-weight: 700; }
+.uxui-palette-heading button.is-active { background: var(--color-surface); color: var(--color-fg); box-shadow: var(--shadow-border); }
+.uxui-color-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+.uxui-color-grid button {
+  min-width: 0; aspect-ratio: 1; border: 1px solid rgb(15 23 42 / 13%); border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%);
+}
+.uxui-color-grid button:hover { outline: 2px solid var(--color-fg); outline-offset: 1px; transform: scale(1.06); }
+.uxui-active-color { display: flex; min-width: 0; align-items: center; gap: 7px; margin-top: 9px; color: var(--color-muted); }
+.uxui-active-color > span { width: 17px; height: 17px; flex: 0 0 auto; border: 1px solid var(--color-border-strong); border-radius: 4px; }
+.uxui-active-color small { font-size: 9px; }
+.uxui-active-color code { min-width: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-fg); font-size: 9px; }
+.uxui-advanced-controls { margin-top: 15px; border-top: 1px solid var(--color-border); padding-top: 11px; }
+.uxui-advanced-controls > summary { cursor: pointer; color: var(--color-fg); font-size: 12px; font-weight: 800; }
+.uxui-advanced-body { padding-top: 11px; }
+.uxui-artboard-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 13px; }
+.uxui-artboard-settings label { display: flex; flex-direction: column; gap: 5px; color: var(--color-muted); font-size: 10px; font-weight: 700; }
+.uxui-artboard-settings label:first-child { flex-direction: row; align-items: center; justify-content: space-between; grid-column: 1 / -1; }
+.uxui-artboard-settings input:not([type="checkbox"]) { min-width: 0; width: 100%; border: 1px solid var(--color-border); border-radius: 7px; padding: 6px; color: var(--color-fg); background: var(--color-surface); font-size: 11px; }
+.uxui-artboard-settings input:disabled { opacity: .4; }
+@media (max-width: 900px) {
+  .uxui-workspace { grid-template-columns: minmax(0, 1fr); }
+  .uxui-canvas-stage { min-height: 500px; }
+  .uxui-inspector { display: grid; grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .uxui-topbar { padding: 8px; }
+  .uxui-topbar-left { min-width: 0; flex: 1 1 auto; }
+  .uxui-brand-mark { width: 32px; height: 32px; }
+  .uxui-target-switch button { width: 34px; min-height: 34px; padding: 0; }
+  .uxui-target-switch button span { display: none; }
+  .uxui-topbar-actions { gap: 1px; }
+  .uxui-icon-button { width: 30px; height: 34px; }
+  .uxui-export-trigger { min-height: 34px; padding: 0 8px; font-size: 11px; }
+  .uxui-canvas-stage { min-height: 420px; padding: 22px 10px 15px; }
+  .uxui-bottom-toolbar { gap: 3px; padding: 5px 5px; }
+  .uxui-bottom-group { gap: 0; }
+  .uxui-bottom-group button { width: 28px; height: 34px; }
+  .uxui-add-button { width: 54px; height: 54px; border-width: 3px; }
+  .uxui-layer-name { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uxui-color-grid button:hover { transform: none; }
+}
