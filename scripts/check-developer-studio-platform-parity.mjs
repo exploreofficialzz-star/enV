@@ -52,5 +52,14 @@ assert.match(androidUx, /aiPrompt/, 'Android project handoff must include an AI 
 assert.match(iosTools, /NativeUxUiStudioView/, 'iOS Swift UX/UI editor must be present');
 assert.match(iosTools, /UIGraphicsPDFRenderer/, 'iOS UX/UI Studio must generate a native PDF');
 assert.match(iosTools, /iconName|marginLeft|fontFamily/, 'iOS design layers must retain implementation metadata');
+const uxStudioCss = readFileSync('src/styles.css', 'utf8');
+assert.match(webUx, /uxui-device-shell/, 'Web preview must use a target-specific device mockup');
+assert.match(webUx, /uxui-layer-chip/, 'Web editor must expose selectable visual layer chips');
+assert.match(webUx, /uxui-color-grid/, 'Web editor must expose the compact palette');
+assert.match(webUx, /Fine-tune design/, 'Exact measurements must remain available in the advanced inspector');
+assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
+assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
+assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a monitor mockup');
+assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
 console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF and layer metadata).');
 console.log(`Developer Studio platform parity: PASS (${web.size} Studios; ${[...web.values()].reduce((sum, modes) => sum + modes.length, 0)} Studio modes match across TypeScript, Kotlin, and Swift).`);
