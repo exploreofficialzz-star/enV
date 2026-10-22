@@ -54,6 +54,7 @@ assert.match(iosTools, /UIGraphicsPDFRenderer/, 'iOS UX/UI Studio must generate 
 assert.match(iosTools, /iconName|marginLeft|fontFamily/, 'iOS design layers must retain implementation metadata');
 const uxStudioCss = readFileSync('src/styles.css', 'utf8');
 assert.match(webUx, /uxui-device-shell/, 'Web preview must use a target-specific device mockup');
+assert.match(webUx, /uxui-brand-title/, 'The redesigned editor must keep its studio heading visible for accessible orientation');
 assert.match(webUx, /uxui-layer-chip/, 'Web editor must expose selectable visual layer chips');
 assert.match(webUx, /uxui-color-grid/, 'Web editor must expose the compact palette');
 assert.match(webUx, /Fine-tune design/, 'Exact measurements must remain available in the advanced inspector');

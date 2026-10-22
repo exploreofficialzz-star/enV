@@ -1114,6 +1114,7 @@ export function UxUiStudioEngine() {
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
           <div className="uxui-brand-mark" aria-hidden="true">enV</div>
+          <h2 className="uxui-brand-title">UX/UI Studio</h2>
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
             <button type="button" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
             <button type="button" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
@@ -1130,7 +1131,7 @@ export function UxUiStudioEngine() {
           <div className="uxui-export-menu-title">Export your design</div>
           <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
           <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
-          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React · TypeScript</strong><small>Web implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
@@ -1342,7 +1343,7 @@ export function UxUiStudioEngine() {
         <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
-            <input aria-label="Project title" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
+            <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
             <p>{elements.length} layers · {board.width} × {board.height} px</p>
           </div>
           {helpOpen && <div className="uxui-help-note" role="status"><strong>Make it by eye.</strong><span>Drag and style your layers on the mockup. enV quietly records exact measurements, type, spacing, colours and icon identity for developer or AI handoff.</span></div>}

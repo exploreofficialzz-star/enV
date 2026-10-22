@@ -274,6 +274,10 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   background: var(--color-surface); box-shadow: var(--shadow-border);
 }
 .uxui-topbar-left, .uxui-topbar-actions, .uxui-target-switch { display: flex; align-items: center; gap: 8px; }
+.uxui-brand-title {
+  margin: 0; white-space: nowrap; color: var(--color-fg);
+  font-size: 12px; line-height: 1.25; font-weight: 850; letter-spacing: -.025em;
+}
 .uxui-brand-mark {
   display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
   border-radius: 11px; background: var(--color-fg); color: var(--color-surface);

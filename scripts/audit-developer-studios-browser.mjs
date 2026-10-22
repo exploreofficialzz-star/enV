@@ -72,13 +72,16 @@ try {
         // Wait for the real React tool effect before clicking SSR markup; a pre-hydration click can be dropped.
         await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
         await page.getByRole('heading', { name: 'UX/UI Studio', exact: true, level: 2 }).waitFor({ state: 'visible', timeout });
-        await page.getByRole('button', { name: /Mobile interface/ }).click();
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
+        await page.locator('.uxui-device-mobile').waitFor({ state: 'visible', timeout });
         await page.getByLabel('Project name').fill('UX/UI Studio browser QA');
         const [download] = await Promise.all([
           page.waitForEvent('download'),
-          page.getByRole('button', { name: 'React TSX', exact: true }).click(),
+          (async () => {
+            await page.getByRole('button', { name: 'Export', exact: true }).click();
+            await page.getByRole('button', { name: 'React TSX', exact: true }).click();
+          })(),
         ]);
         const downloadPath = await download.path();
         const generatedSource = downloadPath ? await readFile(downloadPath, 'utf8') : '';
