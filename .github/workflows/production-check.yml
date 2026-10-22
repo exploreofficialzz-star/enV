@@ -26,8 +26,17 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install production media runtime
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Ensure production media runtime
+        shell: bash
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "Using runner-provided FFmpeg: $(command -v ffmpeg)"
+            ffmpeg -version | head -n 1
+          else
+            echo "FFmpeg is not present; installing it with bounded package-manager retries."
+            sudo timeout 180s apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            sudo timeout 180s apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends ffmpeg
+          fi
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
