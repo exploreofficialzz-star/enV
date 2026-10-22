@@ -8208,20 +8208,64 @@ private struct NativeUxUiStudioView: View {
     private func inspectorIconFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         if binding.wrappedValue.kind == "icon" {
             VStack(alignment: .leading, spacing: 8) {
-                inspectorTextField("Search icon library", text: $iconQuery)
+                Text("Browse icon categories").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(uxUiIconCategories, id: \.0) { category in
+                            Button { iconCategory = category.0 } label: {
+                                Text(category.0).font(.envScaled(size: 10, weight: .semibold))
+                                    .padding(.horizontal, 9).padding(.vertical, 7)
+                                    .foregroundStyle(iconCategory == category.0 ? Color.white : Color.envInk)
+                                    .background(iconCategory == category.0 ? Color.envAccent : Color.envSurface2, in: Capsule())
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                Text("Visual style / set").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(uxUiIconSets, id: \.0) { set in
+                            Button { iconPrefix = set.0; iconResults = []; iconTotal = 0 } label: {
+                                Text(set.1).font(.envScaled(size: 10, weight: .medium))
+                                    .padding(.horizontal, 9).padding(.vertical, 7)
+                                    .foregroundStyle(iconPrefix == set.0 ? Color.white : Color.envInk)
+                                    .background(iconPrefix == set.0 ? Color.envAccent : Color.envSurface2, in: Capsule())
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                if iconQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let quick = (uxUiIconCategories.first(where: { $0.0 == iconCategory })?.1 ?? [])
+                        .filter { iconPrefix == "all" || $0.hasPrefix(iconPrefix + ":") }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                        ForEach(quick, id: \.self) { iconName in
+                            Button { chooseIconArtwork(iconName, layerID: binding.wrappedValue.id) } label: {
+                                HStack(spacing: 7) {
+                                    UxUiIconifyThumbnail(iconName: iconName).frame(width: 26, height: 26)
+                                    Text(iconName).font(.envScaled(size: 9, weight: .medium)).lineLimit(1).foregroundStyle(Color.envInk)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(7)
+                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                inspectorTextField("Search the complete icon catalogue", text: $iconQuery)
                 Button { searchIconLibrary() } label: {
                     HStack {
                         Image(systemName: "magnifyingglass")
                         Text(isSearchingIcons ? "Searching…" : "Search open-source icons")
                     }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
-                }.disabled(isSearchingIcons)
+                }.disabled(isSearchingIcons || iconQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ForEach(iconResults, id: \.self) { iconName in
-                    Button {
-                        chooseIconArtwork(iconName, layerID: binding.wrappedValue.id)
-                    } label: {
-                        Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(8)
-                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                    Button { chooseIconArtwork(iconName, layerID: binding.wrappedValue.id) } label: {
+                        HStack(spacing: 7) {
+                            UxUiIconifyThumbnail(iconName: iconName).frame(width: 24, height: 24)
+                            Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+                                .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
+                        }
+                        .padding(8).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
                     }.buttonStyle(.plain)
                 }
                 if iconResults.count < iconTotal {
@@ -8232,13 +8276,13 @@ private struct NativeUxUiStudioView: View {
                         }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
                     }.disabled(isSearchingIcons)
                 }
-                Text("Iconify results are paginated; the selected SVG artwork is rendered in the canvas and included in the export. Check source collection licences before shipping.")
+                Text("Curated examples are available immediately. Search queries the larger Iconify library, and selected SVG artwork is retained in the project and PDF. Verify each collection's licence.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
         }
     }
 
-    private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
+    private func inspectorSpecification(    private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
             let encoded = (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data()
