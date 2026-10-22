@@ -90,6 +90,40 @@ private fun uxNativeLayerHeight(layer: UxUiNativeLayer, boardHeight: Int): Int =
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
 
+private fun uxNativeIconThumbnailHtml(iconName: String): String {
+    val parts = iconName.split(":", limit = 2)
+    if (parts.size != 2 || !Regex("^[A-Za-z0-9-]+$").matches(parts[0]) || !Regex("^[A-Za-z0-9-]+$").matches(parts[1])) {
+        return "<!doctype html><html><body style='margin:0;background:transparent'></body></html>"
+    }
+    val src = "https://api.iconify.design/" + parts[0] + "/" + parts[1] + ".svg"
+    return "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}img{display:block;width:100%;height:100%;object-fit:contain}</style></head><body><img alt='' src='" + src + "'></body></html>"
+}
+
+@Composable
+private fun UxNativeIconThumbnail(iconName: String) {
+    val html = remember(iconName) { uxNativeIconThumbnailHtml(iconName) }
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                settings.javaScriptEnabled = false
+                settings.domStorageEnabled = false
+                isHorizontalScrollBarEnabled = false
+                isVerticalScrollBarEnabled = false
+                isFocusable = false
+                isFocusableInTouchMode = false
+            }
+        },
+        modifier = Modifier.size(28.dp),
+        update = { view ->
+            if (view.tag != html) {
+                view.tag = html
+                view.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            }
+        }
+    )
+}
+
 private val uxNativeFontFamilies = listOf(
     "Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Source Sans 3","Work Sans","DM Sans",
     "Manrope","Plus Jakarta Sans","Urbanist","Outfit","IBM Plex Sans","Noto Sans","Ubuntu","Rubik","Mulish",
@@ -116,6 +150,14 @@ private val uxNativeIconCategories = linkedMapOf(
     "Files" to listOf("lucide:file-text","tabler:file-text","mdi:file-document-outline","lucide:folder","tabler:folder","mdi:folder-outline","lucide:cloud","tabler:cloud","mdi:cloud-outline","lucide:code","tabler:code","mdi:code-tags","lucide:terminal","tabler:terminal-2"),
     "Shapes" to listOf("lucide:circle","tabler:circle","mdi:circle-outline","lucide:square","tabler:square","mdi:square-outline","lucide:triangle","tabler:triangle","mdi:triangle-outline","lucide:star","tabler:star","mdi:star-outline","lucide:heart","tabler:heart","mdi:heart-outline","lucide:hexagon","tabler:hexagon","lucide:diamond","tabler:diamond")
 )
+
+private fun uxNativeFontFamilyCategory(family: String): String = when {
+    family in setOf("Merriweather","Playfair Display","Lora","PT Serif","Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","Crimson Text","Bitter") -> "Serif"
+    family in setOf("JetBrains Mono","Fira Code","IBM Plex Mono","Source Code Pro","Space Mono","Inconsolata","monospace","Menlo") -> "Monospace"
+    family in setOf("Oswald","Bebas Neue","Archivo Black","Anton","Space Grotesk","Syne") -> "Display"
+    family in setOf("Caveat","Pacifico","Dancing Script","Satisfy") -> "Handwriting"
+    else -> "Sans serif"
+}
 
 private fun uxNativeComposeShape(kind: String, radius: Int): Shape = when (kind) {
     "ellipse", "avatar" -> CircleShape
@@ -891,7 +933,7 @@ fun NativeUxUiStudioForm() {
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")}
+    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -1170,8 +1212,21 @@ fun NativeUxUiStudioForm() {
                             OutlinedTextField(e.fontWeight.toString(),{v->v.toIntOrNull()?.let{n->edit(e.id){it.copy(fontWeight=n.coerceIn(100,900))}}},label={Text("Font weight")},modifier=Modifier.weight(1f),singleLine=true)
                         }
                         OutlinedTextField(e.fontFamily,{v->edit(e.id){it.copy(fontFamily=v,fontData="")}},label={Text("Font family")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search all font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                            uxNativeFontFamilies.take(22).forEach{family->FilterChip(selected=e.fontFamily==family,onClick={edit(e.id){it.copy(fontFamily=family,fontData="")}},label={Text(family,maxLines=1)})}
+                            listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->
+                                FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})
+                            }
+                        }
+                        Column(Modifier.fillMaxWidth().heightIn(max=230.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                            uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)}.forEach{family->
+                                OutlinedButton(onClick={edit(e.id){it.copy(fontFamily=family,fontData="")}},modifier=Modifier.fillMaxWidth()){
+                                    Column(Modifier.fillMaxWidth()){
+                                        Text(family)
+                                        Text("Aa Bb Cc 0123",fontFamily=FontFamily(uxNativeTypeface(context,e.copy(fontFamily=family,fontData=""))),fontSize=13.sp)
+                                    }
+                                }
+                            }
                         }
                         OutlinedButton(onClick={fontTargetId=e.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text(if(e.fontData.isBlank())"Import local TTF / OTF font" else "Replace local font file")}
                         Text("Choose common families above or import a licensed TTF/OTF. Imported font data is preserved in project JSON and native preview/PDF.",style=MaterialTheme.typography.bodySmall)
@@ -1223,12 +1278,22 @@ fun NativeUxUiStudioForm() {
                             }
                             if(iconQuery.isBlank()){
                                 uxNativeIconCategories[iconCategory].orEmpty().filter{iconPrefix=="all"||it.startsWith(iconPrefix+":")}.forEach{icon->
-                                    OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}
+                                    OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){
+                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            UxNativeIconThumbnail(icon)
+                                            Text(icon,maxLines=1)
+                                        }
+                                    }
                                 }
                             }
                             OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0;iconResults=emptyList()},label={Text("Search icon catalogue")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                             Button(onClick={searchIcons(false)},enabled=!iconBusy&&iconQuery.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search catalogue")}
-                            iconResults.forEach{icon->OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){Text(icon,maxLines=1)}}
+                            iconResults.forEach{icon->OutlinedButton(onClick={chooseIcon(e.id,icon)},modifier=Modifier.fillMaxWidth()){
+                                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                    UxNativeIconThumbnail(icon)
+                                    Text(icon,maxLines=1)
+                                }
+                            }}
                             if(iconQuery.isNotBlank()&&iconResults.size<iconTotal)OutlinedButton(onClick={searchIcons(true)},enabled=!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Loading…" else "Load more icons · "+iconResults.size+" / "+iconTotal)}
                             Text("The category browser shows curated icon variants immediately. Search pages the online Iconify catalog; selected SVG artwork is embedded in the project. Check each icon set's licence.",style=MaterialTheme.typography.bodySmall)
                         }
