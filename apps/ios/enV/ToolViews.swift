@@ -7636,7 +7636,8 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
                 child = "GeometryReader { geometry in ZStack(alignment:.topLeading) { \(drawingViews.joined(separator: " ")) }.frame(width:\(uxUiCodegenFloat(viewBox.width)),height:\(uxUiCodegenFloat(viewBox.height)),alignment:.topLeading).scaleEffect(x:geometry.size.width/\(uxUiCodegenFloat(viewBox.width)),y:geometry.size.height/\(uxUiCodegenFloat(viewBox.height)),anchor:.topLeading).offset(x:(-\(uxUiCodegenFloat(viewBox.minX))*geometry.size.width/\(uxUiCodegenFloat(viewBox.width))),y:(-\(uxUiCodegenFloat(viewBox.minY))*geometry.size.height/\(uxUiCodegenFloat(viewBox.height)))) }"
             }
         } else if layer.kind == "image", let dataURL = layer.imageData, !dataURL.isEmpty {
-            child = "Group { if let data = Data(base64Encoded:\(uxUiSourceString(dataURL.components(separatedBy: \",\").last ?? \"\"))), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFill() } else { Text(\(uxUiSourceString(layer.name))) } }"
+            let encodedImage = dataURL.components(separatedBy: ",").last ?? ""
+            child = "Group { if let data = Data(base64Encoded:\(uxUiSourceString(encodedImage))), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFill() } else { Text(\(uxUiSourceString(layer.name))) } }"
         } else {
             child = "Text(\(uxUiSourceString(layer.text))).font(.custom(\(uxUiSourceString(layer.fontFamily)),size:\(layer.fontSize)).weight(\(layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular"))).foregroundStyle(Color(hex:\(uxUiSourceString(layer.color))))"
         }
@@ -7692,7 +7693,7 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
     return lines.joined(separator: "\n")
 }
 
-private struct NativeUxUiStudioViewprivate struct NativeUxUiStudioView: View {
+private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
     @State private var target = "mobile"
