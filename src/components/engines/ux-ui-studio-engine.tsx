@@ -1229,8 +1229,6 @@ export function UxUiStudioEngine() {
 
   return (
     <section ref={studioRootRef} className={"ux-ui-studio min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}>
-  return (
-    <section className="ux-ui-studio min-w-0 space-y-3">
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
