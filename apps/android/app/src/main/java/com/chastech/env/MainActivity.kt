@@ -1227,7 +1227,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
-        "developer" -> NativeDeveloperToolForm(tool, onRelatedTool)
+        "developer" -> if (tool.id == "ux-ui-studio") NativeUxUiStudioForm() else NativeDeveloperToolForm(tool, onRelatedTool)
     "custom" -> when {
         NativeProductivityEngine.supports(tool.id) -> NativeProductivityToolForm(tool.id)
         NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)

@@ -23,8 +23,10 @@ class CatalogModelsTest {
         }
         val catalog = Catalog(1, "test", CatalogCounts(sources.size, sources.size, 0, 1), emptyList(), sources)
         val studios = catalog.developerStudioTools()
-        assertEquals(12, studios.size)
-        assertEquals(12, studios.map { it.id }.distinct().size)
+        assertEquals(13, studios.size)
+        assertEquals(13, studios.map { it.id }.distinct().size)
+        val uxUiStudio = NativeDeveloperStudios.specs.first { it.id == "ux-ui-studio" }
+        assertTrue(uxUiStudio.modes.map { it.key }.containsAll(listOf("workspace", "components", "icons", "tokens", "presets")))
         assertTrue(studios.all { it.engine.type == "developer" })
         assertTrue(NativeDeveloperStudios.specs.all { it.modes.isNotEmpty() && it.modes.map { mode -> mode.key }.distinct().size == it.modes.size })
         assertTrue(NativeDeveloperStudios.specs.any { spec -> spec.modes.any { it.key == "base64" && it.decodeOp == "base64-decoder" } })
@@ -32,7 +34,7 @@ class CatalogModelsTest {
         assertEquals("file", NativeDeveloperStudios.modeForLegacySlug(NativeDeveloperStudios.forLegacySlug("file-hash-calculator"), "file-hash-calculator"))
         assertEquals("dockerfile", NativeDeveloperStudios.modeForLegacySlug(NativeDeveloperStudios.forLegacySlug("developer-dockerfile-helper"), "developer-dockerfile-helper"))
         assertEquals("developer-gitignore-generator", studios.first { it.id == "devops-studio" }.engine.extras["op"])
-        assertEquals(12, catalog.search("", "developer").count { "developer-studio" in it.tags })
+        assertEquals(13, catalog.search("", "developer").count { "developer-studio" in it.tags })
         assertTrue(catalog.tools.any { it.id == "json-formatter" })
         assertTrue(NativeDeveloperStudios.specs.first { it.id == "json-studio" }.modes.any { it.key == "schema" })
         assertTrue(NativeDeveloperStudios.specs.first { it.id == "markup-studio" }.modes.any { it.key == "samples" })

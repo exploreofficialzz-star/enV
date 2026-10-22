@@ -67,7 +67,7 @@ Each Studio is a **workspace**: modes, local processing, evidence-grade output, 
 
 # Target architecture: Developer Studios
 
-Implement **12 Studios**. Each Studio is a first-class route (like Accessibility studios) with mode tabs. Map every existing slug into a Studio mode or deep-link.
+Implement **13 Studios**. Each Studio is a first-class route (like Accessibility studios) with mode tabs. Map every existing slug into a Studio mode or deep-link.
 
 ## 1. JSON Studio
 **Route:** `/tools/developer/json-studio` (and keep all json-* pages as mode entry points)

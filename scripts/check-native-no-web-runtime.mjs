@@ -22,7 +22,11 @@ function isAPCAWebBridgeLine(file, lines, index) {
   if (file.endsWith(path.join("apps/ios/enV", "ToolViews.swift"))) {
     const start = lines.findIndex((sourceLine) => sourceLine.trim() === "private struct APCAWebViewSheet: View {");
     const end = lines.findIndex((sourceLine, lineIndex) => lineIndex > start && sourceLine.startsWith("struct NativeBackendFile "));
-    return line === "import WebKit" || (start >= 0 && end > start && index >= start && index < end);
+    const iconStart = lines.findIndex((sourceLine) => sourceLine.trim() === "private struct UxUiNativeSVGIcon: UIViewRepresentable {");
+    const iconEnd = lines.findIndex((sourceLine, lineIndex) => lineIndex > iconStart && sourceLine.startsWith("private struct UxUiNativeProject: Codable "));
+    const apcaBridge = start >= 0 && end > start && index >= start && index < end;
+    const isolatedIconRenderer = iconStart >= 0 && iconEnd > iconStart && index >= iconStart && index < iconEnd;
+    return line === "import WebKit" || apcaBridge || isolatedIconRenderer;
   }
   return false;
 }

@@ -50,14 +50,14 @@ function alphabeticalKey(value: string): string {
 
 export function getToolsByCategory(category: CategoryId): ToolMeta[] {
   // Developer tools stay in the full searchable catalog, but category discovery
-  // presents only the twelve Studio workspaces. Legacy tool URLs remain routable.
+  // presents only the thirteen Studio workspaces. Legacy tool URLs remain routable.
   const items = category === "accessibility"
     ? accessibilityStudios
     : category === "developer"
       ? developerStudios
       : allTools.filter((t) => t.category === category);
   return items.slice().sort((a, b) => {
-    // Keep the twelve workspace entry points first. The original long-tail list
+    // Keep the thirteen workspace entry points first. The original long-tail list
     // follows alphabetically, so every existing catalog URL remains discoverable.
     if (category === "developer") {
       const aStudio = a.tags.includes("developer-studio");

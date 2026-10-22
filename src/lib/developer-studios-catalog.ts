@@ -135,6 +135,19 @@ export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
       { key: "recipe", label: "Recipe pipeline", op: "developer-recipe-runner" },
     ],
   },
+  {
+    id: "ux-ui-studio", slug: "ux-ui-studio", name: "UX/UI Studio",
+    description: "Design mobile apps and websites with exact pixel geometry, typography, spacing, component layers, color tokens, searchable icons, and visual plus machine-readable design handoff.",
+    sourceId: "javascript-formatter", icon: "PanelsTopLeft",
+    keywords: ["ux", "ui", "design", "wireframe", "interface", "website", "mobile app", "desktop", "components", "icon library", "typography", "spacing", "color tokens", "margin", "pixel", "PDF", "design system", "AI prompt", "figma", "sketch", "accessibility"],
+    modes: [
+      { key: "workspace", label: "Workspace", op: "ux-ui-studio" },
+      { key: "components", label: "Components", op: "ux-ui-components" },
+      { key: "icons", label: "Icon library", op: "ux-ui-icons" },
+      { key: "tokens", label: "Design tokens", op: "ux-ui-tokens" },
+      { key: "presets", label: "Starter layouts", op: "ux-ui-presets" },
+    ],
+  },
 ];
 
 export function makeDeveloperStudioTools(allTools: ToolMeta[]): ToolMeta[] {

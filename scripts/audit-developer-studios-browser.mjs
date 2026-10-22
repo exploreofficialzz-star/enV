@@ -70,7 +70,7 @@ try {
       if (route.kind === 'regex') {
         await primaryInput.fill('ENV_PRIVACY_SENTINEL_[A-Z0-9]+');
         await page.getByLabel(/Test text or batch JSON/).fill(JSON.stringify([{ label: 'privacy sample', text: sampleMarker, expectMatch: true }]));
-        await page.getByLabel('Studio mode').selectOption('test');
+        await page.locator("#dev-regex-mode").selectOption("test");
         await page.getByRole('button', { name: /Run tests/i }).click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
@@ -79,7 +79,7 @@ try {
         routeReport.actionWorked = output.includes(sampleMarker) && /assertionPassed|matchCount|results/i.test(output);
       } else if (route.kind === 'javascript') {
         await primaryInput.fill('const greet=async(name)=>{return await Promise.resolve("hi "+name);};');
-        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
+        await page.getByRole("button", { name: /^(Format|Run)$/i }).last().click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
         const output = await outputRegion.innerText();
@@ -87,7 +87,7 @@ try {
       } else {
         await primaryInput.fill("select a.id,a.name from accounts a left join orders o on o.account_id=a.id where a.note='FROM should stay in text' group by a.id,a.name having count(*)>0 order by a.name;");
         await page.getByLabel('SQL dialect').selectOption('postgresql');
-        await page.getByRole('button', { name: /^(Format|Run)$/i }).click();
+        await page.getByRole("button", { name: "Format", exact: true }).last().click();
         const outputRegion = page.getByLabel('Formatted output');
         await outputRegion.waitFor({ state: 'visible', timeout });
         const output = await outputRegion.innerText();
@@ -159,4 +159,13 @@ await mkdir(resolve(outputPath, '..'), { recursive: true });
 await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 const failures = report.errors.length || report.networkLeaks.length || report.storageLeaks.length || report.axeViolations.length || report.routes.some((route) => !route.loaded || !route.actionWorked || route.mobileOverflow?.overflowing);
 console.log(`Developer browser audit: routes=${report.routes.length}, network leaks=${report.networkLeaks.length}, storage leaks=${report.storageLeaks.length}, serious/critical axe findings=${report.axeViolations.length}, errors=${report.errors.length}. Report: ${outputPath}`);
-if (failures) process.exitCode = 1;
+if (failures) {
+  console.error(JSON.stringify({
+    failedRoutes: report.routes.filter((route) => !route.loaded || !route.actionWorked || route.mobileOverflow?.overflowing || route.error),
+    errors: report.errors,
+    networkLeaks: report.networkLeaks,
+    storageLeaks: report.storageLeaks,
+    axeViolations: report.axeViolations,
+  }, null, 2));
+  process.exitCode = 1;
+}
