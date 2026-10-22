@@ -64,6 +64,7 @@ assert.match(webUx, /uxui-color-grid/, 'Web editor must expose the compact palet
 assert.match(webUx, /Fine-tune design/, 'Exact measurements must remain available in the advanced inspector');
 assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
+assert.match(uxStudioCss, /\.uxui-canvas-hint\s*\{[^}]*color:\s*#E4E7E4/i, 'Canvas hint text must remain readable against the dark device bezel');
 assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a monitor mockup');
 assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
 const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
