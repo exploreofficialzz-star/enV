@@ -67,7 +67,7 @@ private data class UxUiNativeLayer(
     val horizontalConstraint: String = "left", val verticalConstraint: String = "top",
     val minWidth: Int = 0, val maxWidth: Int = 0, val visibleOn: String = "mobile,tablet,desktop",
     val referenceWidth: Int = 390, val referenceHeight: Int = 844, val componentKey: String = "",
-    val iconViewBox: String = "0 0 24 24"
+    val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f
 )
 
 private fun uxNativeLayerX(layer: UxUiNativeLayer, boardWidth: Int): Int = when(layer.horizontalConstraint) {
@@ -315,7 +315,7 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
         put("horizontalConstraint", element.horizontalConstraint); put("verticalConstraint", element.verticalConstraint)
         put("minWidth", element.minWidth); put("maxWidth", element.maxWidth); put("visibleOn", element.visibleOn)
         put("referenceWidth", element.referenceWidth); put("referenceHeight", element.referenceHeight); put("componentKey", element.componentKey)
-        put("iconViewBox", element.iconViewBox)
+        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation)
     }) }
 }
 
@@ -332,7 +332,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
             horizontalConstraint=item.optString("horizontalConstraint","left"),verticalConstraint=item.optString("verticalConstraint","top"),
             minWidth=item.optInt("minWidth"),maxWidth=item.optInt("maxWidth"),visibleOn=item.optString("visibleOn","mobile,tablet,desktop"),
             referenceWidth=item.optInt("referenceWidth",390),referenceHeight=item.optInt("referenceHeight",844),componentKey=item.optString("componentKey"),
-            iconViewBox=item.optString("iconViewBox","0 0 24 24")
+            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat()
         ))
     }
 }
@@ -927,7 +927,7 @@ fun NativeUxUiStudioForm() {
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -936,7 +936,7 @@ fun NativeUxUiStudioForm() {
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
     val tokenJson=remember(colorTokens.toList(),spacingTokens.toList()){JSONObject().put("colors",JSONArray().apply{colorTokens.forEach{(name,value)->put(JSONObject().put("name",name).put("value",value))}}).put("spacing",JSONArray().apply{spacingTokens.forEach{put(it)}}).put("typography",JSONArray().apply{put(JSONObject().put("name","heading").put("fontFamily","sans-serif").put("fontSize",24).put("fontWeight",700).put("lineHeight",1.2));put(JSONObject().put("name","body").put("fontFamily","sans-serif").put("fontSize",16).put("fontWeight",400).put("lineHeight",1.5))})}
-    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
+    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.rotation+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
     val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()+":"+it.fontData.hashCode()}
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
@@ -1188,7 +1188,7 @@ fun NativeUxUiStudioForm() {
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
                                     val shape=uxNativeComposeShape(e.kind,e.radius)
-                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
                                         val density=dragDensity
                                         detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
                                             change.consume()
@@ -1216,22 +1216,71 @@ fun NativeUxUiStudioForm() {
                         }
                         }
                     }
-                    Text("Preview scales to fit. Coordinates remain design pixels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Your design automatically fits the preview.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("↶")}
-                    OutlinedButton(onClick={showElementTray=!showElementTray}){Text("＋",style=MaterialTheme.typography.headlineSmall)}
+                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
                     OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("↷")}
                     Spacer(Modifier.weight(1f))
                     if(elements.isNotEmpty())Text(elements.size.toString()+(if(elements.size==1)" element" else " elements"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                val selectedElement=selected
+                if(selectedElement!=null){
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+                        Text(selectedElement.name.take(12),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        if(selectedElement.kind !in setOf("icon","ellipse","rect","divider"))OutlinedButton(onClick={showAdvancedControls=false;notice="Edit the text in the Style section below."}){Text("Edit text")}
+                        OutlinedButton(onClick={fontTargetId=selectedElement.id;showElementTray=true;toolkitTab="Fonts"}){Text("Fonts")}
+                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw-it.x).coerceAtLeast(12)),height=(it.height*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh-it.y).coerceAtLeast(12)))}}){Text("Size +")}
+                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*0.9f).roundToInt().coerceAtLeast(12),height=(it.height*0.9f).roundToInt().coerceAtLeast(12))}}){Text("Size −")}
+                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}}){Text("Rotate")}
+                        OutlinedButton(onClick={showAdvancedControls=true}){Text("Style")}
+                        OutlinedButton(onClick={selectedId="";showAdvancedControls=false}){Text("Cancel")}
+                        OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==selectedElement.id};selectedId="";showAdvancedControls=false}){Text("Delete")}
+                    }
+                }
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    Text("Design tools",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                    Text("Studio toolkit",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close tools" else "+ Add elements")}
+                    TextButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close" else "+ Add")}
                 }
                 if(showElementTray){
-                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
+                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            listOf("Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
+                        }
+                        when(toolkitTab){
+                            "Icons" -> {
+                                OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                val iconLayer=selectedElement?.takeIf{it.kind=="icon"}
+                                if(iconLayer!=null && iconResults.isNotEmpty())Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){iconResults.filter{it.contains(toolkitSearch,true)||it.contains(iconQuery,true)}.take(24).forEach{icon->OutlinedButton(onClick={chooseIcon(iconLayer.id,icon)}){Text(icon.substringAfter(":"))}}}
+                                Text("Add an icon element first, then choose its artwork here.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            "Elements" -> {
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                    listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").filter{(kind,label)->label.contains(toolkitSearch,true)||kind.contains(toolkitSearch,true)}.forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}
+                                }
+                            }
+                            "Presets" -> {
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                    listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
+                                }
+                                Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            "Fonts" -> {
+                                Text("Choose a text layer, then browse or import a font.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})}}
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)&&it.contains(toolkitSearch,true)}.take(28).forEach{family->OutlinedButton(onClick={val fontLayer=selectedElement;fontLayer?.let{item->edit(item.id){it.copy(fontFamily=family,fontData="")}}}){Text(family)}}}
+                                if(selectedElement!=null)OutlinedButton(onClick={fontTargetId=selectedElement.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text("Import font (TTF / OTF)")}
+                            }
+                            "Tokens" -> {
+                                Text("Tap a colour to apply it to the selected element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){colorTokens.filter{it.first.contains(toolkitSearch,true)||it.second.contains(toolkitSearch,true)}.forEach{(name,value)->OutlinedButton(onClick={val colorLayer=selectedElement;if(colorLayer!=null)edit(colorLayer.id){it.copy(fill=value)}else background=value}){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}}
+                            }
+                        }
+                    }}
                 }
                 Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
