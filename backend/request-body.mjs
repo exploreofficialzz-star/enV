@@ -85,3 +85,69 @@ export async function readJsonObject(request, maxBytes = 128 * 1024) {
   }
   return parsed;
 }
+
+
+const INVALID_MULTIPART_MESSAGE = "The uploaded form is invalid. Check the files and try again.";
+const MULTIPART_TOO_LARGE_MESSAGE = "The combined upload is too large. Keep the files under the 100 MB limit and try again.";
+
+/**
+ * Parse a bounded multipart upload before allocating File objects.
+ * @param {Request} request
+ * @param {number} [maxBytes]
+ * @returns {Promise<FormData>}
+ */
+export async function readFormDataBounded(request, maxBytes = 100 * 1024 * 1024) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new TypeError("maxBytes must be a positive safe integer");
+  }
+
+  const contentType = request.headers.get("content-type") || "";
+  if (!/^multipart\/form-data\b/i.test(contentType) || !/\bboundary=/i.test(contentType)) {
+    throw new RequestBodyError("UNSUPPORTED_MEDIA_TYPE", 415, "Send uploaded files using multipart/form-data.");
+  }
+
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength !== null) {
+    const length = Number(declaredLength);
+    if (Number.isSafeInteger(length) && length >= 0 && length > maxBytes) {
+      throw new RequestBodyError("REQUEST_TOO_LARGE", 413, MULTIPART_TOO_LARGE_MESSAGE);
+    }
+  }
+
+  if (!request.body) {
+    throw new RequestBodyError("INVALID_MULTIPART_FORM_DATA", 400, INVALID_MULTIPART_MESSAGE);
+  }
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maxBytes) {
+        try { await reader.cancel(); } catch {}
+        throw new RequestBodyError("REQUEST_TOO_LARGE", 413, MULTIPART_TOO_LARGE_MESSAGE);
+      }
+      chunks.push(Buffer.from(chunk.value));
+    }
+  } catch (error) {
+    if (error instanceof RequestBodyError) throw error;
+    throw new RequestBodyError("REQUEST_BODY_READ_FAILED", 400, "The upload could not be read. Please select the files and try again.");
+  } finally {
+    reader.releaseLock();
+  }
+
+  try {
+    const replay = new Request(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: Buffer.concat(chunks),
+      duplex: "half",
+    });
+    return await replay.formData();
+  } catch {
+    throw new RequestBodyError("INVALID_MULTIPART_FORM_DATA", 400, INVALID_MULTIPART_MESSAGE);
+  }
+}

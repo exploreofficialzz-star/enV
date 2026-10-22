@@ -1,6 +1,7 @@
 import { defineHandler } from "nitro/h3";
 import { backendConfig, joinUrl } from "../../../../backend/config";
 import { jsonResponse, optionsResponse, proxyRequest, measureServerOperation, safeFailureResponse } from "../../../../backend/http";
+import { readFormDataBounded, RequestBodyError } from "../../../../backend/request-body.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -31,7 +32,7 @@ export default defineHandler(async (event) => {
   return measureServerOperation(event.req, "server.ocr_processing", async () => {
     const directory = await mkdtemp(join(tmpdir(), `env-ocr-${randomUUID()}-`));
     try {
-      const form = await event.req.formData();
+      const form = await readFormDataBounded(event.req, 100 * 1024 * 1024);
       const files = form.getAll("files").filter((item): item is File => item instanceof File);
       if (!files.length) return jsonResponse({ error: "Choose an image or PDF first." }, 400);
       const language = String(form.get("language") ?? "eng").replace(/[^a-zA-Z+_-]/g, "") || "eng";
@@ -46,6 +47,7 @@ export default defineHandler(async (event) => {
       }
       return jsonResponse({ text: results.join("\n\n"), language });
     } catch (error) {
+      if (error instanceof RequestBodyError) return jsonResponse({ ok: false, code: error.code, error: error.message }, error.status);
       return safeFailureResponse(event.req, error, "OCR_PROCESSING_FAILED", "We couldn't read text from this file. Try a clearer image or a text-based PDF.", 500);
     } finally {
       await rm(directory, { recursive: true, force: true }).catch(() => {});

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { readJsonObject, RequestBodyError } from "../backend/request-body.mjs";
+import { readJsonObject, readFormDataBounded, RequestBodyError } from "../backend/request-body.mjs";
 
 function request(body, headers = { "content-type": "application/json" }) {
   return new Request("https://envtools.example.test/api/backend/tool", {
@@ -93,4 +93,64 @@ test("production configuration consistently uses envtools.store as the canonical
   assert.ok(gateway.includes('process.env.APPLICATION_API_ORIGIN || "https://envtools.store"'));
   assert.ok(readme.includes("BETTER_AUTH_URL"));
   assert.equal(/https:\/\/en-v\.vercel\.app/.test(render + gateway + readme), false);
+});
+
+
+test("bounded multipart parser accepts valid small file forms", async () => {
+  const form = new FormData();
+  form.set("operation", "metadata");
+  form.set("file", new Blob(["fixture"], { type: "application/pdf" }), "fixture.pdf");
+  const request = new Request("https://envtools.example.test/api/backend/pdf", { method: "POST", body: form });
+  const parsed = await readFormDataBounded(request, 1024);
+  assert.equal(parsed.get("operation"), "metadata");
+  assert.equal(parsed.get("file")?.name, "fixture.pdf");
+});
+
+test("bounded multipart parser rejects oversized declared uploads", async () => {
+  const req = new Request("https://envtools.example.test/api/backend/pdf", {
+    method: "POST",
+    headers: {
+      "content-type": "multipart/form-data; boundary=enV-test",
+      "content-length": "999",
+    },
+    body: "--enV-test--\r\n",
+  });
+  await assert.rejects(
+    readFormDataBounded(req, 64),
+    (error) => error instanceof RequestBodyError && error.status === 413 && error.code === "REQUEST_TOO_LARGE",
+  );
+});
+
+test("bounded multipart parser rejects oversized streamed uploads without Content-Length", async () => {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode("0123456789ABCDEFGHIJKLMNO"));
+      controller.close();
+    },
+  });
+  const req = new Request("https://envtools.example.test/api/backend/pdf", {
+    method: "POST",
+    headers: { "content-type": "multipart/form-data; boundary=enV-test" },
+    body: stream,
+    duplex: "half",
+  });
+  await assert.rejects(
+    readFormDataBounded(req, 12),
+    (error) => error instanceof RequestBodyError && error.status === 413,
+  );
+});
+
+test("file-processing routes enforce the shared multipart byte cap", async () => {
+  const paths = [
+    "../server/routes/api/backend/documents.post.ts",
+    "../server/routes/api/backend/images.post.ts",
+    "../server/routes/api/backend/screenshots.post.ts",
+    "../server/routes/api/backend/ocr.post.ts",
+    "../server/routes/api/backend/pdf.post.ts",
+  ];
+  for (const path of paths) {
+    const source = await readFile(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /readFormDataBounded\([^,]+, 100 \* 1024 \* 1024\)/, path);
+    assert.match(source, /RequestBodyError/, path);
+  }
 });
