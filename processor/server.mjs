@@ -28,7 +28,7 @@ function failSafely(req, res, status, code, message, cause) {
   const route = String(req.url || "/").split("?")[0].slice(0, 180);
   const causeType = cause instanceof Error ? cause.name : "UnknownError";
   console.error(`[gateway] ${code} requestId=${requestId} route=${route} causeType=${causeType}`);
-  json(req, res, status, { ok: false, error: code, message, requestId });
+  json(req, res, status, { ok: false, error: message, code, message, requestId });
 }
 function authorized(req) { return SHARED_SECRET ? req.headers["x-processor-key"] === SHARED_SECRET : process.env.NODE_ENV !== "production"; }
 async function childServiceReadiness() {

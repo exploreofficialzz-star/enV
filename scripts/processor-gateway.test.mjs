@@ -24,11 +24,11 @@ async function waitForOutput(child, pattern, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (pattern.test(output)) return output;
-    if (child.exitCode !== null) throw new Error(\`Child exited early (code \${child.exitCode}). Output: \${output}\`);
+    if (child.exitCode !== null) throw new Error(`Child exited early (code ${child.exitCode}). Output: ${output}`);
     await delay(50);
   }
   child.kill("SIGTERM");
-  throw new Error(\`Timed out waiting for child output. Output: \${output}\`);
+  throw new Error(`Timed out waiting for child output. Output: ${output}`);
 }
 
 test("production gateway refuses to start without its shared secret", async () => {
@@ -57,6 +57,7 @@ test("gateway hides upstream network details behind a stable public error", asyn
       PROCESSOR_SHARED_SECRET: "gateway-test-secret",
       PROCESSOR_ALLOWED_ORIGIN: "http://127.0.0.1",
       APPLICATION_API_ORIGIN: "http://127.0.0.1:1",
+      YTDLP_BIN: "/tmp/envtools-test-missing-ytdlp",
       PORT: String(port),
       PROCESSOR_HOST: "127.0.0.1",
     },
@@ -64,11 +65,18 @@ test("gateway hides upstream network details behind a stable public error", asyn
   });
   try {
     await waitForOutput(child, /enV Render API listening on/);
-    const response = await fetch(\`http://127.0.0.1:\${port}/api/health-probe?private=value\`);
+    const health = await fetch("http://127.0.0.1:" + port + "/health");
+    const healthBody = await health.json();
+    assert.equal(health.status, 503);
+    assert.equal(healthBody.ok, false);
+    assert.equal(healthBody.processors["url-media"], false);
+
+    const response = await fetch(`http://127.0.0.1:${port}/api/health-probe?private=value`);
     const body = await response.json();
     assert.equal(response.status, 502);
     assert.equal(body.ok, false);
-    assert.equal(body.error, "APPLICATION_API_UNAVAILABLE");
+    assert.equal(body.code, "APPLICATION_API_UNAVAILABLE");
+    assert.equal(body.error, "enV could not complete this request right now. Please try again shortly.");
     assert.equal(body.message, "enV could not complete this request right now. Please try again shortly.");
     assert.ok(body.requestId);
     assert.doesNotMatch(JSON.stringify(body), /ECONNREFUSED|127\.0\.0\.1:1|fetch failed|private=value/i);
@@ -98,11 +106,12 @@ test("media processor exposes a helpful safe message rather than process interna
     form.append("operation", "video-to-mp4");
     form.append("outputName", "result.mp4");
     form.append("params", "{}");
-    const response = await fetch(\`http://127.0.0.1:\${port}/media\`, { method: "POST", body: form });
+    const response = await fetch(`http://127.0.0.1:${port}/media`, { method: "POST", body: form });
     const body = await response.json();
     assert.equal(response.status, 500);
     assert.equal(body.ok, false);
-    assert.equal(body.error, "MEDIA_PROCESSING_FAILED");
+    assert.equal(body.code, "MEDIA_PROCESSING_FAILED");
+    assert.equal(body.error, "We couldn’t complete this media operation. Check the file format and try again.");
     assert.equal(body.message, "We couldn’t complete this media operation. Check the file format and try again.");
     assert.ok(body.requestId);
     assert.doesNotMatch(JSON.stringify(body), /ENOENT|envtools-test-missing-ffmpeg|spawn/i);

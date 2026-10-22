@@ -62,3 +62,16 @@ test("backend tool route uses bounded request parsing and sanitized internal fai
   assert.match(source, /causeType/);
   assert.doesNotMatch(source, /err instanceof Error\s*\?\s*err\.message/);
 });
+
+test("gateway and media processor fail safely and report actual readiness", async () => {
+  const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
+  const media = await readFile(new URL("./media-processor.mjs", import.meta.url), "utf8");
+  assert.match(gateway, /PROCESSOR_SHARED_SECRET must be configured in production/);
+  assert.match(gateway, /PROCESSOR_ALLOWED_ORIGIN must be an explicit production origin/);
+  assert.match(gateway, /servicesReady \? 200 : 503/);
+  assert.match(gateway, /await childServiceReadiness\(\)/);
+  assert.match(gateway, /APPLICATION_API_UNAVAILABLE/);
+  assert.doesNotMatch(gateway, /Application API unavailable: \\${error/);
+  assert.match(media, /MEDIA_PROCESSING_FAILED/);
+  assert.doesNotMatch(media, /json\(res, 500, \{ error: error instanceof Error \? error\.message/);
+});
