@@ -918,17 +918,17 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
 fun NativeUxUiStudioForm() {
     val context=LocalContext.current;val prefs=remember{context.getSharedPreferences("env.ux-ui-studio",android.content.Context.MODE_PRIVATE)}
     val scope=rememberCoroutineScope()
-    var onboarding by remember{mutableStateOf(false)};var target by remember{mutableStateOf("mobile")}
-    var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
+    var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
+    var projectName by remember{mutableStateOf("Untitled design")};var background by remember{mutableStateOf("#FFFFFF")}
     var customArtboard by remember{mutableStateOf(false)};var customWidth by remember{mutableIntStateOf(390)};var customHeight by remember{mutableIntStateOf(844)}
     var tokenNameDraft by remember{mutableStateOf("brand")};var tokenValueDraft by remember{mutableStateOf("#2563EB")};var spacingDraft by remember{mutableStateOf("20")}
     val colorTokens=remember{mutableStateListOf<Pair<String,String>>("primary" to "#2563EB","surface" to "#FFFFFF","text" to "#111827","muted" to "#64748B","border" to "#E5E7EB")}
     val spacingTokens=remember{mutableStateListOf(4,8,12,16,24,32,48)}
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
-    val elements=remember{mutableStateListOf<UxUiNativeLayer>().apply{addAll(uxNativePreset("mobile","mobile-dashboard").map{it.copy(referenceWidth=390,referenceHeight=844)})}};var selectedId by remember{mutableStateOf(elements.firstOrNull()?.id.orEmpty())}
+    val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
     var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
-    var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
+    var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
     val selected=elements.firstOrNull{it.id==selectedId}
@@ -942,7 +942,7 @@ fun NativeUxUiStudioForm() {
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
-    LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);customWidth=p.optJSONObject("viewport")?.optInt("width",customWidth)?:customWidth;customHeight=p.optJSONObject("viewport")?.optInt("height",customHeight)?:customHeight;customArtboard=true
+    LaunchedEffect(Unit){runCatching{val raw=prefs.getString("draft",null)?:return@runCatching;val p=JSONObject(raw);hasSavedDraft=true;projectName=p.optString("name",projectName);target=p.optString("target",target);background=p.optString("background",background);customWidth=p.optJSONObject("viewport")?.optInt("width",customWidth)?:customWidth;customHeight=p.optJSONObject("viewport")?.optInt("height",customHeight)?:customHeight;customArtboard=true
             colorTokens.clear();val savedColors=p.optJSONObject("tokens")?.optJSONArray("colors");if(savedColors!=null){for(index in 0 until savedColors.length()){val t=savedColors.optJSONObject(index)?:continue;colorTokens.add(t.optString("name") to t.optString("value","#2563EB"))}}
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
             reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
@@ -1114,13 +1114,27 @@ fun NativeUxUiStudioForm() {
             Text("UX/UI Studio",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
             Text("Design by eye. Export exact developer and AI handoff.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(onboarding){
-                Card{Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    Text("What are you designing?",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
-                    Text("Choose an exact target-size artboard, edit elements and export PDF or JSON handoff.")
-                    Button(onClick={target="mobile";customArtboard=false;background="#F8FAFC";projectName="Mobile dashboard";elements.clear();elements.addAll(uxNativePreset("mobile","mobile-dashboard").map{it.copy(referenceWidth=390,referenceHeight=844)});customWidth=390;customHeight=844;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Mobile · 390 × 844 px")}
-                    OutlinedButton(onClick={target="tablet";customArtboard=false;background="#F8FAFC";projectName="Tablet dashboard";elements.clear();elements.addAll(uxNativePreset("tablet","tablet-dashboard").map{it.copy(referenceWidth=768,referenceHeight=1024)});customWidth=768;customHeight=1024;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Tablet · 768 × 1024 px")}
-                    OutlinedButton(onClick={target="desktop";customArtboard=false;background="#FFFFFF";projectName="Website landing";elements.clear();elements.addAll(uxNativePreset("desktop","desktop-landing").map{it.copy(referenceWidth=1440,referenceHeight=900)});customWidth=1440;customHeight=900;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Desktop · 1440 × 900 px")}
+                Card { Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(72.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(50)),contentAlignment=Alignment.Center) {
+                        Text("＋",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Normal)
+                    }
+                    Text("New project",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    Text("Start with a blank design. Add elements only when you need them.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
                 }}
+                Text("Drafts",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                if(hasSavedDraft) {
+                    Card { Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text(projectName,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                        Text(if(elements.isEmpty())"Blank canvas" else elements.size.toString()+" design elements",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick={onboarding=false;notice="Draft opened."},modifier=Modifier.fillMaxWidth()){Text("Open draft")}
+                    }}
+                } else {
+                    Card { Column(Modifier.fillMaxWidth().padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                        Text("No drafts yet",fontWeight=FontWeight.SemiBold)
+                        Text("Your designs will appear here as you work.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }}
+                }
             }else{
                 OutlinedTextField(projectName,{projectName=it},label={Text("Project title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
@@ -1205,7 +1219,7 @@ fun NativeUxUiStudioForm() {
                     OutlinedButton(onClick={showElementTray=!showElementTray}){Text("＋",style=MaterialTheme.typography.headlineSmall)}
                     OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("↷")}
                     Spacer(Modifier.weight(1f))
-                    Text(elements.size.toString()+" layers",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(elements.isNotEmpty())Text(elements.size.toString()+(if(elements.size==1)" element" else " elements"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Design tools",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
@@ -1215,8 +1229,9 @@ fun NativeUxUiStudioForm() {
                 if(showElementTray){
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
                 }
-                Text("Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
+                if(elements.isEmpty())Text("No layers yet. Tap + to add your first element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(elements.size>6)OutlinedButton(onClick={showAllLayers=!showAllLayers}){Text(if(showAllLayers)"see less" else "see more")}
                 selected?.let{e->
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
