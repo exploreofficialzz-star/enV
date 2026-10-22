@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff } from "lucide-react";
+import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -33,6 +33,12 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
+type FundingProviderId = "paystack" | "cryptomus";
+type FundingProviderOption = {
+  id: FundingProviderId; label: string; enabled: boolean; currency: string; pricePerTokenMinor: number | null;
+  packs: Array<{ tokens: number; amountMinor: number | null; currency: string }>; message: string;
+};
+type FundingOptionsState = { status: "loading" | "ready" | "unavailable"; providers: FundingProviderOption[]; message?: string };
 type RewardsData = {
   referralCode: string; videoSignature: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
   videoSignups: number; videoConversions: number; referralTokens: number; affiliateTokens: number;
@@ -172,11 +178,63 @@ function Account() {
   const [rewardsReloadKey, setRewardsReloadKey] = useState(0);
   const [selectedTokenPack, setSelectedTokenPack] = useState(100);
   const [fundingBusy, setFundingBusy] = useState(false);
+  const [showFundingOptions, setShowFundingOptions] = useState(false);
+  const [selectedFundingProvider, setSelectedFundingProvider] = useState<FundingProviderId | null>(null);
+  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", providers: [] });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [showVideoDetails, setShowVideoDetails] = useState(false);
 
+
+  useEffect(() => {
+    if (!showFundingOptions) return;
+    const controller = new AbortController();
+    setFundingOptionsState({ status: "loading", providers: [] });
+    void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as {
+          ok?: boolean;
+          data?: { providers?: FundingProviderOption[] };
+          message?: string;
+        } | null;
+        if (!response.ok || !payload?.ok || !Array.isArray(payload.data?.providers)) {
+          throw new Error(payload?.message ?? "Payment options could not be loaded.");
+        }
+        const providers = payload.data.providers.filter((item) =>
+          item && (item.id === "paystack" || item.id === "cryptomus")
+        );
+        if (!providers.length) throw new Error("Payment options are not available.");
+        setFundingOptionsState({ status: "ready", providers });
+        setSelectedFundingProvider((current) =>
+          current && providers.some((item) => item.id === current)
+            ? current
+            : providers.find((item) => item.enabled)?.id ?? null
+        );
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setFundingOptionsState({
+          status: "unavailable",
+          providers: [
+            { id: "paystack", label: "Card & local payments", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Secure card checkout could not be loaded. Refresh and try again." },
+            { id: "cryptomus", label: "Cryptocurrency", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "Secure crypto checkout could not be loaded. Refresh and try again." },
+          ],
+          message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
+        });
+        setSelectedFundingProvider(null);
+      });
+    return () => controller.abort();
+  }, [showFundingOptions]);
+
+  useEffect(() => {
+    if (!showFundingOptions) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !fundingBusy) setShowFundingOptions(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showFundingOptions, fundingBusy]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -195,7 +253,11 @@ function Account() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentState = params.get("payment");
-    if (paymentState === "success") {
+    if (paymentState === "crypto-pending") {
+      setFundingFeedback({ kind: "success", message: "You returned from crypto checkout. Your balance changes only after the provider confirms and enV verifies the payment." });
+      setReloadKey(value => value + 1);
+      window.history.replaceState({}, "", "/wallet");
+    } else if (paymentState === "success") {
       setFundingFeedback({ kind: "success", message: "Payment verified by enV. Your wallet has been refreshed." });
       setReloadKey(value => value + 1);
       window.history.replaceState({}, "", "/wallet");
@@ -365,27 +427,45 @@ function Account() {
     await copyReferralLink(code, source, signature);
   }
 
-  async function startFundingCheckout() {
+  async function startFundingCheckout(provider: FundingProviderId) {
     if (fundingBusy) return;
+    const providerOption = fundingOptionsState.providers.find((item) => item.id === provider);
+    if (!providerOption?.enabled || fundingOptionsState.status !== "ready") {
+      setFundingFeedback({
+        kind: "error",
+        message: providerOption?.message ?? "This payment method is not available right now. No payment was taken.",
+      });
+      return;
+    }
     setFundingBusy(true);
     setFundingFeedback(null);
     try {
       const response = await fetch("/api/billing/purchases", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ tokenPack: selectedTokenPack, idempotencyKey: `wallet-topup-${crypto.randomUUID()}` }),
+        body: JSON.stringify({
+          provider,
+          tokenPack: selectedTokenPack,
+          idempotencyKey: provider + "-wallet-topup-" + crypto.randomUUID(),
+        }),
       });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; data?: { authorizationUrl?: string }; message?: string } | null;
+      const payload = await response.json().catch(() => null) as {
+        ok?: boolean;
+        data?: { authorizationUrl?: string; provider?: string };
+        message?: string;
+      } | null;
       const target = payload?.data?.authorizationUrl;
+      const expectedHost = provider === "paystack" ? "checkout.paystack.com" : "pay.cryptomus.com";
       let checkout: URL | null = null;
       try { if (target) checkout = new URL(target); } catch { checkout = null; }
-      if (!response.ok || !payload?.ok || !checkout || checkout.protocol !== "https:" || checkout.hostname !== "checkout.paystack.com") {
+      if (!response.ok || !payload?.ok || payload.data?.provider !== provider ||
+          !checkout || checkout.protocol !== "https:" || checkout.hostname !== expectedHost) {
         throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
       }
       window.location.assign(checkout.href);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
-      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|wallet funding is not live yet|provider credentials|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
+      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
       setFundingFeedback({
         kind: "error",
         message: requiresSetup
@@ -581,7 +661,7 @@ function Account() {
                 <svg viewBox="0 0 120 64" className="h-10 w-20 sm:h-12 sm:w-28" fill="none" aria-label="Upward token trend">
                   <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } void startFundingCheckout(); }} disabled={fundingBusy} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-3 py-2 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-4">
+                <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } setFundingFeedback(null); setShowFundingOptions(true); }} disabled={fundingBusy} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-3 py-2 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-4">
                   <CreditCard size={15} aria-hidden="true"/>{fundingBusy ? "Opening…" : "Add funds"}<ArrowUpRight size={13} aria-hidden="true"/>
                 </button>
               </div>
@@ -594,6 +674,130 @@ function Account() {
             <MetricCard title="Total used" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimeConsumedSubunits)} enV` : "0.000 enV"} description={tokenReferenceValue((visibleWallet?.lifetimeConsumedSubunits ?? 0) / 1_000)} icon={<TrendingUp size={15} aria-hidden="true"/>} />
           </div>
         </section>
+
+        {showFundingOptions ? (
+          <div
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+            role="presentation"
+            onMouseDown={(event) => { if (event.target === event.currentTarget && !fundingBusy) setShowFundingOptions(false); }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="funding-dialog-title"
+              className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-border bg-surface p-4 text-fg shadow-2xl sm:rounded-3xl sm:p-6"
+            >
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 id="funding-dialog-title" className="text-lg font-semibold sm:text-xl">Add funds</h2>
+                  <p className="mt-1 text-sm leading-5 text-muted">Choose how you want to pay, then select the enV token amount.</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close payment options"
+                  onClick={() => { if (!fundingBusy) setShowFundingOptions(false); }}
+                  disabled={fundingBusy}
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border text-muted hover:bg-surface-2 disabled:opacity-50"
+                >
+                  <X size={18} aria-hidden="true"/>
+                </button>
+              </div>
+
+              {fundingOptionsState.status === "loading" ? (
+                <p className="mt-5 rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted" role="status">Checking available payment methods…</p>
+              ) : null}
+              {fundingOptionsState.status === "unavailable" ? (
+                <p className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-sm leading-5 text-fg" role="status">{fundingOptionsState.message}</p>
+              ) : null}
+
+              <div className="mt-4 space-y-2">
+                <h3 className="text-sm font-semibold">Payment method</h3>
+                {fundingOptionsState.providers.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={selectedFundingProvider === option.id}
+                    onClick={() => setSelectedFundingProvider(option.id)}
+                    className={"flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition " +
+                      (selectedFundingProvider === option.id
+                        ? "border-accent bg-accent/5"
+                        : "border-border bg-surface hover:bg-surface-2") +
+                      (!option.enabled ? " opacity-80" : "")}
+                  >
+                    <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">
+                      {option.id === "paystack" ? <CreditCard size={19} aria-hidden="true"/> : <Coins size={19} aria-hidden="true"/>}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold">{option.label}</span>
+                        <span className={"rounded-full px-2 py-1 text-[10px] font-semibold " +
+                          (option.enabled ? "bg-emerald-500/10 text-emerald-600" : "bg-surface-2 text-muted")}>
+                          {option.enabled ? "Available" : "Not available"}
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-muted">
+                        {option.id === "paystack"
+                          ? "Pay by card and any local channels enabled on enV’s approved Paystack account."
+                          : "Pay through a hosted crypto invoice. The available coins and networks are shown by the provider."}
+                      </span>
+                      {selectedFundingProvider === option.id && !option.enabled ? (
+                        <span className="mt-2 block text-xs leading-5 text-muted">{option.message}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 space-y-2">
+                <h3 className="text-sm font-semibold">Choose your token pack</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[100, 250, 500, 1000].map((tokens) => {
+                    const pack = fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.packs.find((item) => item.tokens === tokens);
+                    const amount = pack?.amountMinor;
+                    const currency = pack?.currency ?? fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.currency ?? "NGN";
+                    const formattedAmount = amount !== null && amount !== undefined
+                      ? new Intl.NumberFormat(currency === "NGN" ? "en-NG" : "en-US", {
+                          style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+                        }).format(amount / 100)
+                      : "Price at checkout";
+                    return (
+                      <button
+                        key={tokens}
+                        type="button"
+                        aria-pressed={selectedTokenPack === tokens}
+                        onClick={() => setSelectedTokenPack(tokens)}
+                        className={"flex min-h-[78px] flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition " +
+                          (selectedTokenPack === tokens ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
+                      >
+                        <span className="text-sm font-semibold">{tokens.toLocaleString()} enV</span>
+                        <span className="mt-1 text-xs text-muted">{formattedAmount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedFundingProvider ? (
+                <p className="mt-4 text-xs leading-5 text-muted">
+                  {fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.message}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => selectedFundingProvider && void startFundingCheckout(selectedFundingProvider)}
+                disabled={fundingBusy || fundingOptionsState.status !== "ready" ||
+                  !selectedFundingProvider ||
+                  !fundingOptionsState.providers.some((item) => item.id === selectedFundingProvider && item.enabled)}
+                className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#3df1c2] px-4 py-3 text-sm font-semibold text-[#052a2a] transition hover:bg-[#74f9d7] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CreditCard size={17} aria-hidden="true"/>
+                {fundingBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
+                {!fundingBusy ? <ArrowUpRight size={15} aria-hidden="true"/> : null}
+              </button>
+              <p className="mt-3 text-center text-[11px] leading-4 text-muted">enV adds tokens only after the server verifies the provider’s payment confirmation. Do not close a payment until the provider shows its final status.</p>
+            </section>
+          </div>
+        ) : null}
 
         <section className="mt-2 space-y-2" aria-labelledby="rewards-title">
           <h2 id="rewards-title" className="sr-only">Referral and creator rewards</h2>
