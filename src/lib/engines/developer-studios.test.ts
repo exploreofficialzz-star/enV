@@ -532,14 +532,14 @@ test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and 
   const swift = generateSwiftProject(project);
   assert.match(html, /clip-path:polygon/);
   assert.match(html, /@font-face/);
-  assert.match(html, /data:image\\/png;base64/);
+  assert.ok(html.includes("data:image/png;base64"));
   assert.match(html, /lucide:house/);
   assert.match(react, /embeddedFontCss/);
-  assert.match(react, /data:image\\/png;base64/);
+  assert.ok(react.includes("data:image/png;base64"));
   assert.match(kotlin, /generatedUxShape/);
   assert.match(kotlin, /generatedUxFontFamily/);
-  assert.match(kotlin, /data:image\\/png;base64/);
+  assert.ok(kotlin.includes("data:image/png;base64"));
   assert.match(swift, /GeneratedUxShape/);
   assert.match(swift, /generatedUxRegisterFont/);
-  assert.match(swift, /data:image\\/png;base64/);
+  assert.ok(swift.includes("data:image/png;base64"));
 });
