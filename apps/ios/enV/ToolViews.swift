@@ -7975,7 +7975,13 @@ private struct NativeUxUiStudioView: View {
 
     private var editorContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                Button { onboarding = true; showComponentPalette = false; showAdvancedCanvas = false; showAdvancedInspector = false } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 14, weight: .semibold))
+                        .frame(width: 36, height: 42).foregroundStyle(Color.envInk)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                }.accessibilityLabel("Back to projects")
                 TextField("Project title", text: $projectName)
                     .font(.envScaled(size: 15, weight: .semibold)).padding(10)
                     .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
