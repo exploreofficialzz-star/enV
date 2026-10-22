@@ -37,7 +37,7 @@ spawnService("media", "scripts/media-processor.mjs", 8787, { MEDIA_HOST: "127.0.
 spawnService("url-media", "scripts/url-media-processor.mjs", 8790, { URL_MEDIA_HOST: "127.0.0.1", URL_MEDIA_PORT: "8790", URL_MEDIA_ALLOWED_ORIGIN: ALLOWED_ORIGIN });
 if (process.env.TRANSCRIBE_ENABLED === "true") spawnService("transcription", "scripts/transcription-processor.mjs", 8788, { TRANSCRIBE_HOST: "127.0.0.1", TRANSCRIBE_PORT: "8788", TRANSCRIBE_ALLOWED_ORIGIN: ALLOWED_ORIGIN });
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`); const { pathname, search } = url;
   if (req.method === "OPTIONS") return json(req, res, 204, {});
   if (pathname === "/health" && req.method === "GET") { const servicesReady = [...services.values()].every(({ child }) => child.exitCode === null); return json(req, res, 200, { ok: servicesReady, service: "enV Render API", applicationApiOrigin: APPLICATION_API_ORIGIN, authentication: Boolean(SHARED_SECRET), ready: servicesReady, routes: ["/api/*", "/media", "/info", "/download", ...(services.has("transcription") ? ["/transcribe"] : [])], limits: { maxMediaBytes: Number(process.env.MEDIA_MAX_BYTES || 100 * 1024 * 1024) } }); }
