@@ -132,3 +132,41 @@ Migration `migrations/0007_wallet_rewards.sql` adds referral attribution and a l
 Paystack checkout initialization uses a server-side secret, server-defined NGN token price and supported token packs. The hosted checkout reference, paid amount, currency, status, and provider transaction ID must be re-verified with Paystack before the token ledger is credited. Webhooks require an HMAC-SHA512 signature checked with a timing-safe comparison. The launch and enforcement flags remain off by default. Do not turn them on until production authentication and PostgreSQL migrations, finance-approved pricing, Paystack merchant credentials, supported-country/currency behavior, refunds/chargebacks, monitoring and release tests have been completed.
 
 Android/iOS wallet dashboards read the shared balance using a revocable paired-device session. Their purchase controls remain disabled until Google Play Billing / Apple StoreKit adapters and server-side receipt verification are separately implemented; the Web Paystack route is not used as a shortcut around digital-goods store policies.
+
+
+## Multi-provider wallet checkout — implementation
+
+The Web wallet now opens a payment-method chooser before checkout. The server publishes the two configured methods through the existing funding-options endpoint:
+
+- **Paystack (NGN):** hosted checkout is initialized with the secret key on the server. The provider must confirm the transaction and enV must match the purchase intent's provider reference, product, amount, currency and transaction ID before the ledger is credited. The signed Paystack webhook uses HMAC-SHA512 with a timing-safe comparison.
+- **Cryptomus (crypto invoice):** enV creates a fiat-priced USD invoice, then directs the customer to the provider-hosted invoice page, where the available currencies and networks come from the merchant configuration. The Merchant API request is signed server-side using Cryptomus' documented MD5(base64(JSON body) + payment API key) format. The webhook signature is verified, then the server independently queries the invoice by order ID and matches invoice UUID, expected USD amount, currency, final paid status and the original purchase intent before crediting tokens. Browser return URLs never credit tokens.
+- **Shared ledger:** both methods use the same wallet account, integer milli-token units, purchase-intent table, idempotency constraints, provider transaction uniqueness and verified-purchase ledger transaction. Replayed callbacks do not create a second credit.
+- **Exceptional crypto statuses:** partial, underpaid, paid-over, locked, cancelled, failed or unfinalized invoices do not grant token credit automatically. Paid-over, locked and incorrect-amount invoices are flagged as disputed for manual review; refunds and disputes still require an operator's reconciled resolution under the published policy.
+
+### Configuration and deliberate launch gates
+
+All of the following stay disabled or empty by default:
+
+- BILLING_LAUNCH_ENABLED and BILLING_ENFORCEMENT_ENABLED
+- PAYSTACK_PROVIDER_APPROVED and CRYPTOMUS_PROVIDER_APPROVED
+- PAYSTACK_TOKEN_PRICE_NGN_KOBO and CRYPTOMUS_TOKEN_PRICE_USD_CENTS
+- Paystack secret credentials and Cryptomus merchant UUID/payment API key
+
+Set the provider approval flags only after that provider has expressly approved the enV business model, the intended geography and payment rails, finance has approved the matching pack prices, the production domain/authentication/database are available, and end-to-end verification/refund/reconciliation checks have passed. A configured API key is not evidence of merchant approval. Cryptomus access and crypto acceptance in Nigeria also require the business's KYC, tax, AML, sanctions, consumer-disclosure and local legal review; this code does not establish legal eligibility.
+
+Paystack documents restrictions for mobile-wallet and cryptocurrency businesses for international payment acceptance and flags some merchant categories for further review. Ask Paystack to classify enV's non-transferable tool-credit product and approve the Nigerian and international channels you actually intend to offer before enabling card checkout. Do not describe enV credits as cash, withdrawable value or cryptocurrency.
+
+### Native-store restrictions
+
+The Web chooser is responsive and can be used in a mobile browser. Native Android and iOS wallet buttons must not open this Web checkout as a workaround for store billing. Digital token credits generally require Google Play Billing on Google Play and Apple In-App Purchase/StoreKit on the App Store, unless the app and storefront meet a specific published exception or approved external-billing program. Native purchase adapters, signed store transaction verification, restore/revoke handling and store reconciliation are separate launch blockers. Until those adapters are completed and tested, the native Add funds action must state clearly that in-app purchases are not available in that release and must not launch Paystack or crypto checkout.
+
+### Deployment checklist specific to payments
+
+1. Configure the production PostgreSQL database and apply every required migration; verify wallet and purchase-intent/ledger transaction behavior on a production-equivalent database.
+2. Complete provider onboarding/KYC and written approval, including approval for the intended sale of enV tool credits.
+3. Approve the actual NGN-kobo and USD-cent prices per visible enV token; never treat the reference-value display as automatically approved pricing.
+4. Add server-only credentials and the canonical HTTPS authentication URL in the production secret manager; register the Cryptomus webhook URL at /api/billing/cryptomus/webhook and the existing Paystack webhook URL in each provider dashboard.
+5. Test signed good/bad webhooks, stale/duplicate callbacks, amount/currency/reference mismatch, expiry, underpayment, overpayment, provider timeout, database failure after invoice creation, refunds/chargebacks, support/reconciliation and mobile-browser redirect flows.
+6. Complete Google Play Billing and Apple StoreKit product/receipt verification before enabling native-store purchases. Never embed gateway secrets in TypeScript clients, Android assets or iOS binaries.
+7. Only then set the global enforcement and launch flags and each provider approval gate to true. If any live prerequisites are absent, checkout remains closed and the UI must communicate that no payment was taken.
+
