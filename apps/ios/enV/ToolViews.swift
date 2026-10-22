@@ -7642,7 +7642,14 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
         }
         let visible = layer.visibleOn.map(uxUiSourceString).joined(separator: ",")
         lines.append("      if [\(visible)].contains(target) {")
-        lines.append("        \(child).frame(width:\(w),height:\(heightCode),alignment:.topLeading).background(Color(hex:\(uxUiSourceString(fill)))).clipShape(GeneratedUxShape(kind:\(uxUiSourceString(layer.kind)),radius:CGFloat(\(layer.radius)))).position(x:CGFloat(\(layer.x))+\(dx)+(\(w))/2,y:CGFloat(\(layer.y))+\(dy)+(\(heightCode))/2)" + (layer.fontData?.isEmpty == false ? ".onAppear { _ = generatedUxRegisterFont(base64:\(uxUiSourceString(layer.fontData!.components(separatedBy: \",\").last ?? \"\")),family:\(uxUiSourceString(layer.fontFamily))) }" : ""))
+        let fontRegistration: String
+        if let fontData = layer.fontData, !fontData.isEmpty {
+            let encodedFont = fontData.components(separatedBy: ",").last ?? ""
+            fontRegistration = ".onAppear { _ = generatedUxRegisterFont(base64:\(uxUiSourceString(encodedFont)),family:\(uxUiSourceString(layer.fontFamily))) }"
+        } else {
+            fontRegistration = ""
+        }
+        lines.append("        \(child).frame(width:\(w),height:\(heightCode),alignment:.topLeading).background(Color(hex:\(uxUiSourceString(fill)))).clipShape(GeneratedUxShape(kind:\(uxUiSourceString(layer.kind)),radius:CGFloat(\(layer.radius)))).position(x:CGFloat(\(layer.x))+\(dx)+(\(w))/2,y:CGFloat(\(layer.y))+\(dy)+(\(heightCode))/2)" + fontRegistration)
         lines.append("      }")
     }
     lines += [
