@@ -2596,7 +2596,7 @@ private struct NativePricingInformationPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-            Button("Open Wallet") { if let url = URL(string: "https://en-v.vercel.app/wallet") { openURL(url) } }
+            Button("Open Wallet") { if let url = URL(string: "https://envtools.store/wallet") { openURL(url) } }
                 .buttonStyle(.borderedProminent)
             enVLocalizedCharacterSpacedText(LocalizedStringKey("Questions about enV pricing can be sent to [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com)."))
                 .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)

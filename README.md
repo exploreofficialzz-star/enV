@@ -55,7 +55,7 @@ Authentication is off by default. The app now has sign-in, sign-up, password-res
 Required production settings:
 
 - `VITE_AUTH_ENABLED=true` — public feature switch; must be set in the production build and server environment.
-- `BETTER_AUTH_URL` — canonical HTTPS origin for the deployed application (currently `https://en-v.vercel.app`).
+- `BETTER_AUTH_URL` — canonical HTTPS origin for the deployed application (currently `https://envtools.store`).
 - `BETTER_AUTH_SECRET` — high-entropy server-only signing secret.
 - `DATABASE_URL` — durable Postgres connection string; production authentication refuses to start without it.
 

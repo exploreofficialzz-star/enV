@@ -201,7 +201,7 @@ struct ToolDetailView: View {
                                 : "This tool is available in the Web product and is not executable natively.")
                                 .font(.envScaled(size: 14, weight: .regular))
                                 .foregroundStyle(Color.envMuted)
-                            if !tool.isPlanned, let webURL = URL(string: "https://en-v.vercel.app/tools/\(tool.category)/\(tool.slug)") {
+                            if !tool.isPlanned, let webURL = URL(string: "https://envtools.store/tools/\(tool.category)/\(tool.slug)") {
                                 Link("Open in Web", destination: webURL)
                                     .font(.envScaled(size: 14, weight: .semibold))
                                     .accessibilityHint("Opens this tool in your default web browser")
@@ -4283,7 +4283,7 @@ struct NativeAccessibilityToolView: View {
     }
 }
 
-private let apcaStudioWebURL = URL(string: "https://en-v.vercel.app/tools/accessibility/color-contrast-studio")!
+private let apcaStudioWebURL = URL(string: "https://envtools.store/tools/accessibility/color-contrast-studio")!
 
 private struct APCAWebViewSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -4326,7 +4326,7 @@ private struct APCAWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let target = navigationAction.request.url else { decisionHandler(.cancel); return }
-            if target.scheme == "https", target.host == "en-v.vercel.app" { decisionHandler(.allow); return }
+            if target.scheme == "https", target.host == "envtools.store" { decisionHandler(.allow); return }
             if target.scheme == "https" { UIApplication.shared.open(target) }
             decisionHandler(.cancel)
         }

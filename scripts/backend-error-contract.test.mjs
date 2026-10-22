@@ -75,3 +75,15 @@ test("gateway and media processor fail safely and report actual readiness", asyn
   assert.match(media, /MEDIA_PROCESSING_FAILED/);
   assert.doesNotMatch(media, /json\(res, 500, \{ error: error instanceof Error \? error\.message/);
 });
+
+ 
+test("production configuration consistently uses envtools.store as the canonical origin", async () => {
+  const render = await readFile(new URL("../render.yaml", import.meta.url), "utf8");
+  const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
+  const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+  assert.ok(render.includes('value: "https://envtools.store"'));
+  assert.equal(render.split('value: "https://envtools.store"').length - 1, 2);
+  assert.ok(gateway.includes('process.env.APPLICATION_API_ORIGIN || "https://envtools.store"'));
+  assert.ok(readme.includes("BETTER_AUTH_URL"));
+  assert.equal(/https:\/\/en-v\.vercel\.app/.test(render + gateway + readme), false);
+});

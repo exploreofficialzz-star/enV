@@ -245,7 +245,7 @@ assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\
 assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
 assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
 assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
-assert.ok(iosTools.includes("https://en-v.vercel.app/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
+assert.ok(iosTools.includes("https://envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
 assert.match(iosContent, /NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeBackendSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);

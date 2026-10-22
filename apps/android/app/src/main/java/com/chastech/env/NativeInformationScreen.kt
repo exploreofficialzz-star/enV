@@ -1246,7 +1246,7 @@ private fun PricingInformation() {
                 Text("Review the applicable rate, usage estimate, maximum budget, and provider details before starting metered work. Usage may vary with input size, duration, output, retries, and provider fees.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://en-v.vercel.app/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open Wallet") }
+        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet"))) }, modifier = Modifier.fillMaxWidth()) { Text("Open Wallet") }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Questions about enV pricing can be sent to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             EmailAction("envtoolkit@gmail.com", LocalContext.current)

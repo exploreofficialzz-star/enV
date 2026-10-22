@@ -34,7 +34,7 @@ npm run audit:accessibility:live -- --base-url=http://127.0.0.1:8080 --max-pages
 To scan the deployed site instead, provided it is reachable from the machine running the audit:
 
 ```sh
-npm run audit:accessibility:live -- --base-url=https://en-v.vercel.app --max-pages=40
+npm run audit:accessibility:live -- --base-url=https://envtools.store --max-pages=40
 ```
 
 The script also accepts `--routes=/,/tools,/search`, `--max-pages=80`, `--max-interactions=0`, `--timeout-ms=30000`, `--report=artifacts/a11y.json`, `--screenshot-dir=artifacts/a11y/screenshots`, `--no-screenshots`, `--fail-on-violations`, and `--fail-on-scan-errors`. The violation gate is opt-in until findings have been reviewed and a known baseline is established. CI enables `--fail-on-scan-errors`, which fails when a route could not be loaded or audited; a route-budget limit is still reported as a coverage gap and does not itself make the audit fail.

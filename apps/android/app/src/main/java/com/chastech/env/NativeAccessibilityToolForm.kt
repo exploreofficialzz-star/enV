@@ -57,8 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chastech.env.data.ToolRecord
 
-private const val APCA_WEB_URL = "https://en-v.vercel.app/tools/accessibility/color-contrast-studio"
-private const val APCA_WEB_HOST = "en-v.vercel.app"
+private const val APCA_WEB_URL = "https://envtools.store/tools/accessibility/color-contrast-studio"
+private const val APCA_WEB_HOST = "envtools.store"
 
 @Composable
 fun NativeAccessibilityToolForm(tool: ToolRecord) {

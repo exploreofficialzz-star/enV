@@ -8,7 +8,7 @@ const HOST = process.env.PROCESSOR_HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || process.env.PROCESSOR_PORT || 10000);
 const SHARED_SECRET = String(process.env.PROCESSOR_SHARED_SECRET || "").trim();
 const ALLOWED_ORIGIN = String(process.env.PROCESSOR_ALLOWED_ORIGIN || "*").trim();
-const APPLICATION_API_ORIGIN = String(process.env.APPLICATION_API_ORIGIN || "https://en-v.vercel.app").trim().replace(/\/+$/, "");
+const APPLICATION_API_ORIGIN = String(process.env.APPLICATION_API_ORIGIN || "https://envtools.store").trim().replace(/\/+$/, "");
 const services = new Map();
 
 if (process.env.NODE_ENV === "production" && !SHARED_SECRET) {

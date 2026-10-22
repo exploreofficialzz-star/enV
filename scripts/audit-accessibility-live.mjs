@@ -5,7 +5,7 @@
  * Usage:
  *   npm run dev
  *   A11Y_BASE_URL=http://127.0.0.1:8080 npm run audit:accessibility:live
- *   A11Y_BASE_URL=https://en-v.vercel.app npm run audit:accessibility:live
+ *   A11Y_BASE_URL=https://envtools.store npm run audit:accessibility:live
  *
  * Automated axe violations and manual-review items are reported separately. This script is not
  * a WCAG conformance certification, and it does not submit valid forms or trigger tool actions.
@@ -66,7 +66,7 @@ function parseArgs(argv) {
 const HELP = `enV live rendered accessibility audit (Phase 8)
 
 Options:
-  --base-url=https://en-v.vercel.app   Root origin to scan (default localhost:8080)
+  --base-url=https://envtools.store   Root origin to scan (default localhost:8080)
   --routes=/,/tools,/search            Comma-separated route seeds (internal pages only)
   --max-pages=40                       Maximum unique routes to visit
   --max-interactions=4                 Low-risk interaction states per route

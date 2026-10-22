@@ -16,12 +16,12 @@ import {
 } from './lib/accessibility-live-audit.mjs';
 
 test('route canonicalization strips fragments and query values while preserving path', () => {
-  const canonical = canonicalizeRouteUrl('https://en-v.vercel.app/tools?q=private#results', 'https://en-v.vercel.app');
-  assert.equal(canonical.href, 'https://en-v.vercel.app/tools');
+  const canonical = canonicalizeRouteUrl('https://envtools.store/tools?q=private#results', 'https://envtools.store');
+  assert.equal(canonical.href, 'https://envtools.store/tools');
 });
 
 test('crawler keeps same-origin pages and ignores external, API, and static-file URLs', () => {
-  const base = 'https://en-v.vercel.app/';
+  const base = 'https://envtools.store/';
   assert.equal(isCrawlableInternalUrl('/tools?sort=popular', base), true);
   assert.equal(isCrawlableInternalUrl('https://example.com/tools', base), false);
   assert.equal(isCrawlableInternalUrl('/api/backend/tool', base), false);
@@ -30,10 +30,10 @@ test('crawler keeps same-origin pages and ignores external, API, and static-file
 });
 
 test('finding IDs are reproducible but separate by route, state, rule, and target', () => {
-  const first = stableFindingId('https://en-v.vercel.app/tools', 'default', 'button-name', ['button.save']);
-  assert.equal(first, stableFindingId('https://en-v.vercel.app/tools', 'default', 'button-name', ['button.save']));
-  assert.notEqual(first, stableFindingId('https://en-v.vercel.app/tools', 'popup', 'button-name', ['button.save']));
-  assert.notEqual(first, stableFindingId('https://en-v.vercel.app/tools', 'default', 'button-name', ['button.cancel']));
+  const first = stableFindingId('https://envtools.store/tools', 'default', 'button-name', ['button.save']);
+  assert.equal(first, stableFindingId('https://envtools.store/tools', 'default', 'button-name', ['button.save']));
+  assert.notEqual(first, stableFindingId('https://envtools.store/tools', 'popup', 'button-name', ['button.save']));
+  assert.notEqual(first, stableFindingId('https://envtools.store/tools', 'default', 'button-name', ['button.cancel']));
   assert.match(first, /^env-a11y-live:button-name:[a-f0-9]{12}$/);
 });
 
@@ -67,7 +67,7 @@ test('summary separates confirmed axe violations from manual-review nodes and br
 });
 
 test('report slugs are filesystem-safe and the baseline includes core enV route seeds', () => {
-  assert.equal(safeReportSlug('https://en-v.vercel.app/tools/my-tool?x=1'), 'en-v-vercel-app-tools-my-tool-x-1');
+  assert.equal(safeReportSlug('https://envtools.store/tools/my-tool?x=1'), 'envtools-store-tools-my-tool-x-1');
   assert.ok(DEFAULT_ROUTE_SEEDS.includes('/'));
   assert.ok(DEFAULT_ROUTE_SEEDS.includes('/tools'));
   assert.ok(AXE_TAGS.includes('wcag22aa'));
