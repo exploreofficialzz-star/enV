@@ -32,8 +32,17 @@ for (const [id, modes] of web) {
   assert.deepEqual([...ios.get(id)].sort(), [...modes].sort(), `iOS modes must match Web for ${id}`);
 }
 const webUx = readFileSync('src/components/engines/ux-ui-studio-engine.tsx', 'utf8');
+const webDispatcher = readFileSync('src/components/tools/tool-engine.tsx', 'utf8');
+const webRoute = readFileSync('src/routes/tools/$category/$slug.tsx', 'utf8');
+const webRegistry = readFileSync('src/lib/registry.ts', 'utf8');
+const androidMain = readFileSync('apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', 'utf8');
 const androidUx = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosTools = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+assert.match(webRegistry, /makeDeveloperStudioTools\\(allTools\\)/, 'UX/UI Studio must enter the searchable virtual tool registry');
+assert.match(webRoute, /getToolByPath\\(category, slug\\)/, 'The public tools route must resolve the Studio slug');
+assert.match(webDispatcher, /tool\\.slug === "ux-ui-studio"\\s*\\?\\s*<UxUiStudioEngine\\s*\\/>/, 'Web route must launch the dedicated UX/UI editor');
+assert.match(androidMain, /tool\\.id == "ux-ui-studio"\\) NativeUxUiStudioForm\\(\\)/, 'Android route must launch the native Kotlin UX/UI editor');
+assert.match(iosTools, /if tool\\.id == "ux-ui-studio" \\{\\s*NativeUxUiStudioView\\(\\)/, 'iOS route must launch the native SwiftUI UX/UI editor');
 assert.match(webUx, /PDFDocument\.create\(\)/, 'Web UX/UI Studio must create a downloadable PDF');
 assert.match(webUx, /api\.iconify\.design\/search/, 'Web UX/UI Studio must search the icon catalogue on demand');
 assert.match(webUx, /iconName|marginLeft|fontFamily|borderWidth/, 'Web design layers must retain detailed metadata');
