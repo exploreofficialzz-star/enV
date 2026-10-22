@@ -144,7 +144,6 @@ export async function readFormDataBounded(request, maxBytes = 100 * 1024 * 1024)
       method: request.method,
       headers: request.headers,
       body: Buffer.concat(chunks),
-      duplex: "half",
     });
     return await replay.formData();
   } catch {
