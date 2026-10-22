@@ -64,6 +64,9 @@ if (authRequested && googleUiRequested && !googleConfigured) {
 if (authRequested && appleUiRequested && !appleConfigured) {
   throw new Error("The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.");
 }
+if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) {
+  throw new Error("Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.");
+}
 if (authRequested && applePartiallyConfigured) {
   throw new Error("Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.");
 }
