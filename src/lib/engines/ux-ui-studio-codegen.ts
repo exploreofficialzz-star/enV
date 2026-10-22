@@ -372,7 +372,10 @@ export function generateKotlinProject(project: UxCodegenProject): string {
       ".padding(" + layer.padding + ".dp)"
     ].filter(Boolean).join("");
     let content: string;
-    if (layer.kind === "icon" && layer.iconSvg) {
+    if (layer.kind === "line") {
+      const lineColor = layer.background === "transparent" ? layer.color : layer.background;
+      content = "Canvas(Modifier.fillMaxSize()) { drawLine(color = Color(android.graphics.Color.parseColor(" + safe(lineColor) + ")), start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), strokeWidth = size.height) }";
+    } else if (layer.kind === "icon" && layer.iconSvg) {
       const [viewX,viewY,viewWidth,viewHeight] = svgViewBox(layer.iconViewBox);
       const drawables = extractSvgDrawables(layer.iconSvg);
       const drawings = drawables.flatMap((drawable,index) => kotlinDrawableStatements(drawable,layer,index)).map((line) => "              " + line).join("\n");
@@ -436,6 +439,8 @@ export function generateKotlinProject(project: UxCodegenProject): string {
     "import androidx.compose.ui.graphics.drawscope.drawIntoCanvas",
     "import androidx.compose.ui.graphics.nativeCanvas",
     "import androidx.compose.ui.graphics.graphicsLayer",
+    "import androidx.compose.ui.draw.shadow",
+    "import androidx.compose.ui.geometry.Offset",
     "import androidx.compose.ui.layout.ContentScale",
     "import androidx.compose.ui.platform.LocalContext",
     "import androidx.compose.material3.Text",
@@ -492,6 +497,9 @@ export function generateSwiftProject(project: UxCodegenProject): string {
       child = views.length
         ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
         : "Text(" + safe(layer.iconName || layer.name) + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
+    } else if (layer.kind === "line") {
+      const lineColor = layer.background === "transparent" ? layer.color : layer.background;
+      child = "Rectangle().fill(Color(hex: " + safe(lineColor) + "))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
       const base64 = layer.imageDataUrl.split(",").slice(1).join(",");
       child = "Group { if let data = Data(base64Encoded: " + safe(base64) + "), let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() } else { Text(" + safe(layer.name) + ") } }";
@@ -502,7 +510,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
         : safe(layer.fontFamily);
       child = "Text(" + safe(layer.text) + ").font(.custom(" + fontFamily + ", size: " + layer.fontSize + ")).fontWeight(" + weight + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
     }
-    const shape = "GeneratedUxShape(kind: " + safe(layer.kind) + ", radius: CGFloat(" + layer.radius + "))";
+    const shape = layer.kind === "line" ? "RoundedRectangle(cornerRadius: CGFloat(" + Math.max(1, layer.height) + ") / 2)" : "GeneratedUxShape(kind: " + safe(layer.kind) + ", radius: CGFloat(" + layer.radius + "))";
     const overlay = layer.borderWidth > 0 ? ".overlay(" + shape + ".stroke(Color(hex: " + safe(layer.borderColor) + "), lineWidth: CGFloat(" + layer.borderWidth + ")))" : "";
     const shadow = layer.shadow ? ".shadow(color: Color.black.opacity(0.14), radius: 10, x: 0, y: 3)" : "";
     return [

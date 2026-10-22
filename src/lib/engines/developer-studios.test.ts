@@ -540,7 +540,10 @@ test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and 
   assert.match(kotlin, /generatedUxShape/);
   assert.match(kotlin, /generatedUxFontFamily/);
   assert.ok(kotlin.includes("data:image/png;base64"));
+  assert.match(kotlin, /androidx\.core\.graphics\.PathParser/);
+  assert.doesNotMatch(kotlin, /AndroidView|WebView\(/, "Kotlin exports must render assets natively");
   assert.match(swift, /GeneratedUxShape/);
   assert.match(swift, /generatedUxRegisterFont/);
   assert.ok(swift.includes("data:image/png;base64"));
+  assert.doesNotMatch(swift, /WKWebView|WebKit|GeneratedHTMLAsset/, "Swift exports must render assets natively");
 });
