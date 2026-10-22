@@ -7963,6 +7963,74 @@ private struct NativeUxUiStudioView: View {
                 notice = error.localizedDescription
             }
         }
+        .fileImporter(isPresented: $isImportingProjectJSON, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let data = try Data(contentsOf: url)
+                    guard data.count <= 8 * 1024 * 1024 else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 20, userInfo: [NSLocalizedDescriptionKey: "Project files must be 8 MB or smaller."])
+                    }
+                    let root = try JSONSerialization.jsonObject(with: data)
+                    let project = root as? [String: Any]
+                    let rawLayers = (project?["elements"] as? [[String: Any]]) ?? (root as? [[String: Any]]) ?? []
+                    guard !rawLayers.isEmpty else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 21, userInfo: [NSLocalizedDescriptionKey: "No design elements were found in that file."])
+                    }
+                    let compatibleLayers: [[String: Any]] = rawLayers.map { original in
+                        var layer = original
+                        layer.removeValue(forKey: "id")
+                        if layer["fill"] == nil, let background = layer["background"] as? String { layer["fill"] = background }
+                        if layer["imageData"] == nil, let imageData = layer["imageDataUrl"] as? String { layer["imageData"] = imageData }
+                        if layer["fontData"] == nil, let fontData = layer["fontDataUrl"] as? String { layer["fontData"] = fontData }
+                        if let svg = layer["iconSvg"] as? String, !svg.isEmpty { layer["iconSvg"] = uxUiCleanIconSVG(svg) }
+                        return layer
+                    }
+                    let compatibleData = try JSONSerialization.data(withJSONObject: compatibleLayers)
+                    var imported = try JSONDecoder().decode([UxUiNativeLayer].self, from: compatibleData)
+                    guard !imported.isEmpty else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 22, userInfo: [NSLocalizedDescriptionKey: "This file contains no usable design elements."])
+                    }
+                    checkpoint()
+                    if let project {
+                        let importedTarget = project["target"] as? String ?? target
+                        target = ["mobile", "tablet", "desktop"].contains(importedTarget) ? importedTarget : "mobile"
+                        projectName = (project["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? url.deletingPathExtension().lastPathComponent
+                        background = project["background"] as? String ?? "#FFFFFF"
+                        if let viewport = project["viewport"] as? [String: Any] {
+                            if let width = viewport["width"] as? NSNumber { customWidth = min(4096, max(160, width.intValue)) }
+                            if let height = viewport["height"] as? NSNumber { customHeight = min(4096, max(240, height.intValue)) }
+                            customArtboard = true
+                        } else {
+                            customArtboard = false
+                        }
+                        tokens = (try? JSONDecoder().decode(UxUiNativeTokens.self, from: JSONSerialization.data(withJSONObject: project["tokens"] ?? [:]))) ?? UxUiNativeTokens()
+                    }
+                    imported = imported.map { item in
+                        var copy = item
+                        copy.referenceWidth = max(1, copy.referenceWidth == 390 && customWidth != 390 ? customWidth : copy.referenceWidth)
+                        copy.referenceHeight = max(1, copy.referenceHeight == 844 && customHeight != 844 ? customHeight : copy.referenceHeight)
+                        return copy
+                    }
+                    if root is [String: Any] {
+                        elements = imported
+                    } else {
+                        elements.append(contentsOf: imported)
+                    }
+                    selectedID = imported.first?.id
+                    showComponentPalette = false
+                    onboarding = false
+                    notice = "Imported \(imported.count) design element(s). You can now edit and customise them."
+                } catch {
+                    notice = "Could not import that design: \(error.localizedDescription)"
+                }
+            case .failure(let error):
+                notice = "Could not import that file: \(error.localizedDescription)"
+            }
+        }
         .onChange(of: projectName) { _ in saveDraft() }
         .onChange(of: target) { _ in saveDraft() }
         .onChange(of: background) { _ in saveDraft() }
@@ -8473,6 +8541,7 @@ private struct NativeUxUiStudioView: View {
             }
         }
         .opacity(1)
+        .rotationEffect(.degrees(item.rotation))
     }
 
     @ViewBuilder
