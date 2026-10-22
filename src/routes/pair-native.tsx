@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check, Copy, Smartphone, X } from "lucide-react";
+import { Check, Copy, Smartphone } from "lucide-react";
 
 export const Route = createFileRoute("/pair-native")({ component: NativePairingPage });
 
