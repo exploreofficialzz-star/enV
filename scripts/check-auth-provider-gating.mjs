@@ -28,6 +28,9 @@ assert.ok(page.includes("!hasAnyAuthMethod"), "Disabled account screens need a t
 assert.ok(server.includes("async function getAppleClientSecret"), "Apple client secrets should be generated server-side.");
 assert.ok(server.includes("importPKCS8") && server.includes("setExpirationTime"), "Apple JWT must be signed with ES256 and expire.");
 assert.ok(server.includes("APPLE_PRIVATE_KEY"), "Apple private key must only be read by the server auth module.");
+assert.ok(server.includes("emailPasswordUiRequested && !emailPasswordAuthEnabled"), "Email UI must fail closed if the server provider is disabled.");
+assert.ok(server.includes("googleUiRequested && !googleConfigured"), "Google UI must fail closed if credentials are missing.");
+assert.ok(server.includes("appleUiRequested && !appleConfigured"), "Apple UI must fail closed if credentials are missing.");
 
 for (const flag of [
   "VITE_AUTH_ENABLED",
