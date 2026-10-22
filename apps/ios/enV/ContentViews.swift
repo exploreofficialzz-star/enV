@@ -2102,6 +2102,7 @@ private struct NativeWalletDashboardView: View {
                 .foregroundStyle(.white)
                 .frame(width: 52, height: 52)
                 .background(Color.white.opacity(0.13), in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
                     Text("Total balance").font(.subheadline.weight(.medium)).foregroundStyle(Color.white.opacity(0.9))
@@ -2215,6 +2216,7 @@ private struct NativeWalletDashboardView: View {
                     .foregroundStyle(Color.envInk)
                     .frame(width: 23, height: 23)
                     .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                    .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 9, weight: .medium)).foregroundStyle(Color.envMuted).lineLimit(2)

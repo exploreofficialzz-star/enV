@@ -65,7 +65,7 @@ try {
       await page.setViewportSize(report.viewport);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: 'domcontentloaded', timeout });
       if (route.kind === 'ux-ui') {
-        await page.getByRole('heading', { name: 'UX/UI Studio', exact: true }).waitFor({ state: 'visible', timeout });
+        await page.getByRole('heading', { name: 'UX/UI Studio', exact: true, level: 2 }).waitFor({ state: 'visible', timeout });
         await page.getByRole('button', { name: /Mobile interface/ }).click();
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
