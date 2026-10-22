@@ -342,7 +342,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-canvas-heading span { color: var(--color-muted); font-family: var(--font-mono); font-size: 10px; }
 .uxui-canvas-zoom { display: flex; align-items: center; gap: 2px; }
 .uxui-canvas-zoom span { width: 36px; text-align: center; font-family: var(--font-sans); }
-.uxui-canvas-zoom button.is-active { background: var(--color-accent-soft); color: var(--color-accent); }
+.uxui-canvas-zoom button.is-active { background: var(--color-accent-soft); color: var(--color-fg); border-color: var(--color-accent); }
 .uxui-canvas-stage {
   display: flex; min-width: 0; min-height: 540px; align-items: center; justify-content: center; flex-direction: column;
   gap: 10px; overflow: auto; padding: 28px 16px 18px;
@@ -385,7 +385,8 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 }
 .uxui-bottom-group { display: flex; align-items: center; justify-content: center; gap: 3px; }
 .uxui-bottom-group button { display: grid; width: 33px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--color-fg); }
-.uxui-bottom-group button:hover, .uxui-bottom-group button.is-active { background: var(--color-surface-2); color: var(--color-accent); }
+.uxui-bottom-group button:hover, .uxui-bottom-group button.is-active { background: var(--color-surface-2); color: var(--color-fg); }
+.uxui-bottom-group button.is-active { outline: 1px solid var(--color-accent); outline-offset: -1px; }
 .uxui-bottom-group button:disabled { opacity: .28; }
 .uxui-add-button {
   display: grid; width: 66px; height: 66px; flex: 0 0 auto; place-items: center;
@@ -447,7 +448,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-quick-style-heading span { color: var(--color-muted); font-size: 9px; }
 .uxui-radius-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
 .uxui-radius-buttons button { min-height: 33px; border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-fg); background: var(--color-surface); font-size: 10px; font-weight: 750; }
-.uxui-radius-buttons button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
+.uxui-radius-buttons button[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-fg); }
 .uxui-quick-style-shadow { display: flex; min-height: 35px; align-items: center; justify-content: space-between; margin-top: 7px; color: var(--color-fg); font-size: 11px; font-weight: 650; }
 .uxui-quick-style-shadow input { width: 17px; height: 17px; accent-color: var(--color-accent); }
 .uxui-advanced-controls { margin-top: 15px; border-top: 1px solid var(--color-border); padding-top: 11px; }

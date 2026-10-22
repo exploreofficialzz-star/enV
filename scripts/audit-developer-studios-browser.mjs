@@ -168,7 +168,7 @@ try {
         await page.addScriptTag({ path: axePath });
         const axe = await page.evaluate(async () => {
           const results = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] } });
-          return results.violations.map((violation) => ({ id: violation.id, impact: violation.impact, help: violation.help, nodes: violation.nodes.length, route: location.pathname }));
+          return results.violations.map((violation) => ({ id: violation.id, impact: violation.impact, help: violation.help, nodes: violation.nodes.length, targets: violation.nodes.map((node) => ({ target: node.target, html: node.html.slice(0, 180), failureSummary: node.failureSummary })), route: location.pathname }));
         });
         report.axeViolations.push(...axe.filter((v) => ['critical', 'serious'].includes(v.impact)));
         routeReport.axeScan = { available: true, violations: axe.length };

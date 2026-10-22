@@ -1116,9 +1116,9 @@ export function UxUiStudioEngine() {
           <div className="uxui-brand-mark" aria-hidden="true">enV</div>
           <h2 className="uxui-brand-title">UX/UI Studio</h2>
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
-            <button type="button" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
-            <button type="button" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
-            <button type="button" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
+            <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
+            <button type="button" aria-label="Tablet" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
+            <button type="button" aria-label="Desktop" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
           </div>
         </div>
         <div className="uxui-topbar-actions">
