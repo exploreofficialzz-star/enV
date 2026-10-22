@@ -72,6 +72,8 @@ assert.match(androidUxStudio, /mutableStateOf\(false\)\};var target by remember\
 assert.match(androidUxStudio, /if\(showElementTray\)/, 'Android native tools palette should be collapsible');
 assert.match(androidUxStudio, /Corner style/, 'Android native studio should expose quick rounded-corner styles');
 assert.match(androidUxStudio, /0xFF0B0C0E/, 'Android previews must use a device shell');
+assert.match(androidUxStudio, /Desktop mockup/, 'Android studio must label the selected device preview simply');
+assert.match(androidUxStudio, /0xFF9BA0A5/, 'Android desktop preview must include a monitor stand');
 assert.match(iosUxStudio, /didInitialize = true/, 'iOS native studio should initialize its design once');
 assert.match(iosUxStudio, /showComponentPalette\.toggle\(\)/, 'iOS native tools palette should be collapsible');
 assert.match(iosUxStudio, /aspectRatio\(CGFloat\(boardWidth\) \/ CGFloat\(boardHeight\), contentMode: \.fit\)/, 'iOS preview must preserve target viewport ratio inside a mockup');

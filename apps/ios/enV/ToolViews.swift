@@ -7799,7 +7799,7 @@ private struct NativeUxUiStudioView: View {
                     Image(systemName: "square.and.pencil").font(.system(size: 23, weight: .semibold)).foregroundStyle(Color.envAccent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("UX/UI Studio").font(.envScaled(size: 22, weight: .bold)).foregroundStyle(Color.envInk)
-                        Text("Native editor · exact pixel geometry and design handoff").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        Text("Make it by eye. Export a developer-ready design.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
                     }
                 }
                 if onboarding {
@@ -8034,7 +8034,7 @@ private struct NativeUxUiStudioView: View {
 
     private var artboardPreview: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Artboard preview").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(target == "mobile" ? "Phone mockup" : target == "tablet" ? "Tablet mockup" : "Desktop mockup").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
                 GeometryReader { proxy in
                     let scale = min(CGFloat(1), proxy.size.width / CGFloat(boardWidth))
                     ZStack(alignment: .topLeading) {
@@ -8071,9 +8071,9 @@ private struct NativeUxUiStudioView: View {
                 .background(Color.black, in: RoundedRectangle(cornerRadius: target == "mobile" ? 46 : target == "tablet" ? 24 : 10))
                 .overlay(alignment: .top) {
                     if target == "mobile" {
-                        Capsule().fill(Color.black).frame(width: 108, height: 20).padding(.top, 4)
+                        Capsule().fill(Color.black).frame(width: 108, height: 20).padding(.top, 12)
                     } else if target == "tablet" {
-                        Circle().fill(Color.black).frame(width: 6, height: 6).padding(.top, 5)
+                        Circle().fill(Color.black).frame(width: 6, height: 6).padding(.top, 13)
                     }
                 }
                 .padding(.bottom, target == "desktop" ? 34 : 0)
@@ -8085,16 +8085,7 @@ private struct NativeUxUiStudioView: View {
                         }.offset(y: 32)
                     }
                 }
-                HStack(spacing: 8) {
-                    Button { undoLayout() } label: {
-                        Label("Undo", systemImage: "arrow.uturn.backward")
-                    }.disabled(undoHistory.isEmpty)
-                    Button { redoLayout() } label: {
-                        Label("Redo", systemImage: "arrow.uturn.forward")
-                    }.disabled(redoHistory.isEmpty)
-                    Text("Drag layers to reposition.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
-                }
-                Text("Select a layer to edit its exact measurements and properties.")
+                Text("Tap or drag to shape your design.")
                     .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))

@@ -1122,7 +1122,7 @@ fun NativeUxUiStudioForm() {
                     OutlinedButton(onClick={target="desktop";customArtboard=false;background="#FFFFFF";projectName="Website landing";elements.clear();elements.addAll(uxNativePreset("desktop","desktop-landing").map{it.copy(referenceWidth=1440,referenceHeight=900)});customWidth=1440;customHeight=900;selectedId=elements.firstOrNull()?.id.orEmpty();onboarding=false},modifier=Modifier.fillMaxWidth()){Text("Desktop · 1440 × 900 px")}
                 }}
             }else{
-                OutlinedTextField(projectName,{projectName=it},label={Text("Project name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedTextField(projectName,{projectName=it},label={Text("Project title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
                     FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
@@ -1158,7 +1158,7 @@ fun NativeUxUiStudioForm() {
                 }
                 }
                 Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
-                    Text("Artboard preview",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                    Text(if(target=="mobile")"Phone mockup" else if(target=="tablet")"Tablet mockup" else "Desktop mockup",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.TopCenter){
                         val bezel=if(target=="mobile")8f else if(target=="tablet")12f else 10f
                         val width=(maxWidth.value-bezel*2).coerceAtLeast(140f).coerceAtMost(if(target=="mobile")390f else if(target=="tablet")768f else 1040f)
@@ -1190,6 +1190,12 @@ fun NativeUxUiStudioForm() {
                                 else if(target=="tablet")Box(Modifier.align(Alignment.TopCenter).padding(top=3.dp).size(6.dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
                         }
                     }
+                        if(target=="desktop"){
+                            Column(horizontalAlignment=Alignment.CenterHorizontally){
+                                Box(Modifier.width(76.dp).height(25.dp).background(Color(0xFF9BA0A5),RoundedCornerShape(4.dp)))
+                                Box(Modifier.width(180.dp).height(7.dp).background(Color(0xFF777C82),RoundedCornerShape(99.dp)))
+                            }
+                        }
                         }
                     }
                     Text("Preview scales to fit. Coordinates remain design pixels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
