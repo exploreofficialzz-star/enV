@@ -96,13 +96,17 @@ async function verifyDownloadedMedia(file, expectedMaxBytes, signal) {
   return stat;
 }
 
+let downloaderReadinessPromise;
+
 async function commandExists() {
-  // Readiness should check the installed binary directly. runYtdlp prepends
-  // download-specific flags, which are not needed for a version probe and can
-  // make a healthy installation look unavailable.
-  return new Promise((resolve) => {
+  // Probe the binary once per running process. Re-spawning Python-backed yt-dlp
+  // on every health request can make the gateway's readiness deadline expire.
+  if (downloaderReadinessPromise) return downloaderReadinessPromise;
+
+  const probe = new Promise((resolve) => {
     let child;
     let settled = false;
+    let timer;
     const finish = (ready, reason) => {
       if (settled) return;
       settled = true;
@@ -112,7 +116,8 @@ async function commandExists() {
       }
       resolve(ready);
     };
-    const timer = setTimeout(() => {
+
+    timer = setTimeout(() => {
       child?.kill("SIGTERM");
       finish(false, "timed out after 5 seconds");
     }, 5000);
@@ -128,8 +133,14 @@ async function commandExists() {
       finish(false, String(error?.code || error?.name || "spawn error"));
     }
   });
-}
 
+  downloaderReadinessPromise = probe.then((ready) => {
+    // A failed probe must be retryable after a transient resource/launch issue.
+    if (!ready) downloaderReadinessPromise = null;
+    return ready;
+  });
+  return downloaderReadinessPromise;
+}
 async function readJson(req) {
   let body = "";
   for await (const chunk of req) { body += chunk; if (body.length > 128 * 1024) throw new Error("Request body is too large."); }
