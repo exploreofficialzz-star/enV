@@ -6704,6 +6704,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var referenceHeight: Int = 844
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
+    var rotation: Double = 0
 
     init(
         id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
@@ -6718,7 +6719,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         minWidth: Int = 0, maxWidth: Int = 0,
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
-        componentKey: String = "", iconViewBox: String = "0 0 24 24"
+        componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0
     ) {
         self.id = id
         self.kind = kind
@@ -6755,6 +6756,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.referenceHeight = referenceHeight
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
+        self.rotation = rotation
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -6763,7 +6765,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         case marginTop, marginRight, marginBottom, marginLeft
         case fontFamily, fontSize, fontWeight, lineHeight
         case horizontalConstraint, verticalConstraint, minWidth, maxWidth, visibleOn
-        case referenceWidth, referenceHeight, componentKey, iconViewBox
+        case referenceWidth, referenceHeight, componentKey, iconViewBox, rotation
     }
 
     init(from decoder: Decoder) throws {
@@ -6803,6 +6805,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         referenceHeight = try c.decodeIfPresent(Int.self, forKey: .referenceHeight) ?? 844
         componentKey = try c.decodeIfPresent(String.self, forKey: .componentKey) ?? ""
         iconViewBox = try c.decodeIfPresent(String.self, forKey: .iconViewBox) ?? "0 0 24 24"
+        rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
     }
 }
 
@@ -7657,6 +7660,9 @@ private struct NativeUxUiStudioView: View {
     @State private var onboarding = true
     @State private var didInitialize = false
     @State private var showComponentPalette = false
+    @State private var toolkitTab = "Icons"
+    @State private var toolkitQuery = ""
+    @State private var isImportingProjectJSON = false
     @State private var showAllLayers = false
     @State private var showAdvancedInspector = false
     @State private var showAdvancedCanvas = false
@@ -8041,6 +8047,9 @@ private struct NativeUxUiStudioView: View {
                 Spacer()
                 Text("Drag · tap · style").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
             }
+            if let index = selectedIndex {
+                selectedElementToolbar(for: index)
+            }
             if showComponentPalette { componentPalette }
             layerListPanel
             if let index = selectedIndex { inspector(for: index) }
@@ -8179,50 +8188,160 @@ private struct NativeUxUiStudioView: View {
     }
 
     private var componentPalette: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Add elements").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    addButton("Text", icon: "textformat", kind: "text")
-                    addButton("Button", icon: "rectangle.roundedtop", kind: "button")
-                    addButton("Card", icon: "rectangle.on.rectangle", kind: "card")
-                    addButton("Input", icon: "rectangle.and.pencil.and.ellipsis", kind: "input")
-                    addButton("Icon", icon: "square.grid.2x2", kind: "icon")
-                    addButton("Image", icon: "photo", kind: "image")
-                    addButton("Triangle", icon: "triangle", kind: "triangle")
-                    addButton("Diamond", icon: "diamond", kind: "diamond")
-                    addButton("Hexagon", icon: "hexagon", kind: "hexagon")
-                    addButton("Star", icon: "star", kind: "star")
-                    addButton("Line", icon: "line.3.horizontal", kind: "line")
-                    addButton("Pill", icon: "capsule", kind: "pill")
-                    addButton("Navbar", icon: "menubar.rectangle", kind: "navbar")
-                    addButton("Tab bar", icon: "rectangle.bottomthird.inset.filled", kind: "tabbar")
-                    addButton("Tabs", icon: "square.split.2x1", kind: "tabs")
-                    addButton("Row", icon: "list.bullet", kind: "row")
-                    addButton("Avatar", icon: "person.crop.circle", kind: "avatar")
-                    addButton("Badge", icon: "seal", kind: "badge")
-                    addButton("Switch", icon: "switch.2", kind: "switch")
-                    addButton("Progress", icon: "chart.bar.fill", kind: "progress")
-                    addButton("Slider", icon: "slider.horizontal.3", kind: "slider")
-                    addButton("Radio", icon: "circle.inset.filled", kind: "radio")
-                    addButton("Dropdown", icon: "chevron.down.square", kind: "dropdown")
-                    addButton("Search", icon: "magnifyingglass", kind: "search")
-                    addButton("Text area", icon: "text.alignleft", kind: "textarea")
-                    addButton("Table", icon: "tablecells", kind: "table")
-                    addButton("Chart", icon: "chart.bar", kind: "chart")
-                    addButton("Modal", icon: "rectangle.center.inset.filled", kind: "modal")
-                    addButton("Breadcrumb", icon: "chevron.right", kind: "breadcrumb")
-                    addButton("Tooltip", icon: "text.bubble", kind: "tooltip")
-                    addButton("List", icon: "list.bullet.rectangle", kind: "list")
-                    addButton("Video", icon: "video", kind: "video")
-                    addButton("Logo", icon: "signature", kind: "logo")
-                    addButton("Menu", icon: "line.3.horizontal", kind: "menu")
-                    addButton("Spacer", icon: "arrow.left.and.right", kind: "spacer")
-                    addButton("Rectangle", icon: "rectangle", kind: "rect")
-                    addButton("Circle", icon: "circle", kind: "ellipse")
-                    addButton("Divider", icon: "minus", kind: "divider")
+        let components: [(label: String, icon: String, kind: String)] = [
+            ("Text", "textformat", "text"), ("Button", "rectangle.roundedtop", "button"),
+            ("Card", "rectangle.on.rectangle", "card"), ("Input", "rectangle.and.pencil.and.ellipsis", "input"),
+            ("Icon", "square.grid.2x2", "icon"), ("Image", "photo", "image"),
+            ("Triangle", "triangle", "triangle"), ("Diamond", "diamond", "diamond"),
+            ("Hexagon", "hexagon", "hexagon"), ("Star", "star", "star"),
+            ("Line", "line.3.horizontal", "line"), ("Pill", "capsule", "pill"),
+            ("Navbar", "menubar.rectangle", "navbar"), ("Tab bar", "rectangle.bottomthird.inset.filled", "tabbar"),
+            ("Tabs", "square.split.2x1", "tabs"), ("Row", "list.bullet", "row"),
+            ("Avatar", "person.crop.circle", "avatar"), ("Badge", "seal", "badge"),
+            ("Switch", "switch.2", "switch"), ("Progress", "chart.bar.fill", "progress"),
+            ("Slider", "slider.horizontal.3", "slider"), ("Radio", "circle.inset.filled", "radio"),
+            ("Dropdown", "chevron.down.square", "dropdown"), ("Search", "magnifyingglass", "search"),
+            ("Text area", "text.alignleft", "textarea"), ("Table", "tablecells", "table"),
+            ("Chart", "chart.bar", "chart"), ("Modal", "rectangle.center.inset.filled", "modal"),
+            ("Breadcrumb", "chevron.right", "breadcrumb"), ("Tooltip", "text.bubble", "tooltip"),
+            ("List", "list.bullet.rectangle", "list"), ("Video", "video", "video"),
+            ("Logo", "signature", "logo"), ("Menu", "line.3.horizontal", "menu"),
+            ("Spacer", "arrow.left.and.right", "spacer"), ("Rectangle", "rectangle", "rect"),
+            ("Circle", "circle", "ellipse"), ("Divider", "minus", "divider")
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Studio toolkit").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Spacer()
+                Button { showComponentPalette = false } label: {
+                    Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.envMuted).frame(width: 30, height: 30)
+                        .background(Color.envSurface2, in: Circle())
+                }.accessibilityLabel("Close studio toolkit")
+            }
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.envMuted)
+                TextField("Search elements, icons, presets…", text: $toolkitQuery)
+                    .font(.envScaled(size: 13, weight: .regular))
+                    .accessibilityLabel("Search studio toolkit")
+            }
+            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 5) {
+                    ForEach(["Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
+                        Button { toolkitTab = tab } label: {
+                            Text(tab).font(.envScaled(size: 11, weight: .semibold))
+                                .padding(.horizontal, 10).padding(.vertical, 8)
+                                .foregroundStyle(toolkitTab == tab ? Color.envInk : Color.envMuted)
+                                .background(toolkitTab == tab ? Color.envSurface : Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(toolkitTab == tab ? Color.envBorder : .clear, lineWidth: 1))
+                        }.buttonStyle(.plain)
+                    }
                 }
             }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            Group {
+                if toolkitTab == "Elements" {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(components.indices.filter { components[$0].label.localizedCaseInsensitiveContains(toolkitQuery) || components[$0].kind.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { index in
+                            addButton(components[index].label, icon: components[index].icon, kind: components[index].kind)
+                        }
+                    }
+                } else if toolkitTab == "Icons" {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Label("Icons", systemImage: "square.grid.2x2").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Add an Icon element, then select it to browse or import its artwork from Style.")
+                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        Button { addLayer("icon") } label: {
+                            Label("Add icon", systemImage: "plus").font(.envScaled(size: 12, weight: .semibold))
+                                .frame(maxWidth: .infinity).padding(10)
+                                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                        }.buttonStyle(.plain)
+                    }
+                } else if toolkitTab == "Presets" {
+                    VStack(spacing: 7) {
+                        Button { startDesign("mobile", preset: "mobile-dashboard") } label: { Label("Mobile app", systemImage: "iphone").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
+                        Button { startDesign("mobile", preset: "mobile-login") } label: { Label("Login screen", systemImage: "rectangle.portrait").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
+                        Button { startDesign("tablet", preset: "tablet-dashboard") } label: { Label("Tablet app", systemImage: "ipad").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
+                        Button { startDesign("desktop", preset: "desktop-landing") } label: { Label("Website", systemImage: "laptopcomputer").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
+                        Button { isImportingProjectJSON = true } label: { Label("Import preset / project JSON", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.borderedProminent)
+                    }
+                } else if toolkitTab == "Fonts" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Fonts").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text(selectedIndex == nil ? "Add or select a text element before applying a font." : "Choose a font or import your own TTF/OTF.")
+                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        let families = ["Inter", "SF Pro Rounded", "Avenir Next", "Helvetica Neue", "Arial", "Georgia", "Times New Roman", "Menlo", "Courier New", "Palatino"]
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(families.filter { $0.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { family in
+                                    Button(family) {
+                                        guard let index = selectedIndex else { return }
+                                        checkpoint(); elements[index].fontFamily = family; showAdvancedInspector = true
+                                    }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                        if let index = selectedIndex {
+                            Button { fontTargetID = elements[index].id; isImportingFont = true } label: {
+                                Label("Import font (TTF / OTF)", systemImage: "textformat")
+                                    .frame(maxWidth: .infinity).padding(9)
+                            }.buttonStyle(.bordered)
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Colour tokens").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Pick a colour for the selected element, or set the page background.")
+                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                ForEach(tokens.colors.filter { $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.value.localizedCaseInsensitiveContains(toolkitQuery) }) { token in
+                                    Button {
+                                        if let index = selectedIndex { checkpoint(); elements[index].fill = token.value }
+                                        else { background = token.value }
+                                    } label: {
+                                        RoundedRectangle(cornerRadius: 8).fill(uxUiUIColor(token.value)).frame(width: 30, height: 30)
+                                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+                                    }.buttonStyle(.plain).accessibilityLabel("Apply \(token.name)")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
+    private func selectedElementToolbar(for index: Int) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text(elements[index].name).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+                if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
+                    Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+                }
+                Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
+                Button {
+                    checkpoint()
+                    elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x))
+                    elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y))
+                } label: { Label("Size +", systemImage: "plus.magnifyingglass") }.buttonStyle(.bordered)
+                Button {
+                    checkpoint()
+                    elements[index].width = max(12, Int(Double(elements[index].width) * 0.9))
+                    elements[index].height = max(12, Int(Double(elements[index].height) * 0.9))
+                } label: { Label("Size −", systemImage: "minus.magnifyingglass") }.buttonStyle(.bordered)
+                Button {
+                    checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360)
+                } label: { Label("Rotate", systemImage: "rotate.right") }.buttonStyle(.bordered)
+                Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
+                Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
+                Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
+            }.padding(.vertical, 3)
+        }
     }
 
     private var layerListPanel: some View {
