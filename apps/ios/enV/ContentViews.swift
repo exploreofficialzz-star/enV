@@ -2122,7 +2122,9 @@ private struct NativeWalletDashboardView: View {
                         : "Balance hidden")
                     .font(.system(size: 37, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
                 HStack(spacing: 5) {
-                    Image(systemName: "circle.hexagongrid.fill").foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
+                    Image(systemName: "circle.hexagongrid.fill")
+                        .foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
+                        .accessibilityHidden(true)
                     styledEnVUnit(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV", unitSize: 9)
                         .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
                 }
