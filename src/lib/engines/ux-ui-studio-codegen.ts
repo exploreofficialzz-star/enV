@@ -227,8 +227,8 @@ function parseSvgPathData(data: string): UxSvgSegment[] {
       while (index < tokens.length && !isLetter(tokens[index])) {
         if (!hasNumbers(2)) { index = tokens.length; break; }
         const bx=x, by=y, a=read(), b=read();
-        const x1=(previousCommand==="Q"||previousCommand==="T")&&lastQuad?2*bx-lastQuad.x:bx;
-        const y1=(previousCommand==="Q"||previousCommand==="T")&&lastQuad?2*by-lastQuad.y:by;
+        const x1: number = (previousCommand==="Q"||previousCommand==="T")&&lastQuad ? 2*bx-lastQuad.x : bx;
+        const y1: number = (previousCommand==="Q"||previousCommand==="T")&&lastQuad ? 2*by-lastQuad.y : by;
         const nx=relative?bx+a:a, ny=relative?by+b:b;
         emit("quad", [x1,y1,nx,ny]); x=nx; y=ny; lastQuad={x:x1,y:y1}; lastCubic=null; previousCommand="T";
       }
