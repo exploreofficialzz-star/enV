@@ -152,7 +152,7 @@ private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path?
         "diamond" -> listOf(x+w/2 to y, x+w to y+h/2, x+w/2 to y+h, x to y+h/2)
         "hexagon" -> listOf(x+w*.25f to y, x+w*.75f to y, x+w to y+h/2, x+w*.75f to y+h, x+w*.25f to y+h, x to y+h/2)
         else -> (0 until 10).map { index ->
-            val radiusFactor=if(index%2==0).5 else .21
+            val radiusFactor=if(index%2==0).5f else .21f
             val angle=(-PI/2.0)+index*PI/5.0
             (x+w/2+cos(angle).toFloat()*w*radiusFactor) to (y+h/2+sin(angle).toFloat()*h*radiusFactor)
         }
@@ -172,7 +172,7 @@ private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface
             require(bytes.size<=4*1024*1024)
             val extension=if(mime.contains("otf")||mime.contains("opentype"))"otf" else "ttf"
             val target=File(context.cacheDir,"uxui-font-"+data.hashCode()+"."+extension)
-            if(!target.exists()||target.length()!=bytes.size)target.writeBytes(bytes)
+            if(!target.exists()||target.length()!=bytes.size.toLong())target.writeBytes(bytes)
             return Typeface.create(Typeface.createFromFile(target),if(layer.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)
         }
     }
@@ -1219,7 +1219,6 @@ fun NativeUxUiStudioForm() {
                             Text("The category browser shows curated icon variants immediately. Search pages the online Iconify catalog; selected SVG artwork is embedded in the project. Check each icon set's licence.",style=MaterialTheme.typography.bodySmall)
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
-                            OutlinedButton(onClick={val copy=e.copy                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
                             OutlinedButton(onClick={moveLayer(e.id,-1)},modifier=Modifier.weight(1f)){Text("Move up")}
                             OutlinedButton(onClick={moveLayer(e.id,1)},modifier=Modifier.weight(1f)){Text("Move down")}
