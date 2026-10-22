@@ -707,6 +707,7 @@ export function UxUiStudioEngine() {
           } as SavedProject;
           const merged = [normalized, ...storedDrafts.filter((item) => item.id !== normalized.id)]
             .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
+          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged));
           setSavedProject(normalized); setDrafts(merged); setProjectName(normalized.name);
           setTarget(normalized.target); setBackground(normalized.background); setCustomArtboard(true);
           setCustomWidth(normalized.viewport.width); setCustomHeight(normalized.viewport.height);
