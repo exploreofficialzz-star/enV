@@ -483,3 +483,107 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 @media (prefers-reduced-motion: reduce) {
   .uxui-color-grid button:hover { transform: none; }
 }
+
+
+
+/* UX/UI Studio redesign: project home, right-side inspector on every viewport, and touch-first controls. */
+.uxui-home { color: var(--color-fg); }
+.uxui-home-heading { margin: 2px auto 0; }
+.uxui-new-project-card { min-height: 210px; color: var(--color-fg); }
+.uxui-new-project-plus { color: var(--color-fg); background: var(--color-surface); }
+.uxui-empty-drafts { color: var(--color-muted); }
+.uxui-draft-card { background: var(--color-surface); }
+.uxui-draft-card:hover { border-color: var(--color-accent); }
+.uxui-projects-trigger { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--color-border); border-radius: 10px; padding: 0 9px; color: var(--color-fg); font-size: 11px; font-weight: 750; }
+.uxui-projects-trigger:hover { background: var(--color-surface-2); }
+.uxui-toolkit-search { display: flex; min-height: 39px; align-items: center; gap: 8px; border: 1px solid var(--color-border); border-radius: 10px; padding: 0 10px; color: var(--color-muted); background: var(--color-surface); }
+.uxui-toolkit-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--color-fg); font-size: 12px; }
+.uxui-toolkit-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; margin-top: 10px; border-radius: 11px; padding: 3px; background: var(--color-surface-2); }
+.uxui-toolkit-tabs button { min-width: 0; border-radius: 8px; padding: 8px 3px; color: var(--color-muted); font-size: 10px; font-weight: 750; }
+.uxui-toolkit-tabs button.is-active { background: var(--color-surface); color: var(--color-fg); box-shadow: var(--shadow-border); }
+.uxui-import-button { display: inline-flex; min-height: 32px; align-items: center; gap: 5px; border: 1px solid var(--color-border); border-radius: 8px; padding: 5px 9px; color: var(--color-fg); background: var(--color-surface); font-size: 10px; font-weight: 750; }
+.uxui-import-button:hover { background: var(--color-surface-2); border-color: var(--color-accent); }
+.uxui-empty-layers { display: flex; align-items: center; flex-direction: column; gap: 5px; border: 1px dashed var(--color-border); border-radius: 10px; padding: 17px 9px; color: var(--color-muted); text-align: center; }
+.uxui-empty-layers span { color: var(--color-fg); font-size: 11px; font-weight: 750; }
+.uxui-empty-layers small { font-size: 10px; line-height: 1.4; }
+.uxui-empty-layers.compact { font-size: 10px; padding: 10px; }
+
+.uxui-context-controls { border-top: 1px solid var(--color-border); padding: 8px 10px 10px; background: var(--color-surface); }
+.uxui-context-toolbar { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 1px 0 5px; scrollbar-width: thin; }
+.uxui-context-selection { flex: 0 0 auto; max-width: 120px; overflow: hidden; color: var(--color-muted); text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 800; }
+.uxui-context-toolbar button { display: inline-flex; min-height: 34px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--color-border); border-radius: 9px; padding: 0 9px; color: var(--color-fg); background: var(--color-surface); font-size: 10px; font-weight: 750; }
+.uxui-context-toolbar button:hover { background: var(--color-surface-2); }
+.uxui-context-toolbar button.is-danger { color: #DC2626; }
+.uxui-context-editor, .uxui-context-color-picker { margin-top: 7px; border: 1px solid var(--color-border); border-radius: 10px; padding: 10px; background: var(--color-surface-2); }
+.uxui-context-editor label { display: block; margin-bottom: 5px; color: var(--color-fg); font-size: 11px; font-weight: 800; }
+.uxui-context-editor textarea { display: block; width: 100%; border: 1px solid var(--color-border); border-radius: 8px; padding: 8px; background: var(--color-surface); color: var(--color-fg); font-size: 12px; line-height: 1.45; resize: vertical; }
+.uxui-context-color-header { display: flex; align-items: center; gap: 8px; color: var(--color-fg); font-size: 11px; }
+.uxui-context-color-header > div { display: inline-flex; gap: 2px; margin-left: auto; padding: 2px; border-radius: 7px; background: var(--color-surface); }
+.uxui-context-color-header > div button { border-radius: 5px; padding: 4px 7px; color: var(--color-muted); font-size: 10px; }
+.uxui-context-color-header > div button[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-fg); }
+.uxui-context-color-header input { width: 36px; height: 32px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); padding: 3px; }
+.uxui-context-swatches { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+.uxui-context-swatches button { min-width: 0; aspect-ratio: 1; border: 1px solid rgb(15 23 42 / 18%); border-radius: 5px; }
+.uxui-preview-back { display: inline-flex; min-height: 36px; align-items: center; gap: 8px; border: 1px solid var(--color-border); border-radius: 9px; padding: 0 10px; color: var(--color-fg); font-size: 12px; font-weight: 800; }
+.uxui-preview-back:hover { background: var(--color-surface-2); }
+
+/* Keep the mockup and editable project inspector side-by-side on phones and tablets too. */
+@media (max-width: 900px) {
+  .uxui-workspace { grid-template-columns: minmax(0, 1fr) minmax(180px, 32%); gap: 7px; }
+  .uxui-canvas-stage { min-height: 420px; padding: 18px 8px 12px; }
+  .uxui-inspector { display: block; min-width: 0; padding: 10px !important; }
+  .uxui-project-heading h2 { font-size: 14px; }
+  .uxui-tools-drawer { width: min(350px, calc(100% - 16px)); }
+}
+@media (max-width: 560px) {
+  .uxui-topbar { padding: 6px; gap: 5px; }
+  .uxui-topbar-left { min-width: 0; flex: 1 1 auto; }
+  .uxui-target-switch { gap: 0; }
+  .uxui-target-switch button { width: 30px; min-height: 32px; padding: 0; }
+  .uxui-target-switch button span { display: none; }
+  .uxui-topbar-actions { gap: 1px; }
+  .uxui-icon-button { width: 28px; height: 32px; }
+  .uxui-export-trigger { min-height: 32px; padding: 0 7px; font-size: 10px; }
+  .uxui-projects-trigger { min-height: 32px; gap: 2px; padding: 0 6px; font-size: 10px; }
+  .uxui-workspace { grid-template-columns: minmax(0, 1fr) minmax(112px, 36%); gap: 5px; }
+  .uxui-canvas-stage { min-height: 360px; padding: 16px 4px 10px; }
+  .uxui-canvas-heading { padding: 6px; }
+  .uxui-canvas-heading strong { font-size: 10px; }
+  .uxui-canvas-zoom button { width: 27px; height: 31px; }
+  .uxui-canvas-zoom span { width: 28px; font-size: 9px; }
+  .uxui-bottom-toolbar { gap: 2px; padding: 5px 3px; }
+  .uxui-bottom-group { gap: 0; }
+  .uxui-bottom-group button { width: 25px; height: 32px; }
+  .uxui-bottom-group button svg { width: 17px; height: 17px; }
+  .uxui-add-button { width: 46px; height: 46px; border-width: 3px; }
+  .uxui-add-button svg { width: 30px; height: 30px; }
+  .uxui-inspector { padding: 7px !important; }
+  .uxui-project-title-input { padding: 7px 6px; font-size: 10px; }
+  .uxui-project-heading p { font-size: 9px; line-height: 1.4; }
+  .uxui-layer-chip { gap: 4px; min-height: 32px; padding: 4px 5px; border-radius: 10px; }
+  .uxui-layer-number, .uxui-layer-name { font-size: 10px; }
+  .uxui-layer-kind { display: none; }
+  .uxui-context-controls { padding: 7px 5px; }
+  .uxui-context-toolbar { gap: 4px; }
+  .uxui-context-toolbar button { min-height: 32px; padding: 0 7px; }
+  .uxui-context-selection { max-width: 80px; }
+  .uxui-context-swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .uxui-toolkit-tabs button { font-size: 9px; padding: 7px 1px; }
+}
+.ux-ui-studio.is-expanded { position: fixed; z-index: 10000; inset: 0; display: flex; flex-direction: column; gap: 0; overflow: auto; padding: 8px; background: var(--color-surface); }
+.ux-ui-studio.is-expanded .uxui-topbar,
+.ux-ui-studio.is-expanded .uxui-inspector,
+.ux-ui-studio.is-expanded .uxui-bottom-toolbar,
+.ux-ui-studio.is-expanded .uxui-context-controls,
+.ux-ui-studio.is-expanded .uxui-tools-drawer { display: none !important; }
+.ux-ui-studio.is-expanded .uxui-workspace { display: block; flex: 1 1 auto; min-height: 0; }
+.ux-ui-studio.is-expanded .uxui-canvas-panel { height: calc(100dvh - 16px); display: flex; flex-direction: column; }
+.ux-ui-studio.is-expanded .uxui-canvas-heading { min-height: 44px; justify-content: flex-start; }
+.ux-ui-studio.is-expanded .uxui-canvas-heading > div { display: none; }
+.ux-ui-studio.is-expanded .uxui-canvas-stage { flex: 1 1 auto; min-height: 0; height: calc(100dvh - 60px); overflow: auto; padding: 8px; background: var(--color-surface); background-image: none; }
+.ux-ui-studio.is-expanded .uxui-device-shell { width: auto; max-width: 100%; border: 0; border-radius: 0; padding: 0; margin: 0; background: transparent; box-shadow: none; }
+.ux-ui-studio.is-expanded .uxui-device-shell > svg { width: auto !important; height: auto !important; max-width: 100%; max-height: calc(100dvh - 82px); border-radius: 0 !important; object-fit: contain; }
+.ux-ui-studio.is-expanded .uxui-device-cutout,
+.ux-ui-studio.is-expanded .uxui-device-neck,
+.ux-ui-studio.is-expanded .uxui-device-base,
+.ux-ui-studio.is-expanded .uxui-canvas-hint { display: none !important; }
