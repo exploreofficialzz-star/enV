@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Paintbrush, Redo2, Undo2,
   Grid2X2, Layers, Laptop, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
-  Trash2, WandSparkles, X, ZoomIn, ZoomOut,
+  Trash2, WandSparkles, X, ZoomIn, ZoomOut, RotateCw,
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
@@ -17,7 +17,7 @@ type VerticalConstraint = "top" | "center" | "bottom" | "stretch";
 type DesignTokens = { colors: Array<{ name: string; value: string }>; typography: Array<{ name: string; fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number }>; spacing: number[] };
 
 type DesignLayer = {
-  id: string; kind: LayerKind; name: string; x: number; y: number; width: number; height: number;
+  id: string; kind: LayerKind; name: string; x: number; y: number; width: number; height: number; rotation?: number;
   text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl: string;
   iconLicense: string; iconAuthor: string;
   color: string; background: string; borderColor: string; borderWidth: number; radius: number;
@@ -30,7 +30,7 @@ type DesignLayer = {
 };
 
 type SavedProject = {
-  schemaVersion: 2; name: string; target: DeviceTarget; background: string;
+  id?: string; schemaVersion: 2; name: string; target: DeviceTarget; background: string;
   viewport: { width: number; height: number };
   breakpoints: { mobile: number; tablet: number; desktop: number };
   tokens: DesignTokens; reusableComponents: DesignLayer[];
@@ -53,6 +53,7 @@ const DEFAULT_TOKENS: DesignTokens = {
 const DESIGN_BREAKPOINTS = { mobile: 480, tablet: 768, desktop: 1024 };
 
 const STORAGE_KEY = "env-ux-ui-studio-project-v1";
+const DRAFTS_STORAGE_KEY = "env-ux-ui-studio-drafts-v1";
 type FontLibraryItem = { family: string; category: "Sans serif" | "Serif" | "Monospace" | "Display" | "Handwriting" | "System"; provider: "google" | "system"; id?: string; weights?: number[]; styles?: string[]; variable?: boolean };
 type FontsourceFontRecord = { id?: string; family?: string; category?: string; weights?: number[]; styles?: string[]; variable?: boolean };
 function fontsourceCategory(value: string | undefined): FontLibraryItem["category"] {
@@ -598,17 +599,18 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function UxUiStudioEngine() {
-  const initialDesign = useMemo(() => createPreset("mobile", "mobile-dashboard"), []);
+  const initialDesign = useMemo(() => ({ name: "Untitled design", background: "#FFFFFF", elements: [] as DesignLayer[] }), []);
   const [target, setTarget] = useState<DeviceTarget>("mobile");
-  const [onboarding, setOnboarding] = useState(false);
+  const [onboarding, setOnboarding] = useState(true);
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [showToolsPanel, setShowToolsPanel] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [showMoreLayers, setShowMoreLayers] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
   const [helpOpen, setHelpOpen] = useState(false);
-  const [startupPreset, setStartupPreset] = useState("mobile-dashboard");
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
+  const [drafts, setDrafts] = useState<SavedProject[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState("");
   const [projectName, setProjectName] = useState(initialDesign.name);
   const [background, setBackground] = useState(initialDesign.background);
   const [customArtboard, setCustomArtboard] = useState(false);
@@ -622,7 +624,11 @@ export function UxUiStudioEngine() {
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
-  const [leftTab, setLeftTab] = useState<PanelTab>("components");
+  const [leftTab, setLeftTab] = useState<PanelTab>("icons");
+  const [toolkitSearch, setToolkitSearch] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [showContextColors, setShowContextColors] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
   const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
@@ -646,11 +652,16 @@ export function UxUiStudioEngine() {
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const artboardRef = useRef<SVGSVGElement | null>(null);
+  const studioRootRef = useRef<HTMLElement | null>(null);
   const quickImageInputRef = useRef<HTMLInputElement | null>(null);
+  const elementImportInputRef = useRef<HTMLInputElement | null>(null);
+  const presetImportInputRef = useRef<HTMLInputElement | null>(null);
+  const iconImportInputRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
+  const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
   const fontChoices = useMemo(() => {
     const byFamily = new Map<string, FontLibraryItem>();
     for (const font of FONT_LIBRARY) {
@@ -672,49 +683,58 @@ export function UxUiStudioEngine() {
 
   useEffect(() => {
     try {
+      const listRaw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+      const listParsed = listRaw ? JSON.parse(listRaw) as unknown : [];
+      const storedDrafts = Array.isArray(listParsed) ? listParsed.filter((item): item is SavedProject =>
+        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2 &&
+          Array.isArray((item as SavedProject).elements) && (item as SavedProject).viewport?.width)) : [];
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
         if ((parsed.schemaVersion === 1 || parsed.schemaVersion === 2) && Array.isArray(parsed.elements) && parsed.viewport?.width) {
           const normalized = {
-            ...parsed, schemaVersion: 2 as const,
+            ...parsed, id: parsed.id || "draft-" + Date.now().toString(36), schemaVersion: 2 as const,
             elements: parsed.elements.map((layer: Partial<DesignLayer>) => ({
-              ...layer,
-              horizontalConstraint: layer.horizontalConstraint || "left",
-              verticalConstraint: layer.verticalConstraint || "top",
-              minWidth: layer.minWidth ?? 0,
-              maxWidth: layer.maxWidth ?? 0,
-              visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
+              ...layer, horizontalConstraint: layer.horizontalConstraint || "left",
+              verticalConstraint: layer.verticalConstraint || "top", minWidth: layer.minWidth ?? 0,
+              maxWidth: layer.maxWidth ?? 0, visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
               referenceWidth: layer.referenceWidth || parsed.viewport.width,
               referenceHeight: layer.referenceHeight || parsed.viewport.height,
-              componentKey: layer.componentKey || "",
-              fontDataUrl: layer.fontDataUrl || "",
+              componentKey: layer.componentKey || "", fontDataUrl: layer.fontDataUrl || "", rotation: layer.rotation || 0,
             } as DesignLayer)),
-            tokens: parsed.tokens || DEFAULT_TOKENS,
-            breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
+            tokens: parsed.tokens || DEFAULT_TOKENS, breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
             reusableComponents: parsed.reusableComponents || [],
           } as SavedProject;
-          setSavedProject(normalized);
-          setProjectName(normalized.name);
-          setTarget(normalized.target);
-          setBackground(normalized.background);
-          setCustomArtboard(true);
-          setCustomWidth(normalized.viewport.width);
-          setCustomHeight(normalized.viewport.height);
-          setTokens(normalized.tokens);
-          setReusableComponents(normalized.reusableComponents);
-          setElements(normalized.elements);
-          setSelectedId(normalized.elements[0]?.id || "");
-        }
-      }
+          const merged = [normalized, ...storedDrafts.filter((item) => item.id !== normalized.id)]
+            .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
+          setSavedProject(normalized); setDrafts(merged); setProjectName(normalized.name);
+          setTarget(normalized.target); setBackground(normalized.background); setCustomArtboard(true);
+          setCustomWidth(normalized.viewport.width); setCustomHeight(normalized.viewport.height);
+          setTokens(normalized.tokens); setReusableComponents(normalized.reusableComponents);
+          setElements(normalized.elements); setSelectedId(normalized.elements[0]?.id || "");
+        } else setDrafts(storedDrafts);
+      } else setDrafts(storedDrafts);
     } catch { /* A corrupt local draft does not block the studio. */ }
     finally { setDraftLoaded(true); }
   }, []);
 
   useEffect(() => {
-    if (!draftLoaded || onboarding || elements.length === 0) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
-  }, [project, onboarding, elements.length, draftLoaded]);
+    if (!draftLoaded || onboarding) return;
+    try {
+      const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+      const saved = { ...project, id: nextId } as SavedProject;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) as unknown : [];
+      const existing = Array.isArray(parsed) ? parsed.filter((item): item is SavedProject =>
+        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)) : [];
+      const nextDrafts = [saved, ...existing.filter((item) => item.id !== nextId)]
+        .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
+      setSavedProject(saved); setDrafts(nextDrafts);
+      if (!activeDraftId) setActiveDraftId(nextId);
+    } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
+  }, [project, onboarding, draftLoaded, activeDraftId]);
 
   useEffect(() => {
     if (leftTab !== "fonts" || fontCatalogRequested.current) return;
@@ -792,44 +812,36 @@ export function UxUiStudioEngine() {
     return () => { cancelled = true; };
   }, [customFontSignature]);
 
-  function startDesign(nextTarget: DeviceTarget, presetId?: string) {
-    const id = presetId || (nextTarget === "mobile" ? "mobile-dashboard" : "desktop-landing");
-    const created = createPreset(nextTarget, id);
-    if (elements.length) checkpoint();
+  function startDesign(nextTarget: DeviceTarget = "mobile", presetId?: string) {
+    const created = presetId ? createPreset(nextTarget, presetId) : { name: "Untitled design", background: "#FFFFFF", elements: [] as DesignLayer[] };
     const size = boardSize(nextTarget);
     setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
-    setTarget(nextTarget);
-    setProjectName(created.name);
-    setBackground(created.background);
-    setElements(created.elements);
-    setSelectedId(created.elements[0]?.id || "");
-    setZoom(100);
-    setOnboarding(false);
-    setNotice("Design ready. Select an element to edit its exact specifications.");
+    setTarget(nextTarget); setProjectName(created.name); setBackground(created.background);
+    setTokens(DEFAULT_TOKENS); setReusableComponents([]);
+    setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
+    setUndoStack([]); setRedoStack([]); setLeftTab("icons"); setToolkitSearch("");
+    setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
+    setZoom(100); setActiveDraftId(""); setOnboarding(false);
+    setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
   }
 
-  function continueSaved() {
-    if (!savedProject) return;
-    setProjectName(savedProject.name);
-    setTarget(savedProject.target);
-    setBackground(savedProject.background);
-    setCustomArtboard(true); setCustomWidth(savedProject.viewport.width); setCustomHeight(savedProject.viewport.height);
-    setTokens(savedProject.tokens || DEFAULT_TOKENS);
-    setReusableComponents(savedProject.reusableComponents || []);
-    setElements(savedProject.elements.map((layer) => ({
-      ...layer,
-      horizontalConstraint: layer.horizontalConstraint || "left",
-      verticalConstraint: layer.verticalConstraint || "top",
-      minWidth: layer.minWidth ?? 0,
-      maxWidth: layer.maxWidth ?? 0,
+  function continueSaved(draft: SavedProject | null = savedProject) {
+    if (!draft) return;
+    setProjectName(draft.name); setTarget(draft.target); setBackground(draft.background);
+    setCustomArtboard(true); setCustomWidth(draft.viewport.width); setCustomHeight(draft.viewport.height);
+    setTokens(draft.tokens || DEFAULT_TOKENS); setReusableComponents(draft.reusableComponents || []);
+    setElements(draft.elements.map((layer) => ({
+      ...layer, horizontalConstraint: layer.horizontalConstraint || "left", verticalConstraint: layer.verticalConstraint || "top",
+      minWidth: layer.minWidth ?? 0, maxWidth: layer.maxWidth ?? 0,
       visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
-      referenceWidth: layer.referenceWidth || savedProject.viewport.width,
-      referenceHeight: layer.referenceHeight || savedProject.viewport.height,
-      componentKey: layer.componentKey || "",
+      referenceWidth: layer.referenceWidth || draft.viewport.width,
+      referenceHeight: layer.referenceHeight || draft.viewport.height,
+      componentKey: layer.componentKey || "", rotation: layer.rotation || 0,
     })));
-    setSelectedId(savedProject.elements[0]?.id || "");
-    setOnboarding(false);
-    setNotice("Your locally saved design has been restored.");
+    setSelectedId(draft.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
+    setLeftTab("icons"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
+    setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
+    setNotice("Draft opened. Tap an element to continue designing.");
   }
 
   function checkpoint() {
@@ -947,6 +959,115 @@ export function UxUiStudioEngine() {
       startX: found.x, startY: found.y,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function toggleExpandedPreview() {
+    if (isExpanded) {
+      setIsExpanded(false);
+      if (document.fullscreenElement && document.exitFullscreen) void document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    setIsExpanded(true);
+    const root = studioRootRef.current;
+    if (root?.requestFullscreen) void root.requestFullscreen().catch(() => undefined);
+  }
+
+  useEffect(() => {
+    const syncFullscreen = () => { if (!document.fullscreenElement) setIsExpanded(false); };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  function normalizeImportedLayers(raw: unknown, referenceWidth = board.width, referenceHeight = board.height): DesignLayer[] {
+    if (!Array.isArray(raw)) throw new Error("The file does not contain an element list.");
+    const validKinds = new Set<string>([...COMPONENTS.map((item) => item.kind), "ellipse", "spacer", "toggle", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "progress", "slider", "radio", "switch", "triangle", "diamond", "hexagon", "star", "line", "pill"]);
+    return raw.slice(0, 100).flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const rawLayer = value as Partial<DesignLayer>;
+      const kind = typeof rawLayer.kind === "string" && validKinds.has(rawLayer.kind) ? rawLayer.kind as LayerKind : "rect";
+      const x = Number.isFinite(rawLayer.x) ? Number(rawLayer.x) : 24;
+      const y = Number.isFinite(rawLayer.y) ? Number(rawLayer.y) : 24;
+      const defaults = makeLayer(kind, Math.max(0, x), Math.max(0, y), referenceWidth, referenceHeight);
+      let safeIcon = { body: "", viewBox: "0 0 24 24" };
+      if (kind === "icon" && typeof rawLayer.iconSvg === "string" && rawLayer.iconSvg) {
+        try { safeIcon = sanitizeIconMarkup('<svg viewBox="' + String(rawLayer.iconViewBox || "0 0 24 24").replace(/["<>]/g, "") + '">' + rawLayer.iconSvg + "</svg>"); } catch { /* Ignore unsafe imported SVG markup. */ }
+      }
+      return [{ ...defaults, ...rawLayer, id: layerId(), kind,
+        name: typeof rawLayer.name === "string" ? rawLayer.name : defaults.name,
+        x: Math.max(0, Math.min(referenceWidth - 1, x)), y: Math.max(0, Math.min(referenceHeight - 1, y)),
+        width: Math.max(1, Math.min(referenceWidth, Number.isFinite(rawLayer.width) ? Number(rawLayer.width) : defaults.width)),
+        height: Math.max(1, Math.min(referenceHeight, Number.isFinite(rawLayer.height) ? Number(rawLayer.height) : defaults.height)),
+        text: typeof rawLayer.text === "string" ? rawLayer.text : defaults.text,
+        iconSvg: safeIcon.body, iconViewBox: safeIcon.viewBox,
+        rotation: Number.isFinite(rawLayer.rotation) ? Number(rawLayer.rotation) : 0 } as DesignLayer];
+    });
+  }
+
+  function importElementsFile(file: File) {
+    if (file.size > 8 * 1024 * 1024) { setNotice("Import files must be 8 MB or smaller."); return; }
+    if (file.name.toLowerCase().endsWith(".svg")) { importIconFile(file); return; }
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") return;
+        const layer = { ...makeLayer("image", Math.round(board.width / 2 - 125), Math.round(board.height * 0.28), board.width, board.height), name: file.name.split(".").slice(0, -1).join(".") || "Image", text: file.name, imageDataUrl: reader.result };
+        checkpoint(); setElements((previous) => [...previous, layer]); setSelectedId(layer.id); setNotice("Image added to your mockup.");
+      };
+      reader.onerror = () => setNotice("Could not read that image.");
+      reader.readAsDataURL(file); return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as unknown;
+        const rawLayers = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === "object" ? (parsed as { elements?: unknown }).elements : null);
+        const imported = normalizeImportedLayers(rawLayers);
+        if (!imported.length) throw new Error("No usable elements were found in that file.");
+        checkpoint(); setElements((previous) => [...previous, ...imported]); setSelectedId(imported[imported.length - 1].id); setNotice(imported.length + " element(s) imported.");
+      } catch (error) { setNotice(error instanceof Error ? error.message : "Could not import those elements."); }
+    };
+    reader.onerror = () => setNotice("Could not read that file.");
+    reader.readAsText(file);
+  }
+
+  function importPresetFile(file: File) {
+    if (file.size > 8 * 1024 * 1024) { setNotice("Preset files must be 8 MB or smaller."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as Partial<SavedProject>;
+        if (!Array.isArray(parsed.elements)) throw new Error("Choose an enV UX/UI Studio project or preset JSON file.");
+        const nextTarget: DeviceTarget = parsed.target === "tablet" || parsed.target === "desktop" ? parsed.target : "mobile";
+        const width = Number.isFinite(parsed.viewport?.width) ? Number(parsed.viewport?.width) : boardSize(nextTarget).width;
+        const height = Number.isFinite(parsed.viewport?.height) ? Number(parsed.viewport?.height) : boardSize(nextTarget).height;
+        const imported = normalizeImportedLayers(parsed.elements, width, height);
+        checkpoint(); setTarget(nextTarget); setCustomArtboard(Boolean(parsed.viewport)); setCustomWidth(width); setCustomHeight(height);
+        setProjectName(typeof parsed.name === "string" ? parsed.name : file.name.split(".").slice(0, -1).join("."));
+        setBackground(typeof parsed.background === "string" ? parsed.background : "#FFFFFF");
+        setTokens(parsed.tokens || DEFAULT_TOKENS); setReusableComponents(parsed.reusableComponents || []);
+        setElements(imported); setSelectedId(imported[0]?.id || ""); setShowToolsPanel(false); setActiveDraftId(""); setOnboarding(false);
+        setNotice("Preset imported. You can now customise every element.");
+      } catch (error) { setNotice(error instanceof Error ? error.message : "Could not import that preset."); }
+    };
+    reader.onerror = () => setNotice("Could not read that preset file.");
+    reader.readAsText(file);
+  }
+
+  function importIconFile(file: File) {
+    if (file.size > 1024 * 1024) { setNotice("SVG icons must be 1 MB or smaller."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = sanitizeIconMarkup(String(reader.result));
+        const name = file.name.toLowerCase().endsWith(".svg") ? file.name.slice(0, -4) : file.name;
+        const details = { iconName: "custom:" + name, iconSvg: parsed.body, iconViewBox: parsed.viewBox, iconLicense: "User supplied", iconAuthor: "Imported by user", name };
+        if (selected?.kind === "icon") updateLayer(selected.id, details);
+        else { const icon = { ...makeLayer("icon", Math.round(board.width / 2 - 20), Math.round(board.height / 3), board.width, board.height), ...details }; checkpoint(); setElements((previous) => [...previous, icon]); setSelectedId(icon.id); }
+        setNotice("SVG icon imported.");
+      } catch (error) { setNotice(error instanceof Error ? error.message : "That SVG could not be imported."); }
+    };
+    reader.onerror = () => setNotice("Could not read that SVG.");
+    reader.readAsText(file);
   }
 
   async function chooseIcon(iconName: string) {
@@ -1075,46 +1196,42 @@ export function UxUiStudioEngine() {
 
   if (onboarding) {
     return (
-      <section className="mx-auto max-w-5xl rounded-2xl border border-border bg-surface p-4 sm:p-8">
-        <div className="flex items-center gap-2 text-sm font-semibold text-accent"><WandSparkles size={18} /> enV Developer Studio</div>
-        <h2 className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Design mobile interfaces and desktop websites with precise layout controls. Every layer keeps its measurements, icon identity, typography, spacing and color values for developer handoff and AI prompting.</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <button type="button" onClick={() => { setStartupPreset("mobile-dashboard"); startDesign("mobile", "mobile-dashboard"); }} className="group rounded-2xl border border-border p-5 text-left transition hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-accent/10 text-accent"><Smartphone size={24} /></div>
-            <h3 className="mt-4 text-lg font-semibold text-fg">Mobile interface</h3>
-            <p className="mt-1 text-sm leading-5 text-muted">Start with a 390 × 844 px mobile artboard. Build app screens, forms, cards, navigation and components.</p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent">Open mobile editor <ArrowRight size={16} /></span>
-          </button>
-          <button type="button" onClick={() => { setStartupPreset("desktop-landing"); startDesign("desktop", "desktop-landing"); }} className="group rounded-2xl border border-border p-5 text-left transition hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-accent/10 text-accent"><Monitor size={24} /></div>
-            <h3 className="mt-4 text-lg font-semibold text-fg">Desktop website</h3>
-            <p className="mt-1 text-sm leading-5 text-muted">Start with a 1440 × 900 px artboard. Design responsive website sections, dashboards, navigation and page layouts.</p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent">Open desktop editor <ArrowRight size={16} /></span>
+      <section className="uxui-home mx-auto w-full max-w-5xl space-y-7 rounded-2xl border border-border bg-surface p-4 sm:p-8">
+        <header className="uxui-home-heading text-center">
+          <h2 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
+        </header>
+        <div className="uxui-home-create-wrap flex justify-center">
+          <button type="button" onClick={() => startDesign("mobile")} aria-label="New project" className="uxui-new-project-card group flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent">
+            <span className="uxui-new-project-plus grid size-20 place-items-center rounded-full border-2 border-current transition group-hover:scale-105"><Plus size={38} strokeWidth={1.8} /></span>
+            <strong className="text-lg font-extrabold text-fg">New project</strong>
+            <span className="text-sm text-muted">Start with a blank design</span>
           </button>
         </div>
-        <div className="mt-6 rounded-xl border border-border p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-fg"><LayoutTemplate size={17} /> Choose a starting layout</div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {PRESETS.map((preset) => <button key={preset.id} type="button" onClick={() => setStartupPreset(preset.id)} aria-pressed={startupPreset === preset.id} className={"rounded-lg border px-3 py-2 text-xs font-medium " + (startupPreset === preset.id ? "border-accent bg-accent text-white" : "border-border text-fg hover:bg-surface-2")}>{preset.label}</button>)}
-          </div>
-          <p className="mt-2 text-xs text-muted">{PRESETS.find((preset) => preset.id === startupPreset)?.description}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90" onClick={() => startDesign(PRESETS.find((preset) => preset.id === startupPreset)?.target || "mobile", startupPreset)}>Create from selected layout</button>
-            {savedProject && <button type="button" className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-fg hover:bg-surface-2" onClick={continueSaved}>Continue saved design: {savedProject.name}</button>}
-          </div>
-        </div>
-        <p className="mt-5 text-xs leading-5 text-muted">The editor runs locally. Icon search uses the open Iconify catalogue when online; downloaded project JSON and PDF contain your selected icon names, license details when provided, and exact layout specifications.</p>
+        <section className="uxui-drafts space-y-3" aria-labelledby="uxui-drafts-title">
+          <div className="flex items-center justify-between gap-3"><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " draft" : " drafts") : ""}</span></div>
+          {drafts.length ? <div className="grid gap-2 sm:grid-cols-2">
+            {drafts.map((draft, index) => <button key={draft.id || draft.name + index} type="button" onClick={() => continueSaved(draft)} className="uxui-draft-card flex min-w-0 items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
+              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
+              <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.elements.length ? draft.elements.length + " design elements" : "Blank canvas"} · {draft.target}</span></span>
+              <ArrowRight size={17} className="shrink-0 text-muted" />
+            </button>)}
+          </div> : <div className="uxui-empty-drafts rounded-xl border border-border px-5 py-8 text-center">
+            <span className="mx-auto grid size-12 place-items-center rounded-full bg-surface-2 text-muted"><Layers size={22} /></span>
+            <p className="mt-3 text-sm font-semibold text-fg">No drafts yet</p>
+            <p className="mt-1 text-sm text-muted">Your designs will appear here as you work.</p>
+          </div>}
+        </section>
       </section>
     );
   }
 
   return (
+    <section ref={studioRootRef} className={"ux-ui-studio min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}>
+  return (
     <section className="ux-ui-studio min-w-0 space-y-3">
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
-          <div className="uxui-brand-mark" aria-hidden="true">enV</div>
-          <h2 className="uxui-brand-title">UX/UI Studio</h2>
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
             <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
             <button type="button" aria-label="Tablet" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
@@ -1126,6 +1243,7 @@ export function UxUiStudioEngine() {
           <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
           <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
           <button type="button" onClick={() => setShowExportPanel((value) => !value)} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
+          <button type="button" onClick={() => { setOnboarding(true); setIsExpanded(false); setShowToolsPanel(false); }} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
         </div>
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
@@ -1140,20 +1258,23 @@ export function UxUiStudioEngine() {
 
       <div className="uxui-workspace grid min-w-0 gap-3">
         {showToolsPanel && <aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3">
-          <div className="uxui-drawer-heading"><span>Add to your design</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close elements panel"><X size={17} /></button></div>
-          <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface-2 p-1">
-            {([{ id: "components", label: "Elements" }, { id: "icons", label: "Icons" }, { id: "fonts", label: "Fonts" }, { id: "presets", label: "Presets" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={"rounded-md px-2 py-2 text-xs font-semibold " + (leftTab === tab.id ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg")}>{tab.label}</button>)}
+          <div className="uxui-drawer-heading"><span>Studio toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
+          <div className="uxui-toolkit-search"><Search size={16} /><input aria-label="Search studio toolkit" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search tools, fonts, icons…" /></div>
+          <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio toolkit categories">
+            {([{ id: "icons", label: "Icons" }, { id: "components", label: "Elements" }, { id: "presets", label: "Presets" }, { id: "fonts", label: "Fonts" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}>{tab.label}</button>)}
           </div>
 
           {leftTab === "components" && <div className="mt-3">
-            <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Add to canvas</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
+            <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Elements</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
+            <button type="button" onClick={() => elementImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import elements</button>
             <div className="grid grid-cols-2 gap-2">
-              {COMPONENTS.map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} className="flex min-h-[66px] flex-col items-start justify-center rounded-lg border border-border p-2 text-left transition hover:border-accent hover:bg-surface-2"><span className="text-xs font-semibold text-fg">{component.label}</span><span className="mt-1 text-[10px] leading-4 text-muted">{component.description}</span></button>)}
+              {COMPONENTS.filter((component) => !toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} className="flex min-h-[66px] flex-col items-start justify-center rounded-lg border border-border p-2 text-left transition hover:border-accent hover:bg-surface-2"><span className="text-xs font-semibold text-fg">{component.label}</span><span className="mt-1 text-[10px] leading-4 text-muted">{component.description}</span></button>)}
             </div>
             <div className="mt-5 border-t border-border pt-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers <span className="ml-auto font-normal text-muted">{elements.length}</span></div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers {elements.length > 0 && <span className="ml-auto font-normal text-muted">{elements.length}</span>}</div>
               <div className="max-h-64 space-y-1 overflow-y-auto">
                 {[...elements].reverse().map((item) => <div key={item.id} className={"flex items-center gap-1 rounded-md border px-1.5 py-1 " + (selectedId === item.id ? "border-accent bg-accent/10" : "border-transparent hover:bg-surface-2")}><button type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} className="min-w-0 flex-1 truncate py-1 text-left text-xs text-fg">{item.name}</button><button type="button" aria-label={"Move " + item.name + " up in layer stack"} onClick={() => moveLayer(item.id, 1)} disabled={elements.findIndex((layer) => layer.id === item.id) === elements.length - 1} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowUp size={12} /></button><button type="button" aria-label={"Move " + item.name + " down in layer stack"} onClick={() => moveLayer(item.id, -1)} disabled={elements.findIndex((layer) => layer.id === item.id) === 0} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowDown size={12} /></button><button type="button" aria-label={"Duplicate " + item.name} onClick={() => { checkpoint(); const dup = { ...item, id: layerId(), name: item.name + " copy", x: item.x + 12, y: item.y + 12 }; setElements((old) => [...old, dup]); setSelectedId(dup.id); }} className="rounded p-1 text-muted hover:text-fg"><Copy size={12} /></button></div>)}
+                {elements.length === 0 && <p className="uxui-empty-layers compact">No elements yet. Tap + to add one.</p>}
               </div>
               {selected && <><button type="button" onClick={() => {const saved={...selected,id:"component-"+layerId(),componentKey:selected.componentKey || selected.id,name:selected.name};setReusableComponents((old)=>[...old.filter((item)=>item.componentKey!==saved.componentKey),saved]);setNotice("Saved "+saved.name+" as a reusable component template.");}} className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-fg"><Copy size={13} /> Save as component</button><button type="button" onClick={deleteSelected} className="mt-2 ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-500/10"><Trash2 size={13} /> Delete selected</button></>}
               {reusableComponents.length > 0 && <div className="mt-3 border-t border-border pt-3"><h4 className="mb-2 text-xs font-semibold text-fg">Reusable components</h4>{reusableComponents.map((component)=> <button key={component.id} type="button" onClick={()=>{const copy={...component,id:layerId(),name:component.name+" instance",x:Math.min(board.width-component.width,component.x+16),y:Math.min(board.height-component.height,component.y+16),referenceWidth:board.width,referenceHeight:board.height};checkpoint();setElements((old)=>[...old,copy]);setSelectedId(copy.id);setNotice("Added reusable component: "+component.name);}} className="mb-1 block w-full truncate rounded-md border border-border p-2 text-left text-xs text-fg hover:bg-surface-2">{component.name} · Add instance</button>)}</div>}
@@ -1161,7 +1282,7 @@ export function UxUiStudioEngine() {
           </div>}
 
           {leftTab === "icons" && <div className="mt-3">
-            <h3 className="text-xs font-semibold text-fg">Icon library</h3>
+            <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-fg">Icon library</h3><button type="button" onClick={() => iconImportInputRef.current?.click()} className="uxui-import-button">Import SVG</button></div>
             <p className="mt-1 text-[11px] leading-4 text-muted">Browse immediate examples by interface category and visual style, or search the online Iconify catalogue. Selected SVGs and collection identifiers are stored in the project.</p>
             <div className="mt-3 relative"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event)=>{setIconQuery(event.target.value);setIconStart(0);setIconResults([]);}} placeholder="Search icons: home, charts, payment…" className="w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent" /></div>
             <label className="mt-2 block text-[10px] font-medium text-muted">Visual style / icon family
@@ -1173,7 +1294,7 @@ export function UxUiStudioEngine() {
             <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconQuery.trim().length>=2?(iconLoading?"Searching…":iconTotal.toLocaleString()+" matching online icons"):iconBrowseCategory+" · curated examples by style"}</span><span>Iconify · SVG</span></div>
             {iconError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600">{iconError}</p>}
             <div className="mt-2 grid grid-cols-4 gap-1.5">
-              {visibleIconResults.map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
+              {visibleIconResults.filter((name) => !toolkitSearch.trim() || name.toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
                 <img loading="lazy" alt="" src={"https://api.iconify.design/"+name.replace(":","/")+".svg"} className="mx-auto size-7" />
                 <span className="mt-1 block truncate text-[9px] text-muted">{name}</span>
               </button>)}
@@ -1205,7 +1326,7 @@ export function UxUiStudioEngine() {
               </label>
             </div>}
             <div className="mt-3 space-y-1.5">
-              {fontChoices.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)).map((font)=>{
+              {fontChoices.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)&&(!toolkitSearch.trim()||font.family.toLowerCase().includes(toolkitSearch.trim().toLowerCase()))).map((font)=>{
                 const fontId=font.id || font.family.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
                 const weights=font.weights?.length ? font.weights.join(" · ") : "300–900 where supplied";
                 return <div key={font.family} className={"rounded-lg border p-2.5 "+(selected?.fontFamily===font.family?"border-accent bg-accent/10":"border-border")}>
@@ -1224,7 +1345,8 @@ export function UxUiStudioEngine() {
 
           {leftTab === "presets" && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Starter layouts</h3><p className="mt-1 text-[11px] leading-4 text-muted">Curated responsive starting points, then customise every layer.</p>
-            <div className="mt-3 space-y-2">{PRESETS.map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2"><span className="block text-xs font-semibold text-fg">{preset.label}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{preset.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas</span></button>)}</div>
+            <button type="button" onClick={() => presetImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import preset / project JSON</button>
+            <div className="mt-3 space-y-2">{PRESETS.filter((preset) => !toolkitSearch.trim() || (preset.label + " " + preset.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2"><span className="block text-xs font-semibold text-fg">{preset.label}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{preset.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas</span></button>)}</div>
           </div>}
 
           {leftTab === "tokens" && <div className="mt-3">
@@ -1256,7 +1378,8 @@ export function UxUiStudioEngine() {
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
-            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{board.width} × {board.height} px</span></div>
+            {isExpanded && <button type="button" onClick={toggleExpandedPreview} className="uxui-preview-back"><ArrowLeft size={18} /><span>Back to editor</span></button>}
+            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>Preview</span></div>
             <div className="uxui-canvas-zoom">
               <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
               <span>{zoom}%</span>
@@ -1278,7 +1401,7 @@ export function UxUiStudioEngine() {
                   const baseBox = (round = layer.radius) => <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={round} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
                   const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity };
-                  return <g key={layer.id} data-layer-id={layer.id} style={style}>
+                  return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
                     {["triangle","diamond","hexagon","star"].includes(layer.kind) ? <polygon
@@ -1302,7 +1425,7 @@ export function UxUiStudioEngine() {
                 })}
               </svg>
               <div className="uxui-device-neck" aria-hidden="true" /><div className="uxui-device-base" aria-hidden="true" />
-              <p className="uxui-canvas-hint">Move anything with your finger or mouse. Select a layer to style it.</p>
+              {!elements.length && <p className="uxui-canvas-hint">Your canvas is ready. Tap + to add your first element.</p>}
             </div>
           </div>
           <div className="uxui-bottom-toolbar">
@@ -1314,13 +1437,32 @@ export function UxUiStudioEngine() {
             </div>
             <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => setShowMoreLayers((value) => !value)} aria-label="Show more layers" title="Layers" className={showMoreLayers ? "is-active" : ""}><Layers size={20} /></button>
-              <button type="button" onClick={() => addLayer("text")} aria-label="Add text" title="Add text"><Type size={20} /></button>
-              <button type="button" onClick={() => addLayer("rect")} aria-label="Add shape" title="Add shape"><Shapes size={20} /></button>
-              <button type="button" onClick={() => { setPaletteMode((mode) => mode === "fill" ? "text" : "fill"); }} aria-label="Switch palette color mode" title="Switch fill/text colour"><Paintbrush size={20} /></button>
-              <button type="button" onClick={() => setZoom(100)} aria-label="Reset zoom" title="Fit preview"><Maximize2 size={20} /></button>
+              <button type="button" onClick={() => setShowMoreLayers((value) => !value)} aria-label="Show layers" title="Layers" className={showMoreLayers ? "is-active" : ""}><Layers size={20} /></button>
+              <button type="button" onClick={() => elementImportInputRef.current?.click()} aria-label="Import elements" title="Import elements"><ImagePlus size={20} /></button>
+              <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
             </div>
           </div>
+          {selected && !isExpanded && <div className="uxui-context-controls">
+            <div className="uxui-context-toolbar" role="toolbar" aria-label="Selected element tools">
+              <span className="uxui-context-selection">{selected.name || "Selected element"}</span>
+              {selectedHasText && <button type="button" onClick={() => setShowTextEditor((value) => !value)} aria-expanded={showTextEditor}><Type size={15} /><span>Edit text</span></button>}
+              {selectedHasText && <button type="button" onClick={() => { setLeftTab("fonts"); setToolkitSearch(""); setShowToolsPanel(true); }}><Type size={15} /><span>Fonts</span></button>}
+              <button type="button" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })} aria-label="Make selected element larger" title="Make larger"><ZoomIn size={15} /><span>Size +</span></button>
+              <button type="button" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })} aria-label="Make selected element smaller" title="Make smaller"><ZoomOut size={15} /><span>Size −</span></button>
+              <button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })} aria-label="Rotate selected element" title="Rotate 15 degrees"><RotateCw size={15} /><span>Rotate</span></button>
+              <button type="button" onClick={() => setShowContextColors((value) => !value)} aria-expanded={showContextColors}><Palette size={15} /><span>Color</span></button>
+              <button type="button" onClick={() => { setSelectedId(""); setShowTextEditor(false); setShowContextColors(false); }}><X size={15} /><span>Cancel</span></button>
+              <button type="button" onClick={deleteSelected} className="is-danger"><Trash2 size={15} /><span>Delete</span></button>
+            </div>
+            {showTextEditor && selectedHasText && <div className="uxui-context-editor"><label htmlFor="uxui-selected-text">Edit text</label><textarea id="uxui-selected-text" value={selected.text} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { text: event.target.value }, false)} rows={2} /></div>}
+            {showContextColors && <div className="uxui-context-color-picker">
+              <div className="uxui-context-color-header"><strong>Color</strong><div role="group" aria-label="Color target"><button type="button" aria-pressed={paletteMode === "fill"} onClick={() => setPaletteMode("fill")}>Fill</button><button type="button" aria-pressed={paletteMode === "text"} onClick={() => setPaletteMode("text")}>Text</button></div><input type="color" aria-label="Choose element color" value={(paletteMode === "text" ? selected.color : selected.background) === "transparent" ? "#FFFFFF" : (paletteMode === "text" ? selected.color : selected.background)} onChange={(event) => updateLayer(selected.id, paletteMode === "text" ? { color: event.target.value } : { background: event.target.value })} /></div>
+              <div className="uxui-context-swatches">{["#111827", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2775", "#DC2626", "#D97706", "#059669", "#0F766E", "#64748B", "#E5E7EB", "#DBEAFE"].map((color) => <button key={color} type="button" style={{ background: color }} onClick={() => updateLayer(selected.id, paletteMode === "text" ? { color } : { background: color })} aria-label={"Apply " + color} title={color} />)}</div>
+            </div>}
+          </div>}
+          <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
+          <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
+          <input ref={iconImportInputRef} type="file" accept=".svg,image/svg+xml" className="sr-only" aria-label="Import SVG icon" onChange={(event) => { const file = event.target.files?.[0]; if (file) importIconFile(file); event.target.value = ""; }} />
           <input ref={quickImageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" aria-label="Choose an image" onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;
@@ -1344,17 +1486,17 @@ export function UxUiStudioEngine() {
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
             <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
-            <p>{elements.length} layers · {board.width} × {board.height} px</p>
+            <p>{elements.length ? elements.length + (elements.length === 1 ? " element" : " elements") : "Add your first element using +"}</p>
           </div>
           {helpOpen && <div className="uxui-help-note" role="status"><strong>Make it by eye.</strong><span>Drag and style your layers on the mockup. enV quietly records exact measurements, type, spacing, colours and icon identity for developer or AI handoff.</span></div>}
-          <div className="uxui-layer-heading"><strong>Layers</strong><span>{elements.length}</span></div>
+          <div className="uxui-layer-heading"><strong>Layers</strong>{elements.length > 0 && <span>{elements.length}</span>}</div>
           <div className="uxui-layer-list">
-            {[...elements].reverse().slice(0, showMoreLayers ? elements.length : 6).map((item, index) => {
+            {elements.length ? [...elements].reverse().slice(0, showMoreLayers ? elements.length : 6).map((item, index) => {
               const outlines = ["#8EC8E7", "#D48D91", "#A8CE79", "#D8C87D", "#C8C8C8", "#8FC6B3"];
               return <button key={item.id} type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} aria-pressed={selectedId === item.id} className={"uxui-layer-chip " + (selectedId === item.id ? "is-selected" : "")} style={{ "--layer-tint": outlines[index % outlines.length] } as CSSProperties}>
                 <span className="uxui-layer-number">{index + 1}.</span><span className="uxui-layer-name">{item.name || item.kind}</span><span className="uxui-layer-kind">{item.kind}</span>
               </button>;
-            })}
+            }) : <div className="uxui-empty-layers"><Layers size={18} /><span>No layers yet</span><small>Add an element to see it here.</small></div>}
             {elements.length > 6 && <button type="button" className="uxui-see-more" onClick={() => setShowMoreLayers((value) => !value)}>{showMoreLayers ? "see less" : "see more"}</button>}
           </div>
           <div className="uxui-palette-panel">
