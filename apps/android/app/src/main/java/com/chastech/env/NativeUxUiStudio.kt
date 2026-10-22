@@ -5,6 +5,9 @@ import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.graphics.Rect
 import android.graphics.Typeface
+import android.content.Context
+import android.util.Base64
+import java.io.File
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +21,9 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,10 +54,13 @@ import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 private data class UxUiNativeLayer(
     val id: String, val kind: String, val name: String, val x: Int, val y: Int, val width: Int, val height: Int,
-    val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "",
+    val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "", val fontData: String = "",
     val fontFamily: String = "sans-serif", val fontSize: Int = 16, val fontWeight: Int = 400,
     val radius: Int = 12, val borderColor: String = "#E5E7EB", val borderWidth: Int = 0, val padding: Int = 12,
     val marginTop: Int = 0, val marginRight: Int = 0, val marginBottom: Int = 0, val marginLeft: Int = 0,
@@ -80,6 +89,101 @@ private fun uxNativeLayerHeight(layer: UxUiNativeLayer, boardHeight: Int): Int =
 
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
+
+private val uxNativeFontFamilies = listOf(
+    "Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Source Sans 3","Work Sans","DM Sans",
+    "Manrope","Plus Jakarta Sans","Urbanist","Outfit","IBM Plex Sans","Noto Sans","Ubuntu","Rubik","Mulish",
+    "Quicksand","Barlow","Karla","Cabin","Raleway","Merriweather","Playfair Display","Lora","PT Serif",
+    "Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","JetBrains Mono","Fira Code",
+    "IBM Plex Mono","Source Code Pro","Space Mono","Inconsolata","Oswald","Bebas Neue","Space Grotesk",
+    "Caveat","Pacifico","system-ui","sans-serif","serif","monospace"
+)
+private val uxNativeIconStyles = listOf(
+    "all" to "All styles","lucide" to "Lucide · line","tabler" to "Tabler · outline",
+    "material-symbols" to "Material Symbols","mdi" to "Material Design","ph" to "Phosphor",
+    "solar" to "Solar","carbon" to "Carbon","fa6-solid" to "Font Awesome","heroicons" to "Heroicons",
+    "fluent" to "Fluent","iconamoon" to "Iconamoon","mingcute" to "MingCute"
+)
+private val uxNativeIconCategories = linkedMapOf(
+    "Navigation" to listOf("lucide:house","tabler:home","material-symbols:home-rounded","mdi:home","ph:house","solar:home-linear","carbon:home","fa6-solid:house","heroicons:home","fluent:home-24-regular","lucide:menu","tabler:menu-2","mdi:menu","ph:list","lucide:arrow-left","tabler:arrow-left","material-symbols:arrow-back-rounded","lucide:chevron-down","tabler:chevron-down","mdi:chevron-down"),
+    "Actions" to listOf("lucide:plus","tabler:plus","material-symbols:add-rounded","mdi:plus","ph:plus-bold","lucide:check","tabler:check","mdi:check-bold","lucide:x","tabler:x","mdi:close","lucide:pencil","tabler:edit","mdi:pencil","lucide:trash-2","tabler:trash","mdi:delete","lucide:copy","tabler:copy","lucide:download","tabler:download"),
+    "Forms" to listOf("lucide:mail","tabler:mail","mdi:email-outline","ph:envelope","lucide:lock","tabler:lock","mdi:lock-outline","lucide:eye","tabler:eye","mdi:eye-outline","lucide:eye-off","tabler:eye-off","lucide:calendar","tabler:calendar","lucide:clock","tabler:clock","lucide:sliders-horizontal","tabler:adjustments"),
+    "Communication" to listOf("lucide:message-circle","tabler:message-circle","mdi:message-outline","lucide:bell","tabler:bell","mdi:bell-outline","lucide:phone","tabler:phone","mdi:phone-outline","lucide:send","tabler:send","lucide:users","tabler:users","mdi:account-group-outline"),
+    "Media" to listOf("lucide:image","tabler:photo","mdi:image-outline","lucide:camera","tabler:camera","mdi:camera-outline","lucide:video","tabler:video","lucide:music","tabler:music","lucide:mic","tabler:microphone","lucide:play","tabler:player-play"),
+    "Commerce" to listOf("lucide:shopping-cart","tabler:shopping-cart","mdi:cart-outline","lucide:credit-card","tabler:credit-card","mdi:credit-card-outline","lucide:wallet","tabler:wallet","mdi:wallet-outline","lucide:package","tabler:package","lucide:tag","tabler:tag","lucide:truck","tabler:truck"),
+    "Data" to listOf("lucide:chart-column","tabler:chart-bar","mdi:chart-bar","lucide:chart-line","tabler:chart-line","mdi:chart-line","lucide:pie-chart","tabler:chart-pie","mdi:chart-pie","lucide:database","tabler:database","mdi:database-outline","lucide:table","tabler:table","lucide:activity"),
+    "Devices" to listOf("lucide:smartphone","tabler:device-mobile","mdi:cellphone","lucide:tablet","tabler:device-tablet","mdi:tablet","lucide:laptop","tabler:device-laptop","mdi:laptop","lucide:monitor","tabler:device-desktop","mdi:monitor","lucide:wifi","tabler:wifi","lucide:bluetooth","lucide:battery"),
+    "Files" to listOf("lucide:file-text","tabler:file-text","mdi:file-document-outline","lucide:folder","tabler:folder","mdi:folder-outline","lucide:cloud","tabler:cloud","mdi:cloud-outline","lucide:code","tabler:code","mdi:code-tags","lucide:terminal","tabler:terminal-2"),
+    "Shapes" to listOf("lucide:circle","tabler:circle","mdi:circle-outline","lucide:square","tabler:square","mdi:square-outline","lucide:triangle","tabler:triangle","mdi:triangle-outline","lucide:star","tabler:star","mdi:star-outline","lucide:heart","tabler:heart","mdi:heart-outline","lucide:hexagon","tabler:hexagon","lucide:diamond","tabler:diamond")
+)
+
+private fun uxNativeComposeShape(kind: String, radius: Int): Shape = when (kind) {
+    "ellipse", "avatar" -> CircleShape
+    "pill", "badge", "switch", "toggle" -> RoundedCornerShape(percent = 50)
+    "triangle" -> GenericShape { size, _ ->
+        moveTo(size.width / 2, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close()
+    }
+    "diamond" -> GenericShape { size, _ ->
+        moveTo(size.width / 2, 0f); lineTo(size.width, size.height / 2); lineTo(size.width / 2, size.height); lineTo(0f, size.height / 2); close()
+    }
+    "hexagon" -> GenericShape { size, _ ->
+        moveTo(size.width * .25f, 0f); lineTo(size.width * .75f, 0f); lineTo(size.width, size.height / 2)
+        lineTo(size.width * .75f, size.height); lineTo(size.width * .25f, size.height); lineTo(0f, size.height / 2); close()
+    }
+    "star" -> GenericShape { size, _ ->
+        for (index in 0 until 10) {
+            val radiusFactor = if (index % 2 == 0) .5f else .21f
+            val angle = (-PI / 2.0) + index * PI / 5.0
+            val x = size.width / 2 + cos(angle).toFloat() * size.width * radiusFactor
+            val y = size.height / 2 + sin(angle).toFloat() * size.height * radiusFactor
+            if (index == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+    else -> RoundedCornerShape(radius.coerceAtLeast(0).dp)
+}
+
+private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path? {
+    if (kind !in setOf("triangle","diamond","hexagon","star")) return null
+    val path = android.graphics.Path()
+    val x=rect.left; val y=rect.top; val w=rect.width(); val h=rect.height()
+    val points = when(kind) {
+        "triangle" -> listOf(x+w/2 to y, x+w to y+h, x to y+h)
+        "diamond" -> listOf(x+w/2 to y, x+w to y+h/2, x+w/2 to y+h, x to y+h/2)
+        "hexagon" -> listOf(x+w*.25f to y, x+w*.75f to y, x+w to y+h/2, x+w*.75f to y+h, x+w*.25f to y+h, x to y+h/2)
+        else -> (0 until 10).map { index ->
+            val radiusFactor=if(index%2==0).5 else .21
+            val angle=(-PI/2.0)+index*PI/5.0
+            (x+w/2+cos(angle).toFloat()*w*radiusFactor) to (y+h/2+sin(angle).toFloat()*h*radiusFactor)
+        }
+    }
+    points.forEachIndexed { index, point -> if(index==0) path.moveTo(point.first,point.second) else path.lineTo(point.first,point.second) }
+    path.close()
+    return path
+}
+
+private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
+    val data = layer.fontData
+    if (data.startsWith("data:font/") && data.contains(",")) {
+        runCatching {
+            val mime=data.substringAfter("data:").substringBefore(";").lowercase()
+            require(mime=="font/ttf" || mime=="font/otf" || mime=="application/x-font-ttf" || mime=="application/vnd.ms-opentype")
+            val bytes=Base64.decode(data.substringAfter(","),Base64.DEFAULT)
+            require(bytes.size<=4*1024*1024)
+            val extension=if(mime.contains("otf")||mime.contains("opentype"))"otf" else "ttf"
+            val target=File(context.cacheDir,"uxui-font-"+data.hashCode()+"."+extension)
+            if(!target.exists()||target.length()!=bytes.size)target.writeBytes(bytes)
+            return Typeface.create(Typeface.createFromFile(target),if(layer.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)
+        }
+    }
+    val family=when {
+        layer.fontFamily.contains("mono",true)||layer.fontFamily.contains("code",true) -> Typeface.MONOSPACE
+        layer.fontFamily.contains("serif",true)||layer.fontFamily.contains("Merriweather",true)||layer.fontFamily.contains("Playfair",true) -> Typeface.SERIF
+        else -> Typeface.SANS_SERIF
+    }
+    return Typeface.create(family,if(layer.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)
+}
+
 
 private fun uxNativeCleanIconSvg(svg: String): String =
     svg
@@ -163,7 +267,7 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
     elements.forEach { element -> put(JSONObject().apply {
         put("id", element.id); put("kind", element.kind); put("name", element.name)
         put("x", element.x); put("y", element.y); put("width", element.width); put("height", element.height)
-        put("text", element.text); put("color", element.color); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg); put("imageData", element.imageData)
+        put("text", element.text); put("color", element.color); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg); put("imageData", element.imageData); put("fontData", element.fontData)
         put("fontFamily", element.fontFamily); put("fontSize", element.fontSize); put("fontWeight", element.fontWeight)
         put("radius", element.radius); put("borderColor", element.borderColor); put("borderWidth", element.borderWidth); put("padding", element.padding)
         put("marginTop", element.marginTop); put("marginRight", element.marginRight); put("marginBottom", element.marginBottom); put("marginLeft", element.marginLeft)
@@ -180,7 +284,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
         add(UxUiNativeLayer(
             id=item.optString("id","layer-"+index),kind=item.optString("kind","text"),name=item.optString("name","Layer"),
             x=item.optInt("x"),y=item.optInt("y"),width=item.optInt("width",180).coerceAtLeast(1),height=item.optInt("height",48).coerceAtLeast(1),
-            text=item.optString("text"),color=item.optString("color","#111827"),fill=item.optString("fill","transparent"),iconName=item.optString("iconName"),iconSvg=item.optString("iconSvg"),imageData=item.optString("imageData"),
+            text=item.optString("text"),color=item.optString("color","#111827"),fill=item.optString("fill","transparent"),iconName=item.optString("iconName"),iconSvg=item.optString("iconSvg"),imageData=item.optString("imageData"),fontData=item.optString("fontData"),
             fontFamily=item.optString("fontFamily","sans-serif"),fontSize=item.optInt("fontSize",16).coerceAtLeast(1),fontWeight=item.optInt("fontWeight",400),
             radius=item.optInt("radius",12),borderColor=item.optString("borderColor","#E5E7EB"),borderWidth=item.optInt("borderWidth"),padding=item.optInt("padding",12),
             marginTop=item.optInt("marginTop"),marginRight=item.optInt("marginRight"),marginBottom=item.optInt("marginBottom"),marginLeft=item.optInt("marginLeft"),
@@ -782,9 +886,9 @@ fun NativeUxUiStudioForm() {
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
     val tokenJson=remember(colorTokens.toList(),spacingTokens.toList()){JSONObject().put("colors",JSONArray().apply{colorTokens.forEach{(name,value)->put(JSONObject().put("name",name).put("value",value))}}).put("spacing",JSONArray().apply{spacingTokens.forEach{put(it)}}).put("typography",JSONArray().apply{put(JSONObject().put("name","heading").put("fontFamily","sans-serif").put("fontSize",24).put("fontWeight",700).put("lineHeight",1.2));put(JSONObject().put("name","body").put("fontFamily","sans-serif").put("fontSize",16).put("fontWeight",400).put("lineHeight",1.5))})}
-    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
+    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
-    val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()}
+    val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()+":"+it.fontData.hashCode()}
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
@@ -834,6 +938,12 @@ fun NativeUxUiStudioForm() {
             "card"->UxUiNativeLayer(id,kind,"Card",24,270,300,132,"Card title\\nSupporting text",fill="#FFFFFF",borderWidth=1,radius=18,padding=18)
             "input"->UxUiNativeLayer(id,kind,"Text input",24,420,300,48,"Enter your email",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "icon"->UxUiNativeLayer(id,kind,"Icon",24,490,44,44,"",iconName="mdi:home",color="#2563EB")
+            "triangle"->UxUiNativeLayer(id,kind,"Triangle",24,540,96,84,"",fill="#DBEAFE",radius=0,padding=0)
+            "diamond"->UxUiNativeLayer(id,kind,"Diamond",24,540,92,92,"",fill="#DBEAFE",radius=0,padding=0)
+            "hexagon"->UxUiNativeLayer(id,kind,"Hexagon",24,540,112,96,"",fill="#DBEAFE",radius=0,padding=0)
+            "star"->UxUiNativeLayer(id,kind,"Star",24,540,100,100,"",fill="#FDE68A",radius=0,padding=0)
+            "line"->UxUiNativeLayer(id,kind,"Line",24,540,180,3,"",fill="#64748B",radius=0,padding=0)
+            "pill"->UxUiNativeLayer(id,kind,"Pill shape",24,540,150,52,"",fill="#DBEAFE",radius=26,padding=0)
             "image"->UxUiNativeLayer(id,kind,"Image",24,330,280,160,"Import an image",color="#64748B",fill="#E5E7EB",radius=12)
             "circle","ellipse"->UxUiNativeLayer(id,"ellipse","Circle",24,540,84,84,"",fill="#DBEAFE",radius=42)
             "divider"->UxUiNativeLayer(id,kind,"Divider",24,640,300,1,"",fill="#CBD5E1")
@@ -980,7 +1090,7 @@ fun NativeUxUiStudioForm() {
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
-                                    val shape=if(e.kind=="ellipse")androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(e.radius.dp)
+                                    val shape=uxNativeComposeShape(e.kind,e.radius)
                                     Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
                                         val density=dragDensity
                                         detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
@@ -992,7 +1102,7 @@ fun NativeUxUiStudioForm() {
                                         if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
                                             UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
                                         } else {
-                                            Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=if(e.fontFamily.contains("serif",true))FontFamily.Serif else FontFamily.SansSerif,maxLines=5,overflow=TextOverflow.Clip)
+                                            Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=FontFamily(uxNativeTypeface(context,e)),maxLines=5,overflow=TextOverflow.Clip)
                                         }
                                     }
                                 }
@@ -1002,7 +1112,7 @@ fun NativeUxUiStudioForm() {
                     Text("Preview scales to fit. Coordinates remain design pixels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
                 Text("Add elements",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
+                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
                 Text("Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 elements.forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
                 selected?.let{e->
