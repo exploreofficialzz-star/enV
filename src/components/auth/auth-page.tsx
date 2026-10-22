@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
-import { authClient, authEnabled, emailPasswordEnabled } from "@/lib/auth/client";
+import { authClient, authEnabled, emailPasswordEnabled, googleAuthEnabled, appleAuthEnabled } from "@/lib/auth/client";
 
 type AuthPageProps = { mode: "sign-in" | "sign-up" };
 type SocialProvider = "google" | "apple";
@@ -17,6 +17,11 @@ const greetingSets = {
 
 export function AuthPage({ mode }: AuthPageProps) {
   const isSignUp = mode === "sign-up";
+  const emailAuthAvailable = authEnabled && emailPasswordEnabled;
+  const googleAuthAvailable = authEnabled && googleAuthEnabled;
+  const appleAuthAvailable = authEnabled && appleAuthEnabled;
+  const hasSocialAuth = googleAuthAvailable || appleAuthAvailable;
+  const hasAnyAuthMethod = emailAuthAvailable || hasSocialAuth;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +57,7 @@ export function AuthPage({ mode }: AuthPageProps) {
     event.preventDefault();
     setError(null);
     setNotice(null);
-    if (!authEnabled || !emailPasswordEnabled) {
+    if (!emailAuthAvailable) {
       setError("Sign-in is temporarily unavailable. Please try again shortly.");
       return;
     }
@@ -101,7 +106,9 @@ export function AuthPage({ mode }: AuthPageProps) {
     setNotice(null);
     setBusy(true);
     try {
-      if (!authEnabled) throw new Error("Sign-in is temporarily unavailable. Please try again shortly.");
+      if (!authEnabled || (provider === "google" && !googleAuthAvailable) || (provider === "apple" && !appleAuthAvailable)) {
+        throw new Error("This sign-in option is not available right now.");
+      }
       const result = await authClient.signIn.social({
         provider,
         callbackURL: isSignUp && window.localStorage.getItem("env.pendingReferralCode")
@@ -138,6 +145,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               </p>
             </header>
 
+            {emailAuthAvailable && (
             <form className="mt-7 space-y-4" onSubmit={event => void submit(event)}>
               {isSignUp && (
                 <label htmlFor="full-name" className="block text-sm font-medium text-fg">
@@ -193,37 +201,52 @@ export function AuthPage({ mode }: AuthPageProps) {
                 {busy ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
               </Button>
             </form>
+            )}
 
-            <div className="my-5 flex items-center gap-3" aria-hidden="true">
-              <span className="h-px flex-1 bg-border" />
-              <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Or</span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
+            {emailAuthAvailable && hasSocialAuth && (
+              <div className="my-5 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Or</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            )}
 
-            <div className="space-y-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-12 w-full justify-center gap-3 rounded-xl bg-bg"
-                disabled={busy}
-                onClick={() => void signInWithProvider("google")}
-              >
-                <GoogleMark />
-                {isSignUp ? "Continue with Google" : "Sign in with Google"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-12 w-full justify-center gap-3 rounded-xl bg-bg"
-                disabled={busy}
-                onClick={() => void signInWithProvider("apple")}
-              >
-                <AppleMark />
-                {isSignUp ? "Continue with Apple" : "Sign in with Apple"}
-              </Button>
-            </div>
+            {hasSocialAuth && (
+              <div className="space-y-3">
+                {googleAuthAvailable && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full justify-center gap-3 rounded-xl bg-bg"
+                    disabled={busy}
+                    onClick={() => void signInWithProvider("google")}
+                  >
+                    <GoogleMark />
+                    {isSignUp ? "Continue with Google" : "Sign in with Google"}
+                  </Button>
+                )}
+                {appleAuthAvailable && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full justify-center gap-3 rounded-xl bg-bg"
+                    disabled={busy}
+                    onClick={() => void signInWithProvider("apple")}
+                  >
+                    <AppleMark />
+                    {isSignUp ? "Continue with Apple" : "Sign in with Apple"}
+                  </Button>
+                )}
+              </div>
+            )}
 
-            {!isSignUp && (
+            {!hasAnyAuthMethod && (
+              <p role="status" className="mt-6 rounded-xl border border-border bg-surface-2 p-3 text-center text-sm leading-6 text-muted">
+                Account sign-in is temporarily unavailable.
+              </p>
+            )}
+
+            {!isSignUp && emailAuthAvailable && (
               <p className="mt-5 text-center text-sm">
                 <Link to="/forgot-password" className="font-medium text-accent underline-offset-4 hover:underline">
                   Forgot password?
@@ -234,18 +257,18 @@ export function AuthPage({ mode }: AuthPageProps) {
             {notice && <p role="status" className="mt-4 rounded-xl border border-border bg-surface-2 p-3 text-sm leading-6">{notice}</p>}
             {error && <p role="alert" className="mt-4 rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm leading-6 text-danger">{error}</p>}
 
-            <p className="mt-6 text-center text-sm text-muted">
+            {hasAnyAuthMethod && <p className="mt-6 text-center text-sm text-muted">
               {isSignUp ? "Already have an account?" : "Don't have an account yet?"}{" "}
               <Link to={isSignUp ? "/login" : "/signup"} className="font-semibold text-accent underline-offset-4 hover:underline">
                 {isSignUp ? "Sign in" : "Sign up"}
               </Link>
-            </p>
-            <p className="mt-4 text-center text-xs leading-5 text-muted">
+            </p>}
+            {hasAnyAuthMethod && <p className="mt-4 text-center text-xs leading-5 text-muted">
               By continuing, you agree to the{" "}
               <Link to="/terms" className="underline underline-offset-2 hover:text-fg">Terms</Link>
               {" "}and{" "}
               <Link to="/privacy" className="underline underline-offset-2 hover:text-fg">Privacy Policy</Link>.
-            </p>
+            </p> }
           </div>
         </section>
       </div>
