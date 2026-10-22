@@ -77,6 +77,13 @@ test("gateway and media processor fail safely and report actual readiness", asyn
 });
 
  
+test("backend health endpoint reports missing required processors as unavailable", async () => {
+  const source = await readFile(new URL("../server/routes/api/backend/health.get.ts", import.meta.url), "utf8");
+  assert.match(source, /const ready = processors\.media && processors\.urlMedia/);
+  assert.match(source, /ok: ready/);
+  assert.match(source, /ready \? 200 : 503/);
+});
+
 test("production configuration consistently uses envtools.store as the canonical origin", async () => {
   const render = await readFile(new URL("../render.yaml", import.meta.url), "utf8");
   const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
