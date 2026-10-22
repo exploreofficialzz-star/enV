@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { defineHandler } from "nitro/h3";
 import { jsonResponse, optionsResponse, measureServerOperation } from "../../../../backend/http";
+import { randomUUID } from "node:crypto";
+import { readJsonObject, RequestBodyError } from "../../../../backend/request-body.mjs";
 import { parseSocialToolId, buildSocialOutput } from "../../../../src/components/engines/social-engine-utils";
 import { parseGamingToolId, buildGamingOutput } from "../../../../src/components/engines/gaming-engine-utils";
 import { parseWebDesignToolId, buildWebDesignOutput } from "../../../../src/components/engines/webdesign-engine-utils";
@@ -19,6 +21,14 @@ const CUSTOM_CATEGORIES = new Set([
 ]);
 
 function clean(v: unknown, fallback = "") { return String(v ?? fallback).trim(); }
+class BackendToolInputError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "BackendToolInputError";
+    this.code = code;
+  }
+}
 function execute(id: string, category: string, input: string, o: Record<string, unknown>): string {
   if (category === "social") return buildSocialOutput(id, o as Record<string,string>);
   if (category === "gaming") { const p = parseGamingToolId(id); return buildGamingOutput(p.family, p.workflow, { name: clean(o.name,"My Game"), base:Number(o.base??10), modifier:Number(o.modifier??0), quantity:Number(o.quantity??1), sides:Number(o.sides??6), level:Number(o.level??1), players:Number(o.players??2), rounds:Number(o.rounds??1), notes:clean(o.notes), entries:clean(o.entries,input).split("\n").filter(Boolean) }); }
@@ -30,18 +40,53 @@ function execute(id: string, category: string, input: string, o: Record<string, 
   if (category === "marketing") { const p=parseMarketingToolId(id); return buildMarketingOutput(p.topic,p.action,{audience:clean(o.audience,"Target audience"),goal:clean(o.goal,"Grow demand"),offer:clean(o.offer,"Offer"),channel:clean(o.channel,"Social"),notes:clean(o.notes,input),budget:Number(o.budget??100),clicks:Number(o.clicks??100),leads:Number(o.leads??10),sales:Number(o.sales??2),revenue:Number(o.revenue??200)}); }
   if (category === "communication") { const p=parseCommunicationToolId(id); return buildCommunication({kind:p.kind,action:p.action,audience:clean(o.audience,"Recipient"),subject:clean(o.subject,"Message"),purpose:clean(o.purpose,input),tone:clean(o.tone,"clear"),details:clean(o.details),date:clean(o.date),items:clean(o.items,"Agenda item 1\nAgenda item 2")}); }
   if (category === "accessibility") { const p=parseAccessibilityToolId(id); return `${p.kind} ${p.action}\n\nInput: ${clean(o.text,input)}\nForeground: ${clean(o.foreground,"#000000")}\nBackground: ${clean(o.background,"#ffffff")}\nSize: ${Number(o.size??16)}px\nLine height: ${Number(o.lineHeight??1.5)}\n\nReview against WCAG success criteria and the actual target UI before release.`; }
-  if (category === "streaming") { const p=parseStreamingToolId(id); if(!p) throw new Error("Unsupported streaming tool."); const op=p.operation; if(op.includes("bitrate")) return calculateBitrate(clean(o.resolution,"1080p"),clean(o.fps,"30"),clean(o.quality,"standard"),p.platform); if(op.includes("aspect")) return calculateAspectRatio(clean(o.width,"1920"),clean(o.height,"1080")); if(op.includes("revenue")) return calculateRevenue(clean(o.viewers,"1000"),clean(o.hours,"2"),clean(o.rate,"3")); if(op.includes("schedule")) return buildScheduleText(p.platform,clean(o.date,""),clean(o.time,""),clean(o.duration,"60"),clean(o.topic,"Stream")); if(op.includes("overlay")) return buildOverlayText(p.platform,clean(o.items,"Welcome\nBe right back").split("\n")); if(op.includes("checklist")) return buildChecklistText(p.platform,clean(o.items,"Camera\nAudio\nInternet").split("\n"),[]); if(op.includes("title")) return buildTitles(clean(o.topic,"Stream"),clean(o.style,"clear")); if(op.includes("description")) return buildDescription(clean(o.topic,"Stream"),clean(o.cta,"Follow for more")); return `${p.platform} ${op}\n\n${clean(input,"Enter the stream details.")}`; }
-  throw new Error(`No backend execution contract is implemented for ${category}/${id}.`);
+  if (category === "streaming") { const p=parseStreamingToolId(id); if(!p) throw new BackendToolInputError("UNSUPPORTED_TOOL", "This streaming tool is not supported by the current service."); const op=p.operation; if(op.includes("bitrate")) return calculateBitrate(clean(o.resolution,"1080p"),clean(o.fps,"30"),clean(o.quality,"standard"),p.platform); if(op.includes("aspect")) return calculateAspectRatio(clean(o.width,"1920"),clean(o.height,"1080")); if(op.includes("revenue")) return calculateRevenue(clean(o.viewers,"1000"),clean(o.hours,"2"),clean(o.rate,"3")); if(op.includes("schedule")) return buildScheduleText(p.platform,clean(o.date,""),clean(o.time,""),clean(o.duration,"60"),clean(o.topic,"Stream")); if(op.includes("overlay")) return buildOverlayText(p.platform,clean(o.items,"Welcome\nBe right back").split("\n")); if(op.includes("checklist")) return buildChecklistText(p.platform,clean(o.items,"Camera\nAudio\nInternet").split("\n"),[]); if(op.includes("title")) return buildTitles(clean(o.topic,"Stream"),clean(o.style,"clear")); if(op.includes("description")) return buildDescription(clean(o.topic,"Stream"),clean(o.cta,"Follow for more")); return `${p.platform} ${op}\n\n${clean(input,"Enter the stream details.")}`; }
+  throw new BackendToolInputError("UNSUPPORTED_TOOL", "This tool is not supported by the current backend route.");
 }
 
 export default defineHandler(async e => measureServerOperation(e.req, "server.template_tool", async () => {
   if (e.req.method === "OPTIONS") return optionsResponse();
+
+  const requestId = randomUUID();
   try {
-    const body = await e.req.json().catch(() => ({}));
-    const id = clean(body.toolId); const category = clean(body.category);
-    if (!id || !CUSTOM_CATEGORIES.has(category)) return jsonResponse({error:"Unsupported backend category tool."},400);
-    const options = body.options && typeof body.options === "object" ? body.options as Record<string,unknown> : {};
-    const output = execute(id,category,clean(body.input),options);
-    return jsonResponse({toolId:id,output});
-  } catch (err) { return jsonResponse({error:err instanceof Error?err.message:"Tool execution failed."},400); }
+    const body = await readJsonObject(e.req, 128 * 1024);
+    const id = clean(body.toolId);
+    const category = clean(body.category);
+    if (!id || id.length > 160 || !CUSTOM_CATEGORIES.has(category)) {
+      return jsonResponse({
+        ok: false,
+        code: "UNSUPPORTED_TOOL",
+        error: "Select a supported backend tool and try again.",
+        requestId,
+      }, 400);
+    }
+    if (body.options !== undefined && body.options !== null &&
+        (typeof body.options !== "object" || Array.isArray(body.options))) {
+      return jsonResponse({
+        ok: false,
+        code: "INVALID_TOOL_OPTIONS",
+        error: "Tool options must be sent as a JSON object.",
+        requestId,
+      }, 400);
+    }
+    const options = body.options && typeof body.options === "object" ? body.options as Record<string, unknown> : {};
+    const output = execute(id, category, clean(body.input), options);
+    return jsonResponse({ ok: true, toolId: id, output, requestId });
+  } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return jsonResponse({ ok: false, code: err.code, error: err.message, requestId }, err.status);
+    }
+    if (err instanceof BackendToolInputError) {
+      return jsonResponse({ ok: false, code: err.code, error: err.message, requestId }, 400);
+    }
+
+    const causeType = err instanceof Error ? err.name : "UnknownError";
+    console.error(`[template-tool] TOOL_EXECUTION_FAILED requestId=${requestId} causeType=${causeType}`);
+    return jsonResponse({
+      ok: false,
+      code: "TOOL_EXECUTION_FAILED",
+      error: `The tool couldn't complete this request. Check the inputs and try again. If the problem continues, contact enV support with reference ID: ${requestId}.`,
+      requestId,
+    }, 500);
+  }
 }));
