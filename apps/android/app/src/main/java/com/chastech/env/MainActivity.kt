@@ -389,7 +389,11 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, openTool, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
                             showExchange -> ContactExchangeScreen { showExchange = false }
-                            showInformation -> NativeInformationScreen(informationPage, catalog) { showInformation = false; tab = informationReturnTab }
+                            showInformation -> NativeInformationScreen(
+                                informationPage, catalog,
+                                onBack = { showInformation = false; tab = informationReturnTab },
+                                onOpenWallet = { informationPage = "wallet" },
+                            )
                             else -> AccountScreen(
                                 catalog = catalog,
                                 themeMode = themeMode,
