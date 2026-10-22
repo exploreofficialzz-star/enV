@@ -61,14 +61,14 @@ Required production settings:
 
 Choose at least one identity method for the shared Account, sign-in and sign-up screens:
 
-- **Google:** Set server-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to enable Google sign-in.
-- **Apple:** Set server-only `APPLE_CLIENT_ID` and `APPLE_CLIENT_SECRET`. Apple requires a properly signed client-secret JWT; rotate it before it expires.
+- **Google:** Set server-only `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`; set public `VITE_AUTH_GOOGLE_ENABLED=true` to show the Google button. Register `https://envtools.store/api/auth/callback/google` as an Authorized redirect URI in Google Cloud Console.
+- **Apple:** Set server-only `APPLE_CLIENT_ID` (Apple Services ID), `APPLE_TEAM_ID`, `APPLE_KEY_ID`, and `APPLE_PRIVATE_KEY`; the server generates short-lived-use Apple client-secret JWTs with a six-month maximum lifetime. Set public `VITE_AUTH_APPLE_ENABLED=true` only after the Apple callback and domain are verified. Register `https://envtools.store/api/auth/callback/apple` as the Return URL in Apple Developer. An externally generated `APPLE_CLIENT_SECRET` is supported as a manual-rotation alternative.
 - **OIDC/OAuth:** Set `AUTH_OAUTH_ISSUER`, `AUTH_OAUTH_CLIENT_ID`, and `AUTH_OAUTH_CLIENT_SECRET` together. The issuer must expose standard OIDC discovery, authorization, token, and user-info endpoints. Register the Better Auth callback URL for the deployed origin with the identity provider.
 - **Email/password:** Set server-only `AUTH_EMAIL_PASSWORD_ENABLED=true` and public `VITE_AUTH_EMAIL_ENABLED=true`, plus `RESEND_API_KEY` and `AUTH_EMAIL_FROM`. Verify the sender domain with Resend. Email/password sign-up requires email verification and password reset uses emailed, expiring links. Never put `RESEND_API_KEY` in a `VITE_` variable.
 
 The Web Account route and native Android/iOS Account entry points open the same responsive sign-in page, with sign-up and password recovery links available from that screen.
 
-Apply the committed SQL schema as a deliberate release operation with `npm run db:migrate` after setting `DATABASE_URL`; the build does not write to the production database. Verify migration completion, sender deliverability, OIDC callback URLs, password reset, verification expiry, session cookies, and logout in a staging deployment before enabling production auth. Do not enable either auth flag until these settings are present.
+Apply the committed SQL schema as a deliberate release operation with `npm run db:migrate` after setting `DATABASE_URL`; the build does not write to the production database. Use [the account authentication runbook](docs/account-auth-setup.md) for the full provider checklist. Verify migration completion, sender deliverability, exact OAuth callback URLs, password reset, verification expiry, session cookies, and logout in a staging deployment before enabling production auth. Do not enable a public provider flag until its server credentials and staging checks are complete.
 
 Never commit secret values. Keep preview and production credentials separate and use secure environment settings. Local development intentionally ships with auth disabled until a developer opts in.
 
