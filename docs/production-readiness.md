@@ -21,16 +21,23 @@ The repository intentionally ships `.enV/app-env.json` with `VITE_AUTH_ENABLED=f
 
 ```text
 VITE_AUTH_ENABLED=true
-# For email/password, also set VITE_AUTH_EMAIL_ENABLED=true in the build environment.
+# Enable each UI option only after its matching provider is configured/tested.
+VITE_AUTH_EMAIL_ENABLED=true
+VITE_AUTH_GOOGLE_ENABLED=true
+VITE_AUTH_APPLE_ENABLED=true
 AUTH_EMAIL_PASSWORD_ENABLED=true
 BETTER_AUTH_URL=https://envtools.store
 BETTER_AUTH_SECRET=<server-only high-entropy secret>
 DATABASE_URL=<persistent PostgreSQL connection string>
 # Choose the credentials required by the providers you enable:
-GOOGLE_CLIENT_ID=<Google OAuth client ID>
+GOOGLE_CLIENT_ID=<Google OAuth Web client ID>
 GOOGLE_CLIENT_SECRET=<server-only Google OAuth client secret>
 APPLE_CLIENT_ID=<Apple Services ID>
-APPLE_CLIENT_SECRET=<server-only Apple client-secret JWT>
+APPLE_TEAM_ID=<Apple developer team ID>
+APPLE_KEY_ID=<Apple Sign in with Apple key ID>
+APPLE_PRIVATE_KEY=<server-only contents of the Apple .p8 key>
+# Optional alternative to automatic JWT generation:
+APPLE_CLIENT_SECRET=<pre-generated Apple client-secret JWT>
 AUTH_OAUTH_ISSUER=<HTTPS OIDC issuer URL, optional>
 AUTH_OAUTH_CLIENT_ID=<OIDC client ID, optional>
 AUTH_OAUTH_CLIENT_SECRET=<server-only OIDC client secret, optional>
@@ -39,9 +46,9 @@ RESEND_API_KEY=<server-only Resend key>
 AUTH_EMAIL_FROM=<verified sender, for example enV <auth@your-verified-domain.example>>
 ```
 
-Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) and `VITE_AUTH_EMAIL_ENABLED=true` (public UI build flag), along with a verified transactional email sender. Google and Apple credentials must be supplied as complete pairs; Apple web sign-in uses a client-secret JWT that must be rotated before expiry. Generic OIDC issuer/client settings must be supplied together. Production auth fails closed if durable Postgres, a secure canonical origin, or the Better Auth secret is missing. Apply `migrations/0001_auth.sql` using `npm run db:migrate` as an explicit release operation before enabling auth.
+Email/password requires both `AUTH_EMAIL_PASSWORD_ENABLED=true` (server-side) and `VITE_AUTH_EMAIL_ENABLED=true` (public UI build flag), plus a verified Resend sender domain. Google requires both server credentials and `VITE_AUTH_GOOGLE_ENABLED=true`. Apple requires a Services ID, Team ID, Key ID, server-only `.p8` private key and `VITE_AUTH_APPLE_ENABLED=true`; the server signs short-lived-use client-secret JWTs on demand, avoiding a manually pre-generated token that expires unnoticed. Register these exact production callback URLs with the identity providers: `https://envtools.store/api/auth/callback/google` and `https://envtools.store/api/auth/callback/apple`. Generic OIDC issuer/client settings must be supplied together. Production auth fails closed if durable Postgres, a secure canonical origin, a server-only Better Auth secret, or a complete authentication provider is missing. Apply `migrations/0001_auth.sql` using `npm run db:migrate` as an explicit release operation before enabling auth.
 
-Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design. Email verification, password reset, OIDC callbacks, account recovery, and session revocation still require staging sign-off before enabling a public launch.
+Do not put secrets in `.enV/app-env.json` or any `VITE_` variable. `VITE_` values are browser-visible by design and should contain only UI enablement flags. Email verification, password reset, Google/Apple callbacks, account recovery, session revocation, and sender deliverability still require staging sign-off before enabling a public launch. See [the account authentication runbook](account-auth-setup.md) for provider-specific setup and a release checklist.
 
 ## Processor gateway and media uploads
 
