@@ -54,7 +54,10 @@ assert.match(iosTools, /UIGraphicsPDFRenderer/, 'iOS UX/UI Studio must generate 
 assert.match(iosTools, /iconName|marginLeft|fontFamily/, 'iOS design layers must retain implementation metadata');
 const uxStudioCss = readFileSync('src/styles.css', 'utf8');
 assert.match(webUx, /uxui-device-shell/, 'Web preview must use a target-specific device mockup');
-assert.match(webUx, /uxui-brand-title/, 'The redesigned editor must keep its studio heading visible for accessible orientation');
+assert.match(webUx, /uxui-home-heading/, 'The Studio home must keep a clear heading for accessible orientation');
+assert.match(webUx, /aria-label="New project"/, 'First-run Studio home must provide a labelled blank-project action');
+assert.match(webUx, /className="uxui-inspector/, 'Project title and layers must remain in the right-side inspector');
+assert.match(webUx, /No layers yet/, 'A blank project must start with an empty layer list');
 assert.match(webUx, /uxui-quick-style/, 'Common corner styling must be available without opening technical settings');
 assert.match(webUx, /aria-label="Mobile"/, 'Mobile target control must stay named when its visible label collapses');
 assert.match(webUx, /aria-label="Tablet"/, 'Tablet target control must stay named when its visible label collapses');
@@ -69,7 +72,9 @@ assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a m
 assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
 const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
-assert.match(androidUxStudio, /mutableStateOf\(false\)\};var target by remember\{mutableStateOf\("mobile"\)\}/, 'Android native studio should open directly into the mobile design');
+assert.match(androidUxStudio, /var onboarding by remember\{mutableStateOf\(true\)\}/, 'Android native studio must open on the project home');
+assert.match(androidUxStudio, /val elements=remember\{mutableStateListOf<UxUiNativeLayer>\(\)\}/, 'Android new projects must start with no sample elements');
+assert.match(androidUxStudio, /Text\("New project"/, 'Android project home must provide a New project action');
 assert.match(androidUxStudio, /if\(showElementTray\)/, 'Android native tools palette should be collapsible');
 assert.ok(androidUxStudio.includes('var iconQuery by remember{mutableStateOf("")};var iconResults'), 'Android Compose state declarations must remain separated');
 assert.match(androidUxStudio, /Corner style/, 'Android native studio should expose quick rounded-corner styles');
