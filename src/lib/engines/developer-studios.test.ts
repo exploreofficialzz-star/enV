@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { cronNextRuns, parseCron, hashText, runDeveloperStudio, validateJsonDetailed } from "./developer-studios.ts";
 import { developerStudioGolden } from "./developer-studio-golden.ts";
+import { generateHtmlProject, generateReactProject, generateKotlinProject, generateSwiftProject } from "./ux-ui-studio-codegen.ts";
 
 const fixedNow = new Date("2026-01-01T00:00:00.000Z");
 
@@ -477,4 +478,68 @@ test("Recipe JSON depth and pretty-output budgets stop hostile nested inputs bef
 test("Recipe configuration rejects duplicate top-level keys consistently instead of silently choosing a value", async () => {
   const duplicate = '{"input":"first","input":"second","steps":[{"op":"trim"}]}';
   await assert.rejects(runDeveloperStudio("developer-recipe-runner", duplicate), /Recipe configuration contains duplicate object keys and is ambiguous/i);
+});
+
+
+
+test("UX/UI Studio code exports preserve shapes, SVG icons, imported images and custom fonts", () => {
+  const project = {
+    name: "Interface Asset QA",
+    target: "mobile",
+    background: "#F8FAFC",
+    viewport: { width: 390, height: 844 },
+    breakpoints: { mobile: 480, tablet: 768, desktop: 1024 },
+    tokens: { colors: [{ name: "brand", value: "#2563EB" }], typography: [], spacing: [4, 8, 16] },
+    elements: [
+      {
+        id: "shape-1", kind: "star", name: "Status star", x: 16, y: 24, width: 40, height: 40,
+        text: "", iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "",
+        fontDataUrl: "data:font/ttf;base64,AA==", color: "#1D4ED8", background: "#DBEAFE",
+        borderColor: "#93C5FD", borderWidth: 1, radius: 4, padding: 0, marginTop: 0,
+        marginRight: 0, marginBottom: 0, marginLeft: 0, fontFamily: "Imported QA Font",
+        fontSize: 14, fontWeight: 600, lineHeight: 1.2, letterSpacing: 0,
+        textAlign: "left", opacity: 1, shadow: false, horizontalConstraint: "left",
+        verticalConstraint: "top", minWidth: 1, maxWidth: 100, visibleOn: ["mobile"],
+        referenceWidth: 390, referenceHeight: 844, componentKey: ""
+      },
+      {
+        id: "icon-1", kind: "icon", name: "Home icon", x: 64, y: 24, width: 24, height: 24,
+        text: "", iconName: "lucide:house", iconSvg: "<path d='M2 12 L12 2 L22 12 V22 H2 Z'/>",
+        iconViewBox: "0 0 24 24", imageDataUrl: "", fontDataUrl: "",
+        color: "#2563EB", background: "transparent", borderColor: "#CBD5E1", borderWidth: 0,
+        radius: 0, padding: 0, marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
+        fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.2, letterSpacing: 0,
+        textAlign: "left", opacity: 1, shadow: false, horizontalConstraint: "left",
+        verticalConstraint: "top", minWidth: 1, maxWidth: 100, visibleOn: ["mobile"],
+        referenceWidth: 390, referenceHeight: 844, componentKey: ""
+      },
+      {
+        id: "image-1", kind: "image", name: "Product image", x: 96, y: 24, width: 80, height: 48,
+        text: "", iconName: "", iconSvg: "", iconViewBox: "0 0 24 24",
+        imageDataUrl: "data:image/png;base64,iVBORw0KGgo=", fontDataUrl: "",
+        color: "#111827", background: "#E5E7EB", borderColor: "#CBD5E1", borderWidth: 1,
+        radius: 8, padding: 0, marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
+        fontFamily: "Inter", fontSize: 14, fontWeight: 400, lineHeight: 1.2, letterSpacing: 0,
+        textAlign: "left", opacity: 1, shadow: false, horizontalConstraint: "left",
+        verticalConstraint: "top", minWidth: 1, maxWidth: 100, visibleOn: ["mobile"],
+        referenceWidth: 390, referenceHeight: 844, componentKey: ""
+      }
+    ]
+  };
+  const html = generateHtmlProject(project);
+  const react = generateReactProject(project);
+  const kotlin = generateKotlinProject(project);
+  const swift = generateSwiftProject(project);
+  assert.match(html, /clip-path:polygon/);
+  assert.match(html, /@font-face/);
+  assert.match(html, /data:image\\/png;base64/);
+  assert.match(html, /lucide:house/);
+  assert.match(react, /embeddedFontCss/);
+  assert.match(react, /data:image\\/png;base64/);
+  assert.match(kotlin, /generatedUxShape/);
+  assert.match(kotlin, /generatedUxFontFamily/);
+  assert.match(kotlin, /data:image\\/png;base64/);
+  assert.match(swift, /GeneratedUxShape/);
+  assert.match(swift, /generatedUxRegisterFont/);
+  assert.match(swift, /data:image\\/png;base64/);
 });
