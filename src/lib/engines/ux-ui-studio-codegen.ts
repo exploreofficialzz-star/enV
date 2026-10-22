@@ -251,6 +251,8 @@ private fun generatedUxFontFamily(context: Context, family: String, dataUrl: Str
   ].join("\n");
 }
 
+const generatedSwiftHelpers = "private struct GeneratedUxShape: Shape {\n    let kind: String\n    let radius: CGFloat\n    func path(in rect: CGRect) -> Path {\n        var path = Path()\n        let w = rect.width, h = rect.height, x = rect.minX, y = rect.minY\n        switch kind {\n        case \"ellipse\", \"avatar\": path.addEllipse(in: rect)\n        case \"triangle\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h)); path.closeSubpath()\n        case \"diamond\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w/2, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"hexagon\":\n            path.move(to: CGPoint(x: x+w*0.25, y: y)); path.addLine(to: CGPoint(x: x+w*0.75, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w*0.75, y: y+h)); path.addLine(to: CGPoint(x: x+w*0.25, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"star\":\n            for index in 0..<10 {\n                let r: CGFloat = index % 2 == 0 ? 0.5 : 0.21\n                let angle = -Double.pi/2 + Double(index)*Double.pi/5\n                let point = CGPoint(x: x+w/2+CGFloat(cos(angle))*w*r, y: y+h/2+CGFloat(sin(angle))*h*r)\n                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }\n            }\n            path.closeSubpath()\n        case \"line\":\n            let thickness = max(1, min(h, radius))\n            path.addRoundedRect(in: CGRect(x: x, y: rect.midY-thickness/2, width: w, height: thickness), cornerSize: CGSize(width: thickness/2, height: thickness/2))\n        case \"pill\":\n            let side = min(rect.width, rect.height)/2\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: side, height: side))\n        default:\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: radius, height: radius))\n        }\n        return path\n    }\n}\n\nprivate func generatedUxRegisterFont(dataURL: String, fallback: String) -> String {\n    guard let comma = dataURL.firstIndex(of: \",\") else { return fallback }\n    let header = String(dataURL[..<comma]).lowercased()\n    guard header == \"data:font/ttf;base64\" || header == \"data:font/otf;base64\",\n          let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),\n          data.count <= 4 * 1024 * 1024 else { return fallback }\n    let ext = header.contains(\"otf\") ? \"otf\" : \"ttf\"\n    let safeName = fallback.replacingOccurrences(of: \"[^a-zA-Z0-9-]+\", with: \"-\", options: .regularExpression)\n    let url = FileManager.default.temporaryDirectory.appendingPathComponent(\"env-ux-export-font-\" + safeName + \".\" + ext)\n    do {\n        try data.write(to: url, options: .atomic)\n        var error: Unmanaged<CFError>?\n        let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)\n        guard ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil else { return fallback }\n        return CTFontCopyFamilyName(CTFontCreateWithURL(url as CFURL, 0, nil)) as String\n    } catch { return fallback }\n}";
+
 export function generateSwiftProject(project: UxCodegenProject): string {
   const viewName = sourceName(project.name) + "DesignView";
   const layers = project.elements.map((layer) => {
@@ -267,16 +269,21 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     } else if (layer.kind === "image" && layer.imageDataUrl) {
       const markup = "<img src='" + layer.imageDataUrl + "' style='width:100%;height:100%;object-fit:cover' />";
       child = "GeneratedHTMLAsset(markup: " + safe(markup) + ")";
+    } else if (layer.kind === "line") {
+      child = "Rectangle().fill(Color(hex: " + safe(layer.background === "transparent" ? project.background : layer.background) + "))";
     } else {
       const weight = layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular";
-      child = "Text(" + safe(layer.text) + ").font(.custom(" + safe(layer.fontFamily) + ", size: " + layer.fontSize + ")).fontWeight(" + weight + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
+      const fontFamily = layer.fontDataUrl
+        ? "generatedUxRegisterFont(dataURL: " + safe(layer.fontDataUrl) + ", fallback: " + safe(layer.fontFamily) + ")"
+        : safe(layer.fontFamily);
+      child = "Text(" + safe(layer.text) + ").font(.custom(" + fontFamily + ", size: " + layer.fontSize + ")).fontWeight(" + weight + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
     }
     return [
       "            if [" + visibility(layer).map(safe).join(", ") + "].contains(target) {",
       "                " + child,
       "                    .frame(width: " + width + ", height: " + height + ", alignment: .topLeading)",
       "                    .background(Color(hex: " + safe(layer.background === "transparent" ? project.background : layer.background) + "))",
-      "                    .clipShape(RoundedRectangle(cornerRadius: " + layer.radius + "))",
+      "                    .clipShape(GeneratedUxShape(kind: " + safe(layer.kind) + ", radius: CGFloat(" + (layer.kind === "line" ? Math.max(1, layer.height) : layer.radius) + ")))",
       "                    .position(x: CGFloat(" + layer.x + ") + " + xShift + " + (" + width + ") / 2, y: CGFloat(" + layer.y + ") + " + yShift + " + (" + height + ") / 2)",
       "            }",
     ].join("\n");
@@ -285,6 +292,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     "// Generated by enV UX/UI Studio. Artboard " + project.viewport.width + " x " + project.viewport.height + " px.",
     "import SwiftUI",
     "import WebKit",
+    "import CoreText",
     "",
     "struct GeneratedHTMLAsset: UIViewRepresentable {",
     "  let markup: String",
@@ -294,6 +302,7 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     "extension Color {",
     '  init(hex: String) { let value = UInt64(hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted), radix: 16) ?? 0; self.init(.sRGB, red: Double((value >> 16) & 255)/255, green: Double((value >> 8) & 255)/255, blue: Double(value & 255)/255, opacity: 1) }',
     "}",
+    generatedSwiftHelpers,
     "struct " + viewName + ": View {",
     "  let target: String = " + safe(project.target),
     "  var body: some View {",
