@@ -1327,7 +1327,7 @@ private struct NativeTokenProfileDetails: View {
 }
 
 private struct NativeTokenDashboardView: View {
-    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     @State private var paired = OfflineWalletNativeAPI.isPaired
     @State private var dashboard: [String: Any]?
     @State private var loading = false
@@ -1357,7 +1357,7 @@ private struct NativeTokenDashboardView: View {
                     .foregroundStyle(Color.envInk)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button {
-                    if let url = URL(string: "https://envtools.store/wallet") { openURL(url) }
+                    informationRouter.open("wallet")
                 } label: {
                     Label("Open wallet", systemImage: "wallet.bifold")
                         .font(.caption.weight(.semibold))
@@ -1701,6 +1701,7 @@ private struct NativeWalletDashboardView: View {
     @State private var showConnection = false
     @State private var showBalance = true
     @State private var showVideoDetails = false
+    @State private var showFundingUnavailable = false
 
     private var wallet: [String: Any] { dashboard?["wallet"] as? [String: Any] ?? [:] }
     private var rewards: [String: Any] { dashboard?["rewards"] as? [String: Any] ?? [:] }
@@ -1719,7 +1720,7 @@ private struct NativeWalletDashboardView: View {
                 available: dashboard == nil ? nil : number("availableTokens", from: wallet),
                 showBalance: showBalance,
                 onToggleVisibility: { showBalance.toggle() },
-                onAddFunds: { if let url = URL(string: "https://envtools.store/wallet") { openURL(url) } }
+                onAddFunds: { showFundingUnavailable = true }
             )
             balanceMetrics
             videoTagCard
@@ -1736,6 +1737,11 @@ private struct NativeWalletDashboardView: View {
             }
         }
         .task(id: "\(refreshKey)-\(paired)") { await refresh() }
+        .alert("In-app purchases aren’t available yet", isPresented: $showFundingUnavailable) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("The native StoreKit purchase flow is not configured for this release. No payment was taken.")
+        }
     }
 
     private var balanceMetrics: some View {
@@ -2035,8 +2041,8 @@ private struct NativeWalletDashboardView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.envMuted)
                         .fixedSize(horizontal: false, vertical: true)
-                    Link(destination: URL(string: "https://envtools.store/wallet")!) {
-                        Label("Open enV web Wallet", systemImage: "arrow.up.right.square")
+                    Link(destination: URL(string: "https://envtools.store/pair-native?platform=ios")!) {
+                        Label("Create pairing code", systemImage: "arrow.up.right.square")
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .contentShape(Rectangle())
                     }
@@ -2542,7 +2548,7 @@ private struct NativeSocialLinksSection: View {
 }
 
 private struct NativePricingInformationPage: View {
-    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
@@ -2596,7 +2602,7 @@ private struct NativePricingInformationPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
-            Button("Open Wallet") { if let url = URL(string: "https://envtools.store/wallet") { openURL(url) } }
+            Button("Open Wallet") { informationRouter.open("wallet") }
                 .buttonStyle(.borderedProminent)
             enVLocalizedCharacterSpacedText(LocalizedStringKey("Questions about enV pricing can be sent to [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com)."))
                 .font(.envScaled(size: 14, weight: .regular)).foregroundStyle(Color.envMuted)
