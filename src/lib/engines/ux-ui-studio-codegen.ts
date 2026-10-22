@@ -149,6 +149,208 @@ export function generateReactProject(project: UxCodegenProject): string {
   ].join("\n");
 }
 
+type UxSvgSegment = { op: "move" | "line" | "cubic" | "quad" | "close"; values: number[] };
+type UxSvgDrawable = { tag: string; attrs: Record<string, string> };
+
+function parseSvgPathData(data: string): UxSvgSegment[] {
+  const tokens = data.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) || [];
+  const result: UxSvgSegment[] = [];
+  let index = 0, command = "", x = 0, y = 0, startX = 0, startY = 0;
+  let lastCubic: { x: number; y: number } | null = null;
+  let lastQuad: { x: number; y: number } | null = null;
+  let previousCommand = "";
+  const isLetter = (value: string | undefined) => !!value && /^[a-zA-Z]$/.test(value);
+  const hasNumbers = (count: number) => index + count <= tokens.length && tokens.slice(index, index + count).every((token) => !isLetter(token));
+  const read = () => Number(tokens[index++]);
+  const emit = (op: UxSvgSegment["op"], values: number[]) => result.push({ op, values });
+  while (index < tokens.length) {
+    if (isLetter(tokens[index])) command = tokens[index++];
+    if (!command) { index++; continue; }
+    const upper = command.toUpperCase(), relative = command !== upper;
+    if (upper === "Z") {
+      emit("close", []); x = startX; y = startY; lastCubic = null; lastQuad = null; previousCommand = "Z"; command = "";
+      continue;
+    }
+    if (!hasNumbers(1)) {
+      if (index < tokens.length && !isLetter(tokens[index])) index = tokens.length;
+      continue;
+    }
+    if (upper === "M") {
+      let first = true;
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(2)) { index = tokens.length; break; }
+        const x0 = read(), y0 = read(), nx = relative ? x + x0 : x0, ny = relative ? y + y0 : y0;
+        if (first) {
+          emit("move", [nx, ny]); startX = nx; startY = ny; command = relative ? "l" : "L"; previousCommand = "M";
+        } else { emit("line", [nx, ny]); previousCommand = "L"; }
+        x = nx; y = ny; first = false; lastCubic = null; lastQuad = null;
+      }
+    } else if (upper === "L") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(2)) { index = tokens.length; break; }
+        const x0 = read(), y0 = read(), nx = relative ? x + x0 : x0, ny = relative ? y + y0 : y0;
+        emit("line", [nx, ny]); x = nx; y = ny; lastCubic = null; lastQuad = null; previousCommand = "L";
+      }
+    } else if (upper === "H") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(1)) { index = tokens.length; break; }
+        const n = read(), nx = relative ? x + n : n; emit("line", [nx, y]); x = nx; lastCubic = null; lastQuad = null; previousCommand = "H";
+      }
+    } else if (upper === "V") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(1)) { index = tokens.length; break; }
+        const n = read(), ny = relative ? y + n : n; emit("line", [x, ny]); y = ny; lastCubic = null; lastQuad = null; previousCommand = "V";
+      }
+    } else if (upper === "C") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(6)) { index = tokens.length; break; }
+        const bx=x, by=y, a=read(), b=read(), c=read(), d=read(), e=read(), f=read();
+        const x1=relative?bx+a:a, y1=relative?by+b:b, x2=relative?bx+c:c, y2=relative?by+d:d, nx=relative?bx+e:e, ny=relative?by+f:f;
+        emit("cubic", [x1,y1,x2,y2,nx,ny]); x=nx; y=ny; lastCubic={x:x2,y:y2}; lastQuad=null; previousCommand="C";
+      }
+    } else if (upper === "S") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(4)) { index = tokens.length; break; }
+        const bx=x, by=y, c=read(), d=read(), e=read(), f=read();
+        const x1=(previousCommand==="C"||previousCommand==="S")&&lastCubic?2*bx-lastCubic.x:bx;
+        const y1=(previousCommand==="C"||previousCommand==="S")&&lastCubic?2*by-lastCubic.y:by;
+        const x2=relative?bx+c:c, y2=relative?by+d:d, nx=relative?bx+e:e, ny=relative?by+f:f;
+        emit("cubic", [x1,y1,x2,y2,nx,ny]); x=nx; y=ny; lastCubic={x:x2,y:y2}; lastQuad=null; previousCommand="S";
+      }
+    } else if (upper === "Q") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(4)) { index = tokens.length; break; }
+        const bx=x, by=y, a=read(), b=read(), c=read(), d=read(), x1=relative?bx+a:a, y1=relative?by+b:b, nx=relative?bx+c:c, ny=relative?by+d:d;
+        emit("quad", [x1,y1,nx,ny]); x=nx; y=ny; lastQuad={x:x1,y:y1}; lastCubic=null; previousCommand="Q";
+      }
+    } else if (upper === "T") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(2)) { index = tokens.length; break; }
+        const bx=x, by=y, a=read(), b=read();
+        const x1=(previousCommand==="Q"||previousCommand==="T")&&lastQuad?2*bx-lastQuad.x:bx;
+        const y1=(previousCommand==="Q"||previousCommand==="T")&&lastQuad?2*by-lastQuad.y:by;
+        const nx=relative?bx+a:a, ny=relative?by+b:b;
+        emit("quad", [x1,y1,nx,ny]); x=nx; y=ny; lastQuad={x:x1,y:y1}; lastCubic=null; previousCommand="T";
+      }
+    } else if (upper === "A") {
+      while (index < tokens.length && !isLetter(tokens[index])) {
+        if (!hasNumbers(7)) { index = tokens.length; break; }
+        read(); read(); read(); read(); read();
+        const x0=read(), y0=read(), nx=relative?x+x0:x0, ny=relative?y+y0:y0;
+        emit("line", [nx,ny]); x=nx; y=ny; lastCubic=null; lastQuad=null; previousCommand="A";
+      }
+    } else command = "";
+  }
+  return result;
+}
+
+function parseSvgAttributes(source: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const expression = /([A-Za-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  for (const match of source.matchAll(expression)) attrs[match[1]] = match[2] ?? match[3] ?? "";
+  return attrs;
+}
+
+function extractSvgDrawables(svg: string): UxSvgDrawable[] {
+  const tags: UxSvgDrawable[] = [];
+  const expression = /<(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi;
+  for (const match of svg.matchAll(expression)) tags.push({ tag: match[1].toLowerCase(), attrs: parseSvgAttributes(match[2]) });
+  return tags;
+}
+
+function svgViewBox(value: string | undefined): [number, number, number, number] {
+  const parts = (value || "0 0 24 24").trim().split(/[,\s]+/).map(Number);
+  if (parts.length !== 4 || !parts.every(Number.isFinite) || parts[2] <= 0 || parts[3] <= 0) return [0, 0, 24, 24];
+  return [parts[0], parts[1], parts[2], parts[3]];
+}
+
+function svgStyle(drawable: UxSvgDrawable, layer: UxCodegenLayer): { fill: string | null; stroke: string | null; strokeWidth: number } {
+  const attrs = drawable.attrs;
+  const lineShape = drawable.tag === "line" || drawable.tag === "polyline";
+  const rawFill = attrs.fill ?? (lineShape ? "none" : layer.color);
+  const rawStroke = attrs.stroke ?? (lineShape ? layer.color : "none");
+  const fill = rawFill.toLowerCase() === "none" ? null : rawFill.toLowerCase() === "currentcolor" ? layer.color : rawFill;
+  const stroke = rawStroke.toLowerCase() === "none" ? null : rawStroke.toLowerCase() === "currentcolor" ? layer.color : rawStroke;
+  return { fill, stroke, strokeWidth: Math.max(0.1, Number(attrs["stroke-width"] || "1.5") || 1.5) };
+}
+
+function svgNumber(attrs: Record<string, string>, key: string, fallback = 0): number {
+  const value = Number(attrs[key]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function svgPointPairs(source: string | undefined): number[][] {
+  const nums = (source || "").match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g)?.map(Number) || [];
+  const points: number[][] = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) points.push([nums[i], nums[i + 1]]);
+  return points;
+}
+
+function swiftPathExpression(drawable: UxSvgDrawable): string {
+  const a = drawable.attrs;
+  const commands: string[] = [];
+  const point = (x: number, y: number) => "CGPoint(x: " + x + ", y: " + y + ")";
+  if (drawable.tag === "path") {
+    for (const segment of parseSvgPathData(a.d || "")) {
+      const v = segment.values;
+      if (segment.op === "move") commands.push("path.move(to: " + point(v[0],v[1]) + ")");
+      else if (segment.op === "line") commands.push("path.addLine(to: " + point(v[0],v[1]) + ")");
+      else if (segment.op === "cubic") commands.push("path.addCurve(to: " + point(v[4],v[5]) + ", control1: " + point(v[0],v[1]) + ", control2: " + point(v[2],v[3]) + ")");
+      else if (segment.op === "quad") commands.push("path.addQuadCurve(to: " + point(v[2],v[3]) + ", control: " + point(v[0],v[1]) + ")");
+      else commands.push("path.closeSubpath()");
+    }
+    return "Path { path in " + commands.join("; ") + " }";
+  }
+  if (drawable.tag === "circle") {
+    const r = svgNumber(a, "r");
+    return "Path(ellipseIn: CGRect(x: " + (svgNumber(a,"cx")-r) + ", y: " + (svgNumber(a,"cy")-r) + ", width: " + 2*r + ", height: " + 2*r + "))";
+  }
+  if (drawable.tag === "ellipse") {
+    const rx=svgNumber(a,"rx"), ry=svgNumber(a,"ry");
+    return "Path(ellipseIn: CGRect(x: " + (svgNumber(a,"cx")-rx) + ", y: " + (svgNumber(a,"cy")-ry) + ", width: " + 2*rx + ", height: " + 2*ry + "))";
+  }
+  if (drawable.tag === "rect") {
+    const x=svgNumber(a,"x"), y=svgNumber(a,"y"), w=svgNumber(a,"width"), h=svgNumber(a,"height"), rx=svgNumber(a,"rx"), ry=svgNumber(a,"ry",rx);
+    return rx>0 || ry>0
+      ? "Path(roundedRect: CGRect(x: " + x + ", y: " + y + ", width: " + w + ", height: " + h + "), cornerSize: CGSize(width: " + rx + ", height: " + ry + "))"
+      : "Path(CGRect(x: " + x + ", y: " + y + ", width: " + w + ", height: " + h + "))";
+  }
+  if (drawable.tag === "line") {
+    return "Path { path in path.move(to: " + point(svgNumber(a,"x1"),svgNumber(a,"y1")) + "); path.addLine(to: " + point(svgNumber(a,"x2"),svgNumber(a,"y2")) + ") }";
+  }
+  if (drawable.tag === "polyline" || drawable.tag === "polygon") {
+    const points=svgPointPairs(a.points);
+    const parts=points.map((pt,index)=>(index===0?"path.move(to: ":"path.addLine(to: ")+point(pt[0],pt[1])+")");
+    if(drawable.tag==="polygon")parts.push("path.closeSubpath()");
+    return "Path { path in " + parts.join("; ") + " }";
+  }
+  return "Path()";
+}
+
+function kotlinDrawableStatements(drawable: UxSvgDrawable, layer: UxCodegenLayer, index: number): string[] {
+  const a=drawable.attrs, name="generatedSvgPath"+index, paint="generatedSvgPaint"+index;
+  let pathInit: string;
+  if(drawable.tag==="path") pathInit="val "+name+" = androidx.core.graphics.PathParser.createPathFromPathData("+safe(a.d || "")+")";
+  else if(drawable.tag==="circle") pathInit="val "+name+" = android.graphics.Path().apply { addCircle("+svgNumber(a,"cx")+"f, "+svgNumber(a,"cy")+"f, "+svgNumber(a,"r")+"f, android.graphics.Path.Direction.CW) }";
+  else if(drawable.tag==="ellipse") {
+    const cx=svgNumber(a,"cx"),cy=svgNumber(a,"cy"),rx=svgNumber(a,"rx"),ry=svgNumber(a,"ry");
+    pathInit="val "+name+" = android.graphics.Path().apply { addOval(android.graphics.RectF("+(cx-rx)+"f, "+(cy-ry)+"f, "+(cx+rx)+"f, "+(cy+ry)+"f), android.graphics.Path.Direction.CW) }";
+  } else if(drawable.tag==="rect") {
+    const x=svgNumber(a,"x"),y=svgNumber(a,"y"),w=svgNumber(a,"width"),h=svgNumber(a,"height"),rx=svgNumber(a,"rx"),ry=svgNumber(a,"ry",rx);
+    pathInit="val "+name+" = android.graphics.Path().apply { "+(rx>0||ry>0?"addRoundRect(android.graphics.RectF("+x+"f, "+y+"f, "+(x+w)+"f, "+(y+h)+"f), "+rx+"f, "+ry+"f, android.graphics.Path.Direction.CW)":"addRect(android.graphics.RectF("+x+"f, "+y+"f, "+(x+w)+"f, "+(y+h)+"f), android.graphics.Path.Direction.CW)")+" }";
+  } else if(drawable.tag==="line") pathInit="val "+name+" = android.graphics.Path().apply { moveTo("+svgNumber(a,"x1")+"f, "+svgNumber(a,"y1")+"f); lineTo("+svgNumber(a,"x2")+"f, "+svgNumber(a,"y2")+"f) }";
+  else {
+    const points=svgPointPairs(a.points);
+    const pointLines=points.map((pt,j)=>(j===0?"moveTo(":"lineTo(")+pt[0]+"f, "+pt[1]+"f)");
+    if(drawable.tag==="polygon")pointLines.push("close()");
+    pathInit="val "+name+" = android.graphics.Path().apply { "+pointLines.join("; ")+" }";
+  }
+  const style=svgStyle(drawable,layer), lines=[pathInit];
+  if(style.fill) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.parseColor("+safe(style.fill)+") }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
+  if(style.stroke) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; strokeWidth = "+style.strokeWidth+"f; color = android.graphics.Color.parseColor("+safe(style.stroke)+"); strokeCap = "+(a["stroke-linecap"]==="round"?"android.graphics.Paint.Cap.ROUND":a["stroke-linecap"]==="square"?"android.graphics.Paint.Cap.SQUARE":"android.graphics.Paint.Cap.BUTT")+"; strokeJoin = "+(a["stroke-linejoin"]==="round"?"android.graphics.Paint.Join.ROUND":a["stroke-linejoin"]==="bevel"?"android.graphics.Paint.Join.BEVEL":"android.graphics.Paint.Join.MITER")+" }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
+  return lines;
+}
+
 export function generateKotlinProject(project: UxCodegenProject): string {
   const functionName = sourceName(project.name) + "Design";
   const layers = project.elements.map((layer) => {
@@ -158,85 +360,97 @@ export function generateKotlinProject(project: UxCodegenProject): string {
     let width = h === "stretch" ? "(" + layer.width + "f + widthDelta).coerceAtLeast(" + Math.max(1, layer.minWidth || 1) + "f)" : layer.width + "f";
     if (h === "stretch" && layer.maxWidth && layer.maxWidth > 0) width = width + ".coerceAtMost(" + layer.maxWidth + "f)";
     const height = v === "stretch" ? "(" + layer.height + "f + heightDelta).coerceAtLeast(1f)" : layer.height + "f";
+    const shape = "generatedUxShape(" + safe(layer.kind) + ", " + layer.radius + ".dp)";
+    const fill = layer.background === "transparent" ? "Color.Transparent" : "Color(android.graphics.Color.parseColor(" + safe(layer.background) + "))";
+    const modifiers = [
+      "Modifier.offset(x = ((" + x + ") + " + layer.marginLeft + "f).dp, y = ((" + y + ") + " + layer.marginTop + "f).dp)",
+      ".size(width = (" + width + ").dp, height = (" + height + ").dp)",
+      ".background(" + fill + ", " + shape + ")",
+      layer.borderWidth > 0 ? ".border(" + layer.borderWidth + ".dp, Color(android.graphics.Color.parseColor(" + safe(layer.borderColor) + ")), " + shape + ")" : "",
+      layer.shadow ? ".shadow(10.dp, " + shape + ")" : "",
+      ".graphicsLayer(alpha = " + layer.opacity + "f)",
+      ".padding(" + layer.padding + ".dp)"
+    ].filter(Boolean).join("");
     let content: string;
     if (layer.kind === "icon" && layer.iconSvg) {
-      const html = "<!doctype html><html><body style='margin:0'><svg viewBox='" + (layer.iconViewBox || "0 0 24 24") + "' width='100%' height='100%'>" + layer.iconSvg + "</svg></body></html>";
-      content = "AndroidView(factory = { context -> WebView(context).apply { settings.javaScriptEnabled = false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null, " + safe(html) + ', "text/html", "UTF-8", null) } }, modifier = Modifier.fillMaxSize())';
+      const [viewX,viewY,viewWidth,viewHeight] = svgViewBox(layer.iconViewBox);
+      const drawables = extractSvgDrawables(layer.iconSvg);
+      const drawings = drawables.flatMap((drawable,index) => kotlinDrawableStatements(drawable,layer,index)).map((line) => "              " + line).join("\n");
+      content = drawables.length
+        ? "Canvas(Modifier.fillMaxSize()) {\n  drawIntoCanvas { drawCanvas ->\n    val nativeCanvas = drawCanvas.nativeCanvas\n    nativeCanvas.save()\n    nativeCanvas.scale(size.width / " + viewWidth + "f, size.height / " + viewHeight + "f)\n    nativeCanvas.translate(-" + viewX + "f, -" + viewY + "f)\n" + drawings + "\n    nativeCanvas.restore()\n  }\n}"
+        : "Text(" + safe(layer.iconName || layer.name) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
-      const html = "<!doctype html><html><body style='margin:0'><img style='width:100%;height:100%;object-fit:cover' src='" + layer.imageDataUrl + "'></body></html>";
-      content = "AndroidView(factory = { context -> WebView(context).apply { settings.javaScriptEnabled = false; setBackgroundColor(android.graphics.Color.TRANSPARENT); loadDataWithBaseURL(null, " + safe(html) + ', "text/html", "UTF-8", null) } }, modifier = Modifier.fillMaxSize())';
+      content = "val generatedImageDataUrl = " + safe(layer.imageDataUrl) + "\nval generatedImageBitmap = remember(generatedImageDataUrl) { runCatching { val bytes = Base64.decode(generatedImageDataUrl.substringAfter(\",\", \"\"), Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }\nif (generatedImageBitmap != null) Image(bitmap = generatedImageBitmap.asImageBitmap(), contentDescription = " + safe(layer.name) + ", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) else Text(" + safe(layer.name) + ")";
     } else {
-      const fontFamilyCode = layer.fontDataUrl
+      const fontFamily = layer.fontDataUrl
         ? "generatedUxFontFamily(context, " + safe(layer.fontFamily) + ", " + safe(layer.fontDataUrl) + ", " + layer.fontWeight + ")"
         : "FontFamily(Typeface.create(" + safe(layer.fontFamily) + ", " + (layer.fontWeight >= 600 ? "Typeface.BOLD" : "Typeface.NORMAL") + "))";
-      content = "Text(" + safe(layer.text) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")), fontSize = " + layer.fontSize + ".sp, fontWeight = FontWeight(" + layer.fontWeight + "), fontFamily = " + fontFamilyCode + ", modifier = Modifier.fillMaxSize())";
+      const align = layer.textAlign === "center" ? "TextAlign.Center" : layer.textAlign === "right" ? "TextAlign.End" : "TextAlign.Start";
+      content = "Text(" + safe(layer.text) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")), fontSize = " + layer.fontSize + ".sp, fontWeight = FontWeight(" + layer.fontWeight + "), fontFamily = " + fontFamily + ", lineHeight = " + layer.lineHeight + ".sp, letterSpacing = " + layer.letterSpacing + ".sp, textAlign = " + align + ", modifier = Modifier.fillMaxSize())";
     }
-    const radius = "generatedUxShape(" + safe(layer.kind) + ", " + layer.radius + ".dp)";
     return [
-      "        // " + layer.name.replace(/\n/g, " ") + " (" + layer.kind + "); anchors " + h + "/" + v + "; visibleOn=" + visibility(layer).join(","),
-      "        if (listOf(" + visibility(layer).map(safe).join(", ") + ").contains(target)) Box(Modifier.offset(x = (" + x + ").dp, y = (" + y + ").dp).size(width = (" + width + ").dp, height = (" + height + ").dp).background(Color(android.graphics.Color.parseColor(" + safe(layer.background === "transparent" ? project.background : layer.background) + ")), " + radius + ").padding(" + layer.padding + ".dp)) { " + content + " }",
+      "      // " + layer.name.replace(/\n/g, " ") + " (" + layer.kind + "); responsive anchors " + h + "/" + v,
+      "      if (listOf(" + visibility(layer).map(safe).join(", ") + ").contains(target)) Box(" + modifiers + ") {",
+      "        " + content.replace(/\n/g, "\n        "),
+      "      }"
     ].join("\n");
   }).join("\n");
+  const generatedKotlinHelpers = [
+    "private fun generatedUxShape(kind: String, radius: Dp): Shape = when (kind) {",
+    "  \"ellipse\", \"avatar\" -> CircleShape",
+    "  \"pill\" -> RoundedCornerShape(percent = 50)",
+    "  \"triangle\" -> GenericShape { size, _ -> moveTo(size.width/2,0f); lineTo(size.width,size.height); lineTo(0f,size.height); close() }",
+    "  \"diamond\" -> GenericShape { size, _ -> moveTo(size.width/2,0f); lineTo(size.width,size.height/2); lineTo(size.width/2,size.height); lineTo(0f,size.height/2); close() }",
+    "  \"hexagon\" -> GenericShape { size, _ -> moveTo(size.width*.25f,0f); lineTo(size.width*.75f,0f); lineTo(size.width,size.height/2); lineTo(size.width*.75f,size.height); lineTo(size.width*.25f,size.height); lineTo(0f,size.height/2); close() }",
+    "  \"star\" -> GenericShape { size, _ -> for (index in 0 until 10) { val r=if(index%2==0).5f else .21f; val angle=-Math.PI.toFloat()/2+index*Math.PI.toFloat()/5; val px=size.width/2+kotlin.math.cos(angle)*size.width*r; val py=size.height/2+kotlin.math.sin(angle)*size.height*r; if(index==0)moveTo(px,py)else lineTo(px,py) }; close() }",
+    "  \"line\" -> GenericShape { size, _ -> moveTo(0f,size.height/2); lineTo(size.width,size.height/2) }",
+    "  else -> RoundedCornerShape(radius)",
+    "}",
+    "",
+    "private fun generatedUxFontFamily(context: Context, family: String, dataUrl: String, weight: Int): FontFamily {",
+    "  val style = if (weight >= 600) Typeface.BOLD else Typeface.NORMAL",
+    "  var typeface = Typeface.create(family, style)",
+    "  if (dataUrl.startsWith(\"data:font/\") && dataUrl.contains(\",\")) runCatching { val mime=dataUrl.substringAfter(\"data:\").substringBefore(\";\"); val ext=if(mime.contains(\"otf\"))\"otf\" else \"ttf\"; val bytes=Base64.decode(dataUrl.substringAfter(\",\"),Base64.DEFAULT); require(bytes.size<=4*1024*1024); val file=File(context.cacheDir,\"env-export-font-\"+family.hashCode()+\".\"+ext); if(!file.exists()||file.length()!=bytes.size.toLong())file.writeBytes(bytes); typeface=Typeface.createFromFile(file) }",
+    "  return FontFamily(typeface)",
+    "}"
+  ].join("\n");
   return [
     "// Generated by enV UX/UI Studio. Target artboard: " + project.viewport.width + " x " + project.viewport.height + " px.",
-    "import android.webkit.WebView",
     "import android.content.Context",
+    "import android.graphics.BitmapFactory",
+    "import android.graphics.Paint",
+    "import android.graphics.RectF",
     "import android.graphics.Typeface",
     "import android.util.Base64",
     "import java.io.File",
+    "import androidx.compose.foundation.Canvas",
+    "import androidx.compose.foundation.Image",
     "import androidx.compose.foundation.background",
+    "import androidx.compose.foundation.border",
     "import androidx.compose.foundation.layout.*",
     "import androidx.compose.foundation.shape.RoundedCornerShape",
     "import androidx.compose.foundation.shape.CircleShape",
     "import androidx.compose.foundation.shape.GenericShape",
     "import androidx.compose.ui.graphics.Shape",
-    "import androidx.compose.ui.unit.Dp",
+    "import androidx.compose.ui.graphics.asImageBitmap",
+    "import androidx.compose.ui.graphics.drawscope.drawIntoCanvas",
+    "import androidx.compose.ui.graphics.nativeCanvas",
+    "import androidx.compose.ui.graphics.graphicsLayer",
+    "import androidx.compose.ui.layout.ContentScale",
+    "import androidx.compose.ui.platform.LocalContext",
     "import androidx.compose.material3.Text",
     "import androidx.compose.runtime.Composable",
+    "import androidx.compose.runtime.remember",
     "import androidx.compose.ui.Modifier",
     "import androidx.compose.ui.graphics.Color",
     "import androidx.compose.ui.text.font.FontWeight",
     "import androidx.compose.ui.text.font.FontFamily",
+    "import androidx.compose.ui.text.style.TextAlign",
+    "import androidx.compose.ui.unit.Dp",
     "import androidx.compose.ui.unit.dp",
     "import androidx.compose.ui.unit.sp",
-    "import androidx.compose.ui.viewinterop.AndroidView",
-    "import androidx.compose.ui.platform.LocalContext",
     "",
-    String.raw`private fun generatedUxShape(kind: String, radius: Dp): Shape = when (kind) {
-    "ellipse", "avatar" -> CircleShape
-    "pill" -> RoundedCornerShape(percent = 50)
-    "triangle" -> GenericShape { size, _ -> moveTo(size.width / 2, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
-    "diamond" -> GenericShape { size, _ -> moveTo(size.width / 2, 0f); lineTo(size.width, size.height / 2); lineTo(size.width / 2, size.height); lineTo(0f, size.height / 2); close() }
-    "hexagon" -> GenericShape { size, _ -> moveTo(size.width * .25f, 0f); lineTo(size.width * .75f, 0f); lineTo(size.width, size.height / 2); lineTo(size.width * .75f, size.height); lineTo(size.width * .25f, size.height); lineTo(0f, size.height / 2); close() }
-    "star" -> GenericShape { size, _ ->
-        for (index in 0 until 10) {
-            val r = if (index % 2 == 0) .5f else .21f
-            val angle = -Math.PI.toFloat() / 2 + index * Math.PI.toFloat() / 5
-            val px = size.width / 2 + kotlin.math.cos(angle) * size.width * r
-            val py = size.height / 2 + kotlin.math.sin(angle) * size.height * r
-            if (index == 0) moveTo(px, py) else lineTo(px, py)
-        }
-        close()
-    }
-    else -> RoundedCornerShape(radius)
-}
-
-private fun generatedUxFontFamily(context: Context, family: String, dataUrl: String, weight: Int): FontFamily {
-    val style = if (weight >= 600) Typeface.BOLD else Typeface.NORMAL
-    var typeface = Typeface.create(family, style)
-    if (dataUrl.startsWith("data:font/") && dataUrl.contains(",")) {
-        runCatching {
-            val mime = dataUrl.substringAfter("data:").substringBefore(";")
-            val extension = if (mime.contains("otf")) "otf" else "ttf"
-            val bytes = Base64.decode(dataUrl.substringAfter(","), Base64.DEFAULT)
-            require(bytes.size <= 4 * 1024 * 1024)
-            val file = File(context.cacheDir, "env-export-font-" + family.hashCode().toString() + "." + extension)
-            if (!file.exists() || file.length() != bytes.size.toLong()) file.writeBytes(bytes)
-            typeface = Typeface.createFromFile(file)
-        }
-    }
-    return FontFamily(typeface)
-}`,
+    generatedKotlinHelpers,
     "@Composable fun " + functionName + "(target: String = " + safe(project.target) + ") {",
     "    val context = LocalContext.current",
     "    BoxWithConstraints(Modifier.fillMaxWidth().height(" + project.viewport.height + ".dp)) {",
@@ -251,7 +465,7 @@ private fun generatedUxFontFamily(context: Context, family: String, dataUrl: Str
   ].join("\n");
 }
 
-const generatedSwiftHelpers = "private struct GeneratedUxShape: Shape {\n    let kind: String\n    let radius: CGFloat\n    func path(in rect: CGRect) -> Path {\n        var path = Path()\n        let w = rect.width, h = rect.height, x = rect.minX, y = rect.minY\n        switch kind {\n        case \"ellipse\", \"avatar\": path.addEllipse(in: rect)\n        case \"triangle\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h)); path.closeSubpath()\n        case \"diamond\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w/2, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"hexagon\":\n            path.move(to: CGPoint(x: x+w*0.25, y: y)); path.addLine(to: CGPoint(x: x+w*0.75, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w*0.75, y: y+h)); path.addLine(to: CGPoint(x: x+w*0.25, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"star\":\n            for index in 0..<10 {\n                let r: CGFloat = index % 2 == 0 ? 0.5 : 0.21\n                let angle = -Double.pi/2 + Double(index)*Double.pi/5\n                let point = CGPoint(x: x+w/2+CGFloat(cos(angle))*w*r, y: y+h/2+CGFloat(sin(angle))*h*r)\n                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }\n            }\n            path.closeSubpath()\n        case \"line\":\n            let thickness = max(1, min(h, radius))\n            path.addRoundedRect(in: CGRect(x: x, y: rect.midY-thickness/2, width: w, height: thickness), cornerSize: CGSize(width: thickness/2, height: thickness/2))\n        case \"pill\":\n            let side = min(rect.width, rect.height)/2\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: side, height: side))\n        default:\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: radius, height: radius))\n        }\n        return path\n    }\n}\n\nprivate func generatedUxRegisterFont(dataURL: String, fallback: String) -> String {\n    guard let comma = dataURL.firstIndex(of: \",\") else { return fallback }\n    let header = String(dataURL[..<comma]).lowercased()\n    guard header == \"data:font/ttf;base64\" || header == \"data:font/otf;base64\",\n          let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),\n          data.count <= 4 * 1024 * 1024 else { return fallback }\n    let ext = header.contains(\"otf\") ? \"otf\" : \"ttf\"\n    let safeName = fallback.replacingOccurrences(of: \"[^a-zA-Z0-9-]+\", with: \"-\", options: .regularExpression)\n    let url = FileManager.default.temporaryDirectory.appendingPathComponent(\"env-ux-export-font-\" + safeName + \".\" + ext)\n    do {\n        try data.write(to: url, options: .atomic)\n        var error: Unmanaged<CFError>?\n        let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)\n        guard ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil else { return fallback }\n        return CTFontCopyFamilyName(CTFontCreateWithURL(url as CFURL, 0, nil)) as String\n    } catch { return fallback }\n}";
+const generatedSwiftHelpersconst generatedSwiftHelpers = "private struct GeneratedUxShape: Shape {\n    let kind: String\n    let radius: CGFloat\n    func path(in rect: CGRect) -> Path {\n        var path = Path()\n        let w = rect.width, h = rect.height, x = rect.minX, y = rect.minY\n        switch kind {\n        case \"ellipse\", \"avatar\": path.addEllipse(in: rect)\n        case \"triangle\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h)); path.closeSubpath()\n        case \"diamond\":\n            path.move(to: CGPoint(x: x+w/2, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w/2, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"hexagon\":\n            path.move(to: CGPoint(x: x+w*0.25, y: y)); path.addLine(to: CGPoint(x: x+w*0.75, y: y)); path.addLine(to: CGPoint(x: x+w, y: y+h/2)); path.addLine(to: CGPoint(x: x+w*0.75, y: y+h)); path.addLine(to: CGPoint(x: x+w*0.25, y: y+h)); path.addLine(to: CGPoint(x: x, y: y+h/2)); path.closeSubpath()\n        case \"star\":\n            for index in 0..<10 {\n                let r: CGFloat = index % 2 == 0 ? 0.5 : 0.21\n                let angle = -Double.pi/2 + Double(index)*Double.pi/5\n                let point = CGPoint(x: x+w/2+CGFloat(cos(angle))*w*r, y: y+h/2+CGFloat(sin(angle))*h*r)\n                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }\n            }\n            path.closeSubpath()\n        case \"line\":\n            let thickness = max(1, min(h, radius))\n            path.addRoundedRect(in: CGRect(x: x, y: rect.midY-thickness/2, width: w, height: thickness), cornerSize: CGSize(width: thickness/2, height: thickness/2))\n        case \"pill\":\n            let side = min(rect.width, rect.height)/2\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: side, height: side))\n        default:\n            path.addRoundedRect(in: rect, cornerSize: CGSize(width: radius, height: radius))\n        }\n        return path\n    }\n}\n\nprivate func generatedUxRegisterFont(dataURL: String, fallback: String) -> String {\n    guard let comma = dataURL.firstIndex(of: \",\") else { return fallback }\n    let header = String(dataURL[..<comma]).lowercased()\n    guard header == \"data:font/ttf;base64\" || header == \"data:font/otf;base64\",\n          let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),\n          data.count <= 4 * 1024 * 1024 else { return fallback }\n    let ext = header.contains(\"otf\") ? \"otf\" : \"ttf\"\n    let safeName = fallback.replacingOccurrences(of: \"[^a-zA-Z0-9-]+\", with: \"-\", options: .regularExpression)\n    let url = FileManager.default.temporaryDirectory.appendingPathComponent(\"env-ux-export-font-\" + safeName + \".\" + ext)\n    do {\n        try data.write(to: url, options: .atomic)\n        var error: Unmanaged<CFError>?\n        let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)\n        guard ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil else { return fallback }\n        return CTFontCopyFamilyName(CTFontCreateWithURL(url as CFURL, 0, nil)) as String\n    } catch { return fallback }\n}";
 
 export function generateSwiftProject(project: UxCodegenProject): string {
   const viewName = sourceName(project.name) + "DesignView";
@@ -262,15 +476,25 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     let width = h === "stretch" ? "max(CGFloat(" + Math.max(1, layer.minWidth || 1) + "), CGFloat(" + layer.width + ") + deltaWidth)" : "CGFloat(" + layer.width + ")";
     if (h === "stretch" && layer.maxWidth && layer.maxWidth > 0) width = "min(" + width + ", CGFloat(" + layer.maxWidth + "))";
     const height = v === "stretch" ? "max(1, CGFloat(" + layer.height + ") + deltaHeight)" : "CGFloat(" + layer.height + ")";
+    const fill = layer.background === "transparent" ? "Color.clear" : "Color(hex: " + safe(layer.background) + ")";
     let child: string;
     if (layer.kind === "icon" && layer.iconSvg) {
-      const markup = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='" + (layer.iconViewBox || "0 0 24 24") + "'>" + layer.iconSvg + "</svg>";
-      child = "GeneratedHTMLAsset(markup: " + safe(markup) + ")";
+      const [vbX,vbY,vbW,vbH] = svgViewBox(layer.iconViewBox);
+      const drawables = extractSvgDrawables(layer.iconSvg);
+      const views = drawables.flatMap((drawable) => {
+        const style = svgStyle(drawable, layer);
+        const shiftedPath = "(" + swiftPathExpression(drawable) + ").applying(CGAffineTransform(translationX: -" + vbX + ", y: -" + vbY + "))";
+        const result: string[] = [];
+        if (style.fill) result.push(shiftedPath + ".fill(Color(hex: " + safe(style.fill) + "))");
+        if (style.stroke) result.push(shiftedPath + ".stroke(Color(hex: " + safe(style.stroke) + "), lineWidth: " + style.strokeWidth + ")");
+        return result;
+      });
+      child = views.length
+        ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
+        : "Text(" + safe(layer.iconName || layer.name) + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
-      const markup = "<img src='" + layer.imageDataUrl + "' style='width:100%;height:100%;object-fit:cover' />";
-      child = "GeneratedHTMLAsset(markup: " + safe(markup) + ")";
-    } else if (layer.kind === "line") {
-      child = "Rectangle().fill(Color(hex: " + safe(layer.background === "transparent" ? project.background : layer.background) + "))";
+      const base64 = layer.imageDataUrl.split(",").slice(1).join(",");
+      child = "Group { if let data = Data(base64Encoded: " + safe(base64) + "), let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() } else { Text(" + safe(layer.name) + ") } }";
     } else {
       const weight = layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular";
       const fontFamily = layer.fontDataUrl
@@ -278,27 +502,28 @@ export function generateSwiftProject(project: UxCodegenProject): string {
         : safe(layer.fontFamily);
       child = "Text(" + safe(layer.text) + ").font(.custom(" + fontFamily + ", size: " + layer.fontSize + ")).fontWeight(" + weight + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
     }
+    const shape = "GeneratedUxShape(kind: " + safe(layer.kind) + ", radius: CGFloat(" + layer.radius + "))";
+    const overlay = layer.borderWidth > 0 ? ".overlay(" + shape + ".stroke(Color(hex: " + safe(layer.borderColor) + "), lineWidth: CGFloat(" + layer.borderWidth + ")))" : "";
+    const shadow = layer.shadow ? ".shadow(color: Color.black.opacity(0.14), radius: 10, x: 0, y: 3)" : "";
     return [
-      "            if [" + visibility(layer).map(safe).join(", ") + "].contains(target) {",
+      "            if " + safe(visibility(layer)) + ".contains(target) {",
       "                " + child,
       "                    .frame(width: " + width + ", height: " + height + ", alignment: .topLeading)",
-      "                    .background(Color(hex: " + safe(layer.background === "transparent" ? project.background : layer.background) + "))",
-      "                    .clipShape(GeneratedUxShape(kind: " + safe(layer.kind) + ", radius: CGFloat(" + (layer.kind === "line" ? Math.max(1, layer.height) : layer.radius) + ")))",
-      "                    .position(x: CGFloat(" + layer.x + ") + " + xShift + " + (" + width + ") / 2, y: CGFloat(" + layer.y + ") + " + yShift + " + (" + height + ") / 2)",
+      "                    .background(" + fill + ")",
+      "                    .clipShape(" + shape + ")",
+      overlay ? "                    " + overlay : "",
+      shadow ? "                    " + shadow : "",
+      "                    .opacity(" + layer.opacity + ")",
+      "                    .position(x: CGFloat(" + (layer.x + layer.marginLeft) + ") + " + xShift + " + (" + width + ") / 2, y: CGFloat(" + (layer.y + layer.marginTop) + ") + " + yShift + " + (" + height + ") / 2)",
       "            }",
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }).join("\n");
   return [
     "// Generated by enV UX/UI Studio. Artboard " + project.viewport.width + " x " + project.viewport.height + " px.",
     "import SwiftUI",
-    "import WebKit",
+    "import UIKit",
     "import CoreText",
     "",
-    "struct GeneratedHTMLAsset: UIViewRepresentable {",
-    "  let markup: String",
-    "  func makeUIView(context: Context) -> WKWebView { let view = WKWebView(); view.isOpaque = false; view.backgroundColor = .clear; view.scrollView.isScrollEnabled = false; return view }",
-    '  func updateUIView(_ view: WKWebView, context: Context) { view.loadHTMLString("<html><body style=\'margin:0\'>" + markup + "</body></html>", baseURL: nil) }',
-    "}",
     "extension Color {",
     '  init(hex: String) { let value = UInt64(hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted), radix: 16) ?? 0; self.init(.sRGB, red: Double((value >> 16) & 255)/255, green: Double((value >> 8) & 255)/255, blue: Double(value & 255)/255, opacity: 1) }',
     "}",
@@ -320,3 +545,4 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     "",
   ].join("\n");
 }
+

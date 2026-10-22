@@ -373,9 +373,14 @@ function sanitizeIconMarkup(source: string): { body: string; viewBox: string } {
   if (root.localName !== "svg" || parsed.querySelector("parsererror")) return { body: "", viewBox: "0 0 24 24" };
   const tags = new Set(["path", "circle", "rect", "ellipse", "line", "polyline", "polygon", "g"]);
   const attributes = new Set(["d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "transform", "opacity", "fill-opacity", "stroke-opacity", "vector-effect"]);
+  const inheritedPresentation = ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "opacity", "fill-opacity", "stroke-opacity", "vector-effect"];
+  if (!root.hasAttribute("fill") && !root.hasAttribute("stroke")) root.setAttribute("fill", "currentColor");
   const clean = (node: Element) => {
     for (const child of Array.from(node.children)) {
       if (!tags.has(child.localName)) { child.remove(); continue; }
+      for (const attribute of inheritedPresentation) {
+        if (!child.hasAttribute(attribute) && node.hasAttribute(attribute)) child.setAttribute(attribute, node.getAttribute(attribute) || "");
+      }
       for (const attribute of Array.from(child.attributes)) {
         if (!attributes.has(attribute.name) || attribute.name.toLowerCase().startsWith("on")) child.removeAttribute(attribute.name);
         else if (attribute.name === "fill" || attribute.name === "stroke") {
