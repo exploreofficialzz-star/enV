@@ -7701,6 +7701,45 @@ private struct NativeUxUiStudioView: View {
                 notice = error.localizedDescription
             }
         }
+        .fileImporter(isPresented: $isImportingFont, allowedContentTypes: [.font], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first, let targetID = fontTargetID else {
+                    notice = "Select a design layer before importing a font."
+                    return
+                }
+                do {
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    let ext = url.pathExtension.lowercased()
+                    guard ext == "ttf" || ext == "otf" else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 10, userInfo: [NSLocalizedDescriptionKey: "Choose a TrueType (.ttf) or OpenType (.otf) font."])
+                    }
+                    let data = try Data(contentsOf: url)
+                    guard data.count <= 4 * 1024 * 1024 else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 11, userInfo: [NSLocalizedDescriptionKey: "Font files must be 4 MB or smaller."])
+                    }
+                    let mime = ext == "otf" ? "font/otf" : "font/ttf"
+                    let dataURL = "data:\(mime);base64,\(data.base64EncodedString())"
+                    let baseName = url.deletingPathExtension().lastPathComponent
+                    guard let fontFamily = uxUiRegisterImportedFont(dataURL, family: baseName) else {
+                        throw NSError(domain: "enV.UxUiStudio", code: 12, userInfo: [NSLocalizedDescriptionKey: "This font could not be registered. Try another TTF/OTF file."])
+                    }
+                    guard let index = elements.firstIndex(where: { $0.id == targetID }) else {
+                        notice = "The selected layer no longer exists."
+                        return
+                    }
+                    checkpoint()
+                    elements[index].fontFamily = fontFamily
+                    elements[index].fontData = dataURL
+                    notice = "Imported font \(fontFamily) and embedded it in your design project."
+                } catch {
+                    notice = error.localizedDescription
+                }
+            case .failure(let error):
+                notice = error.localizedDescription
+            }
+        }
         .onChange(of: projectName) { _ in saveDraft() }
         .onChange(of: target) { _ in saveDraft() }
         .onChange(of: background) { _ in saveDraft() }
@@ -8063,6 +8102,7 @@ private struct NativeUxUiStudioView: View {
             inspectorImageFields(binding)
             inspectorIconFields(binding)
             inspectorSpecification(binding)
+            inspectorFontLibrary(binding)
         }
         .padding(12)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
@@ -8187,24 +8227,67 @@ private struct NativeUxUiStudioView: View {
         }
     }
 
-    @ViewBuilder
-    private func inspectorImageFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
-        if binding.wrappedValue.kind == "image" {
-            VStack(alignment: .leading, spacing: 6) {
-                Button {
-                    imageTargetID = binding.wrappedValue.id
-                    isImportingImage = true
-                } label: {
-                    Label(binding.wrappedValue.imageData?.isEmpty == false ? "Replace image" : "Import image", systemImage: "photo")
-                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+    private func inspectorFontLibrary(_ binding: Binding<UxUiNativeLayer>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Font library · \(uxUiFontFamilies.count) families").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            inspectorTextField("Search fonts", text: $fontQuery)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(["All","Sans serif","Serif","Monospace","Display","Handwriting","System"], id: \.self) { category in
+                        Button { fontCategory = category } label: {
+                            Text(category).font(.envScaled(size: 10, weight: .medium))
+                                .padding(.horizontal, 8).padding(.vertical, 6)
+                                .foregroundStyle(fontCategory == category ? Color.white : Color.envInk)
+                                .background(fontCategory == category ? Color.envAccent : Color.envSurface2, in: Capsule())
+                        }.buttonStyle(.plain)
+                    }
                 }
-                Text("Embed PNG, JPEG, WebP or GIF assets up to 4 MB. The editable JSON keeps the image; the PDF contains the visual asset without duplicating the base64 bytes in its spec.")
-                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: 6) {
+                    ForEach(uxUiFontFamilies.filter { $0.0.localizedCaseInsensitiveContains(fontQuery) && (fontCategory == "All" || $0.1 == fontCategory) }, id: \.0) { family, category in
+                        Button {
+                            guard let index = elements.firstIndex(where: { $0.id == binding.wrappedValue.id }) else { return }
+                            checkpoint()
+                            elements[index].fontFamily = family
+                            elements[index].fontData = nil
+                            notice = "Applied \(family). Custom fonts can be imported below; system font availability differs by platform."
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(family).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                                    Text("Aa Bb Cc · Interface typography 012345")
+                                        .font(.custom(family == "System" ? "System" : family, size: 13))
+                                        .foregroundStyle(Color.envMuted).lineLimit(1)
+                                }
+                                Spacer(minLength: 8)
+                                Text(category).font(.envScaled(size: 9, weight: .regular)).foregroundStyle(Color.envMuted)
+                            }
+                            .padding(8)
+                            .background(binding.wrappedValue.fontFamily == family ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(binding.wrappedValue.fontFamily == family ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        }.buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxHeight: 230)
+            Button {
+                fontTargetID = binding.wrappedValue.id
+                isImportingFont = true
+            } label: {
+                Label(binding.wrappedValue.fontData == nil ? "Import licensed TTF / OTF font" : "Replace imported font", systemImage: "textformat")
+                    .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+            }
+            Text("Custom TTF/OTF files up to 4 MB are embedded in the project and can be used by the visual preview and PDF export.")
+                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
         }
+        .padding(12)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 
     @ViewBuilder
+    private func inspectorImageFields(    @ViewBuilder
     private func inspectorIconFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         if binding.wrappedValue.kind == "icon" {
             VStack(alignment: .leading, spacing: 8) {
