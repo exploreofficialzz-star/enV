@@ -383,6 +383,7 @@ private fun uxNativePrompt(name:String,target:String,background:String,elements:
 
 private object UxUiNativePdf {
     fun build(
+        context: Context,
         projectName: String,
         target: String,
         background: String,
@@ -455,7 +456,7 @@ private object UxUiNativePdf {
                             color = runCatching { android.graphics.Color.parseColor(layer.color) }
                                 .getOrDefault(android.graphics.Color.BLACK)
                             textSize = layer.fontSize.coerceIn(1, 256).toFloat()
-                            typeface = Typeface.create(layer.fontFamily, if (layer.fontWeight >= 600) Typeface.BOLD else Typeface.NORMAL)
+                            typeface = uxNativeTypeface(context, layer)
                         }
                         val save = canvas.save()
                         canvas.clipRect(rect)
@@ -1249,7 +1250,7 @@ fun NativeUxUiStudioForm() {
                         Button(onClick={val value=spacingDraft.toIntOrNull();if(value!=null&&value in 1..256&&value !in spacingTokens){spacingTokens.add(value);spacingTokens.sort()}},enabled=spacingDraft.toIntOrNull() in 1..256){Text("Add spacing")}
                     }
                     Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}});jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export JSON + generated code + AI prompt")}
-                    Button(onClick={pdfBytes=UxUiNativePdf.build(projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}}),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
+                    Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}}),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
                     Button(onClick={sourceText=uxNativeGenerateHtml(projectName,target,background,elements,bw,bh,tokenJson,JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024));sourceLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+".html")},modifier=Modifier.fillMaxWidth()){Text("Export Web HTML")}
                     Button(onClick={sourceText=uxNativeGenerateKotlin(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+".kt")},modifier=Modifier.fillMaxWidth()){Text("Export Android Kotlin")}
                     Button(onClick={sourceText=uxNativeGenerateSwift(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+"View.swift")},modifier=Modifier.fillMaxWidth()){Text("Export iOS SwiftUI")}
