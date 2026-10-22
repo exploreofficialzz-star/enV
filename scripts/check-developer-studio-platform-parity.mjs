@@ -66,5 +66,16 @@ assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the 
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
 assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a monitor mockup');
 assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
+const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
+const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+assert.match(androidUxStudio, /mutableStateOf\(false\)\};var target by remember\{mutableStateOf\("mobile"\)\}/, 'Android native studio should open directly into the mobile design');
+assert.match(androidUxStudio, /if\(showElementTray\)/, 'Android native tools palette should be collapsible');
+assert.match(androidUxStudio, /Corner style/, 'Android native studio should expose quick rounded-corner styles');
+assert.match(androidUxStudio, /0xFF0B0C0E/, 'Android previews must use a device shell');
+assert.match(iosUxStudio, /didInitialize = true/, 'iOS native studio should initialize its design once');
+assert.match(iosUxStudio, /showComponentPalette\.toggle\(\)/, 'iOS native tools palette should be collapsible');
+assert.match(iosUxStudio, /aspectRatio\(CGFloat\(boardWidth\) \/ CGFloat\(boardHeight\), contentMode: \.fit\)/, 'iOS preview must preserve target viewport ratio inside a mockup');
+assert.match(iosUxStudio, /DisclosureGroup\("Fine-tune design"/, 'iOS technical measurements must be behind simple visual controls');
+assert.match(iosUxStudio, /showAllLayers \? elements : Array\(elements\.prefix\(6\)\)/, 'iOS layer list must support a compact preview with see-more');
 console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF and layer metadata).');
 console.log(`Developer Studio platform parity: PASS (${web.size} Studios; ${[...web.values()].reduce((sum, modes) => sum + modes.length, 0)} Studio modes match across TypeScript, Kotlin, and Swift).`);

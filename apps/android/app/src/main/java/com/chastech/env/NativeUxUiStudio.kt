@@ -918,16 +918,16 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
 fun NativeUxUiStudioForm() {
     val context=LocalContext.current;val prefs=remember{context.getSharedPreferences("env.ux-ui-studio",android.content.Context.MODE_PRIVATE)}
     val scope=rememberCoroutineScope()
-    var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
+    var onboarding by remember{mutableStateOf(false)};var target by remember{mutableStateOf("mobile")}
     var projectName by remember{mutableStateOf("Mobile dashboard")};var background by remember{mutableStateOf("#F8FAFC")}
     var customArtboard by remember{mutableStateOf(false)};var customWidth by remember{mutableIntStateOf(390)};var customHeight by remember{mutableIntStateOf(844)}
     var tokenNameDraft by remember{mutableStateOf("brand")};var tokenValueDraft by remember{mutableStateOf("#2563EB")};var spacingDraft by remember{mutableStateOf("20")}
     val colorTokens=remember{mutableStateListOf<Pair<String,String>>("primary" to "#2563EB","surface" to "#FFFFFF","text" to "#111827","muted" to "#64748B","border" to "#E5E7EB")}
     val spacingTokens=remember{mutableStateListOf(4,8,12,16,24,32,48)}
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
-    val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
+    val elements=remember{mutableStateListOf<UxUiNativeLayer>().apply{addAll(uxNativePreset("mobile","mobile-dashboard").map{it.copy(referenceWidth=390,referenceHeight=844)})}};var selectedId by remember{mutableStateOf(elements.firstOrNull()?.id.orEmpty())}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")}var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -1112,7 +1112,7 @@ fun NativeUxUiStudioForm() {
     Surface(color=MaterialTheme.colorScheme.background,modifier=Modifier.fillMaxWidth()){
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text("UX/UI Studio",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-            Text("Native editor · exact coordinates, type, spacing, colors and icon names.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Design by eye. Export exact developer and AI handoff.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             if(onboarding){
                 Card{Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                     Text("What are you designing?",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
@@ -1127,8 +1127,9 @@ fun NativeUxUiStudioForm() {
                     FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
                     FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
                     FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")})
-                    OutlinedButton(onClick={onboarding=true}){Text("Workflow")}
+                    OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
                 }
+                if(showCanvasSettings){
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
                     OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("Undo")}
                     OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("Redo")}
@@ -1155,11 +1156,16 @@ fun NativeUxUiStudioForm() {
                         }){Text(label,maxLines=1)}
                     }
                 }
+                }
                 Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Text("Artboard preview",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                    BoxWithConstraints(Modifier.fillMaxWidth()){
-                        val width=maxWidth.value.coerceAtMost(if(target=="mobile")390f else 900f);val scale=width/bw.toFloat()
-                        Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(8.dp)).background(uxNativeColor(background))){
+                    BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.TopCenter){
+                        val bezel=if(target=="mobile")8f else if(target=="tablet")12f else 10f
+                        val width=(maxWidth.value-bezel*2).coerceAtLeast(140f).coerceAtMost(if(target=="mobile")390f else if(target=="tablet")768f else 1040f)
+                        val scale=width/bw.toFloat()
+                        Column(horizontalAlignment=Alignment.CenterHorizontally){
+                            Box(Modifier.width((width+bezel*2).dp).clip(RoundedCornerShape(if(target=="mobile")46.dp else if(target=="tablet")25.dp else 10.dp)).background(Color(0xFF0B0C0E)).padding(bezel.dp)){
+                                Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(if(target=="mobile")38.dp else if(target=="tablet")16.dp else 2.dp)).background(uxNativeColor(background))){
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
@@ -1180,17 +1186,50 @@ fun NativeUxUiStudioForm() {
                                     }
                                 }
                             }
+                                if(target=="mobile")Box(Modifier.align(Alignment.TopCenter).padding(top=4.dp).width((width*0.28f).dp).height((width*0.055f).dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
+                                else if(target=="tablet")Box(Modifier.align(Alignment.TopCenter).padding(top=3.dp).size(6.dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
+                        }
+                    }
                         }
                     }
                     Text("Preview scales to fit. Coordinates remain design pixels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
-                Text("Add elements",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("↶")}
+                    OutlinedButton(onClick={showElementTray=!showElementTray}){Text("＋",style=MaterialTheme.typography.headlineSmall)}
+                    OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("↷")}
+                    Spacer(Modifier.weight(1f))
+                    Text(elements.size.toString()+" layers",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text("Design tools",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close tools" else "+ Add elements")}
+                }
+                if(showElementTray){
                 Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}}
+                }
                 Text("Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                elements.forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
+                elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
+                if(elements.size>6)OutlinedButton(onClick={showAllLayers=!showAllLayers}){Text(if(showAllLayers)"see less" else "see more")}
                 selected?.let{e->
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                        Text("Properties · "+e.kind,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
+                        Text("Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=3)
+                        Text("Corner style",style=MaterialTheme.typography.labelLarge)
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            OutlinedButton(onClick={edit(e.id){it.copy(radius=0)}}){Text("Sharp")}
+                            OutlinedButton(onClick={edit(e.id){it.copy(radius=minOf(14,shortEdge/4))}}){Text("Soft")}
+                            OutlinedButton(onClick={edit(e.id){it.copy(radius=shortEdge/2)}}){Text("Round")}
+                        }
+                        Text("Fill colour",style=MaterialTheme.typography.labelLarge)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            colorTokens.forEach{(name,value)->OutlinedButton(onClick={edit(e.id){it.copy(fill=value)}}){Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){Box(Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}
+                        }
+                        OutlinedButton(onClick={showAdvancedControls=!showAdvancedControls},modifier=Modifier.fillMaxWidth()){Text(if(showAdvancedControls)"Hide fine-tune design" else "Fine-tune design")}
+                        if(showAdvancedControls){
+                        Text("Detailed measurements",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                         OutlinedTextField(e.name,{v->edit(e.id){it.copy(name=v)}},label={Text("Layer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text content")},modifier=Modifier.fillMaxWidth(),maxLines=4)
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
@@ -1299,6 +1338,7 @@ fun NativeUxUiStudioForm() {
                         }
                         Text("Exact specification",style=MaterialTheme.typography.labelLarge)
                         Text(uxNativeJson(listOf(e)).toString(2),style=MaterialTheme.typography.bodySmall)
+                        }
                     }}
                 }
                 Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){

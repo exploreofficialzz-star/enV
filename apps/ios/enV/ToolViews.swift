@@ -7655,6 +7655,12 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
 private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
+    @State private var didInitialize = false
+    @State private var showComponentPalette = false
+    @State private var showAllLayers = false
+    @State private var showAdvancedInspector = false
+    @State private var showAdvancedCanvas = false
+    @State private var showDesignSystem = false
     @State private var target = "mobile"
     @State private var projectName = "Mobile dashboard"
     @State private var background = "#F8FAFC"
@@ -7836,7 +7842,16 @@ private struct NativeUxUiStudioView: View {
         .background(Color.envSurface.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { loadSavedDraftStatus() }
+        .onAppear {
+            guard !didInitialize else { return }
+            didInitialize = true
+            loadSavedDraftStatus()
+            if UserDefaults.standard.data(forKey: storageKey) != nil {
+                restoreDraft()
+            } else {
+                startDesign("mobile", preset: "mobile-dashboard")
+            }
+        }
         .fileExporter(isPresented: $isExportingPDF, document: pdfDocument, contentType: .pdf, defaultFilename: safeFileName + "-design-spec") { result in
             switch result { case .success(let url): notice = "PDF exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
         }
@@ -7946,47 +7961,76 @@ private struct NativeUxUiStudioView: View {
 
     private var editorContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("Project name", text: $projectName)
-                .font(.envScaled(size: 14, weight: .medium)).padding(12)
-                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
             HStack(spacing: 8) {
+                TextField("Project title", text: $projectName)
+                    .font(.envScaled(size: 15, weight: .semibold)).padding(10)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                Button { exportPDF() } label: {
+                    Image(systemName: "square.and.arrow.up").font(.system(size: 17, weight: .semibold))
+                        .frame(width: 42, height: 42).foregroundStyle(Color.envInk)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                }.accessibilityLabel("Export design")
+            }
+            HStack(spacing: 6) {
                 targetButton("Mobile", icon: "iphone", value: "mobile")
                 targetButton("Tablet", icon: "ipad", value: "tablet")
                 targetButton("Desktop", icon: "laptopcomputer", value: "desktop")
-                Button("Workflow") { onboarding = true }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                Spacer(minLength: 0)
             }
-            Text("ARTBOARD  ·  \(boardWidth) × \(boardHeight) px  ·  \(elements.count) layers")
-                .font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted)
-            HStack(spacing: 8) {
-                Toggle("Custom artboard", isOn: $customArtboard).labelsHidden()
-                Text("Custom").font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
-                inspectorNumber("Width px", value: $customWidth)
-                inspectorNumber("Height px", value: $customHeight)
-            }
-            .onChange(of: customWidth) { customWidth = min(4096, max(160, $0)) }
-            .onChange(of: customHeight) { customHeight = min(4096, max(240, $0)) }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    presetButton("Mobile dashboard", target: "mobile", preset: "mobile-dashboard")
-                    presetButton("Mobile login", target: "mobile", preset: "mobile-login")
-                    presetButton("Tablet dashboard", target: "tablet", preset: "tablet-dashboard")
-                    presetButton("Tablet settings", target: "tablet", preset: "tablet-settings")
-                    presetButton("Website landing", target: "desktop", preset: "desktop-landing")
-                    presetButton("Desktop dashboard", target: "desktop", preset: "desktop-dashboard")
-                    presetButton("Desktop settings", target: "desktop", preset: "desktop-settings")
+            Text("\(boardWidth) × \(boardHeight) px  ·  \(elements.count) layers")
+                .font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+
+            DisclosureGroup("Fine-tune canvas", isExpanded: $showAdvancedCanvas) {
+                HStack(spacing: 8) {
+                    Toggle("Custom artboard", isOn: $customArtboard)
+                    inspectorNumber("Width px", value: $customWidth)
+                    inspectorNumber("Height px", value: $customHeight)
+                }
+                .onChange(of: customWidth) { customWidth = min(4096, max(160, $0)) }
+                .onChange(of: customHeight) { customHeight = min(4096, max(240, $0)) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        presetButton("Mobile dashboard", target: "mobile", preset: "mobile-dashboard")
+                        presetButton("Mobile login", target: "mobile", preset: "mobile-login")
+                        presetButton("Tablet dashboard", target: "tablet", preset: "tablet-dashboard")
+                        presetButton("Tablet settings", target: "tablet", preset: "tablet-settings")
+                        presetButton("Website landing", target: "desktop", preset: "desktop-landing")
+                        presetButton("Desktop dashboard", target: "desktop", preset: "desktop-dashboard")
+                        presetButton("Desktop settings", target: "desktop", preset: "desktop-settings")
+                    }
                 }
             }
-
+            .font(.envScaled(size: 12, weight: .semibold))
             artboardPreview
-            designSystemPanel
-            componentPalette
+
+            HStack(spacing: 10) {
+                Button { showComponentPalette.toggle() } label: {
+                    Image(systemName: showComponentPalette ? "xmark" : "plus")
+                        .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
+                        .foregroundStyle(Color.envInk).background(Color.envCard, in: Circle())
+                        .overlay(Circle().stroke(Color.envInk, lineWidth: 3))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(showComponentPalette ? "Close elements" : "Add elements")
+                Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward") }
+                    .disabled(undoHistory.isEmpty).frame(width: 38, height: 38)
+                Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward") }
+                    .disabled(redoHistory.isEmpty).frame(width: 38, height: 38)
+                Spacer()
+                Text("Drag · tap · style").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+            }
+            if showComponentPalette { componentPalette }
             layerListPanel
             if let index = selectedIndex { inspector(for: index) }
+            DisclosureGroup("Design system", isExpanded: $showDesignSystem) {
+                designSystemPanel
+            }
+            .font(.envScaled(size: 12, weight: .semibold))
             designHandoffPanel
         }
     }
-
 
     private var artboardPreview: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -8022,7 +8066,25 @@ private struct NativeUxUiStudioView: View {
                     .clipped()
                     .overlay(Rectangle().stroke(Color.envBorder, lineWidth: 1))
                 }
-                .frame(height: max(CGFloat(290), min(CGFloat(560), CGFloat(boardHeight) * min(CGFloat(1), UIScreen.main.bounds.width / CGFloat(boardWidth)))))
+                .aspectRatio(CGFloat(boardWidth) / CGFloat(boardHeight), contentMode: .fit)
+                .padding(target == "mobile" ? 8 : target == "tablet" ? 12 : 9)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: target == "mobile" ? 46 : target == "tablet" ? 24 : 10))
+                .overlay(alignment: .top) {
+                    if target == "mobile" {
+                        Capsule().fill(Color.black).frame(width: 108, height: 20).padding(.top, 4)
+                    } else if target == "tablet" {
+                        Circle().fill(Color.black).frame(width: 6, height: 6).padding(.top, 5)
+                    }
+                }
+                .padding(.bottom, target == "desktop" ? 34 : 0)
+                .overlay(alignment: .bottom) {
+                    if target == "desktop" {
+                        VStack(spacing: 0) {
+                            Rectangle().fill(LinearGradient(colors: [.gray, .white, .gray], startPoint: .leading, endPoint: .trailing)).frame(width: 80, height: 25)
+                            Capsule().fill(Color.gray).frame(width: 180, height: 8)
+                        }.offset(y: 32)
+                    }
+                }
                 HStack(spacing: 8) {
                     Button { undoLayout() } label: {
                         Label("Undo", systemImage: "arrow.uturn.backward")
@@ -8155,7 +8217,7 @@ private struct NativeUxUiStudioView: View {
     private var layerListPanel: some View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                ForEach(elements) { item in
+                ForEach(showAllLayers ? elements : Array(elements.prefix(6))) { item in
                     Button { selectedID = item.id } label: {
                         HStack(spacing: 8) {
                             Image(systemName: item.kind == "text" ? "textformat" : item.kind == "icon" ? "square.grid.2x2" : "rectangle")
@@ -8168,6 +8230,10 @@ private struct NativeUxUiStudioView: View {
                         .background(selectedID == item.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedID == item.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
                     }.buttonStyle(.plain)
+                }
+                if elements.count > 6 {
+                    Button(showAllLayers ? "see less" : "see more") { showAllLayers.toggle() }
+                        .font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envMuted)
                 }
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
@@ -8281,16 +8347,54 @@ private struct NativeUxUiStudioView: View {
             }
         )
         VStack(alignment: .leading, spacing: 10) {
-            inspectorHeader(binding)
-            inspectorIdentityFields(binding)
-            inspectorGeometryFields(binding)
-            inspectorResponsiveFields(binding)
-            inspectorTypographyFields(binding)
-            inspectorVisualFields(binding)
-            inspectorImageFields(binding)
-            inspectorIconFields(binding)
-            inspectorSpecification(binding)
-            inspectorFontLibrary(binding)
+            HStack {
+                Text("Style").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Spacer()
+                Text(binding.wrappedValue.kind).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+            }
+            if ["text", "button", "card", "input", "badge", "logo", "navbar", "tabbar", "tabs", "row", "menu", "modal", "tooltip", "breadcrumb", "list", "table", "chart", "video"].contains(binding.wrappedValue.kind) {
+                inspectorTextField("Text on canvas", text: binding.text, multiline: true)
+            }
+            Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            HStack(spacing: 6) {
+                Button("Sharp") { checkpoint(); elements[index].radius = 0 }
+                    .buttonStyle(.bordered)
+                Button("Soft") { checkpoint(); elements[index].radius = min(14, min(elements[index].width, elements[index].height) / 4) }
+                    .buttonStyle(.bordered)
+                Button("Round") { checkpoint(); elements[index].radius = min(elements[index].width, elements[index].height) / 2 }
+                    .buttonStyle(.bordered)
+            }
+            Text("Fill colour").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tokens.colors) { token in
+                        Button {
+                            checkpoint(); elements[index].fill = token.value
+                        } label: {
+                            RoundedRectangle(cornerRadius: 7).fill(uxUiUIColor(token.value))
+                                .frame(width: 27, height: 27)
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.envBorder, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Apply fill \(token.name)")
+                    }
+                }
+            }
+            DisclosureGroup("Fine-tune design", isExpanded: $showAdvancedInspector) {
+                VStack(alignment: .leading, spacing: 10) {
+                    inspectorIdentityFields(binding)
+                    inspectorGeometryFields(binding)
+                    inspectorResponsiveFields(binding)
+                    inspectorTypographyFields(binding)
+                    inspectorVisualFields(binding)
+                    inspectorImageFields(binding)
+                    inspectorIconFields(binding)
+                    inspectorSpecification(binding)
+                    inspectorFontLibrary(binding)
+                }
+                .padding(.top, 8)
+            }
+            .font(.envScaled(size: 12, weight: .semibold))
         }
         .padding(12)
         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
