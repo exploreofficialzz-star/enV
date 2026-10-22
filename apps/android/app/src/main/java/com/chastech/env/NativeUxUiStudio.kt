@@ -1143,6 +1143,31 @@ fun NativeUxUiStudioForm() {
         }
     }
 
+    val svgIconImportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->
+        if(uri!=null)scope.launch{
+            runCatching{
+                withContext(Dispatchers.IO){
+                    val name=context.contentResolver.query(uri,arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->if(cursor.moveToFirst())cursor.getString(0) else "Imported icon"}.orEmpty().ifBlank{"Imported icon"}
+                    val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()}?:error("Could not read the selected SVG icon.")
+                    require(bytes.size<=1024*1024){"SVG icons must be 1 MB or smaller."}
+                    val svg=uxNativeCleanIconSvg(String(bytes,Charsets.UTF_8))
+                    require(svg.contains(Regex("(?is)<svg\\b")) && !svg.contains(Regex("(?is)<script\\b"))){"Choose a valid SVG icon file."}
+                    Triple(name.substringAfterLast("/").removeSuffix(".svg"),svg,uxNativeSvgAttribute(svg,"viewBox")?:"0 0 24 24")
+                }
+            }.onSuccess{(name,svg,viewBox)->
+                val current=elements.firstOrNull{it.id==selectedId}
+                if(current?.kind=="icon"){
+                    edit(current.id){it.copy(name=name.ifBlank{"Imported icon"},iconName="custom:"+(name.ifBlank{"icon"}),iconSvg=svg,iconViewBox=viewBox)}
+                }else{
+                    add("icon")
+                    val newId=selectedId
+                    edit(newId){it.copy(name=name.ifBlank{"Imported icon"},iconName="custom:"+(name.ifBlank{"icon"}),iconSvg=svg,iconViewBox=viewBox)}
+                }
+                showElementTray=false;notice="Imported SVG icon."
+            }.onFailure{notice=it.message?:"SVG icon import failed."}
+        }
+    }
+
     fun chooseIcon(layerId:String, icon:String){
         scope.launch {
             iconBusy=true
@@ -1304,6 +1329,7 @@ fun NativeUxUiStudioForm() {
                         when(toolkitTab){
                             "Icons" -> {
                                 OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
                                 val iconLayer=selectedElement?.takeIf{it.kind=="icon"}
                                 if(iconLayer!=null && iconResults.isNotEmpty())Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){iconResults.filter{it.contains(toolkitSearch,true)||it.contains(iconQuery,true)}.take(24).forEach{icon->OutlinedButton(onClick={chooseIcon(iconLayer.id,icon)}){Text(icon.substringAfter(":"))}}}
                                 Text("Add an icon element first, then choose its artwork here.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
