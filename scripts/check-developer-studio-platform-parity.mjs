@@ -65,6 +65,13 @@ assert.match(webUx, /aria-label="Desktop"/, 'Desktop target control must stay na
 assert.match(webUx, /uxui-layer-chip/, 'Web editor must expose selectable visual layer chips');
 assert.match(webUx, /uxui-color-grid/, 'Web editor must expose the compact palette');
 assert.match(webUx, /Fine-tune design/, 'Exact measurements must remain available in the advanced inspector');
+assert.match(webUx, /uxui-mobile-controls/, 'Web Studio must provide a thumb-friendly mobile movement controller for selected layers');
+assert.match(webUx, /aria-label="Move selected element"/, 'Web movement controls must be accessibly labelled');
+assert.match(webUx, /Technical styling · CSS/, 'Web Studio must expose advanced CSS-oriented controls');
+assert.match(webUx, /:focus-visible fill/, 'Web Studio must expose focus-visible style controls');
+assert.match(uxStudioCss, /\.uxui-gamepad/, 'Mobile gamepad controls must have dedicated responsive styling');
+assert.match(androidUxStudio, /Move · \$\{selectedElement\.name\}/, 'Android Studio must expose native selected-layer movement controls');
+assert.match(iosUxStudio, /Selected element movement and size controls/, 'iOS Studio must expose native selected-layer movement controls');
 assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
 assert.match(uxStudioCss, /\.uxui-canvas-hint\s*\{[^}]*color:\s*#E4E7E4/i, 'Canvas hint text must remain readable against the dark device bezel');
