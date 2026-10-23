@@ -70,8 +70,6 @@ assert.match(webUx, /aria-label="Move selected element"/, 'Web movement controls
 assert.match(webUx, /Technical styling · CSS/, 'Web Studio must expose advanced CSS-oriented controls');
 assert.match(webUx, /:focus-visible fill/, 'Web Studio must expose focus-visible style controls');
 assert.match(uxStudioCss, /\.uxui-gamepad/, 'Mobile gamepad controls must have dedicated responsive styling');
-assert.match(androidUxStudio, /Move · \$\{selectedElement\.name\}/, 'Android Studio must expose native selected-layer movement controls');
-assert.match(iosUxStudio, /Selected element movement and size controls/, 'iOS Studio must expose native selected-layer movement controls');
 assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
 assert.match(uxStudioCss, /\.uxui-canvas-hint\s*\{[^}]*color:\s*#E4E7E4/i, 'Canvas hint text must remain readable against the dark device bezel');
@@ -79,6 +77,8 @@ assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a m
 assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
 const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+assert.match(androidUxStudio, /Move · \$\{selectedElement\.name\}/, 'Android Studio must expose native selected-layer movement controls');
+assert.match(iosUxStudio, /Selected element movement and size controls/, 'iOS Studio must expose native selected-layer movement controls');
 assert.match(androidUxStudio, /var onboarding by remember\{mutableStateOf\(true\)\}/, 'Android native studio must open on the project home');
 assert.match(androidUxStudio, /val elements=remember\{mutableStateListOf<UxUiNativeLayer>\(\)\}/, 'Android new projects must start with no sample elements');
 assert.match(androidUxStudio, /Text\("New project"/, 'Android project home must provide a New project action');
