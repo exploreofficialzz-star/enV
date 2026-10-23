@@ -27,6 +27,8 @@ type DesignLayer = {
   horizontalConstraint: HorizontalConstraint; verticalConstraint: VerticalConstraint;
   minWidth: number; maxWidth: number; visibleOn: DeviceTarget[];
   referenceWidth: number; referenceHeight: number; componentKey: string;
+  display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
+  hoverColor?: string; activeColor?: string; focusColor?: string;
 };
 
 type SavedProject = {
@@ -187,6 +189,8 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     textAlign: "left", opacity: 1, shadow: false,
     horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
     visibleOn: ["mobile", "tablet", "desktop"], referenceWidth, referenceHeight, componentKey: "",
+    display: "flex", cursor: "default", zIndex: 1, transitionDuration: 180,
+    hoverColor: "", activeColor: "", focusColor: "",
   };
   switch (kind) {
     case "text": return { ...shared, name: "Text", width: 250, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700 };
@@ -1441,6 +1445,24 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
             </div>
           </div>
+          {selected && target === "mobile" && !isExpanded && <div className="uxui-mobile-controls" aria-label="Selected element movement and transform controls">
+            <div className="uxui-gamepad" role="group" aria-label="Move selected element">
+              <span className="uxui-gamepad-label">Move</span>
+              <button type="button" className="uxui-pad-up" aria-label="Move element up 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.max(0, selected.y - 8) })}><ArrowUp size={19} /></button>
+              <button type="button" className="uxui-pad-left" aria-label="Move element left 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.max(0, selected.x - 8) })}><ArrowLeft size={19} /></button>
+              <button type="button" className="uxui-pad-center" aria-label="Center selected element" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)), y: Math.max(0, Math.round((board.height - selected.height) / 2)) })}>•</button>
+              <button type="button" className="uxui-pad-right" aria-label="Move element right 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.min(Math.max(0, board.width - selected.width), selected.x + 8) })}><ArrowRight size={19} /></button>
+              <button type="button" className="uxui-pad-down" aria-label="Move element down 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.min(Math.max(0, board.height - selected.height), selected.y + 8) })}><ArrowDown size={19} /></button>
+            </div>
+            <div className="uxui-gamepad uxui-gamepad-transform" role="group" aria-label={selected.kind === "icon" ? "Icon transform controls" : "Selected element transform controls"}>
+              <span className="uxui-gamepad-label">{selected.kind === "icon" ? "Icon" : "Adjust"}</span>
+              <button type="button" className="uxui-pad-up" aria-label="Increase element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })}><ZoomIn size={18} /></button>
+              <button type="button" className="uxui-pad-left" aria-label="Rotate element left 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })}><RotateCw size={17} className="uxui-rotate-back" /></button>
+              <button type="button" className="uxui-pad-center" aria-label="Reset element rotation" onClick={() => updateLayer(selected.id, { rotation: 0 })}>0°</button>
+              <button type="button" className="uxui-pad-right" aria-label="Rotate element right 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })}><RotateCw size={17} /></button>
+              <button type="button" className="uxui-pad-down" aria-label="Decrease element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></button>
+            </div>
+          </div>}
           {selected && !isExpanded && <div className="uxui-context-controls">
             <div className="uxui-context-toolbar" role="toolbar" aria-label="Selected element tools">
               <span className="uxui-context-selection">{selected.name || "Selected element"}</span>
@@ -1550,6 +1572,22 @@ export function UxUiStudioEngine() {
               <Field label="Width (px)"><input type="number" min="1" className={fieldClass()} value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field>
               <Field label="Height (px)"><input type="number" min="1" className={fieldClass()} value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field>
             </div>
+            <details className="uxui-css-controls rounded-lg border border-border p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-fg">Technical styling · CSS</summary>
+              <p className="mt-2 text-[10px] leading-4 text-muted">Visual controls handle everyday edits. These implementation values are included in the project specification and web handoff.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Field label="Display"><select className={fieldClass()} value={selected.display || "flex"} onChange={(event) => updateLayer(selected.id, { display: event.target.value })}><option value="block">Block</option><option value="inline-flex">Inline flex</option><option value="flex">Flex</option><option value="grid">Grid</option><option value="none">Hidden</option></select></Field>
+                <Field label="Cursor"><select className={fieldClass()} value={selected.cursor || "default"} onChange={(event) => updateLayer(selected.id, { cursor: event.target.value })}><option value="default">Default</option><option value="pointer">Pointer</option><option value="grab">Grab</option><option value="text">Text</option><option value="move">Move</option><option value="not-allowed">Not allowed</option></select></Field>
+                <Field label="Z-index"><input type="number" className={fieldClass()} value={selected.zIndex ?? 1} onChange={(event) => updateLayer(selected.id, { zIndex: Math.max(-999, Math.min(9999, Number(event.target.value) || 0)) })} /></Field>
+                <Field label="Transition (ms)"><input type="number" min="0" max="5000" step="25" className={fieldClass()} value={selected.transitionDuration ?? 180} onChange={(event) => updateLayer(selected.id, { transitionDuration: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} /></Field>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Field label=":hover fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.hoverColor || "") ? selected.hoverColor : "#2563EB"} onChange={(event) => updateLayer(selected.id, { hoverColor: event.target.value })} /></Field>
+                <Field label=":active fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.activeColor || "") ? selected.activeColor : "#1D4ED8"} onChange={(event) => updateLayer(selected.id, { activeColor: event.target.value })} /></Field>
+                <Field label=":focus-visible fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.focusColor || "") ? selected.focusColor : "#7C3AED"} onChange={(event) => updateLayer(selected.id, { focusColor: event.target.value })} /></Field>
+              </div>
+              <p className="mt-2 text-[10px] text-muted">Empty interaction colours mean inherit the base style. Values are retained in the design specification.</p>
+            </details>
             <div className="mt-3 rounded-lg border border-border p-3">
               <h4 className="mb-2 text-xs font-semibold text-fg">Responsive constraints</h4>
               <div className="grid grid-cols-2 gap-2">
