@@ -7655,12 +7655,44 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
     return lines.joined(separator: "\n")
 }
 
+private struct UxUiStudioToolkit: Identifiable { let id: String; let name: String; let description: String; let status: String }
+private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
+    UxUiStudioToolkit(id: "icons", name: "Icon Studio", description: "Discover, style, import and reuse icons.", status: "Connected"),
+    UxUiStudioToolkit(id: "typography", name: "Typography Studio", description: "Font discovery, typography and embedded font assets.", status: "Connected"),
+    UxUiStudioToolkit(id: "color", name: "Color Studio", description: "Palette, semantic colors and design tokens.", status: "Connected"),
+    UxUiStudioToolkit(id: "background", name: "Gradient & Background Studio", description: "Canvas background and imported image backgrounds.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "effects", name: "Effects Studio", description: "Border, radius, opacity, shadow and visual depth.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "illustrations", name: "Illustration Studio", description: "Import and position SVG or image illustrations.", status: "Import"),
+    UxUiStudioToolkit(id: "media", name: "Image & Media Studio", description: "Import photos, screenshots and media previews.", status: "Import"),
+    UxUiStudioToolkit(id: "brand", name: "Brand Studio", description: "Brand colors, font tokens and reusable component templates.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "motion", name: "Motion Studio", description: "Rotation and visual transition settings.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "components", name: "UI Components, Kits & Patterns", description: "Reusable controls, cards, forms and navigation elements.", status: "Connected"),
+    UxUiStudioToolkit(id: "device", name: "Device Mockup Studio", description: "Preview screen contents in mobile, tablet and desktop frames.", status: "Connected"),
+    UxUiStudioToolkit(id: "responsive", name: "Responsive Design, Layout & Canvas", description: "Viewport size, anchors, grid and responsive visibility.", status: "Connected"),
+    UxUiStudioToolkit(id: "projects", name: "Screen & Project Manager", description: "Projects, drafts, presets and import.", status: "Connected"),
+    UxUiStudioToolkit(id: "layers", name: "Layers & Object Manager", description: "Select, reorder, duplicate and delete layers.", status: "Connected"),
+    UxUiStudioToolkit(id: "prototype", name: "Prototype Studio", description: "Connected navigation, overlays and interactive flows.", status: "Not complete"),
+    UxUiStudioToolkit(id: "design-system", name: "Design System Studio", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "accessibility", name: "Accessibility Studio", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
+    UxUiStudioToolkit(id: "content", name: "Content & Placeholder Studio", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "data-viz", name: "Data Visualization Studio", description: "Charts and dashboard elements.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "patterns", name: "Patterns & Textures Studio", description: "Grid and decorative vector patterns.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "3d", name: "3D Studio", description: "Live 3D models, camera and lighting.", status: "Not complete"),
+    UxUiStudioToolkit(id: "platform", name: "Platform Design Kits", description: "Mobile, tablet and desktop conventions.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "assets", name: "Asset Manager", description: "Import and replace supported assets.", status: "Import"),
+    UxUiStudioToolkit(id: "handoff", name: "Export & Design Handoff Studio", description: "Export PDF, JSON and source handoff.", status: "Connected"),
+    UxUiStudioToolkit(id: "inspiration", name: "Inspiration & Reference Studio", description: "Import visual references for comparison.", status: "Import"),
+    UxUiStudioToolkit(id: "qa", name: "Design QA Studio", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
+]
+
 private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
     @State private var didInitialize = false
     @State private var showComponentPalette = false
-    @State private var toolkitTab = "Icons"
+    @State private var toolkitTab = "All 26"
+    @State private var activeToolkitID = "icons"
+    @State private var qaReport: [String] = []
     @State private var toolkitQuery = ""
     @State private var isImportingProjectJSON = false
     @State private var isImportingSVGIcon = false
