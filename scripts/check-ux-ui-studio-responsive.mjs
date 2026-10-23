@@ -29,5 +29,6 @@ assert.ok(responsiveRules.includes("height:auto !important; min-height:0 !import
 assert.ok(responsiveRules.includes("target-desktop .uxui-mobile-controls { display:none !important; }"), "Desktop hides the movement controller");
 assert.ok(responsiveRules.includes("target-tablet .uxui-mobile-controls { display:flex !important; }"), "Tablet retains the movement controller");
 assert.ok(responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit surface follows user theme");
-assert.ok(responsiveRules.includes("z-index:1 !important"), "Topbar stacking is scoped below platform overlays");
+assert.ok(responsiveRules.includes("isolation:isolate;"), "Studio controls are contained in a local stacking context");
+assert.ok(responsiveRules.includes("position:sticky !important; top:64px !important; z-index:31 !important"), "Studio toolbar remains clickable below the global sticky header without escaping the Studio stack");
 console.log("UX/UI Studio responsive layout, contextual actions, naming, theme and placeholder checks: PASS");
