@@ -388,6 +388,8 @@ function shapePoints(kind: string, x: number, y: number, width: number, height: 
   return points.join(" ");
 }
 
+function newScreenId(): string { return "screen-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7); }
+
 function layerId(): string {
   return "layer-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
@@ -1095,6 +1097,76 @@ export function UxUiStudioEngine() {
     setLeftTab("toolkits"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
     setNotice("Draft opened. Tap an element to continue designing.");
+  }
+
+  function activeScreenSnapshot(): DesignScreen {
+    const current = screens.find((screen) => screen.id === activeScreenId);
+    return { id: activeScreenId || newScreenId(), name: current?.name || ("Screen " + (screens.length || 1)), target, background, customArtboard, customWidth, customHeight, elements, updatedAt: new Date().toISOString() };
+  }
+
+  function openScreen(screenId: string) {
+    if (screenId === activeScreenId) return;
+    const next = screens.find((screen) => screen.id === screenId);
+    if (!next) return;
+    const current = activeScreenSnapshot();
+    checkpoint();
+    setScreens((previous) => previous.map((screen) => screen.id === current.id ? current : screen));
+    setActiveScreenId(next.id);
+    setTarget(next.target); setBackground(next.background);
+    setCustomArtboard(next.customArtboard); setCustomWidth(next.customWidth); setCustomHeight(next.customHeight);
+    setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+    setShowInspector(false); setNotice("Opened " + next.name + ".");
+  }
+
+  function addScreen() {
+    const current = activeScreenSnapshot();
+    const id = newScreenId();
+    const next: DesignScreen = { ...current, id, name: "Screen " + (screens.length + 1), elements: [], updatedAt: new Date().toISOString() };
+    setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), next]);
+    setActiveScreenId(id); setElements([]); setSelectedId("");
+    setUndoStack([]); setRedoStack([]); setShowInspector(true);
+    setNotice(next.name + " added. Add elements to design this screen.");
+  }
+
+  function duplicateScreen(screenId: string) {
+    const source = screens.find((screen) => screen.id === screenId);
+    if (!source) return;
+    const duplicate: DesignScreen = { ...source, id: newScreenId(), name: source.name + " copy", elements: source.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })), updatedAt: new Date().toISOString() };
+    const current = activeScreenSnapshot();
+    setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), duplicate]);
+    setActiveScreenId(duplicate.id); setTarget(duplicate.target); setBackground(duplicate.background);
+    setCustomArtboard(duplicate.customArtboard); setCustomWidth(duplicate.customWidth); setCustomHeight(duplicate.customHeight);
+    setElements(duplicate.elements); setSelectedId(duplicate.elements[0]?.id || "");
+    setShowInspector(true); setNotice(duplicate.name + " duplicated.");
+  }
+
+  function deleteScreen(screenId: string) {
+    if (screens.length <= 1) { setNotice("A project must keep at least one screen."); return; }
+    const index = screens.findIndex((screen) => screen.id === screenId);
+    if (index < 0) return;
+    const remaining = screens.filter((screen) => screen.id !== screenId);
+    if (screenId === activeScreenId) {
+      const next = remaining[Math.max(0, index - 1)];
+      setScreens(remaining); setActiveScreenId(next.id);
+      setTarget(next.target); setBackground(next.background); setCustomArtboard(next.customArtboard);
+      setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+    } else setScreens(remaining);
+    setNotice("Screen deleted.");
+  }
+
+  function reorderScreen(screenId: string, offset: number) {
+    const current = activeScreenSnapshot();
+    const source = screens.map((screen) => screen.id === current.id ? current : screen);
+    const index = source.findIndex((screen) => screen.id === screenId);
+    const destination = index + offset;
+    if (index < 0 || destination < 0 || destination >= source.length) return;
+    const next = [...source];
+    [next[index], next[destination]] = [next[destination], next[index]];
+    setScreens(next);
+  }
+
+  function renameScreen(screenId: string, name: string) {
+    setScreens((previous) => previous.map((screen) => screen.id === screenId ? { ...screen, name: name.slice(0, 70), updatedAt: new Date().toISOString() } : screen));
   }
 
   function checkpoint() {
