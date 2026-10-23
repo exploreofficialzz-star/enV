@@ -123,7 +123,7 @@ try {
         // return with Back, then exit the preview.
         await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'Elements', exact: true }).click();
-        await page.getByRole('button', { name: 'Button', exact: true }).click();
+        await page.getByRole('button', { name: /^Button\b/ }).click();
         await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
         await page.getByRole('button', { name: 'Add app screen', exact: true }).click();
