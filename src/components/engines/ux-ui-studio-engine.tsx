@@ -1106,6 +1106,46 @@ export function UxUiStudioEngine() {
     setElements((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
+  function openToolkit(id: string) {
+    const toolkit = STUDIO_TOOLKITS.find((item) => item.id === id);
+    if (!toolkit) return;
+    setActiveToolkitId(id);
+    setLeftTab(toolkit.tab);
+    if (["media", "illustrations", "assets", "inspiration"].includes(id)) setNotice("Use the import actions to bring a supported image or SVG into the project.");
+    if (id === "device" || id === "platform") setNotice("Choose Mobile, Tablet or Desktop using the viewport selector above the mockup.");
+  }
+
+  function runDesignAudit() {
+    const findings: string[] = [];
+    if (!elements.length) findings.push("No layers have been added yet.");
+    for (const item of elements) {
+      if (!item.name.trim()) findings.push("Unnamed layer: " + item.id);
+      if (item.x < 0 || item.y < 0 || item.x + item.width > board.width || item.y + item.height > board.height) findings.push(item.name + ": extends beyond the current artboard.");
+      if (item.width < 44 || item.height < 44) findings.push(item.name + ": may be smaller than a comfortable touch target.");
+      if (item.kind === "icon" && !item.iconSvg.trim()) findings.push(item.name + ": icon SVG content is missing.");
+      if (item.kind === "image" && !item.imageDataUrl.trim()) findings.push(item.name + ": image source is missing.");
+      if (["text","button","input","search","textarea"].includes(item.kind) && item.fontSize < 14) findings.push(item.name + ": text is below 14 px; verify readability and scaling.");
+      if (item.borderWidth > 0 && (!item.borderColor || item.borderColor === "transparent")) findings.push(item.name + ": border width is set but the border color is transparent.");
+    }
+    for (let i = 0; i < elements.length; i++) for (let j = i + 1; j < elements.length; j++) {
+      const a = elements[i], b = elements[j];
+      const overlapWidth = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapHeight = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      if (overlapWidth > 0 && overlapHeight > 0) findings.push(a.name + " overlaps " + b.name + " by " + Math.round(overlapWidth) + "×" + Math.round(overlapHeight) + " px.");
+    }
+    setQaReport(findings);
+    setShowQaReport(true);
+    setNotice("Design QA completed: " + findings.length + " potential finding(s). This local structural scan is advisory, not a conformance certification.");
+  }
+
+  function addSample(kind: LayerKind, name: string, copy: string) {
+    const layer = { ...makeLayer(kind, Math.max(8, Math.round(board.width * 0.08)), Math.max(24, Math.round(board.height * 0.16) + elements.length * 74), board.width, board.height), name, text: copy, width: Math.min(kind === "text" ? board.width - 24 : 240, board.width - 24) };
+    checkpoint();
+    setElements((previous) => [...previous, layer]);
+    setSelectedId(layer.id);
+    setInspectorTab("design");
+    setNotice(name + " added to the artboard.");
+  }
   function addLayer(kind: LayerKind) {
     const x = Math.max(8, Math.round((board.width - Math.min(kind === "text" ? 250 : 180, board.width - 24)) / 2));
     const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)), board.width, board.height);
