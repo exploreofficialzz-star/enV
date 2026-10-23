@@ -146,7 +146,7 @@ export function ToolShell({
         <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
       </header>
 
-remove fallback error UI      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
+      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
