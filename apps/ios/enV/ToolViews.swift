@@ -8329,6 +8329,27 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 
+    private func runStudioAudit() {
+        var findings: [String] = []
+        if elements.isEmpty { findings.append("No layers have been added yet.") }
+        for item in elements {
+            if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { findings.append("An unnamed layer exists.") }
+            if item.x < 0 || item.y < 0 || item.x + item.width > boardWidth || item.y + item.height > boardHeight { findings.append("\(item.name) extends beyond the current artboard.") }
+            if item.width < 44 || item.height < 44 { findings.append("\(item.name) may be smaller than a comfortable touch target.") }
+            if item.kind == "icon" && item.iconSvg.isEmpty { findings.append("\(item.name) has no embedded icon SVG.") }
+            if item.kind == "image" && item.imageData.isEmpty { findings.append("\(item.name) has no image data.") }
+        }
+        for i in elements.indices {
+            for j in elements.indices where j > i {
+                let a = elements[i], b = elements[j]
+                if min(a.x + a.width, b.x + b.width) > max(a.x, b.x) && min(a.y + a.height, b.y + b.height) > max(a.y, b.y) {
+                    findings.append("\(a.name) overlaps \(b.name).")
+                }
+            }
+        }
+        qaReport = findings
+        notice = "Studio check completed: \(findings.count) potential finding(s). This local check is advisory, not a WCAG certification."
+    }
     private var componentPalette: some View {
         let components: [(label: String, icon: String, kind: String)] = [
             ("Text", "textformat", "text"), ("Button", "rectangle.roundedtop", "button"),
@@ -8371,7 +8392,7 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
-                    ForEach(["Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
+                    ForEach(["All 26", "Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
                         Button { toolkitTab = tab } label: {
                             Text(tab).font(.envScaled(size: 11, weight: .semibold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
@@ -8383,7 +8404,51 @@ private struct NativeUxUiStudioView: View {
                 }
             }
             Group {
-                if toolkitTab == "Elements" {
+                if toolkitTab == "All 26" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All 26 Studio toolkits").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Choose a toolkit to reach its connected native controls. Systems needing a separate engine are explicitly labelled rather than represented by inactive mock controls.").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                        ForEach(uxUiStudioToolkits.filter { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) || $0.id.localizedCaseInsensitiveContains(toolkitQuery) }) { toolkit in
+                            Button {
+                                activeToolkitID = toolkit.id
+                                switch toolkit.id {
+                                case "icons": toolkitTab = "Icons"
+                                case "typography": toolkitTab = "Fonts"
+                                case "color", "brand", "design-system": toolkitTab = "Tokens"
+                                case "background": toolkitTab = "Tokens"; showAdvancedCanvas = true
+                                case "effects", "motion": showAdvancedInspector = true; notice = "Use selected-layer controls and Fine-tune design for supported visual properties."
+                                case "illustrations", "media", "assets", "inspiration": toolkitTab = "Elements"; isImportingImage = true
+                                case "components": toolkitTab = "Elements"
+                                case "device", "platform": showAdvancedCanvas = true; notice = "Use the viewport target controls to switch between device previews."
+                                case "responsive": showAdvancedCanvas = true
+                                case "projects": toolkitTab = "Presets"
+                                case "layers": showAllLayers = true
+                                case "prototype": notice = "Connected multi-screen prototype navigation and overlay playback are not implemented yet."
+                                case "content": addLayer("text"); if let index = elements.indices.last { elements[index].name = "Welcome heading"; elements[index].text = "Welcome back" }
+                                case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity" }
+                                case "patterns": addLayer("star"); if let index = elements.indices.last { elements[index].name = "Decorative star" }
+                                case "3d": notice = "Live GLB/GLTF rendering, lighting and camera controls are not implemented in this editor. Import a rendered preview instead."
+                                case "accessibility", "qa": runStudioAudit()
+                                case "handoff": showComponentPalette = false; notice = "Use the Design handoff panel for PDF, JSON and source exports."
+                                default: break
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack { Text(toolkit.name).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk); Spacer(minLength: 4); Text(toolkit.status).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(toolkit.status == "Not complete" ? Color.envDanger : Color.envAccent) }
+                                    Text(toolkit.description).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    if activeToolkitID == toolkit.id { Text("Selected toolkit").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent) }
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                                    .background(activeToolkitID == toolkit.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(activeToolkitID == toolkit.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                            }.buttonStyle(.plain)
+                        }
+                        if activeToolkitID == "qa" || activeToolkitID == "accessibility" || !qaReport.isEmpty {
+                            Text("Review results · \(qaReport.count)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                            if qaReport.isEmpty { Text("No findings in the limited checks run.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                            ForEach(Array(qaReport.prefix(80).enumerated()), id: \.offset) { _, finding in Text("• " + finding).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                        }
+                    }
+                } else if toolkitTab == "Elements" {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ForEach(components.indices.filter { components[$0].label.localizedCaseInsensitiveContains(toolkitQuery) || components[$0].kind.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { index in
                             addButton(components[index].label, icon: components[index].icon, kind: components[index].kind)
