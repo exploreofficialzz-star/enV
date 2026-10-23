@@ -7263,6 +7263,17 @@ private struct UxUiNativeTokens: Codable, Equatable {
     ]
     var spacing: [Int] = [4, 8, 12, 16, 24, 32, 48]
 }
+private struct UxUiNativeScreen: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var target: String
+    var background: String
+    var customArtboard: Bool
+    var customWidth: Int
+    var customHeight: Int
+    var elements: [UxUiNativeLayer]
+    var updatedAt: String = ISO8601DateFormatter().string(from: Date())
+}
 private struct UxUiNativeProject: Codable {
     var schemaVersion = 2
     var name: String
@@ -7276,6 +7287,8 @@ private struct UxUiNativeProject: Codable {
     var aiPrompt: String
     var generatedCode: [String: String]? = nil
     var updatedAt: String
+    var screens: [UxUiNativeScreen]? = nil
+    var activeScreenID: String? = nil
 }
 private struct UxUiViewport: Codable { var width: Int; var height: Int }
 
@@ -7712,6 +7725,9 @@ private struct NativeUxUiStudioView: View {
     @State private var spacingDraft = "20"
     @State private var reusableComponents: [UxUiNativeLayer] = []
     @State private var elements: [UxUiNativeLayer] = []
+    @State private var screens: [UxUiNativeScreen] = [UxUiNativeScreen(id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [])]
+    @State private var activeScreenID = "screen-home"
+    @State private var showScreenManager = false
     @State private var undoHistory: [[UxUiNativeLayer]] = []
     @State private var redoHistory: [[UxUiNativeLayer]] = []
     @State private var dragOrigins: [UUID: CGPoint] = [:]
@@ -7824,7 +7840,8 @@ private struct NativeUxUiStudioView: View {
             breakpoints: ["mobile": 480, "tablet": 768, "desktop": 1024],
             tokens: tokens, reusableComponents: reusableComponents,
             elements: elements, aiPrompt: aiPrompt, generatedCode: generated,
-            updatedAt: ISO8601DateFormatter().string(from: Date())
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            screens: screens, activeScreenID: activeScreenID
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
