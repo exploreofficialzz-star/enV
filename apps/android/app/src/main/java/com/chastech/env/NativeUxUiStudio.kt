@@ -1317,6 +1317,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         if(id==activeScreenId)persistActiveScreen()
         screens.removeAt(index)
         for(screenIndex in screens.indices){val screen=screens[screenIndex];screens[screenIndex]=screen.copy(elements=screen.elements.map{layer->if(layer.prototypeTargetScreenId==id)layer.copy(prototypeTargetScreenId="")else layer})}
+        for(elementIndex in elements.indices){val layer=elements[elementIndex];if(layer.prototypeTargetScreenId==id)elements[elementIndex]=layer.copy(prototypeTargetScreenId="")}
         prototypeHistory.removeAll{it==id}
         if(id==activeScreenId){val next=screens[maxOf(0,index-1)];activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight;elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear()}
         if(prototypeStartScreenId==id)prototypeStartScreenId=activeScreenId
