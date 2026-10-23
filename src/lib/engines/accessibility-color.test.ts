@@ -10,6 +10,7 @@ import {
   toHex,
 } from "./accessibility-color.ts";
 import { auditUxUiStudioTextContrast } from "./ux-ui-studio-qa.ts";
+import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
 
 test("parses 3/4/6/8 digit hex colors", () => {
   assert.deepEqual(parseCssColor("#fff"), { r: 255, g: 255, b: 255, a: 1, format: "hex", input: "#fff" });
@@ -83,6 +84,21 @@ test("UX/UI Studio QA detects WCAG AA text contrast and preserves manual-review 
   assert.ok(findings.some((finding) => finding.includes("Translucent label") && finding.includes("3.98:1")));
   assert.ok(findings.some((finding) => finding.includes("Gradient label") && finding.includes("manually review")));
   assert.ok(findings.some((finding) => finding.includes("Faded label") && finding.includes("reduced layer opacity")));
+});
+
+test("UX/UI Studio chart rows are parsed and invalid rows are reported", () => {
+  const chart = parseUxUiStudioChartData("Monthly activity\nJan: 36\nFeb, 62.5\nMar=0\nBroken row\nApr: -3\nMay: 18");
+  assert.equal(chart.title, "Monthly activity");
+  assert.deepEqual(chart.points, [
+    { label: "Jan", value: 36 },
+    { label: "Feb", value: 62.5 },
+    { label: "Mar", value: 0 },
+    { label: "May", value: 18 },
+  ]);
+  assert.equal(chart.invalidRows, 2);
+  const empty = parseUxUiStudioChartData("Chart title\nNo numeric value");
+  assert.equal(empty.points.length, 0);
+  assert.equal(empty.invalidRows, 1);
 });
 
 test("invalid values are rejected", () => {

@@ -1,3 +1,5 @@
+import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
+
 export type UxCodegenLayer = {
   id: string; kind: string; name: string; x: number; y: number; width: number; height: number;
   text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl?: string;
@@ -79,6 +81,27 @@ const layerStyle = (l: UxCodegenLayer) => [
 ].filter(Boolean).join(";");
 const layerHtml = (l: UxCodegenLayer, p: UxCodegenProject) => {
   const common = 'class="env-layer env-layer-' + esc(l.id) + '" data-visible-on="' + visibility(l).join(" ") + '" style="' + esc("position:absolute;" + cssGeometry(l,p) + ";" + layerStyle(l)) + '"';
+  if (l.kind === "chart") {
+    const chart = parseUxUiStudioChartData(l.text);
+    const pad = Math.max(4, l.padding);
+    const plotLeft = pad + 4, plotRight = l.width - pad - 4;
+    const plotTop = pad + Math.min(22, l.fontSize + 6), plotBottom = l.height - pad - 17;
+    const plotHeight = Math.max(4, plotBottom - plotTop), plotWidth = Math.max(1, plotRight - plotLeft);
+    const maximum = Math.max(1, ...chart.points.map((point) => point.value));
+    const slot = plotWidth / Math.max(1, chart.points.length);
+    const bars = chart.points.map((point, index) => {
+      const barHeight = plotHeight * point.value / maximum, barWidth = Math.max(2, Math.min(26, slot * 0.58));
+      const x = plotLeft + index * slot + (slot - barWidth) / 2, y = plotBottom - barHeight;
+      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" rx="3" fill="' + esc(l.color) + '" />' +
+        '<text x="' + (plotLeft + index * slot + slot / 2) + '" y="' + Math.max(plotTop + 7, y - 3) + '" font-size="' + Math.max(5, Math.min(9, l.fontSize * 0.64)) + '" text-anchor="middle" fill="' + esc(l.color) + '">' + esc(String(point.value)) + '</text>' +
+        '<text x="' + (plotLeft + index * slot + slot / 2) + '" y="' + (plotBottom + 12) + '" font-size="' + Math.max(5, Math.min(9, l.fontSize * 0.64)) + '" text-anchor="middle" fill="' + esc(l.color) + '">' + esc(point.label.slice(0, 8)) + '</text>';
+    }).join("");
+    const grid = [0,1,2,3].map((index) => '<line x1="' + plotLeft + '" y1="' + (plotTop + plotHeight * index / 3) + '" x2="' + plotRight + '" y2="' + (plotTop + plotHeight * index / 3) + '" stroke="#E5E7EB" />').join("");
+    return '<div ' + common + ' role="img" aria-label="' + esc("Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")) + '">' +
+      '<div style="position:absolute;left:' + pad + 'px;top:' + pad + 'px;font-size:' + Math.min(13, l.fontSize) + 'px;font-weight:700">' + esc(chart.title) + '</div>' +
+      '<svg aria-hidden="true" viewBox="0 0 ' + l.width + ' ' + l.height + '" style="position:absolute;inset:0;width:100%;height:100%">' + (chart.points.length ? grid + bars : '<text x="' + (l.width/2) + '" y="' + (plotTop + plotHeight/2) + '" text-anchor="middle" fill="' + esc(l.color) + '" font-size="10">Enter data as Label: value</text>') + '</svg>' +
+      (chart.invalidRows ? '<span style="position:absolute;right:' + pad + 'px;bottom:2px;font-size:8px;color:#B45309">' + chart.invalidRows + ' invalid row(s)</span>' : '') + '</div>';
+  }
   if (l.kind === "icon") return '<div ' + common + ' aria-label="' + esc(l.name) + '"><svg viewBox="' + esc(l.iconViewBox || "0 0 24 24") + '" width="100%" height="100%" aria-hidden="true" style="fill:currentColor">' + (l.iconSvg || "") + '</svg></div>';
   if (l.kind === "image") return '<div ' + common + '>' + (l.imageDataUrl ? '<img alt="' + esc(l.name) + '" src="' + esc(l.imageDataUrl) + '" style="width:100%;height:100%;object-fit:cover" />' : esc(l.text || "Image asset not selected")) + '</div>';
   if (l.kind === "input" || l.kind === "search" || l.kind === "textarea") {

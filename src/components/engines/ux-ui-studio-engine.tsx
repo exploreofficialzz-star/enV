@@ -1,5 +1,6 @@
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
+import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
@@ -262,10 +263,10 @@ const STUDIO_TOOLKITS: StudioToolkit[] = [
   {
     "id": "data-viz",
     "name": "Data Visualization Studio",
-    "description": "Insert chart components and edit chart labels for dashboard mockups.",
+    "description": "Author numeric bar-chart data and preview the saved values in dashboards.",
     "tab": "components",
     "icon": "ChartNoAxesColumn",
-    "outcome": "Insert a chart layer and edit its label, geometry and styling like any other layer."
+    "outcome": "Edit the title and Label: value rows; preview uses actual values and flags invalid rows."
   },
   {
     "id": "patterns",
@@ -437,7 +438,7 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     case "search": return { ...shared, name: "Search field", width: 280, height: 48, text: "Search…", background: "#FFFFFF", color: "#6B7280", borderColor: "#D1D5DB", borderWidth: 1, radius: 10, fontSize: 14 };
     case "textarea": return { ...shared, name: "Text area", width: 280, height: 96, text: "Enter your message", background: "#FFFFFF", color: "#6B7280", borderColor: "#D1D5DB", borderWidth: 1, radius: 10, fontSize: 14 };
     case "table": return { ...shared, name: "Data table", width: 320, height: 180, text: "Name           Status         Updated\nProject A      Active         Today\nProject B      Draft          Yesterday", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 12, padding: 14, fontSize: 12 };
-    case "chart": return { ...shared, name: "Bar chart", width: 300, height: 180, text: "Activity overview\nJan       Feb       Mar       Apr", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 14, padding: 14, fontSize: 13 };
+    case "chart": return { ...shared, name: "Bar chart", width: 300, height: 180, text: "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 14, padding: 14, fontSize: 13 };
     case "modal": return { ...shared, name: "Dialog panel", width: 310, height: 200, text: "Dialog title\n\nDescribe the action here.\n\nCancel          Confirm", background: "#FFFFFF", color: "#111827", borderColor: "#D1D5DB", borderWidth: 1, radius: 18, padding: 18, shadow: true, fontSize: 14 };
     case "breadcrumb": return { ...shared, name: "Breadcrumb trail", width: 300, height: 34, text: "Home / Workspace / Current", color: "#475569", fontSize: 12 };
     case "tooltip": return { ...shared, name: "Tooltip", width: 170, height: 38, text: "Helpful information", background: "#111827", color: "#FFFFFF", radius: 8, padding: 9, fontSize: 12 };
@@ -1978,7 +1979,7 @@ export function UxUiStudioEngine() {
               {toolkit.id === "background" && <div className="mt-3"><label className="block text-xs font-semibold text-fg">Canvas background<input type="color" aria-label="Toolkit canvas background" value={background.startsWith("#") ? background : "#FFFFFF"} onChange={(event)=>setBackground(event.target.value)} className="mt-2 block h-10 w-full"/></label><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import background image as layer</button></div>}
               {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
               {toolkit.id === "assets" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import assets</button></div>}
-              {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={()=>addSample("chart","Sample chart","Monthly activity")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add sample chart</button></div>}
+              {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={()=>addSample("chart","Sample chart","Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add sample chart</button></div>}
               {toolkit.id === "illustrations" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import illustration (SVG/image)</button></div>}
               {toolkit.id === "media" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import image</button></div>}
             </section>; })()}
@@ -2156,10 +2157,38 @@ export function UxUiStudioEngine() {
                     {layer.kind === "progress" ? <><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={layer.radius} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y} width={layer.width * 0.72} height={layer.height} rx={layer.radius} fill={layer.color} /></> : null}
                     {layer.kind === "slider" ? <><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width} height={4} rx={2} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width * 0.62} height={4} rx={2} fill={layer.color} /><circle cx={layer.x + layer.width * 0.62} cy={layer.y + layer.height / 2} r={7} fill={layer.color} /></> : null}
                     {["text", "icon", "divider", "ellipse", "avatar", "checkbox", "radio", "switch", "toggle", "progress", "slider", "triangle", "diamond", "hexagon", "star", "line"].includes(layer.kind) ? null : baseBox()}
-                    {layer.kind === "chart" ? <g>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={layer.x+layer.padding} y1={layer.y+layer.height-layer.padding-22-grid*22} x2={layer.x+layer.width-layer.padding} y2={layer.y+layer.height-layer.padding-22-grid*22} stroke="#E5E7EB" strokeWidth="1" />)}{[0.36,0.62,0.46,0.82,0.67].map((ratio,index)=><rect key={"bar-"+index} x={layer.x+layer.padding+18+index*30} y={layer.y+layer.height-layer.padding-24-ratio*76} width="16" height={ratio*76} rx="3" fill={layer.color} opacity={index===4?1:0.72} />)}</g> : null}
+                    {layer.kind === "chart" ? (() => {
+                      const chart = parseUxUiStudioChartData(layer.text);
+                      const plotLeft = layer.x + layer.padding + 4;
+                      const plotRight = layer.x + layer.width - layer.padding - 4;
+                      const plotTop = layer.y + layer.padding + Math.min(22, layer.fontSize + 6);
+                      const plotBottom = layer.y + layer.height - layer.padding - 17;
+                      const plotHeight = Math.max(4, plotBottom - plotTop);
+                      const plotWidth = Math.max(1, plotRight - plotLeft);
+                      const maxValue = Math.max(1, ...chart.points.map((point) => point.value));
+                      const slotWidth = plotWidth / Math.max(1, chart.points.length);
+                      const labelSize = Math.max(5, Math.min(9, layer.fontSize * 0.64));
+                      return <g role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>
+                        <text x={layer.x + layer.padding} y={layer.y + layer.padding + Math.min(18, layer.fontSize + 3)} fontSize={Math.min(13, layer.fontSize)} fontWeight={layer.fontWeight} fill={layer.color}>{chart.title}</text>
+                        {chart.points.length > 0 ? <>
+                          {[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={plotLeft} y1={plotTop + plotHeight * grid / 3} x2={plotRight} y2={plotTop + plotHeight * grid / 3} stroke="#E5E7EB" strokeWidth="1" />)}
+                          {chart.points.map((point, index) => {
+                            const barHeight = plotHeight * point.value / maxValue;
+                            const barWidth = Math.max(2, Math.min(26, slotWidth * 0.58));
+                            const barX = plotLeft + index * slotWidth + (slotWidth - barWidth) / 2;
+                            return <g key={point.label + "-" + index}>
+                              <rect x={barX} y={plotBottom - barHeight} width={barWidth} height={barHeight} rx="3" fill={layer.color} opacity={index === chart.points.length - 1 ? 1 : 0.78} />
+                              <text x={plotLeft + index * slotWidth + slotWidth / 2} y={Math.max(plotTop + 7, plotBottom - barHeight - 3)} fontSize={labelSize} fill={layer.color} textAnchor="middle">{point.value}</text>
+                              <text x={plotLeft + index * slotWidth + slotWidth / 2} y={plotBottom + 12} fontSize={labelSize} fill={layer.color} textAnchor="middle">{point.label.slice(0, 8)}</text>
+                            </g>;
+                          })}
+                        </> : <text x={layer.x + layer.width/2} y={plotTop + plotHeight/2} fontSize={labelSize} fill={layer.color} textAnchor="middle">Enter data as Label: value</text>}
+                        {chart.invalidRows > 0 && <text x={layer.x + layer.width - layer.padding} y={layer.y + layer.height - 3} fontSize={Math.max(5, labelSize - 1)} fill="#B45309" textAnchor="end">{chart.invalidRows} invalid row(s)</text>}
+                      </g>;
+                    })() : null}
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
                     {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
-                    {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
+                    {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
                     {selectedId === layer.id && <rect x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="#2563EB" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
                   </g>;
                 })}
@@ -2364,7 +2393,7 @@ export function UxUiStudioEngine() {
           {selected && inspectorTab === "design" && <div className="mt-3 space-y-3">
             <div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-semibold text-fg">{selected.kind.charAt(0).toUpperCase() + selected.kind.slice(1)} properties</p><button type="button" title="Duplicate selected layer" onClick={duplicateSelected} className="rounded-md border border-border p-2 text-muted hover:text-fg"><Copy size={13} /></button></div>
             <Field label="Layer name"><input className={fieldClass()} value={selected.name} onChange={(event) => updateLayer(selected.id, { name: event.target.value })} /></Field>
-            {["text", "button", "card", "input", "image", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(selected.kind) && <Field label="Text content"><textarea rows={selected.kind === "card" || selected.kind === "row" ? 3 : 2} className={fieldClass()} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field>}
+            {["text", "button", "card", "input", "image", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(selected.kind) && <Field label={selected.kind === "chart" ? "Chart data (title, then Label: value)" : "Text content"}><textarea rows={selected.kind === "chart" ? 7 : selected.kind === "card" || selected.kind === "row" ? 3 : 2} spellCheck={selected.kind !== "chart"} className={fieldClass()} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field>}
             {selected.kind === "image" && <Field label="Replace image"><input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" className="mt-2 block w-full text-[11px] text-muted file:mr-2 file:rounded-md file:border-0 file:bg-surface-2 file:px-2 file:py-1.5 file:text-xs file:font-semibold" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 4 * 1024 * 1024) { setNotice("Image assets must be 4 MB or smaller for a portable design project."); event.target.value = ""; return; } if (!file.type.startsWith("image/")) { setNotice("Choose a supported image file."); event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === "string") updateLayer(selected.id, { imageDataUrl: reader.result }); }; reader.onerror = () => setNotice("Could not read the selected image."); reader.readAsDataURL(file); }} /></Field>}
             {selected.kind === "icon" && <div className="rounded-lg border border-border p-2"><p className="break-all text-xs font-semibold text-fg">{selected.iconName || "Built-in home icon"}</p><p className="mt-1 text-[10px] leading-4 text-muted">{selected.iconAuthor || "Built-in icon"} · {selected.iconLicense || "No external license metadata"}</p><button type="button" onClick={() => setLeftTab("icons")} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent"><Search size={12} /> Replace icon</button></div>}
             <div className="grid grid-cols-2 gap-2">
