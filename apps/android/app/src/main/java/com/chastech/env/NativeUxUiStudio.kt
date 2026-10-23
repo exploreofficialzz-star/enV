@@ -18,6 +18,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,7 +68,8 @@ private data class UxUiNativeLayer(
     val horizontalConstraint: String = "left", val verticalConstraint: String = "top",
     val minWidth: Int = 0, val maxWidth: Int = 0, val visibleOn: String = "mobile,tablet,desktop",
     val referenceWidth: Int = 390, val referenceHeight: Int = 844, val componentKey: String = "",
-    val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f
+    val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f,
+    val prototypeTargetScreenId: String = ""
 )
 
 private data class UxNativeToolkit(val id: String, val name: String, val description: String, val panel: String, val status: String)
@@ -86,7 +88,7 @@ private val uxNativeToolkits = listOf(
     UxNativeToolkit("responsive", "Responsive Design, Layout & Canvas", "Viewport size, anchors, grid and responsive visibility.", "Canvas", "Connected"),
     UxNativeToolkit("projects", "Screen & Project Manager", "Projects, drafts, presets and import.", "Presets", "Connected"),
     UxNativeToolkit("layers", "Layers & Object Manager", "Select and reorder objects, duplicate and delete layers.", "Layers", "Connected"),
-    UxNativeToolkit("prototype", "Prototype Studio", "Connected navigation, overlays and interaction flows.", "Prototype", "Not complete"),
+    UxNativeToolkit("prototype", "Prototype Studio", "Assign tap destinations and preview connected screens.", "Prototype", "Partial: screen links"),
     UxNativeToolkit("design-system", "Design System Studio", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
     UxNativeToolkit("accessibility", "Accessibility Studio", "Structure and touch-target review.", "QA", "Advisory checks"),
     UxNativeToolkit("content", "Content & Placeholder Studio", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
@@ -351,7 +353,7 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
         put("horizontalConstraint", element.horizontalConstraint); put("verticalConstraint", element.verticalConstraint)
         put("minWidth", element.minWidth); put("maxWidth", element.maxWidth); put("visibleOn", element.visibleOn)
         put("referenceWidth", element.referenceWidth); put("referenceHeight", element.referenceHeight); put("componentKey", element.componentKey)
-        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation)
+        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation); put("prototypeTargetScreenId", element.prototypeTargetScreenId)
     }) }
 }
 
@@ -368,7 +370,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
             horizontalConstraint=item.optString("horizontalConstraint","left"),verticalConstraint=item.optString("verticalConstraint","top"),
             minWidth=item.optInt("minWidth"),maxWidth=item.optInt("maxWidth"),visibleOn=item.optString("visibleOn","mobile,tablet,desktop"),
             referenceWidth=item.optInt("referenceWidth",390),referenceHeight=item.optInt("referenceHeight",844),componentKey=item.optString("componentKey"),
-            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat()
+            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat(),prototypeTargetScreenId=item.optString("prototypeTargetScreenId","")
         ))
     }
 }
@@ -973,6 +975,9 @@ fun NativeUxUiStudioForm() {
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val screens=remember{mutableStateListOf<UxUiNativeScreen>(UxUiNativeScreen("screen-home","Screen 1","mobile","#FFFFFF",false,390,844, emptyList()))}
     var activeScreenId by remember{mutableStateOf("screen-home")}
+    var prototypePreview by remember{mutableStateOf(false)}
+    val prototypeHistory=remember{mutableStateListOf<String>()}
+    var prototypeStartScreenId by remember{mutableStateOf("screen-home")}
     var showScreenManager by remember{mutableStateOf(false)}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
     var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var activeToolkitId by remember{mutableStateOf("icons")};var qaReport by remember{mutableStateOf(emptyList<String>())};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
@@ -980,6 +985,7 @@ fun NativeUxUiStudioForm() {
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
     val selected=elements.firstOrNull{it.id==selectedId}
+    val hasActivePrototypeLinks=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
     val presetWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
@@ -1262,6 +1268,34 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty()
         undoHistory.clear();redoHistory.clear();showAdvancedControls=false;notice="Opened "+next.name+"."
     }
+    fun startPrototypePreview(){
+        persistActiveScreen()
+        val hasValidLink=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
+        if(!hasValidLink){
+            activeToolkitId="prototype";showElementTray=true
+            notice="Select a layer and assign a destination screen in Prototype Studio before previewing."
+            return
+        }
+        prototypeStartScreenId=activeScreenId;prototypeHistory.clear();prototypePreview=true
+        selectedId="";showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showScreenManager=false
+        notice="Prototype preview started. Tap linked elements to navigate."
+    }
+    fun navigatePrototype(destinationId:String){
+        if(destinationId==activeScreenId||screens.none{it.id==destinationId}){notice="This element has no valid screen destination.";return}
+        prototypeHistory.add(activeScreenId)
+        activateScreen(destinationId);selectedId=""
+    }
+    fun backPrototypePreview(){
+        if(prototypeHistory.isEmpty())return
+        val previous=prototypeHistory.removeAt(prototypeHistory.lastIndex)
+        activateScreen(previous);selectedId=""
+    }
+    fun stopPrototypePreview(){
+        val start=prototypeStartScreenId
+        prototypePreview=false;prototypeHistory.clear()
+        if(start!=activeScreenId&&screens.any{it.id==start})activateScreen(start)
+        selectedId="";notice="Returned to design editing."
+    }
     fun addAppScreen(){
         persistActiveScreen()
         val id="screen-"+System.nanoTime()
@@ -1282,8 +1316,11 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         val index=screens.indexOfFirst{it.id==id};if(index<0)return
         if(id==activeScreenId)persistActiveScreen()
         screens.removeAt(index)
+        for(screenIndex in screens.indices){val screen=screens[screenIndex];screens[screenIndex]=screen.copy(elements=screen.elements.map{layer->if(layer.prototypeTargetScreenId==id)layer.copy(prototypeTargetScreenId="")else layer})}
+        prototypeHistory.removeAll{it==id}
         if(id==activeScreenId){val next=screens[maxOf(0,index-1)];activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight;elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear()}
-        notice="Screen deleted."
+        if(prototypeStartScreenId==id)prototypeStartScreenId=activeScreenId
+        notice="Screen deleted. Any links to it were cleared."
     }
     fun reorderAppScreen(id:String,delta:Int){
         persistActiveScreen()
@@ -1344,10 +1381,16 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     Spacer(Modifier.weight(1f))
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
-                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
-                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")})
-                    OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
+                    if(prototypePreview){
+                        OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
+                        Button(onClick={stopPrototypePreview}){Text("Exit preview")}
+                    }else{
+                        OutlinedButton(onClick={startPrototypePreview},enabled=hasActivePrototypeLinks){Text("Preview prototype")}
+                        OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                    }
                 }
                 if(showCanvasSettings){
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
@@ -1390,12 +1433,16 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
                                     val shape=uxNativeComposeShape(e.kind,e.radius)
-                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
-                                        val density=dragDensity
-                                        detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
-                                            change.consume()
-                                            val index=elements.indexOfFirst{it.id==e.id}
-                                            if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity,prototypePreview){
+                                        if(prototypePreview){
+                                            detectTapGestures(onTap={navigatePrototype(e.prototypeTargetScreenId)})
+                                        }else{
+                                            val density=dragDensity
+                                            detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
+                                                change.consume()
+                                                val index=elements.indexOfFirst{it.id==e.id}
+                                                if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
+                                            }
                                         }
                                     }){
                                         if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
@@ -1547,7 +1594,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                                     "responsive"->{showCanvasSettings=true;toolkitTab="All 26"}
                                                     "projects"->{toolkitTab="Presets"}
                                                     "layers"->{showAllLayers=true;toolkitTab="All 26"}
-                                                    "prototype"->{toolkitTab="All 26";notice="Connected multi-screen prototype navigation and overlay playback are not implemented yet."}
+                                                    "prototype"->{toolkitTab="All 26";showAdvancedControls=true;notice="Assign tap destinations to layers, then preview the connected screen flow. Overlay interactions are not yet supported."}
                                                     "content"->{toolkitTab="All 26";add("text");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Welcome heading",text="Welcome back")}}}
                                                     "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity")}}}
                                                     "patterns"->{toolkitTab="All 26";showCanvasSettings=true;add("star");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Decorative star")}}}
@@ -1612,6 +1659,14 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                         val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
                         Text("Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        Text("Prototype destination",style=MaterialTheme.typography.labelLarge)
+                        val prototypeDestinations=screens.filter{it.id!=activeScreenId}
+                        if(prototypeDestinations.isEmpty())Text("Add another screen to connect this layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        else Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){ 
+                            FilterChip(selected=e.prototypeTargetScreenId.isBlank(),onClick={edit(e.id){it.copy(prototypeTargetScreenId="")}},label={Text("None")})
+                            prototypeDestinations.forEach{screen->FilterChip(selected=e.prototypeTargetScreenId==screen.id,onClick={edit(e.id){it.copy(prototypeTargetScreenId=screen.id)}},label={Text(screen.name,maxLines=1)})}
+                        }
+                        if(hasActivePrototypeLinks)OutlinedButton(onClick={startPrototypePreview},modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=3)
                         Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
