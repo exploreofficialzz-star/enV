@@ -411,7 +411,6 @@ private struct ToolFullscreenContainer<Content: View>: View {
             ScrollView {
                 content
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 12)
                     .padding(.bottom, 24)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
