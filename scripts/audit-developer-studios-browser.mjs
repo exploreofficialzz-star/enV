@@ -46,6 +46,13 @@ try {
   }, { marker: [regexMarker, sampleMarker] });
   const page = await context.newPage();
   page.setDefaultTimeout(timeout);
+  let activeRouteDiagnostics = null;
+  page.on('pageerror', (error) => {
+    if (activeRouteDiagnostics) activeRouteDiagnostics.runtimeErrors.push(String(error?.stack || error?.message || error).slice(0, 900));
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error' && activeRouteDiagnostics) activeRouteDiagnostics.consoleErrors.push(message.text().slice(0, 900));
+  });
   page.on('request', (request) => {
     const candidate = `${request.url()}\n${request.postData() || ''}`;
     if ([regexMarker, sampleMarker].some((sentinel) => candidate.includes(sentinel))) {
@@ -64,7 +71,9 @@ try {
     throw new Error('Developer Studio did not become interactive before the browser audit deadline.');
   };
   for (const route of routes) {
-    const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [] };
+    const routeDiagnostics = { runtimeErrors: [], consoleErrors: [] };
+    activeRouteDiagnostics = routeDiagnostics;
+    const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [], browserDiagnostics: routeDiagnostics };
     try {
       await page.setViewportSize(report.viewport);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: 'domcontentloaded', timeout });
@@ -80,13 +89,28 @@ try {
         await page.getByRole('button', { name: 'App screens and layers' }).click();
         await page.getByLabel('Project name').waitFor({ state: 'visible', timeout });
         await page.getByLabel('Project name').fill('UX/UI Studio browser QA');
-        const [download] = await Promise.all([
-          page.waitForEvent('download'),
-          (async () => {
-            await page.getByRole('button', { name: 'Export', exact: true }).click();
-            await page.getByRole('button', { name: /React TSX/ }).click();
-          })(),
-        ]);
+        await page.getByRole('button', { name: 'Export', exact: true }).click();
+        const exportDialog = page.getByRole('dialog', { name: 'Export design handoff' });
+        await exportDialog.waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) });
+        const reactExport = page.getByRole('button', { name: 'React TSX', exact: true });
+        await reactExport.waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) });
+        const downloadPromise = page.waitForEvent('download', { timeout: Math.min(timeout, 7000) }).catch(() => null);
+        await reactExport.click();
+        const download = await downloadPromise;
+        if (!download) {
+          const domState = await page.evaluate(() => ({
+            exportMenuText: document.querySelector('.uxui-export-menu')?.textContent?.slice(0, 700) || null,
+            reactTsxButtons: Array.from(document.querySelectorAll('button')).filter((button) => (button.getAttribute('aria-label') || button.textContent || '').includes('React TSX')).length,
+            downloadingAnchors: Array.from(document.querySelectorAll('a[download]')).map((anchor) => ({ filename: anchor.getAttribute('download'), attached: anchor.isConnected })),
+            notices: Array.from(document.querySelectorAll('[role="status"], [aria-live]')).map((node) => node.textContent?.slice(0, 300) || '').filter(Boolean).slice(0, 5),
+            hydrated: document.documentElement.dataset.envToolHydrated || null,
+          }));
+          throw new Error('React TSX export did not start a browser download. Diagnostics: ' + JSON.stringify({
+            ...domState,
+            runtimeErrors: routeDiagnostics.runtimeErrors,
+            consoleErrors: routeDiagnostics.consoleErrors,
+          }));
+        }
         const downloadPath = await download.path();
         const generatedSource = downloadPath ? await readFile(downloadPath, 'utf8') : '';
         routeReport.loaded = true;
