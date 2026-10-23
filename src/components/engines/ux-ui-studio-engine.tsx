@@ -39,6 +39,7 @@ type SavedProject = {
   tokens: DesignTokens; reusableComponents: DesignLayer[];
   elements: DesignLayer[]; updatedAt: string;
   screens?: DesignScreen[]; activeScreenId?: string;
+  description?: string; category?: string; isFavorite?: boolean;
 };
 
 type DesignScreen = {
@@ -839,6 +840,8 @@ export function UxUiStudioEngine() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
   const [drafts, setDrafts] = useState<SavedProject[]>([]);
+  const [draftSearch, setDraftSearch] = useState("");
+  const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState("");
   const [projectName, setProjectName] = useState(initialDesign.name);
   const [background, setBackground] = useState(initialDesign.background);
@@ -1005,7 +1008,12 @@ export function UxUiStudioEngine() {
     if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design" && screens.length <= 1)) return;
     try {
       const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
-      const saved = { ...project, id: nextId } as SavedProject;
+      const saved = {
+        ...project, id: nextId,
+        description: savedProject?.description || "",
+        category: savedProject?.category || "Uncategorized",
+        isFavorite: savedProject?.isFavorite || false,
+      } as SavedProject;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
       const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) as unknown : [];
@@ -1107,7 +1115,7 @@ export function UxUiStudioEngine() {
     setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
     setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
     setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
-    setZoom(100); setActiveDraftId(""); setOnboarding(false);
+    setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
   }
 
@@ -1133,9 +1141,74 @@ export function UxUiStudioEngine() {
       componentKey: layer.componentKey || "", rotation: layer.rotation || 0,
     })));
     setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
+    setSavedProject(draft);
     setLeftTab("toolkits"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
     setNotice("Draft opened. Tap an element to continue designing.");
+  }
+
+  function commitDraftList(nextDrafts: SavedProject[]) {
+    const sorted = [...nextDrafts].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 100);
+    setDrafts(sorted);
+    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted)); }
+    catch { setNotice("Project changes could not be saved in this browser. Export project JSON as a backup."); }
+  }
+
+  function renameDraft(id: string, name: string) {
+    const normalized = name.trim().slice(0, 100);
+    if (!normalized) { setNotice("Project name cannot be empty."); return; }
+    const original = drafts.find((draft) => draft.id === id);
+    if (!original) return;
+    const renamed = { ...original, name: normalized, updatedAt: new Date().toISOString() };
+    commitDraftList(drafts.map((draft) => draft.id === id ? renamed : draft));
+    if (activeDraftId === id) { setProjectName(normalized); setSavedProject(renamed); }
+  }
+
+  function toggleDraftFavorite(id: string) {
+    const original = drafts.find((draft) => draft.id === id);
+    if (!original) return;
+    const updated = { ...original, isFavorite: !original.isFavorite, updatedAt: new Date().toISOString() };
+    commitDraftList(drafts.map((draft) => draft.id === id ? updated : draft));
+    if (activeDraftId === id) setSavedProject(updated);
+  }
+
+  function deleteDraft(id: string) {
+    const draft = drafts.find((item) => item.id === id);
+    if (!draft) return;
+    commitDraftList(drafts.filter((item) => item.id !== id));
+    try {
+      if (activeDraftId === id) {
+        localStorage.removeItem(STORAGE_KEY);
+        setActiveDraftId(""); setSavedProject(null);
+      }
+    } catch { setNotice("The project was removed from the list, but local storage cleanup failed."); }
+    setNotice("Deleted project: " + (draft.name || "Untitled design") + ".");
+  }
+
+  function duplicateDraft(id: string) {
+    const source = drafts.find((item) => item.id === id);
+    if (!source) return;
+    const sourceScreens = source.screens?.length ? source.screens : [{
+      id: "screen-home", name: "Screen 1", target: source.target, background: source.background,
+      customArtboard: true, customWidth: source.viewport.width, customHeight: source.viewport.height,
+      elements: source.elements, updatedAt: source.updatedAt,
+    }];
+    const screenCopies = sourceScreens.map((screen) => ({
+      ...screen, id: newScreenId(), name: screen.name + " copy",
+      elements: screen.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })),
+      updatedAt: new Date().toISOString(),
+    }));
+    const idNext = "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    const active = screenCopies[0];
+    const clone: SavedProject = {
+      ...source, id: idNext, name: (source.name || "Untitled design") + " copy",
+      screens: screenCopies, activeScreenId: active.id, target: active.target, background: active.background,
+      viewport: { width: active.customArtboard ? active.customWidth : boardSize(active.target).width,
+        height: active.customArtboard ? active.customHeight : boardSize(active.target).height },
+      elements: active.elements, isFavorite: false, updatedAt: new Date().toISOString(),
+    };
+    commitDraftList([clone, ...drafts]);
+    setNotice("Duplicated project: " + clone.name + ".");
   }
 
   function activeScreenSnapshot(): DesignScreen {
@@ -1712,13 +1785,24 @@ export function UxUiStudioEngine() {
           </button>
         </div>
         <section className="uxui-drafts space-y-3" aria-labelledby="uxui-drafts-title">
-          <div className="flex items-center justify-between gap-3"><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " draft" : " drafts") : ""}</span></div>
-          {drafts.length ? <div className="grid gap-2 sm:grid-cols-2">
-            {drafts.map((draft, index) => <button key={draft.id || draft.name + index} type="button" onClick={() => continueSaved(draft)} className="uxui-draft-card flex min-w-0 items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
-              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
-              <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.elements.length ? draft.elements.length + " design elements" : "Blank canvas"} · {draft.target}</span></span>
-              <ArrowRight size={17} className="shrink-0 text-muted" />
-            </button>)}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Projects & drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " project" : " projects") : "Projects are stored locally in this browser"}</span></div>
+            <div className="flex min-w-0 gap-2"><input type="search" aria-label="Search projects" placeholder="Search projects…" value={draftSearch} onChange={(event)=>setDraftSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg"/><button type="button" onClick={()=>setDraftFavoritesOnly((value)=>!value)} aria-pressed={draftFavoritesOnly} className={"rounded-lg border px-3 py-2 text-xs font-semibold " + (draftFavoritesOnly ? "border-accent bg-accent/10 text-accent" : "border-border text-fg")}>{draftFavoritesOnly ? "★ Favorites" : "☆ Favorites"}</button></div>
+          </div>
+          {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).length ? <div className="grid gap-3 sm:grid-cols-2">
+            {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).map((draft, index) => <article key={draft.id || draft.name + index} className="uxui-draft-card min-w-0 rounded-xl border border-border p-3 transition hover:border-accent">
+              <button type="button" onClick={() => continueSaved(draft)} className="flex w-full min-w-0 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-accent">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
+                <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.screens?.length || 1} {((draft.screens?.length || 1)===1?"screen":"screens")} · {draft.elements.length} layers · {draft.target}</span><span className="mt-1 block truncate text-[10px] text-muted">{draft.description || "No project description"}</span></span>
+                <ArrowRight size={17} className="shrink-0 text-muted" />
+              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                <label className="min-w-0 flex-1"><span className="sr-only">Rename project {draft.name}</span><input aria-label={"Rename project "+draft.name} value={draft.name || ""} maxLength={100} onChange={(event)=>setDrafts((previous)=>previous.map((item)=>item.id===draft.id?{...item,name:event.target.value}:item))} onBlur={(event)=>renameDraft(draft.id || "",event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"){event.currentTarget.blur();}}} className="w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg"/></label>
+                <button type="button" aria-label={(draft.isFavorite?"Remove favorite ":"Add favorite ")+draft.name} aria-pressed={!!draft.isFavorite} onClick={()=>toggleDraftFavorite(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">{draft.isFavorite ? "★" : "☆"}</button>
+                <button type="button" onClick={()=>duplicateDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">Duplicate</button>
+                <button type="button" onClick={()=>deleteDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-red-600">Delete</button>
+              </div>
+            </article>)}
           </div> : <div className="uxui-empty-drafts rounded-xl border border-border px-5 py-8 text-center">
             <span className="mx-auto grid size-12 place-items-center rounded-full bg-surface-2 text-muted"><Layers size={22} /></span>
             <p className="mt-3 text-sm font-semibold text-fg">No drafts yet</p>
