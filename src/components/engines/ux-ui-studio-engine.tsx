@@ -1993,7 +1993,7 @@ export function UxUiStudioEngine() {
   }
 
   return (
-    <section ref={studioRootRef} className={"ux-ui-studio target-" + target + " min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}>
+    <section ref={studioRootRef} aria-label="UX/UI Studio editor workspace" className={"ux-ui-studio target-" + target + " min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}>
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
