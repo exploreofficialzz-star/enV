@@ -9442,7 +9442,6 @@ private struct NativeUxUiStudioView: View {
             return copy
         }
         prototypeHistory.removeAll { $0 == id }
-        if prototypeStartScreenID == id { prototypeStartScreenID = activeScreenID }
         if id == activeScreenID, !screens.isEmpty {
             let nextIndex = min(max(0, index - 1), screens.count - 1)
             let next = screens[nextIndex]
@@ -9452,7 +9451,8 @@ private struct NativeUxUiStudioView: View {
             elements = next.elements; selectedID = elements.first?.id
             undoHistory = []; redoHistory = []
         }
-        notice = "Screen deleted."
+        if prototypeStartScreenID == id { prototypeStartScreenID = activeScreenID }
+        notice = "Screen deleted. Any links to it were cleared."
     }
 
     private func reorderAppScreen(_ id: String, by offset: Int) {
