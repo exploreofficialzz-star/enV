@@ -108,10 +108,10 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>
+            {!isFullscreen ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p> : null}
           </div>
         </div>
-        <Button
+        {!isFullscreen ? <Button
           type="button"
           variant={saved ? "default" : "outline"}
           className="col-start-3 row-start-1 shrink-0"
@@ -125,14 +125,14 @@ export function ToolShell({
         >
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
-        </Button>
-        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
+        </Button> : null}
+        {!isFullscreen ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p> : null}
       </header>
 
       {fullscreenError ? <p className="mt-3 text-sm text-danger" role="status">{fullscreenError}</p> : null}
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {!isFullscreen && note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
         {children}
       </section>
