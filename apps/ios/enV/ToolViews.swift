@@ -9097,11 +9097,13 @@ private struct NativeUxUiStudioView: View {
         if current.target == target && current.background == background &&
             current.customArtboard == customArtboard && current.customWidth == customWidth &&
             current.customHeight == customHeight && current.elements == elements { return }
-        screens[index] = current.copy(
-            target: target, background: background, customArtboard: customArtboard,
-            customWidth: customWidth, customHeight: customHeight, elements: elements,
-            updatedAt: ISO8601DateFormatter().string(from: Date())
-        )
+        var updated = current
+        updated.target = target; updated.background = background
+        updated.customArtboard = customArtboard
+        updated.customWidth = customWidth; updated.customHeight = customHeight
+        updated.elements = elements
+        updated.updatedAt = ISO8601DateFormatter().string(from: Date())
+        screens[index] = updated
     }
 
     private func openAppScreen(_ id: String) {
@@ -9152,7 +9154,9 @@ private struct NativeUxUiStudioView: View {
         }
         if id == activeScreenID { captureActiveScreen() }
         screens.removeAll { $0.id == id }
-        if id == activeScreenID, let next = screens[safe: max(0, index - 1)] {
+        if id == activeScreenID, !screens.isEmpty {
+            let nextIndex = min(max(0, index - 1), screens.count - 1)
+            let next = screens[nextIndex]
             activeScreenID = next.id
             target = next.target; background = next.background; customArtboard = next.customArtboard
             customWidth = next.customWidth; customHeight = next.customHeight
