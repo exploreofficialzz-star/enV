@@ -2274,7 +2274,10 @@ export function UxUiStudioEngine() {
           <section className="uxui-screen-manager" aria-labelledby="uxui-screens-heading">
             <div className="uxui-screen-manager-heading">
               <div><h2 id="uxui-screens-heading">App screens</h2><p>{screens.length} {screens.length === 1 ? "screen" : "screens"} · {screens.find((screen) => screen.id === activeScreenId)?.name || "Screen 1"}</p></div>
-              <button type="button" onClick={addScreen} aria-label="Add app screen" title="Add app screen" className="uxui-screen-add"><Plus size={20}/><span>New screen</span></button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => setShowInspector(false)} aria-label="Close app screens and layers" title="Close app screens and layers" className="grid size-8 place-items-center rounded-lg border border-border text-fg hover:bg-surface-2"><X size={15}/></button>
+                <button type="button" onClick={addScreen} aria-label="Add app screen" title="Add app screen" className="uxui-screen-add"><Plus size={20}/><span>New screen</span></button>
+              </div>
             </div>
             <div className="uxui-screen-grid">
               {screens.map((screen,index) => {
