@@ -898,7 +898,7 @@ function ElementVisual({ kind }: { kind: LayerKind }) {
   return <span className={"uxui-element-preview uxui-element-preview-" + kind} aria-hidden="true">{visual}</span>;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode })
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block min-w-0 text-xs font-medium text-muted"><span>{label}</span>{children}</label>;
 }
 
