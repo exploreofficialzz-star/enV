@@ -931,8 +931,7 @@ export function UxUiStudioEngine() {
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
   const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents, screens, activeScreenId]);
   const activeScreen = screens.find((screen) => screen.id === activeScreenId) || screens[0];
-  const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId))
-    || screens.some((screen) => screen.id !== activeScreenId && screen.elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((destination) => destination.id === layer.prototypeTargetScreenId)));
+  const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
 
   useEffect(() => {
     if (!activeScreenId) return;
@@ -1251,8 +1250,7 @@ export function UxUiStudioEngine() {
   }
 
   function startPrototypePreview() {
-    const hasValidLink = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId))
-      || screens.some((screen) => screen.elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((destination) => destination.id === layer.prototypeTargetScreenId)));
+    const hasValidLink = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
     if (!hasValidLink) {
       setNotice("Assign a selected layer to another screen in Prototype Studio before previewing.");
       setShowToolsPanel(true);
@@ -1330,11 +1328,14 @@ export function UxUiStudioEngine() {
     }));
     if (screenId === activeScreenId) {
       const next = remaining[Math.max(0, index - 1)];
+      if (prototypeStartScreenId === screenId) setPrototypeStartScreenId(next.id);
       setScreens(remaining); setActiveScreenId(next.id);
       setTarget(next.target); setBackground(next.background); setCustomArtboard(next.customArtboard);
       setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
     } else {
       setScreens(remaining);
+      const updatedActive = remaining.find((screen) => screen.id === activeScreenId);
+      if (updatedActive) setElements(updatedActive.elements);
       if (screenId === prototypeStartScreenId) setPrototypeStartScreenId(activeScreenId);
     }
     setPrototypeHistory((previous) => previous.filter((id) => id !== screenId));
@@ -2124,7 +2125,7 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
             </div>
           </div>
-          <div className="uxui-canvas-stage">
+          <div className="uxui-canvas-stage" role="region" aria-label={projectName + " scrollable design canvas"} tabIndex={0}>
             <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
