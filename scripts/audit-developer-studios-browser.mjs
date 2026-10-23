@@ -76,6 +76,9 @@ try {
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
         await page.locator('.uxui-device-mobile').waitFor({ state: 'visible', timeout });
+        // The sketch-first workspace hides the screen/layer inspector until explicitly opened.
+        await page.getByRole('button', { name: 'App screens and layers' }).click();
+        await page.getByLabel('Project name').waitFor({ state: 'visible', timeout });
         await page.getByLabel('Project name').fill('UX/UI Studio browser QA');
         const [download] = await Promise.all([
           page.waitForEvent('download'),
