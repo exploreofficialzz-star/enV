@@ -24,6 +24,13 @@ assert.ok(engine.includes('selected.kind === "image"') && engine.includes("<span
 assert.ok(engine.includes('selected.kind === "icon"') && engine.includes('<span>Icons</span>'), "Icon selection opens connected icon controls");
 assert.ok(engine.includes('toolkit.id === "transform"') && engine.includes("Center horizontally"), "Former 3D placeholder is now connected transform tooling");
 assert.ok(!engine.includes("Live GLB/GLTF rendering") && !engine.includes("Add sample chart"), "Unsupported viewer and chart sample placeholders removed");
+assert.ok(!engine.includes("Project A      Active         Today") && !engine.includes("Sample paragraph") && !engine.includes("Media placeholder"), "Starter content avoids fictitious records and placeholder labels");
+const iconStart = engine.indexOf("const ICON_BROWSE_CATEGORIES:");
+const iconEnd = engine.indexOf("const SWATCHES", iconStart);
+const iconCatalog = engine.slice(iconStart, iconEnd);
+assert.ok([...iconCatalog.matchAll(/\{name:/g)].length >= 20, "Icon picker includes an expanded set of specialist categories");
+assert.ok([...iconCatalog.matchAll(/"lucide:[^"]+"/g)].length >= 400, "Icon picker contains at least 400 curated Iconify entries");
+for (const category of ["Security & identity", "AI & automation", "Travel & maps", "Weather & nature", "Education & learning", "Accessibility & wellbeing", "Finance & business", "Social & community", "Food & lifestyle", "Creative tools", "Home & workspace", "Sports & fitness", "Music & entertainment", "Productivity & work"]) assert.ok(iconCatalog.includes('name:' + JSON.stringify(category)), "Icon category exists: " + category);
 assert.ok(engine.includes('toolkit.id === "flows"'), "Interactive flows remains connected after rename");
 assert.ok(engine.includes('toolkit.id === "device"') && engine.includes('onClick={() => changeTarget(option.target)}'), "Device mockups provides functional responsive target switches");
 assert.ok(engine.includes('toolkit.id === "platform"') && engine.includes("selected.visibleOn.filter"), "Platform kits edits per-layer viewport visibility");
