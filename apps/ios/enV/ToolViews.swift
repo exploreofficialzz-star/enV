@@ -8364,8 +8364,8 @@ private struct NativeUxUiStudioView: View {
             if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { findings.append("An unnamed layer exists.") }
             if item.x < 0 || item.y < 0 || item.x + item.width > boardWidth || item.y + item.height > boardHeight { findings.append("\(item.name) extends beyond the current artboard.") }
             if item.width < 44 || item.height < 44 { findings.append("\(item.name) may be smaller than a comfortable touch target.") }
-            if item.kind == "icon" && item.iconSvg.isEmpty { findings.append("\(item.name) has no embedded icon SVG.") }
-            if item.kind == "image" && item.imageData.isEmpty { findings.append("\(item.name) has no image data.") }
+            if item.kind == "icon" && (item.iconSvg ?? "").isEmpty { findings.append("\(item.name) has no embedded icon SVG.") }
+            if item.kind == "image" && (item.imageData ?? "").isEmpty { findings.append("\(item.name) has no image data.") }
         }
         for i in elements.indices {
             for j in elements.indices where j > i {
