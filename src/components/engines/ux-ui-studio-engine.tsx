@@ -681,7 +681,22 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = url; anchor.download = filename; anchor.click();
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+
+  // Chromium-based browsers may ignore a download initiated from a detached
+  // anchor, particularly after a second-step action in a popover. Attach it to
+  // the live document for the user-initiated click, then remove it immediately.
+  document.body.appendChild(anchor);
+  try {
+    anchor.click();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  } finally {
+    anchor.remove();
+  }
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
