@@ -8436,6 +8436,18 @@ private struct NativeUxUiStudioView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 Text(elements[index].name).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+                Group {
+                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 34, height: 34) }
+                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 34, height: 34) }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Selected element movement and size controls")
                 if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
                     Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
                 }
