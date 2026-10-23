@@ -314,10 +314,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             mostUsedIds = favorites.getMostUsed()
         }
     }
-    if (detailStack.isNotEmpty()) BackHandler {
-        if (isToolFullscreen) isToolFullscreen = false
-        else detailStack = detailStack.dropLast(1)
-    }
+    if (isToolFullscreen) BackHandler { isToolFullscreen = false }
+    else if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
     else if (showExchange) BackHandler { showExchange = false }
