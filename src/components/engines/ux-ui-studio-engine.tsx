@@ -37,6 +37,13 @@ type SavedProject = {
   breakpoints: { mobile: number; tablet: number; desktop: number };
   tokens: DesignTokens; reusableComponents: DesignLayer[];
   elements: DesignLayer[]; updatedAt: string;
+  screens?: DesignScreen[]; activeScreenId?: string;
+};
+
+type DesignScreen = {
+  id: string; name: string; target: DeviceTarget; background: string;
+  customArtboard: boolean; customWidth: number; customHeight: number;
+  elements: DesignLayer[]; updatedAt: string;
 };
 
 const DEFAULT_TOKENS: DesignTokens = {
@@ -823,6 +830,8 @@ export function UxUiStudioEngine() {
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [showMoreLayers, setShowMoreLayers] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
+  const [activeScreenId, setActiveScreenId] = useState("screen-home");
+  const [screens, setScreens] = useState<DesignScreen[]>([{ id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [], updatedAt: new Date().toISOString() }]);
   const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
   const [helpOpen, setHelpOpen] = useState(false);
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
@@ -892,7 +901,19 @@ export function UxUiStudioEngine() {
     return Array.from(byFamily.values()).sort((a,b) => a.family.localeCompare(b.family));
   }, [remoteFonts]);
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
-  const project = useMemo(() => buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents]);
+  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents, screens, activeScreenId]);
+  const activeScreen = screens.find((screen) => screen.id === activeScreenId) || screens[0];
+
+  useEffect(() => {
+    if (!activeScreenId) return;
+    setScreens((previous) => {
+      const current = previous.find((screen) => screen.id === activeScreenId);
+      if (!current) return previous;
+      if (current.elements === elements && current.name === (current.name || "Screen 1") && current.target === target && current.background === background && current.customArtboard === customArtboard && current.customWidth === customWidth && current.customHeight === customHeight) return previous;
+      const updated: DesignScreen = { ...current, elements, target, background, customArtboard, customWidth, customHeight, updatedAt: new Date().toISOString() };
+      return previous.map((screen) => screen.id === activeScreenId ? updated : screen);
+    });
+  }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
   const quickIconResults = (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons)
     .filter((name)=>iconPrefix==="all" || name.startsWith(iconPrefix+":"))
