@@ -6668,6 +6668,38 @@ private struct NativeIOSTrackRow: View {
 
 
 
+struct UxUiStudioChartPoint: Equatable {
+    let label: String
+    let value: Double
+}
+struct UxUiStudioChartSpec {
+    let title: String
+    let points: [UxUiStudioChartPoint]
+    let invalidRows: Int
+}
+func uxUiParseChartData(_ source: String) -> UxUiStudioChartSpec {
+    let lines = source.components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    let title = lines.first ?? "Untitled chart"
+    var points: [UxUiStudioChartPoint] = []
+    var invalidRows = 0
+    for line in lines.dropFirst() {
+        guard let separator = line.firstIndex(where: { $0 == ":" || $0 == "," || $0 == "=" }) else {
+            invalidRows += 1
+            continue
+        }
+        let label = String(line[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let valueText = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(valueText), value.isFinite, value >= 0, !label.isEmpty, points.count < 8 else {
+            invalidRows += 1
+            continue
+        }
+        points.append(UxUiStudioChartPoint(label: label, value: value))
+    }
+    return UxUiStudioChartSpec(title: title, points: points, invalidRows: invalidRows)
+}
+
 private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var kind: String
@@ -7693,7 +7725,7 @@ private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
     UxUiStudioToolkit(id: "design-system", name: "Design System Studio", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
     UxUiStudioToolkit(id: "accessibility", name: "Accessibility Studio", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
     UxUiStudioToolkit(id: "content", name: "Content & Placeholder Studio", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
-    UxUiStudioToolkit(id: "data-viz", name: "Data Visualization Studio", description: "Charts and dashboard elements.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "data-viz", name: "Data Visualization Studio", description: "Edit saved numeric data and preview bar charts.", status: "Editable bar charts"),
     UxUiStudioToolkit(id: "patterns", name: "Patterns & Textures Studio", description: "Grid and decorative vector patterns.", status: "Starter actions"),
     UxUiStudioToolkit(id: "3d", name: "3D Studio", description: "Live 3D models, camera and lighting.", status: "Not complete"),
     UxUiStudioToolkit(id: "platform", name: "Platform Design Kits", description: "Mobile, tablet and desktop conventions.", status: "Connected foundation"),
@@ -8664,7 +8696,7 @@ private struct NativeUxUiStudioView: View {
                                 case "layers": showAllLayers = true
                                 case "prototype": showAdvancedInspector = selectedIndex != nil; notice = "Assign a layer destination with the selected-layer menu, then Preview prototype. Overlay interactions remain unsupported."
                                 case "content": addLayer("text"); if let index = elements.indices.last { elements[index].name = "Welcome heading"; elements[index].text = "Welcome back" }
-                                case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity" }
+                                case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67" }
                                 case "patterns": addLayer("star"); if let index = elements.indices.last { elements[index].name = "Decorative star" }
                                 case "3d": notice = "Live GLB/GLTF rendering, lighting and camera controls are not implemented in this editor. Import a rendered preview instead."
                                 case "accessibility", "qa": runStudioAudit()
@@ -8945,6 +8977,34 @@ private struct NativeUxUiStudioView: View {
                         Text(item.text).font(.system(size: max(5, CGFloat(item.fontSize) * scale)))
                             .foregroundStyle(uxUiUIColor(item.color)).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if item.kind == "chart" {
+                    let chart = uxUiParseChartData(item.text)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(chart.title).font(.system(size: max(6, CGFloat(item.fontSize) * scale * 0.82), weight: .semibold)).lineLimit(1)
+                        if chart.points.isEmpty {
+                            Text("Enter data as Label: value").font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.62)))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        } else {
+                            GeometryReader { geometry in
+                                let maximum = max(chart.points.map(\.value).max() ?? 1, 1)
+                                HStack(alignment: .bottom, spacing: 2) {
+                                    ForEach(Array(chart.points.enumerated()), id: \.offset) { entry in
+                                        let point = entry.element
+                                        VStack(spacing: 1) {
+                                            Text(String(format: point.value.rounded() == point.value ? "%.0f" : "%.1f", point.value)).font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.52))).lineLimit(1)
+                                            Spacer(minLength: 0)
+                                            RoundedRectangle(cornerRadius: 2).fill(uxUiUIColor(item.color))
+                                                .frame(height: max(1, (geometry.size.height - 24) * CGFloat(point.value / maximum)))
+                                            Text(point.label).font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.52))).lineLimit(1).minimumScaleFactor(0.55)
+                                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    }
+                                }
+                            }
+                        }
+                        if chart.invalidRows > 0 {
+                            Text("\(chart.invalidRows) invalid row(s) ignored").font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.45))).foregroundStyle(.orange).lineLimit(1)
+                        }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else {
                     Text(item.text).font(uxUiFont(for: item, scale: scale))
                         .foregroundStyle(uxUiUIColor(item.color)).multilineTextAlignment(.leading).lineLimit(6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -8975,7 +9035,7 @@ private struct NativeUxUiStudioView: View {
                 Text(binding.wrappedValue.kind).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
             }
             if ["text", "button", "card", "input", "badge", "logo", "navbar", "tabbar", "tabs", "row", "menu", "modal", "tooltip", "breadcrumb", "list", "table", "chart", "video"].contains(binding.wrappedValue.kind) {
-                inspectorTextField("Text on canvas", text: binding.text, multiline: true)
+                inspectorTextField(binding.wrappedValue.kind == "chart" ? "Chart data (title, then Label: value)" : "Text on canvas", text: binding.text, multiline: true)
             }
             Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
             HStack(spacing: 6) {
@@ -9047,7 +9107,7 @@ private struct NativeUxUiStudioView: View {
     private func inspectorIdentityFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         inspectorTextField("Layer name", text: binding.name)
         if !["icon", "image", "ellipse", "rect", "divider"].contains(binding.wrappedValue.kind) {
-            inspectorTextField("Text content", text: binding.text, multiline: true)
+            inspectorTextField(binding.wrappedValue.kind == "chart" ? "Chart data (title, then Label: value)" : "Text content", text: binding.text, multiline: true)
         }
     }
 
@@ -9610,7 +9670,7 @@ private struct NativeUxUiStudioView: View {
         case "search": newItem = UxUiNativeLayer(kind: kind, name: "Search field", x: 24, y: 420, width: 300, height: 48, text: "Search…", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "textarea": newItem = UxUiNativeLayer(kind: kind, name: "Text area", x: 24, y: 420, width: 300, height: 96, text: "Enter your message", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "table": newItem = UxUiNativeLayer(kind: kind, name: "Data table", x: 24, y: 330, width: 320, height: 150, text: "Name       Status       Updated\nProject A  Active       Today\nProject B  Draft        Yesterday", fill: "#FFFFFF", borderWidth: 1, fontSize: 12)
-        case "chart": newItem = UxUiNativeLayer(kind: kind, name: "Bar chart", x: 24, y: 330, width: 300, height: 170, text: "Activity overview\nJan       Feb       Mar       Apr", fill: "#FFFFFF", borderWidth: 1, fontSize: 13)
+        case "chart": newItem = UxUiNativeLayer(kind: kind, name: "Bar chart", x: 24, y: 330, width: 300, height: 170, text: "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67", fill: "#FFFFFF", borderWidth: 1, fontSize: 13)
         case "modal": newItem = UxUiNativeLayer(kind: kind, name: "Dialog / modal", x: 24, y: 330, width: 310, height: 190, text: "Dialog title\nDescribe the action here.\nCancel          Confirm", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
         case "breadcrumb": newItem = UxUiNativeLayer(kind: kind, name: "Breadcrumb trail", x: 24, y: 330, width: 300, height: 34, text: "Home / Workspace / Current", color: "#475569", fontSize: 12)
         case "tooltip": newItem = UxUiNativeLayer(kind: kind, name: "Tooltip", x: 24, y: 330, width: 170, height: 38, text: "Helpful information", color: "#FFFFFF", fill: "#111827", radius: 8, fontSize: 12)

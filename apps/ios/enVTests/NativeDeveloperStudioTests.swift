@@ -14,6 +14,15 @@ final class NativeDeveloperStudioTests: XCTestCase {
         return try NativeUtilityEngine.run(tool(id), input: input, optionsJSON: options).text
     }
 
+    func testUxUiStudioChartRowsAreParsedAndInvalidRowsReported() {
+        let chart = uxUiParseChartData("Monthly activity\nJan: 36\nFeb, 62.5\nMar=0\nBroken row\nApr: -3\nMay: 18")
+        XCTAssertEqual(chart.title, "Monthly activity")
+        XCTAssertEqual(chart.points.map(\.label), ["Jan", "Feb", "Mar", "May"])
+        XCTAssertEqual(chart.points.map(\.value), [36.0, 62.5, 0.0, 18.0])
+        XCTAssertEqual(chart.invalidRows, 2)
+        XCTAssertTrue(uxUiParseChartData("Chart title\nNo numeric value").points.isEmpty)
+    }
+
     func testCronEncodeDecodeAndExplainStayLocal() throws {
         XCTAssertEqual(try run("cron-encoder", "*/15 * * * *"), "Ki8xNSAqICogKiAq")
         let decoded = try run("cron-decoder", "Ki8xNSAqICogKiAq")

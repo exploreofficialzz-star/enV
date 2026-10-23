@@ -59,6 +59,25 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+internal data class UxUiStudioChartPoint(val label: String, val value: Double)
+internal data class UxUiStudioChartSpec(val title: String, val points: List<UxUiStudioChartPoint>, val invalidRows: Int)
+
+internal fun uxUiParseChartData(source: String): UxUiStudioChartSpec {
+    val lines = source.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+    val title = lines.firstOrNull() ?: "Untitled chart"
+    val points = mutableListOf<UxUiStudioChartPoint>()
+    var invalidRows = 0
+    val rowPattern = Regex("^(.+?)\\s*[:,=]\\s*(\\+?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$")
+    lines.drop(1).forEach { line ->
+        val match = rowPattern.matchEntire(line)
+        val label = match?.groupValues?.getOrNull(1)?.trim().orEmpty()
+        val value = match?.groupValues?.getOrNull(2)?.toDoubleOrNull()
+        if (label.isBlank() || value == null || !value.isFinite() || value < 0 || points.size >= 8) invalidRows++
+        else points.add(UxUiStudioChartPoint(label, value))
+    }
+    return UxUiStudioChartSpec(title, points, invalidRows)
+}
+
 private data class UxUiNativeLayer(
     val id: String, val kind: String, val name: String, val x: Int, val y: Int, val width: Int, val height: Int,
     val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "", val fontData: String = "",
@@ -92,7 +111,7 @@ private val uxNativeToolkits = listOf(
     UxNativeToolkit("design-system", "Design System Studio", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
     UxNativeToolkit("accessibility", "Accessibility Studio", "Structure and touch-target review.", "QA", "Advisory checks"),
     UxNativeToolkit("content", "Content & Placeholder Studio", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
-    UxNativeToolkit("data-viz", "Data Visualization Studio", "Charts and dashboard elements.", "Chart", "Starter actions"),
+    UxNativeToolkit("data-viz", "Data Visualization Studio", "Edit saved numeric data and preview bar charts.", "Chart", "Editable bar charts"),
     UxNativeToolkit("patterns", "Patterns & Textures Studio", "Grid, vector shapes and decorative patterns.", "Pattern", "Starter actions"),
     UxNativeToolkit("3d", "3D Studio", "3D models, camera and lighting.", "3D", "Not complete"),
     UxNativeToolkit("platform", "Platform Design Kits", "Mobile, tablet and desktop conventions.", "Device", "Connected foundation"),
@@ -1092,7 +1111,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
             "search"->UxUiNativeLayer(id,kind,"Search field",24,420,300,48,"Search…",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "textarea"->UxUiNativeLayer(id,kind,"Text area",24,420,300,96,"Enter your message",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "table"->UxUiNativeLayer(id,kind,"Data table",24,330,320,150,"Name       Status       Updated\\nProject A  Active       Today\\nProject B  Draft        Yesterday",fill="#FFFFFF",borderWidth=1,fontSize=12)
-            "chart"->UxUiNativeLayer(id,kind,"Bar chart",24,330,300,170,"Activity overview\\nJan       Feb       Mar       Apr",fill="#FFFFFF",borderWidth=1,fontSize=13)
+            "chart"->UxUiNativeLayer(id,kind,"Bar chart",24,330,300,170,"Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67",fill="#FFFFFF",borderWidth=1,fontSize=13)
             "modal"->UxUiNativeLayer(id,kind,"Dialog / modal",24,330,310,190,"Dialog title\\nDescribe the action here.\\nCancel          Confirm",fill="#FFFFFF",borderWidth=1,radius=18,padding=18)
             "breadcrumb"->UxUiNativeLayer(id,kind,"Breadcrumb trail",24,330,300,34,"Home / Workspace / Current",color="#475569",fontSize=12)
             "tooltip"->UxUiNativeLayer(id,kind,"Tooltip",24,330,170,38,"Helpful information",color="#FFFFFF",fill="#111827",radius=8,fontSize=12)
@@ -1446,7 +1465,30 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                             }
                                         }
                                     }){
-                                        if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
+                                        if(e.kind=="chart") {
+                                            val chart=uxUiParseChartData(e.text)
+                                            Column(Modifier.fillMaxSize().padding(3.dp)) {
+                                                Text(chart.title,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.coerceIn(8,16).sp,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                                                if(chart.points.isEmpty()) {
+                                                    Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){Text("Enter data as Label: value",fontSize=8.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                                } else {
+                                                    val maxValue=chart.points.maxOfOrNull{it.value}?.coerceAtLeast(1.0)?:1.0
+                                                    val barAreaHeight=(e.height-e.padding*2-e.fontSize-28).coerceAtLeast(16)
+                                                    Row(Modifier.fillMaxWidth().height((barAreaHeight+24).dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(2.dp)) {
+                                                        chart.points.forEach { point ->
+                                                            Column(Modifier.weight(1f).fillMaxHeight(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Bottom) {
+                                                                Text(if(point.value%1.0==0.0)point.value.toLong().toString() else String.format(java.util.Locale.US,"%.1f",point.value),fontSize=7.sp,maxLines=1,overflow=TextOverflow.Clip,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                                Spacer(Modifier.height(1.dp))
+                                                                val barHeight=if(point.value<=0)0 else (barAreaHeight*point.value/maxValue).roundToInt().coerceIn(2,barAreaHeight)
+                                                                Box(Modifier.fillMaxWidth(.62f).height(barHeight.dp).clip(RoundedCornerShape(3.dp)).background(uxNativeColor(e.color,android.graphics.Color.BLACK)))
+                                                                Text(point.label,fontSize=6.sp,maxLines=1,overflow=TextOverflow.Ellipsis,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if(chart.invalidRows>0)Text(chart.invalidRows.toString()+" invalid row(s) ignored",fontSize=6.sp,color=Color(0xFFB45309),maxLines=1)
+                                            }
+                                        } else if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
                                             UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
                                         } else {
                                             Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=FontFamily(uxNativeTypeface(context,e)),maxLines=5,overflow=TextOverflow.Clip)
@@ -1597,7 +1639,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                                     "layers"->{showAllLayers=true;toolkitTab="All 26"}
                                                     "prototype"->{toolkitTab="All 26";showAdvancedControls=true;notice="Assign tap destinations to layers, then preview the connected screen flow. Overlay interactions are not yet supported."}
                                                     "content"->{toolkitTab="All 26";add("text");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Welcome heading",text="Welcome back")}}}
-                                                    "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity")}}}
+                                                    "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67")}}}
                                                     "patterns"->{toolkitTab="All 26";showCanvasSettings=true;add("star");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Decorative star")}}}
                                                     "3d"->{toolkitTab="All 26";notice="Live GLB/GLTF rendering, camera and lighting are not implemented in this editor. Import a rendered preview instead."}
                                                     "accessibility","qa"->{
@@ -1680,7 +1722,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             prototypeDestinations.forEach{screen->FilterChip(selected=e.prototypeTargetScreenId==screen.id,onClick={edit(e.id){it.copy(prototypeTargetScreenId=screen.id)}},label={Text(screen.name,maxLines=1)})}
                         }
                         if(hasActivePrototypeLinks)OutlinedButton(onClick={ { startPrototypePreview() } },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
-                        if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=3)
+                        if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text(if(e.kind=="chart")"Chart data (title, then Label: value)" else "Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=if(e.kind=="chart")8 else 3)
                         Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                             OutlinedButton(onClick={edit(e.id){it.copy(radius=0)}}){Text("Sharp")}
