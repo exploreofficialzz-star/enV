@@ -1888,15 +1888,12 @@ export function UxUiStudioEngine() {
           </div>
           <div className="uxui-bottom-toolbar">
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-label="Toggle grid" title="Toggle grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={20} /></button>
-              <button type="button" onClick={() => quickImageInputRef.current?.click()} aria-label="Add an image" title="Add image"><ImagePlus size={21} /></button>
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
             <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens and layers" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
-              <button type="button" onClick={() => elementImportInputRef.current?.click()} aria-label="Import elements" title="Import elements"><ImagePlus size={20} /></button>
+              <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
             </div>
           </div>
