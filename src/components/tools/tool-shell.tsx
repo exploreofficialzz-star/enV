@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, ChevronDown, Heart } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
@@ -30,17 +30,52 @@ export function ToolShell({
   const recordRecent = usePrefs((s) => s.recordRecent);
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
+  const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
 
   useEffect(() => {
     recordRecent(tool.id);
     setVisibleRelatedCount(6);
   }, [tool.id, recordRecent]);
 
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setIsFullscreen(document.fullscreenElement === toolInterfaceRef.current);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  async function toggleFullscreen() {
+    const surface = toolInterfaceRef.current;
+    if (!surface) return;
+
+    try {
+      if (document.fullscreenElement === surface) {
+        await document.exitFullscreen();
+      } else {
+        if (!surface.requestFullscreen) {
+          setFullscreenError("Full screen is not supported by this browser.");
+          return;
+        }
+        await surface.requestFullscreen();
+      }
+      setFullscreenError(null);
+    } catch {
+      setFullscreenError("Full screen could not be opened. Check your browser permissions and try again.");
+    }
+  }
+
   const cat = CATEGORY_MAP[tool.category];
 
   return (
     <article className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
+      <div
+        ref={toolInterfaceRef}
+        className={isFullscreen ? "min-h-screen w-full max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8" : ""}
+      >
+      {!isFullscreen ? <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">
           Home
         </Link>
@@ -54,13 +89,25 @@ export function ToolShell({
         </Link>
         <span aria-hidden="true">/</span>
         <span className="text-fg">{tool.name}</span>
-      </nav>
+      </nav> : null}
 
-      <header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
+      <header className={`${isFullscreen ? "mt-0" : "mt-6"} grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
         <ToolAppIcon tool={tool} className="row-span-2 size-11 sm:row-span-1" />
         <div className="col-start-2 row-start-1 min-w-0 sm:flex sm:min-w-0 sm:flex-1 sm:gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>{tool.status === "planned" ? <ComingSoonBadge /> : null}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{tool.name}</h1>
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
+                title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
+              >
+                {isFullscreen ? <Minimize2 className="size-4" aria-hidden="true" /> : <Maximize2 className="size-4" aria-hidden="true" />}
+              </button>
+              {tool.status === "planned" ? <ComingSoonBadge /> : null}
+            </div>
             <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>
           </div>
         </div>
@@ -82,6 +129,7 @@ export function ToolShell({
         <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
       </header>
 
+      {fullscreenError ? <p className="mt-3 text-sm text-danger" role="status">{fullscreenError}</p> : null}
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
@@ -89,7 +137,8 @@ export function ToolShell({
         {children}
       </section>
 
-      <AiAssistPanel toolId={tool.id} />
+      {!isFullscreen ? <AiAssistPanel toolId={tool.id} /> : null}
+      </div>
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
