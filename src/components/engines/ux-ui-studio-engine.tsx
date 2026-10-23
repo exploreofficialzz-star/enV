@@ -29,7 +29,7 @@ type DesignLayer = {
   referenceWidth: number; referenceHeight: number; componentKey: string;
   display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
   hoverColor?: string; activeColor?: string; focusColor?: string;
-  hidden?: boolean; locked?: boolean; groupId?: string;
+  hidden?: boolean; locked?: boolean; groupId?: string; prototypeTargetScreenId?: string;
 };
 
 type SavedProject = {
@@ -232,7 +232,7 @@ const STUDIO_TOOLKITS: StudioToolkit[] = [
     "description": "Prepare screen states and review interactive design behavior.",
     "tab": "toolkits",
     "icon": "ArrowRight",
-    "outcome": "Connected multi-screen prototype playback requires its own interaction graph; this editor will not present it as complete before navigation is wired."
+    "outcome": "Assign layer tap destinations, preview the multi-screen flow and retrace paths with Back."
   },
   {
     "id": "design-system",
@@ -413,7 +413,7 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
     visibleOn: ["mobile", "tablet", "desktop"], referenceWidth, referenceHeight, componentKey: "",
     display: "flex", cursor: "default", zIndex: 1, transitionDuration: 180,
-    hoverColor: "", activeColor: "", focusColor: "", hidden: false, locked: false, groupId: "",
+    hoverColor: "", activeColor: "", focusColor: "", hidden: false, locked: false, groupId: "", prototypeTargetScreenId: "",
   };
   switch (kind) {
     case "text": return { ...shared, name: "Text", width: 250, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700 };
@@ -851,6 +851,9 @@ export function UxUiStudioEngine() {
   const [showInspector, setShowInspector] = useState(false);
   const [activeScreenId, setActiveScreenId] = useState("screen-home");
   const [screens, setScreens] = useState<DesignScreen[]>([{ id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [], updatedAt: new Date().toISOString() }]);
+  const [prototypePreview, setPrototypePreview] = useState(false);
+  const [prototypeHistory, setPrototypeHistory] = useState<string[]>([]);
+  const [prototypeStartScreenId, setPrototypeStartScreenId] = useState("screen-home");
   const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
   const [helpOpen, setHelpOpen] = useState(false);
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
@@ -928,6 +931,8 @@ export function UxUiStudioEngine() {
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
   const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents, screens, activeScreenId]);
   const activeScreen = screens.find((screen) => screen.id === activeScreenId) || screens[0];
+  const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId))
+    || screens.some((screen) => screen.id !== activeScreenId && screen.elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((destination) => destination.id === layer.prototypeTargetScreenId)));
 
   useEffect(() => {
     if (!activeScreenId) return;
@@ -1245,6 +1250,52 @@ export function UxUiStudioEngine() {
     setShowInspector(false); setNotice("Opened " + next.name + ".");
   }
 
+  function startPrototypePreview() {
+    const hasValidLink = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId))
+      || screens.some((screen) => screen.elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((destination) => destination.id === layer.prototypeTargetScreenId)));
+    if (!hasValidLink) {
+      setNotice("Assign a selected layer to another screen in Prototype Studio before previewing.");
+      setShowToolsPanel(true);
+      setActiveToolkitId("prototype");
+      return;
+    }
+    const current = activeScreenSnapshot();
+    setScreens((previous) => previous.map((screen) => screen.id === current.id ? current : screen));
+    setPrototypeStartScreenId(activeScreenId);
+    setPrototypeHistory([]);
+    setPrototypePreview(true);
+    setSelectedId("");
+    setShowInspector(false); setShowToolsPanel(false); setShowExportPanel(false);
+    setShowTextEditor(false); setShowContextColors(false); setShowAdvancedContext(false);
+    setNotice("Prototype preview started. Tap an element with a screen destination to navigate.");
+  }
+
+  function navigatePrototype(screenId: string, recordHistory = true) {
+    if (!screens.some((screen) => screen.id === screenId)) {
+      setNotice("That prototype destination is no longer available.");
+      return;
+    }
+    if (recordHistory) setPrototypeHistory((previous) => [...previous, activeScreenId]);
+    openScreen(screenId);
+    setSelectedId("");
+  }
+
+  function backPrototypePreview() {
+    const previousScreen = prototypeHistory[prototypeHistory.length - 1];
+    if (!previousScreen) return;
+    setPrototypeHistory((previous) => previous.slice(0, -1));
+    navigatePrototype(previousScreen, false);
+  }
+
+  function stopPrototypePreview() {
+    const startScreen = prototypeStartScreenId;
+    setPrototypePreview(false);
+    setPrototypeHistory([]);
+    if (startScreen !== activeScreenId && screens.some((screen) => screen.id === startScreen)) openScreen(startScreen);
+    setSelectedId("");
+    setNotice("Returned to design editing.");
+  }
+
   function addScreen() {
     const current = activeScreenSnapshot();
     const id = newScreenId();
@@ -1269,16 +1320,25 @@ export function UxUiStudioEngine() {
 
   function deleteScreen(screenId: string) {
     if (screens.length <= 1) { setNotice("A project must keep at least one screen."); return; }
-    const index = screens.findIndex((screen) => screen.id === screenId);
+    const current = activeScreenSnapshot();
+    const source = screens.map((screen) => screen.id === current.id ? current : screen);
+    const index = source.findIndex((screen) => screen.id === screenId);
     if (index < 0) return;
-    const remaining = screens.filter((screen) => screen.id !== screenId);
+    const remaining = source.filter((screen) => screen.id !== screenId).map((screen) => ({
+      ...screen,
+      elements: screen.elements.map((layer) => layer.prototypeTargetScreenId === screenId ? { ...layer, prototypeTargetScreenId: "" } : layer),
+    }));
     if (screenId === activeScreenId) {
       const next = remaining[Math.max(0, index - 1)];
       setScreens(remaining); setActiveScreenId(next.id);
       setTarget(next.target); setBackground(next.background); setCustomArtboard(next.customArtboard);
       setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
-    } else setScreens(remaining);
-    setNotice("Screen deleted.");
+    } else {
+      setScreens(remaining);
+      if (screenId === prototypeStartScreenId) setPrototypeStartScreenId(activeScreenId);
+    }
+    setPrototypeHistory((previous) => previous.filter((id) => id !== screenId));
+    setNotice("Screen deleted. Any links to it were cleared.");
   }
 
   function reorderScreen(screenId: string, offset: number) {
@@ -1536,6 +1596,15 @@ export function UxUiStudioEngine() {
   function onArtboardPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     const node = (event.target as Element).closest("[data-layer-id]");
     const id = node?.getAttribute("data-layer-id");
+    if (prototypePreview) {
+      event.preventDefault();
+      dragRef.current = null;
+      if (!id) return;
+      const destination = elements.find((item) => item.id === id)?.prototypeTargetScreenId || "";
+      if (destination && destination !== activeScreenId && screens.some((screen) => screen.id === destination)) navigatePrototype(destination);
+      else setNotice("This element has no valid screen destination. Exit preview to assign one in Prototype Studio.");
+      return;
+    }
     if (!id) { setSelectedId(""); return; }
     const found = elements.find((item) => item.id === id);
     if (!found) return;
@@ -1856,6 +1925,13 @@ export function UxUiStudioEngine() {
         </div>}
       </header>
 
+      {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
+        <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
+        <div>
+          <button type="button" onClick={backPrototypePreview} disabled={prototypeHistory.length === 0}>Back</button>
+          <button type="button" onClick={stopPrototypePreview}>Exit preview</button>
+        </div>
+      </div>}
       <div className="uxui-workspace grid min-w-0 gap-3">
         {showToolsPanel && <aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3">
           <div className="uxui-drawer-heading"><span>Studio toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
@@ -1884,7 +1960,17 @@ export function UxUiStudioEngine() {
               {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>setCustomArtboard(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
               {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>setShowExportPanel(true)} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
               {toolkit.id === "3d" && <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-5 text-amber-950">Live GLB/GLTF rendering, lighting and camera manipulation are not available in this editor yet. Use imported rendered previews instead of treating a placeholder as a live 3D viewer.</p>}
-              {toolkit.id === "prototype" && <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-5 text-amber-950">Connected multi-screen playback is a separate implementation task; screen connections and overlays are not reported as working until navigation is wired.</p>}
+              {toolkit.id === "prototype" && <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                <p className="text-xs leading-5 text-muted">Assign a selected layer to another screen. During preview, tapping that layer opens its destination; Back follows the interaction history.</p>
+                {selected ? <label className="block text-xs font-semibold text-fg">On tap, navigate to
+                  <select aria-label="Prototype destination" value={selected.prototypeTargetScreenId || ""} onChange={(event) => updateLayer(selected.id, { prototypeTargetScreenId: event.target.value })} className={fieldClass()}>
+                    <option value="">No navigation</option>
+                    {screens.filter((screen) => screen.id !== activeScreenId).map((screen) => <option key={screen.id} value={screen.id}>{screen.name}</option>)}
+                  </select>
+                </label> : <p className="text-xs text-muted">Select an element on the artboard first, then choose its destination here.</p>}
+                <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Preview prototype</button>
+                {!screens.some((screen) => screen.id !== activeScreenId) && <p className="text-xs text-muted">Add a second screen from App screens and layers to create a transition.</p>}
+              </div>}
               {toolkit.id === "inspiration" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import reference image</button><p className="mt-1 text-[10px] text-muted">Keep reference source and licensing notes with the project before redistribution.</p></div>}
               {toolkit.id === "background" && <div className="mt-3"><label className="block text-xs font-semibold text-fg">Canvas background<input type="color" aria-label="Toolkit canvas background" value={background.startsWith("#") ? background : "#FFFFFF"} onChange={(event)=>setBackground(event.target.value)} className="mt-2 block h-10 w-full"/></label><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import background image as layer</button></div>}
               {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
@@ -2029,9 +2115,10 @@ export function UxUiStudioEngine() {
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
             {isExpanded && <button type="button" onClick={toggleExpandedPreview} className="uxui-preview-back"><ArrowLeft size={18} /><span>Back to editor</span></button>}
-            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>Preview</span></div>
+            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{prototypePreview ? "Prototype" : "Preview"}</span></div>
             <div className="uxui-canvas-zoom">
-              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
+              {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} title="Preview connected screen flow" className="rounded-lg border border-border px-2.5 py-2 text-xs font-semibold text-fg disabled:opacity-40">Prototype</button>}
+              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out" disabled={prototypePreview}><ZoomOut size={16} /></button>
               <span>{zoom}%</span>
               <button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
@@ -2050,7 +2137,7 @@ export function UxUiStudioEngine() {
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";
                   const baseBox = (round = layer.radius) => <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={round} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
-                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
+                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: prototypePreview ? (layer.prototypeTargetScreenId && screens.some((screen) => screen.id === layer.prototypeTargetScreenId) ? "pointer" : "not-allowed") : layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
                   return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
