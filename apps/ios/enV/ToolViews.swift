@@ -8434,7 +8434,7 @@ private struct NativeUxUiStudioView: View {
                                 }
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    HStack { Text(toolkit.name).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk); Spacer(minLength: 4); Text(toolkit.status).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(toolkit.status == "Not complete" ? Color.envDanger : Color.envAccent) }
+                                    HStack { Text(toolkit.name).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk); Spacer(minLength: 4); Text(toolkit.status).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(toolkit.status == "Not complete" ? Color.red : Color.envAccent) }
                                     Text(toolkit.description).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
                                     if activeToolkitID == toolkit.id { Text("Selected toolkit").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent) }
                                 }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
@@ -8445,7 +8445,7 @@ private struct NativeUxUiStudioView: View {
                         if activeToolkitID == "qa" || activeToolkitID == "accessibility" || !qaReport.isEmpty {
                             Text("Review results · \(qaReport.count)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
                             if qaReport.isEmpty { Text("No findings in the limited checks run.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
-                            ForEach(Array(qaReport.prefix(80).enumerated()), id: \.offset) { _, finding in Text("• " + finding).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                            ForEach(Array(qaReport.prefix(80).enumerated()), id: \.offset) { entry in Text("• " + entry.element).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
                         }
                     }
                 } else if toolkitTab == "Elements" {
