@@ -135,7 +135,7 @@ assert.ok(
   webToolShell.includes("env-tool-fullscreen__content") &&
   webStyles.includes(".env-tool-fullscreen {") &&
   webStyles.includes("height: 100dvh") &&
-  webStyles.includes("env(safe-area-inset-top)") &&
+  webStyles.includes("env(safe-area-inset-top, 0px)") &&
   webStyles.includes(".env-tool-fullscreen__content > *") &&
   webStyles.includes("--env-tool-fullscreen-toolbar-height") &&
   webStyles.includes(".env-tool-fullscreen__content .uxui-topbar"),
