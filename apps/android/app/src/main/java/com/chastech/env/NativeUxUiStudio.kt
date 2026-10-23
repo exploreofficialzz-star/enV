@@ -70,6 +70,36 @@ private data class UxUiNativeLayer(
     val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f
 )
 
+private data class UxNativeToolkit(val id: String, val name: String, val description: String, val panel: String, val status: String)
+private val uxNativeToolkits = listOf(
+    UxNativeToolkit("icons", "Icon Studio", "Discover, style, import and reuse icons.", "Icons", "Connected"),
+    UxNativeToolkit("typography", "Typography Studio", "Font discovery, typography and embedded font assets.", "Fonts", "Connected"),
+    UxNativeToolkit("color", "Color Studio", "Palette, semantic colors and design tokens.", "Tokens", "Connected"),
+    UxNativeToolkit("background", "Gradient & Background Studio", "Canvas background, image backgrounds and decorative surfaces.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("effects", "Effects Studio", "Border, radius, opacity, shadow and visual depth.", "Style", "Connected foundation"),
+    UxNativeToolkit("illustrations", "Illustration Studio", "Import and position SVG or image illustrations.", "Elements", "Import"),
+    UxNativeToolkit("media", "Image & Media Studio", "Import photos, screenshots and media previews.", "Elements", "Import"),
+    UxNativeToolkit("brand", "Brand Studio", "Brand colors, fonts and reusable component templates.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("motion", "Motion Studio", "Rotation and visual transition values.", "Style", "Connected foundation"),
+    UxNativeToolkit("components", "UI Components, Kits & Patterns", "Reusable controls, cards, forms and navigation elements.", "Elements", "Connected"),
+    UxNativeToolkit("device", "Device Mockup Studio", "Preview the screen in device frames.", "Device", "Connected"),
+    UxNativeToolkit("responsive", "Responsive Design, Layout & Canvas", "Viewport size, anchors, grid and responsive visibility.", "Canvas", "Connected"),
+    UxNativeToolkit("projects", "Screen & Project Manager", "Projects, drafts, presets and import.", "Presets", "Connected"),
+    UxNativeToolkit("layers", "Layers & Object Manager", "Select and reorder objects, duplicate and delete layers.", "Layers", "Connected"),
+    UxNativeToolkit("prototype", "Prototype Studio", "Connected navigation, overlays and interaction flows.", "Prototype", "Not complete"),
+    UxNativeToolkit("design-system", "Design System Studio", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("accessibility", "Accessibility Studio", "Structure and touch-target review.", "QA", "Advisory checks"),
+    UxNativeToolkit("content", "Content & Placeholder Studio", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
+    UxNativeToolkit("data-viz", "Data Visualization Studio", "Charts and dashboard elements.", "Chart", "Starter actions"),
+    UxNativeToolkit("patterns", "Patterns & Textures Studio", "Grid, vector shapes and decorative patterns.", "Pattern", "Starter actions"),
+    UxNativeToolkit("3d", "3D Studio", "3D models, camera and lighting.", "3D", "Not complete"),
+    UxNativeToolkit("platform", "Platform Design Kits", "Mobile, tablet and desktop conventions.", "Device", "Connected foundation"),
+    UxNativeToolkit("assets", "Asset Manager", "Import supported assets and replace artwork.", "Elements", "Import"),
+    UxNativeToolkit("handoff", "Export & Design Handoff Studio", "Export PDF, JSON and source handoff.", "Handoff", "Connected"),
+    UxNativeToolkit("inspiration", "Inspiration & Reference Studio", "Import visual references for comparison.", "Elements", "Import"),
+    UxNativeToolkit("qa", "Design QA Studio", "Review overlaps, bounds, labels and touch targets.", "QA", "Advisory checks")
+)
+
 private fun uxNativeLayerX(layer: UxUiNativeLayer, boardWidth: Int): Int = when(layer.horizontalConstraint) {
     "center" -> layer.x + (boardWidth - layer.referenceWidth) / 2
     "right" -> boardWidth - (layer.referenceWidth - layer.x)
