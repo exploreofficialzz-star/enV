@@ -1197,3 +1197,107 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio:not(.is-expanded) .uxui-property-dock-header > button { min-height:21px; font-size:8px; }
   .ux-ui-studio:not(.is-expanded) .uxui-property-card { min-height:30px; flex-basis:90px; padding:3px; }
 }
+
+
+/* UX/UI Studio responsive pass: preserve device proportions and isolate editor toolbars. */
+.ux-ui-studio { isolation:isolate; }
+.ux-ui-studio:not(.is-expanded) {
+  position:relative; display:flex; flex-direction:column; gap:8px !important;
+  height:auto !important; min-height:0 !important; max-height:none !important;
+  overflow:visible !important;
+}
+.ux-ui-studio:not(.is-expanded) > .uxui-topbar {
+  position:relative !important; top:auto !important; z-index:1 !important;
+  flex:0 0 auto; min-width:0;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-workspace {
+  position:relative !important; display:block !important; flex:0 0 auto !important;
+  height:auto !important; min-height:0 !important; overflow:visible !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-panel {
+  display:flex; flex-direction:column; width:100%; height:auto !important;
+  min-height:0 !important; overflow:visible !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-heading {
+  position:relative !important; top:auto !important; z-index:auto !important;
+  flex:0 0 auto; flex-wrap:nowrap;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-stage {
+  flex:0 0 auto !important; width:100%; height:auto !important; min-height:0 !important;
+  overflow:visible !important; padding:clamp(10px,2vw,20px);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-shell { flex:0 0 auto; max-width:100%; }
+.ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar {
+  position:relative !important; inset:auto !important; z-index:1;
+  flex:0 0 auto; min-height:64px; padding:7px 10px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-mobile-controls {
+  display:flex; position:relative; z-index:1; flex:0 0 auto; width:100%;
+  min-width:0; max-height:none; overflow-x:auto; overflow-y:hidden;
+  justify-content:space-evenly; align-items:center; gap:clamp(5px,2vw,20px);
+  padding:12px 8px 10px; border-top:1px solid var(--color-border);
+  background:var(--color-surface);
+}
+.ux-ui-studio:not(.is-expanded).target-desktop .uxui-mobile-controls { display:none !important; }
+.ux-ui-studio:not(.is-expanded).target-mobile .uxui-mobile-controls,
+.ux-ui-studio:not(.is-expanded).target-tablet .uxui-mobile-controls { display:flex !important; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-controls {
+  position:relative; z-index:auto; flex:0 0 auto; min-width:0; width:100%;
+  max-width:100%; overflow:visible; padding:7px 8px 8px;
+  border-top:1px solid var(--color-border); background:var(--color-surface);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar {
+  display:flex; flex-wrap:nowrap; align-items:stretch; gap:4px; width:100%;
+  padding:2px 0 4px; overflow-x:auto; overflow-y:hidden;
+  overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action {
+  display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; gap:5px;
+  min-width:42px; min-height:42px; padding:5px 8px; border:1px solid transparent;
+  border-radius:9px; background:transparent; color:var(--color-fg);
+  font-size:11px; font-weight:750;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action:hover,
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action[aria-expanded="true"] {
+  background:var(--color-surface-2);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action:focus-visible {
+  outline:2px solid var(--color-accent); outline-offset:1px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action.is-danger { color:#dc2626; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action svg { flex:0 0 auto; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-selection {
+  display:flex; flex:0 0 auto; align-items:center; max-width:120px; padding:0 7px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-tools-drawer {
+  border:1px solid var(--color-border) !important;
+  background:var(--color-surface) !important;
+  box-shadow:var(--shadow-border) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .bg-surface-2,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-selection { background:var(--color-surface) !important; }
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-tile { background:var(--color-surface); color:var(--color-fg); }
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-tile-art { background:var(--color-surface-2); color:var(--color-fg); }
+.ux-ui-studio:not(.is-expanded) > footer { display:none !important; }
+
+@media (max-width:1023px) {
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action {
+    flex-direction:column; justify-content:center; gap:4px;
+    min-width:56px; min-height:62px; padding:5px 6px;
+  }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action svg { width:21px; height:21px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span {
+    display:block !important; font-size:9px; line-height:1.2; font-weight:750;
+  }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-selection { max-width:84px; font-size:10px; }
+}
+@media (max-width:480px) {
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-stage { padding:10px 5px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar { min-height:58px; padding:5px 4px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-controls { padding:5px 4px 7px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action { min-width:52px; min-height:58px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad { grid-template-columns:repeat(3,36px); grid-template-rows:16px repeat(3,36px); gap:1px; padding:2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:35px; height:35px; border-radius:10px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:9px; line-height:15px; }
+}
