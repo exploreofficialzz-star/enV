@@ -1060,8 +1060,11 @@ export function UxUiStudioEngine() {
     setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
     setTarget(nextTarget); setProjectName(created.name); setBackground(created.background);
     setTokens(DEFAULT_TOKENS); setReusableComponents([]);
+    const nextScreenId = newScreenId();
+    setScreens([{ id: nextScreenId, name: "Screen 1", target: nextTarget, background: created.background, customArtboard: false, customWidth: size.width, customHeight: size.height, elements: created.elements, updatedAt: new Date().toISOString() }]);
+    setActiveScreenId(nextScreenId);
     setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
-    setUndoStack([]); setRedoStack([]); setLeftTab("icons"); setToolkitSearch("");
+    setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
     setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
     setZoom(100); setActiveDraftId(""); setOnboarding(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
@@ -1069,10 +1072,18 @@ export function UxUiStudioEngine() {
 
   function continueSaved(draft: SavedProject | null = savedProject) {
     if (!draft) return;
-    setProjectName(draft.name); setTarget(draft.target); setBackground(draft.background);
-    setCustomArtboard(true); setCustomWidth(draft.viewport.width); setCustomHeight(draft.viewport.height);
+    const restoredScreens = draft.screens?.length ? draft.screens : [{
+      id: newScreenId(), name: "Screen 1", target: draft.target, background: draft.background,
+      customArtboard: true, customWidth: draft.viewport.width, customHeight: draft.viewport.height,
+      elements: draft.elements, updatedAt: draft.updatedAt,
+    }];
+    const currentScreen = restoredScreens.find((screen) => screen.id === draft.activeScreenId) || restoredScreens[0];
+    setScreens(restoredScreens);
+    setActiveScreenId(currentScreen.id);
+    setProjectName(draft.name); setTarget(currentScreen.target); setBackground(currentScreen.background);
+    setCustomArtboard(currentScreen.customArtboard); setCustomWidth(currentScreen.customWidth); setCustomHeight(currentScreen.customHeight);
     setTokens(draft.tokens || DEFAULT_TOKENS); setReusableComponents(draft.reusableComponents || []);
-    setElements(draft.elements.map((layer) => ({
+    setElements(currentScreen.elements.map((layer) => ({
       ...layer, horizontalConstraint: layer.horizontalConstraint || "left", verticalConstraint: layer.verticalConstraint || "top",
       minWidth: layer.minWidth ?? 0, maxWidth: layer.maxWidth ?? 0,
       visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
@@ -1080,8 +1091,8 @@ export function UxUiStudioEngine() {
       referenceHeight: layer.referenceHeight || draft.viewport.height,
       componentKey: layer.componentKey || "", rotation: layer.rotation || 0,
     })));
-    setSelectedId(draft.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
-    setLeftTab("icons"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
+    setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
+    setLeftTab("toolkits"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
     setNotice("Draft opened. Tap an element to continue designing.");
   }
