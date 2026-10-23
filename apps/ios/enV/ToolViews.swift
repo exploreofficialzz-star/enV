@@ -9190,6 +9190,8 @@ private struct NativeUxUiStudioView: View {
         tokens = UxUiNativeTokens()
         reusableComponents = []
         elements = []
+        let firstScreen = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [])
+        screens = [firstScreen]; activeScreenID = firstScreen.id; showScreenManager = false
         selectedID = nil
         undoHistory = []
         redoHistory = []
@@ -9212,6 +9214,8 @@ private struct NativeUxUiStudioView: View {
         elements = starterElements(target: nextTarget, preset: preset).map { item in
             var layer = item; layer.referenceWidth = customWidth; layer.referenceHeight = customHeight; return layer
         }
+        let firstScreen = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: nextTarget, background: background, customArtboard: customArtboard, customWidth: boardWidth, customHeight: boardHeight, elements: elements)
+        screens = [firstScreen]; activeScreenID = firstScreen.id; showScreenManager = false
         selectedID = elements.first?.id
         onboarding = false
         notice = "Design ready. Select a layer to adjust its exact specifications."
@@ -9336,7 +9340,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func saveDraft() {
-        guard !onboarding, !elements.isEmpty else { return }
+        guard !onboarding, (!elements.isEmpty || screens.count > 1) else { return }
         UserDefaults.standard.set(projectJSON, forKey: storageKey)
         hasSavedDraft = true
     }
@@ -9346,11 +9350,24 @@ private struct NativeUxUiStudioView: View {
               let project = try? JSONDecoder().decode(UxUiNativeProject.self, from: data) else {
             notice = "No valid local draft was found."; return
         }
-        projectName = project.name; target = project.target; background = project.background
-        customWidth = project.viewport.width; customHeight = project.viewport.height; customArtboard = true
+        projectName = project.name
         tokens = project.tokens ?? UxUiNativeTokens()
         reusableComponents = project.reusableComponents ?? []
-        elements = project.elements; selectedID = elements.first?.id; onboarding = false
+        if let savedScreens = project.screens, !savedScreens.isEmpty {
+            screens = savedScreens
+            let active = savedScreens.first(where: { $0.id == project.activeScreenID }) ?? savedScreens[0]
+            activeScreenID = active.id
+            target = active.target; background = active.background
+            customWidth = active.customWidth; customHeight = active.customHeight; customArtboard = active.customArtboard
+            elements = active.elements
+        } else {
+            target = project.target; background = project.background
+            customWidth = project.viewport.width; customHeight = project.viewport.height; customArtboard = true
+            let legacy = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: project.target, background: project.background, customArtboard: true, customWidth: project.viewport.width, customHeight: project.viewport.height, elements: project.elements)
+            screens = [legacy]; activeScreenID = legacy.id
+            elements = project.elements
+        }
+        selectedID = elements.first?.id; onboarding = false
         notice = "Local design restored."
     }
 
