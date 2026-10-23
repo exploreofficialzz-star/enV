@@ -1322,7 +1322,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     }
                     Text("New project",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
                     Text("Start with a blank design. Add elements only when you need them.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
+                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showScreenManager=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;val id="screen-"+System.nanoTime();screens.clear();screens.add(UxUiNativeScreen(id,"Screen 1","mobile","#FFFFFF",false,390,844,emptyList()));activeScreenId=id;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
                 }}
                 Text("Drafts",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 if(hasSavedDraft) {
@@ -1420,12 +1420,42 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     }
                     Text("Your design automatically fits the preview.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("↶")}
-                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
-                    OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("↷")}
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                        OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↶")}
+                        OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
+                    }
                     Spacer(Modifier.weight(1f))
-                    if(elements.isNotEmpty())Text(elements.size.toString()+(if(elements.size==1)" element" else " elements"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
+                        IconButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp)){Icon(imageVector=androidx.compose.material.icons.Icons.Outlined.Layers,contentDescription="App screens",tint=MaterialTheme.colorScheme.onSurface)}
+                        Text(screens.size.toString(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if(showScreenManager){
+                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                        Row(verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){Text("App screens",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text("Choose which screen is open in the mockup.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                            Button(onClick={addAppScreen()}){Text("＋ New screen")}
+                        }
+                        screens.forEachIndexed{screenIndex,screen->
+                            Card(colors=CardDefaults.cardColors(containerColor=if(screen.id==activeScreenId)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)){
+                                Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                    OutlinedTextField(value=screen.name,onValueChange={renameAppScreen(screen.id,it)},label={Text("Screen name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                    Text(screen.target+" · "+screen.elements.size+" layers · "+screen.customWidth+"×"+screen.customHeight,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
+                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId,modifier=Modifier.weight(1f)){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,-1)},enabled=screenIndex>0,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↑")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,1)},enabled=screenIndex<screens.lastIndex,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↓")}
+                                        OutlinedButton(onClick={duplicateAppScreen(screen.id)},contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Duplicate")}
+                                        OutlinedButton(onClick={deleteAppScreen(screen.id)},enabled=screens.size>1,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Delete")}
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedButton(onClick={showScreenManager=false},modifier=Modifier.fillMaxWidth()){Text("Done")}
+                    }}
                 }
                 val selectedElement=selected
                 if(selectedElement!=null){
