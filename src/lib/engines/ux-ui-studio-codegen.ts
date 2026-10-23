@@ -9,6 +9,8 @@ export type UxCodegenLayer = {
   verticalConstraint?: "top" | "center" | "bottom" | "stretch";
   minWidth?: number; maxWidth?: number; visibleOn?: string[];
   referenceWidth?: number; referenceHeight?: number; componentKey?: string;
+  display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
+  hoverColor?: string; activeColor?: string; focusColor?: string;
 };
 export type UxCodegenProject = {
   name: string; target: string; background: string; viewport: { width: number; height: number };
@@ -64,12 +66,13 @@ const googleFontLink = (family: string): string => "https://fonts.googleapis.com
 
 const layerStyle = (l: UxCodegenLayer) => [
   "box-sizing:border-box","padding:" + l.padding + "px","color:" + l.color,
+  "display:" + (l.display || "flex"),"cursor:" + (l.cursor || "default"),"z-index:" + (l.zIndex ?? 1),"transition:background-color " + (l.transitionDuration ?? 180) + "ms ease,opacity " + (l.transitionDuration ?? 180) + "ms ease",
   "background:" + (l.background === "transparent" ? "transparent" : l.background),
   "border:" + l.borderWidth + "px solid " + (l.borderWidth > 0 ? l.borderColor : "transparent"),
   "border-radius:" + l.radius + "px","opacity:" + l.opacity,"font-family:" + safe(l.fontFamily),
   "font-size:" + l.fontSize + "px","font-weight:" + l.fontWeight,"line-height:" + l.lineHeight,
   "letter-spacing:" + l.letterSpacing + "px","text-align:" + l.textAlign,"white-space:pre-wrap","overflow:hidden",
-  "display:flex","align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
+  "align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
   "justify-content:" + (l.textAlign === "center" ? "center" : l.textAlign === "right" ? "flex-end" : "flex-start"),
   l.shadow ? "box-shadow:0 3px 10px #0f172a24" : "",
   shapeCss(l),
@@ -95,7 +98,16 @@ export function generateHtmlProject(project: UxCodegenProject): string {
   const mobileHidden = ".env-layer:not([data-visible-on~='mobile']){}";
   const fontFaces = embeddedFontCss(project);
   const fontLinks = remoteFontFamilies(project).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
+  const interactionRules = project.elements.map((layer) => {
+    const selector = ".env-layer-" + layer.id.replace(/[^a-zA-Z0-9_-]/g, "");
+    const rules: string[] = [];
+    if (layer.hoverColor) rules.push(selector + ":hover{background:" + layer.hoverColor + "!important}");
+    if (layer.activeColor) rules.push(selector + ":active{background:" + layer.activeColor + "!important}");
+    if (layer.focusColor) rules.push(selector + ":focus-visible{background:" + layer.focusColor + "!important;outline:3px solid " + layer.focusColor + ";outline-offset:2px}");
+    return rules.join("\\n");
+  }).filter(Boolean).join("\\n");
   const rules = [
+    interactionRules,
     "@media (max-width:" + project.breakpoints.mobile + "px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}",
     "@media (min-width:" + (project.breakpoints.mobile + 1) + "px) and (max-width:" + (project.breakpoints.desktop - 1) + "px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}",
     "@media (min-width:" + project.breakpoints.desktop + "px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}",
