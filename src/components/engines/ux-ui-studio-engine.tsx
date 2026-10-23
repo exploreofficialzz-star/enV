@@ -1008,8 +1008,8 @@ export function UxUiStudioEngine() {
   const deviceDisplayWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
-    canvasStageSize.width > 0 ? Math.max(1, canvasStageSize.width - 20) : Number.POSITIVE_INFINITY,
-    canvasStageSize.height > 0 ? Math.max(1, canvasStageSize.height - 20) * board.width / board.height : Number.POSITIVE_INFINITY,
+    canvasStageSize.width > 0 ? Math.max(1, canvasStageSize.width - 34) : Number.POSITIVE_INFINITY,
+    canvasStageSize.height > 0 ? Math.max(1, canvasStageSize.height - 34) * board.width / board.height : Number.POSITIVE_INFINITY,
   ));
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
