@@ -133,7 +133,7 @@ try {
         await page.getByRole('button', { name: 'Close app screens and layers', exact: true }).click();
         await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'All 26', exact: true }).click();
-        await page.getByRole('button', { name: /Prototype Studio/ }).click();
+        await page.getByRole('button', { name: /Interactive flows/ }).click();
         const destinationPicker = page.getByLabel('Prototype destination', { exact: true });
         await destinationPicker.waitFor({ state: 'visible', timeout });
         await destinationPicker.selectOption({ label: 'Screen 2' });
