@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
-type PanelTab = "components" | "icons" | "fonts" | "presets" | "tokens";
+type PanelTab = "toolkits" | "components" | "icons" | "fonts" | "presets" | "tokens";
 type InspectorTab = "design" | "spec";
 type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer" | "triangle" | "diamond" | "hexagon" | "star" | "line" | "pill";
 type Align = "left" | "center" | "right";
@@ -103,6 +103,218 @@ const ICON_BROWSE_CATEGORIES: Array<{name:string;description:string;icons:string
   {name:"Shapes",description:"Geometric marks and decorative symbols",icons:["lucide:circle","tabler:circle","material-symbols:circle-rounded","mdi:circle-outline","lucide:square","tabler:square","material-symbols:square-rounded","mdi:square-outline","lucide:triangle","tabler:triangle","material-symbols:change-history-rounded","mdi:triangle-outline","lucide:star","tabler:star","material-symbols:star-rounded","mdi:star-outline","lucide:heart","tabler:heart","material-symbols:favorite-rounded","mdi:heart-outline","lucide:hexagon","tabler:hexagon","mdi:hexagon-outline","lucide:diamond","tabler:diamond","mdi:diamond-outline"]}
 ];
 const SWATCHES = ["#111827", "#374151", "#6B7280", "#F9FAFB", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2777", "#059669", "#D97706", "#DC2626", "#0F766E"];
+type StudioToolkit = { id: string; name: string; description: string; tab: PanelTab; icon: string; outcome: string };
+const STUDIO_TOOLKITS: StudioToolkit[] = [
+  {
+    "id": "icons",
+    "name": "Icon Studio",
+    "description": "Discover, customize, import and reuse vector icons.",
+    "tab": "icons",
+    "icon": "Shapes",
+    "outcome": "Search icon collections, select an icon, then customise its size, fill, padding, border, radius and shadow."
+  },
+  {
+    "id": "typography",
+    "name": "Typography Studio",
+    "description": "Build readable type systems and manage font assets.",
+    "tab": "fonts",
+    "icon": "Type",
+    "outcome": "Browse curated and remote fonts, preview families, import local files and embed supported font assets."
+  },
+  {
+    "id": "color",
+    "name": "Color Studio",
+    "description": "Manage accessible colors, palettes and interactive states.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Edit named color tokens, use the palette, apply foreground/fill values and inspect contrast in Design QA."
+  },
+  {
+    "id": "background",
+    "name": "Gradient & Background Studio",
+    "description": "Build backgrounds, gradient surfaces and decorative canvas treatments.",
+    "tab": "tokens",
+    "icon": "PanelsTopLeft",
+    "outcome": "Choose the canvas background, toggle the alignment grid, import image backgrounds and retain values in the project."
+  },
+  {
+    "id": "effects",
+    "name": "Effects Studio",
+    "description": "Tune elevation, borders, transparency and visual depth.",
+    "tab": "toolkits",
+    "icon": "Sparkles",
+    "outcome": "Select an object to adjust opacity, border, radius and shadow in visual controls; detailed values remain in Fine-tune design."
+  },
+  {
+    "id": "illustrations",
+    "name": "Illustration Studio",
+    "description": "Import, place and manage illustration assets.",
+    "tab": "components",
+    "icon": "Image",
+    "outcome": "Import SVGs or images to the artboard, then position, resize, rotate and style them as editable layers."
+  },
+  {
+    "id": "media",
+    "name": "Image & Media Studio",
+    "description": "Bring screenshots, photos, thumbnails and media assets into the mockup.",
+    "tab": "components",
+    "icon": "ImagePlus",
+    "outcome": "Import supported image assets, replace them on selected layers and export designs with embedded image data."
+  },
+  {
+    "id": "brand",
+    "name": "Brand Studio",
+    "description": "Keep brand colors, typography and reusable visual assets consistent.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Maintain named color/type tokens and reusable component templates; apply brand values to selected layers."
+  },
+  {
+    "id": "motion",
+    "name": "Motion Studio",
+    "description": "Control rotations, transitions and interaction-state appearance.",
+    "tab": "toolkits",
+    "icon": "RotateCw",
+    "outcome": "Adjust rotation and set CSS transition duration and hover/active/focus-visible fill values in Technical styling."
+  },
+  {
+    "id": "components",
+    "name": "UI Components, Kits & Patterns",
+    "description": "Create interface controls, cards, forms and navigation patterns.",
+    "tab": "components",
+    "icon": "LayoutTemplate",
+    "outcome": "Insert editable controls from the component library and save selected layers as reusable component templates."
+  },
+  {
+    "id": "device",
+    "name": "Device Mockup Studio",
+    "description": "Preview the screen inside mobile, tablet and desktop device frames.",
+    "tab": "toolkits",
+    "icon": "Smartphone",
+    "outcome": "Switch the preview target in the top bar; the device frame changes independently from screen elements."
+  },
+  {
+    "id": "responsive",
+    "name": "Responsive Design, Layout & Canvas",
+    "description": "Position, size and adapt designs across viewport sizes.",
+    "tab": "toolkits",
+    "icon": "Monitor",
+    "outcome": "Change target, zoom and grid; set custom canvas dimensions, anchors, min/max width and per-target visibility."
+  },
+  {
+    "id": "projects",
+    "name": "Screen & Project Manager",
+    "description": "Create projects, reopen drafts and export editable design files.",
+    "tab": "presets",
+    "icon": "Layers",
+    "outcome": "Use Projects to reopen drafts, import project JSON or start from responsive starter layouts."
+  },
+  {
+    "id": "layers",
+    "name": "Layers & Object Manager",
+    "description": "Select, reorder, duplicate and remove individual elements.",
+    "tab": "toolkits",
+    "icon": "Layers",
+    "outcome": "Select a layer, move it in the stack, duplicate or delete it, and inspect its saved object properties."
+  },
+  {
+    "id": "prototype",
+    "name": "Prototype Studio",
+    "description": "Prepare screen states and review interactive design behavior.",
+    "tab": "toolkits",
+    "icon": "ArrowRight",
+    "outcome": "Connected multi-screen prototype playback requires its own interaction graph; this editor will not present it as complete before navigation is wired."
+  },
+  {
+    "id": "design-system",
+    "name": "Design System Studio",
+    "description": "Manage reusable color, typography and spacing tokens.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Edit named color tokens, type scales and spacing values saved with exported project specifications."
+  },
+  {
+    "id": "accessibility",
+    "name": "Accessibility Studio",
+    "description": "Review likely contrast, text-size, labeling and touch-target issues.",
+    "tab": "toolkits",
+    "icon": "CircleHelp",
+    "outcome": "Run the project check to surface potential issues; this report is advisory and does not claim full WCAG conformance."
+  },
+  {
+    "id": "content",
+    "name": "Content & Placeholder Studio",
+    "description": "Insert realistic headings, sample text, button labels and data.",
+    "tab": "toolkits",
+    "icon": "Type",
+    "outcome": "Add starter headings, body copy, CTA labels and sample elements to the artboard."
+  },
+  {
+    "id": "data-viz",
+    "name": "Data Visualization Studio",
+    "description": "Insert chart components and edit chart labels for dashboard mockups.",
+    "tab": "components",
+    "icon": "ChartNoAxesColumn",
+    "outcome": "Insert a chart layer and edit its label, geometry and styling like any other layer."
+  },
+  {
+    "id": "patterns",
+    "name": "Patterns & Textures Studio",
+    "description": "Use grids, geometric shapes and decorative layers.",
+    "tab": "toolkits",
+    "icon": "Grid2X2",
+    "outcome": "Toggle the canvas grid or insert vector shapes and style their fills, opacity, radius and layering."
+  },
+  {
+    "id": "3d",
+    "name": "3D Studio",
+    "description": "Manage 3D asset references and design placeholders.",
+    "tab": "toolkits",
+    "icon": "Box",
+    "outcome": "Live GLB/GLTF rendering, lighting and camera manipulation are not yet available in this editor; imported rendered previews can be used instead."
+  },
+  {
+    "id": "platform",
+    "name": "Platform Design Kits",
+    "description": "Use mobile, tablet and desktop viewport conventions.",
+    "tab": "toolkits",
+    "icon": "Smartphone",
+    "outcome": "Select the viewport target and use responsive visibility and layout anchors for each design layer."
+  },
+  {
+    "id": "assets",
+    "name": "Asset Manager",
+    "description": "Import, replace and retain image and SVG assets.",
+    "tab": "components",
+    "icon": "ImagePlus",
+    "outcome": "Import and replace supported assets. Check source and licence metadata for third-party resources."
+  },
+  {
+    "id": "handoff",
+    "name": "Export & Design Handoff Studio",
+    "description": "Export a visual brief, exact project specification and source code.",
+    "tab": "toolkits",
+    "icon": "FileOutput",
+    "outcome": "Export PDF, JSON, HTML/CSS, React TSX, Kotlin or SwiftUI; generated source still requires target-app integration and build verification."
+  },
+  {
+    "id": "inspiration",
+    "name": "Inspiration & Reference Studio",
+    "description": "Collect reference assets for visual comparison.",
+    "tab": "toolkits",
+    "icon": "Search",
+    "outcome": "Import screenshots or references into the project and retain source notes before redistributing them."
+  },
+  {
+    "id": "qa",
+    "name": "Design QA Studio",
+    "description": "Check geometry, overlaps, missing assets and basic interaction readiness.",
+    "tab": "toolkits",
+    "icon": "Check",
+    "outcome": "Run the structural audit and review potential issues before handoff."
+  }
+];
+
 const COMPONENTS: Array<{ kind: LayerKind; label: string; description: string }> = [
   { kind: "text", label: "Text", description: "Heading or paragraph" },
   { kind: "button", label: "Button", description: "Primary action" },
@@ -628,7 +840,10 @@ export function UxUiStudioEngine() {
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
-  const [leftTab, setLeftTab] = useState<PanelTab>("icons");
+  const [leftTab, setLeftTab] = useState<PanelTab>("toolkits");
+  const [activeToolkitId, setActiveToolkitId] = useState("icons");
+  const [qaReport, setQaReport] = useState<string[]>([]);
+  const [showQaReport, setShowQaReport] = useState(false);
   const [toolkitSearch, setToolkitSearch] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);
