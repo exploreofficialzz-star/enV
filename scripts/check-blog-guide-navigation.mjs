@@ -95,30 +95,21 @@ try {
   await directPage.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
   await directPage.close();
 
-  const guideResponsePromise = page.waitForResponse(
-    (response) => {
-      const responseUrl = new URL(response.url());
-      return response.request().isNavigationRequest()
-        && responseUrl.origin === targetUrl.origin
-        && responseUrl.pathname === targetUrl.pathname;
-    },
-    { timeout: 20_000 },
-  );
+  // TanStack Router performs an in-app navigation here. A browser document-navigation
+  // response is not guaranteed, so assert the URL and rendered destination instead;
+  // directPage above independently verifies the same URL returns HTTP 200 on refresh.
   const guideUrlPromise = page.waitForURL(
     (url) => url.origin === targetUrl.origin && url.pathname === targetUrl.pathname,
     { timeout: 20_000 },
   );
   await guideLink.click();
-  const [guideResponse] = await Promise.all([guideResponsePromise, guideUrlPromise]);
+  await guideUrlPromise;
 
-  assert.equal(guideResponse.status(), 200, `The individual guide must return HTTP 200: ${href}`);
   // Surface the actual rendered destination when this regression test catches a
-  // route that returns HTTP 200 but renders an error or the wrong page.
+  // route that changes the URL but renders an error or the wrong page.
   const diagnostics = async () => ({
     requestedHref: href,
     finalUrl: page.url(),
-    navigationResponseUrl: guideResponse.url(),
-    navigationStatus: guideResponse.status(),
     title: await page.title().catch(() => ""),
     headings: await page.locator("h1, h2, h3").allInnerTexts().catch(() => []),
     visibleBody: (await page.locator("body").innerText().catch(() => "")).slice(0, 2_500),
