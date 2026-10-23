@@ -948,14 +948,48 @@ export function UxUiStudioEngine() {
             tokens: parsed.tokens || DEFAULT_TOKENS, breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
             reusableComponents: parsed.reusableComponents || [],
           } as SavedProject;
-          const merged = [normalized, ...storedDrafts.filter((item) => item.id !== normalized.id)]
+          const restoredScreens: DesignScreen[] = Array.isArray(parsed.screens) && parsed.screens.length
+            ? parsed.screens.filter((screen) => screen && typeof screen.id === "string" && Array.isArray(screen.elements)).map((screen) => ({
+                ...screen,
+                id: screen.id || newScreenId(),
+                name: typeof screen.name === "string" && screen.name.trim() ? screen.name : "Screen",
+                target: (["mobile", "tablet", "desktop"].includes(screen.target) ? screen.target : parsed.target) as DeviceTarget,
+                background: typeof screen.background === "string" ? screen.background : parsed.background,
+                customArtboard: Boolean(screen.customArtboard),
+                customWidth: Number.isFinite(screen.customWidth) ? Math.max(160, Math.min(4096, screen.customWidth)) : parsed.viewport.width,
+                customHeight: Number.isFinite(screen.customHeight) ? Math.max(240, Math.min(4096, screen.customHeight)) : parsed.viewport.height,
+                elements: screen.elements.map((layer: Partial<DesignLayer>) => ({
+                  ...layer, horizontalConstraint: layer.horizontalConstraint || "left",
+                  verticalConstraint: layer.verticalConstraint || "top", minWidth: layer.minWidth ?? 0,
+                  maxWidth: layer.maxWidth ?? 0, visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
+                  referenceWidth: layer.referenceWidth || parsed.viewport.width,
+                  referenceHeight: layer.referenceHeight || parsed.viewport.height,
+                  componentKey: layer.componentKey || "", fontDataUrl: layer.fontDataUrl || "", rotation: layer.rotation || 0,
+                } as DesignLayer)),
+                updatedAt: screen.updatedAt || parsed.updatedAt || new Date().toISOString(),
+              }))
+            : [{
+                id: "screen-home", name: "Screen 1", target: normalized.target, background: normalized.background,
+                customArtboard: true, customWidth: normalized.viewport.width, customHeight: normalized.viewport.height,
+                elements: normalized.elements, updatedAt: normalized.updatedAt || new Date().toISOString(),
+              }];
+          const initialScreen = restoredScreens.find((screen) => screen.id === parsed.activeScreenId) || restoredScreens[0];
+          const hydrated: SavedProject = {
+            ...normalized, screens: restoredScreens, activeScreenId: initialScreen.id,
+            target: initialScreen.target, background: initialScreen.background,
+            viewport: { width: initialScreen.customArtboard ? initialScreen.customWidth : boardSize(initialScreen.target).width,
+              height: initialScreen.customArtboard ? initialScreen.customHeight : boardSize(initialScreen.target).height },
+            elements: initialScreen.elements,
+          };
+          const merged = [hydrated, ...storedDrafts.filter((item) => item.id !== hydrated.id)]
             .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
           localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged));
-          setSavedProject(normalized); setDrafts(merged); setProjectName(normalized.name);
-          setTarget(normalized.target); setBackground(normalized.background); setCustomArtboard(true);
-          setCustomWidth(normalized.viewport.width); setCustomHeight(normalized.viewport.height);
-          setTokens(normalized.tokens); setReusableComponents(normalized.reusableComponents);
-          setElements(normalized.elements); setSelectedId(normalized.elements[0]?.id || "");
+          setSavedProject(hydrated); setDrafts(merged); setProjectName(hydrated.name);
+          setScreens(restoredScreens); setActiveScreenId(initialScreen.id);
+          setTarget(initialScreen.target); setBackground(initialScreen.background); setCustomArtboard(initialScreen.customArtboard);
+          setCustomWidth(initialScreen.customWidth); setCustomHeight(initialScreen.customHeight);
+          setTokens(hydrated.tokens); setReusableComponents(hydrated.reusableComponents);
+          setElements(initialScreen.elements); setSelectedId(initialScreen.elements[0]?.id || "");
         } else setDrafts(storedDrafts);
       } else setDrafts(storedDrafts);
     } catch { /* A corrupt local draft does not block the studio. */ }
