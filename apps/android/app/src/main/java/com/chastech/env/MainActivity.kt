@@ -1043,20 +1043,31 @@ private fun ToolDetail(
                         border = BorderStroke(0.dp, MaterialTheme.colorScheme.background),
                     ) {
                         Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(12.dp),
+                            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                         ) {
-                            NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                IconButton(
+                                    onClick = onToggleFullscreen,
+                                    modifier = Modifier.size(40.dp)
+                                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                                        .semantics { contentDescription = "Exit full screen for ${tool.name}" },
+                                ) {
+                                    Text("⤢", fontSize = 21.sp, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                            Column(
+                                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(0.dp),
+                            ) {
+                                NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
+                            }
                         }
-                    }
-                    IconButton(
-                        onClick = onToggleFullscreen,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(40.dp).zIndex(2f)
-                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-                            .semantics { contentDescription = "Exit full screen for ${tool.name}" },
-                    ) {
-                        Text("⤢", fontSize = 21.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             } else {

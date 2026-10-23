@@ -123,27 +123,6 @@ struct ToolDetailView: View {
     var body: some View {
         let allRelatedTools = relatedTools
         ScrollView {
-            if isToolFullscreen {
-                ZStack(alignment: .topTrailing) {
-                    toolInterface
-                        .frame(maxWidth: .infinity, minHeight: UIScreen.main.bounds.height, maxHeight: .infinity, alignment: .topLeading)
-                    Button { isToolFullscreen = false } label: {
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.envMuted)
-                            .frame(width: 40, height: 40)
-                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(12)
-                    .zIndex(2)
-                    .accessibilityLabel("Exit full screen for \(tool.name)")
-                    .accessibilityIdentifier("tool-fullscreen-exit")
-                }
-                .frame(maxWidth: .infinity)
-                .background(Color.envSurface.ignoresSafeArea())
-            } else {
             VStack(alignment: .leading, spacing: 0) {
                 if !isToolFullscreen {
                 HStack(spacing: 8) {
@@ -163,7 +142,7 @@ struct ToolDetailView: View {
 
                 VStack(alignment: .leading, spacing: compact ? 8 : 0) {
                     HStack(alignment: .top, spacing: compact ? 8 : 16) {
-                        toolHeading(showsDescription: !compact || isToolFullscreen).frame(maxWidth: .infinity, alignment: .leading)
+                        toolHeading(showsDescription: !compact).frame(maxWidth: .infinity, alignment: .leading)
                         if !isToolFullscreen { saveButton }
                     }
                     if compact && !isToolFullscreen {
@@ -277,7 +256,6 @@ struct ToolDetailView: View {
             .padding(.vertical, isToolFullscreen ? 12 : (compact ? 32 : 40))
             .frame(maxWidth: isToolFullscreen ? .infinity : 1024, alignment: .leading)
             .frame(maxWidth: .infinity)
-            }
         }
         .modifier(Screen())
         .navigationTitle("")
@@ -285,6 +263,11 @@ struct ToolDetailView: View {
         .toolbar(isToolFullscreen ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(isToolFullscreen)
         .onAppear { store.recordRecent(tool.id) }
+        .fullScreenCover(isPresented: $isToolFullscreen) {
+            ToolFullscreenContainer(toolName: tool.name) {
+                toolInterface
+            }
+        }
     }
 
     private var toolInterface: some View {
@@ -314,7 +297,7 @@ struct ToolDetailView: View {
             }
         }
         .padding(isToolFullscreen ? 12 : (compact ? 16 : 24))
-        .frame(maxWidth: .infinity, maxHeight: isToolFullscreen ? .infinity : nil, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(Color.envSurface, in: RoundedRectangle(cornerRadius: isToolFullscreen ? 0 : 16))
         .overlay(RoundedRectangle(cornerRadius: isToolFullscreen ? 0 : 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
     }
@@ -391,6 +374,50 @@ private struct RelatedToolDetailCard: View {
         .padding(.vertical, 12)
         .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+    }
+}
+
+private struct ToolFullscreenContainer<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    let toolName: String
+    let content: Content
+
+    init(toolName: String, @ViewBuilder content: () -> Content) {
+        self.toolName = toolName
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer(minLength: 0)
+                Button { dismiss() } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.envMuted)
+                        .frame(width: 44, height: 44)
+                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Exit full screen for \(toolName)")
+                .accessibilityIdentifier("tool-fullscreen-exit")
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            ScrollView {
+                content
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.bottom, 24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.envSurface.ignoresSafeArea())
+        .statusBarHidden(true)
     }
 }
 

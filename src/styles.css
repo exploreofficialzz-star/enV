@@ -705,3 +705,94 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-layer-list>div>button:first-child{min-width:88px;max-width:160px}
 .uxui-layer-list>div>button[aria-label^="Hide "],.uxui-layer-list>div>button[aria-label^="Show "],.uxui-layer-list>div>button[aria-label^="Lock "],.uxui-layer-list>div>button[aria-label^="Unlock "]{padding:4px 5px;border:1px solid var(--color-border);border-radius:6px;font-size:9px}
 @media(max-width:480px){.uxui-layer-list>div>button:first-child{max-width:125px}.uxui-layer-list>div{padding-bottom:3px}}
+
+
+/* Consistent, safe-area-aware fullscreen surface shared by every Web tool. */
+.env-tool-interface {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.env-tool-fullscreen {
+  --env-tool-fullscreen-toolbar-height: calc(52px + max(8px, env(safe-area-inset-top, 0px)));
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-overflow-scrolling: touch;
+}
+
+.env-tool-fullscreen__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: var(--env-tool-fullscreen-toolbar-height);
+  padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+  background: var(--color-bg);
+}
+
+.env-tool-fullscreen__exit {
+  display: inline-flex;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+}
+
+.env-tool-fullscreen__content {
+  width: min(100%, 1440px);
+  min-width: 0;
+  box-sizing: border-box;
+  margin-inline: auto;
+  padding: 8px clamp(12px, 2.5vw, 32px) max(24px, env(safe-area-inset-bottom));
+}
+
+.env-tool-fullscreen__content,
+.env-tool-fullscreen__content * {
+  box-sizing: border-box;
+}
+
+.env-tool-fullscreen__content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The UX/UI Studio topbar now sits below the fullscreen exit row, not the app header. */
+.env-tool-fullscreen__content .uxui-topbar {
+  top: var(--env-tool-fullscreen-toolbar-height);
+}
+
+.env-tool-fullscreen__content :where(input, select, textarea, button, video, audio, canvas, iframe, img, svg, pre, table) {
+  max-width: 100%;
+}
+
+.env-tool-fullscreen__content :where(pre, .overflow-x-auto) {
+  overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+  .env-tool-fullscreen__content {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}
