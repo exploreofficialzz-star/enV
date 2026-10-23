@@ -1925,6 +1925,35 @@ export function UxUiStudioEngine() {
         </main>
 
         {showInspector && <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
+          <section className="uxui-screen-manager" aria-labelledby="uxui-screens-heading">
+            <div className="uxui-screen-manager-heading">
+              <div><h2 id="uxui-screens-heading">App screens</h2><p>{screens.length} {screens.length === 1 ? "screen" : "screens"} · {screens.find((screen) => screen.id === activeScreenId)?.name || "Screen 1"}</p></div>
+              <button type="button" onClick={addScreen} aria-label="Add app screen" title="Add app screen" className="uxui-screen-add"><Plus size={20}/><span>New screen</span></button>
+            </div>
+            <div className="uxui-screen-grid">
+              {screens.map((screen,index) => {
+                const viewportWidth = screen.customArtboard ? screen.customWidth : boardSize(screen.target).width;
+                const viewportHeight = screen.customArtboard ? screen.customHeight : boardSize(screen.target).height;
+                return <article key={screen.id} className={"uxui-screen-card " + (screen.id === activeScreenId ? "is-active" : "")}>
+                  <button type="button" className="uxui-screen-thumb-button" onClick={() => openScreen(screen.id)} aria-label={"Open " + screen.name} aria-pressed={screen.id === activeScreenId}>
+                    <div className={"uxui-screen-thumb uxui-screen-thumb-" + screen.target} style={{background:screen.background}}>
+                      {screen.elements.slice(0,6).map((layer) => <span key={layer.id} style={{left:Math.max(1,Math.min(94,layer.x/Math.max(1,viewportWidth)*100))+"%",top:Math.max(1,Math.min(94,layer.y/Math.max(1,viewportHeight)*100))+"%",width:Math.max(3,Math.min(84,layer.width/Math.max(1,viewportWidth)*100))+"%",height:Math.max(2,Math.min(48,layer.height/Math.max(1,viewportHeight)*100))+"%",background:layer.background==="transparent"?(layer.kind==="text"?"#cbd5e1":layer.color):layer.background,opacity:layer.opacity}} />)}
+                    </div>
+                  </button>
+                  <div className="uxui-screen-card-meta">
+                    <input aria-label={"Screen name " + (index+1)} value={screen.name} maxLength={70} onChange={(event)=>renameScreen(screen.id,event.target.value)} />
+                    <small>{screen.target} · {screen.elements.length} layers</small>
+                  </div>
+                  <div className="uxui-screen-card-actions">
+                    <button type="button" onClick={()=>reorderScreen(screen.id,-1)} disabled={index===0} aria-label={"Move "+screen.name+" earlier"} title="Move earlier"><ArrowLeft size={13}/></button>
+                    <button type="button" onClick={()=>reorderScreen(screen.id,1)} disabled={index===screens.length-1} aria-label={"Move "+screen.name+" later"} title="Move later"><ArrowRight size={13}/></button>
+                    <button type="button" onClick={()=>duplicateScreen(screen.id)} aria-label={"Duplicate "+screen.name} title="Duplicate screen"><Copy size={13}/></button>
+                    <button type="button" onClick={()=>deleteScreen(screen.id)} disabled={screens.length===1} aria-label={"Delete "+screen.name} title="Delete screen"><Trash2 size={13}/></button>
+                  </div>
+                </article>;
+              })}
+            </div>
+          </section>
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
             <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
