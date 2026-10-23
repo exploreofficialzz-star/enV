@@ -113,6 +113,9 @@ const webRelated = webToolShell.split('<h2 className="text-lg font-semibold text
 const androidToolDetail = android.split("private fun ToolDetail(")[1]?.split("@Composable\nprivate fun NativeToolHeader")[0] ?? "";
 const androidRelatedCard = android.split("private fun RelatedToolCard(")[1]?.split("@Composable\nprivate fun NativeToolForm")[0] ?? "";
 const iosToolDetail = iosTools.split("struct ToolDetailView: View")[1]?.split("private func toolHeading")[0] ?? "";
+const webFullscreenTarget = webToolShell.split("ref={toolInterfaceRef}")[1]?.split("</section>")[0] ?? "";
+const androidFullscreenBranch = androidToolDetail.split("if (isFullscreen) {")[1]?.split("} else {")[0] ?? "";
+const iosFullscreenBranch = iosTools.split("if isToolFullscreen {")[1]?.split("} else {")[0] ?? "";
 const iosRelatedCard = iosTools.split("private struct RelatedToolDetailCard: View")[1]?.split("/// The native surface")[0] ?? "";
 assert.match(webHome, /gap-4 rounded-full/, "Web branded search should use a fully rounded capsule");
 assert.match(webHome, /inputClassName="min-w-0 flex-1 bg-transparent text-left/);
@@ -120,9 +123,36 @@ assert.match(androidHome, /Box\(Modifier\.weight\(1f\)\.padding\(horizontal = 16
 assert.match(androidHome, /textAlign = TextAlign\.Start/);
 assert.match(iosHome, /HStack\(spacing: 16\)/, "iOS branded search should keep a deliberate logo-to-field gap");
 assert.match(iosHome, /\.multilineTextAlignment\(\.leading\)/);
-assert.ok((webToolShell.includes('<header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto]') || webToolShell.includes('<header className={`${isFullscreen ? "mt-0" : "mt-6"} grid')) && webToolShell.includes("col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden") && webToolShell.includes('<p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>') && webToolShell.includes('<p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>') && webToolShell.includes("{note ? <p className=\"mt-3 text-sm text-muted\">{note}</p> : null}") && !webToolShell.includes("{!isFullscreen ? <p className=\"mt-1") && webToolShell.includes("Read the full guide") && webToolShell.includes("requestFullscreen") && webToolShell.includes("fullscreenchange"), "Web tool fullscreen must keep both responsive descriptions and the tool note alongside its interface.");
-assert.ok(/NativeToolHeader\(\s*tool,\s*compact,\s*Modifier\.weight\(1f\),\s*showDescription = !compact \|\| isFullscreen,\s*isFullscreen = isFullscreen,\s*onToggleFullscreen = onToggleFullscreen/.test(androidToolDetail) && androidToolDetail.includes("if (compact && !isFullscreen)") && androidToolDetail.includes("tool.nativeDisclaimerText()?.let { notice ->") && androidToolDetail.includes("NativeToolSaveButton(isFavorite, onToggleFavorite)") && androidToolDetail.includes('Text("Read the full guide")') && android.includes("var isToolFullscreen by rememberSaveable") && android.includes('contentDescription = if (isFullscreen) "Exit full screen for ${tool.name}"'), "Android tool details must keep responsive descriptions, native fullscreen controls, and the full-guide link.");
-assert.ok(iosToolDetail.includes("toolHeading(showsDescription: !compact || isToolFullscreen)") && iosToolDetail.includes("if compact && !isToolFullscreen") && iosToolDetail.includes("if let notice = tool.nativeDisclaimerText {") && iosToolDetail.includes("saveButton") && iosToolDetail.includes('Label("Read the full guide", systemImage: "book")') && iosTools.includes('accessibilityIdentifier("tool-fullscreen-toggle")') && iosTools.includes(".statusBarHidden(isToolFullscreen)"), "iOS tool details must keep responsive descriptions, native fullscreen controls, and the full-guide link.");
+assert.ok(
+  webToolShell.includes("ref={toolInterfaceRef}") &&
+  webToolShell.indexOf("<header") < webToolShell.indexOf("ref={toolInterfaceRef}") &&
+  webFullscreenTarget.includes("{children}") &&
+  webFullscreenTarget.includes("Exit full screen") &&
+  !webFullscreenTarget.includes("<h1") &&
+  !webFullscreenTarget.includes("{tool.description}") &&
+  webToolShell.includes("requestFullscreen") &&
+  webToolShell.includes("fullscreenchange"),
+  "Web fullscreen must target only the working interface; the tool page heading and description remain outside the fullscreen target."
+);
+assert.ok(
+  androidFullscreenBranch.includes("NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)") &&
+  androidFullscreenBranch.includes("Exit full screen for ${tool.name}") &&
+  !androidFullscreenBranch.includes("NativeToolHeader") &&
+  !androidFullscreenBranch.includes("tool.description") &&
+  !androidFullscreenBranch.includes("NativeToolSaveButton") &&
+  android.includes("if (isToolFullscreen) BackHandler { isToolFullscreen = false }"),
+  "Android fullscreen must render only the working tool interface, with Back/exit support and no page heading or description."
+);
+assert.ok(
+  iosFullscreenBranch.includes("toolInterface") &&
+  iosFullscreenBranch.includes('accessibilityIdentifier("tool-fullscreen-exit")') &&
+  !iosFullscreenBranch.includes("toolHeading") &&
+  !iosFullscreenBranch.includes("tool.description") &&
+  !iosFullscreenBranch.includes("nativeDisclaimerText") &&
+  !iosFullscreenBranch.includes("saveButton") &&
+  iosTools.includes(".statusBarHidden(isToolFullscreen)"),
+  "iOS fullscreen must render only the working tool interface with an exit action and no page heading or description."
+);
 assert.match(iosTools, /Image\(systemName: isToolFullscreen \? "arrow\.down\.right\.and\.arrow\.up\.left" : "arrow\.up\.left\.and\.arrow\.down\.right"\)/, "iOS fullscreen control must switch between enter and exit icons.");
 assert.match(androidHome, /Popup\(alignment = Alignment\.TopStart, offset = IntOffset\(0, with\(LocalDensity\.current\)/);
 assert.match(iosHome, /\.overlay\(alignment: \.top\)[\s\S]*?if isHomeSearchFocused && hasSearchText[\s\S]*?\.zIndex\(isHomeSearchFocused && hasSearchText/);
