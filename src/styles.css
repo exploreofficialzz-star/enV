@@ -275,6 +275,17 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   background: var(--color-surface); box-shadow: var(--shadow-border);
 }
 .uxui-topbar-left, .uxui-topbar-actions, .uxui-target-switch { display: flex; align-items: center; gap: 8px; }
+.uxui-prototype-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--color-border); border-radius: 12px; padding: 9px 12px;
+  background: var(--color-surface-2); color: var(--color-fg); font-size: 12px; font-weight: 700;
+}
+.uxui-prototype-toolbar > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.uxui-prototype-toolbar button {
+  min-height: 36px; border: 1px solid var(--color-border); border-radius: 9px;
+  padding: 0 12px; background: var(--color-surface); color: var(--color-fg); font-size: 11px; font-weight: 750;
+}
+.uxui-prototype-toolbar button:disabled { opacity: .4; cursor: not-allowed; }
 .uxui-brand-title {
   margin: 0; white-space: nowrap; color: var(--color-fg);
   font-size: 12px; line-height: 1.25; font-weight: 850; letter-spacing: -.025em;
