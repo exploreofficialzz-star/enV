@@ -994,7 +994,24 @@ fun NativeUxUiStudioForm() {
             colorTokens.clear();val savedColors=p.optJSONObject("tokens")?.optJSONArray("colors");if(savedColors!=null){for(index in 0 until savedColors.length()){val t=savedColors.optJSONObject(index)?:continue;colorTokens.add(t.optString("name") to t.optString("value","#2563EB"))}}
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
             reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
-            elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
+            val rootElements=uxNativeReadJson(p.optJSONArray("elements")?:JSONArray())
+val savedScreens=p.optJSONArray("screens")
+screens.clear()
+if(savedScreens!=null && savedScreens.length()>0){
+  for(i in 0 until savedScreens.length()){
+    val item=savedScreens.optJSONObject(i)?:continue
+    val screenTarget=item.optString("target",target).takeIf{it in setOf("mobile","tablet","desktop")}?:target
+    val screenWidth=item.optInt("customWidth",if(screenTarget=="mobile")390 else if(screenTarget=="tablet")768 else 1440).coerceIn(160,4096)
+    val screenHeight=item.optInt("customHeight",if(screenTarget=="mobile")844 else if(screenTarget=="tablet")1024 else 900).coerceIn(240,4096)
+    screens.add(UxUiNativeScreen(item.optString("id","screen-"+i),item.optString("name","Screen "+(i+1)),screenTarget,item.optString("background",background),item.optBoolean("customArtboard",true),screenWidth,screenHeight,uxNativeReadJson(item.optJSONArray("elements")?:JSONArray()),item.optLong("updatedAt",System.currentTimeMillis())))
+  }
+}
+if(screens.isEmpty())screens.add(UxUiNativeScreen("screen-home","Screen 1",target,background,true,customWidth,customHeight,rootElements))
+activeScreenId=p.optString("activeScreenId",screens.first().id).takeIf{id->screens.any{it.id==id}}?:screens.first().id
+val active=screens.first{it.id==activeScreenId}
+target=active.target;background=active.background;customArtboard=active.customArtboard;customWidth=active.customWidth;customHeight=active.customHeight
+elements.clear();elements.addAll(if(active.elements.isEmpty()&&screens.size==1)rootElements else active.elements)
+selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
     LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding&&elements.isNotEmpty())runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}}
     fun checkpoint(){
         undoHistory.add(elements.toList())
