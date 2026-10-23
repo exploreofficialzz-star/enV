@@ -123,6 +123,27 @@ struct ToolDetailView: View {
     var body: some View {
         let allRelatedTools = relatedTools
         ScrollView {
+            if isToolFullscreen {
+                ZStack(alignment: .topTrailing) {
+                    toolInterface
+                        .frame(maxWidth: .infinity, minHeight: UIScreen.main.bounds.height, maxHeight: .infinity, alignment: .topLeading)
+                    Button { isToolFullscreen = false } label: {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.envMuted)
+                            .frame(width: 40, height: 40)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                    .zIndex(2)
+                    .accessibilityLabel("Exit full screen for \\(tool.name)")
+                    .accessibilityIdentifier("tool-fullscreen-exit")
+                }
+                .frame(maxWidth: .infinity)
+                .background(Color.envSurface.ignoresSafeArea())
+            } else {
             VStack(alignment: .leading, spacing: 0) {
                 if !isToolFullscreen {
                 HStack(spacing: 8) {
@@ -187,36 +208,7 @@ struct ToolDetailView: View {
                     .padding(.top, 16)
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    if backend {
-                        NativeBackendToolView(tool: tool)
-                    } else if local {
-                        NativeFamilyToolView(
-                            tool: tool,
-                            initialDeveloperMode: initialDeveloperMode,
-                            initialDeveloperAction: initialDeveloperAction,
-                        )
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
-                            enVCharacterSpacedText(tool.isPlanned
-                                ? "This tool is not yet implemented natively."
-                                : "This tool is available in the Web product and is not executable natively.")
-                                .font(.envScaled(size: 14, weight: .regular))
-                                .foregroundStyle(Color.envMuted)
-                            if !tool.isPlanned, let webURL = URL(string: "https://envtools.store/tools/\(tool.category)/\(tool.slug)") {
-                                Link("Open in Web", destination: webURL)
-                                    .font(.envScaled(size: 14, weight: .semibold))
-                                    .accessibilityHint("Opens this tool in your default web browser")
-                            }
-                        }
-                    }
-                }
-                .padding(compact ? 16 : 24)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
-                .padding(.top, 24)
+                toolInterface.padding(.top, 24)
 
                 if !isToolFullscreen {
                 if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
@@ -285,6 +277,7 @@ struct ToolDetailView: View {
             .padding(.vertical, isToolFullscreen ? 12 : (compact ? 32 : 40))
             .frame(maxWidth: isToolFullscreen ? .infinity : 1024, alignment: .leading)
             .frame(maxWidth: .infinity)
+            }
         }
         .modifier(Screen())
         .navigationTitle("")
@@ -292,6 +285,38 @@ struct ToolDetailView: View {
         .toolbar(isToolFullscreen ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(isToolFullscreen)
         .onAppear { store.recordRecent(tool.id) }
+    }
+
+    private var toolInterface: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if backend {
+                NativeBackendToolView(tool: tool)
+            } else if local {
+                NativeFamilyToolView(
+                    tool: tool,
+                    initialDeveloperMode: initialDeveloperMode,
+                    initialDeveloperAction: initialDeveloperAction,
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    StatusPill(text: tool.isPlanned ? "Coming soon" : "Web only", color: .envMuted)
+                    enVCharacterSpacedText(tool.isPlanned
+                        ? "This tool is not yet implemented natively."
+                        : "This tool is available in the Web product and is not executable natively.")
+                        .font(.envScaled(size: 14, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                    if !tool.isPlanned, let webURL = URL(string: "https://envtools.store/tools/\(tool.category)/\(tool.slug)") {
+                        Link("Open in Web", destination: webURL)
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .accessibilityHint("Opens this tool in your default web browser")
+                    }
+                }
+            }
+        }
+        .padding(isToolFullscreen ? 12 : (compact ? 16 : 24))
+        .frame(maxWidth: .infinity, maxHeight: isToolFullscreen ? .infinity : nil, alignment: .topLeading)
+        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: isToolFullscreen ? 0 : 16))
+        .overlay(RoundedRectangle(cornerRadius: isToolFullscreen ? 0 : 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
     }
 
     private func toolHeading(showsDescription: Bool) -> some View {
