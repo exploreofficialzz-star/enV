@@ -957,7 +957,7 @@ fun NativeUxUiStudioForm() {
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var activeToolkitId by remember{mutableStateOf("icons")};var qaReport by remember{mutableStateOf(emptyList<String>())};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -1375,9 +1375,56 @@ fun NativeUxUiStudioForm() {
                     Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                            listOf("Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
+                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
                         }
                         when(toolkitTab){
+                            "All 26" -> {
+                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                                Text("Choose a toolkit to open its native controls. Where a dedicated engine is not ready, the status below says so instead of reporting a mock implementation as complete.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                uxNativeToolkits.filter{toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
+                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
+                                            OutlinedButton(onClick={
+                                                activeToolkitId=toolkit.id
+                                                when(toolkit.id){
+                                                    "icons"->{toolkitTab="Icons"}
+                                                    "typography"->{toolkitTab="Fonts"}
+                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
+                                                    "background"->{toolkitTab="Tokens";showCanvasSettings=true}
+                                                    "effects"->{showAdvancedControls=true;notice="Use the selected-layer Style and Fine-tune design controls."}
+                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
+                                                    "motion"->{showAdvancedControls=true;notice="Use rotation, opacity and style controls for the selected layer."}
+                                                    "device","platform"->{toolkitTab="All 26";notice="The native canvas target selector supports mobile, tablet and desktop previews."}
+                                                    "responsive"->{showCanvasSettings=true;toolkitTab="All 26"}
+                                                    "projects"->{toolkitTab="Presets"}
+                                                    "layers"->{showAllLayers=true;toolkitTab="All 26"}
+                                                    "prototype"->{toolkitTab="All 26";notice="Connected multi-screen prototype navigation and overlay playback are not implemented yet."}
+                                                    "content"->{toolkitTab="All 26";add("text");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Welcome heading",text="Welcome back")}}}
+                                                    "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity")}}}
+                                                    "patterns"->{toolkitTab="All 26";showCanvasSettings=true;add("star");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Decorative star")}}}
+                                                    "3d"->{toolkitTab="All 26";notice="Live GLB/GLTF rendering, camera and lighting are not implemented in this editor. Import a rendered preview instead."}
+                                                    "accessibility","qa"->{
+                                                        val findings=mutableListOf<String>()
+                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
+                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
+                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
+                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). It is advisory, not a WCAG certification."
+                                                    }
+                                                    "handoff"->{toolkitTab="All 26";notice="Use Design handoff below to export the native PDF, project JSON and source handoff."}
+                                                }
+                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
+                                        }
+                                    }}
+                                }
+                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
+                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                }
+                            }
                             "Icons" -> {
                                 OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                                 OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
