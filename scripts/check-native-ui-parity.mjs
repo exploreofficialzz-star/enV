@@ -115,7 +115,7 @@ const androidRelatedCard = android.split("private fun RelatedToolCard(")[1]?.spl
 const iosToolDetail = iosTools.split("struct ToolDetailView: View")[1]?.split("private func toolHeading")[0] ?? "";
 const webFullscreenTarget = webToolShell.split("ref={toolInterfaceRef}")[1]?.split("</section>")[0] ?? "";
 const androidFullscreenBranch = androidToolDetail.split("if (isFullscreen) {")[1]?.split("} else {")[0] ?? "";
-const iosFullscreenBranch = iosTools.split("if isToolFullscreen {")[1]?.split("} else {")[0] ?? "";
+const iosFullscreenContainer = iosTools.split("private struct ToolFullscreenContainer")[1]?.split("struct ToolDestinationView")[0] ?? "";
 const iosRelatedCard = iosTools.split("private struct RelatedToolDetailCard: View")[1]?.split("/// The native surface")[0] ?? "";
 assert.match(webHome, /gap-4 rounded-full/, "Web branded search should use a fully rounded capsule");
 assert.match(webHome, /inputClassName="min-w-0 flex-1 bg-transparent text-left/);
@@ -131,8 +131,12 @@ assert.ok(
   !webFullscreenTarget.includes("<h1") &&
   !webFullscreenTarget.includes("{tool.description}") &&
   webToolShell.includes("requestFullscreen") &&
-  webToolShell.includes("fullscreenchange"),
-  "Web fullscreen must target only the working interface; the tool page heading and description remain outside the fullscreen target."
+  webToolShell.includes("fullscreenchange") &&
+  webToolShell.includes("env-tool-fullscreen__content") &&
+  webStyles.includes(".env-tool-fullscreen {") &&
+  webStyles.includes("height: 100dvh") &&
+  webStyles.includes("env(safe-area-inset-top)"),
+  "Web fullscreen must target only the working interface and use a safe-area-aware viewport layout."
 );
 assert.ok(
   androidFullscreenBranch.includes("NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)") &&
@@ -140,18 +144,21 @@ assert.ok(
   !androidFullscreenBranch.includes("NativeToolHeader") &&
   !androidFullscreenBranch.includes("tool.description") &&
   !androidFullscreenBranch.includes("NativeToolSaveButton") &&
+  androidFullscreenBranch.includes("heightIn(min = 48.dp)") &&
+  androidFullscreenBranch.includes("verticalScroll(rememberScrollState())") &&
   android.includes("if (isToolFullscreen) BackHandler { isToolFullscreen = false }"),
   "Android fullscreen must render only the working tool interface, with Back/exit support and no page heading or description."
 );
 assert.ok(
-  iosFullscreenBranch.includes("toolInterface") &&
-  iosFullscreenBranch.includes('accessibilityIdentifier("tool-fullscreen-exit")') &&
-  !iosFullscreenBranch.includes("toolHeading") &&
-  !iosFullscreenBranch.includes("tool.description") &&
-  !iosFullscreenBranch.includes("nativeDisclaimerText") &&
-  !iosFullscreenBranch.includes("saveButton") &&
-  iosTools.includes(".statusBarHidden(isToolFullscreen)"),
-  "iOS fullscreen must render only the working tool interface with an exit action and no page heading or description."
+  iosFullscreenContainer.includes("content") &&
+  iosFullscreenContainer.includes('accessibilityIdentifier("tool-fullscreen-exit")') &&
+  !iosFullscreenContainer.includes("toolHeading") &&
+  !iosFullscreenContainer.includes("tool.description") &&
+  !iosFullscreenContainer.includes("nativeDisclaimerText") &&
+  !iosFullscreenContainer.includes("saveButton") &&
+  iosTools.includes(".fullScreenCover(isPresented: $isToolFullscreen)") &&
+  iosTools.includes(".statusBarHidden(true)"),
+  "iOS fullscreen must use a dedicated full-screen presentation containing only the working tool interface and a non-overlapping exit action."
 );
 assert.match(iosTools, /Image\(systemName: isToolFullscreen \? "arrow\.down\.right\.and\.arrow\.up\.left" : "arrow\.up\.left\.and\.arrow\.down\.right"\)/, "iOS fullscreen control must switch between enter and exit icons.");
 assert.match(androidHome, /Popup\(alignment = Alignment\.TopStart, offset = IntOffset\(0, with\(LocalDensity\.current\)/);
