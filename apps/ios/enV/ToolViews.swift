@@ -8633,43 +8633,52 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func selectedElementToolbar(for index: Int) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text(elements[index].name).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
-                Group {
-                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 34, height: 34) }
-                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 34, height: 34) }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 4) {
+                    Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
+                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 35, height: 35) }
+                    HStack(spacing: 3) {
+                        Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 35, height: 35) }
+                    }
+                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 35, height: 35) }
                 }
                 .buttonStyle(.bordered)
                 .accessibilityElement(children: .contain)
-                .accessibilityLabel("Selected element movement and size controls")
-                if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
-                    Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+                .accessibilityLabel("Move selected element")
+                Spacer(minLength: 2)
+                VStack(spacing: 4) {
+                    Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
+                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 35, height: 35) }
+                    HStack(spacing: 3) {
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.left").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].rotation = 0 } label: { Text("0°").font(.envScaled(size: 10, weight: .semibold)).frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.right").frame(width: 35, height: 35) }
+                    }
+                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 35, height: 35) }
                 }
-                Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint()
-                    elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x))
-                    elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y))
-                } label: { Label("Size +", systemImage: "plus.magnifyingglass") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint()
-                    elements[index].width = max(12, Int(Double(elements[index].width) * 0.9))
-                    elements[index].height = max(12, Int(Double(elements[index].height) * 0.9))
-                } label: { Label("Size −", systemImage: "minus.magnifyingglass") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360)
-                } label: { Label("Rotate", systemImage: "rotate.right") }.buttonStyle(.bordered)
-                Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
-                Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
-                Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
-            }.padding(.vertical, 3)
+                .buttonStyle(.bordered)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Adjust selected element size and rotation")
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
+                        Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+                    }
+                    Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
+                    Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
+                    Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
+                    Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
+                }.padding(.vertical, 3)
+            }
         }
+        .padding(10)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 
     private var layerListPanel: some View {
