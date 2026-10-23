@@ -1429,7 +1429,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
-                        IconButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp)){Icon(imageVector=androidx.compose.material.icons.Icons.Outlined.Layers,contentDescription="App screens",tint=MaterialTheme.colorScheme.onSurface)}
+                        OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
                         Text(screens.size.toString(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
