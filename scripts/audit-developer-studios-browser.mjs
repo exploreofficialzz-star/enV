@@ -121,7 +121,7 @@ try {
         // Exercise the prototype interaction graph through the actual editor UI:
         // add a layer, create a second screen, assign a tap destination, navigate,
         // return with Back, then exit the preview.
-        await page.getByRole('button', { name: 'Add elements', exact: true }).click();
+        await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'Elements', exact: true }).click();
         await page.getByRole('button', { name: 'Button', exact: true }).click();
         await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
@@ -131,7 +131,7 @@ try {
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
         await page.getByRole('button', { name: /Primary button/ }).first().click();
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
-        await page.getByRole('button', { name: 'Add elements', exact: true }).click();
+        await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'All 26', exact: true }).click();
         await page.getByRole('button', { name: /Prototype Studio/ }).click();
         const destinationPicker = page.getByLabel('Prototype destination', { exact: true });
