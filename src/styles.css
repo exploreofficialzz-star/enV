@@ -686,3 +686,10 @@ html[data-env-view-mode="tablet"] .env-app-shell {
  .uxui-technical-grid{grid-template-columns:minmax(0,1fr)}
  .uxui-visual-property-dock{padding-bottom:8px}
 }
+
+/* Layer manager controls stay compact and scrollable on narrow devices. */
+.uxui-layer-list>div{min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.uxui-layer-list>div>button{flex:0 0 auto}
+.uxui-layer-list>div>button:first-child{min-width:88px;max-width:160px}
+.uxui-layer-list>div>button[aria-label^="Hide "],.uxui-layer-list>div>button[aria-label^="Show "],.uxui-layer-list>div>button[aria-label^="Lock "],.uxui-layer-list>div>button[aria-label^="Unlock "]{padding:4px 5px;border:1px solid var(--color-border);border-radius:6px;font-size:9px}
+@media(max-width:480px){.uxui-layer-list>div>button:first-child{max-width:125px}.uxui-layer-list>div{padding-bottom:3px}}
