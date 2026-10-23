@@ -14,6 +14,7 @@ assert.doesNotMatch(catalog, /"name": "[^"]*Studio"/, "Individual tools no longe
 const deviceFormula = engine.slice(engine.indexOf("const deviceDisplayWidth ="), engine.indexOf("const selected = elements.find"));
 assert.ok(!deviceFormula.includes("canvasStageSize.height"), "Mockup width never shrinks to fit controls' remaining height");
 assert.match(engine, /target-" \+ target/, "Studio root tracks selected target mode");
+assert.ok(engine.includes('aria-label="UX/UI Studio editor workspace"'), "Studio editing region has an accessible label");
 assert.ok(engine.includes('selected && target !== "desktop" && !isExpanded'), "Movement controls apply to mobile/tablet only");
 assert.ok(!engine.includes("Your canvas is ready. Tap + to add your first element."), "Blank-canvas prompt removed");
 assert.ok(!engine.includes("uxui-visual-property-dock"), "Compressed visual-properties dock removed");
