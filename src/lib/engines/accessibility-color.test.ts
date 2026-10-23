@@ -135,6 +135,9 @@ test("UX/UI Studio generated Web, Compose and SwiftUI handoff renders saved char
   assert.ok(swift.includes("chartPoints"));
   assert.ok(swift.includes("Monthly activity"));
   assert.ok(swift.includes("Jan"));
+  assert.ok(swift.includes('String(format: "%.0f", point.value)'), "SwiftUI chart export must emit valid numeric formatting");
+  assert.ok(swift.includes(".font(.system(size: 7))"), "SwiftUI chart export must emit a concrete font size");
+  assert.ok(!swift.includes("* scale"), "SwiftUI chart export must not depend on an undefined scale variable");
 });
 
 test("invalid values are rejected", () => {
