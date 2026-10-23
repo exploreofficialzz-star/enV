@@ -1386,9 +1386,9 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
                     if(prototypePreview){
                         OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
-                        Button(onClick={stopPrototypePreview}){Text("Exit preview")}
+                        Button(onClick={ { stopPrototypePreview() } }){Text("Exit preview")}
                     }else{
-                        OutlinedButton(onClick={startPrototypePreview},enabled=hasActivePrototypeLinks){Text("Preview prototype")}
+                        OutlinedButton(onClick={ { startPrototypePreview() } },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
                         OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
                     }
                 }
@@ -1666,7 +1666,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             FilterChip(selected=e.prototypeTargetScreenId.isBlank(),onClick={edit(e.id){it.copy(prototypeTargetScreenId="")}},label={Text("None")})
                             prototypeDestinations.forEach{screen->FilterChip(selected=e.prototypeTargetScreenId==screen.id,onClick={edit(e.id){it.copy(prototypeTargetScreenId=screen.id)}},label={Text(screen.name,maxLines=1)})}
                         }
-                        if(hasActivePrototypeLinks)OutlinedButton(onClick={startPrototypePreview},modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
+                        if(hasActivePrototypeLinks)OutlinedButton(onClick={ { startPrototypePreview() } },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=3)
                         Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
