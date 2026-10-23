@@ -1160,3 +1160,8 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio:not(.is-expanded) .uxui-element-tile,
   .ux-ui-studio:not(.is-expanded) .uxui-toolkit-tile { animation:none; transition:none; }
 }
+
+/* Keep the full monitor frame inside the bounded preview card; fullscreen keeps the stand. */
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop { margin-bottom:0; padding:9px; }
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-neck,
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-base { display:none; }
