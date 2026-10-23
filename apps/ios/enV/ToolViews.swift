@@ -8212,7 +8212,7 @@ private struct NativeUxUiStudioView: View {
                     Button { showScreenManager.toggle() } label: {
                         Image(systemName: "square.grid.2x2").font(.system(size: 19, weight: .semibold))
                             .frame(width: 40, height: 35).foregroundStyle(Color.envInk)
-                    }.accessibilityLabel("App screens").accessibilityAddTraits(showScreenManager ? .isSelected : [])
+                    }.accessibilityLabel("App screens").accessibilityValue(showScreenManager ? "Expanded" : "Collapsed")
                     Text(String(screens.count)).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(Color.envMuted)
                 }
             }
@@ -8393,9 +8393,8 @@ private struct NativeUxUiStudioView: View {
                         .foregroundStyle(Color.envSurface)
                 }.buttonStyle(.plain).accessibilityLabel("Add app screen")
             }
-            ForEach(Array(screens.enumerated()), id: \.element.id) { entry in
-                let screen = entry.element
-                let screenIndex = entry.offset
+            ForEach(screens) { screen in
+                let screenIndex = screens.firstIndex(where: { $0.id == screen.id }) ?? 0
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 10) {
                         Button { openAppScreen(screen.id) } label: {
