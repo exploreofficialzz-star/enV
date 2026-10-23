@@ -9091,6 +9091,91 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.envAccent : Color.envBorder, lineWidth: 1))
     }
 
+    private func captureActiveScreen() {
+        guard let index = screens.firstIndex(where: { $0.id == activeScreenID }) else { return }
+        let current = screens[index]
+        if current.target == target && current.background == background &&
+            current.customArtboard == customArtboard && current.customWidth == customWidth &&
+            current.customHeight == customHeight && current.elements == elements { return }
+        screens[index] = current.copy(
+            target: target, background: background, customArtboard: customArtboard,
+            customWidth: customWidth, customHeight: customHeight, elements: elements,
+            updatedAt: ISO8601DateFormatter().string(from: Date())
+        )
+    }
+
+    private func openAppScreen(_ id: String) {
+        captureActiveScreen()
+        guard let screen = screens.first(where: { $0.id == id }) else { return }
+        activeScreenID = screen.id
+        target = screen.target; background = screen.background
+        customArtboard = screen.customArtboard
+        customWidth = screen.customWidth; customHeight = screen.customHeight
+        elements = screen.elements; selectedID = elements.first?.id
+        undoHistory = []; redoHistory = []
+        showAdvancedInspector = false
+        notice = "Opened \(screen.name)."
+    }
+
+    private func addAppScreen() {
+        captureActiveScreen()
+        let screen = UxUiNativeScreen(
+            id: UUID().uuidString, name: "Screen \(screens.count + 1)", target: target,
+            background: background, customArtboard: customArtboard,
+            customWidth: boardWidth, customHeight: boardHeight, elements: []
+        )
+        screens.append(screen)
+        openAppScreen(screen.id)
+        showScreenManager = true
+        notice = "\(screen.name) added. Add elements to design this screen."
+    }
+
+    private func duplicateAppScreen(_ id: String) {
+        captureActiveScreen()
+        guard let source = screens.first(where: { $0.id == id }) else { return }
+        let clonedLayers = source.elements.map { layer -> UxUiNativeLayer in
+            var copy = layer; copy.id = UUID(); copy.name += " copy"; return copy
+        }
+        let duplicate = UxUiNativeScreen(
+            id: UUID().uuidString, name: source.name + " copy", target: source.target,
+            background: source.background, customArtboard: source.customArtboard,
+            customWidth: source.customWidth, customHeight: source.customHeight, elements: clonedLayers
+        )
+        screens.append(duplicate)
+        openAppScreen(duplicate.id)
+        notice = "Duplicated \(duplicate.name)."
+    }
+
+    private func deleteAppScreen(_ id: String) {
+        guard screens.count > 1, let index = screens.firstIndex(where: { $0.id == id }) else {
+            notice = "A project must keep at least one screen."; return
+        }
+        if id == activeScreenID { captureActiveScreen() }
+        screens.removeAll { $0.id == id }
+        if id == activeScreenID, let next = screens[safe: max(0, index - 1)] {
+            activeScreenID = next.id
+            target = next.target; background = next.background; customArtboard = next.customArtboard
+            customWidth = next.customWidth; customHeight = next.customHeight
+            elements = next.elements; selectedID = elements.first?.id
+            undoHistory = []; redoHistory = []
+        }
+        notice = "Screen deleted."
+    }
+
+    private func reorderAppScreen(_ id: String, by offset: Int) {
+        captureActiveScreen()
+        guard let index = screens.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard screens.indices.contains(destination) else { return }
+        screens.swapAt(index, destination)
+    }
+
+    private func renameAppScreen(_ id: String, name: String) {
+        guard let index = screens.firstIndex(where: { $0.id == id }) else { return }
+        screens[index].name = String(name.prefix(70))
+        screens[index].updatedAt = ISO8601DateFormatter().string(from: Date())
+    }
+
     private func createNewProject() {
         target = "mobile"
         customArtboard = false
