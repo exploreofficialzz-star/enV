@@ -1207,7 +1207,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   overflow:visible !important;
 }
 .ux-ui-studio:not(.is-expanded) > .uxui-topbar {
-  position:relative !important; top:auto !important; z-index:1 !important;
+  position:sticky !important; top:64px !important; z-index:31 !important;
   flex:0 0 auto; min-width:0;
 }
 .ux-ui-studio:not(.is-expanded) .uxui-workspace {
