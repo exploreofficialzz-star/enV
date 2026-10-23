@@ -588,3 +588,16 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio.is-expanded .uxui-device-neck,
 .ux-ui-studio.is-expanded .uxui-device-base,
 .ux-ui-studio.is-expanded .uxui-canvas-hint { display: none !important; }
+
+/* Sketch-aligned UX/UI Studio movement controls: thumb-friendly, responsive, accessible. */
+.uxui-mobile-controls{display:flex;align-items:center;justify-content:space-evenly;gap:clamp(8px,3vw,22px);width:100%;padding:12px 8px 10px;border-top:1px solid var(--color-border);background:var(--color-surface);overflow:hidden}
+.uxui-gamepad{position:relative;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:18px repeat(3,42px);align-items:center;justify-items:center;gap:2px;padding:4px;flex:0 0 auto}
+.uxui-gamepad-label{grid-column:1/4;grid-row:1;justify-self:start;font-size:10px;line-height:16px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--color-muted)}
+.uxui-gamepad button{display:grid;width:40px;height:40px;place-items:center;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface-2);color:var(--color-fg);box-shadow:inset 0 -2px 0 rgb(15 23 42 / 7%);touch-action:manipulation;user-select:none}
+.uxui-gamepad button:active{transform:scale(.94);background:var(--color-accent-soft)}
+.uxui-gamepad button:focus-visible{outline:3px solid var(--color-accent);outline-offset:1px}
+.uxui-pad-up{grid-column:2;grid-row:2}.uxui-pad-left{grid-column:1;grid-row:3}.uxui-pad-center{grid-column:2;grid-row:3;font-size:12px;font-weight:900}.uxui-pad-right{grid-column:3;grid-row:3}.uxui-pad-down{grid-column:2;grid-row:4}.uxui-rotate-back{transform:scaleX(-1)}
+.uxui-context-controls{min-width:0}.uxui-context-toolbar{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}.uxui-context-toolbar button{flex:0 0 auto;min-height:40px}.uxui-css-controls summary{min-height:36px;display:flex;align-items:center}.uxui-css-controls input,.uxui-css-controls select{min-width:0;width:100%}
+@media(min-width:769px){.uxui-mobile-controls{display:none}}
+@media(max-width:420px){.uxui-mobile-controls{justify-content:space-between;gap:2px;padding-inline:2px}.uxui-gamepad{grid-template-columns:repeat(3,36px);grid-template-rows:16px repeat(3,36px);gap:1px;padding:2px}.uxui-gamepad button{width:35px;height:35px;border-radius:10px}.uxui-gamepad-label{font-size:9px}.uxui-context-toolbar{gap:5px}}
+@media(prefers-reduced-motion:reduce){.uxui-gamepad button{transition:none!important}}
