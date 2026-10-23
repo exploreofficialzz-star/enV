@@ -100,6 +100,12 @@ private val uxNativeToolkits = listOf(
     UxNativeToolkit("qa", "Design QA Studio", "Review overlaps, bounds, labels and touch targets.", "QA", "Advisory checks")
 )
 
+private data class UxUiNativeScreen(
+    val id: String, val name: String, val target: String, val background: String,
+    val customArtboard: Boolean, val customWidth: Int, val customHeight: Int,
+    val elements: List<UxUiNativeLayer>, val updatedAt: Long = System.currentTimeMillis()
+)
+
 private fun uxNativeLayerX(layer: UxUiNativeLayer, boardWidth: Int): Int = when(layer.horizontalConstraint) {
     "center" -> layer.x + (boardWidth - layer.referenceWidth) / 2
     "right" -> boardWidth - (layer.referenceWidth - layer.x)
@@ -645,7 +651,7 @@ private object UxUiNativePdf {
     }
 }
 
-private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray()):String {
+private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray(),screens:List<UxUiNativeScreen> = emptyList(),activeScreenId:String=""):String {
     val breakpoints=JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024)
     val normalized=JSONArray().apply {
         elements.forEach { item ->
@@ -656,9 +662,18 @@ private fun uxNativeProjectJson(name:String,target:String,background:String,elem
             put(json)
         }
     }
+    val screenJson = JSONArray().apply {
+        screens.forEach { screen ->
+            put(JSONObject()
+                .put("id", screen.id).put("name", screen.name).put("target", screen.target).put("background", screen.background)
+                .put("customArtboard", screen.customArtboard).put("customWidth", screen.customWidth).put("customHeight", screen.customHeight)
+                .put("elements", uxNativeJson(screen.elements)).put("updatedAt", screen.updatedAt))
+        }
+    }
     return JSONObject().put("schemaVersion",2).put("name",name).put("target",target).put("background",background)
         .put("viewport",JSONObject().put("width",boardWidth).put("height",boardHeight))
         .put("breakpoints",breakpoints).put("tokens",tokens).put("reusableComponents",reusable)
+        .put("screens",screenJson).put("activeScreenId",activeScreenId)
         .put("elements",normalized).put("aiPrompt",uxNativePrompt(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
         .put("generatedCode",JSONObject()
             .put("html",uxNativeGenerateHtml(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
