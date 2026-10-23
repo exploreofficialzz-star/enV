@@ -967,9 +967,11 @@ export function UxUiStudioEngine() {
   const [iconError, setIconError] = useState("");
   const [showGrid, setShowGrid] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [canvasStageSize, setCanvasStageSize] = useState({ width: 0, height: 0 });
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const artboardRef = useRef<SVGSVGElement | null>(null);
+  const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const studioRootRef = useRef<HTMLElement | null>(null);
   const quickImageInputRef = useRef<HTMLInputElement | null>(null);
   const elementImportInputRef = useRef<HTMLInputElement | null>(null);
@@ -986,7 +988,29 @@ export function UxUiStudioEngine() {
     return () => window.removeEventListener("keydown", dismissOnEscape);
   }, [showToolsPanel]);
 
+  useEffect(() => {
+    const stage = canvasStageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const next = { width: entry.contentRect.width, height: entry.contentRect.height };
+      setCanvasStageSize((previous) =>
+        Math.abs(previous.width - next.width) < 0.5 && Math.abs(previous.height - next.height) < 0.5
+          ? previous
+          : next,
+      );
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
+  const deviceDisplayWidth = Math.max(1, Math.min(
+    board.width * zoom / 100,
+    target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
+    canvasStageSize.width > 0 ? Math.max(1, canvasStageSize.width - 20) : Number.POSITIVE_INFINITY,
+    canvasStageSize.height > 0 ? Math.max(1, canvasStageSize.height - 20) * board.width / board.height : Number.POSITIVE_INFINITY,
+  ));
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
@@ -2214,11 +2238,11 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
             </div>
           </div>
-          <div className="uxui-canvas-stage" role="region" aria-label={projectName + " scrollable design canvas"} tabIndex={0}>
+          <div ref={canvasStageRef} className="uxui-canvas-stage" role="region" aria-label={projectName + " design canvas"} tabIndex={0}>
             <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
-                style={{ width: Math.min(board.width * zoom / 100, target === "mobile" ? 430 : target === "tablet" ? 700 : 940) + "px", maxWidth: "100%", height: "auto", display: "block", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
+                style={{ width: deviceDisplayWidth + "px", maxWidth: "100%", height: "auto", display: "block", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
                 <rect width={board.width} height={board.height} fill={background} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
