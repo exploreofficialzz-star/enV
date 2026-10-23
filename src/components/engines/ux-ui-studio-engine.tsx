@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
-type PanelTab = "toolkits" | "components" | "icons" | "fonts" | "presets" | "tokens";
+type PanelTab = "toolkits" | "components" | "icons" | "shapes" | "fonts" | "presets" | "tokens";
 type InspectorTab = "design" | "spec";
 type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer" | "triangle" | "diamond" | "hexagon" | "star" | "line" | "pill";
 type Align = "left" | "center" | "right";
@@ -838,7 +838,67 @@ function fieldClass() {
   return "mt-1 w-full min-w-0 rounded-lg border border-border bg-surface px-2.5 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function ToolkitGlyph({ name }: { name: string }) {
+  switch (name) {
+    case "Palette": return <Palette size={21} strokeWidth={1.8} />;
+    case "Shapes": return <Shapes size={21} strokeWidth={1.8} />;
+    case "ImagePlus": return <ImagePlus size={21} strokeWidth={1.8} />;
+    case "FileOutput": return <FileOutput size={21} strokeWidth={1.8} />;
+    case "Search": return <Search size={21} strokeWidth={1.8} />;
+    case "Check": return <Check size={21} strokeWidth={1.8} />;
+    case "Type": return <Type size={21} strokeWidth={1.8} />;
+    case "Smartphone": return <Smartphone size={21} strokeWidth={1.8} />;
+    case "Tablet": return <Tablet size={21} strokeWidth={1.8} />;
+    case "Monitor": return <Monitor size={21} strokeWidth={1.8} />;
+    case "Grid2X2": return <Grid2X2 size={21} strokeWidth={1.8} />;
+    case "Layers": return <Layers size={21} strokeWidth={1.8} />;
+    default: return <LayoutTemplate size={21} strokeWidth={1.8} />;
+  }
+}
+
+function ElementVisual({ kind }: { kind: LayerKind }) {
+  if (["rect", "ellipse", "triangle", "diamond", "hexagon", "star", "line", "divider", "pill"].includes(kind)) {
+    return <span className="uxui-element-preview" aria-hidden="true"><span className={"uxui-element-shape uxui-element-shape-" + kind} /></span>;
+  }
+  let visual: ReactNode;
+  switch (kind) {
+    case "text": visual = <span className="uxui-mini-text"><i /><i /><i /></span>; break;
+    case "button": visual = <span className="uxui-mini-button">Continue</span>; break;
+    case "card": visual = <span className="uxui-mini-card"><i /><i /><i /></span>; break;
+    case "input":
+    case "dropdown":
+    case "search":
+    case "textarea": visual = <span className={"uxui-mini-field uxui-mini-field-" + kind}><i />{kind === "search" ? <Search size={10} /> : null}</span>; break;
+    case "image":
+    case "video": visual = <ImagePlus size={22} strokeWidth={1.8} />; break;
+    case "icon": visual = <Shapes size={22} strokeWidth={1.8} />; break;
+    case "navbar":
+    case "menu":
+    case "tabs":
+    case "tabbar": visual = <span className={"uxui-mini-navigation uxui-mini-navigation-" + kind}><i /><i /><i /></span>; break;
+    case "checkbox": visual = <span className="uxui-mini-check"><Check size={12} /></span>; break;
+    case "radio": visual = <span className="uxui-mini-radio"><i /></span>; break;
+    case "avatar": visual = <span className="uxui-mini-avatar">A</span>; break;
+    case "badge": visual = <span className="uxui-mini-badge">NEW</span>; break;
+    case "switch":
+    case "toggle": visual = <span className="uxui-mini-switch"><i /></span>; break;
+    case "progress":
+    case "slider": visual = <span className={"uxui-mini-progress uxui-mini-progress-" + kind}><i /><i /><i /></span>; break;
+    case "chart": visual = <span className="uxui-mini-chart"><i /><i /><i /><i /></span>; break;
+    case "table":
+    case "row":
+    case "list": visual = <span className={"uxui-mini-list uxui-mini-list-" + kind}><i /><i /><i /></span>; break;
+    case "modal": visual = <span className="uxui-mini-modal"><i /><i /><i /></span>; break;
+    case "breadcrumb": visual = <span className="uxui-mini-breadcrumb"><i /><i /><i /></span>; break;
+    case "tooltip": visual = <span className="uxui-mini-tooltip">?</span>; break;
+    case "logo": visual = <span className="uxui-mini-logo">enV</span>; break;
+    case "spacer": visual = <span className="uxui-mini-spacer"><i /><i /></span>; break;
+    default: visual = <Layers size={22} strokeWidth={1.8} />;
+  }
+  return <span className={"uxui-element-preview uxui-element-preview-" + kind} aria-hidden="true">{visual}</span>;
+}
+
+function Field({ label, children }: { label: string; children: ReactNode })
   return <label className="block min-w-0 text-xs font-medium text-muted"><span>{label}</span>{children}</label>;
 }
 
@@ -876,7 +936,7 @@ export function UxUiStudioEngine() {
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
-  const [leftTab, setLeftTab] = useState<PanelTab>("toolkits");
+  const [leftTab, setLeftTab] = useState<PanelTab>("components");
   const [activeToolkitId, setActiveToolkitId] = useState("icons");
   const [qaReport, setQaReport] = useState<string[]>([]);
   const [showQaReport, setShowQaReport] = useState(false);
@@ -916,6 +976,15 @@ export function UxUiStudioEngine() {
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
+
+  useEffect(() => {
+    if (!showToolsPanel) return;
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowToolsPanel(false);
+    };
+    window.addEventListener("keydown", dismissOnEscape);
+    return () => window.removeEventListener("keydown", dismissOnEscape);
+  }, [showToolsPanel]);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
@@ -1134,7 +1203,7 @@ export function UxUiStudioEngine() {
     setScreens([{ id: nextScreenId, name: "Screen 1", target: nextTarget, background: created.background, customArtboard: false, customWidth: size.width, customHeight: size.height, elements: created.elements, updatedAt: new Date().toISOString() }]);
     setActiveScreenId(nextScreenId);
     setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
-    setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
+    setUndoStack([]); setRedoStack([]); setLeftTab("components"); setToolkitSearch("");
     setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
     setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
@@ -1163,7 +1232,7 @@ export function UxUiStudioEngine() {
     })));
     setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
     setSavedProject(draft);
-    setLeftTab("toolkits"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
+    setLeftTab("components"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
     setNotice("Draft opened. Tap an element to continue designing.");
   }
@@ -1937,22 +2006,31 @@ export function UxUiStudioEngine() {
         </div>
       </div>}
       <div className="uxui-workspace grid min-w-0 gap-3">
-        {showToolsPanel && <aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3">
-          <div className="uxui-drawer-heading"><span>Studio toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
-          <div className="uxui-toolkit-search"><Search size={16} /><input aria-label="Search studio toolkit" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search tools, fonts, icons…" /></div>
-          <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio toolkit categories">
-            {([{ id: "toolkits", label: "All 26" }, { id: "icons", label: "Icons" }, { id: "components", label: "Elements" }, { id: "presets", label: "Presets" }, { id: "fonts", label: "Fonts" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}>{tab.label}</button>)}
+        {showToolsPanel && <div className="uxui-toolkit-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowToolsPanel(false); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role="dialog" aria-modal="true" aria-labelledby="uxui-toolkit-title">
+          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">The Studio Toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close Studio Toolkit"><X size={17} /></button></div>
+          <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
+          <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
+            {([
+              { id: "toolkits", label: "Toolkits", icon: <LayoutTemplate size={18} strokeWidth={1.8} /> },
+              { id: "components", label: "Elements", icon: <Grid2X2 size={18} strokeWidth={1.8} /> },
+              { id: "icons", label: "Icons", icon: <ImagePlus size={18} strokeWidth={1.8} /> },
+              { id: "shapes", label: "Shapes", icon: <Shapes size={18} strokeWidth={1.8} /> },
+              { id: "fonts", label: "Fonts", icon: <Type size={18} strokeWidth={1.8} /> },
+              { id: "presets", label: "Presets", icon: <Smartphone size={18} strokeWidth={1.8} /> },
+              { id: "tokens", label: "Tokens", icon: <Palette size={18} strokeWidth={1.8} /> },
+            ] as Array<{id:PanelTab;label:string;icon:ReactNode}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}><span className="uxui-toolkit-tab-icon">{tab.icon}</span><span className="uxui-toolkit-tab-label">{tab.label}</span></button>)}
           </div>
+          <div className="uxui-toolkit-content">
 
           {leftTab === "toolkits" && <div className="mt-3 space-y-3">
             <div className="rounded-xl border border-border bg-surface-2 p-3">
               <strong className="text-sm text-fg">All 26 Studio toolkits</strong>
               <p className="mt-1 text-xs leading-5 text-muted">Open a toolkit to reach existing controls or use its direct actions. Features that need a separate engine are explicitly identified instead of being displayed as working placeholders.</p>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-card rounded-lg border p-3 text-left transition " + (activeToolkitId === toolkit.id ? "border-accent bg-accent/10" : "border-border hover:border-accent hover:bg-surface-2")} aria-pressed={activeToolkitId === toolkit.id}><span className="block text-xs font-bold text-fg">{toolkit.name}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{toolkit.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-accent">{toolkit.tab === "toolkits" ? "Open toolkit actions" : "Open connected controls"} <ArrowRight size={11} /></span></button>) }
+              <div className="uxui-toolkit-tiles">
+                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-tile " + (activeToolkitId === toolkit.id ? "is-active" : "")} aria-pressed={activeToolkitId === toolkit.id} title={toolkit.description}><span className="uxui-toolkit-tile-art"><ToolkitGlyph name={toolkit.icon} /></span><span className="uxui-toolkit-tile-label">{toolkit.name}</span></button>)}
               </div>
             </div>
-            {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
+            {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="uxui-toolkit-selection rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
               <h3 className="text-sm font-extrabold text-fg">{toolkit.name}</h3><p className="mt-1 text-xs leading-5 text-muted">{toolkit.outcome}</p>
               {toolkit.tab !== "toolkits" && <button type="button" onClick={() => setLeftTab(toolkit.tab)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-bold text-white">Open connected controls <ArrowRight size={14} /></button>}
               {["effects","motion"].includes(toolkit.id) && <div className="mt-3 space-y-2">{selected ? <><label className="block text-[11px] font-semibold text-muted">Opacity · {Math.round(selected.opacity*100)}%<input type="range" min="0" max="1" step=".05" value={selected.opacity} onChange={(event)=>updateLayer(selected.id,{opacity:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="block text-[11px] font-semibold text-muted">Rotation · {selected.rotation || 0}°<input type="range" min="-180" max="180" step="5" value={selected.rotation || 0} onChange={(event)=>updateLayer(selected.id,{rotation:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="flex items-center justify-between gap-2 text-xs text-fg">Shadow <input type="checkbox" checked={selected.shadow} onChange={(event)=>updateLayer(selected.id,{shadow:event.target.checked})}/></label><label className="block text-[11px] font-semibold text-muted">Transition · {selected.transitionDuration ?? 180} ms<input type="range" min="0" max="2000" step="25" value={selected.transitionDuration ?? 180} onChange={(event)=>updateLayer(selected.id,{transitionDuration:Number(event.target.value)})} className="mt-1 w-full"/></label></> : <p className="text-xs text-muted">Select an element on the mockup first.</p>}</div>}
@@ -1987,8 +2065,8 @@ export function UxUiStudioEngine() {
           {leftTab === "components" && <div className="mt-3">
             <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Elements</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
             <button type="button" onClick={() => elementImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import elements</button>
-            <div className="grid grid-cols-2 gap-2">
-              {COMPONENTS.filter((component) => !toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} className="flex min-h-[66px] flex-col items-start justify-center rounded-lg border border-border p-2 text-left transition hover:border-accent hover:bg-surface-2"><span className="text-xs font-semibold text-fg">{component.label}</span><span className="mt-1 text-[10px] leading-4 text-muted">{component.description}</span></button>)}
+            <div className="uxui-elements-grid">
+              {COMPONENTS.filter((component) => !toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} aria-label={"Add " + component.label + ": " + component.description} className="uxui-element-tile"><ElementVisual kind={component.kind} /><span className="uxui-element-tile-label">{component.label}</span></button>)}
             </div>
             <div className="mt-5 border-t border-border pt-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers {elements.length > 0 && <span className="ml-auto font-normal text-muted">{elements.length}</span>}</div>
@@ -2018,6 +2096,13 @@ export function UxUiStudioEngine() {
               </div>
               {selected && <><button type="button" onClick={() => {const saved={...selected,id:"component-"+layerId(),componentKey:selected.componentKey || selected.id,name:selected.name};setReusableComponents((old)=>[...old.filter((item)=>item.componentKey!==saved.componentKey),saved]);setNotice("Saved "+saved.name+" as a reusable component template.");}} className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-fg"><Copy size={13} /> Save as component</button><button type="button" onClick={deleteSelected} className="mt-2 ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-500/10"><Trash2 size={13} /> Delete selected</button></>}
               {reusableComponents.length > 0 && <div className="mt-3 border-t border-border pt-3"><h4 className="mb-2 text-xs font-semibold text-fg">Reusable components</h4>{reusableComponents.map((component)=> <button key={component.id} type="button" onClick={()=>{const copy={...component,id:layerId(),name:component.name+" instance",x:Math.min(board.width-component.width,component.x+16),y:Math.min(board.height-component.height,component.y+16),referenceWidth:board.width,referenceHeight:board.height};checkpoint();setElements((old)=>[...old,copy]);setSelectedId(copy.id);setNotice("Added reusable component: "+component.name);}} className="mb-1 block w-full truncate rounded-md border border-border p-2 text-left text-xs text-fg hover:bg-surface-2">{component.name} · Add instance</button>)}</div>}
+            </div>
+          </div>}
+
+          {leftTab === "shapes" && <div className="mt-3">
+            <div className="uxui-toolkit-section-heading"><div><h3>Shapes &amp; geometry</h3><p>Tap a shape to place it on the mockup.</p></div><span>{COMPONENTS.filter((component) => ["rect","ellipse","triangle","diamond","hexagon","star","line","divider","pill"].includes(component.kind)).length} shapes</span></div>
+            <div className="uxui-elements-grid uxui-shapes-grid">
+              {COMPONENTS.filter((component) => ["rect","ellipse","triangle","diamond","hexagon","star","line","divider","pill"].includes(component.kind) && (!toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase()))).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} aria-label={"Add " + component.label} className="uxui-element-tile"><ElementVisual kind={component.kind} /><span className="uxui-element-tile-label">{component.label}</span></button>)}
             </div>
           </div>}
 
@@ -2086,7 +2171,7 @@ export function UxUiStudioEngine() {
           {leftTab === "presets" && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Starter layouts</h3><p className="mt-1 text-[11px] leading-4 text-muted">Curated responsive starting points, then customise every layer.</p>
             <button type="button" onClick={() => presetImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import preset / project JSON</button>
-            <div className="mt-3 space-y-2">{PRESETS.filter((preset) => !toolkitSearch.trim() || (preset.label + " " + preset.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="w-full rounded-lg border border-border p-2.5 text-left hover:border-accent hover:bg-surface-2"><span className="block text-xs font-semibold text-fg">{preset.label}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{preset.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas</span></button>)}</div>
+            <div className="uxui-preset-grid">{PRESETS.filter((preset) => !toolkitSearch.trim() || (preset.label + " " + preset.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="uxui-preset-card"><span className={"uxui-preset-preview uxui-preset-preview-" + preset.target + " uxui-preset-preview-" + preset.id} aria-hidden="true"><span className="uxui-preset-mockup-top"><i /><i /></span><span className="uxui-preset-mockup-hero" /><span className="uxui-preset-mockup-grid"><i /><i /><i /></span><span className="uxui-preset-mockup-bottom"><i /><i /><i /></span></span><span className="uxui-preset-copy"><strong>{preset.label}</strong><span>{preset.description}</span><span className="uxui-preset-target">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas <ArrowRight size={11} /></span></span></button>)}</div>
           </div>}
 
           {leftTab === "tokens" && <div className="mt-3">
@@ -2114,7 +2199,8 @@ export function UxUiStudioEngine() {
             <h4 className="mt-4 text-[11px] font-semibold text-muted">Spacing scale</h4>
             <p className="mt-1 text-xs leading-5 text-fg">{Array.from(new Set(elements.flatMap((item) => [item.padding, item.marginTop, item.marginRight, item.marginBottom, item.marginLeft]))).sort((a,b)=>a-b).join(" · ") || "No spacing values yet"} px</p>
           </div>}
-        </aside>}
+          </div>
+        </aside></div>}
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
