@@ -137,6 +137,7 @@ assert.ok(
   webStyles.includes("height: 100dvh") &&
   webStyles.includes("env(safe-area-inset-top)") &&
   webStyles.includes(".env-tool-fullscreen__content > *") &&
+  webStyles.includes("--env-tool-fullscreen-toolbar-height") &&
   webStyles.includes(".env-tool-fullscreen__content .uxui-topbar"),
   "Web fullscreen must target only the working interface and use a safe-area-aware viewport layout."
 );
