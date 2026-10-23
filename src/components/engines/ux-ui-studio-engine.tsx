@@ -1404,7 +1404,11 @@ export function UxUiStudioEngine() {
     const step = event.shiftKey ? 1 : 4;
     const nextX = Math.max(0, Math.min(board.width - 1, Math.round((drag.startX + dx) / step) * step));
     const nextY = Math.max(0, Math.min(board.height - 1, Math.round((drag.startY + dy) / step) * step));
-    updateLayer(drag.id, { x: nextX, y: nextY }, false);
+    const starts = drag.groupStarts?.length ? drag.groupStarts : [{ id: drag.id, x: drag.startX, y: drag.startY }];
+    setElements((previous) => previous.map((item) => {
+      const origin = starts.find((start) => start.id === item.id);
+      return origin ? { ...item, x: Math.max(0, Math.min(board.width - item.width, origin.x + nextX - drag.startX)), y: Math.max(0, Math.min(board.height - item.height, origin.y + nextY - drag.startY)) } : item;
+    }));
   }
 
   function onArtboardPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -1413,13 +1417,15 @@ export function UxUiStudioEngine() {
     if (!id) { setSelectedId(""); return; }
     const found = elements.find((item) => item.id === id);
     if (!found) return;
-    setSelectedId(id);
+    selectLayer(id, event.shiftKey);
+    if (found.locked || found.hidden || found.display === "none") { dragRef.current = null; return; }
     checkpoint();
     const rect = event.currentTarget.getBoundingClientRect();
+    const groupStarts = found.groupId ? elements.filter((item) => item.groupId === found.groupId).map((item) => ({ id: item.id, x: item.x, y: item.y })) : [{ id: found.id, x: found.x, y: found.y }];
     dragRef.current = {
       id, pointerX: (event.clientX - rect.left) * board.width / Math.max(1, rect.width),
       pointerY: (event.clientY - rect.top) * board.height / Math.max(1, rect.height),
-      startX: found.x, startY: found.y,
+      startX: found.x, startY: found.y, groupStarts,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -1917,12 +1923,12 @@ export function UxUiStudioEngine() {
                 <rect width={board.width} height={board.height} fill={background} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
-                {elements.filter((layer) => !layer.visibleOn || layer.visibleOn.includes(target)).map((layer) => {
+                {[...elements].filter((layer) => !layer.hidden && layer.display !== "none" && (!layer.visibleOn || layer.visibleOn.includes(target))).sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)).map((layer) => {
                   const boxFill = layer.background === "transparent" ? "none" : layer.background;
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";
                   const baseBox = (round = layer.radius) => <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={round} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
-                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity };
+                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
                   return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
