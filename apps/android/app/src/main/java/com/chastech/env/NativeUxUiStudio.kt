@@ -1303,6 +1303,27 @@ fun NativeUxUiStudioForm() {
                 }
                 val selectedElement=selected
                 if(selectedElement!=null){
+                    Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                        Text("Move · ${selectedElement.name}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
+                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)){
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↑")}
+                                Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("←")}
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("•")}
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x+8).coerceAtMost((bw-it.width).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("→")}
+                                }
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y+8).coerceAtMost((bh-it.height).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↓")}
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw-it.x).coerceAtLeast(12)),height=(it.height*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh-it.y).coerceAtLeast(12)))},modifier=Modifier.widthIn(min=100.dp)){Text("＋ Size")}
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation-15f+360f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↶ Rotate")}
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↻ Rotate")}
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*0.9f).roundToInt().coerceAtLeast(12),height=(it.height*0.9f).roundToInt().coerceAtLeast(12))},modifier=Modifier.widthIn(min=100.dp)){Text("－ Size")}
+                            }
+                        }
+                    }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
                         Text(selectedElement.name.take(12),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(selectedElement.kind !in setOf("icon","ellipse","rect","divider"))OutlinedButton(onClick={showAdvancedControls=false;notice="Edit the text in the Style section below."}){Text("Edit text")}
