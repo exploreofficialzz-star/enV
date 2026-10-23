@@ -8123,14 +8123,15 @@ private struct NativeUxUiStudioView: View {
             }
         }
         .onChange(of: projectName) { _ in saveDraft() }
-        .onChange(of: target) { _ in saveDraft() }
-        .onChange(of: background) { _ in saveDraft() }
-        .onChange(of: customArtboard) { _ in saveDraft() }
-        .onChange(of: customWidth) { _ in saveDraft() }
-        .onChange(of: customHeight) { _ in saveDraft() }
+        .onChange(of: target) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: background) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customArtboard) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customWidth) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customHeight) { _ in captureActiveScreen(); saveDraft() }
         .onChange(of: tokens) { _ in saveDraft() }
         .onChange(of: reusableComponents) { _ in saveDraft() }
-        .onChange(of: elements) { _ in saveDraft() }
+        .onChange(of: elements) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: screens) { _ in saveDraft() }
     }
 
     private var safeFileName: String {
