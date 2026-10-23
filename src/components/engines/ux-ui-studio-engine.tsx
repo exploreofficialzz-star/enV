@@ -29,6 +29,7 @@ type DesignLayer = {
   referenceWidth: number; referenceHeight: number; componentKey: string;
   display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
   hoverColor?: string; activeColor?: string; focusColor?: string;
+  hidden?: boolean; locked?: boolean; groupId?: string;
 };
 
 type SavedProject = {
@@ -411,7 +412,7 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
     visibleOn: ["mobile", "tablet", "desktop"], referenceWidth, referenceHeight, componentKey: "",
     display: "flex", cursor: "default", zIndex: 1, transitionDuration: 180,
-    hoverColor: "", activeColor: "", focusColor: "",
+    hoverColor: "", activeColor: "", focusColor: "", hidden: false, locked: false, groupId: "",
   };
   switch (kind) {
     case "text": return { ...shared, name: "Text", width: 250, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700 };
@@ -861,6 +862,7 @@ export function UxUiStudioEngine() {
   const [showTextEditor, setShowTextEditor] = useState(false);
   const [showContextColors, setShowContextColors] = useState(false);
   const [showAdvancedContext, setShowAdvancedContext] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
   const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
@@ -889,10 +891,11 @@ export function UxUiStudioEngine() {
   const elementImportInputRef = useRef<HTMLInputElement | null>(null);
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
-  const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
+  const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
+  const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
   const fontChoices = useMemo(() => {
     const byFamily = new Map<string, FontLibraryItem>();
