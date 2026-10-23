@@ -92,11 +92,7 @@ export function ToolShell({
 
   return (
     <article className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <div
-        ref={toolInterfaceRef}
-        className={isFullscreen ? "fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8" : ""}
-      >
-      {!isFullscreen ? <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
+      <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">
           Home
         </Link>
@@ -110,9 +106,9 @@ export function ToolShell({
         </Link>
         <span aria-hidden="true">/</span>
         <span className="text-fg">{tool.name}</span>
-      </nav> : null}
+      </nav>
 
-      <header className={`${isFullscreen ? "mt-0" : "mt-6"} grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3`}>
+      <header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
         <ToolAppIcon tool={tool} className="row-span-2 size-11 sm:row-span-1" />
         <div className="col-start-2 row-start-1 min-w-0 sm:flex sm:min-w-0 sm:flex-1 sm:gap-3">
           <div className="min-w-0">
@@ -153,12 +149,27 @@ export function ToolShell({
 remove fallback error UI      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
-      <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
+      <section
+        ref={toolInterfaceRef}
+        className={isFullscreen
+          ? "relative fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8"
+          : "relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
+      >
+        {isFullscreen ? (
+          <button
+            type="button"
+            onClick={() => void toggleFullscreen()}
+            className="absolute right-3 top-3 z-20 inline-flex size-9 items-center justify-center rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label={`Exit full screen for ${tool.name}`}
+            title="Exit full screen"
+          >
+            <Minimize2 className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
         {children}
       </section>
 
-      {!isFullscreen ? <AiAssistPanel toolId={tool.id} /> : null}
-      </div>
+      <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
