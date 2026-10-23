@@ -1052,7 +1052,7 @@ private fun ToolDetail(
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 16.dp),
                 ) {
                     NativeToolHeader(
-                        tool, compact, Modifier.weight(1f), showDescription = !compact,
+                        tool, compact, Modifier.weight(1f), showDescription = !compact || isFullscreen,
                         isFullscreen = isFullscreen, onToggleFullscreen = onToggleFullscreen
                     )
                     if (!isFullscreen) NativeToolSaveButton(isFavorite, onToggleFavorite)
@@ -1066,7 +1066,7 @@ private fun ToolDetail(
                     )
                 }
             }
-            if (!isFullscreen) tool.nativeDisclaimerText()?.let { notice ->
+            tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             }
             if (!isFullscreen && parentDeveloperStudio != null) {
