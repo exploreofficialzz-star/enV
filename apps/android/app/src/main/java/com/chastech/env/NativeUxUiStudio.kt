@@ -987,6 +987,7 @@ fun NativeUxUiStudioForm() {
     val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.rotation+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
     val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()+":"+it.fontData.hashCode()}
+    val screensSignature=screens.joinToString("||"){screen->screen.id+":"+screen.name+":"+screen.target+":"+screen.background+":"+screen.elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.fill}}
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
@@ -1012,7 +1013,19 @@ val active=screens.first{it.id==activeScreenId}
 target=active.target;background=active.background;customArtboard=active.customArtboard;customWidth=active.customWidth;customHeight=active.customHeight
 elements.clear();elements.addAll(if(active.elements.isEmpty()&&screens.size==1)rootElements else active.elements)
 selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
-    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding&&elements.isNotEmpty())runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}}
+    LaunchedEffect(elements.toList(),target,background,bw,bh,customArtboard,customWidth,customHeight,activeScreenId){
+        val index=screens.indexOfFirst{it.id==activeScreenId}
+        if(index>=0){
+            val old=screens[index]
+            val updated=old.copy(target=target,background=background,customArtboard=customArtboard,customWidth=customWidth,customHeight=customHeight,elements=elements.toList())
+            if(old!=updated)screens[index]=updated
+        }
+    }
+    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,screensSignature,activeScreenId,bw,bh,customArtboard,ready,onboarding){
+        if(ready&&!onboarding&&(elements.isNotEmpty()||screens.size>1))runCatching{
+            prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId)).apply()
+        }.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}
+    }
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
