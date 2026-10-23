@@ -78,7 +78,7 @@ assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tab
 const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
 assert.match(androidUxStudio, /Move · \$\{selectedElement\.name\}/, 'Android Studio must expose native selected-layer movement controls');
-assert.match(iosUxStudio, /Selected element movement and size controls/, 'iOS Studio must expose native selected-layer movement controls');
+assert.match(iosUxStudio, /Move selected element|Adjust selected element size and rotation/, 'iOS Studio must expose native selected-layer movement controls');
 assert.match(androidUxStudio, /var onboarding by remember\{mutableStateOf\(true\)\}/, 'Android native studio must open on the project home');
 assert.match(androidUxStudio, /val elements=remember\{mutableStateListOf<UxUiNativeLayer>\(\)\}/, 'Android new projects must start with no sample elements');
 assert.match(androidUxStudio, /Text\("New project"/, 'Android project home must provide a New project action');
