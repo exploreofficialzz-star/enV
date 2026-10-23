@@ -714,6 +714,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 }
 
 .env-tool-fullscreen {
+  --env-tool-fullscreen-toolbar-height: calc(52px + max(8px, env(safe-area-inset-top, 0px)));
   position: fixed !important;
   inset: 0 !important;
   z-index: 1000 !important;
@@ -743,8 +744,8 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  min-height: 56px;
-  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  min-height: var(--env-tool-fullscreen-toolbar-height);
+  padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
   background: var(--color-bg);
 }
 
@@ -778,7 +779,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 
 /* The UX/UI Studio topbar now sits below the fullscreen exit row, not the app header. */
 .env-tool-fullscreen__content .uxui-topbar {
-  top: 56px;
+  top: var(--env-tool-fullscreen-toolbar-height);
 }
 
 .env-tool-fullscreen__content :where(input, select, textarea, button, video, audio, canvas, iframe, img, svg, pre, table) {
