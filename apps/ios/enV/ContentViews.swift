@@ -1868,6 +1868,7 @@ private struct NativeWalletDashboardView: View {
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
                     .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Refer a friend")
                         .font(.subheadline.weight(.semibold))
