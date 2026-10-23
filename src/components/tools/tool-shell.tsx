@@ -173,7 +173,6 @@ export function ToolShell({
             <div className="env-tool-fullscreen__content">{children}</div>
           </>
         ) : children}
-      </section>   {children}
       </section>
 
       <AiAssistPanel toolId={tool.id} />
