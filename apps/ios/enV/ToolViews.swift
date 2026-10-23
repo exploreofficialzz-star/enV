@@ -142,7 +142,7 @@ struct ToolDetailView: View {
 
                 VStack(alignment: .leading, spacing: compact ? 8 : 0) {
                     HStack(alignment: .top, spacing: compact ? 8 : 16) {
-                        toolHeading(showsDescription: !compact && !isToolFullscreen).frame(maxWidth: .infinity, alignment: .leading)
+                        toolHeading(showsDescription: !compact || isToolFullscreen).frame(maxWidth: .infinity, alignment: .leading)
                         if !isToolFullscreen { saveButton }
                     }
                     if compact && !isToolFullscreen {
@@ -155,7 +155,7 @@ struct ToolDetailView: View {
                     }
                 }
 
-                if !isToolFullscreen, let notice = tool.nativeDisclaimerText {
+                if let notice = tool.nativeDisclaimerText {
                     enVCharacterSpacedText(notice)
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
