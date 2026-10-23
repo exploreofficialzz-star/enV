@@ -50,7 +50,7 @@ export function ToolShell({
       }
     };
     const previousOverflow = document.body.style.overflow;
-    if (isCssFullscreen) document.body.style.overflow = "hidden";
+    if (isCssFullscreen || isFullscreen) document.body.style.overflow = "hidden";
     document.addEventListener("fullscreenchange", syncFullscreen);
     window.addEventListener("keydown", closeFallbackOnEscape);
     return () => {
@@ -58,7 +58,7 @@ export function ToolShell({
       window.removeEventListener("keydown", closeFallbackOnEscape);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isCssFullscreen]);
+  }, [isCssFullscreen, isFullscreen]);
 
   async function toggleFullscreen() {
     const surface = toolInterfaceRef.current;
@@ -148,25 +148,32 @@ export function ToolShell({
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
-      <section
+      {note ? <p className="mt-3 text-sm t      <section
         ref={toolInterfaceRef}
         className={isFullscreen
-          ? "fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8"
-          : "relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
+          ? "env-tool-interface env-tool-fullscreen"
+          : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
+        role={isFullscreen ? "dialog" : undefined}
+        aria-modal={isFullscreen || undefined}
+        aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
       >
         {isFullscreen ? (
-          <button
-            type="button"
-            onClick={() => void toggleFullscreen()}
-            className="absolute right-3 top-3 z-20 inline-flex size-9 items-center justify-center rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            aria-label={`Exit full screen for ${tool.name}`}
-            title="Exit full screen"
-          >
-            <Minimize2 className="size-4" aria-hidden="true" />
-          </button>
-        ) : null}
-        {children}
+          <>
+            <div className="env-tool-fullscreen__toolbar">
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                aria-label={`Exit full screen for ${tool.name}`}
+                title="Exit full screen"
+              >
+                <Minimize2 className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="env-tool-fullscreen__content">{children}</div>
+          </>
+        ) : children}
+      </section>   {children}
       </section>
 
       <AiAssistPanel toolId={tool.id} />
