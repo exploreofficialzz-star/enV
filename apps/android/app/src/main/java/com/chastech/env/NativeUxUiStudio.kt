@@ -1473,10 +1473,30 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             }
                             Spacer(Modifier.weight(1f))
                             Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw-it.x).coerceAtLeast(12)),height=(it.height*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh-it.y).coerceAtLeast(12)))},modifier=Modifier.widthIn(min=100.dp)){Text("＋ Size")}
+                                OutlinedButton(
+                                    onClick = {
+                                        edit(selectedElement.id) { layer ->
+                                            layer.copy(
+                                                width = (layer.width * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw - layer.x).coerceAtLeast(12)),
+                                                height = (layer.height * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh - layer.y).coerceAtLeast(12))
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.widthIn(min = 100.dp)
+                                ) { Text("＋ Size") }
                                 OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation-15f+360f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↶ Rotate")}
                                 OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↻ Rotate")}
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*0.9f).roundToInt().coerceAtLeast(12),height=(it.height*0.9f).roundToInt().coerceAtLeast(12))},modifier=Modifier.widthIn(min=100.dp)){Text("－ Size")}
+                                OutlinedButton(
+                                    onClick = {
+                                        edit(selectedElement.id) { layer ->
+                                            layer.copy(
+                                                width = (layer.width * 0.9f).roundToInt().coerceAtLeast(12),
+                                                height = (layer.height * 0.9f).roundToInt().coerceAtLeast(12)
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.widthIn(min = 100.dp)
+                                ) { Text("－ Size") }
                             }
                         }
                     }
