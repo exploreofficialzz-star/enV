@@ -91,7 +91,7 @@ export function ToolShell({
         <span className="text-fg">{tool.name}</span>
       </nav> : null}
 
-      <header className={`${isFullscreen ? "mt-0" : "mt-6"} grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
+      <header className={`${isFullscreen ? "mt-0" : "mt-6"} grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3`}>
         <ToolAppIcon tool={tool} className="row-span-2 size-11 sm:row-span-1" />
         <div className="col-start-2 row-start-1 min-w-0 sm:flex sm:min-w-0 sm:flex-1 sm:gap-3">
           <div className="min-w-0">
