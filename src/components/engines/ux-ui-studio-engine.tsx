@@ -997,7 +997,7 @@ export function UxUiStudioEngine() {
   }, []);
 
   useEffect(() => {
-    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design")) return;
+    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design" && screens.length <= 1)) return;
     try {
       const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
       const saved = { ...project, id: nextId } as SavedProject;
