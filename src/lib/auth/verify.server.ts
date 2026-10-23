@@ -1,5 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { auth, authConfigured } from "./server";
+import { auth, authConfigurationError, authConfigured } from "./server";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
 export { authConfigured };
@@ -16,7 +16,7 @@ export class UnauthorizedError extends Error {
 export type VerifiedUser = { id: string; email: string | null };
 
 export async function getSessionUser(): Promise<VerifiedUser | null> {
-  if (!authConfigured) return null;
+  if (!authConfigured || authConfigurationError) return null;
   const request = getRequest();
   if (!request) return null;
   const session = await auth.api.getSession({ headers: request.headers });

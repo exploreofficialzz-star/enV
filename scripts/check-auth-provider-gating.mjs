@@ -10,6 +10,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const client = read("src/lib/auth/client.ts");
 const page = read("src/components/auth/auth-page.tsx");
 const server = read("src/lib/auth/server.ts");
+const authRoute = read("src/routes/api/auth/$.ts");
+const verify = read("src/lib/auth/verify.server.ts");
 const envExample = read(".env.example");
 const localEnv = JSON.parse(read(".enV/app-env.json"));
 const packageJson = JSON.parse(read("package.json"));
@@ -34,6 +36,11 @@ assert.ok(server.includes("requireLocalEmailVerified: true"), "OAuth account lin
 assert.ok(server.includes("appleClientSecret && appleGeneratedSecretConfigured"), "Reject conflicting manual/generated Apple client-secret configuration.");
 assert.ok(!server.includes("requireLocalEmailVerified: false"), "Do not allow OAuth to link into an unverified local account.");
 assert.ok(server.includes("appleUiRequested && !appleConfigured"), "Apple UI must fail closed if credentials are missing.");
+assert.ok(server.includes("export const authConfigurationError"), "Invalid auth config must not crash unrelated SSR routes during module initialization.");
+assert.ok(server.includes('console.error("[enV auth] Authentication endpoints are disabled:"'), "Auth configuration errors must be visible in logs without credential values.");
+assert.ok(authRoute.includes("if (authConfigurationError)") && authRoute.includes("status: 503"), "Auth API must fail closed with 503 when provider configuration is invalid.");
+assert.ok(authRoute.includes("Account sign-in is temporarily unavailable."), "Auth API must use safe user-facing failure wording.");
+assert.ok(verify.includes("if (!authConfigured || authConfigurationError) return null;"), "Invalid auth config must never fall back to a development identity.");
 
 for (const flag of [
   "VITE_AUTH_ENABLED",

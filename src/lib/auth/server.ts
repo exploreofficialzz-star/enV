@@ -47,47 +47,31 @@ const socialProviderConfigured = googleConfigured || appleConfigured;
 
 export const authConfigured = authRequested;
 
-if (authRequested && oauthPartiallyConfigured) {
-  throw new Error(
-    "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use social providers or email/password authentication.",
-  );
-}
-if (authRequested && googlePartiallyConfigured) {
-  throw new Error("Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
-}
-if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) {
-  throw new Error("The email/password sign-in UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.");
-}
-if (authRequested && googleUiRequested && !googleConfigured) {
-  throw new Error("The Google sign-in UI is enabled but GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on the server.");
-}
-if (authRequested && appleUiRequested && !appleConfigured) {
-  throw new Error("The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.");
-}
-if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) {
-  throw new Error("Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.");
-}
-if (authRequested && applePartiallyConfigured) {
-  throw new Error("Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.");
-}
-if (authRequested && !oauthConfigured && !socialProviderConfigured && !emailPasswordAuthEnabled) {
-  throw new Error("Authentication is enabled but no provider is configured. Configure Google, Apple, a complete OIDC provider, or email/password with transactional email delivery.");
-}
-if (authRequested && emailPasswordAuthEnabled && (!resendApiKey || !authEmailFrom)) {
-  throw new Error("Email/password authentication requires RESEND_API_KEY and AUTH_EMAIL_FROM so verification and password-reset emails can be delivered.");
-}
-if (authRequested && (isVercel || env("NODE_ENV") === "production") && (!explicitBaseURL || !configuredSecret || !databaseUrl)) {
-  throw new Error(
-    "Production authentication requires BETTER_AUTH_URL, BETTER_AUTH_SECRET, and DATABASE_URL. Configure them in the deployment environment.",
-  );
-}
-if (authRequested && (isVercel || env("NODE_ENV") === "production") && !explicitBaseURL?.startsWith("https://")) {
-  throw new Error("BETTER_AUTH_URL must be the canonical HTTPS origin when authentication is enabled in production.");
-}
-if (authRequested && oauthConfigured && (isVercel || env("NODE_ENV") === "production") && !oauthIssuer?.startsWith("https://")) {
-  throw new Error("AUTH_OAUTH_ISSUER must use HTTPS when OAuth is enabled in production.");
-}
+/**
+ * Keep invalid auth configuration scoped to auth-dependent requests. Throwing
+ * at module import can make unrelated TanStack Start SSR routes fail because
+ * the auth route and page bundle share this server module.
+ */
+export const authConfigurationError = (() => {
+  if (authRequested && oauthPartiallyConfigured) return "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use social providers or email/password authentication.";
+  if (authRequested && googlePartiallyConfigured) return "Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.";
+  if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) return "The email/password sign-in UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.";
+  if (authRequested && googleUiRequested && !googleConfigured) return "The Google sign-in UI is enabled but GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on the server.";
+  if (authRequested && appleUiRequested && !appleConfigured) return "The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.";
+  if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) return "Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.";
+  if (authRequested && applePartiallyConfigured) return "Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.";
+  if (authRequested && !oauthConfigured && !socialProviderConfigured && !emailPasswordAuthEnabled) return "Authentication is enabled but no provider is configured. Configure Google, Apple, a complete OIDC provider, or email/password with transactional email delivery.";
+  if (authRequested && emailPasswordAuthEnabled && (!resendApiKey || !authEmailFrom)) return "Email/password authentication requires RESEND_API_KEY and AUTH_EMAIL_FROM so verification and password-reset emails can be delivered.";
+  if (authRequested && (isVercel || env("NODE_ENV") === "production") && (!explicitBaseURL || !configuredSecret || !databaseUrl)) return "Production authentication requires BETTER_AUTH_URL, BETTER_AUTH_SECRET, and DATABASE_URL. Configure them in the deployment environment.";
+  if (authRequested && (isVercel || env("NODE_ENV") === "production") && !explicitBaseURL?.startsWith("https://")) return "BETTER_AUTH_URL must be the canonical HTTPS origin when authentication is enabled in production.";
+  if (authRequested && oauthConfigured && (isVercel || env("NODE_ENV") === "production") && !oauthIssuer?.startsWith("https://")) return "AUTH_OAUTH_ISSUER must use HTTPS when OAuth is enabled in production.";
+  return null;
+})();
 
+if (authConfigurationError) {
+  // Log setting names/validation messages only, never credential values.
+  console.error("[enV auth] Authentication endpoints are disabled:", authConfigurationError);
+}
 const secret = configuredSecret ?? randomBytes(32).toString("hex");
 const database = databaseUrl
   ? new Pool({ connectionString: databaseUrl, max: 5 })
@@ -95,7 +79,7 @@ const database = databaseUrl
 
 // Auth is opt-in. Avoid starting an embedded database on every Vercel function
 // cold start when the app's browser utilities do not require a server account.
-if (authRequested && !databaseUrl) void ensureDbReady();
+if (authRequested && !databaseUrl && !authConfigurationError) void ensureDbReady();
 
 const localOrigins = [
   "http://localhost:8080",
