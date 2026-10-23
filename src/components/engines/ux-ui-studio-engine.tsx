@@ -340,6 +340,7 @@ const COMPONENTS: Array<{ kind: LayerKind; label: string; description: string }>
   { kind: "avatar", label: "Avatar", description: "Profile or user image" },
   { kind: "badge", label: "Badge", description: "Status or tag" },
   { kind: "switch", label: "Switch", description: "On/off control" },
+  { kind: "toggle", label: "Toggle", description: "Alternative on/off setting control" },
   { kind: "progress", label: "Progress bar", description: "Completion indicator" },
   { kind: "slider", label: "Slider", description: "Range control" },
   { kind: "radio", label: "Radio button", description: "Single-choice control" },
@@ -2062,6 +2063,31 @@ export function UxUiStudioEngine() {
               {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>setShowMoreLayers(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
               {["device","platform"].includes(toolkit.id) && <div className="mt-3 flex flex-wrap gap-2">{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device)=><button key={device} type="button" onClick={()=>changeTarget(device)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold capitalize text-fg">{device}</button>)}</div>}
               {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>setCustomArtboard(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
+              {toolkit.id === "device" && <div className="mt-3 space-y-2">
+                <p className="text-xs leading-5 text-muted">Switch the preview frame without compressing or changing the artboard's proportions.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { target: "mobile", label: "Mobile", icon: <Smartphone size={16} /> },
+                    { target: "tablet", label: "Tablet", icon: <Tablet size={16} /> },
+                    { target: "desktop", label: "Desktop", icon: <Monitor size={16} /> },
+                  ] as Array<{ target: DeviceTarget; label: string; icon: ReactNode }>).map((option) => <button key={option.target} type="button" aria-pressed={target === option.target} onClick={() => changeTarget(option.target)} className={"flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold " + (target === option.target ? "border-accent bg-accent-soft text-fg" : "border-border text-fg")}>{option.icon}<span>{option.label}</span></button>)}
+                </div>
+              </div>}
+              {toolkit.id === "platform" && <div className="mt-3 space-y-2">
+                {selected ? <>
+                  <p className="text-xs leading-5 text-muted">Choose where “{selected.name}” is shown. Keep at least one viewport enabled.</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { target: "mobile", label: "Mobile", icon: <Smartphone size={16} /> },
+                      { target: "tablet", label: "Tablet", icon: <Tablet size={16} /> },
+                      { target: "desktop", label: "Desktop", icon: <Monitor size={16} /> },
+                    ] as Array<{ target: DeviceTarget; label: string; icon: ReactNode }>).map((option) => {
+                      const isVisible = selected.visibleOn.includes(option.target);
+                      return <button key={option.target} type="button" aria-pressed={isVisible} disabled={isVisible && selected.visibleOn.length === 1} onClick={() => updateLayer(selected.id, { visibleOn: isVisible ? selected.visibleOn.filter((value) => value !== option.target) : [...selected.visibleOn, option.target] })} className={"flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 " + (isVisible ? "border-accent bg-accent-soft text-fg" : "border-border text-muted")}>{option.icon}<span>{option.label}</span><span className="text-[10px]">{isVisible ? "Shown" : "Hidden"}</span></button>;
+                    })}
+                  </div>
+                </> : <p className="text-xs leading-5 text-muted">Select a layer on the artboard to control whether it appears on mobile, tablet and desktop.</p>}
+              </div>}
               {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>setShowExportPanel(true)} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
               {toolkit.id === "transform" && <div className="mt-3 grid grid-cols-2 gap-2">{selected ? <><button type="button" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center horizontally</button><button type="button" onClick={() => updateLayer(selected.id, { y: Math.max(0, Math.round((board.height - selected.height) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center vertically</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate −15°</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate +15°</button></> : <p className="col-span-2 text-xs text-muted">Select an artboard layer to use positioning and rotation actions.</p>}</div>}
               {toolkit.id === "flows" && <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
