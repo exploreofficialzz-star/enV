@@ -1519,9 +1519,10 @@ export function UxUiStudioEngine() {
       const overlapHeight = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
       if (overlapWidth > 0 && overlapHeight > 0) findings.push(a.name + " overlaps " + b.name + " by " + Math.round(overlapWidth) + "×" + Math.round(overlapHeight) + " px.");
     }
+    findings.push(...auditUxUiStudioTextContrast(elements, background));
     setQaReport(findings);
     setShowQaReport(true);
-    setNotice("Design QA completed: " + findings.length + " potential finding(s). This local structural scan is advisory, not a conformance certification.");
+    setNotice("Design QA completed: " + findings.length + " potential finding(s). Solid-color text contrast is included; gradients, images and complex rendered overlaps still need manual review. This is advisory, not conformance certification.");
   }
 
   function addSample(kind: LayerKind, name: string, copy: string) {

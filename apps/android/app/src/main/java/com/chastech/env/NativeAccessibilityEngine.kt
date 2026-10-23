@@ -521,6 +521,15 @@ object NativeAccessibilityEngine {
             .distinct().take(5)
     }
 
+    /** WCAG contrast for supported #RRGGBB colors; null means manual review. */
+    fun contrastRatio(foreground: String, background: String): Double? {
+        val fg = rgb(foreground) ?: return null
+        val bg = rgb(background) ?: return null
+        val first = luminance(fg)
+        val second = luminance(bg)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
     private fun rgb(value: String): IntArray? {
         val clean = value.trim().removePrefix("#")
         if (!clean.matches(Regex("[0-9a-fA-F]{6}"))) return null

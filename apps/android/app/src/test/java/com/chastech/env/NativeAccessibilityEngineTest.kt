@@ -108,6 +108,9 @@ class NativeAccessibilityEngineTest {
 
     @Test fun suppliesContrastReadabilityAndKeepsAllVariantsLocal() {
         assertTrue(NativeAccessibilityEngine.analyze("contrast-checker", "", "#000000", "#ffffff").contains("21.00:1"))
+        assertEquals(21.0, NativeAccessibilityEngine.contrastRatio("#000000", "#FFFFFF")!!, 0.0001)
+        assertEquals(4.48, NativeAccessibilityEngine.contrastRatio("#777777", "#FFFFFF")!!, 0.02)
+        assertTrue(NativeAccessibilityEngine.contrastRatio("#12", "#FFFFFF") == null)
         assertTrue(NativeAccessibilityEngine.analyze("text-readability-checker", "This is a short sentence.").contains("Flesch Reading Ease"))
         assertTrue(NativeAccessibilityEngine.analyze("color-blindness-simulator", "", "#ff0000", "#00ff00").contains("Protanopia approximation"))
         assertTrue(NativeAccessibilityEngine.analyze("color-blindness-simulator", "", "#ff0000", "#00ff00").contains("#"))

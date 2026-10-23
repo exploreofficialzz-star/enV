@@ -1605,7 +1605,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                                         if(elements.isEmpty())findings.add("No layers have been added yet.")
                                                         elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
                                                         for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
-                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). It is advisory, not a WCAG certification."
+                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
                                                     }
                                                     "handoff"->{toolkitTab="All 26";notice="Use Design handoff below to export the native PDF, project JSON and source handoff."}
                                                 }

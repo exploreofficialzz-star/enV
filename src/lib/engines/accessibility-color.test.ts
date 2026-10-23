@@ -9,6 +9,7 @@ import {
   suggestContrastCorrections,
   toHex,
 } from "./accessibility-color.ts";
+import { auditUxUiStudioTextContrast } from "./ux-ui-studio-qa.ts";
 
 test("parses 3/4/6/8 digit hex colors", () => {
   assert.deepEqual(parseCssColor("#fff"), { r: 255, g: 255, b: 255, a: 1, format: "hex", input: "#fff" });
@@ -67,6 +68,19 @@ test("corrections find a passing color without changing the opposite color", () 
   assert.ok(contrastRatio(after, bg) >= 4.5);
   assert.ok(after.a === fg.a);
   assert.notEqual(toHex(after), toHex(fg));
+});
+
+test("UX/UI Studio QA detects WCAG AA text contrast and preserves manual-review limits", () => {
+  const findings = auditUxUiStudioTextContrast([
+    { id: "low", kind: "text", name: "Low contrast heading", text: "Welcome", color: "#777777", background: "#FFFFFF", fontSize: 16, fontWeight: 400, opacity: 1 },
+    { id: "large", kind: "text", name: "Large title", text: "Design better", color: "#FFFFFF", background: "#0050A4", fontSize: 24, fontWeight: 400, opacity: 1 },
+    { id: "alpha", kind: "text", name: "Translucent label", text: "Save", color: "rgba(0, 0, 0, 0.5)", background: "transparent", fontSize: 16, fontWeight: 400, opacity: 1 },
+    { id: "gradient", kind: "text", name: "Gradient label", text: "Explore", color: "#111827", background: "linear-gradient(red, blue)", fontSize: 16, fontWeight: 400, opacity: 1 },
+  ], "#FFFFFF");
+  assert.ok(findings.some((finding) => finding.includes("Low contrast heading") && finding.includes("4.48:1") && finding.includes("4.5:1")));
+  assert.ok(!findings.some((finding) => finding.includes("Large title")));
+  assert.ok(findings.some((finding) => finding.includes("Translucent label") && finding.includes("3.98:1")));
+  assert.ok(findings.some((finding) => finding.includes("Gradient label") && finding.includes("manually review")));
 });
 
 test("invalid values are rejected", () => {

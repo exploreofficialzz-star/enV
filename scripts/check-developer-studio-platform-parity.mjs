@@ -93,5 +93,8 @@ assert.match(iosUxStudio, /showComponentPalette\.toggle\(\)/, 'iOS native tools 
 assert.match(iosUxStudio, /aspectRatio\(CGFloat\(boardWidth\) \/ CGFloat\(boardHeight\), contentMode: \.fit\)/, 'iOS preview must preserve target viewport ratio inside a mockup');
 assert.match(iosUxStudio, /DisclosureGroup\("Fine-tune design"/, 'iOS technical measurements must be behind simple visual controls');
 assert.match(iosUxStudio, /showAllLayers \? elements : Array\(elements\.prefix\(6\)\)/, 'iOS layer list must support a compact preview with see-more');
-console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF and layer metadata).');
+assert.match(webUx, /auditUxUiStudioTextContrast\(elements, background\)/, 'Web Design QA must report WCAG AA text contrast findings');
+assert.match(androidUxStudio, /NativeAccessibilityEngine\\.contrastRatio\\(e\\.color,surface\\)/, 'Android Design QA must report WCAG AA text contrast findings');
+assert.match(iosUxStudio, /NativeAccessibilityEngine\\.contrastRatio\\(foreground: item\\.color, background: surface\\)/, 'iOS Design QA must report WCAG AA text contrast findings');
+console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF, layer metadata and text-contrast QA).');
 console.log(`Developer Studio platform parity: PASS (${web.size} Studios; ${[...web.values()].reduce((sum, modes) => sum + modes.length, 0)} Studio modes match across TypeScript, Kotlin, and Swift).`);

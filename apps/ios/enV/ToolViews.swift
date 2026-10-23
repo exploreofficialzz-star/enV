@@ -7689,7 +7689,7 @@ private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
     UxUiStudioToolkit(id: "responsive", name: "Responsive Design, Layout & Canvas", description: "Viewport size, anchors, grid and responsive visibility.", status: "Connected"),
     UxUiStudioToolkit(id: "projects", name: "Screen & Project Manager", description: "Projects, drafts, presets and import.", status: "Connected"),
     UxUiStudioToolkit(id: "layers", name: "Layers & Object Manager", description: "Select, reorder, duplicate and delete layers.", status: "Connected"),
-    UxUiStudioToolkit(id: "prototype", name: "Prototype Studio", description: "Connected navigation, overlays and interactive flows.", status: "Not complete"),
+    UxUiStudioToolkit(id: "prototype", name: "Prototype Studio", description: "Tap-linked screen navigation and history; overlay interactions remain unsupported.", status: "Partial: screen links"),
     UxUiStudioToolkit(id: "design-system", name: "Design System Studio", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
     UxUiStudioToolkit(id: "accessibility", name: "Accessibility Studio", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
     UxUiStudioToolkit(id: "content", name: "Content & Placeholder Studio", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
@@ -8490,6 +8490,20 @@ private struct NativeUxUiStudioView: View {
             if item.kind == "icon" && (item.iconSvg ?? "").isEmpty { findings.append("\(item.name) has no embedded icon SVG.") }
             if item.kind == "image" && (item.imageData ?? "").isEmpty { findings.append("\(item.name) has no image data.") }
         }
+        let decorativeKinds: Set<String> = ["image", "icon", "rect", "ellipse", "divider", "spacer", "triangle", "diamond", "hexagon", "star", "line"]
+        for item in elements where !decorativeKinds.contains(item.kind) && !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let rawFill = item.fill.trimmingCharacters(in: .whitespacesAndNewlines)
+            let surface = rawFill.isEmpty || rawFill.lowercased() == "transparent" || rawFill.lowercased() == "none" ? background : rawFill
+            guard let ratio = NativeAccessibilityEngine.contrastRatio(foreground: item.color, background: surface) else {
+                findings.append("\(item.name) text contrast could not be calculated for these colors; manually review contrast.")
+                continue
+            }
+            let large = item.fontSize >= 18 || (item.fontSize >= 14 && item.fontWeight >= 700)
+            let threshold = large ? 3.0 : 4.5
+            if ratio + 0.000001 < threshold {
+                findings.append("\(item.name) text contrast is \(String(format: "%.2f", ratio)):1; WCAG AA \(large ? "large-text" : "normal-text") requires at least \(String(format: "%.1f", threshold)):1 for this solid-color pair.")
+            }
+        }
         for i in elements.indices {
             for j in elements.indices where j > i {
                 let a = elements[i], b = elements[j]
@@ -8499,7 +8513,7 @@ private struct NativeUxUiStudioView: View {
             }
         }
         qaReport = findings
-        notice = "Studio check completed: \(findings.count) potential finding(s). This local check is advisory, not a WCAG certification."
+        notice = "Studio check completed: \(findings.count) potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
     }
     private var appScreensPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
