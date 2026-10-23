@@ -130,7 +130,7 @@ try {
         await page.getByRole('button', { name: 'Open Screen 1', exact: true }).click();
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
         await page.getByRole('button', { name: /Primary button/ }).first().click();
-        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: 'Close app screens and layers', exact: true }).click();
         await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'All 26', exact: true }).click();
         await page.getByRole('button', { name: /Prototype Studio/ }).click();
