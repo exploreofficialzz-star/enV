@@ -1026,13 +1026,40 @@ private fun ToolDetail(
         val compact = maxWidth < 640.dp
         Column(
             (if (isFullscreen) Modifier.fillMaxSize() else Modifier.widthIn(max = 1024.dp).fillMaxWidth().align(Alignment.TopCenter))
-                .verticalScroll(rememberScrollState()).imePadding()
+                .imePadding()
+                .then(if (isFullscreen) Modifier else Modifier.verticalScroll(rememberScrollState()))
                 .padding(
-                    horizontal = if (isFullscreen) 12.dp else if (compact) 16.dp else 24.dp,
-                    vertical = if (isFullscreen) 12.dp else if (compact) 32.dp else 40.dp
+                    horizontal = if (isFullscreen) 0.dp else if (compact) 16.dp else 24.dp,
+                    vertical = if (isFullscreen) 0.dp else if (compact) 32.dp else 40.dp
                 ),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
+            if (isFullscreen) {
+                Box(Modifier.fillMaxSize()) {
+                    Card(
+                        modifier = Modifier.fillMaxSize(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+                        shape = RoundedCornerShape(0.dp),
+                        border = BorderStroke(0.dp, MaterialTheme.colorScheme.background),
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
+                        ) {
+                            NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
+                        }
+                    }
+                    IconButton(
+                        onClick = onToggleFullscreen,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(40.dp).zIndex(2f)
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                            .semantics { contentDescription = "Exit full screen for ${tool.name}" },
+                    ) {
+                        Text("⤢", fontSize = 21.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            } else {
             if (!isFullscreen) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NativeBreadcrumbLink("Home", onHome)
@@ -1098,23 +1125,7 @@ private fun ToolDetail(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
-                    when {
-                        backend -> NativeBackendToolForm(tool, true)
-                        supported -> NativeToolForm(tool, onRelatedTool)
-                        tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatusPill("Coming soon")
-                            Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatusPill("Web only")
-                            Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(onClick = {
-                                val url = Uri.Builder().scheme("https").authority("envtools.store")
-                                    .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
-                                context.startActivity(Intent(Intent.ACTION_VIEW, url))
-                            }) { Text("Open in Web") }
-                        }
-                    }
+                    NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
                 }
             }
             if (!isFullscreen) {
@@ -1156,6 +1167,34 @@ private fun ToolDetail(
                 }
             }
             }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeToolInterfaceContent(
+    tool: ToolRecord,
+    backend: Boolean,
+    supported: Boolean,
+    onRelatedTool: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    when {
+        backend -> NativeBackendToolForm(tool, true)
+        supported -> NativeToolForm(tool, onRelatedTool)
+        tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill("Coming soon")
+            Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill("Web only")
+            Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = {
+                val url = Uri.Builder().scheme("https").authority("envtools.store")
+                    .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
+                context.startActivity(Intent(Intent.ACTION_VIEW, url))
+            }) { Text("Open in Web") }
         }
     }
 }
