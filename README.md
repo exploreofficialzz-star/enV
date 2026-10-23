@@ -28,7 +28,9 @@ npm run build
 
 `npm run build` creates the Vercel/Nitro production output. It deliberately does **not** mutate a database during a Vercel build. Authentication is disabled by default.
 
+
 ## Developer utilities audit
+
 
 The Developer category's platform-specific implementation notes, regression evidence, competitor/user-feedback research, known limitations, and next-priority backlog are maintained in:
 
