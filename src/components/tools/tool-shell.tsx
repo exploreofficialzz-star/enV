@@ -32,7 +32,7 @@ export function ToolShell({
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
+  const [isCssFullscreen, setIsCssFullscreen] = useState(false);
 
   useEffect(() => {
     recordRecent(tool.id);
@@ -41,29 +41,50 @@ export function ToolShell({
 
   useEffect(() => {
     const syncFullscreen = () => {
-      setIsFullscreen(document.fullscreenElement === toolInterfaceRef.current);
+      setIsFullscreen(isCssFullscreen || document.fullscreenElement === toolInterfaceRef.current);
     };
+    const closeFallbackOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isCssFullscreen) {
+        setIsCssFullscreen(false);
+        setIsFullscreen(false);
+      }
+    };
+    const previousOverflow = document.body.style.overflow;
+    if (isCssFullscreen) document.body.style.overflow = "hidden";
     document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, []);
+    window.addEventListener("keydown", closeFallbackOnEscape);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      window.removeEventListener("keydown", closeFallbackOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isCssFullscreen]);
 
   async function toggleFullscreen() {
     const surface = toolInterfaceRef.current;
     if (!surface) return;
 
+    if (isCssFullscreen) {
+      setIsCssFullscreen(false);
+      setIsFullscreen(false);
+      return;
+    }
+
     try {
       if (document.fullscreenElement === surface) {
         await document.exitFullscreen();
-      } else {
-        if (!surface.requestFullscreen) {
-          setFullscreenError("Full screen is not supported by this browser.");
-          return;
-        }
-        await surface.requestFullscreen();
+        return;
       }
-      setFullscreenError(null);
+      if (!surface.requestFullscreen) {
+        setIsCssFullscreen(true);
+        setIsFullscreen(true);
+        return;
+      }
+      await surface.requestFullscreen();
     } catch {
-      setFullscreenError("Full screen could not be opened. Check your browser permissions and try again.");
+      // Keep the feature usable in mobile browsers that reject the Fullscreen API.
+      setIsCssFullscreen(true);
+      setIsFullscreen(true);
     }
   }
 
@@ -73,7 +94,7 @@ export function ToolShell({
     <article className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
       <div
         ref={toolInterfaceRef}
-        className={isFullscreen ? "min-h-screen w-full max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8" : ""}
+        className={isFullscreen ? "fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8" : ""}
       >
       {!isFullscreen ? <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">
@@ -129,8 +150,7 @@ export function ToolShell({
         {!isFullscreen ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p> : null}
       </header>
 
-      {fullscreenError ? <p className="mt-3 text-sm text-danger" role="status">{fullscreenError}</p> : null}
-      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
+remove fallback error UI      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {!isFullscreen && note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
