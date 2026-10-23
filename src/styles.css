@@ -802,7 +802,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio:not(.is-expanded) {
   position:relative; display:flex; flex-direction:column; gap:8px !important;
   height:min(920px,calc(100dvh - 104px)); max-height:calc(100dvh - 64px);
-  min-height:320px; overflow:hidden;
+  min-height:min(320px,calc(100dvh - 104px)); overflow:hidden;
 }
 .ux-ui-studio:not(.is-expanded) > :not([hidden]) { margin-block:0 !important; }
 .ux-ui-studio:not(.is-expanded) > .uxui-topbar {
@@ -810,7 +810,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   padding:5px 8px; gap:5px;
 }
 .ux-ui-studio:not(.is-expanded) .uxui-workspace {
-  position:relative; display:block !important; flex:1 1 0; height:0;
+  position:static; display:block !important; flex:1 1 0; height:0;
   min-height:0; overflow:hidden;
 }
 .ux-ui-studio:not(.is-expanded) .uxui-canvas-panel {
@@ -1102,7 +1102,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 @keyframes uxui-toolkit-in { from { opacity:0; transform:translateY(5px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
 
 @media (max-width: 600px) {
-  .ux-ui-studio:not(.is-expanded) { height:min(920px,calc(100dvh - 88px)); max-height:calc(100dvh - 56px); }
+  .ux-ui-studio:not(.is-expanded) { height:min(920px,calc(100dvh - 88px)); max-height:calc(100dvh - 56px); min-height:min(320px,calc(100dvh - 88px)); }
   .ux-ui-studio:not(.is-expanded) .uxui-topbar-actions > .uxui-icon-button:nth-child(1),
   .ux-ui-studio:not(.is-expanded) .uxui-topbar-actions > .uxui-icon-button:nth-child(2) { display:none; }
   .ux-ui-studio:not(.is-expanded) .uxui-toolkit-overlay { padding:7px; }
@@ -1165,3 +1165,35 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio:not(.is-expanded) .uxui-device-desktop { margin-bottom:0; padding:9px; }
 .ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-neck,
 .ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-base { display:none; }
+
+@media (max-height: 520px) {
+  .ux-ui-studio:not(.is-expanded) {
+    min-height:min(320px,calc(100dvh - 88px));
+    height:calc(100dvh - 88px);
+    max-height:calc(100dvh - 56px);
+    gap:4px !important;
+  }
+  .ux-ui-studio:not(.is-expanded) > footer { display:none; }
+  .ux-ui-studio:not(.is-expanded) > .uxui-topbar { min-height:28px; max-height:32px; padding:2px 4px; gap:3px; overflow:hidden; }
+  .ux-ui-studio:not(.is-expanded) .uxui-topbar-left,
+  .ux-ui-studio:not(.is-expanded) .uxui-topbar-actions { gap:2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-target-switch button { min-height:25px; width:25px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-heading { min-height:24px; max-height:28px; padding:2px 5px; overflow:hidden; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar { min-height:37px; max-height:40px; padding:1px 4px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-group button { width:26px; height:27px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-add-button { width:34px; height:34px; flex-basis:34px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-add-button svg { width:23px; height:23px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-mobile-controls { gap:2px; padding:1px 2px; max-height:65px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad { grid-template-columns:repeat(3,21px); grid-template-rows:8px repeat(3,17px); gap:0; padding:0; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:16px; height:16px; border-radius:5px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button svg { width:11px; height:11px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:7px; line-height:8px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-controls { padding:1px 3px 2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar { gap:2px; padding:0; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar button { min-height:23px; padding:0 4px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-visual-property-dock { max-height:46px; padding:2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-property-dock-header { margin-bottom:1px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-property-dock-header strong { font-size:9px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-property-dock-header > button { min-height:21px; font-size:8px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-property-card { min-height:30px; flex-basis:90px; padding:3px; }
+}
