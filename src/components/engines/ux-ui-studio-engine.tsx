@@ -822,6 +822,7 @@ export function UxUiStudioEngine() {
   const [showToolsPanel, setShowToolsPanel] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [showMoreLayers, setShowMoreLayers] = useState(false);
+  const [showInspector, setShowInspector] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
   const [helpOpen, setHelpOpen] = useState(false);
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
@@ -1756,7 +1757,7 @@ export function UxUiStudioEngine() {
             </div>
             <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => setShowMoreLayers((value) => !value)} aria-label="Show layers" title="Layers" className={showMoreLayers ? "is-active" : ""}><Layers size={20} /></button>
+              <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens and layers" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={() => elementImportInputRef.current?.click()} aria-label="Import elements" title="Import elements"><ImagePlus size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
             </div>
@@ -1819,7 +1820,7 @@ export function UxUiStudioEngine() {
           }} />
         </main>
 
-        <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
+        {showInspector && <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
             <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
@@ -1955,7 +1956,7 @@ export function UxUiStudioEngine() {
           </div>
             </div>
           </details>
-        </aside>
+        </aside>}
       </div>
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> <span className="min-w-0 flex-1">{notice}</span><button aria-label="Dismiss notice" type="button" onClick={() => setNotice("")} className="rounded p-0.5 text-muted hover:text-fg"><X size={13} /></button></div>}
       <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-[11px] leading-5 text-muted"><span>Local-first editor · Exact pixel dimensions · Layer-level specification records</span><button type="button" onClick={() => setShowToolsPanel(true)} className="inline-flex items-center gap-1 font-semibold text-accent"><Plus size={13} /> Add elements</button></footer>
