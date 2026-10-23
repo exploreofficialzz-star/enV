@@ -8192,12 +8192,103 @@ private struct NativeUxUiStudioView: View {
             artboardPreview
 
             HStack(spacing: 7) {
+                Text("App screens").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                Spacer()
+                Button { addAppScreen() } label: {
+                    Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.envSurface)
+                }.accessibilityLabel("Add app screen")
+            }
+            if showScreenManager {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(screens.count) \(screens.count == 1 ? "screen" : "screens") · tap a thumbnail to open it")
+                        .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                        ForEach(screens) { screen in
+                            VStack(alignment: .leading, spacing: 7) {
+                                Button { openAppScreen(screen.id) } label: {
+                                    GeometryReader { proxy in
+                                        let w = screen.customArtboard ? screen.customWidth : (screen.target == "mobile" ? 390 : screen.target == "tablet" ? 768 : 1440)
+                                        let h = screen.customArtboard ? screen.customHeight : (screen.target == "mobile" ? 844 : screen.target == "tablet" ? 1024 : 900)
+                                        let scale = min(proxy.size.width / CGFloat(max(1, w)), proxy.size.height / CGFloat(max(1, h)))
+                                        ZStack(alignment: .topLeading) {
+                                            uxUiUIColor(screen.background)
+                                            ForEach(Array(screen.elements.prefix(10))) { item in
+                                                let rendered = uxUiResolvedLayer(item, boardWidth: w, boardHeight: h)
+                                                layerPreview(rendered, scale: scale)
+                                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale,
+                                                              y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                            }
+                                        }
+                                        .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
+                                    }
+                                    .frame(height: 124)
+                                    .background(uxUiUIColor(screen.background), in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Open \(screen.name)")
+                                TextField("Screen name", text: Binding(
+                                    get: { screens.first(where: { $0.id == screen.id })?.name ?? screen.name },
+                                    set: { renameAppScreen(screen.id, name: $0) }
+                                ))
+                                .font(.envScaled(size: 11, weight: .semibold))
+                                .padding(6)
+                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                                .accessibilityLabel("Screen name \(screen.name)")
+                                Text("\(screen.target.capitalized) · \(screen.elements.count) layers")
+                                    .font(.envScaled(size: 9, weight: .regular)).foregroundStyle(Color.envMuted)
+                                HStack(spacing: 5) {
+                                    Button { openAppScreen(screen.id) } label: {
+                                        Text(screen.id == activeScreenID ? "Editing" : "Open")
+                                            .font(.envScaled(size: 10, weight: .semibold))
+                                            .frame(maxWidth: .infinity).padding(.vertical, 7)
+                                            .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+                                    }.disabled(screen.id == activeScreenID).buttonStyle(.plain)
+                                    Button { reorderAppScreen(screen.id, by: -1) } label: { Image(systemName: "arrow.up").frame(width: 26, height: 30) }
+                                        .disabled(screens.first?.id == screen.id).accessibilityLabel("Move \(screen.name) earlier")
+                                    Button { reorderAppScreen(screen.id, by: 1) } label: { Image(systemName: "arrow.down").frame(width: 26, height: 30) }
+                                        .disabled(screens.last?.id == screen.id).accessibilityLabel("Move \(screen.name) later")
+                                    Button { duplicateAppScreen(screen.id) } label: { Image(systemName: "plus.square.on.square").frame(width: 26, height: 30) }
+                                        .accessibilityLabel("Duplicate \(screen.name)")
+                                    Button { deleteAppScreen(screen.id) } label: { Image(systemName: "trash").frame(width: 26, height: 30) }
+                                        .disabled(screens.count <= 1).accessibilityLabel("Delete \(screen.name)")
+                                }
+                                .font(.system(size: 10, weight: .semibold))
+                                .buttonStyle(.bordered)
+                                .tint(Color.envInk)
+                            }
+                            .padding(8)
+                            .background(screen.id == activeScreenID ? Color.envAccent.opacity(0.07) : Color.envCard, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        }
+                    }
+                    Button { showScreenManager = false } label: {
+                        Text("Close screen manager").font(.envScaled(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity).padding(8)
+                    }.buttonStyle(.bordered)
+                }
+                .padding(10)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            HStack(spacing: 7) {
                 Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 42) }
                     .disabled(undoHistory.isEmpty)
                     .accessibilityLabel("Undo")
                 Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 42) }
                     .disabled(redoHistory.isEmpty)
                     .accessibilityLabel("Redo")
+                Button { showScreenManager.toggle() } label: {
+                    Image(systemName: "square.grid.2x2").font(.system(size: 17, weight: .semibold))
+                        .frame(width: 38, height: 42).foregroundStyle(Color.envInk)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
                 Spacer(minLength: 3)
                 Button { showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
