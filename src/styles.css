@@ -605,7 +605,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 /* Sketch-first workspace: device mockup is the focus; inspectors open only when requested. */
 .uxui-workspace{display:block!important;position:relative;min-width:0}
 .uxui-workspace>.uxui-canvas-panel{width:100%;min-width:0}
-.uxui-inspector{position:absolute!important;z-index:29;top:8px;right:8px;width:min(330px,calc(100% - 16px));max-height:min(78dvh,900px);overflow:auto;overscroll-behavior:contain;background:var(--color-surface);box-shadow:0 18px 48px rgb(15 23 42 / 22%)}
+.uxui-inspector{position:absolute!important;z-index:29;top:62px;right:8px;width:min(330px,calc(100% - 16px));max-height:min(78dvh,900px);overflow:auto;overscroll-behavior:contain;background:var(--color-surface);box-shadow:0 18px 48px rgb(15 23 42 / 22%)}
 .uxui-canvas-stage{width:100%;min-width:0}
 .uxui-mobile-controls{position:relative;z-index:1}
 .uxui-toolkit-card{min-width:0;overflow-wrap:anywhere}
