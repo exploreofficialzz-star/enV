@@ -2031,11 +2031,11 @@ export function UxUiStudioEngine() {
       </div>}
       <div className="uxui-workspace grid min-w-0 gap-3">
         {showToolsPanel && <div className="uxui-toolkit-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowToolsPanel(false); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role="dialog" aria-modal="true" aria-labelledby="uxui-toolkit-title">
-          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">The Studio Toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close Studio Toolkit"><X size={17} /></button></div>
+          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">The Studio Toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
           <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
             {([
-              { id: "toolkits", label: "Toolkits", icon: <LayoutTemplate size={18} strokeWidth={1.8} /> },
+              { id: "toolkits", label: "All 26", icon: <LayoutTemplate size={18} strokeWidth={1.8} /> },
               { id: "components", label: "Elements", icon: <Grid2X2 size={18} strokeWidth={1.8} /> },
               { id: "icons", label: "Icons", icon: <ImagePlus size={18} strokeWidth={1.8} /> },
               { id: "shapes", label: "Shapes", icon: <Shapes size={18} strokeWidth={1.8} /> },
@@ -2090,7 +2090,7 @@ export function UxUiStudioEngine() {
             <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Elements</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
             <button type="button" onClick={() => elementImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import elements</button>
             <div className="uxui-elements-grid">
-              {COMPONENTS.filter((component) => !toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} aria-label={"Add " + component.label + ": " + component.description} className="uxui-element-tile"><ElementVisual kind={component.kind} /><span className="uxui-element-tile-label">{component.label}</span></button>)}
+              {COMPONENTS.filter((component) => !toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} aria-label={component.label + ": " + component.description} className="uxui-element-tile"><ElementVisual kind={component.kind} /><span className="uxui-element-tile-label">{component.label}</span></button>)}
             </div>
             <div className="mt-5 border-t border-border pt-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers {elements.length > 0 && <span className="ml-auto font-normal text-muted">{elements.length}</span>}</div>
