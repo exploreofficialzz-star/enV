@@ -107,6 +107,7 @@ struct ToolDetailView: View {
     @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
     @AppStorage("env.toolsNavigationReset") private var toolsNavigationReset = 0
     @State private var visibleRelatedCount = 6
+    @State private var isToolFullscreen = false
     let tool: Tool
     var initialDeveloperMode: String? = nil
     var initialDeveloperAction: String? = nil
@@ -123,6 +124,7 @@ struct ToolDetailView: View {
         let allRelatedTools = relatedTools
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if !isToolFullscreen {
                 HStack(spacing: 8) {
                     Button("Home") { homeNavigationReset += 1; selectedTab = NativeTab.home.rawValue }
                     enVCharacterSpacedText("/").foregroundStyle(Color.envSubtle)
@@ -136,13 +138,14 @@ struct ToolDetailView: View {
                 .foregroundStyle(Color.envMuted)
                 .buttonStyle(.plain)
                 .padding(.bottom, 24)
+                }
 
                 VStack(alignment: .leading, spacing: compact ? 8 : 0) {
                     HStack(alignment: .top, spacing: compact ? 8 : 16) {
-                        toolHeading(showsDescription: !compact).frame(maxWidth: .infinity, alignment: .leading)
-                        saveButton
+                        toolHeading(showsDescription: !compact && !isToolFullscreen).frame(maxWidth: .infinity, alignment: .leading)
+                        if !isToolFullscreen { saveButton }
                     }
-                    if compact {
+                    if compact && !isToolFullscreen {
                         enVCharacterSpacedText(tool.description)
                             .font(.envScaled(size: 14, weight: .regular))
                             .foregroundStyle(Color.envMuted)
@@ -152,14 +155,14 @@ struct ToolDetailView: View {
                     }
                 }
 
-                if let notice = tool.nativeDisclaimerText {
+                if !isToolFullscreen, let notice = tool.nativeDisclaimerText {
                     enVCharacterSpacedText(notice)
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .padding(.top, 12)
                 }
 
-                if let parentDeveloperStudio {
+                if !isToolFullscreen, let parentDeveloperStudio {
                     NavigationLink(value: parentDeveloperStudio) {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -215,6 +218,7 @@ struct ToolDetailView: View {
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder.opacity(0.5), lineWidth: 1))
                 .padding(.top, 24)
 
+                if !isToolFullscreen {
                 if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
                     NativeAiAssistPanel(tool: tool, feature: assistFeature)
                         .padding(.top, 16)
@@ -275,15 +279,18 @@ struct ToolDetailView: View {
                         .padding(.top, 8)
                     }
                 }
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, compact ? 32 : 40)
-            .frame(maxWidth: 1024, alignment: .leading)
+            .padding(.horizontal, isToolFullscreen ? 12 : 16)
+            .padding(.vertical, isToolFullscreen ? 12 : (compact ? 32 : 40))
+            .frame(maxWidth: isToolFullscreen ? .infinity : 1024, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .modifier(Screen())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isToolFullscreen ? .hidden : .visible, for: .navigationBar)
+        .statusBarHidden(isToolFullscreen)
         .onAppear { store.recordRecent(tool.id) }
     }
 
@@ -297,6 +304,17 @@ struct ToolDetailView: View {
                         .tracking(-0.35)
                         .foregroundStyle(Color.envInk)
                         .fixedSize(horizontal: false, vertical: true)
+                    Button { isToolFullscreen.toggle() } label: {
+                        Image(systemName: isToolFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.envMuted)
+                            .frame(width: 32, height: 32)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isToolFullscreen ? "Exit full screen for \\(tool.name)" : "View \\(tool.name) in full screen")
+                    .accessibilityIdentifier("tool-fullscreen-toggle")
                     if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted) }
                 }
                 if showsDescription {
