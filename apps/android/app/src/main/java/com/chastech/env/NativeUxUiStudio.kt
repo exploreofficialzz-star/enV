@@ -1527,7 +1527,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             "All 26" -> {
                                 Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                                 Text("Choose a toolkit to open its native controls. Where a dedicated engine is not ready, the status below says so instead of reporting a mock implementation as complete.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                uxNativeToolkits.filter{toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
+                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
                                     Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
                                         Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
                                         Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
