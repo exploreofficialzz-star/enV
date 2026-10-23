@@ -769,7 +769,16 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .env-tool-fullscreen__content,
 .env-tool-fullscreen__content * {
   box-sizing: border-box;
+}
+
+.env-tool-fullscreen__content > * {
   min-width: 0;
+  max-width: 100%;
+}
+
+/* The UX/UI Studio topbar now sits below the fullscreen exit row, not the app header. */
+.env-tool-fullscreen__content .uxui-topbar {
+  top: 56px;
 }
 
 .env-tool-fullscreen__content :where(input, select, textarea, button, video, audio, canvas, iframe, img, svg, pre, table) {
