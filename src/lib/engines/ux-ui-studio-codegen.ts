@@ -147,10 +147,12 @@ export function generateReactProject(project: UxCodegenProject): string {
   const json = JSON.stringify(project).replace(/</g, "\\u003c");
   const fontCss = JSON.stringify(embeddedFontCss(project));
   const googleLinks = remoteFontFamilies(project).map((family) => googleFontLink(family));
+  const chartData = Object.fromEntries(project.elements.filter((layer) => layer.kind === "chart").map((layer) => [layer.id, parseUxUiStudioChartData(layer.text)]));
   return [
     'import React from "react";',
     "",
     "const project = " + json + " as const;",
+    "const chartData: Record<string, { title: string; points: Array<{ label: string; value: number }>; invalidRows: number }> = " + JSON.stringify(chartData) + ";",
     "const embeddedFontCss = " + fontCss + ";",
     "const googleFontLinks = " + JSON.stringify(googleLinks) + ";",
     "",
@@ -173,6 +175,25 @@ export function generateReactProject(project: UxCodegenProject): string {
     '    {project.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(project.target)).map((item) => {',
     '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px solid " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:item.radius,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:"flex",alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
     "      if (item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth > 0) style.maxWidth = item.maxWidth;",
+    '      if (item.kind === "chart") {',
+    '        const chart = chartData[item.id] || { title: item.name, points: [], invalidRows: 0 };',
+    '        style.display = "block"; style.padding = 0;',
+    '        const plotTop = item.padding + Math.min(22, item.fontSize + 6);',
+    '        const plotBottom = item.height - item.padding - 17;',
+    '        const plotHeight = Math.max(4, plotBottom - plotTop);',
+    '        const plotLeft = item.padding + 4, plotRight = item.width - item.padding - 4;',
+    '        const plotWidth = Math.max(1, plotRight - plotLeft);',
+    '        const slotWidth = plotWidth / Math.max(1, chart.points.length);',
+    '        const maxValue = Math.max(1, ...chart.points.map((point) => point.value));',
+    '        const labelSize = Math.max(5, Math.min(9, item.fontSize * 0.64));',
+    '        return <div key={item.id} style={style} role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>',
+    '          <div style={{position:"absolute",left:item.padding,top:item.padding,fontSize:Math.min(13,item.fontSize),fontWeight:700}}>{chart.title}</div>',
+    '          <svg aria-hidden="true" viewBox={"0 0 " + item.width + " " + item.height} style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>',
+    '            {chart.points.length ? <>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={plotLeft} y1={plotTop + plotHeight * grid / 3} x2={plotRight} y2={plotTop + plotHeight * grid / 3} stroke="#E5E7EB" />)}{chart.points.map((point,index) => { const barHeight=plotHeight*point.value/maxValue; const barWidth=Math.max(2,Math.min(26,slotWidth*0.58)); const x=plotLeft+index*slotWidth+(slotWidth-barWidth)/2; const y=plotBottom-barHeight; return <g key={point.label+"-"+index}><rect x={x} y={y} width={barWidth} height={barHeight} rx="3" fill={item.color} opacity={index===chart.points.length-1?1:0.78}/><text x={plotLeft+index*slotWidth+slotWidth/2} y={Math.max(plotTop+7,y-3)} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.value}</text><text x={plotLeft+index*slotWidth+slotWidth/2} y={plotBottom+12} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.label.slice(0,8)}</text></g>;})}</> : <text x={item.width/2} y={plotTop+plotHeight/2} textAnchor="middle" fontSize={labelSize} fill={item.color}>Enter data as Label: value</text>}',
+    '          </svg>',
+    '          {chart.invalidRows > 0 && <span style={{position:"absolute",right:item.padding,bottom:2,fontSize:8,color:"#B45309"}}>{chart.invalidRows} invalid row(s)</span>}',
+    '        </div>;',
+    '      }',
     '      const children = item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} width="100%" height="100%" aria-hidden="true" style={{fill:"currentColor"}} dangerouslySetInnerHTML={{__html:item.iconSvg}} /> : item.kind === "image" ? item.imageDataUrl ? <img alt={item.name} src={item.imageDataUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : item.text : item.text;',
     '      if (item.kind === "input" || item.kind === "search") return <div key={item.id} style={style}><input aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0}} /></div>;',
     '      if (item.kind === "textarea") return <div key={item.id} style={style}><textarea aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0,resize:"none"}} /></div>;',
@@ -419,6 +440,34 @@ export function generateKotlinProject(project: UxCodegenProject): string {
       ".padding(" + layer.padding + ".dp)"
     ].filter(Boolean).join("");
     let content: string;
+    } else if (layer.kind === "chart") {
+      const chart = parseUxUiStudioChartData(layer.text);
+      const points = chart.points.map((point) => "(" + safe(point.label) + " to " + (Number.isInteger(point.value) ? point.value.toFixed(1) : String(point.value)) + ")").join(", ");
+      const chartColor = "Color(android.graphics.Color.parseColor(" + safe(layer.color) + "))";
+      const barAreaHeight = Math.max(16, layer.height - layer.padding * 2 - layer.fontSize - 30);
+      const chartBody = chart.points.length
+        ? [
+            "val generatedChartPoints = listOf(" + points + ")",
+            "val generatedChartMaximum = generatedChartPoints.maxOfOrNull { it.second }?.coerceAtLeast(1.0) ?: 1.0",
+            "Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {",
+            "  generatedChartPoints.forEach { (label, value) ->",
+            "    Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {",
+            "      Text(if (value % 1.0 == 0.0) value.toLong().toString() else String.format(java.util.Locale.US, \"%.1f\", value), fontSize = 7.sp, maxLines = 1)",
+            "      Spacer(Modifier.height(1.dp))",
+            "      Box(Modifier.fillMaxWidth(0.62f).height(if (value <= 0.0) 0.dp else maxOf(2f, " + barAreaHeight + "f * (value / generatedChartMaximum).toFloat()).dp).background(" + chartColor + "))",
+            "      Text(label, fontSize = 6.sp, maxLines = 1)",
+            "    }",
+            "  }",
+            "}"
+          ].join("\n")
+        : 'Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Enter data as Label: value", fontSize = 8.sp) }';
+      content = [
+        "Column(Modifier.fillMaxSize().padding(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {",
+        "  Text(" + safe(chart.title) + ", color = " + chartColor + ", fontSize = " + Math.min(16, layer.fontSize) + ".sp, fontWeight = FontWeight.SemiBold, maxLines = 1)",
+        chartBody,
+        chart.invalidRows ? 'Text("' + chart.invalidRows + ' invalid row(s) ignored", fontSize = 6.sp, color = Color(0xFFB45309), maxLines = 1)' : "",
+        "}"
+      ].filter(Boolean).join("\n");
     if (layer.kind === "line") {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       content = "Canvas(Modifier.fillMaxSize()) { drawLine(color = Color(android.graphics.Color.parseColor(" + safe(lineColor) + ")), start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), strokeWidth = size.height) }";
@@ -544,6 +593,14 @@ export function generateSwiftProject(project: UxCodegenProject): string {
       child = views.length
         ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
         : "Text(" + safe(layer.iconName || layer.name) + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
+    } else if (layer.kind === "chart") {
+      const chart = parseUxUiStudioChartData(layer.text);
+      const points = chart.points.map((point) => "(" + safe(point.label) + ", " + (Number.isInteger(point.value) ? point.value.toFixed(1) : String(point.value)) + ")").join(", ");
+      const chartColor = "Color(hex: " + safe(layer.color) + ")";
+      const chartView = chart.points.length
+        ? "GeometryReader { geometry in let chartPoints: [(label: String, value: Double)] = [" + points + "]; let maximum = max(chartPoints.map { $0.value }.max() ?? 1, 1); HStack(alignment: .bottom, spacing: 2) { ForEach(Array(chartPoints.enumerated()), id: \\.offset) { entry in let point = entry.element; VStack(spacing: 1) { Text(point.value.rounded() == point.value ? String(format: \\\"%.0f\\\", point.value) : String(format: \\\"%.1f\\\", point.value)).font(.system(size: max(5, CGFloat(" + Math.round(layer.fontSize * 0.52) + " * scale))); Spacer(minLength: 0); RoundedRectangle(cornerRadius: 2).fill(" + chartColor + ").frame(height: max(1, (geometry.size.height - 24) * CGFloat(point.value / maximum))); Text(point.label).font(.system(size: max(5, CGFloat(" + Math.round(layer.fontSize * 0.52) + " * scale))).lineLimit(1).minimumScaleFactor(0.55) }.frame(maxWidth: .infinity, maxHeight: .infinity) } } }"
+        : "Text(\\\"Enter data as Label: value\\\").font(.system(size: max(5, CGFloat(" + Math.round(layer.fontSize * 0.62) + " * scale))).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)";
+      content = "VStack(alignment: .leading, spacing: 2) { Text(" + safe(chart.title) + ").font(.system(size: max(6, CGFloat(" + Math.round(layer.fontSize * 0.82) + " * scale), weight: .semibold)).lineLimit(1); " + chartView + (chart.invalidRows > 0 ? "; Text(" + safe(chart.invalidRows + " invalid row(s) ignored") + ").font(.system(size: max(5, CGFloat(" + Math.round(layer.fontSize * 0.45) + " * scale))).foregroundStyle(.orange).lineLimit(1)" : "") + " }";
     } else if (layer.kind === "line") {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       child = "Rectangle().fill(Color(hex: " + safe(lineColor) + "))";

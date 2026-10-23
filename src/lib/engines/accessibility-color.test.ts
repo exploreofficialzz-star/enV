@@ -11,6 +11,7 @@ import {
 } from "./accessibility-color.ts";
 import { auditUxUiStudioTextContrast } from "./ux-ui-studio-qa.ts";
 import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
+import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, type UxCodegenProject } from "./ux-ui-studio-codegen.ts";
 
 test("parses 3/4/6/8 digit hex colors", () => {
   assert.deepEqual(parseCssColor("#fff"), { r: 255, g: 255, b: 255, a: 1, format: "hex", input: "#fff" });
@@ -99,6 +100,41 @@ test("UX/UI Studio chart rows are parsed and invalid rows are reported", () => {
   const empty = parseUxUiStudioChartData("Chart title\nNo numeric value");
   assert.equal(empty.points.length, 0);
   assert.equal(empty.invalidRows, 1);
+});
+
+test("UX/UI Studio generated Web, Compose and SwiftUI handoff renders saved chart data", () => {
+  const project: UxCodegenProject = {
+    name: "Chart QA",
+    target: "mobile",
+    background: "#FFFFFF",
+    viewport: { width: 390, height: 844 },
+    breakpoints: { mobile: 480, tablet: 768, desktop: 1024 },
+    tokens: { colors: [], typography: [], spacing: [] },
+    elements: [{
+      id: "chart-qa", kind: "chart", name: "Monthly activity", x: 10, y: 20, width: 300, height: 180,
+      text: "Monthly activity\\nJan: 36\\nFeb: 62",
+      iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "",
+      color: "#2563EB", background: "#FFFFFF", borderColor: "#E5E7EB", borderWidth: 1, radius: 8, padding: 8,
+      marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
+      fontFamily: "Inter", fontSize: 13, fontWeight: 600, lineHeight: 1.35, letterSpacing: 0, textAlign: "left",
+      opacity: 1, shadow: false, horizontalConstraint: "left", verticalConstraint: "top",
+      minWidth: 0, maxWidth: 0, visibleOn: ["mobile"], referenceWidth: 390, referenceHeight: 844, componentKey: ""
+    }]
+  };
+  const html = generateHtmlProject(project);
+  const react = generateReactProject(project);
+  const kotlin = generateKotlinProject(project);
+  const swift = generateSwiftProject(project);
+  assert.ok(html.includes('role="img" aria-label="Chart: Monthly activity'));
+  assert.ok(html.includes(">Jan</text>") || html.includes(">Jan</text>"));
+  assert.ok(react.includes("const chartData: Record"));
+  assert.ok(react.includes('role="img" aria-label={"Chart: "'));
+  assert.ok(react.includes("Jan"));
+  assert.ok(kotlin.includes("generatedChartPoints"));
+  assert.ok(kotlin.includes('"Jan" to 36.0'));
+  assert.ok(swift.includes("chartPoints"));
+  assert.ok(swift.includes("Monthly activity"));
+  assert.ok(swift.includes("Jan"));
 });
 
 test("invalid values are rejected", () => {
