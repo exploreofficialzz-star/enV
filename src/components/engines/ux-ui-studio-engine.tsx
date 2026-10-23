@@ -863,6 +863,7 @@ export function UxUiStudioEngine() {
   const [showContextColors, setShowContextColors] = useState(false);
   const [showAdvancedContext, setShowAdvancedContext] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [clipboardLayers, setClipboardLayers] = useState<DesignLayer[]>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
   const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
@@ -1252,6 +1253,39 @@ export function UxUiStudioEngine() {
   function selectLayer(id: string, multi = false) {
     setSelectedId(id);
     setSelectedIds((previous) => multi ? (previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]) : [id]);
+  }
+
+  function copySelectedLayers() {
+    const copied = selectedLayers.length ? selectedLayers : selected ? [selected] : [];
+    if (!copied.length) { setNotice("Select one or more layers to copy."); return; }
+    setClipboardLayers(copied.map((item) => ({ ...item })));
+    setNotice(copied.length + " layer(s) copied within this project.");
+  }
+
+  function cutSelectedLayers() {
+    const copied = selectedLayers.length ? selectedLayers : selected ? [selected] : [];
+    if (!copied.length) { setNotice("Select one or more layers to cut."); return; }
+    setClipboardLayers(copied.map((item) => ({ ...item })));
+    checkpoint();
+    setElements((previous) => previous.filter((item) => !copied.some((source) => source.id === item.id)));
+    setSelectedId(""); setSelectedIds([]);
+    setNotice(copied.length + " layer(s) cut. Paste to restore them on this screen.");
+  }
+
+  function pasteLayers() {
+    if (!clipboardLayers.length) { setNotice("Your local layer clipboard is empty."); return; }
+    const pasted = clipboardLayers.map((item) => ({
+      ...item, id: layerId(), name: item.name + " copy",
+      x: Math.min(Math.max(0, board.width - item.width), item.x + 16),
+      y: Math.min(Math.max(0, board.height - item.height), item.y + 16),
+      referenceWidth: board.width, referenceHeight: board.height,
+    }));
+    const ids = pasted.map((item) => item.id);
+    checkpoint();
+    setElements((previous) => [...previous, ...pasted]);
+    setSelectedId(ids[ids.length - 1] || "");
+    setSelectedIds(ids);
+    setNotice(pasted.length + " layer(s) pasted.");
   }
 
   function groupSelectedLayers() {
@@ -1814,6 +1848,9 @@ export function UxUiStudioEngine() {
               <div className="mt-3 border-t border-border pt-3">
                 <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-xs text-fg">Selection tools</strong><span className="text-[10px] text-muted">{selectedIds.length} selected · Shift+tap to add</span></div>
                 <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" onClick={copySelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Copy</button>
+                  <button type="button" onClick={cutSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Cut</button>
+                  <button type="button" onClick={pasteLayers} disabled={!clipboardLayers.length} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg disabled:opacity-40">Paste</button>
                   <button type="button" onClick={groupSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Group selection</button>
                   <button type="button" onClick={ungroupSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Ungroup selection</button>
                   {(["left","center","right","top","middle","bottom"] as const).map((edge)=><button key={edge} type="button" onClick={()=>alignSelectedLayers(edge)} disabled={selectedIds.length<2} className="rounded-md border border-border px-2 py-2 text-xs capitalize text-fg disabled:opacity-40">Align {edge}</button>)}
