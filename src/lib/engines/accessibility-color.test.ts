@@ -112,7 +112,7 @@ test("UX/UI Studio generated Web, Compose and SwiftUI handoff renders saved char
     tokens: { colors: [], typography: [], spacing: [] },
     elements: [{
       id: "chart-qa", kind: "chart", name: "Monthly activity", x: 10, y: 20, width: 300, height: 180,
-      text: "Monthly activity\\nJan: 36\\nFeb: 62",
+      text: "Monthly activity\nJan: 36\nFeb: 62",
       iconName: "", iconSvg: "", iconViewBox: "0 0 24 24", imageDataUrl: "",
       color: "#2563EB", background: "#FFFFFF", borderColor: "#E5E7EB", borderWidth: 1, radius: 8, padding: 8,
       marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
