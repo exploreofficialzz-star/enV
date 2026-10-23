@@ -129,7 +129,7 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            {!isFullscreen ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p> : null}
+            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>
           </div>
         </div>
         {!isFullscreen ? <Button
@@ -147,12 +147,12 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button> : null}
-        {!isFullscreen ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p> : null}
+        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
       </header>
 
 remove fallback error UI      {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {!isFullscreen && note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section className="mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6">
         {children}
       </section>
