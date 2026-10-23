@@ -148,7 +148,8 @@ export function ToolShell({
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note ? <p className="mt-3 text-sm t      <section
+      {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      <section
         ref={toolInterfaceRef}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
