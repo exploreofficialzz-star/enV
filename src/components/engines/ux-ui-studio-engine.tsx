@@ -1249,6 +1249,66 @@ export function UxUiStudioEngine() {
     setElements((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
+  function selectLayer(id: string, multi = false) {
+    setSelectedId(id);
+    setSelectedIds((previous) => multi ? (previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]) : [id]);
+  }
+
+  function groupSelectedLayers() {
+    const ids = selectedLayers.map((item) => item.id);
+    if (ids.length < 2) { setNotice("Select at least two layers (Shift+tap or Shift+click) before grouping."); return; }
+    checkpoint();
+    const groupId = "group-" + Date.now().toString(36);
+    setElements((previous) => previous.map((item) => ids.includes(item.id) ? { ...item, groupId } : item));
+    setNotice(ids.length + " layers grouped. Drag one grouped layer to move them together.");
+  }
+
+  function ungroupSelectedLayers() {
+    const ids = selectedLayers.map((item) => item.id);
+    if (!ids.length || !selectedLayers.some((item) => item.groupId)) { setNotice("Select one or more grouped layers first."); return; }
+    checkpoint();
+    setElements((previous) => previous.map((item) => ids.includes(item.id) ? { ...item, groupId: "" } : item));
+    setNotice("Selected layers ungrouped.");
+  }
+
+  function alignSelectedLayers(edge: "left" | "center" | "right" | "top" | "middle" | "bottom") {
+    if (selectedLayers.length < 2) { setNotice("Select at least two layers before aligning."); return; }
+    const left = Math.min(...selectedLayers.map((item) => item.x));
+    const top = Math.min(...selectedLayers.map((item) => item.y));
+    const right = Math.max(...selectedLayers.map((item) => item.x + item.width));
+    const bottom = Math.max(...selectedLayers.map((item) => item.y + item.height));
+    checkpoint();
+    const ids = selectedLayers.map((item) => item.id);
+    setElements((previous) => previous.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      const patch = edge === "left" ? { x: left } : edge === "center" ? { x: Math.round((left + right - item.width) / 2) } : edge === "right" ? { x: right - item.width } : edge === "top" ? { y: top } : edge === "middle" ? { y: Math.round((top + bottom - item.height) / 2) } : { y: bottom - item.height };
+      return { ...item, ...patch };
+    }));
+    setNotice("Aligned " + ids.length + " selected layers.");
+  }
+
+  function distributeSelectedLayers(axis: "horizontal" | "vertical") {
+    if (selectedLayers.length < 3) { setNotice("Select at least three layers before distributing."); return; }
+    const ordered = [...selectedLayers].sort((a, b) => axis === "horizontal" ? a.x - b.x : a.y - b.y);
+    const first = ordered[0], last = ordered[ordered.length - 1];
+    const extent = axis === "horizontal" ? last.x + last.width - first.x : last.y + last.height - first.y;
+    const total = ordered.reduce((sum, item) => sum + (axis === "horizontal" ? item.width : item.height), 0);
+    const gap = (extent - total) / Math.max(1, ordered.length - 1);
+    checkpoint();
+    let cursor = axis === "horizontal" ? first.x : first.y;
+    const positions = new Map<string, number>();
+    ordered.forEach((item, index) => {
+      positions.set(item.id, Math.round(cursor));
+      cursor += (axis === "horizontal" ? item.width : item.height) + (index === ordered.length - 1 ? 0 : gap);
+    });
+    setElements((previous) => previous.map((item) => {
+      const position = positions.get(item.id);
+      if (position === undefined) return item;
+      return axis === "horizontal" ? { ...item, x: position } : { ...item, y: position };
+    }));
+    setNotice("Distributed " + ordered.length + " layers " + axis + "ly.");
+  }
+
   function openToolkit(id: string) {
     const toolkit = STUDIO_TOOLKITS.find((item) => item.id === id);
     if (!toolkit) return;
