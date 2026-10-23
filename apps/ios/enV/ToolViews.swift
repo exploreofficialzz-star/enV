@@ -6705,6 +6705,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
     var rotation: Double = 0
+    var prototypeTargetScreenID: String = ""
 
     init(
         id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
@@ -6719,7 +6720,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         minWidth: Int = 0, maxWidth: Int = 0,
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
-        componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0
+        componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0,
+        prototypeTargetScreenID: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -6757,6 +6759,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
         self.rotation = rotation
+        self.prototypeTargetScreenID = prototypeTargetScreenID
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -6766,6 +6769,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         case fontFamily, fontSize, fontWeight, lineHeight
         case horizontalConstraint, verticalConstraint, minWidth, maxWidth, visibleOn
         case referenceWidth, referenceHeight, componentKey, iconViewBox, rotation
+        case prototypeTargetScreenID = "prototypeTargetScreenId"
     }
 
     init(from decoder: Decoder) throws {
@@ -6806,6 +6810,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         componentKey = try c.decodeIfPresent(String.self, forKey: .componentKey) ?? ""
         iconViewBox = try c.decodeIfPresent(String.self, forKey: .iconViewBox) ?? "0 0 24 24"
         rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
+        prototypeTargetScreenID = try c.decodeIfPresent(String.self, forKey: .prototypeTargetScreenID) ?? ""
     }
 }
 
@@ -7727,6 +7732,9 @@ private struct NativeUxUiStudioView: View {
     @State private var elements: [UxUiNativeLayer] = []
     @State private var screens: [UxUiNativeScreen] = [UxUiNativeScreen(id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [])]
     @State private var activeScreenID = "screen-home"
+    @State private var prototypePreview = false
+    @State private var prototypeHistory: [String] = []
+    @State private var prototypeStartScreenID = "screen-home"
     @State private var showScreenManager = false
     @State private var undoHistory: [[UxUiNativeLayer]] = []
     @State private var redoHistory: [[UxUiNativeLayer]] = []
@@ -7760,6 +7768,11 @@ private struct NativeUxUiStudioView: View {
     private var boardWidth: Int { customArtboard ? customWidth : defaultBoardWidth }
     private var boardHeight: Int { customArtboard ? customHeight : defaultBoardHeight }
     private var selectedIndex: Int? { elements.firstIndex(where: { $0.id == selectedID }) }
+    private var hasActivePrototypeLinks: Bool {
+        elements.contains { layer in
+            !layer.prototypeTargetScreenID.isEmpty && screens.contains { $0.id == layer.prototypeTargetScreenID }
+        }
+    }
 
     private func checkpoint() {
         undoHistory.append(elements)
@@ -8283,6 +8296,17 @@ private struct NativeUxUiStudioView: View {
                 Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 42) }
                     .disabled(redoHistory.isEmpty)
                     .accessibilityLabel("Redo")
+                if prototypePreview {
+                    Button { backPrototypePreview() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 42) }
+                        .disabled(prototypeHistory.isEmpty)
+                        .accessibilityLabel("Back in prototype preview")
+                    Button { stopPrototypePreview() } label: { Image(systemName: "xmark.circle").frame(width: 36, height: 42) }
+                        .accessibilityLabel("Exit prototype preview")
+                } else {
+                    Button { startPrototypePreview() } label: { Image(systemName: "play.rectangle").frame(width: 36, height: 42) }
+                        .disabled(!hasActivePrototypeLinks)
+                        .accessibilityLabel("Preview prototype")
+                }
                 Button { showScreenManager.toggle() } label: {
                     Image(systemName: "square.grid.2x2").font(.system(size: 17, weight: .semibold))
                         .frame(width: 38, height: 42).foregroundStyle(Color.envInk)
@@ -8331,25 +8355,33 @@ private struct NativeUxUiStudioView: View {
                         uxUiUIColor(background)
                         ForEach(elements.filter { $0.visibleOn.contains(target) }) { item in
                             let rendered = uxUiResolvedLayer(item, boardWidth: boardWidth, boardHeight: boardHeight)
-                            layerPreview(rendered, scale: scale)
-                                .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
-                                .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
-                                .onTapGesture { selectedID = item.id }
-                                .simultaneousGesture(
-                                    DragGesture(minimumDistance: 2)
-                                        .onChanged { value in
-                                            selectedID = item.id
-                                            if dragOrigins[item.id] == nil {
-                                                checkpoint()
-                                                dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
+                            if prototypePreview {
+                                layerPreview(rendered, scale: scale)
+                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { navigatePrototype(to: item.prototypeTargetScreenID) }
+                            } else {
+                                layerPreview(rendered, scale: scale)
+                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                    .onTapGesture { selectedID = item.id }
+                                    .simultaneousGesture(
+                                        DragGesture(minimumDistance: 2)
+                                            .onChanged { value in
+                                                selectedID = item.id
+                                                if dragOrigins[item.id] == nil {
+                                                    checkpoint()
+                                                    dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
+                                                }
+                                                guard let origin = dragOrigins[item.id],
+                                                      let index = elements.firstIndex(where: { $0.id == item.id }) else { return }
+                                                elements[index].x = max(0, Int((origin.x + value.translation.width / scale).rounded()))
+                                                elements[index].y = max(0, Int((origin.y + value.translation.height / scale).rounded()))
                                             }
-                                            guard let origin = dragOrigins[item.id],
-                                                  let index = elements.firstIndex(where: { $0.id == item.id }) else { return }
-                                            elements[index].x = max(0, Int((origin.x + value.translation.width / scale).rounded()))
-                                            elements[index].y = max(0, Int((origin.y + value.translation.height / scale).rounded()))
-                                        }
-                                        .onEnded { _ in dragOrigins[item.id] = nil }
-                                )
+                                            .onEnded { _ in dragOrigins[item.id] = nil }
+                                    )
+                            }
                         }
                     }
                     .frame(width: CGFloat(boardWidth) * scale, height: CGFloat(boardHeight) * scale, alignment: .topLeading)
@@ -8375,7 +8407,7 @@ private struct NativeUxUiStudioView: View {
                         }.offset(y: 32)
                     }
                 }
-                Text("Tap or drag to shape your design.")
+                Text(prototypePreview ? "Tap linked elements to navigate. Use Back to retrace the flow." : "Tap or drag to shape your design.")
                     .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
@@ -8616,7 +8648,7 @@ private struct NativeUxUiStudioView: View {
                                 case "responsive": showAdvancedCanvas = true
                                 case "projects": toolkitTab = "Presets"
                                 case "layers": showAllLayers = true
-                                case "prototype": notice = "Connected multi-screen prototype navigation and overlay playback are not implemented yet."
+                                case "prototype": showAdvancedInspector = selectedIndex != nil; notice = "Assign a layer destination with the selected-layer menu, then Preview prototype. Overlay interactions remain unsupported."
                                 case "content": addLayer("text"); if let index = elements.indices.last { elements[index].name = "Welcome heading"; elements[index].text = "Welcome back" }
                                 case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity" }
                                 case "patterns": addLayer("star"); if let index = elements.indices.last { elements[index].name = "Decorative star" }
@@ -8725,6 +8757,17 @@ private struct NativeUxUiStudioView: View {
     private func selectedElementToolbar(for index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+            Picker("On tap, navigate to", selection: Binding(
+                get: { elements[index].prototypeTargetScreenID },
+                set: { destination in checkpoint(); elements[index].prototypeTargetScreenID = destination }
+            )) {
+                Text("No navigation").tag("")
+                ForEach(screens.filter { $0.id != activeScreenID }) { screen in
+                    Text(screen.name).tag(screen.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("Prototype destination for \(elements[index].name)")
             HStack(alignment: .top, spacing: 12) {
                 VStack(spacing: 4) {
                     Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
@@ -9304,6 +9347,51 @@ private struct NativeUxUiStudioView: View {
         notice = "Opened \(screen.name)."
     }
 
+    private func startPrototypePreview() {
+        captureActiveScreen()
+        guard hasActivePrototypeLinks else {
+            activeToolkitID = "prototype"
+            showComponentPalette = true
+            notice = "Select a layer and assign a destination screen before previewing."
+            return
+        }
+        prototypeStartScreenID = activeScreenID
+        prototypeHistory = []
+        prototypePreview = true
+        selectedID = nil
+        showScreenManager = false
+        showComponentPalette = false
+        showAdvancedInspector = false
+        notice = "Prototype preview started. Tap linked elements to navigate."
+    }
+
+    private func navigatePrototype(to destinationID: String) {
+        guard !destinationID.isEmpty, destinationID != activeScreenID, screens.contains(where: { $0.id == destinationID }) else {
+            notice = "This element has no valid screen destination."
+            return
+        }
+        prototypeHistory.append(activeScreenID)
+        openAppScreen(destinationID)
+        selectedID = nil
+    }
+
+    private func backPrototypePreview() {
+        guard let previous = prototypeHistory.popLast() else { return }
+        openAppScreen(previous)
+        selectedID = nil
+    }
+
+    private func stopPrototypePreview() {
+        let start = prototypeStartScreenID
+        prototypePreview = false
+        prototypeHistory = []
+        if start != activeScreenID && screens.contains(where: { $0.id == start }) {
+            openAppScreen(start)
+        }
+        selectedID = nil
+        notice = "Returned to design editing."
+    }
+
     private func addAppScreen() {
         captureActiveScreen()
         let screen = UxUiNativeScreen(
@@ -9339,6 +9427,22 @@ private struct NativeUxUiStudioView: View {
         }
         if id == activeScreenID { captureActiveScreen() }
         screens.removeAll { $0.id == id }
+        screens = screens.map { screen in
+            var updated = screen
+            updated.elements = screen.elements.map { layer in
+                var copy = layer
+                if copy.prototypeTargetScreenID == id { copy.prototypeTargetScreenID = "" }
+                return copy
+            }
+            return updated
+        }
+        elements = elements.map { layer in
+            var copy = layer
+            if copy.prototypeTargetScreenID == id { copy.prototypeTargetScreenID = "" }
+            return copy
+        }
+        prototypeHistory.removeAll { $0 == id }
+        if prototypeStartScreenID == id { prototypeStartScreenID = activeScreenID }
         if id == activeScreenID, !screens.isEmpty {
             let nextIndex = min(max(0, index - 1), screens.count - 1)
             let next = screens[nextIndex]
@@ -9366,6 +9470,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func createNewProject() {
+        prototypePreview = false; prototypeHistory = []
         target = "mobile"
         customArtboard = false
         customWidth = 390
