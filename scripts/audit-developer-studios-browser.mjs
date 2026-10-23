@@ -46,6 +46,13 @@ try {
   }, { marker: [regexMarker, sampleMarker] });
   const page = await context.newPage();
   page.setDefaultTimeout(timeout);
+  let activeRouteDiagnostics = null;
+  page.on('pageerror', (error) => {
+    if (activeRouteDiagnostics) activeRouteDiagnostics.runtimeErrors.push(String(error?.stack || error?.message || error).slice(0, 900));
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error' && activeRouteDiagnostics) activeRouteDiagnostics.consoleErrors.push(message.text().slice(0, 900));
+  });
   page.on('request', (request) => {
     const candidate = `${request.url()}\n${request.postData() || ''}`;
     if ([regexMarker, sampleMarker].some((sentinel) => candidate.includes(sentinel))) {
@@ -64,7 +71,9 @@ try {
     throw new Error('Developer Studio did not become interactive before the browser audit deadline.');
   };
   for (const route of routes) {
-    const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [] };
+    const routeDiagnostics = { runtimeErrors: [], consoleErrors: [] };
+    activeRouteDiagnostics = routeDiagnostics;
+    const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [], browserDiagnostics: routeDiagnostics };
     try {
       await page.setViewportSize(report.viewport);
       await page.goto(`${baseUrl}${route.path}`, { waitUntil: 'domcontentloaded', timeout });
@@ -76,20 +85,69 @@ try {
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
         await page.locator('.uxui-device-mobile').waitFor({ state: 'visible', timeout });
+        // The sketch-first workspace hides the screen/layer inspector until explicitly opened.
+        await page.getByRole('button', { name: 'App screens and layers' }).click();
+        await page.getByLabel('Project name').waitFor({ state: 'visible', timeout });
         await page.getByLabel('Project name').fill('UX/UI Studio browser QA');
-        const [download] = await Promise.all([
-          page.waitForEvent('download'),
-          (async () => {
-            await page.getByRole('button', { name: 'Export', exact: true }).click();
-            await page.getByRole('button', { name: /React TSX/ }).click();
-          })(),
-        ]);
+        await page.getByRole('button', { name: 'Export', exact: true }).click();
+        const exportDialog = page.getByRole('dialog', { name: 'Export design handoff' });
+        await exportDialog.waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) });
+        const reactExport = page.getByRole('button', { name: 'React TSX', exact: true });
+        await reactExport.waitFor({ state: 'visible', timeout: Math.min(timeout, 5000) });
+        const downloadPromise = page.waitForEvent('download', { timeout: Math.min(timeout, 7000) }).catch(() => null);
+        await reactExport.click();
+        const download = await downloadPromise;
+        if (!download) {
+          const domState = await page.evaluate(() => ({
+            exportMenuText: document.querySelector('.uxui-export-menu')?.textContent?.slice(0, 700) || null,
+            reactTsxButtons: Array.from(document.querySelectorAll('button')).filter((button) => (button.getAttribute('aria-label') || button.textContent || '').includes('React TSX')).length,
+            downloadingAnchors: Array.from(document.querySelectorAll('a[download]')).map((anchor) => ({ filename: anchor.getAttribute('download'), attached: anchor.isConnected })),
+            notices: Array.from(document.querySelectorAll('[role="status"], [aria-live]')).map((node) => node.textContent?.slice(0, 300) || '').filter(Boolean).slice(0, 5),
+            hydrated: document.documentElement.dataset.envToolHydrated || null,
+          }));
+          throw new Error('React TSX export did not start a browser download. Diagnostics: ' + JSON.stringify({
+            ...domState,
+            runtimeErrors: routeDiagnostics.runtimeErrors,
+            consoleErrors: routeDiagnostics.consoleErrors,
+          }));
+        }
         const downloadPath = await download.path();
         const generatedSource = downloadPath ? await readFile(downloadPath, 'utf8') : '';
         routeReport.loaded = true;
         routeReport.actionWorked = download.suggestedFilename().endsWith('Design.tsx')
           && generatedSource.length > 100
           && generatedSource.includes('export default function') && generatedSource.includes('UX/UI Studio browser QA');
+
+        // Exercise the prototype interaction graph through the actual editor UI:
+        // add a layer, create a second screen, assign a tap destination, navigate,
+        // return with Back, then exit the preview.
+        await page.getByLabel('Add elements', { exact: true }).click();
+        await page.getByRole('tab', { name: 'Elements', exact: true }).click();
+        await page.getByRole('button', { name: /^Button\b/ }).click();
+        await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
+        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: 'Add app screen', exact: true }).click();
+        await page.getByRole('button', { name: 'Open Screen 1', exact: true }).click();
+        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: /Primary button/ }).first().click();
+        await page.getByRole('button', { name: 'Close app screens and layers', exact: true }).click();
+        await page.getByLabel('Add elements', { exact: true }).click();
+        await page.getByRole('tab', { name: 'All 26', exact: true }).click();
+        await page.getByRole('button', { name: /Prototype Studio/ }).click();
+        const destinationPicker = page.getByLabel('Prototype destination', { exact: true });
+        await destinationPicker.waitFor({ state: 'visible', timeout });
+        await destinationPicker.selectOption({ label: 'Screen 2' });
+        await page.getByRole('button', { name: 'Preview prototype', exact: true }).first().click();
+        const prototypeToolbar = page.locator('.uxui-prototype-toolbar');
+        await prototypeToolbar.waitFor({ state: 'visible', timeout });
+        await page.locator('.uxui-canvas-stage svg [data-layer-id]').first().click();
+        await page.waitForFunction(() => document.querySelector('.uxui-prototype-toolbar')?.textContent?.includes('Screen 2'), null, { timeout });
+        await prototypeToolbar.getByRole('button', { name: 'Back', exact: true }).click();
+        await page.waitForFunction(() => document.querySelector('.uxui-prototype-toolbar')?.textContent?.includes('Screen 1'), null, { timeout });
+        await prototypeToolbar.getByRole('button', { name: 'Exit preview', exact: true }).click();
+        await prototypeToolbar.waitFor({ state: 'hidden', timeout });
+        routeReport.prototypeNavigationWorked = true;
+        routeReport.actionWorked = routeReport.actionWorked && routeReport.prototypeNavigationWorked;
       } else {
         const primaryInput = route.kind === 'regex' ? page.getByLabel('Regular expression') : page.getByLabel('Input');
         await primaryInput.waitFor({ state: 'visible', timeout });

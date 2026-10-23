@@ -65,6 +65,11 @@ assert.match(webUx, /aria-label="Desktop"/, 'Desktop target control must stay na
 assert.match(webUx, /uxui-layer-chip/, 'Web editor must expose selectable visual layer chips');
 assert.match(webUx, /uxui-color-grid/, 'Web editor must expose the compact palette');
 assert.match(webUx, /Fine-tune design/, 'Exact measurements must remain available in the advanced inspector');
+assert.match(webUx, /uxui-mobile-controls/, 'Web Studio must provide a thumb-friendly mobile movement controller for selected layers');
+assert.match(webUx, /aria-label="Move selected element"/, 'Web movement controls must be accessibly labelled');
+assert.match(webUx, /Technical styling · CSS/, 'Web Studio must expose advanced CSS-oriented controls');
+assert.match(webUx, /:focus-visible fill/, 'Web Studio must expose focus-visible style controls');
+assert.match(uxStudioCss, /\.uxui-gamepad/, 'Mobile gamepad controls must have dedicated responsive styling');
 assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
 assert.match(uxStudioCss, /\.uxui-canvas-hint\s*\{[^}]*color:\s*#E4E7E4/i, 'Canvas hint text must remain readable against the dark device bezel');
@@ -72,6 +77,8 @@ assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a m
 assert.match(uxStudioCss, /\.uxui-device-tablet/, 'Tablet preview must use a tablet mockup');
 const androidUxStudio = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosUxStudio = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+assert.match(androidUxStudio, /Move · \$\{selectedElement\.name\}/, 'Android Studio must expose native selected-layer movement controls');
+assert.match(iosUxStudio, /Move selected element|Adjust selected element size and rotation/, 'iOS Studio must expose native selected-layer movement controls');
 assert.match(androidUxStudio, /var onboarding by remember\{mutableStateOf\(true\)\}/, 'Android native studio must open on the project home');
 assert.match(androidUxStudio, /val elements=remember\{mutableStateListOf<UxUiNativeLayer>\(\)\}/, 'Android new projects must start with no sample elements');
 assert.match(androidUxStudio, /Text\("New project"/, 'Android project home must provide a New project action');
@@ -86,5 +93,8 @@ assert.match(iosUxStudio, /showComponentPalette\.toggle\(\)/, 'iOS native tools 
 assert.match(iosUxStudio, /aspectRatio\(CGFloat\(boardWidth\) \/ CGFloat\(boardHeight\), contentMode: \.fit\)/, 'iOS preview must preserve target viewport ratio inside a mockup');
 assert.match(iosUxStudio, /DisclosureGroup\("Fine-tune design"/, 'iOS technical measurements must be behind simple visual controls');
 assert.match(iosUxStudio, /showAllLayers \? elements : Array\(elements\.prefix\(6\)\)/, 'iOS layer list must support a compact preview with see-more');
-console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF and layer metadata).');
+assert.match(webUx, /auditUxUiStudioTextContrast\(elements, background\)/, 'Web Design QA must report WCAG AA text contrast findings');
+assert.match(androidUxStudio, /NativeAccessibilityEngine\.contrastRatio\(e\.color,surface\)/, 'Android Design QA must report WCAG AA text contrast findings');
+assert.match(iosUxStudio, /NativeAccessibilityEngine\.contrastRatio\(foreground: item\.color, background: surface\)/, 'iOS Design QA must report WCAG AA text contrast findings');
+console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin editor/PDF, SwiftUI editor/PDF, layer metadata and text-contrast QA).');
 console.log(`Developer Studio platform parity: PASS (${web.size} Studios; ${[...web.values()].reduce((sum, modes) => sum + modes.length, 0)} Studio modes match across TypeScript, Kotlin, and Swift).`);

@@ -1,6 +1,5 @@
 package com.chastech.env
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.accessibility.enableAccessibilityChecks
+import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.test.filters.SdkSuppress
 import org.junit.Rule
 import org.junit.Test
@@ -21,13 +20,13 @@ class AccessibilityUiAuditTest {
 
     @Test
     fun primaryActionsExposeNamesAndSearchNavigationWorks() {
-        composeRule.onNodeWithContentDescription("Home").assertExists().assertIsEnabled()
-        composeRule.onNodeWithContentDescription("Saved tools").assertExists().assertIsEnabled()
-        composeRule.onNodeWithContentDescription("Tools").assertExists().assertIsEnabled()
-        composeRule.onNodeWithContentDescription("More options").assertExists().assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Home").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Saved tools").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Tools").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithContentDescription("More options").assertIsDisplayed().assertIsEnabled()
 
         composeRule.onNodeWithContentDescription("More options").performClick()
-        composeRule.onNodeWithText("Search tools").assertExists().performClick()
+        composeRule.onNodeWithText("Search tools").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Find a tool by name, category, or keyword.").assertIsDisplayed()
         composeRule.onNodeWithText("Start typing to see matching tools.").assertIsDisplayed()
     }

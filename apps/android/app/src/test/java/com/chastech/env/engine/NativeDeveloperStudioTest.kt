@@ -1,6 +1,7 @@
 package com.chastech.env.engine
 
 import com.chastech.env.data.EngineInfo
+import com.chastech.env.uxUiParseChartData
 import com.chastech.env.data.ToolRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,6 +20,15 @@ class NativeDeveloperStudioTest {
 
     private fun run(id: String, input: String, secondary: String = ""): String =
         NativeUtilityEngine.run(tool(id), input, """{"secondary":${JSONObject.quote(secondary)}}""").text
+
+    @Test fun uxUiStudioChartRowsAreParsedAndInvalidRowsReported() {
+        val chart = uxUiParseChartData("Monthly activity\nJan: 36\nFeb, 62.5\nMar=0\nBroken row\nApr: -3\nMay: 18")
+        assertEquals("Monthly activity", chart.title)
+        assertEquals(listOf("Jan", "Feb", "Mar", "May"), chart.points.map { it.label })
+        assertEquals(listOf(36.0, 62.5, 0.0, 18.0), chart.points.map { it.value })
+        assertEquals(2, chart.invalidRows)
+        assertTrue(uxUiParseChartData("Chart title\nNo numeric value").points.isEmpty())
+    }
 
     @Test fun cronEncoderDecoderAndHumanReportStayLocal() {
         assertEquals("Ki8xNSAqICogKiAq", run("cron-encoder", "*/15 * * * *"))

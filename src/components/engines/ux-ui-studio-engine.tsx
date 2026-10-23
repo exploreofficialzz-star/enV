@@ -1,4 +1,6 @@
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
+import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
+import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
@@ -8,7 +10,7 @@ import {
 } from "lucide-react";
 
 type DeviceTarget = "mobile" | "tablet" | "desktop";
-type PanelTab = "components" | "icons" | "fonts" | "presets" | "tokens";
+type PanelTab = "toolkits" | "components" | "icons" | "fonts" | "presets" | "tokens";
 type InspectorTab = "design" | "spec";
 type LayerKind = "text" | "button" | "card" | "input" | "image" | "icon" | "rect" | "ellipse" | "divider" | "navbar" | "tabbar" | "row" | "checkbox" | "avatar" | "badge" | "switch" | "toggle" | "progress" | "slider" | "radio" | "dropdown" | "search" | "textarea" | "table" | "chart" | "modal" | "breadcrumb" | "tooltip" | "list" | "video" | "logo" | "tabs" | "menu" | "spacer" | "triangle" | "diamond" | "hexagon" | "star" | "line" | "pill";
 type Align = "left" | "center" | "right";
@@ -27,6 +29,9 @@ type DesignLayer = {
   horizontalConstraint: HorizontalConstraint; verticalConstraint: VerticalConstraint;
   minWidth: number; maxWidth: number; visibleOn: DeviceTarget[];
   referenceWidth: number; referenceHeight: number; componentKey: string;
+  display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
+  hoverColor?: string; activeColor?: string; focusColor?: string;
+  hidden?: boolean; locked?: boolean; groupId?: string; prototypeTargetScreenId?: string;
 };
 
 type SavedProject = {
@@ -34,6 +39,14 @@ type SavedProject = {
   viewport: { width: number; height: number };
   breakpoints: { mobile: number; tablet: number; desktop: number };
   tokens: DesignTokens; reusableComponents: DesignLayer[];
+  elements: DesignLayer[]; updatedAt: string;
+  screens?: DesignScreen[]; activeScreenId?: string;
+  description?: string; category?: string; isFavorite?: boolean;
+};
+
+type DesignScreen = {
+  id: string; name: string; target: DeviceTarget; background: string;
+  customArtboard: boolean; customWidth: number; customHeight: number;
   elements: DesignLayer[]; updatedAt: string;
 };
 
@@ -101,6 +114,218 @@ const ICON_BROWSE_CATEGORIES: Array<{name:string;description:string;icons:string
   {name:"Shapes",description:"Geometric marks and decorative symbols",icons:["lucide:circle","tabler:circle","material-symbols:circle-rounded","mdi:circle-outline","lucide:square","tabler:square","material-symbols:square-rounded","mdi:square-outline","lucide:triangle","tabler:triangle","material-symbols:change-history-rounded","mdi:triangle-outline","lucide:star","tabler:star","material-symbols:star-rounded","mdi:star-outline","lucide:heart","tabler:heart","material-symbols:favorite-rounded","mdi:heart-outline","lucide:hexagon","tabler:hexagon","mdi:hexagon-outline","lucide:diamond","tabler:diamond","mdi:diamond-outline"]}
 ];
 const SWATCHES = ["#111827", "#374151", "#6B7280", "#F9FAFB", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2777", "#059669", "#D97706", "#DC2626", "#0F766E"];
+type StudioToolkit = { id: string; name: string; description: string; tab: PanelTab; icon: string; outcome: string };
+const STUDIO_TOOLKITS: StudioToolkit[] = [
+  {
+    "id": "icons",
+    "name": "Icon Studio",
+    "description": "Discover, customize, import and reuse vector icons.",
+    "tab": "icons",
+    "icon": "Shapes",
+    "outcome": "Search icon collections, select an icon, then customise its size, fill, padding, border, radius and shadow."
+  },
+  {
+    "id": "typography",
+    "name": "Typography Studio",
+    "description": "Build readable type systems and manage font assets.",
+    "tab": "fonts",
+    "icon": "Type",
+    "outcome": "Browse curated and remote fonts, preview families, import local files and embed supported font assets."
+  },
+  {
+    "id": "color",
+    "name": "Color Studio",
+    "description": "Manage accessible colors, palettes and interactive states.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Edit named color tokens, use the palette, apply foreground/fill values and inspect contrast in Design QA."
+  },
+  {
+    "id": "background",
+    "name": "Gradient & Background Studio",
+    "description": "Build backgrounds, gradient surfaces and decorative canvas treatments.",
+    "tab": "tokens",
+    "icon": "PanelsTopLeft",
+    "outcome": "Choose the canvas background, toggle the alignment grid, import image backgrounds and retain values in the project."
+  },
+  {
+    "id": "effects",
+    "name": "Effects Studio",
+    "description": "Tune elevation, borders, transparency and visual depth.",
+    "tab": "toolkits",
+    "icon": "Sparkles",
+    "outcome": "Select an object to adjust opacity, border, radius and shadow in visual controls; detailed values remain in Fine-tune design."
+  },
+  {
+    "id": "illustrations",
+    "name": "Illustration Studio",
+    "description": "Import, place and manage illustration assets.",
+    "tab": "components",
+    "icon": "Image",
+    "outcome": "Import SVGs or images to the artboard, then position, resize, rotate and style them as editable layers."
+  },
+  {
+    "id": "media",
+    "name": "Image & Media Studio",
+    "description": "Bring screenshots, photos, thumbnails and media assets into the mockup.",
+    "tab": "components",
+    "icon": "ImagePlus",
+    "outcome": "Import supported image assets, replace them on selected layers and export designs with embedded image data."
+  },
+  {
+    "id": "brand",
+    "name": "Brand Studio",
+    "description": "Keep brand colors, typography and reusable visual assets consistent.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Maintain named color/type tokens and reusable component templates; apply brand values to selected layers."
+  },
+  {
+    "id": "motion",
+    "name": "Motion Studio",
+    "description": "Control rotations, transitions and interaction-state appearance.",
+    "tab": "toolkits",
+    "icon": "RotateCw",
+    "outcome": "Adjust rotation and set CSS transition duration and hover/active/focus-visible fill values in Technical styling."
+  },
+  {
+    "id": "components",
+    "name": "UI Components, Kits & Patterns",
+    "description": "Create interface controls, cards, forms and navigation patterns.",
+    "tab": "components",
+    "icon": "LayoutTemplate",
+    "outcome": "Insert editable controls from the component library and save selected layers as reusable component templates."
+  },
+  {
+    "id": "device",
+    "name": "Device Mockup Studio",
+    "description": "Preview the screen inside mobile, tablet and desktop device frames.",
+    "tab": "toolkits",
+    "icon": "Smartphone",
+    "outcome": "Switch the preview target in the top bar; the device frame changes independently from screen elements."
+  },
+  {
+    "id": "responsive",
+    "name": "Responsive Design, Layout & Canvas",
+    "description": "Position, size and adapt designs across viewport sizes.",
+    "tab": "toolkits",
+    "icon": "Monitor",
+    "outcome": "Change target, zoom and grid; set custom canvas dimensions, anchors, min/max width and per-target visibility."
+  },
+  {
+    "id": "projects",
+    "name": "Screen & Project Manager",
+    "description": "Create projects, reopen drafts and export editable design files.",
+    "tab": "presets",
+    "icon": "Layers",
+    "outcome": "Use Projects to reopen drafts, import project JSON or start from responsive starter layouts."
+  },
+  {
+    "id": "layers",
+    "name": "Layers & Object Manager",
+    "description": "Select, reorder, duplicate and remove individual elements.",
+    "tab": "toolkits",
+    "icon": "Layers",
+    "outcome": "Select a layer, move it in the stack, duplicate or delete it, and inspect its saved object properties."
+  },
+  {
+    "id": "prototype",
+    "name": "Prototype Studio",
+    "description": "Prepare screen states and review interactive design behavior.",
+    "tab": "toolkits",
+    "icon": "ArrowRight",
+    "outcome": "Assign layer tap destinations, preview the multi-screen flow and retrace paths with Back."
+  },
+  {
+    "id": "design-system",
+    "name": "Design System Studio",
+    "description": "Manage reusable color, typography and spacing tokens.",
+    "tab": "tokens",
+    "icon": "Palette",
+    "outcome": "Edit named color tokens, type scales and spacing values saved with exported project specifications."
+  },
+  {
+    "id": "accessibility",
+    "name": "Accessibility Studio",
+    "description": "Review likely contrast, text-size, labeling and touch-target issues.",
+    "tab": "toolkits",
+    "icon": "CircleHelp",
+    "outcome": "Run the project check to surface potential issues; this report is advisory and does not claim full WCAG conformance."
+  },
+  {
+    "id": "content",
+    "name": "Content & Placeholder Studio",
+    "description": "Insert realistic headings, sample text, button labels and data.",
+    "tab": "toolkits",
+    "icon": "Type",
+    "outcome": "Add starter headings, body copy, CTA labels and sample elements to the artboard."
+  },
+  {
+    "id": "data-viz",
+    "name": "Data Visualization Studio",
+    "description": "Author numeric bar-chart data and preview the saved values in dashboards.",
+    "tab": "components",
+    "icon": "ChartNoAxesColumn",
+    "outcome": "Edit the title and Label: value rows; preview uses actual values and flags invalid rows."
+  },
+  {
+    "id": "patterns",
+    "name": "Patterns & Textures Studio",
+    "description": "Use grids, geometric shapes and decorative layers.",
+    "tab": "toolkits",
+    "icon": "Grid2X2",
+    "outcome": "Toggle the canvas grid or insert vector shapes and style their fills, opacity, radius and layering."
+  },
+  {
+    "id": "3d",
+    "name": "3D Studio",
+    "description": "Manage 3D asset references and design placeholders.",
+    "tab": "toolkits",
+    "icon": "Box",
+    "outcome": "Live GLB/GLTF rendering, lighting and camera manipulation are not yet available in this editor; imported rendered previews can be used instead."
+  },
+  {
+    "id": "platform",
+    "name": "Platform Design Kits",
+    "description": "Use mobile, tablet and desktop viewport conventions.",
+    "tab": "toolkits",
+    "icon": "Smartphone",
+    "outcome": "Select the viewport target and use responsive visibility and layout anchors for each design layer."
+  },
+  {
+    "id": "assets",
+    "name": "Asset Manager",
+    "description": "Import, replace and retain image and SVG assets.",
+    "tab": "components",
+    "icon": "ImagePlus",
+    "outcome": "Import and replace supported assets. Check source and licence metadata for third-party resources."
+  },
+  {
+    "id": "handoff",
+    "name": "Export & Design Handoff Studio",
+    "description": "Export a visual brief, exact project specification and source code.",
+    "tab": "toolkits",
+    "icon": "FileOutput",
+    "outcome": "Export PDF, JSON, HTML/CSS, React TSX, Kotlin or SwiftUI; generated source still requires target-app integration and build verification."
+  },
+  {
+    "id": "inspiration",
+    "name": "Inspiration & Reference Studio",
+    "description": "Collect reference assets for visual comparison.",
+    "tab": "toolkits",
+    "icon": "Search",
+    "outcome": "Import screenshots or references into the project and retain source notes before redistributing them."
+  },
+  {
+    "id": "qa",
+    "name": "Design QA Studio",
+    "description": "Check geometry, overlaps, missing assets and basic interaction readiness.",
+    "tab": "toolkits",
+    "icon": "Check",
+    "outcome": "Run the structural audit and review potential issues before handoff."
+  }
+];
+
 const COMPONENTS: Array<{ kind: LayerKind; label: string; description: string }> = [
   { kind: "text", label: "Text", description: "Heading or paragraph" },
   { kind: "button", label: "Button", description: "Primary action" },
@@ -167,6 +392,8 @@ function shapePoints(kind: string, x: number, y: number, width: number, height: 
   return points.join(" ");
 }
 
+function newScreenId(): string { return "screen-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7); }
+
 function layerId(): string {
   return "layer-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
@@ -187,6 +414,8 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     textAlign: "left", opacity: 1, shadow: false,
     horizontalConstraint: "left", verticalConstraint: "top", minWidth: 0, maxWidth: 0,
     visibleOn: ["mobile", "tablet", "desktop"], referenceWidth, referenceHeight, componentKey: "",
+    display: "flex", cursor: "default", zIndex: 1, transitionDuration: 180,
+    hoverColor: "", activeColor: "", focusColor: "", hidden: false, locked: false, groupId: "", prototypeTargetScreenId: "",
   };
   switch (kind) {
     case "text": return { ...shared, name: "Text", width: 250, height: 48, text: "Your heading", fontSize: 24, fontWeight: 700 };
@@ -209,7 +438,7 @@ function makeLayer(kind: LayerKind, x: number, y: number, referenceWidth = 390, 
     case "search": return { ...shared, name: "Search field", width: 280, height: 48, text: "Search…", background: "#FFFFFF", color: "#6B7280", borderColor: "#D1D5DB", borderWidth: 1, radius: 10, fontSize: 14 };
     case "textarea": return { ...shared, name: "Text area", width: 280, height: 96, text: "Enter your message", background: "#FFFFFF", color: "#6B7280", borderColor: "#D1D5DB", borderWidth: 1, radius: 10, fontSize: 14 };
     case "table": return { ...shared, name: "Data table", width: 320, height: 180, text: "Name           Status         Updated\nProject A      Active         Today\nProject B      Draft          Yesterday", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 12, padding: 14, fontSize: 12 };
-    case "chart": return { ...shared, name: "Bar chart", width: 300, height: 180, text: "Activity overview\nJan       Feb       Mar       Apr", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 14, padding: 14, fontSize: 13 };
+    case "chart": return { ...shared, name: "Bar chart", width: 300, height: 180, text: "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67", background: "#FFFFFF", color: "#111827", borderColor: "#E5E7EB", borderWidth: 1, radius: 14, padding: 14, fontSize: 13 };
     case "modal": return { ...shared, name: "Dialog panel", width: 310, height: 200, text: "Dialog title\n\nDescribe the action here.\n\nCancel          Confirm", background: "#FFFFFF", color: "#111827", borderColor: "#D1D5DB", borderWidth: 1, radius: 18, padding: 18, shadow: true, fontSize: 14 };
     case "breadcrumb": return { ...shared, name: "Breadcrumb trail", width: 300, height: 34, text: "Home / Workspace / Current", color: "#475569", fontSize: 12 };
     case "tooltip": return { ...shared, name: "Tooltip", width: 170, height: 38, text: "Helpful information", background: "#111827", color: "#FFFFFF", radius: 8, padding: 9, fontSize: 12 };
@@ -454,7 +683,22 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = url; anchor.download = filename; anchor.click();
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+
+  // Chromium-based browsers may ignore a download initiated from a detached
+  // anchor, particularly after a second-step action in a popover. Attach it to
+  // the live document for the user-initiated click, then remove it immediately.
+  document.body.appendChild(anchor);
+  try {
+    anchor.click();
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  } finally {
+    anchor.remove();
+  }
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -606,10 +850,18 @@ export function UxUiStudioEngine() {
   const [showToolsPanel, setShowToolsPanel] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [showMoreLayers, setShowMoreLayers] = useState(false);
+  const [showInspector, setShowInspector] = useState(false);
+  const [activeScreenId, setActiveScreenId] = useState("screen-home");
+  const [screens, setScreens] = useState<DesignScreen[]>([{ id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [], updatedAt: new Date().toISOString() }]);
+  const [prototypePreview, setPrototypePreview] = useState(false);
+  const [prototypeHistory, setPrototypeHistory] = useState<string[]>([]);
+  const [prototypeStartScreenId, setPrototypeStartScreenId] = useState("screen-home");
   const [paletteMode, setPaletteMode] = useState<"fill" | "text">("fill");
   const [helpOpen, setHelpOpen] = useState(false);
   const [savedProject, setSavedProject] = useState<SavedProject | null>(null);
   const [drafts, setDrafts] = useState<SavedProject[]>([]);
+  const [draftSearch, setDraftSearch] = useState("");
+  const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState("");
   const [projectName, setProjectName] = useState(initialDesign.name);
   const [background, setBackground] = useState(initialDesign.background);
@@ -624,11 +876,17 @@ export function UxUiStudioEngine() {
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
-  const [leftTab, setLeftTab] = useState<PanelTab>("icons");
+  const [leftTab, setLeftTab] = useState<PanelTab>("toolkits");
+  const [activeToolkitId, setActiveToolkitId] = useState("icons");
+  const [qaReport, setQaReport] = useState<string[]>([]);
+  const [showQaReport, setShowQaReport] = useState(false);
   const [toolkitSearch, setToolkitSearch] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTextEditor, setShowTextEditor] = useState(false);
   const [showContextColors, setShowContextColors] = useState(false);
+  const [showAdvancedContext, setShowAdvancedContext] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [clipboardLayers, setClipboardLayers] = useState<DesignLayer[]>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
   const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
@@ -657,10 +915,11 @@ export function UxUiStudioEngine() {
   const elementImportInputRef = useRef<HTMLInputElement | null>(null);
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
-  const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
+  const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const selected = elements.find((item) => item.id === selectedId) || null;
+  const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
   const fontChoices = useMemo(() => {
     const byFamily = new Map<string, FontLibraryItem>();
@@ -672,7 +931,20 @@ export function UxUiStudioEngine() {
     return Array.from(byFamily.values()).sort((a,b) => a.family.localeCompare(b.family));
   }, [remoteFonts]);
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
-  const project = useMemo(() => buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents]);
+  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents, screens, activeScreenId]);
+  const activeScreen = screens.find((screen) => screen.id === activeScreenId) || screens[0];
+  const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
+
+  useEffect(() => {
+    if (!activeScreenId) return;
+    setScreens((previous) => {
+      const current = previous.find((screen) => screen.id === activeScreenId);
+      if (!current) return previous;
+      if (current.elements === elements && current.name === (current.name || "Screen 1") && current.target === target && current.background === background && current.customArtboard === customArtboard && current.customWidth === customWidth && current.customHeight === customHeight) return previous;
+      const updated: DesignScreen = { ...current, elements, target, background, customArtboard, customWidth, customHeight, updatedAt: new Date().toISOString() };
+      return previous.map((screen) => screen.id === activeScreenId ? updated : screen);
+    });
+  }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
   const quickIconResults = (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons)
     .filter((name)=>iconPrefix==="all" || name.startsWith(iconPrefix+":"))
@@ -705,14 +977,48 @@ export function UxUiStudioEngine() {
             tokens: parsed.tokens || DEFAULT_TOKENS, breakpoints: parsed.breakpoints || DESIGN_BREAKPOINTS,
             reusableComponents: parsed.reusableComponents || [],
           } as SavedProject;
-          const merged = [normalized, ...storedDrafts.filter((item) => item.id !== normalized.id)]
+          const restoredScreens: DesignScreen[] = Array.isArray(parsed.screens) && parsed.screens.length
+            ? parsed.screens.filter((screen) => screen && typeof screen.id === "string" && Array.isArray(screen.elements)).map((screen) => ({
+                ...screen,
+                id: screen.id || newScreenId(),
+                name: typeof screen.name === "string" && screen.name.trim() ? screen.name : "Screen",
+                target: (["mobile", "tablet", "desktop"].includes(screen.target) ? screen.target : parsed.target) as DeviceTarget,
+                background: typeof screen.background === "string" ? screen.background : parsed.background,
+                customArtboard: Boolean(screen.customArtboard),
+                customWidth: Number.isFinite(screen.customWidth) ? Math.max(160, Math.min(4096, screen.customWidth)) : parsed.viewport.width,
+                customHeight: Number.isFinite(screen.customHeight) ? Math.max(240, Math.min(4096, screen.customHeight)) : parsed.viewport.height,
+                elements: screen.elements.map((layer: Partial<DesignLayer>) => ({
+                  ...layer, horizontalConstraint: layer.horizontalConstraint || "left",
+                  verticalConstraint: layer.verticalConstraint || "top", minWidth: layer.minWidth ?? 0,
+                  maxWidth: layer.maxWidth ?? 0, visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
+                  referenceWidth: layer.referenceWidth || parsed.viewport.width,
+                  referenceHeight: layer.referenceHeight || parsed.viewport.height,
+                  componentKey: layer.componentKey || "", fontDataUrl: layer.fontDataUrl || "", rotation: layer.rotation || 0,
+                } as DesignLayer)),
+                updatedAt: screen.updatedAt || parsed.updatedAt || new Date().toISOString(),
+              }))
+            : [{
+                id: "screen-home", name: "Screen 1", target: normalized.target, background: normalized.background,
+                customArtboard: true, customWidth: normalized.viewport.width, customHeight: normalized.viewport.height,
+                elements: normalized.elements, updatedAt: normalized.updatedAt || new Date().toISOString(),
+              }];
+          const initialScreen = restoredScreens.find((screen) => screen.id === parsed.activeScreenId) || restoredScreens[0];
+          const hydrated: SavedProject = {
+            ...normalized, screens: restoredScreens, activeScreenId: initialScreen.id,
+            target: initialScreen.target, background: initialScreen.background,
+            viewport: { width: initialScreen.customArtboard ? initialScreen.customWidth : boardSize(initialScreen.target).width,
+              height: initialScreen.customArtboard ? initialScreen.customHeight : boardSize(initialScreen.target).height },
+            elements: initialScreen.elements,
+          };
+          const merged = [hydrated, ...storedDrafts.filter((item) => item.id !== hydrated.id)]
             .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
           localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged));
-          setSavedProject(normalized); setDrafts(merged); setProjectName(normalized.name);
-          setTarget(normalized.target); setBackground(normalized.background); setCustomArtboard(true);
-          setCustomWidth(normalized.viewport.width); setCustomHeight(normalized.viewport.height);
-          setTokens(normalized.tokens); setReusableComponents(normalized.reusableComponents);
-          setElements(normalized.elements); setSelectedId(normalized.elements[0]?.id || "");
+          setSavedProject(hydrated); setDrafts(merged); setProjectName(hydrated.name);
+          setScreens(restoredScreens); setActiveScreenId(initialScreen.id);
+          setTarget(initialScreen.target); setBackground(initialScreen.background); setCustomArtboard(initialScreen.customArtboard);
+          setCustomWidth(initialScreen.customWidth); setCustomHeight(initialScreen.customHeight);
+          setTokens(hydrated.tokens); setReusableComponents(hydrated.reusableComponents);
+          setElements(initialScreen.elements); setSelectedId(initialScreen.elements[0]?.id || "");
         } else setDrafts(storedDrafts);
       } else setDrafts(storedDrafts);
     } catch { /* A corrupt local draft does not block the studio. */ }
@@ -720,10 +1026,15 @@ export function UxUiStudioEngine() {
   }, []);
 
   useEffect(() => {
-    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design")) return;
+    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design" && screens.length <= 1)) return;
     try {
       const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
-      const saved = { ...project, id: nextId } as SavedProject;
+      const saved = {
+        ...project, id: nextId,
+        description: savedProject?.description || "",
+        category: savedProject?.category || "Uncategorized",
+        isFavorite: savedProject?.isFavorite || false,
+      } as SavedProject;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
       const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) as unknown : [];
@@ -819,19 +1130,30 @@ export function UxUiStudioEngine() {
     setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
     setTarget(nextTarget); setProjectName(created.name); setBackground(created.background);
     setTokens(DEFAULT_TOKENS); setReusableComponents([]);
+    const nextScreenId = newScreenId();
+    setScreens([{ id: nextScreenId, name: "Screen 1", target: nextTarget, background: created.background, customArtboard: false, customWidth: size.width, customHeight: size.height, elements: created.elements, updatedAt: new Date().toISOString() }]);
+    setActiveScreenId(nextScreenId);
     setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
-    setUndoStack([]); setRedoStack([]); setLeftTab("icons"); setToolkitSearch("");
+    setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
     setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
-    setZoom(100); setActiveDraftId(""); setOnboarding(false);
+    setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
   }
 
   function continueSaved(draft: SavedProject | null = savedProject) {
     if (!draft) return;
-    setProjectName(draft.name); setTarget(draft.target); setBackground(draft.background);
-    setCustomArtboard(true); setCustomWidth(draft.viewport.width); setCustomHeight(draft.viewport.height);
+    const restoredScreens = draft.screens?.length ? draft.screens : [{
+      id: newScreenId(), name: "Screen 1", target: draft.target, background: draft.background,
+      customArtboard: true, customWidth: draft.viewport.width, customHeight: draft.viewport.height,
+      elements: draft.elements, updatedAt: draft.updatedAt,
+    }];
+    const currentScreen = restoredScreens.find((screen) => screen.id === draft.activeScreenId) || restoredScreens[0];
+    setScreens(restoredScreens);
+    setActiveScreenId(currentScreen.id);
+    setProjectName(draft.name); setTarget(currentScreen.target); setBackground(currentScreen.background);
+    setCustomArtboard(currentScreen.customArtboard); setCustomWidth(currentScreen.customWidth); setCustomHeight(currentScreen.customHeight);
     setTokens(draft.tokens || DEFAULT_TOKENS); setReusableComponents(draft.reusableComponents || []);
-    setElements(draft.elements.map((layer) => ({
+    setElements(currentScreen.elements.map((layer) => ({
       ...layer, horizontalConstraint: layer.horizontalConstraint || "left", verticalConstraint: layer.verticalConstraint || "top",
       minWidth: layer.minWidth ?? 0, maxWidth: layer.maxWidth ?? 0,
       visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
@@ -839,10 +1161,202 @@ export function UxUiStudioEngine() {
       referenceHeight: layer.referenceHeight || draft.viewport.height,
       componentKey: layer.componentKey || "", rotation: layer.rotation || 0,
     })));
-    setSelectedId(draft.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
-    setLeftTab("icons"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
+    setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
+    setSavedProject(draft);
+    setLeftTab("toolkits"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
     setNotice("Draft opened. Tap an element to continue designing.");
+  }
+
+  function commitDraftList(nextDrafts: SavedProject[]) {
+    const sorted = [...nextDrafts].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 100);
+    setDrafts(sorted);
+    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted)); }
+    catch { setNotice("Project changes could not be saved in this browser. Export project JSON as a backup."); }
+  }
+
+  function renameDraft(id: string, name: string) {
+    const normalized = name.trim().slice(0, 100);
+    if (!normalized) { setNotice("Project name cannot be empty."); return; }
+    const original = drafts.find((draft) => draft.id === id);
+    if (!original) return;
+    const renamed = { ...original, name: normalized, updatedAt: new Date().toISOString() };
+    commitDraftList(drafts.map((draft) => draft.id === id ? renamed : draft));
+    if (activeDraftId === id) { setProjectName(normalized); setSavedProject(renamed); }
+  }
+
+  function toggleDraftFavorite(id: string) {
+    const original = drafts.find((draft) => draft.id === id);
+    if (!original) return;
+    const updated = { ...original, isFavorite: !original.isFavorite, updatedAt: new Date().toISOString() };
+    commitDraftList(drafts.map((draft) => draft.id === id ? updated : draft));
+    if (activeDraftId === id) setSavedProject(updated);
+  }
+
+  function deleteDraft(id: string) {
+    const draft = drafts.find((item) => item.id === id);
+    if (!draft) return;
+    commitDraftList(drafts.filter((item) => item.id !== id));
+    try {
+      if (activeDraftId === id) {
+        localStorage.removeItem(STORAGE_KEY);
+        setActiveDraftId(""); setSavedProject(null);
+      }
+    } catch { setNotice("The project was removed from the list, but local storage cleanup failed."); }
+    setNotice("Deleted project: " + (draft.name || "Untitled design") + ".");
+  }
+
+  function duplicateDraft(id: string) {
+    const source = drafts.find((item) => item.id === id);
+    if (!source) return;
+    const sourceScreens = source.screens?.length ? source.screens : [{
+      id: "screen-home", name: "Screen 1", target: source.target, background: source.background,
+      customArtboard: true, customWidth: source.viewport.width, customHeight: source.viewport.height,
+      elements: source.elements, updatedAt: source.updatedAt,
+    }];
+    const screenCopies = sourceScreens.map((screen) => ({
+      ...screen, id: newScreenId(), name: screen.name + " copy",
+      elements: screen.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })),
+      updatedAt: new Date().toISOString(),
+    }));
+    const idNext = "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    const active = screenCopies[0];
+    const clone: SavedProject = {
+      ...source, id: idNext, name: (source.name || "Untitled design") + " copy",
+      screens: screenCopies, activeScreenId: active.id, target: active.target, background: active.background,
+      viewport: { width: active.customArtboard ? active.customWidth : boardSize(active.target).width,
+        height: active.customArtboard ? active.customHeight : boardSize(active.target).height },
+      elements: active.elements, isFavorite: false, updatedAt: new Date().toISOString(),
+    };
+    commitDraftList([clone, ...drafts]);
+    setNotice("Duplicated project: " + clone.name + ".");
+  }
+
+  function activeScreenSnapshot(): DesignScreen {
+    const current = screens.find((screen) => screen.id === activeScreenId);
+    return { id: activeScreenId || newScreenId(), name: current?.name || ("Screen " + (screens.length || 1)), target, background, customArtboard, customWidth, customHeight, elements, updatedAt: new Date().toISOString() };
+  }
+
+  function openScreen(screenId: string) {
+    if (screenId === activeScreenId) return;
+    const next = screens.find((screen) => screen.id === screenId);
+    if (!next) return;
+    const current = activeScreenSnapshot();
+    checkpoint();
+    setScreens((previous) => previous.map((screen) => screen.id === current.id ? current : screen));
+    setActiveScreenId(next.id);
+    setTarget(next.target); setBackground(next.background);
+    setCustomArtboard(next.customArtboard); setCustomWidth(next.customWidth); setCustomHeight(next.customHeight);
+    setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+    setShowInspector(false); setNotice("Opened " + next.name + ".");
+  }
+
+  function startPrototypePreview() {
+    const hasValidLink = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
+    if (!hasValidLink) {
+      setNotice("Assign a selected layer to another screen in Prototype Studio before previewing.");
+      setShowToolsPanel(true);
+      setActiveToolkitId("prototype");
+      return;
+    }
+    const current = activeScreenSnapshot();
+    setScreens((previous) => previous.map((screen) => screen.id === current.id ? current : screen));
+    setPrototypeStartScreenId(activeScreenId);
+    setPrototypeHistory([]);
+    setPrototypePreview(true);
+    setSelectedId("");
+    setShowInspector(false); setShowToolsPanel(false); setShowExportPanel(false);
+    setShowTextEditor(false); setShowContextColors(false); setShowAdvancedContext(false);
+    setNotice("Prototype preview started. Tap an element with a screen destination to navigate.");
+  }
+
+  function navigatePrototype(screenId: string, recordHistory = true) {
+    if (!screens.some((screen) => screen.id === screenId)) {
+      setNotice("That prototype destination is no longer available.");
+      return;
+    }
+    if (recordHistory) setPrototypeHistory((previous) => [...previous, activeScreenId]);
+    openScreen(screenId);
+    setSelectedId("");
+  }
+
+  function backPrototypePreview() {
+    const previousScreen = prototypeHistory[prototypeHistory.length - 1];
+    if (!previousScreen) return;
+    setPrototypeHistory((previous) => previous.slice(0, -1));
+    navigatePrototype(previousScreen, false);
+  }
+
+  function stopPrototypePreview() {
+    const startScreen = prototypeStartScreenId;
+    setPrototypePreview(false);
+    setPrototypeHistory([]);
+    if (startScreen !== activeScreenId && screens.some((screen) => screen.id === startScreen)) openScreen(startScreen);
+    setSelectedId("");
+    setNotice("Returned to design editing.");
+  }
+
+  function addScreen() {
+    const current = activeScreenSnapshot();
+    const id = newScreenId();
+    const next: DesignScreen = { ...current, id, name: "Screen " + (screens.length + 1), elements: [], updatedAt: new Date().toISOString() };
+    setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), next]);
+    setActiveScreenId(id); setElements([]); setSelectedId("");
+    setUndoStack([]); setRedoStack([]); setShowInspector(true);
+    setNotice(next.name + " added. Add elements to design this screen.");
+  }
+
+  function duplicateScreen(screenId: string) {
+    const source = screens.find((screen) => screen.id === screenId);
+    if (!source) return;
+    const duplicate: DesignScreen = { ...source, id: newScreenId(), name: source.name + " copy", elements: source.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })), updatedAt: new Date().toISOString() };
+    const current = activeScreenSnapshot();
+    setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), duplicate]);
+    setActiveScreenId(duplicate.id); setTarget(duplicate.target); setBackground(duplicate.background);
+    setCustomArtboard(duplicate.customArtboard); setCustomWidth(duplicate.customWidth); setCustomHeight(duplicate.customHeight);
+    setElements(duplicate.elements); setSelectedId(duplicate.elements[0]?.id || "");
+    setShowInspector(true); setNotice(duplicate.name + " duplicated.");
+  }
+
+  function deleteScreen(screenId: string) {
+    if (screens.length <= 1) { setNotice("A project must keep at least one screen."); return; }
+    const current = activeScreenSnapshot();
+    const source = screens.map((screen) => screen.id === current.id ? current : screen);
+    const index = source.findIndex((screen) => screen.id === screenId);
+    if (index < 0) return;
+    const remaining = source.filter((screen) => screen.id !== screenId).map((screen) => ({
+      ...screen,
+      elements: screen.elements.map((layer) => layer.prototypeTargetScreenId === screenId ? { ...layer, prototypeTargetScreenId: "" } : layer),
+    }));
+    if (screenId === activeScreenId) {
+      const next = remaining[Math.max(0, index - 1)];
+      if (prototypeStartScreenId === screenId) setPrototypeStartScreenId(next.id);
+      setScreens(remaining); setActiveScreenId(next.id);
+      setTarget(next.target); setBackground(next.background); setCustomArtboard(next.customArtboard);
+      setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+    } else {
+      setScreens(remaining);
+      const updatedActive = remaining.find((screen) => screen.id === activeScreenId);
+      if (updatedActive) setElements(updatedActive.elements);
+      if (screenId === prototypeStartScreenId) setPrototypeStartScreenId(activeScreenId);
+    }
+    setPrototypeHistory((previous) => previous.filter((id) => id !== screenId));
+    setNotice("Screen deleted. Any links to it were cleared.");
+  }
+
+  function reorderScreen(screenId: string, offset: number) {
+    const current = activeScreenSnapshot();
+    const source = screens.map((screen) => screen.id === current.id ? current : screen);
+    const index = source.findIndex((screen) => screen.id === screenId);
+    const destination = index + offset;
+    if (index < 0 || destination < 0 || destination >= source.length) return;
+    const next = [...source];
+    [next[index], next[destination]] = [next[destination], next[index]];
+    setScreens(next);
+  }
+
+  function renameScreen(screenId: string, name: string) {
+    setScreens((previous) => previous.map((screen) => screen.id === screenId ? { ...screen, name: name.slice(0, 70), updatedAt: new Date().toISOString() } : screen));
   }
 
   function checkpoint() {
@@ -887,6 +1401,140 @@ export function UxUiStudioEngine() {
     setElements((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
+  function selectLayer(id: string, multi = false) {
+    setSelectedId(id);
+    setSelectedIds((previous) => multi ? (previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]) : [id]);
+  }
+
+  function copySelectedLayers() {
+    const copied = selectedLayers.length ? selectedLayers : selected ? [selected] : [];
+    if (!copied.length) { setNotice("Select one or more layers to copy."); return; }
+    setClipboardLayers(copied.map((item) => ({ ...item })));
+    setNotice(copied.length + " layer(s) copied within this project.");
+  }
+
+  function cutSelectedLayers() {
+    const copied = selectedLayers.length ? selectedLayers : selected ? [selected] : [];
+    if (!copied.length) { setNotice("Select one or more layers to cut."); return; }
+    setClipboardLayers(copied.map((item) => ({ ...item })));
+    checkpoint();
+    setElements((previous) => previous.filter((item) => !copied.some((source) => source.id === item.id)));
+    setSelectedId(""); setSelectedIds([]);
+    setNotice(copied.length + " layer(s) cut. Paste to restore them on this screen.");
+  }
+
+  function pasteLayers() {
+    if (!clipboardLayers.length) { setNotice("Your local layer clipboard is empty."); return; }
+    const pasted = clipboardLayers.map((item) => ({
+      ...item, id: layerId(), name: item.name + " copy",
+      x: Math.min(Math.max(0, board.width - item.width), item.x + 16),
+      y: Math.min(Math.max(0, board.height - item.height), item.y + 16),
+      referenceWidth: board.width, referenceHeight: board.height,
+    }));
+    const ids = pasted.map((item) => item.id);
+    checkpoint();
+    setElements((previous) => [...previous, ...pasted]);
+    setSelectedId(ids[ids.length - 1] || "");
+    setSelectedIds(ids);
+    setNotice(pasted.length + " layer(s) pasted.");
+  }
+
+  function groupSelectedLayers() {
+    const ids = selectedLayers.map((item) => item.id);
+    if (ids.length < 2) { setNotice("Select at least two layers (Shift+tap or Shift+click) before grouping."); return; }
+    checkpoint();
+    const groupId = "group-" + Date.now().toString(36);
+    setElements((previous) => previous.map((item) => ids.includes(item.id) ? { ...item, groupId } : item));
+    setNotice(ids.length + " layers grouped. Drag one grouped layer to move them together.");
+  }
+
+  function ungroupSelectedLayers() {
+    const ids = selectedLayers.map((item) => item.id);
+    if (!ids.length || !selectedLayers.some((item) => item.groupId)) { setNotice("Select one or more grouped layers first."); return; }
+    checkpoint();
+    setElements((previous) => previous.map((item) => ids.includes(item.id) ? { ...item, groupId: "" } : item));
+    setNotice("Selected layers ungrouped.");
+  }
+
+  function alignSelectedLayers(edge: "left" | "center" | "right" | "top" | "middle" | "bottom") {
+    if (selectedLayers.length < 2) { setNotice("Select at least two layers before aligning."); return; }
+    const left = Math.min(...selectedLayers.map((item) => item.x));
+    const top = Math.min(...selectedLayers.map((item) => item.y));
+    const right = Math.max(...selectedLayers.map((item) => item.x + item.width));
+    const bottom = Math.max(...selectedLayers.map((item) => item.y + item.height));
+    checkpoint();
+    const ids = selectedLayers.map((item) => item.id);
+    setElements((previous) => previous.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      const patch = edge === "left" ? { x: left } : edge === "center" ? { x: Math.round((left + right - item.width) / 2) } : edge === "right" ? { x: right - item.width } : edge === "top" ? { y: top } : edge === "middle" ? { y: Math.round((top + bottom - item.height) / 2) } : { y: bottom - item.height };
+      return { ...item, ...patch };
+    }));
+    setNotice("Aligned " + ids.length + " selected layers.");
+  }
+
+  function distributeSelectedLayers(axis: "horizontal" | "vertical") {
+    if (selectedLayers.length < 3) { setNotice("Select at least three layers before distributing."); return; }
+    const ordered = [...selectedLayers].sort((a, b) => axis === "horizontal" ? a.x - b.x : a.y - b.y);
+    const first = ordered[0], last = ordered[ordered.length - 1];
+    const extent = axis === "horizontal" ? last.x + last.width - first.x : last.y + last.height - first.y;
+    const total = ordered.reduce((sum, item) => sum + (axis === "horizontal" ? item.width : item.height), 0);
+    const gap = (extent - total) / Math.max(1, ordered.length - 1);
+    checkpoint();
+    let cursor = axis === "horizontal" ? first.x : first.y;
+    const positions = new Map<string, number>();
+    ordered.forEach((item, index) => {
+      positions.set(item.id, Math.round(cursor));
+      cursor += (axis === "horizontal" ? item.width : item.height) + (index === ordered.length - 1 ? 0 : gap);
+    });
+    setElements((previous) => previous.map((item) => {
+      const position = positions.get(item.id);
+      if (position === undefined) return item;
+      return axis === "horizontal" ? { ...item, x: position } : { ...item, y: position };
+    }));
+    setNotice("Distributed " + ordered.length + " layers " + axis + "ly.");
+  }
+
+  function openToolkit(id: string) {
+    const toolkit = STUDIO_TOOLKITS.find((item) => item.id === id);
+    if (!toolkit) return;
+    setActiveToolkitId(id);
+    setLeftTab(toolkit.tab);
+    if (["media", "illustrations", "assets", "inspiration"].includes(id)) setNotice("Use the import actions to bring a supported image or SVG into the project.");
+    if (id === "device" || id === "platform") setNotice("Choose Mobile, Tablet or Desktop using the viewport selector above the mockup.");
+  }
+
+  function runDesignAudit() {
+    const findings: string[] = [];
+    if (!elements.length) findings.push("No layers have been added yet.");
+    for (const item of elements) {
+      if (!item.name.trim()) findings.push("Unnamed layer: " + item.id);
+      if (item.x < 0 || item.y < 0 || item.x + item.width > board.width || item.y + item.height > board.height) findings.push(item.name + ": extends beyond the current artboard.");
+      if (item.width < 44 || item.height < 44) findings.push(item.name + ": may be smaller than a comfortable touch target.");
+      if (item.kind === "icon" && !item.iconSvg.trim()) findings.push(item.name + ": icon SVG content is missing.");
+      if (item.kind === "image" && !item.imageDataUrl.trim()) findings.push(item.name + ": image source is missing.");
+      if (["text","button","input","search","textarea"].includes(item.kind) && item.fontSize < 14) findings.push(item.name + ": text is below 14 px; verify readability and scaling.");
+      if (item.borderWidth > 0 && (!item.borderColor || item.borderColor === "transparent")) findings.push(item.name + ": border width is set but the border color is transparent.");
+    }
+    for (let i = 0; i < elements.length; i++) for (let j = i + 1; j < elements.length; j++) {
+      const a = elements[i], b = elements[j];
+      const overlapWidth = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapHeight = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      if (overlapWidth > 0 && overlapHeight > 0) findings.push(a.name + " overlaps " + b.name + " by " + Math.round(overlapWidth) + "×" + Math.round(overlapHeight) + " px.");
+    }
+    findings.push(...auditUxUiStudioTextContrast(elements, background));
+    setQaReport(findings);
+    setShowQaReport(true);
+    setNotice("Design QA completed: " + findings.length + " potential finding(s). Solid-color text contrast is included; gradients, images and complex rendered overlaps still need manual review. This is advisory, not conformance certification.");
+  }
+
+  function addSample(kind: LayerKind, name: string, copy: string) {
+    const layer = { ...makeLayer(kind, Math.max(8, Math.round(board.width * 0.08)), Math.max(24, Math.round(board.height * 0.16) + elements.length * 74), board.width, board.height), name, text: copy, width: Math.min(kind === "text" ? board.width - 24 : 240, board.width - 24) };
+    checkpoint();
+    setElements((previous) => [...previous, layer]);
+    setSelectedId(layer.id);
+    setInspectorTab("design");
+    setNotice(name + " added to the artboard.");
+  }
   function addLayer(kind: LayerKind) {
     const x = Math.max(8, Math.round((board.width - Math.min(kind === "text" ? 250 : 180, board.width - 24)) / 2));
     const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)), board.width, board.height);
@@ -942,22 +1590,37 @@ export function UxUiStudioEngine() {
     const step = event.shiftKey ? 1 : 4;
     const nextX = Math.max(0, Math.min(board.width - 1, Math.round((drag.startX + dx) / step) * step));
     const nextY = Math.max(0, Math.min(board.height - 1, Math.round((drag.startY + dy) / step) * step));
-    updateLayer(drag.id, { x: nextX, y: nextY }, false);
+    const starts = drag.groupStarts?.length ? drag.groupStarts : [{ id: drag.id, x: drag.startX, y: drag.startY }];
+    setElements((previous) => previous.map((item) => {
+      const origin = starts.find((start) => start.id === item.id);
+      return origin ? { ...item, x: Math.max(0, Math.min(board.width - item.width, origin.x + nextX - drag.startX)), y: Math.max(0, Math.min(board.height - item.height, origin.y + nextY - drag.startY)) } : item;
+    }));
   }
 
   function onArtboardPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     const node = (event.target as Element).closest("[data-layer-id]");
     const id = node?.getAttribute("data-layer-id");
+    if (prototypePreview) {
+      event.preventDefault();
+      dragRef.current = null;
+      if (!id) return;
+      const destination = elements.find((item) => item.id === id)?.prototypeTargetScreenId || "";
+      if (destination && destination !== activeScreenId && screens.some((screen) => screen.id === destination)) navigatePrototype(destination);
+      else setNotice("This element has no valid screen destination. Exit preview to assign one in Prototype Studio.");
+      return;
+    }
     if (!id) { setSelectedId(""); return; }
     const found = elements.find((item) => item.id === id);
     if (!found) return;
-    setSelectedId(id);
+    selectLayer(id, event.shiftKey);
+    if (found.locked || found.hidden || found.display === "none") { dragRef.current = null; return; }
     checkpoint();
     const rect = event.currentTarget.getBoundingClientRect();
+    const groupStarts = found.groupId ? elements.filter((item) => item.groupId === found.groupId).map((item) => ({ id: item.id, x: item.x, y: item.y })) : [{ id: found.id, x: found.x, y: found.y }];
     dragRef.current = {
       id, pointerX: (event.clientX - rect.left) * board.width / Math.max(1, rect.width),
       pointerY: (event.clientY - rect.top) * board.height / Math.max(1, rect.height),
-      startX: found.x, startY: found.y,
+      startX: found.x, startY: found.y, groupStarts,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -1210,13 +1873,24 @@ export function UxUiStudioEngine() {
           </button>
         </div>
         <section className="uxui-drafts space-y-3" aria-labelledby="uxui-drafts-title">
-          <div className="flex items-center justify-between gap-3"><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " draft" : " drafts") : ""}</span></div>
-          {drafts.length ? <div className="grid gap-2 sm:grid-cols-2">
-            {drafts.map((draft, index) => <button key={draft.id || draft.name + index} type="button" onClick={() => continueSaved(draft)} className="uxui-draft-card flex min-w-0 items-center gap-3 rounded-xl border border-border p-3 text-left transition hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent">
-              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
-              <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.elements.length ? draft.elements.length + " design elements" : "Blank canvas"} · {draft.target}</span></span>
-              <ArrowRight size={17} className="shrink-0 text-muted" />
-            </button>)}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Projects & drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " project" : " projects") : "Projects are stored locally in this browser"}</span></div>
+            <div className="flex min-w-0 gap-2"><input type="search" aria-label="Search projects" placeholder="Search projects…" value={draftSearch} onChange={(event)=>setDraftSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg"/><button type="button" onClick={()=>setDraftFavoritesOnly((value)=>!value)} aria-pressed={draftFavoritesOnly} className={"rounded-lg border px-3 py-2 text-xs font-semibold " + (draftFavoritesOnly ? "border-accent bg-accent/10 text-accent" : "border-border text-fg")}>{draftFavoritesOnly ? "★ Favorites" : "☆ Favorites"}</button></div>
+          </div>
+          {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).length ? <div className="grid gap-3 sm:grid-cols-2">
+            {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).map((draft, index) => <article key={draft.id || draft.name + index} className="uxui-draft-card min-w-0 rounded-xl border border-border p-3 transition hover:border-accent">
+              <button type="button" onClick={() => continueSaved(draft)} className="flex w-full min-w-0 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-accent">
+                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
+                <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.screens?.length || 1} {((draft.screens?.length || 1)===1?"screen":"screens")} · {draft.elements.length} layers · {draft.target}</span><span className="mt-1 block truncate text-[10px] text-muted">{draft.description || "No project description"}</span></span>
+                <ArrowRight size={17} className="shrink-0 text-muted" />
+              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                <label className="min-w-0 flex-1"><span className="sr-only">Rename project {draft.name}</span><input aria-label={"Rename project "+draft.name} value={draft.name || ""} maxLength={100} onChange={(event)=>setDrafts((previous)=>previous.map((item)=>item.id===draft.id?{...item,name:event.target.value}:item))} onBlur={(event)=>renameDraft(draft.id || "",event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"){event.currentTarget.blur();}}} className="w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg"/></label>
+                <button type="button" aria-label={(draft.isFavorite?"Remove favorite ":"Add favorite ")+draft.name} aria-pressed={!!draft.isFavorite} onClick={()=>toggleDraftFavorite(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">{draft.isFavorite ? "★" : "☆"}</button>
+                <button type="button" onClick={()=>duplicateDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">Duplicate</button>
+                <button type="button" onClick={()=>deleteDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-red-600">Delete</button>
+              </div>
+            </article>)}
           </div> : <div className="uxui-empty-drafts rounded-xl border border-border px-5 py-8 text-center">
             <span className="mx-auto grid size-12 place-items-center rounded-full bg-surface-2 text-muted"><Layers size={22} /></span>
             <p className="mt-3 text-sm font-semibold text-fg">No drafts yet</p>
@@ -1241,7 +1915,7 @@ export function UxUiStudioEngine() {
           <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
           <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
           <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
-          <button type="button" onClick={() => setShowExportPanel((value) => !value)} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
+          <button type="button" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
           <button type="button" onClick={() => { setOnboarding(true); setIsExpanded(false); setShowToolsPanel(false); }} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
         </div>
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
@@ -1255,14 +1929,61 @@ export function UxUiStudioEngine() {
         </div>}
       </header>
 
+      {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
+        <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
+        <div>
+          <button type="button" onClick={backPrototypePreview} disabled={prototypeHistory.length === 0}>Back</button>
+          <button type="button" onClick={stopPrototypePreview}>Exit preview</button>
+        </div>
+      </div>}
       <div className="uxui-workspace grid min-w-0 gap-3">
         {showToolsPanel && <aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3">
           <div className="uxui-drawer-heading"><span>Studio toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
           <div className="uxui-toolkit-search"><Search size={16} /><input aria-label="Search studio toolkit" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search tools, fonts, icons…" /></div>
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio toolkit categories">
-            {([{ id: "icons", label: "Icons" }, { id: "components", label: "Elements" }, { id: "presets", label: "Presets" }, { id: "fonts", label: "Fonts" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}>{tab.label}</button>)}
+            {([{ id: "toolkits", label: "All 26" }, { id: "icons", label: "Icons" }, { id: "components", label: "Elements" }, { id: "presets", label: "Presets" }, { id: "fonts", label: "Fonts" }, { id: "tokens", label: "Tokens" }] as Array<{id:PanelTab;label:string}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}>{tab.label}</button>)}
           </div>
 
+          {leftTab === "toolkits" && <div className="mt-3 space-y-3">
+            <div className="rounded-xl border border-border bg-surface-2 p-3">
+              <strong className="text-sm text-fg">All 26 Studio toolkits</strong>
+              <p className="mt-1 text-xs leading-5 text-muted">Open a toolkit to reach existing controls or use its direct actions. Features that need a separate engine are explicitly identified instead of being displayed as working placeholders.</p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-card rounded-lg border p-3 text-left transition " + (activeToolkitId === toolkit.id ? "border-accent bg-accent/10" : "border-border hover:border-accent hover:bg-surface-2")} aria-pressed={activeToolkitId === toolkit.id}><span className="block text-xs font-bold text-fg">{toolkit.name}</span><span className="mt-1 block text-[10px] leading-4 text-muted">{toolkit.description}</span><span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-accent">{toolkit.tab === "toolkits" ? "Open toolkit actions" : "Open connected controls"} <ArrowRight size={11} /></span></button>) }
+              </div>
+            </div>
+            {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
+              <h3 className="text-sm font-extrabold text-fg">{toolkit.name}</h3><p className="mt-1 text-xs leading-5 text-muted">{toolkit.outcome}</p>
+              {toolkit.tab !== "toolkits" && <button type="button" onClick={() => setLeftTab(toolkit.tab)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-bold text-white">Open connected controls <ArrowRight size={14} /></button>}
+              {["effects","motion"].includes(toolkit.id) && <div className="mt-3 space-y-2">{selected ? <><label className="block text-[11px] font-semibold text-muted">Opacity · {Math.round(selected.opacity*100)}%<input type="range" min="0" max="1" step=".05" value={selected.opacity} onChange={(event)=>updateLayer(selected.id,{opacity:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="block text-[11px] font-semibold text-muted">Rotation · {selected.rotation || 0}°<input type="range" min="-180" max="180" step="5" value={selected.rotation || 0} onChange={(event)=>updateLayer(selected.id,{rotation:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="flex items-center justify-between gap-2 text-xs text-fg">Shadow <input type="checkbox" checked={selected.shadow} onChange={(event)=>updateLayer(selected.id,{shadow:event.target.checked})}/></label><label className="block text-[11px] font-semibold text-muted">Transition · {selected.transitionDuration ?? 180} ms<input type="range" min="0" max="2000" step="25" value={selected.transitionDuration ?? 180} onChange={(event)=>updateLayer(selected.id,{transitionDuration:Number(event.target.value)})} className="mt-1 w-full"/></label></> : <p className="text-xs text-muted">Select an element on the mockup first.</p>}</div>}
+              {toolkit.id === "content" && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>addSample("text","Welcome heading","Welcome back")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add heading</button><button type="button" onClick={()=>addSample("text","Sample paragraph","Your projects, all in one place.")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add paragraph</button><button type="button" onClick={()=>addSample("button","Primary action","Get started")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add button</button><button type="button" onClick={()=>addSample("avatar","Sample avatar","AB")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add avatar</button></div>}
+              {["accessibility","qa"].includes(toolkit.id) && <div className="mt-3"><button type="button" onClick={runDesignAudit} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">{toolkit.id === "qa" ? "Run design QA" : "Run accessibility & structure review"}</button></div>}
+              {toolkit.id === "patterns" && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>setShowGrid(true)} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Show canvas grid</button><button type="button" onClick={()=>addSample("star","Decorative star","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add star shape</button><button type="button" onClick={()=>addSample("hexagon","Geometric shape","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add hexagon</button><button type="button" onClick={()=>addSample("line","Decorative line","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add line</button></div>}
+              {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>setShowMoreLayers(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
+              {["device","platform"].includes(toolkit.id) && <div className="mt-3 flex flex-wrap gap-2">{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device)=><button key={device} type="button" onClick={()=>changeTarget(device)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold capitalize text-fg">{device}</button>)}</div>}
+              {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>setCustomArtboard(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
+              {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>setShowExportPanel(true)} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
+              {toolkit.id === "3d" && <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-5 text-amber-950">Live GLB/GLTF rendering, lighting and camera manipulation are not available in this editor yet. Use imported rendered previews instead of treating a placeholder as a live 3D viewer.</p>}
+              {toolkit.id === "prototype" && <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                <p className="text-xs leading-5 text-muted">Assign a selected layer to another screen. During preview, tapping that layer opens its destination; Back follows the interaction history.</p>
+                {selected ? <label className="block text-xs font-semibold text-fg">On tap, navigate to
+                  <select aria-label="Prototype destination" value={selected.prototypeTargetScreenId || ""} onChange={(event) => updateLayer(selected.id, { prototypeTargetScreenId: event.target.value })} className={fieldClass()}>
+                    <option value="">No navigation</option>
+                    {screens.filter((screen) => screen.id !== activeScreenId).map((screen) => <option key={screen.id} value={screen.id}>{screen.name}</option>)}
+                  </select>
+                </label> : <p className="text-xs text-muted">Select an element on the artboard first, then choose its destination here.</p>}
+                <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Preview prototype</button>
+                {!screens.some((screen) => screen.id !== activeScreenId) && <p className="text-xs text-muted">Add a second screen from App screens and layers to create a transition.</p>}
+              </div>}
+              {toolkit.id === "inspiration" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import reference image</button><p className="mt-1 text-[10px] text-muted">Keep reference source and licensing notes with the project before redistribution.</p></div>}
+              {toolkit.id === "background" && <div className="mt-3"><label className="block text-xs font-semibold text-fg">Canvas background<input type="color" aria-label="Toolkit canvas background" value={background.startsWith("#") ? background : "#FFFFFF"} onChange={(event)=>setBackground(event.target.value)} className="mt-2 block h-10 w-full"/></label><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import background image as layer</button></div>}
+              {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
+              {toolkit.id === "assets" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import assets</button></div>}
+              {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={()=>addSample("chart","Sample chart","Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add sample chart</button></div>}
+              {toolkit.id === "illustrations" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import illustration (SVG/image)</button></div>}
+              {toolkit.id === "media" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import image</button></div>}
+            </section>; })()}
+          </div>}
           {leftTab === "components" && <div className="mt-3">
             <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Elements</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
             <button type="button" onClick={() => elementImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import elements</button>
@@ -1272,8 +1993,28 @@ export function UxUiStudioEngine() {
             <div className="mt-5 border-t border-border pt-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg"><Layers size={14} /> Layers {elements.length > 0 && <span className="ml-auto font-normal text-muted">{elements.length}</span>}</div>
               <div className="max-h-64 space-y-1 overflow-y-auto">
-                {[...elements].reverse().map((item) => <div key={item.id} className={"flex items-center gap-1 rounded-md border px-1.5 py-1 " + (selectedId === item.id ? "border-accent bg-accent/10" : "border-transparent hover:bg-surface-2")}><button type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} className="min-w-0 flex-1 truncate py-1 text-left text-xs text-fg">{item.name}</button><button type="button" aria-label={"Move " + item.name + " up in layer stack"} onClick={() => moveLayer(item.id, 1)} disabled={elements.findIndex((layer) => layer.id === item.id) === elements.length - 1} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowUp size={12} /></button><button type="button" aria-label={"Move " + item.name + " down in layer stack"} onClick={() => moveLayer(item.id, -1)} disabled={elements.findIndex((layer) => layer.id === item.id) === 0} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowDown size={12} /></button><button type="button" aria-label={"Duplicate " + item.name} onClick={() => { checkpoint(); const dup = { ...item, id: layerId(), name: item.name + " copy", x: item.x + 12, y: item.y + 12 }; setElements((old) => [...old, dup]); setSelectedId(dup.id); }} className="rounded p-1 text-muted hover:text-fg"><Copy size={12} /></button></div>)}
+                {[...elements].reverse().map((item) => <div key={item.id} className={"flex items-center gap-1 rounded-md border px-1.5 py-1 " + (selectedIds.includes(item.id) ? "border-accent bg-accent/10" : "border-transparent hover:bg-surface-2")}>
+                  <button type="button" onClick={(event) => { selectLayer(item.id, event.shiftKey); setInspectorTab("design"); }} aria-pressed={selectedIds.includes(item.id)} className="min-w-0 flex-1 truncate py-1 text-left text-xs text-fg">{item.name}{item.groupId ? " · Group" : ""}{item.locked ? " · Locked" : ""}{item.hidden ? " · Hidden" : ""}</button>
+                  <button type="button" aria-label={(item.hidden ? "Show " : "Hide ") + item.name} onClick={() => { checkpoint(); updateLayer(item.id, { hidden: !item.hidden }, false); }} className="rounded p-1 text-muted hover:text-fg">{item.hidden ? "Show" : "Hide"}</button>
+                  <button type="button" aria-label={(item.locked ? "Unlock " : "Lock ") + item.name} onClick={() => { checkpoint(); updateLayer(item.id, { locked: !item.locked }, false); }} className="rounded p-1 text-muted hover:text-fg">{item.locked ? "Unlock" : "Lock"}</button>
+                  <button type="button" aria-label={"Move " + item.name + " up in layer stack"} onClick={() => moveLayer(item.id, 1)} disabled={elements.findIndex((layer) => layer.id === item.id) === elements.length - 1} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowUp size={12} /></button>
+                  <button type="button" aria-label={"Move " + item.name + " down in layer stack"} onClick={() => moveLayer(item.id, -1)} disabled={elements.findIndex((layer) => layer.id === item.id) === 0} className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowDown size={12} /></button>
+                  <button type="button" aria-label={"Duplicate " + item.name} onClick={() => { checkpoint(); const dup = { ...item, id: layerId(), name: item.name + " copy", x: item.x + 12, y: item.y + 12 }; setElements((old) => [...old, dup]); selectLayer(dup.id); }} className="rounded p-1 text-muted hover:text-fg"><Copy size={12} /></button>
+                </div>)}
                 {elements.length === 0 && <p className="uxui-empty-layers compact">No elements yet. Tap + to add one.</p>}
+              </div>
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-xs text-fg">Selection tools</strong><span className="text-[10px] text-muted">{selectedIds.length} selected · Shift+tap to add</span></div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" onClick={copySelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Copy</button>
+                  <button type="button" onClick={cutSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Cut</button>
+                  <button type="button" onClick={pasteLayers} disabled={!clipboardLayers.length} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg disabled:opacity-40">Paste</button>
+                  <button type="button" onClick={groupSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Group selection</button>
+                  <button type="button" onClick={ungroupSelectedLayers} className="rounded-md border border-border px-2 py-2 text-xs font-semibold text-fg">Ungroup selection</button>
+                  {(["left","center","right","top","middle","bottom"] as const).map((edge)=><button key={edge} type="button" onClick={()=>alignSelectedLayers(edge)} disabled={selectedIds.length<2} className="rounded-md border border-border px-2 py-2 text-xs capitalize text-fg disabled:opacity-40">Align {edge}</button>)}
+                  <button type="button" onClick={()=>distributeSelectedLayers("horizontal")} disabled={selectedIds.length<3} className="rounded-md border border-border px-2 py-2 text-xs text-fg disabled:opacity-40">Distribute horizontally</button>
+                  <button type="button" onClick={()=>distributeSelectedLayers("vertical")} disabled={selectedIds.length<3} className="rounded-md border border-border px-2 py-2 text-xs text-fg disabled:opacity-40">Distribute vertically</button>
+                </div>
               </div>
               {selected && <><button type="button" onClick={() => {const saved={...selected,id:"component-"+layerId(),componentKey:selected.componentKey || selected.id,name:selected.name};setReusableComponents((old)=>[...old.filter((item)=>item.componentKey!==saved.componentKey),saved]);setNotice("Saved "+saved.name+" as a reusable component template.");}} className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-fg"><Copy size={13} /> Save as component</button><button type="button" onClick={deleteSelected} className="mt-2 ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-red-600 hover:bg-red-500/10"><Trash2 size={13} /> Delete selected</button></>}
               {reusableComponents.length > 0 && <div className="mt-3 border-t border-border pt-3"><h4 className="mb-2 text-xs font-semibold text-fg">Reusable components</h4>{reusableComponents.map((component)=> <button key={component.id} type="button" onClick={()=>{const copy={...component,id:layerId(),name:component.name+" instance",x:Math.min(board.width-component.width,component.x+16),y:Math.min(board.height-component.height,component.y+16),referenceWidth:board.width,referenceHeight:board.height};checkpoint();setElements((old)=>[...old,copy]);setSelectedId(copy.id);setNotice("Added reusable component: "+component.name);}} className="mb-1 block w-full truncate rounded-md border border-border p-2 text-left text-xs text-fg hover:bg-surface-2">{component.name} · Add instance</button>)}</div>}
@@ -1378,15 +2119,16 @@ export function UxUiStudioEngine() {
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
             {isExpanded && <button type="button" onClick={toggleExpandedPreview} className="uxui-preview-back"><ArrowLeft size={18} /><span>Back to editor</span></button>}
-            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>Preview</span></div>
+            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{prototypePreview ? "Prototype" : "Preview"}</span></div>
             <div className="uxui-canvas-zoom">
-              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out"><ZoomOut size={16} /></button>
+              {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} title="Preview connected screen flow" className="rounded-lg border border-border px-2.5 py-2 text-xs font-semibold text-fg disabled:opacity-40">Prototype</button>}
+              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out" disabled={prototypePreview}><ZoomOut size={16} /></button>
               <span>{zoom}%</span>
               <button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
             </div>
           </div>
-          <div className="uxui-canvas-stage">
+          <div className="uxui-canvas-stage" role="region" aria-label={projectName + " scrollable design canvas"} tabIndex={0}>
             <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
@@ -1394,12 +2136,12 @@ export function UxUiStudioEngine() {
                 <rect width={board.width} height={board.height} fill={background} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
-                {elements.filter((layer) => !layer.visibleOn || layer.visibleOn.includes(target)).map((layer) => {
+                {[...elements].filter((layer) => !layer.hidden && layer.display !== "none" && (!layer.visibleOn || layer.visibleOn.includes(target))).sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)).map((layer) => {
                   const boxFill = layer.background === "transparent" ? "none" : layer.background;
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";
                   const baseBox = (round = layer.radius) => <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={round} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
-                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity };
+                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: prototypePreview ? (layer.prototypeTargetScreenId && screens.some((screen) => screen.id === layer.prototypeTargetScreenId) ? "pointer" : "not-allowed") : layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
                   return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
@@ -1415,10 +2157,38 @@ export function UxUiStudioEngine() {
                     {layer.kind === "progress" ? <><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={layer.radius} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y} width={layer.width * 0.72} height={layer.height} rx={layer.radius} fill={layer.color} /></> : null}
                     {layer.kind === "slider" ? <><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width} height={4} rx={2} fill={boxFill === "none" ? "#E5E7EB" : boxFill} /><rect x={layer.x} y={layer.y + layer.height / 2 - 2} width={layer.width * 0.62} height={4} rx={2} fill={layer.color} /><circle cx={layer.x + layer.width * 0.62} cy={layer.y + layer.height / 2} r={7} fill={layer.color} /></> : null}
                     {["text", "icon", "divider", "ellipse", "avatar", "checkbox", "radio", "switch", "toggle", "progress", "slider", "triangle", "diamond", "hexagon", "star", "line"].includes(layer.kind) ? null : baseBox()}
-                    {layer.kind === "chart" ? <g>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={layer.x+layer.padding} y1={layer.y+layer.height-layer.padding-22-grid*22} x2={layer.x+layer.width-layer.padding} y2={layer.y+layer.height-layer.padding-22-grid*22} stroke="#E5E7EB" strokeWidth="1" />)}{[0.36,0.62,0.46,0.82,0.67].map((ratio,index)=><rect key={"bar-"+index} x={layer.x+layer.padding+18+index*30} y={layer.y+layer.height-layer.padding-24-ratio*76} width="16" height={ratio*76} rx="3" fill={layer.color} opacity={index===4?1:0.72} />)}</g> : null}
+                    {layer.kind === "chart" ? (() => {
+                      const chart = parseUxUiStudioChartData(layer.text);
+                      const plotLeft = layer.x + layer.padding + 4;
+                      const plotRight = layer.x + layer.width - layer.padding - 4;
+                      const plotTop = layer.y + layer.padding + Math.min(22, layer.fontSize + 6);
+                      const plotBottom = layer.y + layer.height - layer.padding - 17;
+                      const plotHeight = Math.max(4, plotBottom - plotTop);
+                      const plotWidth = Math.max(1, plotRight - plotLeft);
+                      const maxValue = Math.max(1, ...chart.points.map((point) => point.value));
+                      const slotWidth = plotWidth / Math.max(1, chart.points.length);
+                      const labelSize = Math.max(5, Math.min(9, layer.fontSize * 0.64));
+                      return <g role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>
+                        <text x={layer.x + layer.padding} y={layer.y + layer.padding + Math.min(18, layer.fontSize + 3)} fontSize={Math.min(13, layer.fontSize)} fontWeight={layer.fontWeight} fill={layer.color}>{chart.title}</text>
+                        {chart.points.length > 0 ? <>
+                          {[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={plotLeft} y1={plotTop + plotHeight * grid / 3} x2={plotRight} y2={plotTop + plotHeight * grid / 3} stroke="#E5E7EB" strokeWidth="1" />)}
+                          {chart.points.map((point, index) => {
+                            const barHeight = plotHeight * point.value / maxValue;
+                            const barWidth = Math.max(2, Math.min(26, slotWidth * 0.58));
+                            const barX = plotLeft + index * slotWidth + (slotWidth - barWidth) / 2;
+                            return <g key={point.label + "-" + index}>
+                              <rect x={barX} y={plotBottom - barHeight} width={barWidth} height={barHeight} rx="3" fill={layer.color} opacity={index === chart.points.length - 1 ? 1 : 0.78} />
+                              <text x={plotLeft + index * slotWidth + slotWidth / 2} y={Math.max(plotTop + 7, plotBottom - barHeight - 3)} fontSize={labelSize} fill={layer.color} textAnchor="middle">{point.value}</text>
+                              <text x={plotLeft + index * slotWidth + slotWidth / 2} y={plotBottom + 12} fontSize={labelSize} fill={layer.color} textAnchor="middle">{point.label.slice(0, 8)}</text>
+                            </g>;
+                          })}
+                        </> : <text x={layer.x + layer.width/2} y={plotTop + plotHeight/2} fontSize={labelSize} fill={layer.color} textAnchor="middle">Enter data as Label: value</text>}
+                        {chart.invalidRows > 0 && <text x={layer.x + layer.width - layer.padding} y={layer.y + layer.height - 3} fontSize={Math.max(5, labelSize - 1)} fill="#B45309" textAnchor="end">{chart.invalidRows} invalid row(s)</text>}
+                      </g>;
+                    })() : null}
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
                     {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
-                    {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
+                    {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
                     {selectedId === layer.id && <rect x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="#2563EB" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
                   </g>;
                 })}
@@ -1429,18 +2199,33 @@ export function UxUiStudioEngine() {
           </div>
           <div className="uxui-bottom-toolbar">
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-label="Toggle grid" title="Toggle grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={20} /></button>
-              <button type="button" onClick={() => quickImageInputRef.current?.click()} aria-label="Add an image" title="Add image"><ImagePlus size={21} /></button>
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
             <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
-              <button type="button" onClick={() => setShowMoreLayers((value) => !value)} aria-label="Show layers" title="Layers" className={showMoreLayers ? "is-active" : ""}><Layers size={20} /></button>
-              <button type="button" onClick={() => elementImportInputRef.current?.click()} aria-label="Import elements" title="Import elements"><ImagePlus size={20} /></button>
+              <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
             </div>
           </div>
+          {selected && target === "mobile" && !isExpanded && <div className="uxui-mobile-controls" aria-label="Selected element movement and transform controls">
+            <div className="uxui-gamepad" role="group" aria-label="Move selected element">
+              <span className="uxui-gamepad-label">Move</span>
+              <button type="button" className="uxui-pad-up" aria-label="Move element up 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.max(0, selected.y - 8) })}><ArrowUp size={19} /></button>
+              <button type="button" className="uxui-pad-left" aria-label="Move element left 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.max(0, selected.x - 8) })}><ArrowLeft size={19} /></button>
+              <button type="button" className="uxui-pad-center" aria-label="Center selected element" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)), y: Math.max(0, Math.round((board.height - selected.height) / 2)) })}>•</button>
+              <button type="button" className="uxui-pad-right" aria-label="Move element right 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.min(Math.max(0, board.width - selected.width), selected.x + 8) })}><ArrowRight size={19} /></button>
+              <button type="button" className="uxui-pad-down" aria-label="Move element down 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.min(Math.max(0, board.height - selected.height), selected.y + 8) })}><ArrowDown size={19} /></button>
+            </div>
+            <div className="uxui-gamepad uxui-gamepad-transform" role="group" aria-label={selected.kind === "icon" ? "Icon transform controls" : "Selected element transform controls"}>
+              <span className="uxui-gamepad-label">{selected.kind === "icon" ? "Icon" : "Adjust"}</span>
+              <button type="button" className="uxui-pad-up" aria-label="Increase element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })}><ZoomIn size={18} /></button>
+              <button type="button" className="uxui-pad-left" aria-label="Rotate element left 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })}><RotateCw size={17} className="uxui-rotate-back" /></button>
+              <button type="button" className="uxui-pad-center" aria-label="Reset element rotation" onClick={() => updateLayer(selected.id, { rotation: 0 })}>0°</button>
+              <button type="button" className="uxui-pad-right" aria-label="Rotate element right 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })}><RotateCw size={17} /></button>
+              <button type="button" className="uxui-pad-down" aria-label="Decrease element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></button>
+            </div>
+          </div>}
           {selected && !isExpanded && <div className="uxui-context-controls">
             <div className="uxui-context-toolbar" role="toolbar" aria-label="Selected element tools">
               <span className="uxui-context-selection">{selected.name || "Selected element"}</span>
@@ -1459,6 +2244,41 @@ export function UxUiStudioEngine() {
               <div className="uxui-context-swatches">{["#111827", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2775", "#DC2626", "#D97706", "#059669", "#0F766E", "#64748B", "#E5E7EB", "#DBEAFE"].map((color) => <button key={color} type="button" style={{ background: color }} onClick={() => updateLayer(selected.id, paletteMode === "text" ? { color } : { background: color })} aria-label={"Apply " + color} title={color} />)}</div>
             </div>}
           </div>}
+          {selected && !isExpanded && <section className="uxui-visual-property-dock" aria-label="Selected element visual properties">
+            <div className="uxui-property-dock-header"><strong>Adjust visually</strong><span>{selected.kind} · {selected.width} × {selected.height}px</span><button type="button" onClick={() => setShowAdvancedContext((value) => !value)} aria-expanded={showAdvancedContext}>{showAdvancedContext ? "Hide technical settings" : "More settings"}</button></div>
+            <div className="uxui-property-cards">
+              <label className="uxui-property-card"><span>Width · {selected.width}px</span><input aria-label="Visual width" type="range" min="12" max={Math.max(12, board.width - selected.x)} value={Math.min(selected.width, Math.max(12, board.width - selected.x))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { width: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Height · {selected.height}px</span><input aria-label="Visual height" type="range" min="12" max={Math.max(12, board.height - selected.y)} value={Math.min(selected.height, Math.max(12, board.height - selected.y))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { height: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Horizontal position · {selected.x}px</span><input aria-label="Visual X position" type="range" min="0" max={Math.max(0, board.width - selected.width)} value={Math.min(selected.x, Math.max(0, board.width - selected.width))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { x: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Vertical position · {selected.y}px</span><input aria-label="Visual Y position" type="range" min="0" max={Math.max(0, board.height - selected.height)} value={Math.min(selected.y, Math.max(0, board.height - selected.height))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { y: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Corner radius · {selected.radius}px</span><input aria-label="Visual corner radius" type="range" min="0" max={Math.max(0, Math.floor(Math.min(selected.width, selected.height) / 2))} value={Math.min(selected.radius, Math.max(0, Math.floor(Math.min(selected.width, selected.height) / 2)))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { radius: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Padding · {selected.padding}px</span><input aria-label="Visual padding" type="range" min="0" max="64" value={selected.padding} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { padding: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Opacity · {Math.round(selected.opacity * 100)}%</span><input aria-label="Visual opacity" type="range" min="0" max="1" step=".05" value={selected.opacity} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { opacity: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card"><span>Border width · {selected.borderWidth}px</span><input aria-label="Visual border width" type="range" min="0" max="12" value={selected.borderWidth} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { borderWidth: Number(event.target.value) }, false)} /></label>
+              {(["Top","Right","Bottom","Left"] as const).map((side) => { const key = ("margin" + side) as "marginTop" | "marginRight" | "marginBottom" | "marginLeft"; return <label key={key} className="uxui-property-card"><span>Margin {side.toLowerCase()} · {selected[key]}px</span><input aria-label={"Visual margin " + side.toLowerCase()} type="range" min="0" max="80" value={selected[key]} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { [key]: Number(event.target.value) } as Partial<DesignLayer>, false)} /></label>; })}
+              <label className="uxui-property-card"><span>Text size · {selected.fontSize}px</span><input aria-label="Visual font size" type="range" min="8" max="96" value={Math.max(8, Math.min(96, selected.fontSize))} onPointerDown={() => checkpoint()} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { fontSize: Number(event.target.value) }, false)} /></label>
+              <label className="uxui-property-card uxui-property-color"><span>Fill / background</span><input aria-label="Visual background color" type="color" value={/^#[0-9a-f]{6}$/i.test(selected.background) ? selected.background : "#FFFFFF"} onChange={(event) => updateLayer(selected.id, { background: event.target.value })} /></label>
+              <label className="uxui-property-card uxui-property-color"><span>Text / icon color</span><input aria-label="Visual foreground color" type="color" value={/^#[0-9a-f]{6}$/i.test(selected.color) ? selected.color : "#111827"} onChange={(event) => updateLayer(selected.id, { color: event.target.value })} /></label>
+              <label className="uxui-property-card uxui-property-color"><span>Border color</span><input aria-label="Visual border color" type="color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#E5E7EB"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></label>
+              <label className="uxui-property-card uxui-property-toggle"><span>Soft shadow</span><input aria-label="Visual soft shadow" type="checkbox" checked={selected.shadow} onChange={(event) => updateLayer(selected.id, { shadow: event.target.checked })} /></label>
+            </div>
+            {showAdvancedContext && <div className="uxui-context-technical">
+              <h3>Technical properties · CSS handoff</h3>
+              <div className="uxui-technical-grid">
+                <Field label="display"><select className={fieldClass()} value={selected.display || "flex"} onChange={(event) => updateLayer(selected.id, { display: event.target.value })}><option value="block">block</option><option value="inline-flex">inline-flex</option><option value="flex">flex</option><option value="grid">grid</option><option value="none">none</option></select></Field>
+                <Field label="cursor"><select className={fieldClass()} value={selected.cursor || "default"} onChange={(event) => updateLayer(selected.id, { cursor: event.target.value })}><option value="default">default</option><option value="pointer">pointer</option><option value="grab">grab</option><option value="text">text</option><option value="move">move</option><option value="not-allowed">not-allowed</option></select></Field>
+                <Field label="z-index"><input className={fieldClass()} type="number" value={selected.zIndex ?? 1} onChange={(event) => updateLayer(selected.id, { zIndex: Math.max(-999, Math.min(9999, Number(event.target.value) || 0)) })} /></Field>
+                <Field label="transition (ms)"><input className={fieldClass()} type="number" min="0" max="5000" step="25" value={selected.transitionDuration ?? 180} onChange={(event) => updateLayer(selected.id, { transitionDuration: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} /></Field>
+                <Field label=":hover fill"><input className={fieldClass()} type="color" value={/^#[0-9a-f]{6}$/i.test(selected.hoverColor || "") ? selected.hoverColor : "#2563EB"} onChange={(event) => updateLayer(selected.id, { hoverColor: event.target.value })} /></Field>
+                <Field label=":active fill"><input className={fieldClass()} type="color" value={/^#[0-9a-f]{6}$/i.test(selected.activeColor || "") ? selected.activeColor : "#1D4ED8"} onChange={(event) => updateLayer(selected.id, { activeColor: event.target.value })} /></Field>
+                <Field label=":focus-visible fill"><input className={fieldClass()} type="color" value={/^#[0-9a-f]{6}$/i.test(selected.focusColor || "") ? selected.focusColor : "#7C3AED"} onChange={(event) => updateLayer(selected.id, { focusColor: event.target.value })} /></Field>
+                <Field label="Minimum width"><input className={fieldClass()} type="number" min="0" value={selected.minWidth || 0} onChange={(event) => updateLayer(selected.id, { minWidth: Math.max(0, Number(event.target.value) || 0) })} /></Field>
+                <Field label="Maximum width (0 = none)"><input className={fieldClass()} type="number" min="0" value={selected.maxWidth || 0} onChange={(event) => updateLayer(selected.id, { maxWidth: Math.max(0, Number(event.target.value) || 0) })} /></Field>
+              </div>
+              <fieldset className="uxui-device-visibility"><legend>Responsive visibility · generated @media rules</legend>{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device) => <label key={device}><input type="checkbox" checked={(selected.visibleOn || ["mobile","tablet","desktop"]).includes(device)} onChange={(event) => updateLayer(selected.id, { visibleOn: event.target.checked ? [...(selected.visibleOn || ["mobile","tablet","desktop"]), device] : (selected.visibleOn || ["mobile","tablet","desktop"]).filter((value) => value !== device) })} />{device}</label>)}</fieldset>
+              <p className="text-xs text-muted">Media breakpoint defaults: mobile ≤ {DESIGN_BREAKPOINTS.mobile}px; tablet through {DESIGN_BREAKPOINTS.desktop - 1}px; desktop ≥ {DESIGN_BREAKPOINTS.desktop}px. Use per-device visibility to generate the corresponding @media rules.</p>
+            </div>}
+          </section>}
           <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
           <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
           <input ref={iconImportInputRef} type="file" accept=".svg,image/svg+xml" className="sr-only" aria-label="Import SVG icon" onChange={(event) => { const file = event.target.files?.[0]; if (file) importIconFile(file); event.target.value = ""; }} />
@@ -1481,7 +2301,39 @@ export function UxUiStudioEngine() {
           }} />
         </main>
 
-        <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
+        {showInspector && <aside className="uxui-inspector min-w-0 rounded-xl border border-border bg-surface p-3">
+          <section className="uxui-screen-manager" aria-labelledby="uxui-screens-heading">
+            <div className="uxui-screen-manager-heading">
+              <div><h2 id="uxui-screens-heading">App screens</h2><p>{screens.length} {screens.length === 1 ? "screen" : "screens"} · {screens.find((screen) => screen.id === activeScreenId)?.name || "Screen 1"}</p></div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => setShowInspector(false)} aria-label="Close app screens and layers" title="Close app screens and layers" className="grid size-8 place-items-center rounded-lg border border-border text-fg hover:bg-surface-2"><X size={15}/></button>
+                <button type="button" onClick={addScreen} aria-label="Add app screen" title="Add app screen" className="uxui-screen-add"><Plus size={20}/><span>New screen</span></button>
+              </div>
+            </div>
+            <div className="uxui-screen-grid">
+              {screens.map((screen,index) => {
+                const viewportWidth = screen.customArtboard ? screen.customWidth : boardSize(screen.target).width;
+                const viewportHeight = screen.customArtboard ? screen.customHeight : boardSize(screen.target).height;
+                return <article key={screen.id} className={"uxui-screen-card " + (screen.id === activeScreenId ? "is-active" : "")}>
+                  <button type="button" className="uxui-screen-thumb-button" onClick={() => openScreen(screen.id)} aria-label={"Open " + screen.name} aria-pressed={screen.id === activeScreenId}>
+                    <div className={"uxui-screen-thumb uxui-screen-thumb-" + screen.target} style={{background:screen.background}}>
+                      {screen.elements.slice(0,6).map((layer) => <span key={layer.id} style={{left:Math.max(1,Math.min(94,layer.x/Math.max(1,viewportWidth)*100))+"%",top:Math.max(1,Math.min(94,layer.y/Math.max(1,viewportHeight)*100))+"%",width:Math.max(3,Math.min(84,layer.width/Math.max(1,viewportWidth)*100))+"%",height:Math.max(2,Math.min(48,layer.height/Math.max(1,viewportHeight)*100))+"%",background:layer.background==="transparent"?(layer.kind==="text"?"#cbd5e1":layer.color):layer.background,opacity:layer.opacity}} />)}
+                    </div>
+                  </button>
+                  <div className="uxui-screen-card-meta">
+                    <input aria-label={"Screen name " + (index+1)} value={screen.name} maxLength={70} onChange={(event)=>renameScreen(screen.id,event.target.value)} />
+                    <small>{screen.target} · {screen.elements.length} layers</small>
+                  </div>
+                  <div className="uxui-screen-card-actions">
+                    <button type="button" onClick={()=>reorderScreen(screen.id,-1)} disabled={index===0} aria-label={"Move "+screen.name+" earlier"} title="Move earlier"><ArrowLeft size={13}/></button>
+                    <button type="button" onClick={()=>reorderScreen(screen.id,1)} disabled={index===screens.length-1} aria-label={"Move "+screen.name+" later"} title="Move later"><ArrowRight size={13}/></button>
+                    <button type="button" onClick={()=>duplicateScreen(screen.id)} aria-label={"Duplicate "+screen.name} title="Duplicate screen"><Copy size={13}/></button>
+                    <button type="button" onClick={()=>deleteScreen(screen.id)} disabled={screens.length===1} aria-label={"Delete "+screen.name} title="Delete screen"><Trash2 size={13}/></button>
+                  </div>
+                </article>;
+              })}
+            </div>
+          </section>
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
             <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
@@ -1541,7 +2393,7 @@ export function UxUiStudioEngine() {
           {selected && inspectorTab === "design" && <div className="mt-3 space-y-3">
             <div className="flex items-center justify-between gap-2"><p className="truncate text-sm font-semibold text-fg">{selected.kind.charAt(0).toUpperCase() + selected.kind.slice(1)} properties</p><button type="button" title="Duplicate selected layer" onClick={duplicateSelected} className="rounded-md border border-border p-2 text-muted hover:text-fg"><Copy size={13} /></button></div>
             <Field label="Layer name"><input className={fieldClass()} value={selected.name} onChange={(event) => updateLayer(selected.id, { name: event.target.value })} /></Field>
-            {["text", "button", "card", "input", "image", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(selected.kind) && <Field label="Text content"><textarea rows={selected.kind === "card" || selected.kind === "row" ? 3 : 2} className={fieldClass()} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field>}
+            {["text", "button", "card", "input", "image", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(selected.kind) && <Field label={selected.kind === "chart" ? "Chart data (title, then Label: value)" : "Text content"}><textarea rows={selected.kind === "chart" ? 7 : selected.kind === "card" || selected.kind === "row" ? 3 : 2} spellCheck={selected.kind !== "chart"} className={fieldClass()} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field>}
             {selected.kind === "image" && <Field label="Replace image"><input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" className="mt-2 block w-full text-[11px] text-muted file:mr-2 file:rounded-md file:border-0 file:bg-surface-2 file:px-2 file:py-1.5 file:text-xs file:font-semibold" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 4 * 1024 * 1024) { setNotice("Image assets must be 4 MB or smaller for a portable design project."); event.target.value = ""; return; } if (!file.type.startsWith("image/")) { setNotice("Choose a supported image file."); event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === "string") updateLayer(selected.id, { imageDataUrl: reader.result }); }; reader.onerror = () => setNotice("Could not read the selected image."); reader.readAsDataURL(file); }} /></Field>}
             {selected.kind === "icon" && <div className="rounded-lg border border-border p-2"><p className="break-all text-xs font-semibold text-fg">{selected.iconName || "Built-in home icon"}</p><p className="mt-1 text-[10px] leading-4 text-muted">{selected.iconAuthor || "Built-in icon"} · {selected.iconLicense || "No external license metadata"}</p><button type="button" onClick={() => setLeftTab("icons")} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent"><Search size={12} /> Replace icon</button></div>}
             <div className="grid grid-cols-2 gap-2">
@@ -1550,6 +2402,22 @@ export function UxUiStudioEngine() {
               <Field label="Width (px)"><input type="number" min="1" className={fieldClass()} value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field>
               <Field label="Height (px)"><input type="number" min="1" className={fieldClass()} value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field>
             </div>
+            <details className="uxui-css-controls rounded-lg border border-border p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-fg">Technical styling · CSS</summary>
+              <p className="mt-2 text-[10px] leading-4 text-muted">Visual controls handle everyday edits. These implementation values are included in the project specification and web handoff.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Field label="Display"><select className={fieldClass()} value={selected.display || "flex"} onChange={(event) => updateLayer(selected.id, { display: event.target.value })}><option value="block">Block</option><option value="inline-flex">Inline flex</option><option value="flex">Flex</option><option value="grid">Grid</option><option value="none">Hidden</option></select></Field>
+                <Field label="Cursor"><select className={fieldClass()} value={selected.cursor || "default"} onChange={(event) => updateLayer(selected.id, { cursor: event.target.value })}><option value="default">Default</option><option value="pointer">Pointer</option><option value="grab">Grab</option><option value="text">Text</option><option value="move">Move</option><option value="not-allowed">Not allowed</option></select></Field>
+                <Field label="Z-index"><input type="number" className={fieldClass()} value={selected.zIndex ?? 1} onChange={(event) => updateLayer(selected.id, { zIndex: Math.max(-999, Math.min(9999, Number(event.target.value) || 0)) })} /></Field>
+                <Field label="Transition (ms)"><input type="number" min="0" max="5000" step="25" className={fieldClass()} value={selected.transitionDuration ?? 180} onChange={(event) => updateLayer(selected.id, { transitionDuration: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} /></Field>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Field label=":hover fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.hoverColor || "") ? selected.hoverColor : "#2563EB"} onChange={(event) => updateLayer(selected.id, { hoverColor: event.target.value })} /></Field>
+                <Field label=":active fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.activeColor || "") ? selected.activeColor : "#1D4ED8"} onChange={(event) => updateLayer(selected.id, { activeColor: event.target.value })} /></Field>
+                <Field label=":focus-visible fill"><input type="color" className={fieldClass()} value={/^#[0-9a-f]{6}$/i.test(selected.focusColor || "") ? selected.focusColor : "#7C3AED"} onChange={(event) => updateLayer(selected.id, { focusColor: event.target.value })} /></Field>
+              </div>
+              <p className="mt-2 text-[10px] text-muted">Empty interaction colours mean inherit the base style. Values are retained in the design specification.</p>
+            </details>
             <div className="mt-3 rounded-lg border border-border p-3">
               <h4 className="mb-2 text-xs font-semibold text-fg">Responsive constraints</h4>
               <div className="grid grid-cols-2 gap-2">
@@ -1601,7 +2469,7 @@ export function UxUiStudioEngine() {
           </div>
             </div>
           </details>
-        </aside>
+        </aside>}
       </div>
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> <span className="min-w-0 flex-1">{notice}</span><button aria-label="Dismiss notice" type="button" onClick={() => setNotice("")} className="rounded p-0.5 text-muted hover:text-fg"><X size={13} /></button></div>}
       <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-[11px] leading-5 text-muted"><span>Local-first editor · Exact pixel dimensions · Layer-level specification records</span><button type="button" onClick={() => setShowToolsPanel(true)} className="inline-flex items-center gap-1 font-semibold text-accent"><Plus size={13} /> Add elements</button></footer>

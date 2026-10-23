@@ -1,3 +1,5 @@
+import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
+
 export type UxCodegenLayer = {
   id: string; kind: string; name: string; x: number; y: number; width: number; height: number;
   text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl?: string;
@@ -9,6 +11,8 @@ export type UxCodegenLayer = {
   verticalConstraint?: "top" | "center" | "bottom" | "stretch";
   minWidth?: number; maxWidth?: number; visibleOn?: string[];
   referenceWidth?: number; referenceHeight?: number; componentKey?: string;
+  display?: string; cursor?: string; zIndex?: number; transitionDuration?: number;
+  hoverColor?: string; activeColor?: string; focusColor?: string;
 };
 export type UxCodegenProject = {
   name: string; target: string; background: string; viewport: { width: number; height: number };
@@ -64,18 +68,40 @@ const googleFontLink = (family: string): string => "https://fonts.googleapis.com
 
 const layerStyle = (l: UxCodegenLayer) => [
   "box-sizing:border-box","padding:" + l.padding + "px","color:" + l.color,
+  "display:" + (l.display || "flex"),"cursor:" + (l.cursor || "default"),"z-index:" + (l.zIndex ?? 1),"transition:background-color " + (l.transitionDuration ?? 180) + "ms ease,opacity " + (l.transitionDuration ?? 180) + "ms ease",
   "background:" + (l.background === "transparent" ? "transparent" : l.background),
   "border:" + l.borderWidth + "px solid " + (l.borderWidth > 0 ? l.borderColor : "transparent"),
   "border-radius:" + l.radius + "px","opacity:" + l.opacity,"font-family:" + safe(l.fontFamily),
   "font-size:" + l.fontSize + "px","font-weight:" + l.fontWeight,"line-height:" + l.lineHeight,
   "letter-spacing:" + l.letterSpacing + "px","text-align:" + l.textAlign,"white-space:pre-wrap","overflow:hidden",
-  "display:flex","align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
+  "align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
   "justify-content:" + (l.textAlign === "center" ? "center" : l.textAlign === "right" ? "flex-end" : "flex-start"),
   l.shadow ? "box-shadow:0 3px 10px #0f172a24" : "",
   shapeCss(l),
 ].filter(Boolean).join(";");
 const layerHtml = (l: UxCodegenLayer, p: UxCodegenProject) => {
   const common = 'class="env-layer env-layer-' + esc(l.id) + '" data-visible-on="' + visibility(l).join(" ") + '" style="' + esc("position:absolute;" + cssGeometry(l,p) + ";" + layerStyle(l)) + '"';
+  if (l.kind === "chart") {
+    const chart = parseUxUiStudioChartData(l.text);
+    const pad = Math.max(4, l.padding);
+    const plotLeft = pad + 4, plotRight = l.width - pad - 4;
+    const plotTop = pad + Math.min(22, l.fontSize + 6), plotBottom = l.height - pad - 17;
+    const plotHeight = Math.max(4, plotBottom - plotTop), plotWidth = Math.max(1, plotRight - plotLeft);
+    const maximum = Math.max(1, ...chart.points.map((point) => point.value));
+    const slot = plotWidth / Math.max(1, chart.points.length);
+    const bars = chart.points.map((point, index) => {
+      const barHeight = plotHeight * point.value / maximum, barWidth = Math.max(2, Math.min(26, slot * 0.58));
+      const x = plotLeft + index * slot + (slot - barWidth) / 2, y = plotBottom - barHeight;
+      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" rx="3" fill="' + esc(l.color) + '" />' +
+        '<text x="' + (plotLeft + index * slot + slot / 2) + '" y="' + Math.max(plotTop + 7, y - 3) + '" font-size="' + Math.max(5, Math.min(9, l.fontSize * 0.64)) + '" text-anchor="middle" fill="' + esc(l.color) + '">' + esc(String(point.value)) + '</text>' +
+        '<text x="' + (plotLeft + index * slot + slot / 2) + '" y="' + (plotBottom + 12) + '" font-size="' + Math.max(5, Math.min(9, l.fontSize * 0.64)) + '" text-anchor="middle" fill="' + esc(l.color) + '">' + esc(point.label.slice(0, 8)) + '</text>';
+    }).join("");
+    const grid = [0,1,2,3].map((index) => '<line x1="' + plotLeft + '" y1="' + (plotTop + plotHeight * index / 3) + '" x2="' + plotRight + '" y2="' + (plotTop + plotHeight * index / 3) + '" stroke="#E5E7EB" />').join("");
+    return '<div ' + common + ' role="img" aria-label="' + esc("Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")) + '">' +
+      '<div style="position:absolute;left:' + pad + 'px;top:' + pad + 'px;font-size:' + Math.min(13, l.fontSize) + 'px;font-weight:700">' + esc(chart.title) + '</div>' +
+      '<svg aria-hidden="true" viewBox="0 0 ' + l.width + ' ' + l.height + '" style="position:absolute;inset:0;width:100%;height:100%">' + (chart.points.length ? grid + bars : '<text x="' + (l.width/2) + '" y="' + (plotTop + plotHeight/2) + '" text-anchor="middle" fill="' + esc(l.color) + '" font-size="10">Enter data as Label: value</text>') + '</svg>' +
+      (chart.invalidRows ? '<span style="position:absolute;right:' + pad + 'px;bottom:2px;font-size:8px;color:#B45309">' + chart.invalidRows + ' invalid row(s)</span>' : '') + '</div>';
+  }
   if (l.kind === "icon") return '<div ' + common + ' aria-label="' + esc(l.name) + '"><svg viewBox="' + esc(l.iconViewBox || "0 0 24 24") + '" width="100%" height="100%" aria-hidden="true" style="fill:currentColor">' + (l.iconSvg || "") + '</svg></div>';
   if (l.kind === "image") return '<div ' + common + '>' + (l.imageDataUrl ? '<img alt="' + esc(l.name) + '" src="' + esc(l.imageDataUrl) + '" style="width:100%;height:100%;object-fit:cover" />' : esc(l.text || "Image asset not selected")) + '</div>';
   if (l.kind === "input" || l.kind === "search" || l.kind === "textarea") {
@@ -95,7 +121,16 @@ export function generateHtmlProject(project: UxCodegenProject): string {
   const mobileHidden = ".env-layer:not([data-visible-on~='mobile']){}";
   const fontFaces = embeddedFontCss(project);
   const fontLinks = remoteFontFamilies(project).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
+  const interactionRules = project.elements.map((layer) => {
+    const selector = ".env-layer-" + layer.id.replace(/[^a-zA-Z0-9_-]/g, "");
+    const rules: string[] = [];
+    if (layer.hoverColor) rules.push(selector + ":hover{background:" + layer.hoverColor + "!important}");
+    if (layer.activeColor) rules.push(selector + ":active{background:" + layer.activeColor + "!important}");
+    if (layer.focusColor) rules.push(selector + ":focus-visible{background:" + layer.focusColor + "!important;outline:3px solid " + layer.focusColor + ";outline-offset:2px}");
+    return rules.join("\\n");
+  }).filter(Boolean).join("\\n");
   const rules = [
+    interactionRules,
     "@media (max-width:" + project.breakpoints.mobile + "px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}",
     "@media (min-width:" + (project.breakpoints.mobile + 1) + "px) and (max-width:" + (project.breakpoints.desktop - 1) + "px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}",
     "@media (min-width:" + project.breakpoints.desktop + "px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}",
@@ -112,10 +147,12 @@ export function generateReactProject(project: UxCodegenProject): string {
   const json = JSON.stringify(project).replace(/</g, "\\u003c");
   const fontCss = JSON.stringify(embeddedFontCss(project));
   const googleLinks = remoteFontFamilies(project).map((family) => googleFontLink(family));
+  const chartData = Object.fromEntries(project.elements.filter((layer) => layer.kind === "chart").map((layer) => [layer.id, parseUxUiStudioChartData(layer.text)]));
   return [
     'import React from "react";',
     "",
     "const project = " + json + " as const;",
+    "const chartData: Record<string, { title: string; points: Array<{ label: string; value: number }>; invalidRows: number }> = " + JSON.stringify(chartData) + ";",
     "const embeddedFontCss = " + fontCss + ";",
     "const googleFontLinks = " + JSON.stringify(googleLinks) + ";",
     "",
@@ -138,6 +175,25 @@ export function generateReactProject(project: UxCodegenProject): string {
     '    {project.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(project.target)).map((item) => {',
     '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px solid " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:item.radius,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:"flex",alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
     "      if (item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth > 0) style.maxWidth = item.maxWidth;",
+    '      if (item.kind === "chart") {',
+    '        const chart = chartData[item.id] || { title: item.name, points: [], invalidRows: 0 };',
+    '        style.display = "block"; style.padding = 0;',
+    '        const plotTop = item.padding + Math.min(22, item.fontSize + 6);',
+    '        const plotBottom = item.height - item.padding - 17;',
+    '        const plotHeight = Math.max(4, plotBottom - plotTop);',
+    '        const plotLeft = item.padding + 4, plotRight = item.width - item.padding - 4;',
+    '        const plotWidth = Math.max(1, plotRight - plotLeft);',
+    '        const slotWidth = plotWidth / Math.max(1, chart.points.length);',
+    '        const maxValue = Math.max(1, ...chart.points.map((point) => point.value));',
+    '        const labelSize = Math.max(5, Math.min(9, item.fontSize * 0.64));',
+    '        return <div key={item.id} style={style} role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>',
+    '          <div style={{position:"absolute",left:item.padding,top:item.padding,fontSize:Math.min(13,item.fontSize),fontWeight:700}}>{chart.title}</div>',
+    '          <svg aria-hidden="true" viewBox={"0 0 " + item.width + " " + item.height} style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>',
+    '            {chart.points.length ? <>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={plotLeft} y1={plotTop + plotHeight * grid / 3} x2={plotRight} y2={plotTop + plotHeight * grid / 3} stroke="#E5E7EB" />)}{chart.points.map((point,index) => { const barHeight=plotHeight*point.value/maxValue; const barWidth=Math.max(2,Math.min(26,slotWidth*0.58)); const x=plotLeft+index*slotWidth+(slotWidth-barWidth)/2; const y=plotBottom-barHeight; return <g key={point.label+"-"+index}><rect x={x} y={y} width={barWidth} height={barHeight} rx="3" fill={item.color} opacity={index===chart.points.length-1?1:0.78}/><text x={plotLeft+index*slotWidth+slotWidth/2} y={Math.max(plotTop+7,y-3)} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.value}</text><text x={plotLeft+index*slotWidth+slotWidth/2} y={plotBottom+12} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.label.slice(0,8)}</text></g>;})}</> : <text x={item.width/2} y={plotTop+plotHeight/2} textAnchor="middle" fontSize={labelSize} fill={item.color}>Enter data as Label: value</text>}',
+    '          </svg>',
+    '          {chart.invalidRows > 0 && <span style={{position:"absolute",right:item.padding,bottom:2,fontSize:8,color:"#B45309"}}>{chart.invalidRows} invalid row(s)</span>}',
+    '        </div>;',
+    '      }',
     '      const children = item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} width="100%" height="100%" aria-hidden="true" style={{fill:"currentColor"}} dangerouslySetInnerHTML={{__html:item.iconSvg}} /> : item.kind === "image" ? item.imageDataUrl ? <img alt={item.name} src={item.imageDataUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : item.text : item.text;',
     '      if (item.kind === "input" || item.kind === "search") return <div key={item.id} style={style}><input aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0}} /></div>;',
     '      if (item.kind === "textarea") return <div key={item.id} style={style}><textarea aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0,resize:"none"}} /></div>;',
@@ -384,7 +440,35 @@ export function generateKotlinProject(project: UxCodegenProject): string {
       ".padding(" + layer.padding + ".dp)"
     ].filter(Boolean).join("");
     let content: string;
-    if (layer.kind === "line") {
+    if (layer.kind === "chart") {
+      const chart = parseUxUiStudioChartData(layer.text);
+      const points = chart.points.map((point) => "(" + safe(point.label) + " to " + (Number.isInteger(point.value) ? point.value.toFixed(1) : String(point.value)) + ")").join(", ");
+      const chartColor = "Color(android.graphics.Color.parseColor(" + safe(layer.color) + "))";
+      const barAreaHeight = Math.max(16, layer.height - layer.padding * 2 - layer.fontSize - 30);
+      const chartBody = chart.points.length
+        ? [
+            "val generatedChartPoints = listOf(" + points + ")",
+            "val generatedChartMaximum = generatedChartPoints.maxOfOrNull { it.second }?.coerceAtLeast(1.0) ?: 1.0",
+            "Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {",
+            "  generatedChartPoints.forEach { (label, value) ->",
+            "    Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {",
+            "      Text(if (value % 1.0 == 0.0) value.toLong().toString() else String.format(java.util.Locale.US, \"%.1f\", value), fontSize = 7.sp, maxLines = 1)",
+            "      Spacer(Modifier.height(1.dp))",
+            "      Box(Modifier.fillMaxWidth(0.62f).height(if (value <= 0.0) 0.dp else maxOf(2f, " + barAreaHeight + "f * (value / generatedChartMaximum).toFloat()).dp).background(" + chartColor + "))",
+            "      Text(label, fontSize = 6.sp, maxLines = 1)",
+            "    }",
+            "  }",
+            "}"
+          ].join("\n")
+        : 'Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Enter data as Label: value", fontSize = 8.sp) }';
+      content = [
+        "Column(Modifier.fillMaxSize().padding(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {",
+        "  Text(" + safe(chart.title) + ", color = " + chartColor + ", fontSize = " + Math.min(16, layer.fontSize) + ".sp, fontWeight = FontWeight.SemiBold, maxLines = 1)",
+        chartBody,
+        chart.invalidRows ? 'Text("' + chart.invalidRows + ' invalid row(s) ignored", fontSize = 6.sp, color = Color(0xFFB45309), maxLines = 1)' : "",
+        "}"
+      ].filter(Boolean).join("\n");
+    } else if (layer.kind === "line") {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       content = "Canvas(Modifier.fillMaxSize()) { drawLine(color = Color(android.graphics.Color.parseColor(" + safe(lineColor) + ")), start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), strokeWidth = size.height) }";
     } else if (layer.kind === "icon" && layer.iconSvg) {
@@ -509,6 +593,18 @@ export function generateSwiftProject(project: UxCodegenProject): string {
       child = views.length
         ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
         : "Text(" + safe(layer.iconName || layer.name) + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
+    } else if (layer.kind === "chart") {
+      const chart = parseUxUiStudioChartData(layer.text);
+      const points = chart.points.map((point) => "(" + safe(point.label) + ", " + (Number.isInteger(point.value) ? point.value.toFixed(1) : String(point.value)) + ")").join(", ");
+      const chartColor = "Color(hex: " + safe(layer.color) + ")";
+      const pointFontSize = Math.max(5, Math.round(layer.fontSize * 0.52));
+      const titleFontSize = Math.max(6, Math.round(layer.fontSize * 0.82));
+      const warningFontSize = Math.max(5, Math.round(layer.fontSize * 0.45));
+      const fallbackFontSize = Math.max(5, Math.round(layer.fontSize * 0.62));
+      const chartView = chart.points.length
+        ? "GeometryReader { geometry in let chartPoints: [(label: String, value: Double)] = [" + points + "]; let maximum = max(chartPoints.map { $0.value }.max() ?? 1, 1); HStack(alignment: .bottom, spacing: 2) { ForEach(Array(chartPoints.enumerated()), id: \\.offset) { entry in let point = entry.element; VStack(spacing: 1) { Text(point.value.rounded() == point.value ? String(format: \"%.0f\", point.value) : String(format: \"%.1f\", point.value)).font(.system(size: " + pointFontSize + ")); Spacer(minLength: 0); RoundedRectangle(cornerRadius: 2).fill(" + chartColor + ").frame(height: max(1, (geometry.size.height - 24) * CGFloat(point.value / maximum))); Text(point.label).font(.system(size: " + pointFontSize + ")).lineLimit(1).minimumScaleFactor(0.55) }.frame(maxWidth: .infinity, maxHeight: .infinity) } } }"
+        : "Text(\"Enter data as Label: value\").font(.system(size: " + fallbackFontSize + ")).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)";
+      child = "VStack(alignment: .leading, spacing: 2) { Text(" + safe(chart.title) + ").font(.system(size: " + titleFontSize + ", weight: .semibold)).lineLimit(1); " + chartView + (chart.invalidRows > 0 ? "; Text(" + safe(chart.invalidRows + " invalid row(s) ignored") + ").font(.system(size: " + warningFontSize + ")).foregroundStyle(.orange).lineLimit(1)" : "") + " }";
     } else if (layer.kind === "line") {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       child = "Rectangle().fill(Color(hex: " + safe(lineColor) + "))";

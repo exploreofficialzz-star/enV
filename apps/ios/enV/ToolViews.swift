@@ -6668,6 +6668,38 @@ private struct NativeIOSTrackRow: View {
 
 
 
+struct UxUiStudioChartPoint: Equatable {
+    let label: String
+    let value: Double
+}
+struct UxUiStudioChartSpec {
+    let title: String
+    let points: [UxUiStudioChartPoint]
+    let invalidRows: Int
+}
+func uxUiParseChartData(_ source: String) -> UxUiStudioChartSpec {
+    let lines = source.components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    let title = lines.first ?? "Untitled chart"
+    var points: [UxUiStudioChartPoint] = []
+    var invalidRows = 0
+    for line in lines.dropFirst() {
+        guard let separator = line.firstIndex(where: { $0 == ":" || $0 == "," || $0 == "=" }) else {
+            invalidRows += 1
+            continue
+        }
+        let label = String(line[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let valueText = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(valueText), value.isFinite, value >= 0, !label.isEmpty, points.count < 8 else {
+            invalidRows += 1
+            continue
+        }
+        points.append(UxUiStudioChartPoint(label: label, value: value))
+    }
+    return UxUiStudioChartSpec(title: title, points: points, invalidRows: invalidRows)
+}
+
 private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var kind: String
@@ -6705,6 +6737,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
     var rotation: Double = 0
+    var prototypeTargetScreenID: String = ""
 
     init(
         id: UUID = UUID(), kind: String, name: String, x: Int, y: Int,
@@ -6719,7 +6752,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         minWidth: Int = 0, maxWidth: Int = 0,
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
-        componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0
+        componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0,
+        prototypeTargetScreenID: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -6757,6 +6791,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
         self.rotation = rotation
+        self.prototypeTargetScreenID = prototypeTargetScreenID
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -6766,6 +6801,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         case fontFamily, fontSize, fontWeight, lineHeight
         case horizontalConstraint, verticalConstraint, minWidth, maxWidth, visibleOn
         case referenceWidth, referenceHeight, componentKey, iconViewBox, rotation
+        case prototypeTargetScreenID = "prototypeTargetScreenId"
     }
 
     init(from decoder: Decoder) throws {
@@ -6806,6 +6842,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         componentKey = try c.decodeIfPresent(String.self, forKey: .componentKey) ?? ""
         iconViewBox = try c.decodeIfPresent(String.self, forKey: .iconViewBox) ?? "0 0 24 24"
         rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
+        prototypeTargetScreenID = try c.decodeIfPresent(String.self, forKey: .prototypeTargetScreenID) ?? ""
     }
 }
 
@@ -7263,6 +7300,17 @@ private struct UxUiNativeTokens: Codable, Equatable {
     ]
     var spacing: [Int] = [4, 8, 12, 16, 24, 32, 48]
 }
+private struct UxUiNativeScreen: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var target: String
+    var background: String
+    var customArtboard: Bool
+    var customWidth: Int
+    var customHeight: Int
+    var elements: [UxUiNativeLayer]
+    var updatedAt: String = ISO8601DateFormatter().string(from: Date())
+}
 private struct UxUiNativeProject: Codable {
     var schemaVersion = 2
     var name: String
@@ -7276,6 +7324,8 @@ private struct UxUiNativeProject: Codable {
     var aiPrompt: String
     var generatedCode: [String: String]? = nil
     var updatedAt: String
+    var screens: [UxUiNativeScreen]? = nil
+    var activeScreenID: String? = nil
 }
 private struct UxUiViewport: Codable { var width: Int; var height: Int }
 
@@ -7655,12 +7705,44 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
     return lines.joined(separator: "\n")
 }
 
+private struct UxUiStudioToolkit: Identifiable { let id: String; let name: String; let description: String; let status: String }
+private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
+    UxUiStudioToolkit(id: "icons", name: "Icon Studio", description: "Discover, style, import and reuse icons.", status: "Connected"),
+    UxUiStudioToolkit(id: "typography", name: "Typography Studio", description: "Font discovery, typography and embedded font assets.", status: "Connected"),
+    UxUiStudioToolkit(id: "color", name: "Color Studio", description: "Palette, semantic colors and design tokens.", status: "Connected"),
+    UxUiStudioToolkit(id: "background", name: "Gradient & Background Studio", description: "Canvas background and imported image backgrounds.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "effects", name: "Effects Studio", description: "Border, radius, opacity, shadow and visual depth.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "illustrations", name: "Illustration Studio", description: "Import and position SVG or image illustrations.", status: "Import"),
+    UxUiStudioToolkit(id: "media", name: "Image & Media Studio", description: "Import photos, screenshots and media previews.", status: "Import"),
+    UxUiStudioToolkit(id: "brand", name: "Brand Studio", description: "Brand colors, font tokens and reusable component templates.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "motion", name: "Motion Studio", description: "Rotation and visual transition settings.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "components", name: "UI Components, Kits & Patterns", description: "Reusable controls, cards, forms and navigation elements.", status: "Connected"),
+    UxUiStudioToolkit(id: "device", name: "Device Mockup Studio", description: "Preview screen contents in mobile, tablet and desktop frames.", status: "Connected"),
+    UxUiStudioToolkit(id: "responsive", name: "Responsive Design, Layout & Canvas", description: "Viewport size, anchors, grid and responsive visibility.", status: "Connected"),
+    UxUiStudioToolkit(id: "projects", name: "Screen & Project Manager", description: "Projects, drafts, presets and import.", status: "Connected"),
+    UxUiStudioToolkit(id: "layers", name: "Layers & Object Manager", description: "Select, reorder, duplicate and delete layers.", status: "Connected"),
+    UxUiStudioToolkit(id: "prototype", name: "Prototype Studio", description: "Tap-linked screen navigation and history; overlay interactions remain unsupported.", status: "Partial: screen links"),
+    UxUiStudioToolkit(id: "design-system", name: "Design System Studio", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "accessibility", name: "Accessibility Studio", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
+    UxUiStudioToolkit(id: "content", name: "Content & Placeholder Studio", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "data-viz", name: "Data Visualization Studio", description: "Edit saved numeric data and preview bar charts.", status: "Editable bar charts"),
+    UxUiStudioToolkit(id: "patterns", name: "Patterns & Textures Studio", description: "Grid and decorative vector patterns.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "3d", name: "3D Studio", description: "Live 3D models, camera and lighting.", status: "Not complete"),
+    UxUiStudioToolkit(id: "platform", name: "Platform Design Kits", description: "Mobile, tablet and desktop conventions.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "assets", name: "Asset Manager", description: "Import and replace supported assets.", status: "Import"),
+    UxUiStudioToolkit(id: "handoff", name: "Export & Design Handoff Studio", description: "Export PDF, JSON and source handoff.", status: "Connected"),
+    UxUiStudioToolkit(id: "inspiration", name: "Inspiration & Reference Studio", description: "Import visual references for comparison.", status: "Import"),
+    UxUiStudioToolkit(id: "qa", name: "Design QA Studio", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
+]
+
 private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
     @State private var didInitialize = false
     @State private var showComponentPalette = false
-    @State private var toolkitTab = "Icons"
+    @State private var toolkitTab = "All 26"
+    @State private var activeToolkitID = "icons"
+    @State private var qaReport: [String] = []
     @State private var toolkitQuery = ""
     @State private var isImportingProjectJSON = false
     @State private var isImportingSVGIcon = false
@@ -7680,6 +7762,12 @@ private struct NativeUxUiStudioView: View {
     @State private var spacingDraft = "20"
     @State private var reusableComponents: [UxUiNativeLayer] = []
     @State private var elements: [UxUiNativeLayer] = []
+    @State private var screens: [UxUiNativeScreen] = [UxUiNativeScreen(id: "screen-home", name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [])]
+    @State private var activeScreenID = "screen-home"
+    @State private var prototypePreview = false
+    @State private var prototypeHistory: [String] = []
+    @State private var prototypeStartScreenID = "screen-home"
+    @State private var showScreenManager = false
     @State private var undoHistory: [[UxUiNativeLayer]] = []
     @State private var redoHistory: [[UxUiNativeLayer]] = []
     @State private var dragOrigins: [UUID: CGPoint] = [:]
@@ -7712,6 +7800,11 @@ private struct NativeUxUiStudioView: View {
     private var boardWidth: Int { customArtboard ? customWidth : defaultBoardWidth }
     private var boardHeight: Int { customArtboard ? customHeight : defaultBoardHeight }
     private var selectedIndex: Int? { elements.firstIndex(where: { $0.id == selectedID }) }
+    private var hasActivePrototypeLinks: Bool {
+        elements.contains { layer in
+            !layer.prototypeTargetScreenID.isEmpty && screens.contains { $0.id == layer.prototypeTargetScreenID }
+        }
+    }
 
     private func checkpoint() {
         undoHistory.append(elements)
@@ -7792,7 +7885,8 @@ private struct NativeUxUiStudioView: View {
             breakpoints: ["mobile": 480, "tablet": 768, "desktop": 1024],
             tokens: tokens, reusableComponents: reusableComponents,
             elements: elements, aiPrompt: aiPrompt, generatedCode: generated,
-            updatedAt: ISO8601DateFormatter().string(from: Date())
+            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            screens: screens, activeScreenID: activeScreenID
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -8074,14 +8168,15 @@ private struct NativeUxUiStudioView: View {
             }
         }
         .onChange(of: projectName) { _ in saveDraft() }
-        .onChange(of: target) { _ in saveDraft() }
-        .onChange(of: background) { _ in saveDraft() }
-        .onChange(of: customArtboard) { _ in saveDraft() }
-        .onChange(of: customWidth) { _ in saveDraft() }
-        .onChange(of: customHeight) { _ in saveDraft() }
+        .onChange(of: target) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: background) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customArtboard) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customWidth) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: customHeight) { _ in captureActiveScreen(); saveDraft() }
         .onChange(of: tokens) { _ in saveDraft() }
         .onChange(of: reusableComponents) { _ in saveDraft() }
-        .onChange(of: elements) { _ in saveDraft() }
+        .onChange(of: elements) { _ in captureActiveScreen(); saveDraft() }
+        .onChange(of: screens) { _ in saveDraft() }
     }
 
     private var safeFileName: String {
@@ -8141,7 +8236,116 @@ private struct NativeUxUiStudioView: View {
             .font(.envScaled(size: 12, weight: .semibold))
             artboardPreview
 
-            HStack(spacing: 10) {
+            HStack(spacing: 7) {
+                Text("App screens").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                Spacer()
+                Button { addAppScreen() } label: {
+                    Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.envSurface)
+                }.accessibilityLabel("Add app screen")
+            }
+            if showScreenManager {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(screens.count) \(screens.count == 1 ? "screen" : "screens") · tap a thumbnail to open it")
+                        .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                        ForEach(screens) { screen in
+                            VStack(alignment: .leading, spacing: 7) {
+                                Button { openAppScreen(screen.id) } label: {
+                                    GeometryReader { proxy in
+                                        let w = screen.customArtboard ? screen.customWidth : (screen.target == "mobile" ? 390 : screen.target == "tablet" ? 768 : 1440)
+                                        let h = screen.customArtboard ? screen.customHeight : (screen.target == "mobile" ? 844 : screen.target == "tablet" ? 1024 : 900)
+                                        let scale = min(proxy.size.width / CGFloat(max(1, w)), proxy.size.height / CGFloat(max(1, h)))
+                                        ZStack(alignment: .topLeading) {
+                                            uxUiUIColor(screen.background)
+                                            ForEach(Array(screen.elements.prefix(10))) { item in
+                                                let rendered = uxUiResolvedLayer(item, boardWidth: w, boardHeight: h)
+                                                layerPreview(rendered, scale: scale)
+                                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale,
+                                                              y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                            }
+                                        }
+                                        .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
+                                    }
+                                    .frame(height: 124)
+                                    .background(uxUiUIColor(screen.background), in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Open \(screen.name)")
+                                TextField("Screen name", text: Binding(
+                                    get: { screens.first(where: { $0.id == screen.id })?.name ?? screen.name },
+                                    set: { renameAppScreen(screen.id, name: $0) }
+                                ))
+                                .font(.envScaled(size: 11, weight: .semibold))
+                                .padding(6)
+                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                                .accessibilityLabel("Screen name \(screen.name)")
+                                Text("\(screen.target.capitalized) · \(screen.elements.count) layers")
+                                    .font(.envScaled(size: 9, weight: .regular)).foregroundStyle(Color.envMuted)
+                                HStack(spacing: 5) {
+                                    Button { openAppScreen(screen.id) } label: {
+                                        Text(screen.id == activeScreenID ? "Editing" : "Open")
+                                            .font(.envScaled(size: 10, weight: .semibold))
+                                            .frame(maxWidth: .infinity).padding(.vertical, 7)
+                                            .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+                                    }.disabled(screen.id == activeScreenID).buttonStyle(.plain)
+                                    Button { reorderAppScreen(screen.id, by: -1) } label: { Image(systemName: "arrow.up").frame(width: 26, height: 30) }
+                                        .disabled(screens.first?.id == screen.id).accessibilityLabel("Move \(screen.name) earlier")
+                                    Button { reorderAppScreen(screen.id, by: 1) } label: { Image(systemName: "arrow.down").frame(width: 26, height: 30) }
+                                        .disabled(screens.last?.id == screen.id).accessibilityLabel("Move \(screen.name) later")
+                                    Button { duplicateAppScreen(screen.id) } label: { Image(systemName: "plus.square.on.square").frame(width: 26, height: 30) }
+                                        .accessibilityLabel("Duplicate \(screen.name)")
+                                    Button { deleteAppScreen(screen.id) } label: { Image(systemName: "trash").frame(width: 26, height: 30) }
+                                        .disabled(screens.count <= 1).accessibilityLabel("Delete \(screen.name)")
+                                }
+                                .font(.system(size: 10, weight: .semibold))
+                                .buttonStyle(.bordered)
+                                .tint(Color.envInk)
+                            }
+                            .padding(8)
+                            .background(screen.id == activeScreenID ? Color.envAccent.opacity(0.07) : Color.envCard, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        }
+                    }
+                    Button { showScreenManager = false } label: {
+                        Text("Close screen manager").font(.envScaled(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity).padding(8)
+                    }.buttonStyle(.bordered)
+                }
+                .padding(10)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            HStack(spacing: 7) {
+                Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 42) }
+                    .disabled(undoHistory.isEmpty)
+                    .accessibilityLabel("Undo")
+                Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 42) }
+                    .disabled(redoHistory.isEmpty)
+                    .accessibilityLabel("Redo")
+                if prototypePreview {
+                    Button { backPrototypePreview() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 42) }
+                        .disabled(prototypeHistory.isEmpty)
+                        .accessibilityLabel("Back in prototype preview")
+                    Button { stopPrototypePreview() } label: { Image(systemName: "xmark.circle").frame(width: 36, height: 42) }
+                        .accessibilityLabel("Exit prototype preview")
+                } else {
+                    Button { startPrototypePreview() } label: { Image(systemName: "play.rectangle").frame(width: 36, height: 42) }
+                        .disabled(!hasActivePrototypeLinks)
+                        .accessibilityLabel("Preview prototype")
+                }
+                Button { showScreenManager.toggle() } label: {
+                    Image(systemName: "square.grid.2x2").font(.system(size: 17, weight: .semibold))
+                        .frame(width: 38, height: 42).foregroundStyle(Color.envInk)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
+                Spacer(minLength: 3)
                 Button { showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
                         .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
@@ -8150,19 +8354,22 @@ private struct NativeUxUiStudioView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showComponentPalette ? "Close elements" : "Add elements")
-                Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward") }
-                    .disabled(undoHistory.isEmpty).frame(width: 38, height: 38)
-                Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward") }
-                    .disabled(redoHistory.isEmpty).frame(width: 38, height: 38)
-                Spacer()
-                Text("Drag · tap · style").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+                Spacer(minLength: 3)
+                VStack(spacing: 0) {
+                    Button { showScreenManager.toggle() } label: {
+                        Image(systemName: "square.grid.2x2").font(.system(size: 19, weight: .semibold))
+                            .frame(width: 40, height: 35).foregroundStyle(Color.envInk)
+                    }.accessibilityLabel("App screens").accessibilityValue(showScreenManager ? "Expanded" : "Collapsed")
+                    Text(String(screens.count)).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(Color.envMuted)
+                }
             }
+            if showScreenManager { appScreensPanel }
             if let index = selectedIndex {
                 selectedElementToolbar(for: index)
             }
             if showComponentPalette { componentPalette }
-            layerListPanel
-            if let index = selectedIndex { inspector(for: index) }
+            if showScreenManager { layerListPanel }
+            if showAdvancedInspector, let index = selectedIndex { inspector(for: index) }
             DisclosureGroup("Design system", isExpanded: $showDesignSystem) {
                 designSystemPanel
             }
@@ -8180,25 +8387,33 @@ private struct NativeUxUiStudioView: View {
                         uxUiUIColor(background)
                         ForEach(elements.filter { $0.visibleOn.contains(target) }) { item in
                             let rendered = uxUiResolvedLayer(item, boardWidth: boardWidth, boardHeight: boardHeight)
-                            layerPreview(rendered, scale: scale)
-                                .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
-                                .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
-                                .onTapGesture { selectedID = item.id }
-                                .simultaneousGesture(
-                                    DragGesture(minimumDistance: 2)
-                                        .onChanged { value in
-                                            selectedID = item.id
-                                            if dragOrigins[item.id] == nil {
-                                                checkpoint()
-                                                dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
+                            if prototypePreview {
+                                layerPreview(rendered, scale: scale)
+                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { navigatePrototype(to: item.prototypeTargetScreenID) }
+                            } else {
+                                layerPreview(rendered, scale: scale)
+                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
+                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
+                                    .onTapGesture { selectedID = item.id }
+                                    .simultaneousGesture(
+                                        DragGesture(minimumDistance: 2)
+                                            .onChanged { value in
+                                                selectedID = item.id
+                                                if dragOrigins[item.id] == nil {
+                                                    checkpoint()
+                                                    dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
+                                                }
+                                                guard let origin = dragOrigins[item.id],
+                                                      let index = elements.firstIndex(where: { $0.id == item.id }) else { return }
+                                                elements[index].x = max(0, Int((origin.x + value.translation.width / scale).rounded()))
+                                                elements[index].y = max(0, Int((origin.y + value.translation.height / scale).rounded()))
                                             }
-                                            guard let origin = dragOrigins[item.id],
-                                                  let index = elements.firstIndex(where: { $0.id == item.id }) else { return }
-                                            elements[index].x = max(0, Int((origin.x + value.translation.width / scale).rounded()))
-                                            elements[index].y = max(0, Int((origin.y + value.translation.height / scale).rounded()))
-                                        }
-                                        .onEnded { _ in dragOrigins[item.id] = nil }
-                                )
+                                            .onEnded { _ in dragOrigins[item.id] = nil }
+                                    )
+                            }
                         }
                     }
                     .frame(width: CGFloat(boardWidth) * scale, height: CGFloat(boardHeight) * scale, alignment: .topLeading)
@@ -8224,7 +8439,7 @@ private struct NativeUxUiStudioView: View {
                         }.offset(y: 32)
                     }
                 }
-                Text("Tap or drag to shape your design.")
+                Text(prototypePreview ? "Tap linked elements to navigate. Use Back to retrace the flow." : "Tap or drag to shape your design.")
                     .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
@@ -8297,6 +8512,115 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 
+    private func runStudioAudit() {
+        var findings: [String] = []
+        if elements.isEmpty { findings.append("No layers have been added yet.") }
+        for item in elements {
+            if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { findings.append("An unnamed layer exists.") }
+            if item.x < 0 || item.y < 0 || item.x + item.width > boardWidth || item.y + item.height > boardHeight { findings.append("\(item.name) extends beyond the current artboard.") }
+            if item.width < 44 || item.height < 44 { findings.append("\(item.name) may be smaller than a comfortable touch target.") }
+            if item.kind == "icon" && (item.iconSvg ?? "").isEmpty { findings.append("\(item.name) has no embedded icon SVG.") }
+            if item.kind == "image" && (item.imageData ?? "").isEmpty { findings.append("\(item.name) has no image data.") }
+        }
+        let decorativeKinds: Set<String> = ["image", "icon", "rect", "ellipse", "divider", "spacer", "triangle", "diamond", "hexagon", "star", "line"]
+        for item in elements where !decorativeKinds.contains(item.kind) && !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let rawFill = item.fill.trimmingCharacters(in: .whitespacesAndNewlines)
+            let surface = rawFill.isEmpty || rawFill.lowercased() == "transparent" || rawFill.lowercased() == "none" ? background : rawFill
+            guard let ratio = NativeAccessibilityEngine.contrastRatio(foreground: item.color, background: surface) else {
+                findings.append("\(item.name) text contrast could not be calculated for these colors; manually review contrast.")
+                continue
+            }
+            let large = item.fontSize >= 18 || (item.fontSize >= 14 && item.fontWeight >= 700)
+            let threshold = large ? 3.0 : 4.5
+            if ratio + 0.000001 < threshold {
+                findings.append("\(item.name) text contrast is \(String(format: "%.2f", ratio)):1; WCAG AA \(large ? "large-text" : "normal-text") requires at least \(String(format: "%.1f", threshold)):1 for this solid-color pair.")
+            }
+        }
+        for i in elements.indices {
+            for j in elements.indices where j > i {
+                let a = elements[i], b = elements[j]
+                if min(a.x + a.width, b.x + b.width) > max(a.x, b.x) && min(a.y + a.height, b.y + b.height) > max(a.y, b.y) {
+                    findings.append("\(a.name) overlaps \(b.name).")
+                }
+            }
+        }
+        qaReport = findings
+        notice = "Studio check completed: \(findings.count) potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
+    }
+    private var appScreensPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("App screens").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                    Text("\(screens.count) screens · tap a thumbnail to edit it").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                }
+                Spacer(minLength: 6)
+                Button { addAppScreen() } label: {
+                    Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
+                        .padding(.horizontal, 9).padding(.vertical, 8)
+                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.envSurface)
+                }.buttonStyle(.plain).accessibilityLabel("Add app screen")
+            }
+            ForEach(screens) { screen in
+                let screenIndex = screens.firstIndex(where: { $0.id == screen.id }) ?? 0
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 10) {
+                        Button { openAppScreen(screen.id) } label: {
+                            ZStack(alignment: .topLeading) {
+                                uxUiUIColor(screen.background)
+                                ForEach(Array(screen.elements.prefix(5))) { layer in
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(uxUiUIColor(layer.fill == "transparent" ? layer.color : layer.fill))
+                                        .frame(width: max(3, min(35, CGFloat(layer.width) * 0.12)),
+                                               height: max(2, min(14, CGFloat(layer.height) * 0.12)))
+                                        .position(x: max(5, min(39, CGFloat(layer.x) * 0.1)),
+                                                  y: max(5, min(55, CGFloat(layer.y) * 0.1)))
+                                }
+                            }
+                            .frame(width: 48, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(screen.name)")
+                        VStack(alignment: .leading, spacing: 3) {
+                            TextField("Screen name", text: Binding(get: { screen.name }, set: { renameAppScreen(screen.id, name: $0) }))
+                                .font(.envScaled(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.envInk)
+                                .textFieldStyle(.roundedBorder)
+                            Text("\(screen.target.capitalized) · \(screen.elements.count) layers · \(screen.customWidth) × \(screen.customHeight)")
+                                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                            if screen.id == activeScreenID {
+                                Text("Currently editing").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    HStack(spacing: 6) {
+                        Button { openAppScreen(screen.id) } label: { Label("Open", systemImage: "arrow.up.right.square") }
+                            .buttonStyle(.bordered).disabled(screen.id == activeScreenID)
+                        Button { reorderAppScreen(screen.id, by: -1) } label: { Image(systemName: "arrow.up") }
+                            .buttonStyle(.bordered).disabled(screenIndex == 0).accessibilityLabel("Move screen earlier")
+                        Button { reorderAppScreen(screen.id, by: 1) } label: { Image(systemName: "arrow.down") }
+                            .buttonStyle(.bordered).disabled(screenIndex == screens.count - 1).accessibilityLabel("Move screen later")
+                        Button { duplicateAppScreen(screen.id) } label: { Image(systemName: "plus.square.on.square") }
+                            .buttonStyle(.bordered).accessibilityLabel("Duplicate \(screen.name)")
+                        Button(role: .destructive) { deleteAppScreen(screen.id) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.bordered).disabled(screens.count <= 1).accessibilityLabel("Delete \(screen.name)")
+                        Spacer(minLength: 0)
+                    }.font(.envScaled(size: 10, weight: .medium))
+                }
+                .padding(9)
+                .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
+            }
+        }
+        .padding(12)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
     private var componentPalette: some View {
         let components: [(label: String, icon: String, kind: String)] = [
             ("Text", "textformat", "text"), ("Button", "rectangle.roundedtop", "button"),
@@ -8339,7 +8663,7 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
-                    ForEach(["Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
+                    ForEach(["All 26", "Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
                         Button { toolkitTab = tab } label: {
                             Text(tab).font(.envScaled(size: 11, weight: .semibold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
@@ -8351,7 +8675,51 @@ private struct NativeUxUiStudioView: View {
                 }
             }
             Group {
-                if toolkitTab == "Elements" {
+                if toolkitTab == "All 26" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("All 26 Studio toolkits").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                        Text("Choose a toolkit to reach its connected native controls. Systems needing a separate engine are explicitly labelled rather than represented by inactive mock controls.").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                        ForEach(uxUiStudioToolkits.filter { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) || $0.id.localizedCaseInsensitiveContains(toolkitQuery) }) { toolkit in
+                            Button {
+                                activeToolkitID = toolkit.id
+                                switch toolkit.id {
+                                case "icons": toolkitTab = "Icons"
+                                case "typography": toolkitTab = "Fonts"
+                                case "color", "brand", "design-system": toolkitTab = "Tokens"
+                                case "background": toolkitTab = "Tokens"; showAdvancedCanvas = true
+                                case "effects", "motion": showAdvancedInspector = true; notice = "Use selected-layer controls and Fine-tune design for supported visual properties."
+                                case "illustrations", "media", "assets", "inspiration": toolkitTab = "Elements"; isImportingImage = true
+                                case "components": toolkitTab = "Elements"
+                                case "device", "platform": showAdvancedCanvas = true; notice = "Use the viewport target controls to switch between device previews."
+                                case "responsive": showAdvancedCanvas = true
+                                case "projects": toolkitTab = "Presets"
+                                case "layers": showAllLayers = true
+                                case "prototype": showAdvancedInspector = selectedIndex != nil; notice = "Assign a layer destination with the selected-layer menu, then Preview prototype. Overlay interactions remain unsupported."
+                                case "content": addLayer("text"); if let index = elements.indices.last { elements[index].name = "Welcome heading"; elements[index].text = "Welcome back" }
+                                case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67" }
+                                case "patterns": addLayer("star"); if let index = elements.indices.last { elements[index].name = "Decorative star" }
+                                case "3d": notice = "Live GLB/GLTF rendering, lighting and camera controls are not implemented in this editor. Import a rendered preview instead."
+                                case "accessibility", "qa": runStudioAudit()
+                                case "handoff": showComponentPalette = false; notice = "Use the Design handoff panel for PDF, JSON and source exports."
+                                default: break
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack { Text(toolkit.name).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk); Spacer(minLength: 4); Text(toolkit.status).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(toolkit.status == "Not complete" ? Color.red : Color.envAccent) }
+                                    Text(toolkit.description).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    if activeToolkitID == toolkit.id { Text("Selected toolkit").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent) }
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                                    .background(activeToolkitID == toolkit.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(activeToolkitID == toolkit.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                            }.buttonStyle(.plain)
+                        }
+                        if activeToolkitID == "qa" || activeToolkitID == "accessibility" || !qaReport.isEmpty {
+                            Text("Review results · \(qaReport.count)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                            if qaReport.isEmpty { Text("No findings in the limited checks run.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                            ForEach(Array(qaReport.prefix(80).enumerated()), id: \.offset) { entry in Text("• " + entry.element).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                        }
+                    }
+                } else if toolkitTab == "Elements" {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ForEach(components.indices.filter { components[$0].label.localizedCaseInsensitiveContains(toolkitQuery) || components[$0].kind.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { index in
                             addButton(components[index].label, icon: components[index].icon, kind: components[index].kind)
@@ -8433,31 +8801,63 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func selectedElementToolbar(for index: Int) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                Text(elements[index].name).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
-                if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
-                    Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+            Picker("On tap, navigate to", selection: Binding(
+                get: { elements[index].prototypeTargetScreenID },
+                set: { destination in checkpoint(); elements[index].prototypeTargetScreenID = destination }
+            )) {
+                Text("No navigation").tag("")
+                ForEach(screens.filter { $0.id != activeScreenID }) { screen in
+                    Text(screen.name).tag(screen.id)
                 }
-                Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint()
-                    elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x))
-                    elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y))
-                } label: { Label("Size +", systemImage: "plus.magnifyingglass") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint()
-                    elements[index].width = max(12, Int(Double(elements[index].width) * 0.9))
-                    elements[index].height = max(12, Int(Double(elements[index].height) * 0.9))
-                } label: { Label("Size −", systemImage: "minus.magnifyingglass") }.buttonStyle(.bordered)
-                Button {
-                    checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360)
-                } label: { Label("Rotate", systemImage: "rotate.right") }.buttonStyle(.bordered)
-                Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
-                Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
-                Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
-            }.padding(.vertical, 3)
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("Prototype destination for \(elements[index].name)")
+            HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 4) {
+                    Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
+                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 35, height: 35) }
+                    HStack(spacing: 3) {
+                        Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 35, height: 35) }
+                    }
+                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 35, height: 35) }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Move selected element")
+                Spacer(minLength: 2)
+                VStack(spacing: 4) {
+                    Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
+                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 35, height: 35) }
+                    HStack(spacing: 3) {
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.left").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].rotation = 0 } label: { Text("0°").font(.envScaled(size: 10, weight: .semibold)).frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.right").frame(width: 35, height: 35) }
+                    }
+                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 35, height: 35) }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Adjust selected element size and rotation")
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
+                        Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+                    }
+                    Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
+                    Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
+                    Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
+                    Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
+                }.padding(.vertical, 3)
+            }
         }
+        .padding(10)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
     }
 
     private var layerListPanel: some View {
@@ -8577,6 +8977,34 @@ private struct NativeUxUiStudioView: View {
                         Text(item.text).font(.system(size: max(5, CGFloat(item.fontSize) * scale)))
                             .foregroundStyle(uxUiUIColor(item.color)).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if item.kind == "chart" {
+                    let chart = uxUiParseChartData(item.text)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(chart.title).font(.system(size: max(6, CGFloat(item.fontSize) * scale * 0.82), weight: .semibold)).lineLimit(1)
+                        if chart.points.isEmpty {
+                            Text("Enter data as Label: value").font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.62)))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        } else {
+                            GeometryReader { geometry in
+                                let maximum = max(chart.points.map(\.value).max() ?? 1, 1)
+                                HStack(alignment: .bottom, spacing: 2) {
+                                    ForEach(Array(chart.points.enumerated()), id: \.offset) { entry in
+                                        let point = entry.element
+                                        VStack(spacing: 1) {
+                                            Text(String(format: point.value.rounded() == point.value ? "%.0f" : "%.1f", point.value)).font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.52))).lineLimit(1)
+                                            Spacer(minLength: 0)
+                                            RoundedRectangle(cornerRadius: 2).fill(uxUiUIColor(item.color))
+                                                .frame(height: max(1, (geometry.size.height - 24) * CGFloat(point.value / maximum)))
+                                            Text(point.label).font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.52))).lineLimit(1).minimumScaleFactor(0.55)
+                                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    }
+                                }
+                            }
+                        }
+                        if chart.invalidRows > 0 {
+                            Text("\(chart.invalidRows) invalid row(s) ignored").font(.system(size: max(5, CGFloat(item.fontSize) * scale * 0.45))).foregroundStyle(.orange).lineLimit(1)
+                        }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else {
                     Text(item.text).font(uxUiFont(for: item, scale: scale))
                         .foregroundStyle(uxUiUIColor(item.color)).multilineTextAlignment(.leading).lineLimit(6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -8607,7 +9035,7 @@ private struct NativeUxUiStudioView: View {
                 Text(binding.wrappedValue.kind).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
             }
             if ["text", "button", "card", "input", "badge", "logo", "navbar", "tabbar", "tabs", "row", "menu", "modal", "tooltip", "breadcrumb", "list", "table", "chart", "video"].contains(binding.wrappedValue.kind) {
-                inspectorTextField("Text on canvas", text: binding.text, multiline: true)
+                inspectorTextField(binding.wrappedValue.kind == "chart" ? "Chart data (title, then Label: value)" : "Text on canvas", text: binding.text, multiline: true)
             }
             Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
             HStack(spacing: 6) {
@@ -8679,7 +9107,7 @@ private struct NativeUxUiStudioView: View {
     private func inspectorIdentityFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         inspectorTextField("Layer name", text: binding.name)
         if !["icon", "image", "ellipse", "rect", "divider"].contains(binding.wrappedValue.kind) {
-            inspectorTextField("Text content", text: binding.text, multiline: true)
+            inspectorTextField(binding.wrappedValue.kind == "chart" ? "Chart data (title, then Label: value)" : "Text content", text: binding.text, multiline: true)
         }
     }
 
@@ -8965,7 +9393,158 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.envAccent : Color.envBorder, lineWidth: 1))
     }
 
+    private func captureActiveScreen() {
+        guard let index = screens.firstIndex(where: { $0.id == activeScreenID }) else { return }
+        let current = screens[index]
+        if current.target == target && current.background == background &&
+            current.customArtboard == customArtboard && current.customWidth == customWidth &&
+            current.customHeight == customHeight && current.elements == elements { return }
+        var updated = current
+        updated.target = target; updated.background = background
+        updated.customArtboard = customArtboard
+        updated.customWidth = customWidth; updated.customHeight = customHeight
+        updated.elements = elements
+        updated.updatedAt = ISO8601DateFormatter().string(from: Date())
+        screens[index] = updated
+    }
+
+    private func openAppScreen(_ id: String) {
+        captureActiveScreen()
+        guard let screen = screens.first(where: { $0.id == id }) else { return }
+        activeScreenID = screen.id
+        target = screen.target; background = screen.background
+        customArtboard = screen.customArtboard
+        customWidth = screen.customWidth; customHeight = screen.customHeight
+        elements = screen.elements; selectedID = elements.first?.id
+        undoHistory = []; redoHistory = []
+        showAdvancedInspector = false
+        notice = "Opened \(screen.name)."
+    }
+
+    private func startPrototypePreview() {
+        captureActiveScreen()
+        guard hasActivePrototypeLinks else {
+            activeToolkitID = "prototype"
+            showComponentPalette = true
+            notice = "Select a layer and assign a destination screen before previewing."
+            return
+        }
+        prototypeStartScreenID = activeScreenID
+        prototypeHistory = []
+        prototypePreview = true
+        selectedID = nil
+        showScreenManager = false
+        showComponentPalette = false
+        showAdvancedInspector = false
+        notice = "Prototype preview started. Tap linked elements to navigate."
+    }
+
+    private func navigatePrototype(to destinationID: String) {
+        guard !destinationID.isEmpty, destinationID != activeScreenID, screens.contains(where: { $0.id == destinationID }) else {
+            notice = "This element has no valid screen destination."
+            return
+        }
+        prototypeHistory.append(activeScreenID)
+        openAppScreen(destinationID)
+        selectedID = nil
+    }
+
+    private func backPrototypePreview() {
+        guard let previous = prototypeHistory.popLast() else { return }
+        openAppScreen(previous)
+        selectedID = nil
+    }
+
+    private func stopPrototypePreview() {
+        let start = prototypeStartScreenID
+        prototypePreview = false
+        prototypeHistory = []
+        if start != activeScreenID && screens.contains(where: { $0.id == start }) {
+            openAppScreen(start)
+        }
+        selectedID = nil
+        notice = "Returned to design editing."
+    }
+
+    private func addAppScreen() {
+        captureActiveScreen()
+        let screen = UxUiNativeScreen(
+            id: UUID().uuidString, name: "Screen \(screens.count + 1)", target: target,
+            background: background, customArtboard: customArtboard,
+            customWidth: boardWidth, customHeight: boardHeight, elements: []
+        )
+        screens.append(screen)
+        openAppScreen(screen.id)
+        showScreenManager = true
+        notice = "\(screen.name) added. Add elements to design this screen."
+    }
+
+    private func duplicateAppScreen(_ id: String) {
+        captureActiveScreen()
+        guard let source = screens.first(where: { $0.id == id }) else { return }
+        let clonedLayers = source.elements.map { layer -> UxUiNativeLayer in
+            var copy = layer; copy.id = UUID(); copy.name += " copy"; return copy
+        }
+        let duplicate = UxUiNativeScreen(
+            id: UUID().uuidString, name: source.name + " copy", target: source.target,
+            background: source.background, customArtboard: source.customArtboard,
+            customWidth: source.customWidth, customHeight: source.customHeight, elements: clonedLayers
+        )
+        screens.append(duplicate)
+        openAppScreen(duplicate.id)
+        notice = "Duplicated \(duplicate.name)."
+    }
+
+    private func deleteAppScreen(_ id: String) {
+        guard screens.count > 1, let index = screens.firstIndex(where: { $0.id == id }) else {
+            notice = "A project must keep at least one screen."; return
+        }
+        if id == activeScreenID { captureActiveScreen() }
+        screens.removeAll { $0.id == id }
+        screens = screens.map { screen in
+            var updated = screen
+            updated.elements = screen.elements.map { layer in
+                var copy = layer
+                if copy.prototypeTargetScreenID == id { copy.prototypeTargetScreenID = "" }
+                return copy
+            }
+            return updated
+        }
+        elements = elements.map { layer in
+            var copy = layer
+            if copy.prototypeTargetScreenID == id { copy.prototypeTargetScreenID = "" }
+            return copy
+        }
+        prototypeHistory.removeAll { $0 == id }
+        if id == activeScreenID, !screens.isEmpty {
+            let nextIndex = min(max(0, index - 1), screens.count - 1)
+            let next = screens[nextIndex]
+            activeScreenID = next.id
+            target = next.target; background = next.background; customArtboard = next.customArtboard
+            customWidth = next.customWidth; customHeight = next.customHeight
+            elements = next.elements; selectedID = elements.first?.id
+            undoHistory = []; redoHistory = []
+        }
+        if prototypeStartScreenID == id { prototypeStartScreenID = activeScreenID }
+        notice = "Screen deleted. Any links to it were cleared."
+    }
+
+    private func reorderAppScreen(_ id: String, by offset: Int) {
+        captureActiveScreen()
+        guard let index = screens.firstIndex(where: { $0.id == id }) else { return }
+        let destination = index + offset
+        guard screens.indices.contains(destination) else { return }
+        screens.swapAt(index, destination)
+    }
+
+    private func renameAppScreen(_ id: String, name: String) {
+        guard let index = screens.firstIndex(where: { $0.id == id }) else { return }
+        screens[index].name = String(name.prefix(70))
+        screens[index].updatedAt = ISO8601DateFormatter().string(from: Date())
+    }
+
     private func createNewProject() {
+        prototypePreview = false; prototypeHistory = []
         target = "mobile"
         customArtboard = false
         customWidth = 390
@@ -8975,6 +9554,8 @@ private struct NativeUxUiStudioView: View {
         tokens = UxUiNativeTokens()
         reusableComponents = []
         elements = []
+        let firstScreen = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: "mobile", background: "#FFFFFF", customArtboard: false, customWidth: 390, customHeight: 844, elements: [])
+        screens = [firstScreen]; activeScreenID = firstScreen.id; showScreenManager = false
         selectedID = nil
         undoHistory = []
         redoHistory = []
@@ -8997,6 +9578,8 @@ private struct NativeUxUiStudioView: View {
         elements = starterElements(target: nextTarget, preset: preset).map { item in
             var layer = item; layer.referenceWidth = customWidth; layer.referenceHeight = customHeight; return layer
         }
+        let firstScreen = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: nextTarget, background: background, customArtboard: customArtboard, customWidth: boardWidth, customHeight: boardHeight, elements: elements)
+        screens = [firstScreen]; activeScreenID = firstScreen.id; showScreenManager = false
         selectedID = elements.first?.id
         onboarding = false
         notice = "Design ready. Select a layer to adjust its exact specifications."
@@ -9087,7 +9670,7 @@ private struct NativeUxUiStudioView: View {
         case "search": newItem = UxUiNativeLayer(kind: kind, name: "Search field", x: 24, y: 420, width: 300, height: 48, text: "Search…", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "textarea": newItem = UxUiNativeLayer(kind: kind, name: "Text area", x: 24, y: 420, width: 300, height: 96, text: "Enter your message", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
         case "table": newItem = UxUiNativeLayer(kind: kind, name: "Data table", x: 24, y: 330, width: 320, height: 150, text: "Name       Status       Updated\nProject A  Active       Today\nProject B  Draft        Yesterday", fill: "#FFFFFF", borderWidth: 1, fontSize: 12)
-        case "chart": newItem = UxUiNativeLayer(kind: kind, name: "Bar chart", x: 24, y: 330, width: 300, height: 170, text: "Activity overview\nJan       Feb       Mar       Apr", fill: "#FFFFFF", borderWidth: 1, fontSize: 13)
+        case "chart": newItem = UxUiNativeLayer(kind: kind, name: "Bar chart", x: 24, y: 330, width: 300, height: 170, text: "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67", fill: "#FFFFFF", borderWidth: 1, fontSize: 13)
         case "modal": newItem = UxUiNativeLayer(kind: kind, name: "Dialog / modal", x: 24, y: 330, width: 310, height: 190, text: "Dialog title\nDescribe the action here.\nCancel          Confirm", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
         case "breadcrumb": newItem = UxUiNativeLayer(kind: kind, name: "Breadcrumb trail", x: 24, y: 330, width: 300, height: 34, text: "Home / Workspace / Current", color: "#475569", fontSize: 12)
         case "tooltip": newItem = UxUiNativeLayer(kind: kind, name: "Tooltip", x: 24, y: 330, width: 170, height: 38, text: "Helpful information", color: "#FFFFFF", fill: "#111827", radius: 8, fontSize: 12)
@@ -9121,7 +9704,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func saveDraft() {
-        guard !onboarding, !elements.isEmpty else { return }
+        guard !onboarding, (!elements.isEmpty || screens.count > 1) else { return }
         UserDefaults.standard.set(projectJSON, forKey: storageKey)
         hasSavedDraft = true
     }
@@ -9131,11 +9714,24 @@ private struct NativeUxUiStudioView: View {
               let project = try? JSONDecoder().decode(UxUiNativeProject.self, from: data) else {
             notice = "No valid local draft was found."; return
         }
-        projectName = project.name; target = project.target; background = project.background
-        customWidth = project.viewport.width; customHeight = project.viewport.height; customArtboard = true
+        projectName = project.name
         tokens = project.tokens ?? UxUiNativeTokens()
         reusableComponents = project.reusableComponents ?? []
-        elements = project.elements; selectedID = elements.first?.id; onboarding = false
+        if let savedScreens = project.screens, !savedScreens.isEmpty {
+            screens = savedScreens
+            let active = savedScreens.first(where: { $0.id == project.activeScreenID }) ?? savedScreens[0]
+            activeScreenID = active.id
+            target = active.target; background = active.background
+            customWidth = active.customWidth; customHeight = active.customHeight; customArtboard = active.customArtboard
+            elements = active.elements
+        } else {
+            target = project.target; background = project.background
+            customWidth = project.viewport.width; customHeight = project.viewport.height; customArtboard = true
+            let legacy = UxUiNativeScreen(id: UUID().uuidString, name: "Screen 1", target: project.target, background: project.background, customArtboard: true, customWidth: project.viewport.width, customHeight: project.viewport.height, elements: project.elements)
+            screens = [legacy]; activeScreenID = legacy.id
+            elements = project.elements
+        }
+        selectedID = elements.first?.id; onboarding = false
         notice = "Local design restored."
     }
 

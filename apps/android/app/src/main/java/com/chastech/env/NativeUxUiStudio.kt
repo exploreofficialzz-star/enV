@@ -18,6 +18,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,25 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+internal data class UxUiStudioChartPoint(val label: String, val value: Double)
+internal data class UxUiStudioChartSpec(val title: String, val points: List<UxUiStudioChartPoint>, val invalidRows: Int)
+
+internal fun uxUiParseChartData(source: String): UxUiStudioChartSpec {
+    val lines = source.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+    val title = lines.firstOrNull() ?: "Untitled chart"
+    val points = mutableListOf<UxUiStudioChartPoint>()
+    var invalidRows = 0
+    val rowPattern = Regex("^(.+?)\\s*[:,=]\\s*(\\+?(?:\\d+(?:\\.\\d*)?|\\.\\d+))$")
+    lines.drop(1).forEach { line ->
+        val match = rowPattern.matchEntire(line)
+        val label = match?.groupValues?.getOrNull(1)?.trim().orEmpty()
+        val value = match?.groupValues?.getOrNull(2)?.toDoubleOrNull()
+        if (label.isBlank() || value == null || !value.isFinite() || value < 0 || points.size >= 8) invalidRows++
+        else points.add(UxUiStudioChartPoint(label, value))
+    }
+    return UxUiStudioChartSpec(title, points, invalidRows)
+}
+
 private data class UxUiNativeLayer(
     val id: String, val kind: String, val name: String, val x: Int, val y: Int, val width: Int, val height: Int,
     val text: String, val color: String = "#111827", val fill: String = "transparent", val iconName: String = "", val iconSvg: String = "", val imageData: String = "", val fontData: String = "",
@@ -67,7 +87,44 @@ private data class UxUiNativeLayer(
     val horizontalConstraint: String = "left", val verticalConstraint: String = "top",
     val minWidth: Int = 0, val maxWidth: Int = 0, val visibleOn: String = "mobile,tablet,desktop",
     val referenceWidth: Int = 390, val referenceHeight: Int = 844, val componentKey: String = "",
-    val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f
+    val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f,
+    val prototypeTargetScreenId: String = ""
+)
+
+private data class UxNativeToolkit(val id: String, val name: String, val description: String, val panel: String, val status: String)
+private val uxNativeToolkits = listOf(
+    UxNativeToolkit("icons", "Icon Studio", "Discover, style, import and reuse icons.", "Icons", "Connected"),
+    UxNativeToolkit("typography", "Typography Studio", "Font discovery, typography and embedded font assets.", "Fonts", "Connected"),
+    UxNativeToolkit("color", "Color Studio", "Palette, semantic colors and design tokens.", "Tokens", "Connected"),
+    UxNativeToolkit("background", "Gradient & Background Studio", "Canvas background, image backgrounds and decorative surfaces.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("effects", "Effects Studio", "Border, radius, opacity, shadow and visual depth.", "Style", "Connected foundation"),
+    UxNativeToolkit("illustrations", "Illustration Studio", "Import and position SVG or image illustrations.", "Elements", "Import"),
+    UxNativeToolkit("media", "Image & Media Studio", "Import photos, screenshots and media previews.", "Elements", "Import"),
+    UxNativeToolkit("brand", "Brand Studio", "Brand colors, fonts and reusable component templates.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("motion", "Motion Studio", "Rotation and visual transition values.", "Style", "Connected foundation"),
+    UxNativeToolkit("components", "UI Components, Kits & Patterns", "Reusable controls, cards, forms and navigation elements.", "Elements", "Connected"),
+    UxNativeToolkit("device", "Device Mockup Studio", "Preview the screen in device frames.", "Device", "Connected"),
+    UxNativeToolkit("responsive", "Responsive Design, Layout & Canvas", "Viewport size, anchors, grid and responsive visibility.", "Canvas", "Connected"),
+    UxNativeToolkit("projects", "Screen & Project Manager", "Projects, drafts, presets and import.", "Presets", "Connected"),
+    UxNativeToolkit("layers", "Layers & Object Manager", "Select and reorder objects, duplicate and delete layers.", "Layers", "Connected"),
+    UxNativeToolkit("prototype", "Prototype Studio", "Assign tap destinations and preview connected screens.", "Prototype", "Partial: screen links"),
+    UxNativeToolkit("design-system", "Design System Studio", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("accessibility", "Accessibility Studio", "Structure and touch-target review.", "QA", "Advisory checks"),
+    UxNativeToolkit("content", "Content & Placeholder Studio", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
+    UxNativeToolkit("data-viz", "Data Visualization Studio", "Edit saved numeric data and preview bar charts.", "Chart", "Editable bar charts"),
+    UxNativeToolkit("patterns", "Patterns & Textures Studio", "Grid, vector shapes and decorative patterns.", "Pattern", "Starter actions"),
+    UxNativeToolkit("3d", "3D Studio", "3D models, camera and lighting.", "3D", "Not complete"),
+    UxNativeToolkit("platform", "Platform Design Kits", "Mobile, tablet and desktop conventions.", "Device", "Connected foundation"),
+    UxNativeToolkit("assets", "Asset Manager", "Import supported assets and replace artwork.", "Elements", "Import"),
+    UxNativeToolkit("handoff", "Export & Design Handoff Studio", "Export PDF, JSON and source handoff.", "Handoff", "Connected"),
+    UxNativeToolkit("inspiration", "Inspiration & Reference Studio", "Import visual references for comparison.", "Elements", "Import"),
+    UxNativeToolkit("qa", "Design QA Studio", "Review overlaps, bounds, labels and touch targets.", "QA", "Advisory checks")
+)
+
+private data class UxUiNativeScreen(
+    val id: String, val name: String, val target: String, val background: String,
+    val customArtboard: Boolean, val customWidth: Int, val customHeight: Int,
+    val elements: List<UxUiNativeLayer>, val updatedAt: Long = System.currentTimeMillis()
 )
 
 private fun uxNativeLayerX(layer: UxUiNativeLayer, boardWidth: Int): Int = when(layer.horizontalConstraint) {
@@ -315,7 +372,7 @@ private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray
         put("horizontalConstraint", element.horizontalConstraint); put("verticalConstraint", element.verticalConstraint)
         put("minWidth", element.minWidth); put("maxWidth", element.maxWidth); put("visibleOn", element.visibleOn)
         put("referenceWidth", element.referenceWidth); put("referenceHeight", element.referenceHeight); put("componentKey", element.componentKey)
-        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation)
+        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation); put("prototypeTargetScreenId", element.prototypeTargetScreenId)
     }) }
 }
 
@@ -332,7 +389,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
             horizontalConstraint=item.optString("horizontalConstraint","left"),verticalConstraint=item.optString("verticalConstraint","top"),
             minWidth=item.optInt("minWidth"),maxWidth=item.optInt("maxWidth"),visibleOn=item.optString("visibleOn","mobile,tablet,desktop"),
             referenceWidth=item.optInt("referenceWidth",390),referenceHeight=item.optInt("referenceHeight",844),componentKey=item.optString("componentKey"),
-            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat()
+            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat(),prototypeTargetScreenId=item.optString("prototypeTargetScreenId","")
         ))
     }
 }
@@ -615,7 +672,7 @@ private object UxUiNativePdf {
     }
 }
 
-private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray()):String {
+private fun uxNativeProjectJson(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,boardWidth:Int=if(target=="mobile")390 else if(target=="tablet")768 else 1440,boardHeight:Int=if(target=="mobile")844 else if(target=="tablet")1024 else 900,tokens:JSONObject=JSONObject(),reusable:JSONArray=JSONArray(),screens:List<UxUiNativeScreen> = emptyList(),activeScreenId:String=""):String {
     val breakpoints=JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024)
     val normalized=JSONArray().apply {
         elements.forEach { item ->
@@ -626,9 +683,18 @@ private fun uxNativeProjectJson(name:String,target:String,background:String,elem
             put(json)
         }
     }
+    val screenJson = JSONArray().apply {
+        screens.forEach { screen ->
+            put(JSONObject()
+                .put("id", screen.id).put("name", screen.name).put("target", screen.target).put("background", screen.background)
+                .put("customArtboard", screen.customArtboard).put("customWidth", screen.customWidth).put("customHeight", screen.customHeight)
+                .put("elements", uxNativeJson(screen.elements)).put("updatedAt", screen.updatedAt))
+        }
+    }
     return JSONObject().put("schemaVersion",2).put("name",name).put("target",target).put("background",background)
         .put("viewport",JSONObject().put("width",boardWidth).put("height",boardHeight))
         .put("breakpoints",breakpoints).put("tokens",tokens).put("reusableComponents",reusable)
+        .put("screens",screenJson).put("activeScreenId",activeScreenId)
         .put("elements",normalized).put("aiPrompt",uxNativePrompt(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
         .put("generatedCode",JSONObject()
             .put("html",uxNativeGenerateHtml(name,target,background,elements,boardWidth,boardHeight,tokens,breakpoints))
@@ -926,12 +992,19 @@ fun NativeUxUiStudioForm() {
     val spacingTokens=remember{mutableStateListOf(4,8,12,16,24,32,48)}
     val reusable=remember{mutableStateListOf<UxUiNativeLayer>()}
     val elements=remember{mutableStateListOf<UxUiNativeLayer>()};var selectedId by remember{mutableStateOf("")}
+    val screens=remember{mutableStateListOf<UxUiNativeScreen>(UxUiNativeScreen("screen-home","Screen 1","mobile","#FFFFFF",false,390,844, emptyList()))}
+    var activeScreenId by remember{mutableStateOf("screen-home")}
+    var prototypePreview by remember{mutableStateOf(false)}
+    val prototypeHistory=remember{mutableStateListOf<String>()}
+    var prototypeStartScreenId by remember{mutableStateOf("screen-home")}
+    var showScreenManager by remember{mutableStateOf(false)}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var activeToolkitId by remember{mutableStateOf("icons")};var qaReport by remember{mutableStateOf(emptyList<String>())};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
     val selected=elements.firstOrNull{it.id==selectedId}
+    val hasActivePrototypeLinks=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
     val presetWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
@@ -939,6 +1012,7 @@ fun NativeUxUiStudioForm() {
     val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.rotation+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
     val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()+":"+it.fontData.hashCode()}
+    val screensSignature=screens.joinToString("||"){screen->screen.id+":"+screen.name+":"+screen.target+":"+screen.background+":"+screen.elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.fill}}
     val pdfLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri:Uri?->if(uri!=null)runCatching{val bytes=pdfBytes?:error("Export not prepared.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("No writable destination.")}.onSuccess{notice="PDF saved with visual preview, AI prompt and machine-readable specifications."}.onFailure{notice=it.message?:"PDF export failed."}}
     val jsonLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(jsonText)}?:error("No writable destination.")}.onSuccess{notice="Project JSON saved."}.onFailure{notice=it.message?:"JSON export failed."}}
     val sourceLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")){uri:Uri?->if(uri!=null)runCatching{context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(sourceText)}?:error("No writable destination.")}.onSuccess{notice="Source file saved."}.onFailure{notice=it.message?:"Source export failed."}}
@@ -946,8 +1020,37 @@ fun NativeUxUiStudioForm() {
             colorTokens.clear();val savedColors=p.optJSONObject("tokens")?.optJSONArray("colors");if(savedColors!=null){for(index in 0 until savedColors.length()){val t=savedColors.optJSONObject(index)?:continue;colorTokens.add(t.optString("name") to t.optString("value","#2563EB"))}}
             spacingTokens.clear();val savedSpacing=p.optJSONObject("tokens")?.optJSONArray("spacing");if(savedSpacing!=null){for(index in 0 until savedSpacing.length())spacingTokens.add(savedSpacing.optInt(index).coerceAtLeast(1))}
             reusable.clear();reusable.addAll(uxNativeReadJson(p.optJSONArray("reusableComponents")?:JSONArray()))
-            elements.clear();elements.addAll(uxNativeReadJson(p.optJSONArray("elements")?:JSONArray()));selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
-    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,bw,bh,customArtboard,ready,onboarding){if(ready&&!onboarding&&elements.isNotEmpty())runCatching{prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}})).apply()}.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}}
+            val rootElements=uxNativeReadJson(p.optJSONArray("elements")?:JSONArray())
+val savedScreens=p.optJSONArray("screens")
+screens.clear()
+if(savedScreens!=null && savedScreens.length()>0){
+  for(i in 0 until savedScreens.length()){
+    val item=savedScreens.optJSONObject(i)?:continue
+    val screenTarget=item.optString("target",target).takeIf{it in setOf("mobile","tablet","desktop")}?:target
+    val screenWidth=item.optInt("customWidth",if(screenTarget=="mobile")390 else if(screenTarget=="tablet")768 else 1440).coerceIn(160,4096)
+    val screenHeight=item.optInt("customHeight",if(screenTarget=="mobile")844 else if(screenTarget=="tablet")1024 else 900).coerceIn(240,4096)
+    screens.add(UxUiNativeScreen(item.optString("id","screen-"+i),item.optString("name","Screen "+(i+1)),screenTarget,item.optString("background",background),item.optBoolean("customArtboard",true),screenWidth,screenHeight,uxNativeReadJson(item.optJSONArray("elements")?:JSONArray()),item.optLong("updatedAt",System.currentTimeMillis())))
+  }
+}
+if(screens.isEmpty())screens.add(UxUiNativeScreen("screen-home","Screen 1",target,background,true,customWidth,customHeight,rootElements))
+activeScreenId=p.optString("activeScreenId",screens.first().id).takeIf{id->screens.any{it.id==id}}?:screens.first().id
+val active=screens.first{it.id==activeScreenId}
+target=active.target;background=active.background;customArtboard=active.customArtboard;customWidth=active.customWidth;customHeight=active.customHeight
+elements.clear();elements.addAll(if(active.elements.isEmpty()&&screens.size==1)rootElements else active.elements)
+selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};ready=true}
+    LaunchedEffect(elements.toList(),target,background,bw,bh,customArtboard,customWidth,customHeight,activeScreenId){
+        val index=screens.indexOfFirst{it.id==activeScreenId}
+        if(index>=0){
+            val old=screens[index]
+            val updated=old.copy(target=target,background=background,customArtboard=customArtboard,customWidth=customWidth,customHeight=customHeight,elements=elements.toList())
+            if(old!=updated)screens[index]=updated
+        }
+    }
+    LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,screensSignature,activeScreenId,bw,bh,customArtboard,ready,onboarding){
+        if(ready&&!onboarding&&(elements.isNotEmpty()||screens.size>1))runCatching{
+            prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId)).apply()
+        }.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}
+    }
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
@@ -1008,7 +1111,7 @@ fun NativeUxUiStudioForm() {
             "search"->UxUiNativeLayer(id,kind,"Search field",24,420,300,48,"Search…",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "textarea"->UxUiNativeLayer(id,kind,"Text area",24,420,300,96,"Enter your message",color="#64748B",fill="#FFFFFF",borderWidth=1)
             "table"->UxUiNativeLayer(id,kind,"Data table",24,330,320,150,"Name       Status       Updated\\nProject A  Active       Today\\nProject B  Draft        Yesterday",fill="#FFFFFF",borderWidth=1,fontSize=12)
-            "chart"->UxUiNativeLayer(id,kind,"Bar chart",24,330,300,170,"Activity overview\\nJan       Feb       Mar       Apr",fill="#FFFFFF",borderWidth=1,fontSize=13)
+            "chart"->UxUiNativeLayer(id,kind,"Bar chart",24,330,300,170,"Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67",fill="#FFFFFF",borderWidth=1,fontSize=13)
             "modal"->UxUiNativeLayer(id,kind,"Dialog / modal",24,330,310,190,"Dialog title\\nDescribe the action here.\\nCancel          Confirm",fill="#FFFFFF",borderWidth=1,radius=18,padding=18)
             "breadcrumb"->UxUiNativeLayer(id,kind,"Breadcrumb trail",24,330,300,34,"Home / Workspace / Current",color="#475569",fontSize=12)
             "tooltip"->UxUiNativeLayer(id,kind,"Tooltip",24,330,170,38,"Helpful information",color="#FFFFFF",fill="#111827",radius=8,fontSize=12)
@@ -1168,6 +1271,86 @@ fun NativeUxUiStudioForm() {
         }
     }
 
+    fun persistActiveScreen(){
+        val index=screens.indexOfFirst{it.id==activeScreenId}
+        if(index>=0){
+            val old=screens[index]
+            val updated=old.copy(target=target,background=background,customArtboard=customArtboard,customWidth=customWidth,customHeight=customHeight,elements=elements.toList(),updatedAt=System.currentTimeMillis())
+            if(old!=updated)screens[index]=updated
+        }
+    }
+    fun activateScreen(id:String){
+        if(id==activeScreenId)return
+        persistActiveScreen()
+        val next=screens.firstOrNull{it.id==id}?:return
+        activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight
+        elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty()
+        undoHistory.clear();redoHistory.clear();showAdvancedControls=false;notice="Opened "+next.name+"."
+    }
+    fun startPrototypePreview(){
+        persistActiveScreen()
+        val hasValidLink=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
+        if(!hasValidLink){
+            activeToolkitId="prototype";showElementTray=true
+            notice="Select a layer and assign a destination screen in Prototype Studio before previewing."
+            return
+        }
+        prototypeStartScreenId=activeScreenId;prototypeHistory.clear();prototypePreview=true
+        selectedId="";showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showScreenManager=false
+        notice="Prototype preview started. Tap linked elements to navigate."
+    }
+    fun navigatePrototype(destinationId:String){
+        if(destinationId==activeScreenId||screens.none{it.id==destinationId}){notice="This element has no valid screen destination.";return}
+        prototypeHistory.add(activeScreenId)
+        activateScreen(destinationId);selectedId=""
+    }
+    fun backPrototypePreview(){
+        if(prototypeHistory.isEmpty())return
+        val previous=prototypeHistory.removeAt(prototypeHistory.lastIndex)
+        activateScreen(previous);selectedId=""
+    }
+    fun stopPrototypePreview(){
+        val start=prototypeStartScreenId
+        prototypePreview=false;prototypeHistory.clear()
+        if(start!=activeScreenId&&screens.any{it.id==start})activateScreen(start)
+        selectedId="";notice="Returned to design editing."
+    }
+    fun addAppScreen(){
+        persistActiveScreen()
+        val id="screen-"+System.nanoTime()
+        val next=UxUiNativeScreen(id,"Screen "+(screens.size+1),target,background,customArtboard,bw,bh,emptyList())
+        screens.add(next);activeScreenId=id;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showAdvancedControls=false
+        notice=next.name+" added. Add elements to design this screen."
+    }
+    fun duplicateAppScreen(id:String){
+        persistActiveScreen()
+        val source=screens.firstOrNull{it.id==id}?:return
+        val copy=source.copy(id="screen-"+System.nanoTime(),name=source.name+" copy",elements=source.elements.map{it.copy(id="layer-"+System.nanoTime()+kotlin.random.Random.nextInt(1000),name=it.name+" copy")},updatedAt=System.currentTimeMillis())
+        screens.add(copy);activeScreenId=copy.id;target=copy.target;background=copy.background;customArtboard=copy.customArtboard;customWidth=copy.customWidth;customHeight=copy.customHeight
+        elements.clear();elements.addAll(copy.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear();showAdvancedControls=false
+        notice=copy.name+" duplicated."
+    }
+    fun deleteAppScreen(id:String){
+        if(screens.size<=1){notice="A project must keep at least one screen.";return}
+        val index=screens.indexOfFirst{it.id==id};if(index<0)return
+        if(id==activeScreenId)persistActiveScreen()
+        screens.removeAt(index)
+        for(screenIndex in screens.indices){val screen=screens[screenIndex];screens[screenIndex]=screen.copy(elements=screen.elements.map{layer->if(layer.prototypeTargetScreenId==id)layer.copy(prototypeTargetScreenId="")else layer})}
+        for(elementIndex in elements.indices){val layer=elements[elementIndex];if(layer.prototypeTargetScreenId==id)elements[elementIndex]=layer.copy(prototypeTargetScreenId="")}
+        prototypeHistory.removeAll{it==id}
+        if(id==activeScreenId){val next=screens[maxOf(0,index-1)];activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight;elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear()}
+        if(prototypeStartScreenId==id)prototypeStartScreenId=activeScreenId
+        notice="Screen deleted. Any links to it were cleared."
+    }
+    fun reorderAppScreen(id:String,delta:Int){
+        persistActiveScreen()
+        val from=screens.indexOfFirst{it.id==id};val to=from+delta
+        if(from<0||to !in screens.indices)return
+        val moving=screens.removeAt(from);screens.add(to,moving)
+    }
+    fun renameAppScreen(id:String,name:String){
+        val index=screens.indexOfFirst{it.id==id};if(index>=0)screens[index]=screens[index].copy(name=name.take(70),updatedAt=System.currentTimeMillis())
+    }
     fun chooseIcon(layerId:String, icon:String){
         scope.launch {
             iconBusy=true
@@ -1196,7 +1379,7 @@ fun NativeUxUiStudioForm() {
                     }
                     Text("New project",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
                     Text("Start with a blank design. Add elements only when you need them.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
+                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showScreenManager=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;val id="screen-"+System.nanoTime();screens.clear();screens.add(UxUiNativeScreen(id,"Screen 1","mobile","#FFFFFF",false,390,844,emptyList()));activeScreenId=id;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
                 }}
                 Text("Drafts",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                 if(hasSavedDraft) {
@@ -1218,10 +1401,16 @@ fun NativeUxUiStudioForm() {
                     Spacer(Modifier.weight(1f))
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")})
-                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")})
-                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")})
-                    OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
+                    if(prototypePreview){
+                        OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
+                        Button(onClick={ { stopPrototypePreview() } }){Text("Exit preview")}
+                    }else{
+                        OutlinedButton(onClick={ { startPrototypePreview() } },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
+                        OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                    }
                 }
                 if(showCanvasSettings){
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
@@ -1264,15 +1453,42 @@ fun NativeUxUiStudioForm() {
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
                                     val shape=uxNativeComposeShape(e.kind,e.radius)
-                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity){
-                                        val density=dragDensity
-                                        detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
-                                            change.consume()
-                                            val index=elements.indexOfFirst{it.id==e.id}
-                                            if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity,prototypePreview){
+                                        if(prototypePreview){
+                                            detectTapGestures(onTap={navigatePrototype(e.prototypeTargetScreenId)})
+                                        }else{
+                                            val density=dragDensity
+                                            detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
+                                                change.consume()
+                                                val index=elements.indexOfFirst{it.id==e.id}
+                                                if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
+                                            }
                                         }
                                     }){
-                                        if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
+                                        if(e.kind=="chart") {
+                                            val chart=uxUiParseChartData(e.text)
+                                            Column(Modifier.fillMaxSize().padding(3.dp)) {
+                                                Text(chart.title,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.coerceIn(8,16).sp,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                                                if(chart.points.isEmpty()) {
+                                                    Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){Text("Enter data as Label: value",fontSize=8.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                                } else {
+                                                    val maxValue=chart.points.maxOfOrNull{it.value}?.coerceAtLeast(1.0)?:1.0
+                                                    val barAreaHeight=(e.height-e.padding*2-e.fontSize-28).coerceAtLeast(16)
+                                                    Row(Modifier.fillMaxWidth().height((barAreaHeight+24).dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(2.dp)) {
+                                                        chart.points.forEach { point ->
+                                                            Column(Modifier.weight(1f).fillMaxHeight(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Bottom) {
+                                                                Text(if(point.value%1.0==0.0)point.value.toLong().toString() else String.format(java.util.Locale.US,"%.1f",point.value),fontSize=7.sp,maxLines=1,overflow=TextOverflow.Clip,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                                Spacer(Modifier.height(1.dp))
+                                                                val barHeight=if(point.value<=0)0 else (barAreaHeight*point.value/maxValue).roundToInt().coerceIn(2,barAreaHeight)
+                                                                Box(Modifier.fillMaxWidth(.62f).height(barHeight.dp).clip(RoundedCornerShape(3.dp)).background(uxNativeColor(e.color,android.graphics.Color.BLACK)))
+                                                                Text(point.label,fontSize=6.sp,maxLines=1,overflow=TextOverflow.Ellipsis,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if(chart.invalidRows>0)Text(chart.invalidRows.toString()+" invalid row(s) ignored",fontSize=6.sp,color=Color(0xFFB45309),maxLines=1)
+                                            }
+                                        } else if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
                                             UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
                                         } else {
                                             Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=FontFamily(uxNativeTypeface(context,e)),maxLines=5,overflow=TextOverflow.Clip)
@@ -1294,15 +1510,86 @@ fun NativeUxUiStudioForm() {
                     }
                     Text("Your design automatically fits the preview.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("↶")}
-                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
-                    OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("↷")}
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                        OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↶")}
+                        OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
+                    }
                     Spacer(Modifier.weight(1f))
-                    if(elements.isNotEmpty())Text(elements.size.toString()+(if(elements.size==1)" element" else " elements"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
+                        OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
+                        Text(screens.size.toString(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if(showScreenManager){
+                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                        Row(verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){Text("App screens",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text("Choose which screen is open in the mockup.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                            Button(onClick={addAppScreen()}){Text("＋ New screen")}
+                        }
+                        screens.forEachIndexed{screenIndex,screen->
+                            Card(colors=CardDefaults.cardColors(containerColor=if(screen.id==activeScreenId)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)){
+                                Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                    OutlinedTextField(value=screen.name,onValueChange={renameAppScreen(screen.id,it)},label={Text("Screen name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                    Text(screen.target+" · "+screen.elements.size+" layers · "+screen.customWidth+"×"+screen.customHeight,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
+                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId,modifier=Modifier.weight(1f)){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,-1)},enabled=screenIndex>0,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↑")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,1)},enabled=screenIndex<screens.lastIndex,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↓")}
+                                        OutlinedButton(onClick={duplicateAppScreen(screen.id)},contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Duplicate")}
+                                        OutlinedButton(onClick={deleteAppScreen(screen.id)},enabled=screens.size>1,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Delete")}
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedButton(onClick={showScreenManager=false},modifier=Modifier.fillMaxWidth()){Text("Done")}
+                    }}
                 }
                 val selectedElement=selected
                 if(selectedElement!=null){
+                    Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                        Text("Move · ${selectedElement.name}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
+                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)){
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↑")}
+                                Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("←")}
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("•")}
+                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x+8).coerceAtMost((bw-it.width).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("→")}
+                                }
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y+8).coerceAtMost((bh-it.height).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↓")}
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                OutlinedButton(
+                                    onClick = {
+                                        edit(selectedElement.id) { layer ->
+                                            layer.copy(
+                                                width = (layer.width * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw - layer.x).coerceAtLeast(12)),
+                                                height = (layer.height * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh - layer.y).coerceAtLeast(12))
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.widthIn(min = 100.dp)
+                                ) { Text("＋ Size") }
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation-15f+360f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↶ Rotate")}
+                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↻ Rotate")}
+                                OutlinedButton(
+                                    onClick = {
+                                        edit(selectedElement.id) { layer ->
+                                            layer.copy(
+                                                width = (layer.width * 0.9f).roundToInt().coerceAtLeast(12),
+                                                height = (layer.height * 0.9f).roundToInt().coerceAtLeast(12)
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.widthIn(min = 100.dp)
+                                ) { Text("－ Size") }
+                            }
+                        }
+                    }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
                         Text(selectedElement.name.take(12),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         if(selectedElement.kind !in setOf("icon","ellipse","rect","divider"))OutlinedButton(onClick={showAdvancedControls=false;notice="Edit the text in the Style section below."}){Text("Edit text")}
@@ -1324,9 +1611,68 @@ fun NativeUxUiStudioForm() {
                     Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                            listOf("Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
+                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
                         }
                         when(toolkitTab){
+                            "All 26" -> {
+                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                                Text("Choose a toolkit to open its native controls. Where a dedicated engine is not ready, the status below says so instead of reporting a mock implementation as complete.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
+                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
+                                            OutlinedButton(onClick={
+                                                activeToolkitId=toolkit.id
+                                                when(toolkit.id){
+                                                    "icons"->{toolkitTab="Icons"}
+                                                    "typography"->{toolkitTab="Fonts"}
+                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
+                                                    "background"->{toolkitTab="Tokens";showCanvasSettings=true}
+                                                    "effects"->{showAdvancedControls=true;notice="Use the selected-layer Style and Fine-tune design controls."}
+                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
+                                                    "motion"->{showAdvancedControls=true;notice="Use rotation, opacity and style controls for the selected layer."}
+                                                    "device","platform"->{toolkitTab="All 26";notice="The native canvas target selector supports mobile, tablet and desktop previews."}
+                                                    "responsive"->{showCanvasSettings=true;toolkitTab="All 26"}
+                                                    "projects"->{toolkitTab="Presets"}
+                                                    "layers"->{showAllLayers=true;toolkitTab="All 26"}
+                                                    "prototype"->{toolkitTab="All 26";showAdvancedControls=true;notice="Assign tap destinations to layers, then preview the connected screen flow. Overlay interactions are not yet supported."}
+                                                    "content"->{toolkitTab="All 26";add("text");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Welcome heading",text="Welcome back")}}}
+                                                    "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67")}}}
+                                                    "patterns"->{toolkitTab="All 26";showCanvasSettings=true;add("star");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Decorative star")}}}
+                                                    "3d"->{toolkitTab="All 26";notice="Live GLB/GLTF rendering, camera and lighting are not implemented in this editor. Import a rendered preview instead."}
+                                                    "accessibility","qa"->{
+                                                        val findings=mutableListOf<String>()
+                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
+                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
+                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
+                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
+                                                            val rawFill=e.fill.trim()
+                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
+                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
+                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
+                                                            else{
+                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
+                                                                val threshold=if(large)3.0 else 4.5
+                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
+                                                            }
+                                                        }
+                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
+                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
+                                                    }
+                                                    "handoff"->{toolkitTab="All 26";notice="Use Design handoff below to export the native PDF, project JSON and source handoff."}
+                                                }
+                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
+                                        }
+                                    }}
+                                }
+                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
+                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                }
+                            }
                             "Icons" -> {
                                 OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                                 OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
@@ -1368,7 +1714,15 @@ fun NativeUxUiStudioForm() {
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                         val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
                         Text("Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                        if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=3)
+                        Text("Prototype destination",style=MaterialTheme.typography.labelLarge)
+                        val prototypeDestinations=screens.filter{it.id!=activeScreenId}
+                        if(prototypeDestinations.isEmpty())Text("Add another screen to connect this layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        else Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){ 
+                            FilterChip(selected=e.prototypeTargetScreenId.isBlank(),onClick={edit(e.id){it.copy(prototypeTargetScreenId="")}},label={Text("None")})
+                            prototypeDestinations.forEach{screen->FilterChip(selected=e.prototypeTargetScreenId==screen.id,onClick={edit(e.id){it.copy(prototypeTargetScreenId=screen.id)}},label={Text(screen.name,maxLines=1)})}
+                        }
+                        if(hasActivePrototypeLinks)OutlinedButton(onClick={ { startPrototypePreview() } },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
+                        if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text(if(e.kind=="chart")"Chart data (title, then Label: value)" else "Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=if(e.kind=="chart")8 else 3)
                         Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                             OutlinedButton(onClick={edit(e.id){it.copy(radius=0)}}){Text("Sharp")}

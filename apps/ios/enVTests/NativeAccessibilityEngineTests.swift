@@ -104,6 +104,9 @@ final class NativeAccessibilityEngineTests: XCTestCase {
 
     func testContrastAndReadabilityReturnUsefulMetrics() {
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "contrast-checker", input: "", foreground: "#000000", background: "#ffffff").contains("21.00:1"))
+        XCTAssertEqual(NativeAccessibilityEngine.contrastRatio(foreground: "#000000", background: "#FFFFFF")!, 21.0, accuracy: 0.0001)
+        XCTAssertEqual(NativeAccessibilityEngine.contrastRatio(foreground: "#777777", background: "#FFFFFF")!, 4.48, accuracy: 0.02)
+        XCTAssertNil(NativeAccessibilityEngine.contrastRatio(foreground: "#12", background: "#FFFFFF"))
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "text-readability-checker", input: "This is a short sentence.").contains("Flesch Reading Ease"))
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "color-blindness-simulator", input: "", foreground: "#ff0000", background: "#00ff00").contains("Protanopia approximation"))
         XCTAssertTrue(NativeAccessibilityEngine.analyze(toolID: "accessible-color-generator", input: "", foreground: "#777777", background: "#ffffff").contains("Suggested foreground alternatives"))

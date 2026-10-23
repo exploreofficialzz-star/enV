@@ -646,6 +646,14 @@ public enum NativeAccessibilityEngine {
         }.prefix(5).map { $0 }
     }
 
+    /// WCAG contrast for supported #RRGGBB colors; nil means manual review.
+    public static func contrastRatio(foreground: String, background: String) -> Double? {
+        guard let fg = rgb(foreground), let bg = rgb(background) else { return nil }
+        let first = luminance(fg)
+        let second = luminance(bg)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
     private static func rgb(_ value: String) -> [Double]? {
         let clean = value.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         guard clean.range(of: #"^[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil else { return nil }

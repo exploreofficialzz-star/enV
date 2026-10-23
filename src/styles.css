@@ -268,12 +268,24 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 /* Mockup-first UX/UI Studio — visual controls stay simple while the design model retains exact values. */
 .ux-ui-studio { position: relative; }
 .uxui-topbar {
-  position: relative; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
+  /* Stay reachable below the app's sticky navigation while the screen manager scrolls. */
+  position: sticky; top: 64px; z-index: 31; display: flex; flex-wrap: wrap; align-items: center;
   justify-content: space-between; gap: 10px; padding: 10px 12px;
   border: 1px solid var(--color-border); border-radius: 16px;
   background: var(--color-surface); box-shadow: var(--shadow-border);
 }
 .uxui-topbar-left, .uxui-topbar-actions, .uxui-target-switch { display: flex; align-items: center; gap: 8px; }
+.uxui-prototype-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--color-border); border-radius: 12px; padding: 9px 12px;
+  background: var(--color-surface-2); color: var(--color-fg); font-size: 12px; font-weight: 700;
+}
+.uxui-prototype-toolbar > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.uxui-prototype-toolbar button {
+  min-height: 36px; border: 1px solid var(--color-border); border-radius: 9px;
+  padding: 0 12px; background: var(--color-surface); color: var(--color-fg); font-size: 11px; font-weight: 750;
+}
+.uxui-prototype-toolbar button:disabled { opacity: .4; cursor: not-allowed; }
 .uxui-brand-title {
   margin: 0; white-space: nowrap; color: var(--color-fg);
   font-size: 12px; line-height: 1.25; font-weight: 850; letter-spacing: -.025em;
@@ -303,7 +315,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   font-size: 12px; font-weight: 750;
 }
 .uxui-export-menu {
-  position: absolute; z-index: 20; top: calc(100% + 8px); right: 8px; width: min(330px, calc(100vw - 28px));
+  position: absolute; z-index: 40; top: calc(100% + 8px); right: 8px; width: min(330px, calc(100vw - 28px));
   padding: 8px; border: 1px solid var(--color-border); border-radius: 15px;
   background: var(--color-surface); box-shadow: 0 16px 42px rgb(15 23 42 / 18%);
 }
@@ -588,3 +600,108 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio.is-expanded .uxui-device-neck,
 .ux-ui-studio.is-expanded .uxui-device-base,
 .ux-ui-studio.is-expanded .uxui-canvas-hint { display: none !important; }
+
+/* Sketch-aligned UX/UI Studio movement controls: thumb-friendly, responsive, accessible. */
+.uxui-mobile-controls{display:flex;align-items:center;justify-content:space-evenly;gap:clamp(8px,3vw,22px);width:100%;padding:12px 8px 10px;border-top:1px solid var(--color-border);background:var(--color-surface);overflow:hidden}
+.uxui-gamepad{position:relative;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:18px repeat(3,42px);align-items:center;justify-items:center;gap:2px;padding:4px;flex:0 0 auto}
+.uxui-gamepad-label{grid-column:1/4;grid-row:1;justify-self:start;font-size:10px;line-height:16px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--color-muted)}
+.uxui-gamepad button{display:grid;width:40px;height:40px;place-items:center;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface-2);color:var(--color-fg);box-shadow:inset 0 -2px 0 rgb(15 23 42 / 7%);touch-action:manipulation;user-select:none}
+.uxui-gamepad button:active{transform:scale(.94);background:var(--color-accent-soft)}
+.uxui-gamepad button:focus-visible{outline:3px solid var(--color-accent);outline-offset:1px}
+.uxui-pad-up{grid-column:2;grid-row:2}.uxui-pad-left{grid-column:1;grid-row:3}.uxui-pad-center{grid-column:2;grid-row:3;font-size:12px;font-weight:900}.uxui-pad-right{grid-column:3;grid-row:3}.uxui-pad-down{grid-column:2;grid-row:4}.uxui-rotate-back{transform:scaleX(-1)}
+.uxui-context-controls{min-width:0}.uxui-context-toolbar{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}.uxui-context-toolbar button{flex:0 0 auto;min-height:40px}.uxui-css-controls summary{min-height:36px;display:flex;align-items:center}.uxui-css-controls input,.uxui-css-controls select{min-width:0;width:100%}
+@media(min-width:769px){.uxui-mobile-controls{display:none}}
+@media(max-width:420px){.uxui-mobile-controls{justify-content:space-between;gap:2px;padding-inline:2px}.uxui-gamepad{grid-template-columns:repeat(3,36px);grid-template-rows:16px repeat(3,36px);gap:1px;padding:2px}.uxui-gamepad button{width:35px;height:35px;border-radius:10px}.uxui-gamepad-label{font-size:9px}.uxui-context-toolbar{gap:5px}}
+@media(prefers-reduced-motion:reduce){.uxui-gamepad button{transition:none!important}}
+
+/* Sketch-first workspace: device mockup is the focus; inspectors open only when requested. */
+.uxui-workspace{display:block!important;position:relative;min-width:0}
+.uxui-workspace>.uxui-canvas-panel{width:100%;min-width:0}
+.uxui-inspector{position:absolute!important;z-index:29;top:62px;right:8px;width:min(330px,calc(100% - 16px));max-height:min(78dvh,900px);overflow:auto;overscroll-behavior:contain;background:var(--color-surface);box-shadow:0 18px 48px rgb(15 23 42 / 22%)}
+.uxui-canvas-stage{width:100%;min-width:0}
+.uxui-mobile-controls{position:relative;z-index:1}
+.uxui-toolkit-card{min-width:0;overflow-wrap:anywhere}
+.uxui-qa-report{margin-bottom:10px}
+.uxui-bottom-toolbar{position:relative;z-index:4}
+.uxui-context-controls{position:relative;z-index:3;width:100%;max-width:100%;overflow:hidden}
+.uxui-context-toolbar{display:flex;align-items:center;gap:6px;padding:8px 2px 10px}
+@media(max-width:768px){
+  .uxui-canvas-panel{border-radius:12px}
+  .uxui-canvas-heading{position:sticky;top:0;z-index:5;background:var(--color-surface)}
+  .uxui-canvas-stage{min-height:0;padding:14px 5px}
+  .uxui-device-mobile{max-width:calc(100vw - 32px)}
+  .uxui-bottom-toolbar{position:sticky;bottom:0;min-height:70px;padding:7px 4px}
+  .uxui-bottom-group{gap:0}
+  .uxui-bottom-group button{width:34px;height:40px}
+  .uxui-add-button{width:60px;height:60px;flex-basis:60px}
+  .uxui-inspector{position:fixed!important;top:auto;right:8px;bottom:8px;width:calc(100vw - 16px);max-height:72dvh}
+  .uxui-tools-drawer{position:fixed;top:auto;left:8px;bottom:8px;width:calc(100vw - 16px);max-height:76dvh}
+}
+@media(max-width:390px){
+  .uxui-canvas-heading{gap:4px;padding-inline:7px}
+  .uxui-canvas-heading strong{font-size:11px}
+  .uxui-canvas-zoom button{width:30px}
+  .uxui-add-button{width:54px;height:54px;flex-basis:54px}
+  .uxui-bottom-group button{width:30px}
+}
+
+/* Screen manager / thumbnails for the sketch-first App Screens control. */
+.uxui-screen-manager{margin-bottom:14px;border-bottom:1px solid var(--color-border);padding-bottom:14px}
+.uxui-screen-manager-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.uxui-screen-manager-heading h2{margin:0;color:var(--color-fg);font-size:15px;font-weight:850;letter-spacing:-.02em}
+.uxui-screen-manager-heading p{margin:3px 0 0;color:var(--color-muted);font-size:10px}
+.uxui-screen-add{display:inline-flex;align-items:center;gap:5px;min-height:38px;padding:0 9px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-fg);color:var(--color-surface);font-size:11px;font-weight:750;white-space:nowrap}
+.uxui-screen-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.uxui-screen-card{min-width:0;border:1px solid var(--color-border);border-radius:12px;padding:7px;background:var(--color-surface);transition:border-color .15s ease,background-color .15s ease}
+.uxui-screen-card.is-active{border-color:var(--color-accent);background:var(--color-accent-soft);box-shadow:0 0 0 1px var(--color-accent)}
+.uxui-screen-thumb-button{display:block;width:100%;padding:0;border:0;background:transparent}
+.uxui-screen-thumb{position:relative;aspect-ratio:9/14;width:100%;overflow:hidden;border:1px solid var(--color-border);border-radius:8px;background:#fff}
+.uxui-screen-thumb-tablet{aspect-ratio:4/3;border-radius:7px}
+.uxui-screen-thumb-desktop{aspect-ratio:16/10;border-radius:5px}
+.uxui-screen-thumb>span{position:absolute;display:block;min-width:2px;min-height:2px;border-radius:2px;opacity:.88}
+.uxui-screen-card-meta{margin-top:6px;min-width:0}
+.uxui-screen-card-meta input{width:100%;min-width:0;border:1px solid transparent;border-radius:5px;padding:4px 3px;background:transparent;color:var(--color-fg);font-size:11px;font-weight:750}
+.uxui-screen-card-meta input:focus{border-color:var(--color-accent);background:var(--color-surface)}
+.uxui-screen-card-meta small{display:block;padding:0 3px;color:var(--color-muted);font-size:9px;text-transform:capitalize}
+.uxui-screen-card-actions{display:flex;align-items:center;justify-content:space-between;gap:2px;margin-top:5px}
+.uxui-screen-card-actions button{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--color-border);border-radius:7px;background:var(--color-surface);color:var(--color-fg)}
+.uxui-screen-card-actions button:disabled{opacity:.28;cursor:not-allowed}
+.uxui-screen-card-actions button:hover:not(:disabled){background:var(--color-surface-2)}
+@media(max-width:420px){.uxui-screen-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.uxui-screen-card{padding:5px}.uxui-screen-card-actions button{width:27px;height:27px}.uxui-screen-add{padding:0 7px;font-size:10px}}
+
+/* Inline visual property strip directly below the selected mockup controls. */
+.uxui-visual-property-dock{margin-top:8px;border-top:1px solid var(--color-border);padding:10px 0 12px;min-width:0}
+.uxui-property-dock-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.uxui-property-dock-header strong{font-size:12px;font-weight:850;color:var(--color-fg)}
+.uxui-property-dock-header>span{font-size:10px;color:var(--color-muted);font-family:var(--font-mono)}
+.uxui-property-dock-header>button{margin-left:auto;min-height:34px;border:1px solid var(--color-border);border-radius:9px;padding:0 10px;background:var(--color-surface-2);color:var(--color-fg);font-size:11px;font-weight:750}
+.uxui-property-cards{display:flex;gap:8px;align-items:stretch;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;scrollbar-width:thin}
+.uxui-property-card{display:flex;flex:0 0 148px;min-height:76px;flex-direction:column;justify-content:center;gap:9px;border:1px solid var(--color-border);border-radius:11px;padding:10px;background:var(--color-surface);color:var(--color-fg);font-size:10px;font-weight:750}
+.uxui-property-card>span{display:block;line-height:1.45;white-space:normal}
+.uxui-property-card input[type=range]{width:100%;min-width:0;accent-color:var(--color-accent);touch-action:pan-y}
+.uxui-property-card input[type=color]{width:42px;height:30px;border:1px solid var(--color-border);border-radius:7px;background:var(--color-surface);padding:2px}
+.uxui-property-card input[type=checkbox]{width:19px;height:19px;accent-color:var(--color-accent)}
+.uxui-property-toggle{flex-direction:row;align-items:center;justify-content:space-between}
+.uxui-property-color{flex-basis:122px;align-items:flex-start}
+.uxui-context-technical{margin-top:10px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);padding:12px}
+.uxui-context-technical h3{margin:0 0 9px;font-size:12px;font-weight:850;color:var(--color-fg)}
+.uxui-technical-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.uxui-technical-grid>label{min-width:0}
+.uxui-technical-grid input,.uxui-technical-grid select{width:100%;min-width:0}
+.uxui-device-visibility{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px;border:1px solid var(--color-border);border-radius:9px;padding:10px}
+.uxui-device-visibility legend{padding:0 4px;color:var(--color-muted);font-size:10px;font-weight:750}
+.uxui-device-visibility label{display:inline-flex;align-items:center;gap:5px;text-transform:capitalize;font-size:11px;color:var(--color-fg)}
+.uxui-device-visibility input{accent-color:var(--color-accent)}
+@media(max-width:480px){
+ .uxui-property-card{flex-basis:138px;min-height:70px;padding:8px}
+ .uxui-property-dock-header>button{min-height:38px}
+ .uxui-technical-grid{grid-template-columns:minmax(0,1fr)}
+ .uxui-visual-property-dock{padding-bottom:8px}
+}
+
+/* Layer manager controls stay compact and scrollable on narrow devices. */
+.uxui-layer-list>div{min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.uxui-layer-list>div>button{flex:0 0 auto}
+.uxui-layer-list>div>button:first-child{min-width:88px;max-width:160px}
+.uxui-layer-list>div>button[aria-label^="Hide "],.uxui-layer-list>div>button[aria-label^="Show "],.uxui-layer-list>div>button[aria-label^="Lock "],.uxui-layer-list>div>button[aria-label^="Unlock "]{padding:4px 5px;border:1px solid var(--color-border);border-radius:6px;font-size:9px}
+@media(max-width:480px){.uxui-layer-list>div>button:first-child{max-width:125px}.uxui-layer-list>div{padding-bottom:3px}}
