@@ -440,7 +440,7 @@ export function generateKotlinProject(project: UxCodegenProject): string {
       ".padding(" + layer.padding + ".dp)"
     ].filter(Boolean).join("");
     let content: string;
-    } else if (layer.kind === "chart") {
+    if (layer.kind === "chart") {
       const chart = parseUxUiStudioChartData(layer.text);
       const points = chart.points.map((point) => "(" + safe(point.label) + " to " + (Number.isInteger(point.value) ? point.value.toFixed(1) : String(point.value)) + ")").join(", ");
       const chartColor = "Color(android.graphics.Color.parseColor(" + safe(layer.color) + "))";
@@ -468,7 +468,7 @@ export function generateKotlinProject(project: UxCodegenProject): string {
         chart.invalidRows ? 'Text("' + chart.invalidRows + ' invalid row(s) ignored", fontSize = 6.sp, color = Color(0xFFB45309), maxLines = 1)' : "",
         "}"
       ].filter(Boolean).join("\n");
-    if (layer.kind === "line") {
+    } else if (layer.kind === "line") {
       const lineColor = layer.background === "transparent" ? layer.color : layer.background;
       content = "Canvas(Modifier.fillMaxSize()) { drawLine(color = Color(android.graphics.Color.parseColor(" + safe(lineColor) + ")), start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), strokeWidth = size.height) }";
     } else if (layer.kind === "icon" && layer.iconSvg) {
