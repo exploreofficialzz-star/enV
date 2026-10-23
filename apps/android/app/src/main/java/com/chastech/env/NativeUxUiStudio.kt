@@ -1604,6 +1604,18 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                                         val findings=mutableListOf<String>()
                                                         if(elements.isEmpty())findings.add("No layers have been added yet.")
                                                         elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
+                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
+                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
+                                                            val rawFill=e.fill.trim()
+                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
+                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
+                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
+                                                            else{
+                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
+                                                                val threshold=if(large)3.0 else 4.5
+                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
+                                                            }
+                                                        }
                                                         for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
                                                         qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
                                                     }

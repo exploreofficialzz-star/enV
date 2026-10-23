@@ -1,4 +1,5 @@
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
+import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {

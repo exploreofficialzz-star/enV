@@ -63,10 +63,12 @@ export function auditUxUiStudioTextContrast(
 
     const rawOpacity = layer.opacity ?? 1;
     const opacity = Math.min(1, Math.max(0, Number.isFinite(rawOpacity) ? rawOpacity : 1));
+    if (opacity < 0.999) {
+      findings.push(name + ": reduced layer opacity changes the rendered text colors; manually review contrast in the actual preview.");
+      continue;
+    }
     const renderedForeground = rgba(foreground);
-    renderedForeground.a *= opacity;
     const renderedBackground = rgba(parsedBackground);
-    renderedBackground.a *= opacity;
     const isLargeText = layer.fontSize >= 24
       || (layer.fontSize >= 18.67 && (layer.fontWeight ?? 400) >= 700);
     const evaluation = evaluateContrast(
