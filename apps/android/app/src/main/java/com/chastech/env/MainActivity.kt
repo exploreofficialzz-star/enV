@@ -264,6 +264,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     var assistantDraft by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var isToolFullscreen by rememberSaveable { mutableStateOf(false) }
     var productionTool by remember { mutableStateOf<ToolRecord?>(null) }
     val openTool: (String) -> Unit = { id ->
         val candidate = catalog.displayTool(id)
@@ -307,12 +308,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         if (tab != AppTab.Home.name || selected != null || showInformation || showExchange) homeQuery = ""
     }
     LaunchedEffect(selected?.id) {
+        isToolFullscreen = false
         selected?.id?.let {
             favorites.recordRecent(it)
             mostUsedIds = favorites.getMostUsed()
         }
     }
-    if (detailStack.isNotEmpty()) BackHandler { detailStack = detailStack.dropLast(1) }
+    if (detailStack.isNotEmpty()) BackHandler {
+        if (isToolFullscreen) isToolFullscreen = false
+        else detailStack = detailStack.dropLast(1)
+    }
     else if (category != null) BackHandler { category = null }
     else if (showInformation) BackHandler { showInformation = false; tab = informationReturnTab }
     else if (showExchange) BackHandler { showExchange = false }
@@ -321,6 +326,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
+            if (!isToolFullscreen) {
             TopAppBar(
                 title = {},
                 navigationIcon = {
@@ -365,10 +371,16 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
+            }
         }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
-            Column(Modifier.align(Alignment.TopCenter).widthIn(max = 1152.dp).fillMaxHeight()) {
+            Column(
+                Modifier.align(Alignment.TopCenter).then(
+                    if (isToolFullscreen) Modifier.fillMaxSize()
+                    else Modifier.widthIn(max = 1152.dp).fillMaxHeight()
+                )
+            ) {
                 if (selected != null) {
                     ToolDetail(
                         catalog = catalog,
@@ -379,6 +391,8 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
                         onRelatedTool = openRelatedTool,
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
+                        isFullscreen = isToolFullscreen,
+                        onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
                     )
                 } else {
                     when (currentTab) {
@@ -1000,6 +1014,8 @@ private fun ToolDetail(
     onCategory: (String) -> Unit,
     onRelatedTool: (String) -> Unit,
     onToggleFavorite: () -> Unit,
+    isFullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
 ) {
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
@@ -1011,11 +1027,15 @@ private fun ToolDetail(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val compact = maxWidth < 640.dp
         Column(
-            Modifier.widthIn(max = 1024.dp).fillMaxWidth().align(Alignment.TopCenter)
+            (if (isFullscreen) Modifier.fillMaxSize() else Modifier.widthIn(max = 1024.dp).fillMaxWidth().align(Alignment.TopCenter))
                 .verticalScroll(rememberScrollState()).imePadding()
-                .padding(horizontal = if (compact) 16.dp else 24.dp, vertical = if (compact) 32.dp else 40.dp),
+                .padding(
+                    horizontal = if (isFullscreen) 12.dp else if (compact) 16.dp else 24.dp,
+                    vertical = if (isFullscreen) 12.dp else if (compact) 32.dp else 40.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
+            if (!isFullscreen) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NativeBreadcrumbLink("Home", onHome)
                 Text("/", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1026,16 +1046,20 @@ private fun ToolDetail(
                 Text(tool.name, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurface)
             }
             Spacer(Modifier.height(24.dp))
+            }
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 0.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 16.dp),
                 ) {
-                    NativeToolHeader(tool, compact, Modifier.weight(1f), showDescription = !compact)
-                    NativeToolSaveButton(isFavorite, onToggleFavorite)
+                    NativeToolHeader(
+                        tool, compact, Modifier.weight(1f), showDescription = !compact,
+                        isFullscreen = isFullscreen, onToggleFullscreen = onToggleFullscreen
+                    )
+                    if (!isFullscreen) NativeToolSaveButton(isFavorite, onToggleFavorite)
                 }
-                if (compact) {
+                if (compact && !isFullscreen) {
                     Text(
                         tool.description,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
@@ -1044,10 +1068,10 @@ private fun ToolDetail(
                     )
                 }
             }
-            tool.nativeDisclaimerText()?.let { notice ->
+            if (!isFullscreen) tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             }
-            if (parentDeveloperStudio != null) {
+            if (!isFullscreen && parentDeveloperStudio != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -1068,7 +1092,7 @@ private fun ToolDetail(
                 }
                 Spacer(Modifier.height(16.dp))
             }
-            Spacer(Modifier.height(24.dp))
+            if (!isFullscreen) Spacer(Modifier.height(24.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
@@ -1095,6 +1119,7 @@ private fun ToolDetail(
                     }
                 }
             }
+            if (!isFullscreen) {
             if (hasNativeAiAssist(tool.id)) {
                 Spacer(Modifier.height(16.dp))
                 NativeAiAssistPanel(tool)
@@ -1132,17 +1157,33 @@ private fun ToolDetail(
                     }
                 }
             }
+            }
         }
     }
 }
 
 @Composable
-private fun NativeToolHeader(tool: ToolRecord, compact: Boolean, modifier: Modifier = Modifier, showDescription: Boolean = true) {
+private fun NativeToolHeader(
+    tool: ToolRecord,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    showDescription: Boolean = true,
+    isFullscreen: Boolean = false,
+    onToggleFullscreen: () -> Unit = {},
+) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         EnVToolAppIcon(tool, size = 44.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tool.name, style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (compact) 24.sp else 30.sp, lineHeight = if (compact) 30.sp else 36.sp), fontWeight = FontWeight.Normal)
+                IconButton(
+                    onClick = onToggleFullscreen,
+                    modifier = Modifier.size(32.dp).semantics {
+                        contentDescription = if (isFullscreen) "Exit full screen for ${tool.name}" else "View ${tool.name} in full screen"
+                    }
+                ) {
+                    Text(if (isFullscreen) "⤢" else "⛶", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (tool.status == "planned") StatusPill("Coming soon")
             }
             if (showDescription) {
