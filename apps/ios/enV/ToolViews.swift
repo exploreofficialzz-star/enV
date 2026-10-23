@@ -8191,7 +8191,14 @@ private struct NativeUxUiStudioView: View {
             .font(.envScaled(size: 12, weight: .semibold))
             artboardPreview
 
-            HStack(spacing: 10) {
+            HStack(spacing: 7) {
+                Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 42) }
+                    .disabled(undoHistory.isEmpty)
+                    .accessibilityLabel("Undo")
+                Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 42) }
+                    .disabled(redoHistory.isEmpty)
+                    .accessibilityLabel("Redo")
+                Spacer(minLength: 3)
                 Button { showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
                         .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
@@ -8200,19 +8207,22 @@ private struct NativeUxUiStudioView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showComponentPalette ? "Close elements" : "Add elements")
-                Button { undoLayout() } label: { Image(systemName: "arrow.uturn.backward") }
-                    .disabled(undoHistory.isEmpty).frame(width: 38, height: 38)
-                Button { redoLayout() } label: { Image(systemName: "arrow.uturn.forward") }
-                    .disabled(redoHistory.isEmpty).frame(width: 38, height: 38)
-                Spacer()
-                Text("Drag · tap · style").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+                Spacer(minLength: 3)
+                VStack(spacing: 0) {
+                    Button { showScreenManager.toggle() } label: {
+                        Image(systemName: "square.grid.2x2").font(.system(size: 19, weight: .semibold))
+                            .frame(width: 40, height: 35).foregroundStyle(Color.envInk)
+                    }.accessibilityLabel("App screens").accessibilityAddTraits(showScreenManager ? .isSelected : [])
+                    Text(String(screens.count)).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(Color.envMuted)
+                }
             }
+            if showScreenManager { appScreensPanel }
             if let index = selectedIndex {
                 selectedElementToolbar(for: index)
             }
             if showComponentPalette { componentPalette }
-            layerListPanel
-            if let index = selectedIndex { inspector(for: index) }
+            if showScreenManager { layerListPanel }
+            if showAdvancedInspector, let index = selectedIndex { inspector(for: index) }
             DisclosureGroup("Design system", isExpanded: $showDesignSystem) {
                 designSystemPanel
             }
@@ -8368,6 +8378,81 @@ private struct NativeUxUiStudioView: View {
         qaReport = findings
         notice = "Studio check completed: \(findings.count) potential finding(s). This local check is advisory, not a WCAG certification."
     }
+    private var appScreensPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("App screens").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                    Text("\(screens.count) screens · tap a thumbnail to edit it").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                }
+                Spacer(minLength: 6)
+                Button { addAppScreen() } label: {
+                    Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
+                        .padding(.horizontal, 9).padding(.vertical, 8)
+                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.envSurface)
+                }.buttonStyle(.plain).accessibilityLabel("Add app screen")
+            }
+            ForEach(Array(screens.enumerated()), id: \.element.id) { entry in
+                let screen = entry.element
+                let screenIndex = entry.offset
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 10) {
+                        Button { openAppScreen(screen.id) } label: {
+                            ZStack(alignment: .topLeading) {
+                                uxUiUIColor(screen.background)
+                                ForEach(Array(screen.elements.prefix(5))) { layer in
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(uxUiUIColor(layer.fill == "transparent" ? layer.color : layer.fill))
+                                        .frame(width: max(3, min(35, CGFloat(layer.width) * 0.12)),
+                                               height: max(2, min(14, CGFloat(layer.height) * 0.12)))
+                                        .position(x: max(5, min(39, CGFloat(layer.x) * 0.1)),
+                                                  y: max(5, min(55, CGFloat(layer.y) * 0.1)))
+                                }
+                            }
+                            .frame(width: 48, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(screen.name)")
+                        VStack(alignment: .leading, spacing: 3) {
+                            TextField("Screen name", text: Binding(get: { screen.name }, set: { renameAppScreen(screen.id, name: $0) }))
+                                .font(.envScaled(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.envInk)
+                                .textFieldStyle(.roundedBorder)
+                            Text("\(screen.target.capitalized) · \(screen.elements.count) layers · \(screen.customWidth) × \(screen.customHeight)")
+                                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                            if screen.id == activeScreenID {
+                                Text("Currently editing").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    HStack(spacing: 6) {
+                        Button { openAppScreen(screen.id) } label: { Label("Open", systemImage: "arrow.up.right.square") }
+                            .buttonStyle(.bordered).disabled(screen.id == activeScreenID)
+                        Button { reorderAppScreen(screen.id, by: -1) } label: { Image(systemName: "arrow.up") }
+                            .buttonStyle(.bordered).disabled(screenIndex == 0).accessibilityLabel("Move screen earlier")
+                        Button { reorderAppScreen(screen.id, by: 1) } label: { Image(systemName: "arrow.down") }
+                            .buttonStyle(.bordered).disabled(screenIndex == screens.count - 1).accessibilityLabel("Move screen later")
+                        Button { duplicateAppScreen(screen.id) } label: { Image(systemName: "plus.square.on.square") }
+                            .buttonStyle(.bordered).accessibilityLabel("Duplicate \(screen.name)")
+                        Button(role: .destructive) { deleteAppScreen(screen.id) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.bordered).disabled(screens.count <= 1).accessibilityLabel("Delete \(screen.name)")
+                        Spacer(minLength: 0)
+                    }.font(.envScaled(size: 10, weight: .medium))
+                }
+                .padding(9)
+                .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
+            }
+        }
+        .padding(12)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+    }
+
     private var componentPalette: some View {
         let components: [(label: String, icon: String, kind: String)] = [
             ("Text", "textformat", "text"), ("Button", "rectangle.roundedtop", "button"),
