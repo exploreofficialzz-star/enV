@@ -313,7 +313,7 @@ struct ToolDetailView: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isToolFullscreen ? "Exit full screen for \\(tool.name)" : "View \\(tool.name) in full screen")
+                    .accessibilityLabel(isToolFullscreen ? "Exit full screen for \(tool.name)" : "View \(tool.name) in full screen")
                     .accessibilityIdentifier("tool-fullscreen-toggle")
                     if tool.isPlanned { StatusPill(text: "Coming soon", color: .envMuted) }
                 }
