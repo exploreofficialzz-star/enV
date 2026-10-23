@@ -138,7 +138,7 @@ struct ToolDetailView: View {
                     .buttonStyle(.plain)
                     .padding(12)
                     .zIndex(2)
-                    .accessibilityLabel("Exit full screen for \\(tool.name)")
+                    .accessibilityLabel("Exit full screen for \(tool.name)")
                     .accessibilityIdentifier("tool-fullscreen-exit")
                 }
                 .frame(maxWidth: .infinity)
