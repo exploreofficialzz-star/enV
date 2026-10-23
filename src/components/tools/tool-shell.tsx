@@ -152,7 +152,7 @@ remove fallback error UI      {storageError ? <p className="mt-3 text-sm text-da
       <section
         ref={toolInterfaceRef}
         className={isFullscreen
-          ? "relative fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8"
+          ? "fixed inset-0 z-[100] min-h-screen w-screen max-w-none overflow-y-auto bg-bg px-4 py-6 sm:px-6 sm:py-8"
           : "relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
       >
         {isFullscreen ? (
