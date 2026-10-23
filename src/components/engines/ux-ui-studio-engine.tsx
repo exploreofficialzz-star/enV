@@ -2092,7 +2092,6 @@ export function UxUiStudioEngine() {
               <p className="text-xs text-muted">Media breakpoint defaults: mobile ≤ {DESIGN_BREAKPOINTS.mobile}px; tablet through {DESIGN_BREAKPOINTS.desktop - 1}px; desktop ≥ {DESIGN_BREAKPOINTS.desktop}px. Use per-device visibility to generate the corresponding @media rules.</p>
             </div>}
           </section>}
-          <input ref={elementImportInputRef}
           <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
           <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
           <input ref={iconImportInputRef} type="file" accept=".svg,image/svg+xml" className="sr-only" aria-label="Import SVG icon" onChange={(event) => { const file = event.target.files?.[0]; if (file) importIconFile(file); event.target.value = ""; }} />
