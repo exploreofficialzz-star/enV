@@ -25,6 +25,10 @@ assert.ok(engine.includes('selected.kind === "icon"') && engine.includes('<span>
 assert.ok(engine.includes('toolkit.id === "transform"') && engine.includes("Center horizontally"), "Former 3D placeholder is now connected transform tooling");
 assert.ok(!engine.includes("Live GLB/GLTF rendering") && !engine.includes("Add sample chart"), "Unsupported viewer and chart sample placeholders removed");
 assert.ok(engine.includes('toolkit.id === "flows"'), "Interactive flows remains connected after rename");
+assert.ok(engine.includes('toolkit.id === "device"') && engine.includes('onClick={() => changeTarget(option.target)}'), "Device mockups provides functional responsive target switches");
+assert.ok(engine.includes('toolkit.id === "platform"') && engine.includes("selected.visibleOn.filter"), "Platform kits edits per-layer viewport visibility");
+assert.match(engine, /\{ kind: "toggle", label: "Toggle"/, "Component library exposes the already-supported toggle layer");
+assert.ok(engine.includes("Keep at least one viewport enabled"), "Platform visibility prevents hiding a layer from every viewport");
 const responsiveRules = styles.slice(styles.lastIndexOf("UX/UI Studio responsive pass"));
 assert.ok(responsiveRules.includes("height:auto !important; min-height:0 !important; max-height:none !important"), "Editor no longer forces a viewport-height crop");
 assert.ok(responsiveRules.includes("target-desktop .uxui-mobile-controls { display:none !important; }"), "Desktop hides the movement controller");
