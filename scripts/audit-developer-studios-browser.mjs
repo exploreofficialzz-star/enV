@@ -117,6 +117,37 @@ try {
         routeReport.actionWorked = download.suggestedFilename().endsWith('Design.tsx')
           && generatedSource.length > 100
           && generatedSource.includes('export default function') && generatedSource.includes('UX/UI Studio browser QA');
+
+        // Exercise the prototype interaction graph through the actual editor UI:
+        // add a layer, create a second screen, assign a tap destination, navigate,
+        // return with Back, then exit the preview.
+        await page.getByRole('button', { name: 'Add elements', exact: true }).click();
+        await page.getByRole('tab', { name: 'Elements', exact: true }).click();
+        await page.getByRole('button', { name: 'Button', exact: true }).click();
+        await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
+        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: 'Add app screen', exact: true }).click();
+        await page.getByRole('button', { name: 'Open Screen 1', exact: true }).click();
+        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: /Primary button/ }).first().click();
+        await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
+        await page.getByRole('button', { name: 'Add elements', exact: true }).click();
+        await page.getByRole('tab', { name: 'All 26', exact: true }).click();
+        await page.getByRole('button', { name: /Prototype Studio/ }).click();
+        const destinationPicker = page.getByLabel('Prototype destination', { exact: true });
+        await destinationPicker.waitFor({ state: 'visible', timeout });
+        await destinationPicker.selectOption({ label: 'Screen 2' });
+        await page.getByRole('button', { name: 'Preview prototype', exact: true }).first().click();
+        const prototypeToolbar = page.locator('.uxui-prototype-toolbar');
+        await prototypeToolbar.waitFor({ state: 'visible', timeout });
+        await page.locator('.uxui-canvas-stage svg [data-layer-id]').first().click();
+        await page.waitForFunction(() => document.querySelector('.uxui-prototype-toolbar')?.textContent?.includes('Screen 2'), null, { timeout });
+        await prototypeToolbar.getByRole('button', { name: 'Back', exact: true }).click();
+        await page.waitForFunction(() => document.querySelector('.uxui-prototype-toolbar')?.textContent?.includes('Screen 1'), null, { timeout });
+        await prototypeToolbar.getByRole('button', { name: 'Exit preview', exact: true }).click();
+        await prototypeToolbar.waitFor({ state: 'hidden', timeout });
+        routeReport.prototypeNavigationWorked = true;
+        routeReport.actionWorked = routeReport.actionWorked && routeReport.prototypeNavigationWorked;
       } else {
         const primaryInput = route.kind === 'regex' ? page.getByLabel('Regular expression') : page.getByLabel('Input');
         await primaryInput.waitFor({ state: 'visible', timeout });
