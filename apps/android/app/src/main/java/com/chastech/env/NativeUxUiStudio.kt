@@ -1246,6 +1246,54 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         }
     }
 
+    fun persistActiveScreen(){
+        val index=screens.indexOfFirst{it.id==activeScreenId}
+        if(index>=0){
+            val old=screens[index]
+            val updated=old.copy(target=target,background=background,customArtboard=customArtboard,customWidth=customWidth,customHeight=customHeight,elements=elements.toList(),updatedAt=System.currentTimeMillis())
+            if(old!=updated)screens[index]=updated
+        }
+    }
+    fun activateScreen(id:String){
+        if(id==activeScreenId)return
+        persistActiveScreen()
+        val next=screens.firstOrNull{it.id==id}?:return
+        activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight
+        elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty()
+        undoHistory.clear();redoHistory.clear();showAdvancedControls=false;notice="Opened "+next.name+"."
+    }
+    fun addAppScreen(){
+        persistActiveScreen()
+        val id="screen-"+System.nanoTime()
+        val next=UxUiNativeScreen(id,"Screen "+(screens.size+1),target,background,customArtboard,bw,bh,emptyList())
+        screens.add(next);activeScreenId=id;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showAdvancedControls=false
+        notice=next.name+" added. Add elements to design this screen."
+    }
+    fun duplicateAppScreen(id:String){
+        persistActiveScreen()
+        val source=screens.firstOrNull{it.id==id}?:return
+        val copy=source.copy(id="screen-"+System.nanoTime(),name=source.name+" copy",elements=source.elements.map{it.copy(id="layer-"+System.nanoTime()+kotlin.random.Random.nextInt(1000),name=it.name+" copy")},updatedAt=System.currentTimeMillis())
+        screens.add(copy);activeScreenId=copy.id;target=copy.target;background=copy.background;customArtboard=copy.customArtboard;customWidth=copy.customWidth;customHeight=copy.customHeight
+        elements.clear();elements.addAll(copy.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear();showAdvancedControls=false
+        notice=copy.name+" duplicated."
+    }
+    fun deleteAppScreen(id:String){
+        if(screens.size<=1){notice="A project must keep at least one screen.";return}
+        val index=screens.indexOfFirst{it.id==id};if(index<0)return
+        if(id==activeScreenId)persistActiveScreen()
+        screens.removeAt(index)
+        if(id==activeScreenId){val next=screens[maxOf(0,index-1)];activeScreenId=next.id;target=next.target;background=next.background;customArtboard=next.customArtboard;customWidth=next.customWidth;customHeight=next.customHeight;elements.clear();elements.addAll(next.elements);selectedId=elements.firstOrNull()?.id.orEmpty();undoHistory.clear();redoHistory.clear()}
+        notice="Screen deleted."
+    }
+    fun reorderAppScreen(id:String,delta:Int){
+        persistActiveScreen()
+        val from=screens.indexOfFirst{it.id==id};val to=from+delta
+        if(from<0||to !in screens.indices)return
+        val moving=screens.removeAt(from);screens.add(to,moving)
+    }
+    fun renameAppScreen(id:String,name:String){
+        val index=screens.indexOfFirst{it.id==id};if(index>=0)screens[index]=screens[index].copy(name=name.take(70),updatedAt=System.currentTimeMillis())
+    }
     fun chooseIcon(layerId:String, icon:String){
         scope.launch {
             iconBusy=true
