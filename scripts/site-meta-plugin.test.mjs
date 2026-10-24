@@ -108,7 +108,11 @@ test("AI Agent uses the secured backend task, while overflow navigation prioriti
   assert.match(assistant, /recommendedToolIds/);
   assert.match(assistant, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
   assert.match(assistant, /Describe your goal or ask about enV tools/);
-  assert.doesNotMatch(assistant, /fetchAiAvailability|configured AI provider|I understand my message|AI responses can be inaccurate|planning, writing, and everyday work/);
+  assert.match(assistant, /fetchAiAvailability\(\)/, "The AI Agent must query current backend task availability");
+  assert.match(assistant, /tasks\["assistant\.chat"\] === true/, "The AI Agent must require its own task to be routable");
+  assert.match(assistant, /availability !== "available"/, "The composer must remain disabled when the backend cannot serve the agent");
+  assert.match(assistant, /AI Agent is temporarily unavailable/, "The unavailable agent state must be explained to users");
+  assert.doesNotMatch(assistant, /I understand my message|AI responses can be inaccurate|planning, writing, and everyday work/);
   assert.match(task, /id: "assistant\.chat"/);
   assert.match(task, /privacy: "sensitive"/);
   assert.match(task, /BRAND_FACTS/);
