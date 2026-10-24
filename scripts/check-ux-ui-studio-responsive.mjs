@@ -19,6 +19,7 @@ assert.ok(engine.includes('selected && target !== "desktop" && !isExpanded'), "M
 assert.ok(!engine.includes("Your canvas is ready. Tap + to add your first element."), "Blank-canvas prompt removed");
 assert.ok(!engine.includes("uxui-visual-property-dock"), "Compressed visual-properties dock removed");
 assert.ok(engine.includes("uxui-add-button"), "Main canvas Add button remains available");
+assert.ok(!engine.includes("setShowAdvancedContext"), "Removed visual dock has no stale state setter references");
 assert.ok(!engine.includes("Local-first editor · Exact pixel dimensions"), "Redundant Studio footer removed");
 assert.ok(engine.includes('selected.kind === "image"') && engine.includes("<span>Replace</span>"), "Image selection offers connected replace action");
 assert.ok(engine.includes('selected.kind === "icon"') && engine.includes('<span>Icons</span>'), "Icon selection opens connected icon controls");
