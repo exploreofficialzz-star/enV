@@ -22,8 +22,13 @@ function publicOrigin(): string | null {
 }
 
 export function getFundingOptions() {
+  // Do not accept new payments until refund/dispute reconciliation and the
+  // support runbook are explicitly signed off. Existing transactions can still
+  // be verified and settled by the separate Paystack settlement credential path.
+  const refundDisputeHandlingApproved = process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
   const launchChecksPassed = process.env.BILLING_LAUNCH_ENABLED === "true" &&
-    process.env.BILLING_ENFORCEMENT_ENABLED === "true" && Boolean(publicOrigin());
+    process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
+    refundDisputeHandlingApproved && Boolean(publicOrigin());
   const pricePerTokenMinor = positiveSafeInteger(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO);
   const paystackApproved = process.env.PAYSTACK_PROVIDER_APPROVED === "true";
   const enabled = launchChecksPassed && paystackApproved &&
@@ -45,12 +50,16 @@ export function getFundingOptions() {
     ? "Choose a token pack. Payment is verified by enV before tokens are added."
     : !paystackApproved
       ? "Card and local payments are unavailable until Paystack has explicitly approved enV's token-wallet business model."
-      : "Secure card checkout is not configured for this deployment. No payment was taken.";
+      : !refundDisputeHandlingApproved
+        ? "Payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
+        : "Secure card checkout is not configured for this deployment. No payment was taken.";
   const cryptomusMessage = cryptomusEnabled
     ? "Choose a token pack. enV verifies the final crypto invoice with Cryptomus before crediting your wallet."
     : process.env.CRYPTOMUS_PROVIDER_APPROVED !== "true"
       ? "Crypto payments are unavailable until Cryptomus onboarding and the required compliance review are approved."
-      : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
+      : !refundDisputeHandlingApproved
+        ? "Crypto payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
+        : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
 
   return {
     enabled,
