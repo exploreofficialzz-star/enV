@@ -51,6 +51,8 @@ assert.ok(responsiveRules.includes("overflow:hidden !important;") && responsiveR
 assert.ok(responsiveRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Phone edit actions wrap into a visible compact grid instead of requiring horizontal scrolling");
 assert.ok(responsiveRules.includes("height:0 !important; min-height:0 !important; overflow:hidden !important"), "Workspace flexes into the available editor height");
 assert.ok(responsiveRules.includes("Monochrome, user-theme-aware Studio toolkit samples"), "Toolkit pages document their theme-aware monochrome treatment");
+assert.ok(responsiveRules.includes("--uxui-toolkit-surface:#fff;") && responsiveRules.includes("--uxui-toolkit-ink:#000;"), "Light-theme toolkit samples use white surfaces and black foregrounds");
+assert.ok(responsiveRules.includes("--uxui-toolkit-surface:#000;") && responsiveRules.includes("--uxui-toolkit-ink:#fff;"), "Dark-theme toolkit samples use black surfaces and white foregrounds");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-toolkit-tile-art") && responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit icon/sample tiles use the user's theme surface");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-element-shape") && responsiveRules.includes("background:var(--color-fg) !important"), "Component and shape samples use monochrome foreground colors");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-preset-preview") && responsiveRules.includes(".uxui-preset-mockup-hero"), "Preset mockup preview colors follow the user's active theme");
