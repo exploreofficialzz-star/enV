@@ -337,6 +337,14 @@ export async function handleCryptomusWebhook(request: Request) {
     });
   }
   const status = typeof body.status === "string" ? body.status : "";
+  // Refund callbacks must not be accepted as successfully processed until refund
+  // reconciliation and wallet-credit reversal policy are implemented.
+  if (["refund_process", "refund_fail", "refund_paid"].includes(status)) {
+    throw Object.assign(new Error("This Cryptomus refund callback requires manual wallet reconciliation; no wallet balance was changed."), {
+      code: "CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED",
+      status: 503,
+    });
+  }
   if (["paid", "paid_over", "locked", "wrong_amount", "cancel", "fail", "system_fail"].includes(status)) {
     // Even signed non-success/fraud-review callbacks must match the stored order,
     // invoice UUID, amount and currency from the provider's own invoice lookup.
