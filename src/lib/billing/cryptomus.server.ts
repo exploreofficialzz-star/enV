@@ -3,6 +3,7 @@ import { getSql } from "../db";
 import { creditVerifiedPurchase, readWallet } from "./ledger.server";
 import { readBoundedBytes } from "./bounded-json.server";
 import { TOKEN_PACKS, getFundingOptions } from "./paystack.server";
+import { readSafePackPrice } from "./provider-config";
 
 type CryptomusCredentials = { merchantId: string; apiKey: string };
 type CryptomusInvoice = {
@@ -17,30 +18,25 @@ type CryptomusInvoice = {
 };
 type CryptomusPayload = { state?: number; message?: string; result?: CryptomusInvoice };
 
-function positiveSafeInteger(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function validIdempotencyKey(value: unknown): value is string {
   return typeof value === "string" && value.length >= 8 && value.length <= 160 &&
     /^[A-Za-z0-9:_-]+$/.test(value);
 }
 
 function publicOrigin(): string | null {
-  const raw = process.env.BETTER_AUTH_URL;
+  const raw = process.env.BETTER_AUTH_URL?.trim();
   if (!raw) return null;
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") return null;
+    const production = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+    if (parsed.protocol !== "https:" && production) return null;
     return parsed.origin;
   } catch { return null; }
 }
 
 function readCredentials(): CryptomusCredentials {
-  const merchantId = process.env.CRYPTOMUS_MERCHANT_ID ?? "";
-  const apiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY ?? "";
+  const merchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
+  const apiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
   if (!/^[a-f0-9-]{36}$/i.test(merchantId) || !apiKey) {
     throw Object.assign(new Error("Secure crypto verification is not configured."), {
       code: "CRYPTOMUS_NOT_CONFIGURED", status: 503,
@@ -52,7 +48,7 @@ function readCredentials(): CryptomusCredentials {
 function requireNewCheckoutConfiguration() {
   const funding = getFundingOptions();
   const provider = funding.providers.find((entry) => entry.id === "cryptomus");
-  const pricePerTokenMinor = positiveSafeInteger(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS);
+  const pricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
   const origin = publicOrigin();
   if (!provider?.enabled || pricePerTokenMinor === null || !origin) {
     throw Object.assign(new Error(provider?.message ?? "Crypto checkout is not enabled for this deployment."), {
