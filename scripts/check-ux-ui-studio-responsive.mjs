@@ -15,7 +15,7 @@ const deviceFormula = engine.slice(engine.indexOf("const requestedDeviceWidth ="
 assert.ok(deviceFormula.includes("canvasStageSize.width / (requestedDeviceWidth + mobileFrameChrome)"), "Mobile preview fits proportionally to available canvas width including the phone frame");
 assert.ok(deviceFormula.includes("canvasStageSize.height / (mobileFullHeight + mobileFrameChrome)"), "Mobile preview fits proportionally to available canvas height including the phone frame");
 assert.ok(deviceFormula.includes("deviceDisplayWidth = requestedDeviceWidth * mobileFitScale"), "Mobile screen width and height share one uniform scale factor");
-assert.ok(deviceFormula.includes("target === \"mobile\" ? mobileFitScale : 1"), "The phone-frame details use the same mobile scale while tablet/desktop remain unchanged");
+assert.ok(deviceFormula.includes("target === \"mobile\" ? mobileFitScale : isExpanded ? expandedFitScale : 1"), "Each selected device frame uses its fitted scale when the studio is expanded");
 assert.ok(deviceFormula.includes("stage.scrollLeft = 0") && deviceFormula.includes("stage.scrollTop = 0"), "Fitted mobile preview does not retain a scrolled-off centre");
 assert.ok(engine.includes('className="uxui-device-positioner"'), "Device is placed inside a centering wrapper");
 assert.ok(engine.includes('"--uxui-device-radius":') && engine.includes('"--uxui-screen-radius":'), "Phone frame border and screen radius scale proportionally with the display");
