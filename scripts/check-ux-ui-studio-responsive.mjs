@@ -14,7 +14,7 @@ assert.doesNotMatch(catalog, /"name": "[^"]*Studio"/, "Individual tools no longe
 const deviceFormula = engine.slice(engine.indexOf("const requestedDeviceWidth ="), engine.indexOf("const selected = elements.find"));
 assert.ok(deviceFormula.includes("canvasStageSize.width / (requestedDeviceWidth + mobileFrameChrome)"), "Mobile preview fits proportionally to available canvas width including the phone frame");
 assert.ok(deviceFormula.includes("canvasStageSize.height / (mobileFullHeight + mobileFrameChrome)"), "Mobile preview fits proportionally to available canvas height including the phone frame");
-assert.ok(deviceFormula.includes("deviceDisplayWidth = requestedDeviceWidth * mobileFitScale"), "Mobile screen width and height share one uniform scale factor");
+assert.ok(deviceFormula.includes("deviceDisplayWidth = requestedDeviceWidth * deviceFrameScale"), "The selected device screen and frame share one uniform scale factor");
 assert.ok(deviceFormula.includes("target === \"mobile\" ? mobileFitScale : isExpanded ? expandedFitScale : 1"), "Each selected device frame uses its fitted scale when the studio is expanded");
 assert.ok(deviceFormula.includes("stage.scrollLeft = 0") && deviceFormula.includes("stage.scrollTop = 0"), "Fitted mobile preview does not retain a scrolled-off centre");
 assert.ok(engine.includes('className="uxui-device-positioner"'), "Device is placed inside a centering wrapper");
