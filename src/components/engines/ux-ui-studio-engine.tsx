@@ -2414,6 +2414,7 @@ export function UxUiStudioEngine() {
                 data-target={target}
                 style={{
                   "--uxui-device-scale": deviceFrameScale,
+                  "--uxui-device-display-width": deviceDisplayWidth + "px",
                   "--uxui-device-padding": `${deviceFrameDimensions.padding * deviceFrameScale}px`,
                   "--uxui-device-border": `${deviceFrameDimensions.border * deviceFrameScale}px`,
                   "--uxui-device-radius": `${deviceFrameDimensions.radius * deviceFrameScale}px`,
