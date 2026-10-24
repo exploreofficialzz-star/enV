@@ -159,10 +159,15 @@ jobs:
       - name: Run native Android launch and accessibility tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           target: google_apis
           arch: x86_64
-          profile: pixel_7_pro
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 2048 -cores 2
+          pre-emulator-launch-script: |
+            adb kill-server || true
+            adb start-server
+            adb devices
           script: cd apps/android && ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
       - name: Upload Android instrumentation test evidence
         if: always()
