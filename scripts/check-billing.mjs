@@ -7,6 +7,7 @@ const migration = await read("migrations/0002_billing.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const paystackWebhookRoute = await read("server/routes/api/billing/paystack/webhook.post.ts");
 const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
@@ -199,7 +200,7 @@ assert.match(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
 for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
   assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must not be acknowledged before reconciliation is implemented`);
 }
-assert.match(paystackRoute, /billing-paystack-webhook/);
+assert.match(paystackWebhookRoute, /billing-paystack-webhook/);
 assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
