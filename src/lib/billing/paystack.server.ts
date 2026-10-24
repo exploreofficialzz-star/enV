@@ -264,6 +264,24 @@ export async function handlePaystackWebhook(request: Request) {
   let body: { event?: unknown; data?: { reference?: unknown } };
   try { body = JSON.parse(raw) as { event?: unknown; data?: { reference?: unknown } }; }
   catch { throw Object.assign(new Error("The webhook payload is invalid."), { code: "INVALID_WEBHOOK", status: 400 }); }
+  // Do not acknowledge refund/dispute events as handled while wallet reversals are
+  // still unsupported. A non-2xx response keeps delivery visible for provider retry.
+  const reconciliationEvents = [
+    "charge.dispute.create",
+    "charge.dispute.remind",
+    "charge.dispute.resolve",
+    "refund.pending",
+    "refund.processing",
+    "refund.needs-attention",
+    "refund.failed",
+    "refund.processed",
+  ];
+  if (typeof body.event === "string" && reconciliationEvents.includes(body.event)) {
+    throw Object.assign(new Error("A refund or dispute callback requires manual wallet reconciliation; no wallet balance was changed."), {
+      code: "REFUND_DISPUTE_RECONCILIATION_REQUIRED",
+      status: 503,
+    });
+  }
   if (body.event !== "charge.success") return { ignored: true };
   if (typeof body.data?.reference !== "string") {
     throw Object.assign(new Error("The payment event did not include a reference."), { code: "INVALID_WEBHOOK", status: 400 });
