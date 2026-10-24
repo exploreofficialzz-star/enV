@@ -245,7 +245,7 @@ export async function handlePaystackWebhook(request: Request) {
   const signature = request.headers.get("x-paystack-signature") ?? "";
   const raw = await request.text();
   if (raw.length > 256_000) throw Object.assign(new Error("Webhook payload is too large."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
-  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET?.trim() || verificationSecret;
+  const webhookSecret = verificationSecret;
   const expected = createHmac("sha512", webhookSecret).update(raw).digest("hex");
   if (!/^[a-f0-9]{128}$/i.test(signature) ||
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
