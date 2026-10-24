@@ -4,7 +4,7 @@ import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Redo2, Undo2,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Minimize2, Redo2, Undo2,
   Grid2X2, Layers, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
   Trash2, X, ZoomIn, ZoomOut, RotateCw,
 } from "lucide-react";
@@ -67,6 +67,7 @@ const DESIGN_BREAKPOINTS = { mobile: 480, tablet: 768, desktop: 1024 };
 
 const STORAGE_KEY = "env-ux-ui-studio-project-v1";
 const DRAFTS_STORAGE_KEY = "env-ux-ui-studio-drafts-v1";
+const DEVICE_TARGET_STORAGE_KEY = "env-ux-ui-studio-device-target-v1";
 type FontLibraryItem = { family: string; category: "Sans serif" | "Serif" | "Monospace" | "Display" | "Handwriting" | "System"; provider: "google" | "system"; id?: string; weights?: number[]; styles?: string[]; variable?: boolean };
 type FontsourceFontRecord = { id?: string; family?: string; category?: string; weights?: number[]; styles?: string[]; variable?: boolean };
 function fontsourceCategory(value: string | undefined): FontLibraryItem["category"] {
@@ -920,6 +921,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export function UxUiStudioEngine() {
   const initialDesign = useMemo(() => ({ name: "Untitled design", background: "#FFFFFF", elements: [] as DesignLayer[] }), []);
   const [target, setTarget] = useState<DeviceTarget>("mobile");
+  const [preferredTarget, setPreferredTarget] = useState<DeviceTarget>("mobile");
+  const [devicePreferenceLoaded, setDevicePreferenceLoaded] = useState(false);
   const [onboarding, setOnboarding] = useState(true);
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [showToolsPanel, setShowToolsPanel] = useState(false);
@@ -995,6 +998,23 @@ export function UxUiStudioEngine() {
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(DEVICE_TARGET_STORAGE_KEY);
+      if (stored === "mobile" || stored === "tablet" || stored === "desktop") {
+        setPreferredTarget(stored);
+        setTarget(stored);
+      }
+    } catch { /* A blocked or unavailable local store falls back to Mobile. */ }
+    finally { setDevicePreferenceLoaded(true); }
+  }, []);
+
+  useEffect(() => {
+    if (!devicePreferenceLoaded) return;
+    try { window.localStorage.setItem(DEVICE_TARGET_STORAGE_KEY, preferredTarget); }
+    catch { /* The editor remains usable when preferences cannot be persisted. */ }
+  }, [preferredTarget, devicePreferenceLoaded]);
+
+  useEffect(() => {
     if (!showToolsPanel) return;
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowToolsPanel(false);
@@ -1017,7 +1037,7 @@ export function UxUiStudioEngine() {
     });
     observer.observe(stage);
     return () => observer.disconnect();
-  }, []);
+  }, [onboarding, isExpanded]);
 
   useEffect(() => {
     const root = studioRootRef.current;
@@ -1040,16 +1060,16 @@ export function UxUiStudioEngine() {
       window.visualViewport?.removeEventListener("resize", measureAvailableHeight);
       parentObserver?.disconnect();
     };
-  }, []);
+  }, [onboarding, isExpanded]);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
   const requestedDeviceWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
   ));
-  // Mobile preview scales the complete phone uniformly into the space above the
-  // editing controllers. The screen and frame share the exact same scale factor.
-  // Tablet and desktop keep their explicit artboard/zoom sizing in this pass.
+  // Fit the selected device and its frame to the actual canvas stage. The mobile
+  // composition stays fitted above touch controls; tablet/desktop get a fit scale
+  // when the entire editor is expanded to the device viewport.
   const mobileFrameChrome = 24;
   const mobileFullHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
   const mobileFitScale = target === "mobile" && canvasStageSize.width > 0 && canvasStageSize.height > 0
@@ -1059,8 +1079,22 @@ export function UxUiStudioEngine() {
         canvasStageSize.height / (mobileFullHeight + mobileFrameChrome),
       ))
     : 1;
-  const deviceDisplayWidth = requestedDeviceWidth * mobileFitScale;
-  const deviceFrameScale = target === "mobile" ? mobileFitScale : 1;
+  const expandedFrameChrome = target === "tablet" ? 32 : 22;
+  const expandedDeviceHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
+  const expandedFitScale = target !== "mobile" && isExpanded && canvasStageSize.width > 0 && canvasStageSize.height > 0
+    ? Math.max(0.01, Math.min(
+        1,
+        canvasStageSize.width / (requestedDeviceWidth + expandedFrameChrome),
+        canvasStageSize.height / (expandedDeviceHeight + expandedFrameChrome),
+      ))
+    : 1;
+  const deviceFrameScale = target === "mobile" ? mobileFitScale : isExpanded ? expandedFitScale : 1;
+  const deviceDisplayWidth = requestedDeviceWidth * deviceFrameScale;
+  const deviceFrameDimensions = target === "mobile"
+    ? { padding: 8, border: 4, radius: 54, screenRadius: 40 }
+    : target === "tablet"
+      ? { padding: 11, border: 5, radius: 29, screenRadius: 17 }
+      : { padding: 9, border: 2, radius: 12, screenRadius: 2 };
 
   // On mobile the full device is scaled to fit and centered in the preview zone.
   // Other targets retain the panning behavior for oversized mockups.
@@ -1287,7 +1321,16 @@ export function UxUiStudioEngine() {
     return () => { cancelled = true; };
   }, [customFontSignature]);
 
-  function startDesign(nextTarget: DeviceTarget = "mobile", presetId?: string) {
+  function chooseStartingTarget(nextTarget: DeviceTarget) {
+    const size = boardSize(nextTarget);
+    setPreferredTarget(nextTarget);
+    setTarget(nextTarget);
+    setCustomArtboard(false);
+    setCustomWidth(size.width);
+    setCustomHeight(size.height);
+  }
+
+  function startDesign(nextTarget: DeviceTarget = preferredTarget, presetId?: string) {
     const created = presetId ? createPreset(nextTarget, presetId) : { name: "Untitled design", background: "#FFFFFF", elements: [] as DesignLayer[] };
     const size = boardSize(nextTarget);
     setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
@@ -1300,6 +1343,7 @@ export function UxUiStudioEngine() {
     setUndoStack([]); setRedoStack([]); setLeftTab("components"); setToolkitSearch("");
     setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
     setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
+    setPreferredTarget(nextTarget); setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
   }
 
@@ -1328,6 +1372,7 @@ export function UxUiStudioEngine() {
     setSavedProject(draft);
     setLeftTab("components"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
     setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
+    setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);
     setNotice("Draft opened. Tap an element to continue designing.");
   }
 
@@ -1725,6 +1770,7 @@ export function UxUiStudioEngine() {
   }
 
   function changeTarget(next: DeviceTarget) {
+    setPreferredTarget(next);
     if (next === target) return;
     const nextBoard = boardSize(next);
     const scaleX = nextBoard.width / board.width;
@@ -1797,6 +1843,18 @@ export function UxUiStudioEngine() {
     setIsExpanded(true);
     const root = studioRootRef.current;
     if (root?.requestFullscreen) void root.requestFullscreen().catch(() => undefined);
+  }
+
+  function returnToProjects() {
+    setOnboarding(true);
+    setIsExpanded(false);
+    setShowToolsPanel(false);
+    setShowExportPanel(false);
+    setShowInspector(false);
+    setShowTextEditor(false);
+    setShowContextColors(false);
+    setPrototypePreview(false);
+    if (document.fullscreenElement && document.exitFullscreen) void document.exitFullscreen().catch(() => undefined);
   }
 
   useEffect(() => {
@@ -2028,10 +2086,18 @@ export function UxUiStudioEngine() {
           <h2 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
         </header>
+        <div className="uxui-home-device-picker">
+          <span className="uxui-home-device-picker-label">Start with</span>
+          <div className="uxui-target-switch" role="group" aria-label="Starting device view">
+            <button type="button" aria-label="Start with Mobile" aria-pressed={preferredTarget === "mobile"} onClick={() => chooseStartingTarget("mobile")} className={preferredTarget === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
+            <button type="button" aria-label="Start with Tablet" aria-pressed={preferredTarget === "tablet"} onClick={() => chooseStartingTarget("tablet")} className={preferredTarget === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
+            <button type="button" aria-label="Start with Desktop" aria-pressed={preferredTarget === "desktop"} onClick={() => chooseStartingTarget("desktop")} className={preferredTarget === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
+          </div>
+        </div>
         <div className="uxui-home-create-wrap flex justify-center">
-          <button type="button" onClick={() => startDesign("mobile")} aria-label="New project" className="uxui-new-project-card group flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent">
+          <button type="button" onClick={() => startDesign(preferredTarget)} aria-label="Add project" className="uxui-new-project-card group flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent">
             <span className="uxui-new-project-plus grid size-20 place-items-center rounded-full border-2 border-current transition group-hover:scale-105"><Plus size={38} strokeWidth={1.8} /></span>
-            <strong className="text-lg font-extrabold text-fg">New project</strong>
+            <strong className="text-lg font-extrabold text-fg">Add project</strong>
             <span className="text-sm text-muted">Start with a blank design</span>
           </button>
         </div>
@@ -2072,6 +2138,10 @@ export function UxUiStudioEngine() {
       className={"ux-ui-studio target-" + target + " min-w-0 " + (isExpanded ? "is-expanded" : "")}
     >
       <header className="uxui-topbar">
+        <div className="uxui-fullscreen-brand" aria-label="enV UX/UI Studio">
+          <span className="uxui-brand-mark uxui-fullscreen-brand-mark" aria-hidden="true">enV</span>
+          <strong>UX/UI Studio</strong>
+        </div>
         <div className="uxui-topbar-left">
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
             <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
@@ -2084,7 +2154,7 @@ export function UxUiStudioEngine() {
           <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
           <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
           <button type="button" aria-label="Export" title="Export design" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
-          <button type="button" onClick={() => { setOnboarding(true); setIsExpanded(false); setShowToolsPanel(false); }} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
+          <button type="button" onClick={returnToProjects} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
         </div>
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
@@ -2328,7 +2398,6 @@ export function UxUiStudioEngine() {
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
-            {isExpanded && <button type="button" onClick={toggleExpandedPreview} className="uxui-preview-back"><ArrowLeft size={18} /><span>Back to editor</span></button>}
             <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{prototypePreview ? "Prototype" : "Preview"}</span></div>
             <div className="uxui-canvas-zoom">
               {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} title="Preview connected screen flow" className="rounded-lg border border-border px-2.5 py-2 text-xs font-semibold text-fg disabled:opacity-40">Prototype</button>}
@@ -2345,10 +2414,11 @@ export function UxUiStudioEngine() {
                 data-target={target}
                 style={{
                   "--uxui-device-scale": deviceFrameScale,
-                  "--uxui-device-padding": `${8 * deviceFrameScale}px`,
-                  "--uxui-device-border": `${4 * deviceFrameScale}px`,
-                  "--uxui-device-radius": `${54 * deviceFrameScale}px`,
-                  "--uxui-screen-radius": `${40 * deviceFrameScale}px`,
+                  "--uxui-device-display-width": deviceDisplayWidth + "px",
+                  "--uxui-device-padding": `${deviceFrameDimensions.padding * deviceFrameScale}px`,
+                  "--uxui-device-border": `${deviceFrameDimensions.border * deviceFrameScale}px`,
+                  "--uxui-device-radius": `${deviceFrameDimensions.radius * deviceFrameScale}px`,
+                  "--uxui-screen-radius": `${deviceFrameDimensions.screenRadius * deviceFrameScale}px`,
                   "--uxui-cutout-top": `${13 * deviceFrameScale}px`,
                   "--uxui-cutout-width": `${108 * deviceFrameScale}px`,
                   "--uxui-cutout-height": `${21 * deviceFrameScale}px`,
@@ -2429,10 +2499,10 @@ export function UxUiStudioEngine() {
             <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
               <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
-              <button type="button" onClick={toggleExpandedPreview} aria-label="Expand mockup to full screen" title="Expand mockup"><Maximize2 size={20} /></button>
+              <button type="button" onClick={toggleExpandedPreview} aria-label={isExpanded ? "Exit full-screen studio" : "Expand studio to full screen"} title={isExpanded ? "Exit full screen" : "Full-screen studio"}>{isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}</button>
             </div>
           </div>
-          {selected && target !== "desktop" && !isExpanded && <div className="uxui-mobile-controls" aria-label="Selected element movement and transform controls">
+          {selected && target !== "desktop" && <div className="uxui-mobile-controls" aria-label="Selected element movement and transform controls">
             <div className="uxui-gamepad" role="group" aria-label="Move selected element">
               <span className="uxui-gamepad-label">Move</span>
               <button type="button" className="uxui-pad-up" aria-label="Move element up 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.max(0, selected.y - 8) })}><ArrowUp size={19} /></button>
