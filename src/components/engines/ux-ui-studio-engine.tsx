@@ -1,5 +1,6 @@
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
+import { Logo } from "@/components/brand/logo";
 import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -2139,7 +2140,7 @@ export function UxUiStudioEngine() {
     >
       <header className="uxui-topbar">
         <div className="uxui-fullscreen-brand" aria-label="enV UX/UI Studio">
-          <span className="uxui-brand-mark uxui-fullscreen-brand-mark" aria-hidden="true">enV</span>
+          <Logo size="hero" className="uxui-fullscreen-logo" />
           <strong>UX/UI Studio</strong>
         </div>
         <div className="uxui-topbar-left">

@@ -25,6 +25,8 @@ assert.ok(engine.includes('const DEVICE_TARGET_STORAGE_KEY = "env-ux-ui-studio-d
 assert.ok(engine.includes("window.localStorage.getItem(DEVICE_TARGET_STORAGE_KEY)") && engine.includes("window.localStorage.setItem(DEVICE_TARGET_STORAGE_KEY, preferredTarget)"), "Mobile, tablet and desktop preference restores and saves across visits");
 assert.ok(engine.includes('onClick={() => startDesign(preferredTarget)}') && engine.includes('aria-label="Starting device view"'), "Add project uses the chosen starting device mode");
 assert.ok(engine.includes('className="uxui-fullscreen-brand"') && engine.includes("<strong>UX/UI Studio</strong>"), "Full-screen editor carries the compact enV/tool header");
+assert.ok(engine.includes('import { Logo } from "@/components/brand/logo"') && engine.includes('<Logo size="hero" className="uxui-fullscreen-logo" />'), "Full-screen header reuses the canonical enV home logo component");
+assert.ok(!engine.includes("uxui-fullscreen-brand-mark"), "Full-screen header does not invent a separate text-based enV logo");
 assert.ok(engine.includes("setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);"), "New projects launch directly into the full editor workspace");
 assert.ok(engine.includes("}, [onboarding, isExpanded]);"), "Viewport and canvas observers reconnect after the editor mounts or expands");
 assert.match(engine, /target-" \+ target/, "Studio root tracks selected target mode");
@@ -84,7 +86,7 @@ assert.ok(responsiveRules.includes("--uxui-toolkit-surface:#000;") && responsive
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-toolkit-tile-art") && responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit icon/sample tiles use the user's theme surface");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-element-shape") && responsiveRules.includes("background:var(--uxui-toolkit-ink) !important"), "Component and shape samples use monochrome foreground colors");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-preset-preview") && responsiveRules.includes(".uxui-preset-mockup-hero"), "Preset mockup preview colors follow the user's active theme");
-assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && responsiveRules.includes(".dark .ux-ui-studio:not(.is-expanded) .uxui-toolkit-content img[src*=\"api.iconify.design\"]"), "Remote toolkit icons are monochrome in both light and dark themes");
+assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && responsiveRules.includes(".dark .ux-ui-studio .uxui-toolkit-content img[src*=\"api.iconify.design\"]"), "Remote toolkit icons are monochrome in both light and dark themes");
 assert.ok(responsiveRules.includes("The color grid and token color inputs stay colorful"), "Real design color pickers retain their functional colors");
 const fullScreenRules = styles.slice(styles.lastIndexOf("Full-screen project editor: keep the complete editing workspace usable."));
 assert.ok(fullScreenRules.includes("width:100dvw !important;") && fullScreenRules.includes("height:100dvh !important;"), "Full-screen editor occupies the device viewport with safe-area-aware sizing");
@@ -92,4 +94,16 @@ assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-fullscreen-b
 assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-bottom-toolbar") && fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-context-controls"), "Full-screen mode retains working add and contextual editing controls");
 assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-mobile-controls") && fullScreenRules.includes("display:flex !important;"), "Full-screen Tablet mode keeps movement controls available");
 assert.ok(fullScreenRules.includes("var(--uxui-device-radius,29px)") && fullScreenRules.includes("var(--uxui-device-radius,12px)"), "Expanded tablet and desktop previews preserve their device frames");
-console.log("UX/UI Studio responsive layout, project startup, persisted device mode, full-screen editor and theme checks: PASS");
+assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-tools-drawer {\n  display:flex !important;") && fullScreenRules.includes("flex-direction:column !important;") && fullScreenRules.includes("overflow:hidden !important;"), "Fullscreen Toolkit retains a flex-column modal with a bounded scrolling content region");
+assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-toolkit-overlay") && fullScreenRules.includes("justify-content:center !important;") && fullScreenRules.includes("backdrop-filter:blur(5px) !important;"), "Fullscreen Toolkit stays centered over the editor");
+const toolkitLayoutStart = styles.indexOf("/* The Toolkit is a centered modal inside the Studio panel");
+const toolkitLayoutEnd = styles.indexOf("/* Compress the mobile controller and adjustment strip", toolkitLayoutStart);
+assert.ok(toolkitLayoutStart >= 0 && toolkitLayoutEnd > toolkitLayoutStart, "Toolkit layout style block boundaries exist");
+const toolkitLayout = styles.slice(toolkitLayoutStart, toolkitLayoutEnd);
+assert.ok(toolkitLayout.includes(".ux-ui-studio .uxui-toolkit-tabs") && toolkitLayout.includes(".ux-ui-studio .uxui-toolkit-content") && toolkitLayout.includes(".ux-ui-studio .uxui-preset-card"), "Toolkit categories, scrollable content and preset cards are styled in both editor modes");
+assert.ok(!toolkitLayout.includes(".ux-ui-studio:not(.is-expanded) .uxui-toolkit-"), "Toolkit core styles are not disabled by fullscreen mode");
+const toolkitThemeStart = styles.indexOf("/* Monochrome, user-theme-aware Studio toolkit samples. */");
+const toolkitThemeEnd = styles.indexOf("/* Preserve native mockup size:", toolkitThemeStart);
+const toolkitTheme = styles.slice(toolkitThemeStart, toolkitThemeEnd);
+assert.ok(toolkitTheme.includes(".ux-ui-studio .uxui-toolkit-content") && toolkitTheme.includes(".dark .ux-ui-studio"), "Toolkit monochrome samples follow light/dark themes in fullscreen mode too");
+console.log("UX/UI Studio responsive layout, startup, remembered mode, canonical logo, Toolkit pages and full-screen editor checks: PASS");
