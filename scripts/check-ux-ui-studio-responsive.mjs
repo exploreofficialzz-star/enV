@@ -19,7 +19,7 @@ assert.ok(deviceFormula.includes("target === \"mobile\" ? mobileFitScale : isExp
 assert.ok(deviceFormula.includes("stage.scrollLeft = 0") && deviceFormula.includes("stage.scrollTop = 0"), "Fitted mobile preview does not retain a scrolled-off centre");
 assert.ok(engine.includes('className="uxui-device-positioner"'), "Device is placed inside a centering wrapper");
 assert.ok(engine.includes('"--uxui-device-radius":') && engine.includes('"--uxui-screen-radius":'), "Phone frame border and screen radius scale proportionally with the display");
-assert.ok(engine.includes('height: "auto"') && engine.includes('width: deviceDisplayWidth + "px"'), "SVG preserves its intrinsic aspect ratio instead of stretching vertically");
+assert.ok(engine.includes('height: "auto"') && engine.includes('width: deviceDisplayWidth + "px"') && engine.includes('"--uxui-device-display-width": deviceDisplayWidth + "px"'), "SVG preserves its intrinsic ratio and exposes the fitted width to full-screen styles");
 assert.ok(engine.includes("availableEditorHeight") && engine.includes("--uxui-available-height"), "Studio measures the visible viewport remaining below the page header");
 assert.ok(engine.includes('const DEVICE_TARGET_STORAGE_KEY = "env-ux-ui-studio-device-target-v1"'), "Selected device mode has a dedicated persistent preference key");
 assert.ok(engine.includes("window.localStorage.getItem(DEVICE_TARGET_STORAGE_KEY)") && engine.includes("window.localStorage.setItem(DEVICE_TARGET_STORAGE_KEY, preferredTarget)"), "Mobile, tablet and desktop preference restores and saves across visits");
