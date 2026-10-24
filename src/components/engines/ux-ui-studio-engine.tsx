@@ -1049,6 +1049,22 @@ export function UxUiStudioEngine() {
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
   ));
+
+  // Keep the mockup at its chosen size and center the canvas viewport on it.
+  // If the artboard is larger than the available stage, only the canvas scrolls;
+  // the editor toolbar and contextual controls remain fixed in the workspace.
+  useEffect(() => {
+    const stage = canvasStageRef.current;
+    if (!stage) return;
+    const centerViewport = () => {
+      stage.scrollLeft = Math.max(0, Math.round((stage.scrollWidth - stage.clientWidth) / 2));
+      stage.scrollTop = Math.max(0, Math.round((stage.scrollHeight - stage.clientHeight) / 2));
+    };
+    centerViewport();
+    const frame = window.requestAnimationFrame(centerViewport);
+    return () => window.cancelAnimationFrame(frame);
+  }, [deviceDisplayWidth, board.width, board.height, target, canvasStageSize.width, canvasStageSize.height, availableEditorHeight]);
+
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
