@@ -1,6 +1,10 @@
 name: Production live connectivity smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-live-smoke.yml"
   workflow_dispatch:
   schedule:
     - cron: "*/30 * * * *"
