@@ -1043,20 +1043,36 @@ export function UxUiStudioEngine() {
   }, []);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
-  // Device size follows the artboard and the user's explicit zoom only.
-  // The canvas pans/scrolls around the fixed-size mockup instead of auto-scaling it to fit.
-  const deviceDisplayWidth = Math.max(1, Math.min(
+  const requestedDeviceWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
   ));
+  // Mobile preview scales the complete phone uniformly into the space above the
+  // editing controllers. The screen and frame share the exact same scale factor.
+  // Tablet and desktop keep their explicit artboard/zoom sizing in this pass.
+  const mobileFrameChrome = 24;
+  const mobileFullHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
+  const mobileFitScale = target === "mobile" && canvasStageSize.width > 0 && canvasStageSize.height > 0
+    ? Math.max(0.01, Math.min(
+        1,
+        canvasStageSize.width / (requestedDeviceWidth + mobileFrameChrome),
+        canvasStageSize.height / (mobileFullHeight + mobileFrameChrome),
+      ))
+    : 1;
+  const deviceDisplayWidth = requestedDeviceWidth * mobileFitScale;
+  const deviceFrameScale = target === "mobile" ? mobileFitScale : 1;
 
-  // Keep the mockup at its chosen size and center the canvas viewport on it.
-  // If the artboard is larger than the available stage, only the canvas scrolls;
-  // the editor toolbar and contextual controls remain fixed in the workspace.
+  // On mobile the full device is scaled to fit and centered in the preview zone.
+  // Other targets retain the panning behavior for oversized mockups.
   useEffect(() => {
     const stage = canvasStageRef.current;
     if (!stage) return;
     const centerViewport = () => {
+      if (target === "mobile") {
+        stage.scrollLeft = 0;
+        stage.scrollTop = 0;
+        return;
+      }
       stage.scrollLeft = Math.max(0, Math.round((stage.scrollWidth - stage.clientWidth) / 2));
       stage.scrollTop = Math.max(0, Math.round((stage.scrollHeight - stage.clientHeight) / 2));
     };
@@ -2324,7 +2340,7 @@ export function UxUiStudioEngine() {
           </div>
           <div ref={canvasStageRef} className="uxui-canvas-stage" role="region" aria-label={projectName + " design canvas"} tabIndex={0}>
             <div className="uxui-device-positioner">
-              <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
+              <div className={"uxui-device-shell uxui-device-" + target} data-target={target} style={{ "--uxui-device-scale": deviceFrameScale } as CSSProperties}>
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
                 style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
