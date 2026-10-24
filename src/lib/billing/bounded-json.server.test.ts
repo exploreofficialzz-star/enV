@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readBoundedJsonObject } from "./bounded-json.server.ts";
+import { readBoundedBytes, readBoundedJsonObject } from "./bounded-json.server.ts";
 
 function jsonRequest(body: BodyInit, headers: HeadersInit = { "content-type": "application/json" }): Request {
   return new Request("https://env.invalid/api/test", { method: "POST", headers, body });
@@ -36,6 +36,21 @@ test("cancels a streamed body that exceeds the limit even without Content-Length
   assert.equal(await readBoundedJsonObject(request, 8_192), null);
   assert.equal(cancelled, true);
   assert.ok(pushed <= 3, "Reader should stop pulling after the first over-limit chunk.");
+});
+
+test("byte reader enforces the limit against multibyte UTF-8 without Content-Length", async () => {
+  const request = jsonRequest("€€");
+  assert.equal(request.headers.has("content-length"), false);
+  assert.equal(await readBoundedBytes(request, 5), null, "two euro signs occupy six UTF-8 bytes");
+});
+
+test("byte reader accepts the exact byte limit and preserves original payload bytes", async () => {
+  const body = JSON.stringify({ ok: "yes" });
+  const bytes = new TextEncoder().encode(body);
+  const request = jsonRequest(body);
+  const result = await readBoundedBytes(request, bytes.byteLength);
+  assert.ok(result);
+  assert.deepEqual(result, bytes);
 });
 
 test("rejects arrays, malformed JSON, invalid UTF-8, and other content types", async () => {
