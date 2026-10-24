@@ -2464,3 +2464,27 @@ html[data-env-view-mode="tablet"] .env-app-shell {
     height:23px !important;
   }
 }
+
+
+/* Project-home device chooser stays clear and compact before entering the editor. */
+.uxui-home-device-picker {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+.uxui-home-device-picker-label {
+  color:var(--color-muted);
+  font-size:12px;
+  font-weight:750;
+}
+.uxui-home-device-picker .uxui-target-switch button {
+  width:auto;
+  min-height:35px;
+  padding:0 10px;
+}
+@media (max-width:480px) {
+  .uxui-home-device-picker { gap:6px; }
+  .uxui-home-device-picker .uxui-target-switch button { min-height:33px; padding-inline:7px; }
+}
