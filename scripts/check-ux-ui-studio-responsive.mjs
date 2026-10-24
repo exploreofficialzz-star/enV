@@ -86,7 +86,7 @@ assert.ok(responsiveRules.includes("--uxui-toolkit-surface:#000;") && responsive
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-toolkit-tile-art") && responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit icon/sample tiles use the user's theme surface");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-element-shape") && responsiveRules.includes("background:var(--uxui-toolkit-ink) !important"), "Component and shape samples use monochrome foreground colors");
 assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-preset-preview") && responsiveRules.includes(".uxui-preset-mockup-hero"), "Preset mockup preview colors follow the user's active theme");
-assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && responsiveRules.includes(".dark .ux-ui-studio:not(.is-expanded) .uxui-toolkit-content img[src*=\"api.iconify.design\"]"), "Remote toolkit icons are monochrome in both light and dark themes");
+assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && responsiveRules.includes(".dark .ux-ui-studio .uxui-toolkit-content img[src*=\"api.iconify.design\"]"), "Remote toolkit icons are monochrome in both light and dark themes");
 assert.ok(responsiveRules.includes("The color grid and token color inputs stay colorful"), "Real design color pickers retain their functional colors");
 const fullScreenRules = styles.slice(styles.lastIndexOf("Full-screen project editor: keep the complete editing workspace usable."));
 assert.ok(fullScreenRules.includes("width:100dvw !important;") && fullScreenRules.includes("height:100dvh !important;"), "Full-screen editor occupies the device viewport with safe-area-aware sizing");
