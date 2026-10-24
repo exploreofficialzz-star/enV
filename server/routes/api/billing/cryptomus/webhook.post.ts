@@ -14,9 +14,11 @@ export default defineHandler(async (event) => {
     const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
     const status = typeof candidate.status === "number" ? candidate.status : 503;
     const code = typeof candidate.code === "string" ? candidate.code : "WEBHOOK_UNAVAILABLE";
-    const message = typeof candidate.message === "string" && status < 500
-      ? candidate.message
-      : "The crypto payment event could not be verified. It will not change your wallet until verification succeeds.";
+    const message = code === "CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED"
+      ? "This refund event needs manual wallet reconciliation. No wallet balance was changed; retry delivery after reconciliation is available."
+      : typeof candidate.message === "string" && status < 500
+        ? candidate.message
+        : "The crypto payment event could not be verified. It will not change your wallet until verification succeeds.";
     const requestId = randomUUID();
     if (status >= 500) {
       console.error("[billing-cryptomus-webhook] " + code + " requestId=" + requestId +
