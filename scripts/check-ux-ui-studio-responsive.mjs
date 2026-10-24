@@ -12,7 +12,8 @@ assert.match(catalog, /"id": "icons",\s+"name": "Icons"/, "Icon tool is named Ic
 assert.match(catalog, /"id": "media",\s+"name": "Images & media"/, "Image/media tool has the requested name");
 assert.doesNotMatch(catalog, /"name": "[^"]*Studio"/, "Individual tools no longer use the redundant Studio suffix");
 const deviceFormula = engine.slice(engine.indexOf("const deviceDisplayWidth ="), engine.indexOf("const selected = elements.find"));
-assert.ok(!deviceFormula.includes("canvasStageSize.height"), "Mockup width never shrinks to fit controls' remaining height");
+assert.ok(deviceFormula.includes("canvasStageSize.height"), "Mockup scales to the available canvas height as well as width");
+assert.ok(engine.includes("availableEditorHeight") && engine.includes("--uxui-available-height"), "Studio measures the visible viewport remaining below the page header");
 assert.match(engine, /target-" \+ target/, "Studio root tracks selected target mode");
 assert.ok(engine.includes('aria-label="UX/UI Studio editor workspace"'), "Studio editing region has an accessible label");
 assert.ok(engine.includes('selected && target !== "desktop" && !isExpanded'), "Movement controls apply to mobile/tablet only");
@@ -44,4 +45,8 @@ assert.ok(responsiveRules.includes("target-tablet .uxui-mobile-controls { displa
 assert.ok(responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit surface follows user theme");
 assert.ok(responsiveRules.includes("isolation:isolate;"), "Studio controls are contained in a local stacking context");
 assert.ok(responsiveRules.includes("position:sticky !important; top:64px !important; z-index:31 !important"), "Studio toolbar remains clickable below the global sticky header without escaping the Studio stack");
+assert.ok(responsiveRules.includes("height:var(--uxui-available-height,calc(100dvh - 160px)) !important"), "Studio workspace is constrained to the visible viewport height");
+assert.ok(responsiveRules.includes("overflow:hidden !important; padding:8px !important;"), "Canvas stage cannot create a vertical scroll area");
+assert.ok(responsiveRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Phone edit actions wrap into a visible compact grid instead of requiring horizontal scrolling");
+assert.ok(responsiveRules.includes("height:0 !important; min-height:0 !important; overflow:hidden !important"), "Workspace flexes into the available editor height");
 console.log("UX/UI Studio responsive layout, contextual actions, naming, theme and placeholder checks: PASS");
