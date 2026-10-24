@@ -9,6 +9,23 @@
 - Proxy/self-hosted compute costs: unknown until a cost-allocation or invoice integration exists.
 - Purchased-token and promotional-token distinction: should remain explicit when promotions are introduced.
 
+## Payment release blockers — keep checkout disabled
+
+The server-side Paystack and Cryptomus web checkout adapters are present, but that is not sufficient for real-money launch. The current release does not yet implement complete refund/dispute reconciliation or a tested wallet-credit reversal policy. Paystack's webhook handler currently processes successful charges; Cryptomus refund-state callbacks are not fully reconciled into wallet reversals. A refunded or disputed charge must never be allowed to leave spendable credits without an explicit, audited decision.
+
+Keep all of these gates false until the corresponding tests and operator procedures are signed off:
+
+- `BILLING_LAUNCH_ENABLED=false`
+- `BILLING_ENFORCEMENT_ENABLED=false`
+- `BILLING_REFUND_DISPUTE_HANDLING_APPROVED=false`
+- `PAYSTACK_PROVIDER_APPROVED=false` and `CRYPTOMUS_PROVIDER_APPROVED=false` until each provider approves the exact business model, channels and markets.
+
+The additional refund/dispute gate specifically prevents new checkout from opening while refund events, partial refunds, chargebacks, provider retries and customer wallet recovery are not fully reconciled. It does not block verification of an already-created Paystack transaction: settlement must keep working if new checkout is paused, so customers who have already paid are not stranded by a kill switch.
+
+Before enabling real money, add automated tests for: duplicate and out-of-order webhooks; success callbacks arriving before the checkout-init request is finalized; failed/pending/partial/full refunds; dispute create/remind/resolve events; Cryptomus `refund_process`, `refund_fail` and `refund_paid` states; webhook retries after partial processing; and recovery when refunded tokens have already been spent. Decide whether reversals debit unused wallet value, create a recoverable balance obligation, or require manual review—never silently credit or remove tokens based only on a browser redirect.
+
+Native Android/iOS digital token purchases are separately unavailable until Google Play Billing and Apple StoreKit purchase/restore/refund verification and product mapping are implemented. Do not use the web checkout as a native-app billing bypass.
+
 ## Required deployment setup
 
 1. Configure `DATABASE_URL` for the production PostgreSQL/Neon database.
