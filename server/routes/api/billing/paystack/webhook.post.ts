@@ -12,7 +12,16 @@ export default defineHandler(async (event) => {
     const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
     const status = typeof candidate.status === "number" ? candidate.status : 503;
     const code = typeof candidate.code === "string" ? candidate.code : "WEBHOOK_UNAVAILABLE";
-    const message = typeof candidate.message === "string" && status < 500 ? candidate.message : "The payment event could not be verified. Retry delivery later.";
-    return jsonResponse({ ok: false, error: code, message }, status);
+    const requestId = randomUUID();
+    if (status >= 500) {
+      console.error("[billing-paystack-webhook] " + code + " requestId=" + requestId +
+        " causeType=" + (error instanceof Error ? error.name : "UnknownError"));
+    }
+    const message = code === "REFUND_DISPUTE_RECONCILIATION_REQUIRED"
+      ? "This refund/dispute event needs manual wallet reconciliation. No wallet balance was changed; retry delivery after reconciliation is available."
+      : typeof candidate.message === "string" && status < 500
+        ? candidate.message
+        : "The payment event could not be verified. Retry delivery later.";
+    return jsonResponse({ ok: false, error: code, message, requestId }, status);
   }
 });
