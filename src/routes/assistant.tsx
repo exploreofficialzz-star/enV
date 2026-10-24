@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp, LoaderCircle, RotateCcw, Sparkles, SquarePen } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAssistantState } from "@/components/assistant/assistant-state";
 import type { AssistantRequest, ChatMessage, ChatTurn, ToolCandidate } from "@/components/assistant/assistant-state";
 import { AppShell } from "@/components/layout/app-shell";
@@ -8,7 +8,7 @@ import { ToolCard } from "@/components/tools/tool-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AI_LIMITS } from "@/lib/ai/contracts";
-import { AiClientError, runAiTask } from "@/lib/ai/client/ai-client";
+import { AiClientError, fetchAiAvailability, runAiTask } from "@/lib/ai/client/ai-client";
 import { getActiveTools, getToolById } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import type { ToolMeta } from "@/types/tool";
@@ -33,7 +33,18 @@ function candidatesFor(messages: ChatMessage[]): ToolCandidate[] {
 
 export function AssistantPage() {
   const { messages, setMessages, draft, setDraft, busy, setBusy, error, setError, retryRequest, setRetryRequest, activeRequest } = useAssistantState();
+  const [availability, setAvailability] = useState<"checking" | "available" | "unavailable">("checking");
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAiAvailability().then((tasks) => {
+      if (!cancelled) setAvailability(tasks["assistant.chat"] === true ? "available" : "unavailable");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -72,7 +83,7 @@ export function AssistantPage() {
 
   function submitDraft() {
     const content = draft.trim();
-    if (!content || busy) return;
+    if (availability !== "available" || !content || busy) return;
     const updated = [...messages, { role: "user" as const, content }];
     const history = requestContext(updated);
     setMessages(updated);
@@ -105,13 +116,28 @@ export function AssistantPage() {
           </Button>
         </header>
 
+        {availability !== "available" && (
+          <div className="mt-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm" role="status" aria-live="polite">
+            <p className="font-medium text-fg">
+              {availability === "checking" ? "Checking AI service availability…" : "AI Agent is temporarily unavailable"}
+            </p>
+            {availability === "unavailable" && (
+              <p className="mt-1 text-muted">
+                No AI task is currently available from the production service. Provider configuration or routing needs attention; the rest of enV remains available.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 flex min-h-[320px] max-h-[68vh] flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-bg p-4 sm:p-5" role="log" aria-label="AI Agent conversation" aria-live="polite">
           {messages.length === 0 ? (
             <div className="my-auto flex flex-col items-center justify-center py-8 text-center">
               <div className="flex size-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
                 <Sparkles className="size-6" aria-hidden="true" />
               </div>
-              <h2 className="mt-4 text-lg font-semibold text-fg">What can I help with?</h2>
+              <h2 className="mt-4 text-lg font-semibold text-fg">
+                {availability === "available" ? "What can I help with?" : availability === "checking" ? "Checking AI availability…" : "AI Agent is not ready yet"}
+              </h2>
             </div>
           ) : (
             messages.map((message, index) => {
@@ -161,14 +187,14 @@ export function AssistantPage() {
                   submitDraft();
                 }
               }}
-              placeholder="Describe your goal or ask about enV tools…"
+              placeholder={availability === "available" ? "Describe your goal or ask about enV tools…" : availability === "checking" ? "Checking AI availability…" : "AI Agent is temporarily unavailable"}
               aria-label="Message the enV AI Agent"
               maxLength={AI_LIMITS.assistantMessageMax}
               rows={2}
-              disabled={busy}
+              disabled={busy || availability !== "available"}
               className="min-h-12 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
             />
-            <Button type="submit" size="icon" aria-label="Send message" disabled={!draft.trim() || busy}>
+            <Button type="submit" size="icon" aria-label="Send message" disabled={!draft.trim() || busy || availability !== "available"}>
               {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
             </Button>
           </div>
