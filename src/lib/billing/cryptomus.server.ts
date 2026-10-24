@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { creditVerifiedPurchase, readWallet } from "./ledger.server";
+import { readBoundedBytes } from "./bounded-json.server";
 import { TOKEN_PACKS, getFundingOptions } from "./paystack.server";
 
 type CryptomusCredentials = { merchantId: string; apiKey: string };
@@ -301,10 +302,18 @@ function validCryptomusWebhookSignature(body: Record<string, unknown>, credentia
 }
 
 export async function handleCryptomusWebhook(request: Request) {
-  const raw = await request.text();
-  if (raw.length > 256_000) {
-    throw Object.assign(new Error("Webhook payload is too large."), {
+  const rawBytes = await readBoundedBytes(request, 256_000);
+  if (!rawBytes) {
+    throw Object.assign(new Error("Webhook payload is too large or unreadable."), {
       code: "WEBHOOK_TOO_LARGE", status: 413,
+    });
+  }
+  let raw: string;
+  try {
+    raw = new TextDecoder("utf-8", { fatal: true }).decode(rawBytes);
+  } catch {
+    throw Object.assign(new Error("The crypto webhook payload is not valid UTF-8."), {
+      code: "INVALID_WEBHOOK", status: 400,
     });
   }
   let body: Record<string, unknown>;
