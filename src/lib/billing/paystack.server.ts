@@ -1,23 +1,18 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
-import { requirePaystackVerificationSecret } from "./provider-config";
+import { readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
-function positiveSafeInteger(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function publicOrigin(): string | null {
-  const raw = process.env.BETTER_AUTH_URL;
+  const raw = process.env.BETTER_AUTH_URL?.trim();
   if (!raw) return null;
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") return null;
+    const production = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+    if (parsed.protocol !== "https:" && production) return null;
     return parsed.origin;
   } catch { return null; }
 }
@@ -30,16 +25,19 @@ export function getFundingOptions() {
   const launchChecksPassed = process.env.BILLING_LAUNCH_ENABLED === "true" &&
     process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
     refundDisputeHandlingApproved && Boolean(publicOrigin());
-  const pricePerTokenMinor = positiveSafeInteger(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO);
+  const pricePerTokenMinor = readSafePackPrice(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS);
   const paystackApproved = process.env.PAYSTACK_PROVIDER_APPROVED === "true";
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? "";
+  const cryptomusMerchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
+  const cryptomusApiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
   const enabled = launchChecksPassed && paystackApproved &&
-    Boolean(process.env.PAYSTACK_SECRET_KEY) && pricePerTokenMinor !== null;
+    Boolean(paystackSecret) && pricePerTokenMinor !== null;
 
-  const cryptoPricePerTokenMinor = positiveSafeInteger(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS);
+  const cryptoPricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
   const cryptomusEnabled = launchChecksPassed &&
     process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
-    Boolean(process.env.CRYPTOMUS_MERCHANT_ID) &&
-    Boolean(process.env.CRYPTOMUS_PAYMENT_API_KEY) &&
+    /^[a-f0-9-]{36}$/i.test(cryptomusMerchantId) &&
+    Boolean(cryptomusApiKey) &&
     cryptoPricePerTokenMinor !== null;
 
   const packsFor = (price: number | null, currency: string) => TOKEN_PACKS.map((tokens) => ({
@@ -95,7 +93,7 @@ export function getFundingOptions() {
 
 function requireLiveFunding() {
   const options = getFundingOptions();
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
   if (!options.enabled || !secret || !options.pricePerTokenMinor) {
     throw Object.assign(new Error(options.message), { code: "PAYMENTS_NOT_CONFIGURED", status: 503 });
   }
