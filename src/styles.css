@@ -2203,6 +2203,7 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio.is-expanded .uxui-device-shell > svg {
   display:block !important;
   flex:0 0 auto !important;
+  width:var(--uxui-device-display-width) !important;
   height:auto !important;
   max-width:none !important;
   max-height:none !important;
