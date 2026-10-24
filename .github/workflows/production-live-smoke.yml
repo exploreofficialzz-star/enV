@@ -85,6 +85,26 @@ jobs:
           console.log('Application backend gateway and required processors report ready.');
           NODE
 
+      - name: Check account session API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-auth-session.json \
+            --write-out 'Auth session HTTP %{http_code}; downloaded %{size_download} bytes\\n' \
+            https://envtools.store/api/auth/get-session
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const session = JSON.parse(fs.readFileSync('/tmp/env-auth-session.json', 'utf8'));
+          if (session && typeof session !== 'object') {
+            console.error('FAIL: Account session endpoint returned an unexpected response.');
+            process.exit(1);
+          }
+          console.log(`Account session endpoint healthy; signed-in session=${Boolean(session?.user)}.`);
+          NODE
+
       - name: Check AI status endpoint contract
         shell: bash
         run: |
