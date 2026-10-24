@@ -982,6 +982,7 @@ export function UxUiStudioEngine() {
   const [showGrid, setShowGrid] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [canvasStageSize, setCanvasStageSize] = useState({ width: 0, height: 0 });
+  const [availableEditorHeight, setAvailableEditorHeight] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const artboardRef = useRef<SVGSVGElement | null>(null);
@@ -1018,11 +1019,39 @@ export function UxUiStudioEngine() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const root = studioRootRef.current;
+    if (!root) return;
+    const measureAvailableHeight = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const rootTop = Math.max(0, root.getBoundingClientRect().top);
+      const next = Math.max(240, Math.floor(viewportHeight - rootTop - 8));
+      setAvailableEditorHeight((previous) => Math.abs(previous - next) < 2 ? previous : next);
+    };
+    measureAvailableHeight();
+    window.addEventListener("resize", measureAvailableHeight);
+    window.addEventListener("orientationchange", measureAvailableHeight);
+    window.visualViewport?.addEventListener("resize", measureAvailableHeight);
+    const parentObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measureAvailableHeight);
+    if (root.parentElement) parentObserver?.observe(root.parentElement);
+    return () => {
+      window.removeEventListener("resize", measureAvailableHeight);
+      window.removeEventListener("orientationchange", measureAvailableHeight);
+      window.visualViewport?.removeEventListener("resize", measureAvailableHeight);
+      parentObserver?.disconnect();
+    };
+  }, []);
+
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
+  const shellVerticalChrome = target === "mobile" ? 24 : target === "tablet" ? 32 : 18;
+  const heightFitWidth = canvasStageSize.height > 0
+    ? Math.max(1, canvasStageSize.height - shellVerticalChrome) * board.width / Math.max(1, board.height)
+    : Number.POSITIVE_INFINITY;
   const deviceDisplayWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
     canvasStageSize.width > 0 ? Math.max(1, canvasStageSize.width - 34) : Number.POSITIVE_INFINITY,
+    heightFitWidth,
   ));
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
@@ -2008,7 +2037,12 @@ export function UxUiStudioEngine() {
   }
 
   return (
-    <section ref={studioRootRef} aria-label="UX/UI Studio editor workspace" className={"ux-ui-studio target-" + target + " min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}>
+    <section
+      ref={studioRootRef}
+      aria-label="UX/UI Studio editor workspace"
+      style={{ "--uxui-available-height": availableEditorHeight > 0 ? `${availableEditorHeight}px` : "calc(100dvh - 160px)" } as CSSProperties}
+      className={"ux-ui-studio target-" + target + " min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}
+    >
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
