@@ -100,9 +100,14 @@ jobs:
           const status = JSON.parse(fs.readFileSync('/tmp/env-ai-status.json', 'utf8'));
           const entries = Object.values(status.tasks ?? {});
           const available = entries.filter((task) => task?.available === true).length;
+          const reasons = entries.reduce((counts, task) => {
+            const reason = task?.available === true ? 'available' : (task?.reason ?? 'unspecified');
+            counts[reason] = (counts[reason] ?? 0) + 1;
+            return counts;
+          }, {});
           if (status.ok !== true || status.enabled !== true || entries.length === 0 || available === 0) {
-            console.error(`FAIL: AI is not operational. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}.`);
+            console.error(`FAIL: AI is not operational. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
             process.exit(1);
           }
-          console.log(`AI status healthy; enabled=true; tasks=${entries.length}; available=${available}.`);
+          console.log(`AI status healthy; enabled=true; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
           NODE
