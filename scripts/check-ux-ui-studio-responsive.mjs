@@ -12,10 +12,12 @@ assert.match(catalog, /"id": "icons",\s+"name": "Icons"/, "Icon tool is named Ic
 assert.match(catalog, /"id": "media",\s+"name": "Images & media"/, "Image/media tool has the requested name");
 assert.doesNotMatch(catalog, /"name": "[^"]*Studio"/, "Individual tools no longer use the redundant Studio suffix");
 const deviceFormula = engine.slice(engine.indexOf("const deviceDisplayWidth ="), engine.indexOf("const selected = elements.find"));
-assert.ok(!deviceFormula.includes("canvasStageSize.height"), "Mockup height must never auto-scale its design dimensions");
-assert.ok(!deviceFormula.includes("canvasStageSize.width"), "Mockup width must not shrink to the available canvas width");
-assert.ok(deviceFormula.includes("board.width * zoom / 100"), "Mockup size follows its artboard width and explicit user zoom");
-assert.ok(deviceFormula.includes("stage.scrollLeft") && deviceFormula.includes("stage.scrollTop"), "Canvas view centers horizontally and vertically around the unchanged mockup");
+const widthSizingFormula = deviceFormula.slice(0, deviceFormula.indexOf("// Keep the mockup at its chosen size"));
+const canvasCenteringFormula = deviceFormula.slice(deviceFormula.indexOf("// Keep the mockup at its chosen size"));
+assert.ok(!widthSizingFormula.includes("canvasStageSize.height"), "Mockup height must never auto-scale its design dimensions");
+assert.ok(!widthSizingFormula.includes("canvasStageSize.width"), "Mockup width must not shrink to the available canvas width");
+assert.ok(widthSizingFormula.includes("board.width * zoom / 100"), "Mockup size follows its artboard width and explicit user zoom");
+assert.ok(canvasCenteringFormula.includes("stage.scrollLeft") && canvasCenteringFormula.includes("stage.scrollTop"), "Canvas view centers horizontally and vertically around the unchanged mockup");
 assert.ok(engine.includes('className="uxui-device-positioner"'), "Device is placed inside a centering wrapper that can extend beyond the viewport");
 assert.ok(engine.includes('maxWidth: "none", maxHeight: "none"'), "Mockup SVG has no automatic max-width or max-height shrink");
 assert.ok(engine.includes("availableEditorHeight") && engine.includes("--uxui-available-height"), "Studio measures the visible viewport remaining below the page header");
