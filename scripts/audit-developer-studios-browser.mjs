@@ -81,9 +81,25 @@ try {
         // Wait for the real React tool effect before clicking SSR markup; a pre-hydration click can be dropped.
         await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
         await page.getByRole('heading', { name: 'UX/UI Studio', exact: true, level: 2 }).waitFor({ state: 'visible', timeout });
+        // Exercise a user-selected Tablet preference across a full reload before creating a project.
+        await page.getByRole('button', { name: 'Start with Tablet' }).click();
+        await page.waitForFunction(() => window.localStorage.getItem('env-ux-ui-studio-device-target-v1') === 'tablet', null, { timeout });
+        await page.reload({ waitUntil: 'domcontentloaded', timeout });
+        await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
+        await page.waitForFunction(() => document.querySelector('[aria-label="Start with Tablet"]')?.getAttribute('aria-pressed') === 'true', null, { timeout });
         await page.getByRole('button', { name: /Add project/i }).click();
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
+        await page.locator('.uxui-device-tablet').waitFor({ state: 'visible', timeout });
+        const startupState = await studio.evaluate((node) => ({
+          className: node.className,
+          storedTarget: window.localStorage.getItem('env-ux-ui-studio-device-target-v1'),
+        }));
+        if (!startupState.className.includes('target-tablet') || startupState.storedTarget !== 'tablet') {
+          throw new Error('Add project did not open the previously selected Tablet view. State: ' + JSON.stringify(startupState));
+        }
+        // Continue testing the mobile editing experience and its no-overflow guarantee too.
+        await page.getByRole('button', { name: 'Mobile', exact: true }).click();
         await page.locator('.uxui-device-mobile').waitFor({ state: 'visible', timeout });
         // The sketch-first workspace hides the screen/layer inspector until explicitly opened.
         await page.getByRole('button', { name: 'App screens and layers' }).click();
