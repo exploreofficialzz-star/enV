@@ -98,9 +98,11 @@ jobs:
           node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const status = JSON.parse(fs.readFileSync('/tmp/env-ai-status.json', 'utf8'));
-          if (status.ok !== true || !status.tasks || typeof status.tasks !== 'object') {
-            console.error('FAIL: AI status endpoint is not returning its documented health contract.');
+          const entries = Object.values(status.tasks ?? {});
+          const available = entries.filter((task) => task?.available === true).length;
+          if (status.ok !== true || status.enabled !== true || entries.length === 0 || available === 0) {
+            console.error(`FAIL: AI is not operational. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}.`);
             process.exit(1);
           }
-          console.log(`AI status endpoint healthy; enabled=${status.enabled === true}.`);
+          console.log(`AI status healthy; enabled=true; tasks=${entries.length}; available=${available}.`);
           NODE
