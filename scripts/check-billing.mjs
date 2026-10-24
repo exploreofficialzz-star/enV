@@ -148,6 +148,10 @@ assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY/);
 assert.match(cryptomusService, /createHash\("md5"\)/);
 assert.match(cryptomusService, /timingSafeEqual/);
+assert.match(cryptomusService, /readBoundedBytes\(request, 256_000\)/,
+  "Cryptomus webhook bodies must be limited while streaming");
+assert.doesNotMatch(cryptomusService.slice(cryptomusService.indexOf("export async function handleCryptomusWebhook")), /request\.text\(\)/,
+  "Cryptomus webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(cryptomusService, /verifyAndCreditCryptomusReference/);
 assert.match(cryptomusService, /invoice\.is_final !== true/);
 assert.match(cryptomusService, /invoice\.order_id !== reference/);
@@ -182,6 +186,10 @@ assert.match(paystackService, /createHmac\("sha512", verificationSecret\)/,
 assert.doesNotMatch(envExample, /PAYSTACK_WEBHOOK_SECRET=/,
   "Paystack does not expose a separate webhook-signing secret in this integration");
 assert.match(paystackService, /timingSafeEqual/);
+assert.match(paystackService, /readBoundedBytes\(request, 256_000\)/,
+  "Paystack webhook bodies must be limited while streaming");
+assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook")), /request\.text\(\)/,
+  "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.doesNotMatch(paystackProviderConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
