@@ -87,6 +87,59 @@ jobs:
           console.log('Application backend gateway and required processors report ready.');
           NODE
 
+      - name: Check payment funding-options contract
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-funding-options.json \
+            --write-out 'Payment funding-options HTTP %{http_code}; downloaded %{size_download} bytes\\n' \
+            https://envtools.store/api/billing/funding-options
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync('/tmp/env-funding-options.json', 'utf8'));
+          const data = response?.data;
+          const failures = [];
+          const providers = Array.isArray(data?.providers) ? data.providers : [];
+          const required = new Map([['paystack', 'NGN'], ['cryptomus', 'USD']]);
+          if (response?.ok !== true || !data || providers.length !== required.size) {
+            failures.push('Funding-options response is missing one or more configured provider contracts.');
+          }
+          for (const [id, currency] of required) {
+            const provider = providers.find((item) => item?.id === id);
+            if (!provider) {
+              failures.push(`Missing payment provider contract: ${id}.`);
+              continue;
+            }
+            if (typeof provider.enabled !== 'boolean' || provider.currency !== currency ||
+                !Array.isArray(provider.packs) ||
+                provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000') {
+              failures.push(`The ${id} funding-options contract is malformed.`);
+              continue;
+            }
+            for (const pack of provider.packs) {
+              if (pack.amountMinor !== null && (!Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
+                failures.push(`The ${id} provider returned an invalid token-pack amount.`);
+              }
+              if (provider.enabled && (!Number.isSafeInteger(provider.pricePerTokenMinor) ||
+                  provider.pricePerTokenMinor <= 0 || !Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
+                failures.push(`The enabled ${id} provider is missing a valid configured price.`);
+              }
+            }
+          }
+          if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {
+            failures.push('The aggregate anyEnabled flag does not match provider availability.');
+          }
+          if (failures.length) {
+            for (const failure of failures) console.error(`FAIL: ${failure}`);
+            process.exit(1);
+          }
+          console.log(`Payment API contract healthy; Paystack enabled=${providers.find((provider) => provider.id === 'paystack')?.enabled === true}; Cryptomus enabled=${providers.find((provider) => provider.id === 'cryptomus')?.enabled === true}. This contract check does not imply live provider approval.`);
+          NODE
+
       - name: Check account session API
         if: always()
         shell: bash
