@@ -35,6 +35,7 @@ jobs:
           test -s /tmp/env-home.html
 
       - name: Check Render API readiness and processor health
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -62,6 +63,7 @@ jobs:
           NODE
 
       - name: Check application backend gateway readiness
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -86,15 +88,30 @@ jobs:
           NODE
 
       - name: Check account session API
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            --retry 3 --retry-delay 3 --retry-all-errors \
-            --connect-timeout 10 --max-time 30 \
-            --output /tmp/env-auth-session.json \
-            --write-out 'Auth session HTTP %{http_code}; downloaded %{size_download} bytes\\n' \
-            https://envtools.store/api/auth/get-session
+          status_code=""
+          for attempt in 1 2 3 4; do
+            status_code="$(curl --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --output /tmp/env-auth-session.json \
+              --write-out '%{http_code}' \
+              https://envtools.store/api/auth/get-session || true)"
+            if [ "$status_code" = "200" ]; then break; fi
+            sleep 3
+          done
+          echo "Auth session HTTP ${status_code:-000}"
+          if [ "$status_code" != "200" ]; then
+            AUTH_STATUS="$status_code" node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          let body = {};
+          try { body = JSON.parse(fs.readFileSync('/tmp/env-auth-session.json', 'utf8')); } catch {}
+          console.error(`FAIL: Account session endpoint returned HTTP ${process.env.AUTH_STATUS || '000'}; public error code=${body?.error ?? 'unavailable'}.`);
+          NODE
+            exit 1
+          fi
           node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const session = JSON.parse(fs.readFileSync('/tmp/env-auth-session.json', 'utf8'));
@@ -106,6 +123,7 @@ jobs:
           NODE
 
       - name: Check AI status endpoint contract
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
