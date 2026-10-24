@@ -1068,28 +1068,19 @@ export function UxUiStudioEngine() {
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
   ));
-  // Fit the selected device and its frame to the actual canvas stage. The mobile
-  // composition stays fitted above touch controls; tablet/desktop get a fit scale
-  // when the entire editor is expanded to the device viewport.
-  const mobileFrameChrome = 24;
-  const mobileFullHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
-  const mobileFitScale = target === "mobile" && canvasStageSize.width > 0 && canvasStageSize.height > 0
+  // Fit every selected device into the visible canvas, not only phones. The frame and
+  // the SVG artboard share one scale so tablet/desktop layouts cannot be clipped or distorted.
+  const requestedDeviceHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
+  const deviceFrameChromeWidth = target === "mobile" ? 24 : target === "tablet" ? 32 : 22;
+  const deviceFrameChromeHeight = deviceFrameChromeWidth;
+  const deviceFitScale = canvasStageSize.width > 0 && canvasStageSize.height > 0
     ? Math.max(0.01, Math.min(
         1,
-        canvasStageSize.width / (requestedDeviceWidth + mobileFrameChrome),
-        canvasStageSize.height / (mobileFullHeight + mobileFrameChrome),
+        canvasStageSize.width / (requestedDeviceWidth + deviceFrameChromeWidth),
+        canvasStageSize.height / (requestedDeviceHeight + deviceFrameChromeHeight),
       ))
     : 1;
-  const expandedFrameChrome = target === "tablet" ? 32 : 22;
-  const expandedDeviceHeight = requestedDeviceWidth * board.height / Math.max(1, board.width);
-  const expandedFitScale = target !== "mobile" && isExpanded && canvasStageSize.width > 0 && canvasStageSize.height > 0
-    ? Math.max(0.01, Math.min(
-        1,
-        canvasStageSize.width / (requestedDeviceWidth + expandedFrameChrome),
-        canvasStageSize.height / (expandedDeviceHeight + expandedFrameChrome),
-      ))
-    : 1;
-  const deviceFrameScale = target === "mobile" ? mobileFitScale : isExpanded ? expandedFitScale : 1;
+  const deviceFrameScale = deviceFitScale;
   const deviceDisplayWidth = requestedDeviceWidth * deviceFrameScale;
   const deviceFrameDimensions = target === "mobile"
     ? { padding: 8, border: 4, radius: 54, screenRadius: 40 }
@@ -1097,22 +1088,17 @@ export function UxUiStudioEngine() {
       ? { padding: 11, border: 5, radius: 29, screenRadius: 17 }
       : { padding: 9, border: 2, radius: 12, screenRadius: 2 };
 
-  // On mobile the full device is scaled to fit and centered in the preview zone.
-  // Other targets retain the panning behavior for oversized mockups.
+  // A fitted preview always starts at the visible origin; do not preserve a stale pan
+  // offset when switching between mobile, tablet and desktop canvas sizes.
   useEffect(() => {
     const stage = canvasStageRef.current;
     if (!stage) return;
-    const centerViewport = () => {
-      if (target === "mobile") {
-        stage.scrollLeft = 0;
-        stage.scrollTop = 0;
-        return;
-      }
-      stage.scrollLeft = Math.max(0, Math.round((stage.scrollWidth - stage.clientWidth) / 2));
-      stage.scrollTop = Math.max(0, Math.round((stage.scrollHeight - stage.clientHeight) / 2));
+    const resetViewport = () => {
+      stage.scrollLeft = 0;
+      stage.scrollTop = 0;
     };
-    centerViewport();
-    const frame = window.requestAnimationFrame(centerViewport);
+    resetViewport();
+    const frame = window.requestAnimationFrame(resetViewport);
     return () => window.cancelAnimationFrame(frame);
   }, [deviceDisplayWidth, board.width, board.height, target, canvasStageSize.width, canvasStageSize.height, availableEditorHeight]);
 
@@ -2139,9 +2125,8 @@ export function UxUiStudioEngine() {
       className={"ux-ui-studio target-" + target + " min-w-0 " + (isExpanded ? "is-expanded" : "")}
     >
       <header className="uxui-topbar">
-        <div className="uxui-fullscreen-brand" aria-label="enV UX/UI Studio">
+        <div className="uxui-fullscreen-brand" aria-label="enV brand">
           <Logo size="hero" className="uxui-fullscreen-logo" />
-          <strong>UX/UI Studio</strong>
         </div>
         <div className="uxui-topbar-left">
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
@@ -2399,11 +2384,10 @@ export function UxUiStudioEngine() {
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
-            <div><strong>{target === "mobile" ? "Phone mockup" : target === "tablet" ? "Tablet mockup" : "Desktop mockup"}</strong><span>{prototypePreview ? "Prototype" : "Preview"}</span></div>
-            <div className="uxui-canvas-zoom">
-              {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} title="Preview connected screen flow" className="rounded-lg border border-border px-2.5 py-2 text-xs font-semibold text-fg disabled:opacity-40">Prototype</button>}
+            <div className="uxui-canvas-zoom" role="toolbar" aria-label="Canvas view controls">
+              {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} aria-label="Preview connected screen flow" title="Preview connected screen flow" className="rounded-lg border border-border p-2 text-xs font-semibold text-fg disabled:opacity-40"><LayoutTemplate size={16} /></button>}
               <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out" disabled={prototypePreview}><ZoomOut size={16} /></button>
-              <span>{zoom}%</span>
+              <span aria-label={"Zoom " + zoom + "%"} title={"Zoom " + zoom + "%"}>{zoom}%</span>
               <button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
             </div>
