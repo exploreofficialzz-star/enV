@@ -17,3 +17,19 @@ export function requirePaystackVerificationSecret(
   }
   return secret;
 }
+
+/** Parse a positive minor-unit price only when every offered token pack fits safely in integer arithmetic. */
+export function readSafePackPrice(
+  value: string | undefined,
+  packSizes: readonly number[],
+): number | null {
+  if (!value || !/^\d+$/.test(value.trim()) || packSizes.length === 0) return null;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return null;
+  for (const packSize of packSizes) {
+    if (!Number.isSafeInteger(packSize) || packSize <= 0) return null;
+    const total = packSize * parsed;
+    if (!Number.isSafeInteger(total) || total <= 0) return null;
+  }
+  return parsed;
+}
