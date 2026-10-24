@@ -2324,7 +2324,20 @@ export function UxUiStudioEngine() {
           </div>
           <div ref={canvasStageRef} className="uxui-canvas-stage" role="region" aria-label={projectName + " design canvas"} tabIndex={0}>
             <div className="uxui-device-positioner">
-              <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
+              <div
+                className={"uxui-device-shell uxui-device-" + target}
+                data-target={target}
+                style={{
+                  "--uxui-device-scale": deviceFrameScale,
+                  "--uxui-device-padding": `${8 * deviceFrameScale}px`,
+                  "--uxui-device-border": `${4 * deviceFrameScale}px`,
+                  "--uxui-device-radius": `${54 * deviceFrameScale}px`,
+                  "--uxui-screen-radius": `${40 * deviceFrameScale}px`,
+                  "--uxui-cutout-top": `${13 * deviceFrameScale}px`,
+                  "--uxui-cutout-width": `${108 * deviceFrameScale}px`,
+                  "--uxui-cutout-height": `${21 * deviceFrameScale}px`,
+                } as CSSProperties}
+              >
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
                 style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
