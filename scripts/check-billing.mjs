@@ -7,6 +7,7 @@ const migration = await read("migrations/0002_billing.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
 const cryptomusVerifyRoute = await read("server/routes/api/billing/cryptomus/verify.post.ts");
@@ -174,6 +175,22 @@ assert.match(paystackService, /BILLING_ENFORCEMENT_ENABLED === "true"/);
 assert.match(paystackService, /createHmac\("sha512"/);
 assert.match(paystackService, /timingSafeEqual/);
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
+assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
+assert.doesNotMatch(paystackProviderConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
+  "settlement credentials must not inherit the new-checkout kill switch");
+const paystackSettlement = paystackService.slice(
+  paystackService.indexOf("export async function verifyAndCreditPaystackReference"),
+  paystackService.indexOf("export async function handlePaystackWebhook"),
+);
+assert.match(paystackSettlement, /requirePaystackVerificationSecret\(process\.env\)/,
+  "existing Paystack payments must remain verifiable when new checkout is disabled");
+assert.doesNotMatch(paystackSettlement, /requireLiveFunding\(/,
+  "existing transaction verification must not be blocked by the new-checkout launch gates");
+const paystackWebhookSettlement = paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook"));
+assert.match(paystackWebhookSettlement, /requirePaystackVerificationSecret\(process\.env\)/,
+  "Paystack webhook verification must remain available during checkout shutdown");
+assert.doesNotMatch(paystackWebhookSettlement, /requireLiveFunding\(/,
+  "Paystack webhook settlement must not depend on the new-checkout launch gates");
 assert.match(rewardsMigration, /billing_referral_profiles/);
 assert.match(rewardsMigration, /billing_referrals/);
 assert.match(rewardsMigration, /billing_reward_events/);
