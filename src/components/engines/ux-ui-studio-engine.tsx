@@ -1372,7 +1372,7 @@ export function UxUiStudioEngine() {
     setPrototypePreview(true);
     setSelectedId("");
     setShowInspector(false); setShowToolsPanel(false); setShowExportPanel(false);
-    setShowTextEditor(false); setShowContextColors(false); setShowAdvancedContext(false);
+    setShowTextEditor(false); setShowContextColors(false);
     setNotice("Prototype preview started. Tap an element with a screen destination to navigate.");
   }
 
