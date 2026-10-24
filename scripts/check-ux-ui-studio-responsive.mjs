@@ -44,9 +44,9 @@ assert.ok(responsiveRules.includes("target-desktop .uxui-mobile-controls { displ
 assert.ok(responsiveRules.includes("target-tablet .uxui-mobile-controls { display:flex !important; }"), "Tablet retains the movement controller");
 assert.ok(responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit surface follows user theme");
 assert.ok(responsiveRules.includes("isolation:isolate;"), "Studio controls are contained in a local stacking context");
-assert.ok(responsiveRules.includes("position:sticky !important; top:64px !important; z-index:31 !important"), "Studio toolbar remains clickable below the global sticky header without escaping the Studio stack");
+assert.ok(responsiveRules.includes("position:relative !important; top:auto !important;"), "Studio toolbar stays inside the fitted editor stack instead of using sticky positioning");
 assert.ok(responsiveRules.includes("height:var(--uxui-available-height,calc(100dvh - 160px)) !important"), "Studio workspace is constrained to the visible viewport height");
-assert.ok(responsiveRules.includes("overflow:hidden !important; padding:8px !important;"), "Canvas stage cannot create a vertical scroll area");
+assert.ok(responsiveRules.includes("overflow:hidden !important;") && responsiveRules.includes("padding:8px !important;"), "Canvas stage cannot create a vertical scroll area");
 assert.ok(responsiveRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Phone edit actions wrap into a visible compact grid instead of requiring horizontal scrolling");
 assert.ok(responsiveRules.includes("height:0 !important; min-height:0 !important; overflow:hidden !important"), "Workspace flexes into the available editor height");
 console.log("UX/UI Studio responsive layout, contextual actions, naming, theme and placeholder checks: PASS");
