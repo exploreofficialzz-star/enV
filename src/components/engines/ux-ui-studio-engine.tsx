@@ -2140,7 +2140,7 @@ export function UxUiStudioEngine() {
     >
       <header className="uxui-topbar">
         <div className="uxui-fullscreen-brand" aria-label="enV UX/UI Studio">
-          <Logo size="search" className="uxui-fullscreen-logo" />
+          <Logo size="hero" className="uxui-fullscreen-logo" />
           <strong>UX/UI Studio</strong>
         </div>
         <div className="uxui-topbar-left">
