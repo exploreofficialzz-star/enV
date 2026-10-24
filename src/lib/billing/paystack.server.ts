@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
 import { requirePaystackVerificationSecret } from "./provider-config";
+import { readBoundedBytes } from "./bounded-json.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -252,9 +253,12 @@ export async function handlePaystackWebhook(request: Request) {
   // payments can be reconciled and no customer payment is silently stranded.
   const verificationSecret = requirePaystackVerificationSecret(process.env);
   const signature = request.headers.get("x-paystack-signature") ?? "";
-  const raw = await request.text();
-  if (raw.length > 256_000) throw Object.assign(new Error("Webhook payload is too large."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
-  const expected = createHmac("sha512", verificationSecret).update(raw).digest("hex");
+  const rawBytes = await readBoundedBytes(request, 256_000);
+  if (!rawBytes) throw Object.assign(new Error("Webhook payload is too large or unreadable."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
+  let raw: string;
+  try { raw = new TextDecoder("utf-8", { fatal: true }).decode(rawBytes); }
+  catch { throw Object.assign(new Error("The webhook payload is not valid UTF-8."), { code: "INVALID_WEBHOOK", status: 400 }); }
+  const expected = createHmac("sha512", verificationSecret).update(rawBytes).digest("hex");
   if (!/^[a-f0-9]{128}$/i.test(signature) ||
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
     throw Object.assign(new Error("The payment-provider signature is invalid."), { code: "INVALID_WEBHOOK_SIGNATURE", status: 401 });
