@@ -1650,8 +1650,12 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 /* Preserve native mockup size: center the canvas view instead of shrinking the device. */
 .ux-ui-studio:not(.is-expanded) .uxui-canvas-stage {
   display:block !important;
+  flex:1 1 0 !important;
+  width:100%;
+  height:auto !important;
   min-width:0;
   min-height:0 !important;
+  max-height:none !important;
   overflow:auto !important;
   overscroll-behavior:contain;
   padding:8px !important;
@@ -1676,7 +1680,6 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   margin:0 !important;
 }
 .ux-ui-studio:not(.is-expanded) .uxui-device-shell > svg {
-  width:var(--uxui-mockup-rendered-width,auto);
   max-width:none !important;
   max-height:none !important;
   flex:0 0 auto;
