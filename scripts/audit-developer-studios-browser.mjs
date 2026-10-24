@@ -105,7 +105,7 @@ try {
         // The fullscreen header must reuse the real site logo assets for both themes.
         const fullscreenLogoSources = await page.locator('.uxui-fullscreen-logo img').evaluateAll((images) =>
           images.map((image) => image.getAttribute('src')));
-        if (!fullscreenLogoSources.includes('/logo-header-transparent.png') || !fullscreenLogoSources.includes('/logo-header-dark.png')) {
+        if (!fullscreenLogoSources.includes('/logo-home-transparent.png') || !fullscreenLogoSources.includes('/logo-home-dark.png')) {
           throw new Error('Fullscreen Studio header is not using the canonical enV logo assets: ' + JSON.stringify(fullscreenLogoSources));
         }
 
