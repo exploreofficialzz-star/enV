@@ -11,7 +11,7 @@ assert.equal([...catalog.matchAll(/"id": "/g)].length, 26, "Studio keeps all 26 
 assert.match(catalog, /"id": "icons",\s+"name": "Icons"/, "Icon tool is named Icons");
 assert.match(catalog, /"id": "media",\s+"name": "Images & media"/, "Image/media tool has the requested name");
 assert.doesNotMatch(catalog, /"name": "[^"]*Studio"/, "Individual tools no longer use the redundant Studio suffix");
-const deviceFormula = engine.slice(engine.indexOf("const deviceDisplayWidth ="), engine.indexOf("const selected = elements.find"));
+const deviceFormula = engine.slice(engine.indexOf("const shellVerticalChrome ="), engine.indexOf("const selected = elements.find"));
 assert.ok(deviceFormula.includes("canvasStageSize.height"), "Mockup scales to the available canvas height as well as width");
 assert.ok(engine.includes("availableEditorHeight") && engine.includes("--uxui-available-height"), "Studio measures the visible viewport remaining below the page header");
 assert.match(engine, /target-" \+ target/, "Studio root tracks selected target mode");
