@@ -16,6 +16,7 @@ assert.ok(deviceFormula.includes("canvasStageSize.height"), "Mockup scales to th
 assert.ok(engine.includes("availableEditorHeight") && engine.includes("--uxui-available-height"), "Studio measures the visible viewport remaining below the page header");
 assert.match(engine, /target-" \+ target/, "Studio root tracks selected target mode");
 assert.ok(engine.includes('aria-label="UX/UI Studio editor workspace"'), "Studio editing region has an accessible label");
+assert.ok(engine.includes('aria-label="Export" title="Export design"'), "Export keeps an accessible name when its visual label is hidden on narrow screens");
 assert.ok(engine.includes('selected && target !== "desktop" && !isExpanded'), "Movement controls apply to mobile/tablet only");
 assert.ok(!engine.includes("Your canvas is ready. Tap + to add your first element."), "Blank-canvas prompt removed");
 assert.ok(!engine.includes("uxui-visual-property-dock"), "Compressed visual-properties dock removed");
@@ -49,4 +50,10 @@ assert.ok(responsiveRules.includes("height:var(--uxui-available-height,calc(100d
 assert.ok(responsiveRules.includes("overflow:hidden !important;") && responsiveRules.includes("padding:8px !important;"), "Canvas stage cannot create a vertical scroll area");
 assert.ok(responsiveRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Phone edit actions wrap into a visible compact grid instead of requiring horizontal scrolling");
 assert.ok(responsiveRules.includes("height:0 !important; min-height:0 !important; overflow:hidden !important"), "Workspace flexes into the available editor height");
+assert.ok(responsiveRules.includes("Monochrome, user-theme-aware Studio toolkit samples"), "Toolkit pages document their theme-aware monochrome treatment");
+assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-toolkit-tile-art") && responsiveRules.includes("background:var(--color-surface) !important"), "Toolkit icon/sample tiles use the user's theme surface");
+assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-element-shape") && responsiveRules.includes("background:var(--color-fg) !important"), "Component and shape samples use monochrome foreground colors");
+assert.ok(responsiveRules.includes(".uxui-toolkit-content .uxui-preset-preview") && responsiveRules.includes(".uxui-preset-mockup-hero"), "Preset mockup preview colors follow the user's active theme");
+assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && responsiveRules.includes(".dark .ux-ui-studio:not(.is-expanded) .uxui-toolkit-content img[src*=\"api.iconify.design\"]"), "Remote toolkit icons are monochrome in both light and dark themes");
+assert.ok(responsiveRules.includes("The color grid and token color inputs stay colorful"), "Real design color pickers retain their functional colors");
 console.log("UX/UI Studio responsive layout, contextual actions, naming, theme and placeholder checks: PASS");
