@@ -2502,3 +2502,96 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .uxui-home-device-picker { gap:6px; }
   .uxui-home-device-picker .uxui-target-switch button { min-height:33px; padding-inline:7px; }
 }
+
+
+/* UX/UI Studio polish: keep the canonical enV mark, clearly spaced actions and compact canvas controls. */
+.ux-ui-studio .uxui-fullscreen-brand {
+  display:flex !important;
+  flex:0 0 auto !important;
+  align-items:center !important;
+  gap:0 !important;
+  min-width:0 !important;
+}
+.ux-ui-studio .uxui-fullscreen-brand > strong {
+  display:none !important;
+}
+.ux-ui-studio > .uxui-topbar {
+  column-gap:clamp(7px,1.2vw,16px) !important;
+}
+.ux-ui-studio .uxui-topbar-left {
+  flex:0 0 auto !important;
+  min-width:0 !important;
+}
+.ux-ui-studio .uxui-topbar-actions {
+  display:flex !important;
+  flex:0 0 auto !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:clamp(6px,0.9vw,11px) !important;
+  min-width:0 !important;
+}
+.ux-ui-studio .uxui-topbar-actions > .uxui-icon-button,
+.ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger,
+.ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger {
+  flex:0 0 auto !important;
+  margin:0 !important;
+}
+.ux-ui-studio .uxui-canvas-heading {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  flex:0 0 auto !important;
+  min-height:37px !important;
+  height:37px !important;
+  padding:3px 8px !important;
+  gap:5px !important;
+}
+.ux-ui-studio .uxui-canvas-zoom {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:5px !important;
+}
+.ux-ui-studio .uxui-canvas-zoom button {
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  flex:0 0 auto !important;
+  min-width:30px !important;
+  min-height:30px !important;
+  padding:4px !important;
+}
+.ux-ui-studio .uxui-canvas-zoom span {
+  width:34px !important;
+  text-align:center !important;
+}
+.ux-ui-studio.is-expanded .uxui-canvas-heading {
+  min-height:34px !important;
+  height:34px !important;
+  padding:2px 7px !important;
+}
+@media (max-width:700px) {
+  .ux-ui-studio.is-expanded > .uxui-topbar {
+    column-gap:clamp(5px,1vw,8px) !important;
+    padding-inline:7px !important;
+  }
+  .ux-ui-studio.is-expanded .uxui-topbar-left {
+    gap:4px !important;
+  }
+  .ux-ui-studio.is-expanded .uxui-topbar-actions {
+    gap:clamp(4px,1vw,7px) !important;
+  }
+  .ux-ui-studio.is-expanded .uxui-canvas-heading {
+    min-height:31px !important;
+    height:31px !important;
+    padding-inline:4px !important;
+  }
+  .ux-ui-studio.is-expanded .uxui-canvas-zoom {
+    gap:3px !important;
+  }
+  .ux-ui-studio.is-expanded .uxui-canvas-zoom button {
+    min-width:27px !important;
+    min-height:27px !important;
+  }
+}
