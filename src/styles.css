@@ -1645,3 +1645,47 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   border-left-color:var(--uxui-toolkit-ink) !important;
   border-right-color:var(--uxui-toolkit-ink) !important;
 }
+
+
+/* Preserve native mockup size: center the canvas view instead of shrinking the device. */
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-stage {
+  display:block !important;
+  flex:1 1 0 !important;
+  width:100%;
+  height:auto !important;
+  min-width:0;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:auto !important;
+  overscroll-behavior:contain;
+  padding:8px !important;
+  scrollbar-width:thin;
+  scrollbar-gutter:stable;
+  touch-action:pan-x pan-y;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-positioner {
+  display:grid;
+  place-items:center;
+  width:max-content;
+  min-width:100%;
+  min-height:100%;
+  margin-inline:auto;
+  box-sizing:border-box;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-shell {
+  width:max-content !important;
+  max-width:none !important;
+  max-height:none !important;
+  flex:0 0 auto !important;
+  margin:0 !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-shell > svg {
+  max-width:none !important;
+  max-height:none !important;
+  flex:0 0 auto;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-mobile,
+.ux-ui-studio:not(.is-expanded) .uxui-device-tablet,
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop {
+  flex-shrink:0 !important;
+}

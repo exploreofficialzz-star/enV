@@ -1043,16 +1043,28 @@ export function UxUiStudioEngine() {
   }, []);
 
   const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
-  const shellVerticalChrome = target === "mobile" ? 24 : target === "tablet" ? 32 : 18;
-  const heightFitWidth = canvasStageSize.height > 0
-    ? Math.max(1, canvasStageSize.height - shellVerticalChrome) * board.width / Math.max(1, board.height)
-    : Number.POSITIVE_INFINITY;
+  // Device size follows the artboard and the user's explicit zoom only.
+  // The canvas pans/scrolls around the fixed-size mockup instead of auto-scaling it to fit.
   const deviceDisplayWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
-    canvasStageSize.width > 0 ? Math.max(1, canvasStageSize.width - 34) : Number.POSITIVE_INFINITY,
-    heightFitWidth,
   ));
+
+  // Keep the mockup at its chosen size and center the canvas viewport on it.
+  // If the artboard is larger than the available stage, only the canvas scrolls;
+  // the editor toolbar and contextual controls remain fixed in the workspace.
+  useEffect(() => {
+    const stage = canvasStageRef.current;
+    if (!stage) return;
+    const centerViewport = () => {
+      stage.scrollLeft = Math.max(0, Math.round((stage.scrollWidth - stage.clientWidth) / 2));
+      stage.scrollTop = Math.max(0, Math.round((stage.scrollHeight - stage.clientHeight) / 2));
+    };
+    centerViewport();
+    const frame = window.requestAnimationFrame(centerViewport);
+    return () => window.cancelAnimationFrame(frame);
+  }, [deviceDisplayWidth, board.width, board.height, target, canvasStageSize.width, canvasStageSize.height, availableEditorHeight]);
+
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
@@ -2311,10 +2323,11 @@ export function UxUiStudioEngine() {
             </div>
           </div>
           <div ref={canvasStageRef} className="uxui-canvas-stage" role="region" aria-label={projectName + " design canvas"} tabIndex={0}>
-            <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
+            <div className="uxui-device-positioner">
+              <div className={"uxui-device-shell uxui-device-" + target} data-target={target}>
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
-                style={{ width: deviceDisplayWidth + "px", maxWidth: "100%", height: "auto", display: "block", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
+                style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
                 <rect width={board.width} height={board.height} fill={background} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
@@ -2376,7 +2389,7 @@ export function UxUiStudioEngine() {
                 })}
               </svg>
               <div className="uxui-device-neck" aria-hidden="true" /><div className="uxui-device-base" aria-hidden="true" />
-              
+              </div>
             </div>
           </div>
           <div className="uxui-bottom-toolbar">
