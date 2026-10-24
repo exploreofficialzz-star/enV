@@ -83,7 +83,7 @@
     "check:audio-studio-usability": "node scripts/check-audio-studio-usability.mjs",
     "check:production-gating": "node scripts/check-production-gating.mjs && node --experimental-strip-types --test src/lib/production-notice.test.ts",
     "check:tool-icons": "node scripts/check-tool-icon-design.mjs",
-    "check:billing": "node --experimental-strip-types --test src/lib/billing/catalog.test.ts src/lib/billing/bounded-json.server.test.ts && node scripts/check-billing.mjs",
+    "check:billing": "node --experimental-strip-types --test src/lib/billing/catalog.test.ts src/lib/billing/bounded-json.server.test.ts src/lib/billing/provider-config.test.ts && node scripts/check-billing.mjs",
     "generate:billing-profiles": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-billing-profiles.mjs",
     "check:support-center": "node scripts/check-support-center.mjs",
     "generate:offline-eligibility": "node scripts/generate-offline-eligible-tools.mjs",
