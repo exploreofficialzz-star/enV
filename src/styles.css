@@ -2547,9 +2547,6 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   padding:3px 8px !important;
   gap:5px !important;
 }
-.ux-ui-studio .uxui-canvas-heading > div:first-child {
-  display:none !important;
-}
 .ux-ui-studio .uxui-canvas-zoom {
   display:flex !important;
   align-items:center !important;
