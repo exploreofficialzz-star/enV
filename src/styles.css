@@ -1301,3 +1301,164 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:35px; height:35px; border-radius:10px; }
   .ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:9px; line-height:15px; }
 }
+
+
+/* Fit the Studio preview and controls inside the visible viewport, without vertical scrolling. */
+.ux-ui-studio:not(.is-expanded) {
+  height:var(--uxui-available-height,calc(100dvh - 160px)) !important;
+  min-height:0 !important;
+  max-height:var(--uxui-available-height,calc(100dvh - 160px)) !important;
+  overflow:hidden !important;
+  gap:6px !important;
+}
+.ux-ui-studio:not(.is-expanded) > :not([hidden]) ~ :not([hidden]) { margin-top:0 !important; }
+.ux-ui-studio:not(.is-expanded) > .uxui-topbar {
+  position:relative !important; top:auto !important; z-index:5;
+  flex:0 0 auto; min-height:0; flex-wrap:nowrap; gap:6px; padding:4px 6px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-topbar-left,
+.ux-ui-studio:not(.is-expanded) .uxui-topbar-actions { display:flex; min-width:0; align-items:center; gap:3px; }
+.ux-ui-studio:not(.is-expanded) .uxui-target-switch { flex-wrap:nowrap; gap:1px; padding:2px; }
+.ux-ui-studio:not(.is-expanded) .uxui-target-switch button { min-height:32px; padding:0 6px; gap:4px; }
+.ux-ui-studio:not(.is-expanded) .uxui-workspace {
+  position:relative !important; display:block !important; flex:1 1 0 !important;
+  height:0 !important; min-height:0 !important; overflow:hidden !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-panel {
+  display:flex !important; flex-direction:column !important; width:100%; height:100% !important;
+  min-height:0 !important; overflow:hidden !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-heading {
+  position:relative !important; top:auto !important; z-index:auto !important;
+  flex:0 0 auto; min-height:40px; flex-wrap:nowrap; gap:4px; padding:4px 7px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-heading > div:first-child { min-width:0; flex-wrap:nowrap; gap:5px; }
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-heading strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-zoom { flex:0 0 auto; gap:0; }
+.ux-ui-studio:not(.is-expanded) .uxui-canvas-stage {
+  display:flex; flex:1 1 0 !important; min-width:0; width:100%;
+  height:0 !important; min-height:0 !important; max-height:none !important;
+  align-items:center; justify-content:center; overflow:hidden !important;
+  padding:8px !important; gap:0;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-shell {
+  flex:0 0 auto; max-width:100%; max-height:100%; margin:0;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-shell > svg {
+  display:block; max-width:100%; height:auto; max-height:100%;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop { margin-bottom:0; padding:9px; }
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-neck,
+.ux-ui-studio:not(.is-expanded) .uxui-device-desktop .uxui-device-base { display:none; }
+.ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar {
+  position:relative !important; inset:auto !important; z-index:4;
+  flex:0 0 auto; min-height:54px; gap:5px; padding:4px 7px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-add-button { width:48px; height:48px; flex:0 0 48px; }
+.ux-ui-studio:not(.is-expanded) .uxui-add-button svg { width:30px; height:30px; }
+.ux-ui-studio:not(.is-expanded) .uxui-mobile-controls {
+  display:flex; position:relative; z-index:3; flex:0 0 auto; width:100%;
+  min-width:0; max-height:none; overflow:hidden;
+  justify-content:space-evenly; align-items:center; gap:clamp(2px,1vw,12px);
+  padding:4px 5px; border-top:1px solid var(--color-border);
+  background:var(--color-surface);
+}
+.ux-ui-studio:not(.is-expanded).target-desktop .uxui-mobile-controls { display:none !important; }
+.ux-ui-studio:not(.is-expanded).target-mobile .uxui-mobile-controls,
+.ux-ui-studio:not(.is-expanded).target-tablet .uxui-mobile-controls { display:flex !important; }
+.ux-ui-studio:not(.is-expanded) .uxui-gamepad {
+  grid-template-columns:repeat(3,36px); grid-template-rows:14px repeat(3,34px);
+  gap:1px; padding:2px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:33px; height:33px; border-radius:9px; }
+.ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:9px; line-height:13px; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-controls {
+  position:relative; z-index:3; flex:0 0 auto; min-width:0; width:100%; max-width:100%;
+  overflow:hidden; padding:4px 5px 5px; border-top:1px solid var(--color-border);
+  background:var(--color-surface);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar {
+  display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-items:stretch;
+  gap:3px; width:100%; padding:0; overflow:visible; overscroll-behavior:unset;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-selection {
+  grid-column:1/-1; display:block; min-width:0; max-width:100%;
+  padding:0 4px; font-size:9px; line-height:13px;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action {
+  display:flex; min-width:0; width:100%; min-height:48px; height:auto; padding:3px 1px;
+  flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  border:1px solid transparent; border-radius:8px; background:transparent;
+  color:var(--color-fg); font-size:9px; line-height:1.15; white-space:normal;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action svg { width:19px; height:19px; flex:0 0 auto; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span { display:block !important; font-size:9px; line-height:1.15; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action.is-danger { color:#dc2626; }
+.ux-ui-studio:not(.is-expanded) .uxui-tools-drawer {
+  max-height:min(65dvh,560px); overflow:auto; overscroll-behavior:contain;
+}
+@media (min-width:561px) {
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar { grid-template-columns:repeat(8,minmax(0,1fr)); }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action { min-height:48px; }
+}
+@media (min-width:1024px) {
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar {
+    display:flex; flex-wrap:wrap; align-items:center; overflow:visible; gap:4px;
+  }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-selection { grid-column:auto; flex:0 0 auto; max-width:110px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action {
+    display:inline-flex; width:auto; min-width:0; min-height:38px; padding:4px 7px;
+    flex-direction:row; gap:5px; white-space:nowrap; font-size:10px;
+  }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span { font-size:10px; }
+}
+@media (max-width:560px) {
+  .ux-ui-studio:not(.is-expanded) > .uxui-topbar { gap:3px; padding:3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-target-switch button { width:30px; min-height:30px; padding:0; }
+  .ux-ui-studio:not(.is-expanded) .uxui-target-switch button span { display:none; }
+  .ux-ui-studio:not(.is-expanded) .uxui-topbar-actions { gap:1px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-icon-button { width:29px; height:30px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-export-trigger,
+  .ux-ui-studio:not(.is-expanded) .uxui-projects-trigger { min-width:29px; width:29px; min-height:30px; padding:0; gap:0; }
+  .ux-ui-studio:not(.is-expanded) .uxui-export-trigger span,
+  .ux-ui-studio:not(.is-expanded) .uxui-projects-trigger span { display:none; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-heading { min-height:34px; padding:3px 5px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-heading span { font-size:9px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-zoom button { width:25px; height:27px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-zoom span { width:27px; font-size:9px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-stage { padding:4px !important; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar { min-height:47px; padding:2px 4px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-add-button { width:40px; height:40px; flex-basis:40px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-group button { width:29px; height:32px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad {
+    grid-template-columns:repeat(3,31px); grid-template-rows:12px repeat(3,28px); gap:1px; padding:1px;
+  }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:27px; height:27px; border-radius:7px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button svg { width:15px; height:15px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:8px; line-height:11px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-controls { padding:2px 3px 3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar { gap:2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action { min-height:43px; padding:2px 0; gap:2px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action svg { width:17px; height:17px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span { font-size:8px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-selection { font-size:8px; line-height:11px; }
+}
+@media (max-height:680px) {
+  .ux-ui-studio:not(.is-expanded) { gap:3px !important; }
+  .ux-ui-studio:not(.is-expanded) > .uxui-topbar { min-height:28px; padding:2px 3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-target-switch button { min-height:27px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-canvas-heading { min-height:29px; padding:2px 4px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-toolbar { min-height:38px; padding:1px 3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-bottom-group button { height:28px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-add-button { width:34px; height:34px; flex-basis:34px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-add-button svg { width:23px; height:23px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-mobile-controls { padding:1px 3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad { grid-template-rows:9px repeat(3,23px); }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad button { width:22px; height:22px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-gamepad-label { font-size:7px; line-height:8px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-controls { padding:1px 3px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action { min-height:34px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action svg { width:15px; height:15px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span { font-size:7px; }
+  .ux-ui-studio:not(.is-expanded) .uxui-context-selection { font-size:7px; line-height:9px; }
+}
