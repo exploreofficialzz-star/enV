@@ -169,10 +169,18 @@ assert.match(pairNativePage, /Generate pairing code/);
 assert.match(envExample, /PAYSTACK_PROVIDER_APPROVED=false/);
 assert.match(envExample, /CRYPTOMUS_PROVIDER_APPROVED=false/);
 assert.match(envExample, /BILLING_LAUNCH_ENABLED=false/);
+assert.match(envExample, /BILLING_ENFORCEMENT_ENABLED=false/);
+assert.match(envExample, /BILLING_REFUND_DISPUTE_HANDLING_APPROVED=false/,
+  "new payments must remain gated until refund/dispute handling has been approved");
+assert.match(paystackService, /BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true"/,
+  "Paystack/Cryptomus checkout must require the refund/dispute readiness gate");
 assert.match(paystackService, /PAYMENTS_NOT_CONFIGURED/);
 assert.match(paystackService, /BILLING_LAUNCH_ENABLED === "true"/);
 assert.match(paystackService, /BILLING_ENFORCEMENT_ENABLED === "true"/);
-assert.match(paystackService, /createHmac\("sha512"/);
+assert.match(paystackService, /createHmac\("sha512", verificationSecret\)/,
+  "Paystack webhook HMAC must use the same secret that verifies transactions");
+assert.doesNotMatch(envExample, /PAYSTACK_WEBHOOK_SECRET=/,
+  "Paystack does not expose a separate webhook-signing secret in this integration");
 assert.match(paystackService, /timingSafeEqual/);
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
