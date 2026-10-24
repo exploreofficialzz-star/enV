@@ -2041,7 +2041,7 @@ export function UxUiStudioEngine() {
       ref={studioRootRef}
       aria-label="UX/UI Studio editor workspace"
       style={{ "--uxui-available-height": availableEditorHeight > 0 ? `${availableEditorHeight}px` : "calc(100dvh - 160px)" } as CSSProperties}
-      className={"ux-ui-studio target-" + target + " min-w-0 space-y-3 " + (isExpanded ? "is-expanded" : "")}
+      className={"ux-ui-studio target-" + target + " min-w-0 " + (isExpanded ? "is-expanded" : "")}
     >
       <header className="uxui-topbar">
         <div className="uxui-topbar-left">
