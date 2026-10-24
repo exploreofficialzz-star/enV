@@ -192,6 +192,19 @@ assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async 
   "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
+assert.match(paystackProviderConfig, /readSafePackPrice/);
+assert.match(paystackService, /readSafePackPrice\(process\.env\.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS\)/,
+  "Paystack prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /readSafePackPrice\(process\.env\.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS\)/,
+  "Cryptomus prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
+  "whitespace-only Paystack credentials must not enable checkout");
+assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY\?\.trim\(\)/,
+  "whitespace-only Cryptomus credentials must not enable checkout");
+assert.match(paystackService, /process\.env\.VERCEL === "1"/,
+  "Vercel deployments must require HTTPS payment callback origins");
+assert.match(cryptomusService, /process\.env\.VERCEL === "1"/,
+  "Vercel deployments must require HTTPS crypto callback origins");
 assert.doesNotMatch(paystackProviderConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
   "settlement credentials must not inherit the new-checkout kill switch");
 const paystackSettlement = paystackService.slice(
