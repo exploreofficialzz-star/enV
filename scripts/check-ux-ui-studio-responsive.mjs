@@ -25,7 +25,7 @@ assert.ok(engine.includes('const DEVICE_TARGET_STORAGE_KEY = "env-ux-ui-studio-d
 assert.ok(engine.includes("window.localStorage.getItem(DEVICE_TARGET_STORAGE_KEY)") && engine.includes("window.localStorage.setItem(DEVICE_TARGET_STORAGE_KEY, preferredTarget)"), "Mobile, tablet and desktop preference restores and saves across visits");
 assert.ok(engine.includes('onClick={() => startDesign(preferredTarget)}') && engine.includes('aria-label="Starting device view"'), "Add project uses the chosen starting device mode");
 assert.ok(engine.includes('className="uxui-fullscreen-brand"') && engine.includes("<strong>UX/UI Studio</strong>"), "Full-screen editor carries the compact enV/tool header");
-assert.ok(engine.includes('import { Logo } from "@/components/brand/logo"') && engine.includes('<Logo size="search" className="uxui-fullscreen-logo" />'), "Full-screen header reuses the canonical enV home logo component");
+assert.ok(engine.includes('import { Logo } from "@/components/brand/logo"') && engine.includes('<Logo size="hero" className="uxui-fullscreen-logo" />'), "Full-screen header reuses the canonical enV home logo component");
 assert.ok(!engine.includes("uxui-fullscreen-brand-mark"), "Full-screen header does not invent a separate text-based enV logo");
 assert.ok(engine.includes("setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);"), "New projects launch directly into the full editor workspace");
 assert.ok(engine.includes("}, [onboarding, isExpanded]);"), "Viewport and canvas observers reconnect after the editor mounts or expands");
