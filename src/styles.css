@@ -1462,3 +1462,136 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio:not(.is-expanded) .uxui-context-toolbar .uxui-context-action span { font-size:7px; }
   .ux-ui-studio:not(.is-expanded) .uxui-context-selection { font-size:7px; line-height:9px; }
 }
+
+
+/* Monochrome, user-theme-aware Studio toolkit samples. */
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content {
+  color:var(--color-fg);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-toolkit-tile,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-tile,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-card {
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+  border-color:color-mix(in srgb,var(--color-fg) 28%,var(--color-surface)) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-toolkit-tile:hover,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-tile:hover,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-card:hover,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-toolkit-tile.is-active,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-tile:focus-visible {
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+  border-color:var(--color-fg) !important;
+  box-shadow:inset 0 0 0 1px var(--color-fg) !important;
+  transform:none;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-toolkit-tile-art,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-preview {
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+  border-color:var(--color-fg) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-shape,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-text i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-card i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-navigation i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-radio i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-progress i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-chart i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-list i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-modal i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-spacer i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-spacer {
+  background:var(--color-fg) !important;
+  border-color:var(--color-fg) !important;
+  color:var(--color-fg) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-button,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-avatar {
+  background:var(--color-fg) !important;
+  color:var(--color-surface) !important;
+  border-color:var(--color-fg) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-field,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-card,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-navigation,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-modal,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-check,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-radio,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-badge,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-tooltip {
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+  border-color:var(--color-fg) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-field *,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-check svg {
+  color:var(--color-fg) !important;
+  stroke:var(--color-fg);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-switch {
+  justify-content:flex-start;
+  background:var(--color-fg) !important;
+  border:1px solid var(--color-fg);
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-switch i {
+  background:var(--color-surface) !important;
+  border:1px solid var(--color-surface) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-breadcrumb i {
+  border-color:var(--color-fg) !important;
+  background:transparent !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-mini-logo {
+  color:var(--color-fg) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-preview {
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+  border:1px solid var(--color-fg) !important;
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-preview *,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-preview *::before,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-preview *::after {
+  box-shadow:none !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-mockup-top i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-mockup-grid i,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-mockup-bottom i {
+  background:var(--color-fg) !important;
+  border-color:var(--color-fg) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-mockup-hero {
+  background:var(--color-fg) !important;
+  border-color:var(--color-fg) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-mockup-bottom {
+  border-color:var(--color-fg) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-copy,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-copy strong,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-copy span,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-copy svg {
+  color:var(--color-fg) !important;
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content img[src*="api.iconify.design"] {
+  filter:brightness(0);
+}
+.dark .ux-ui-studio:not(.is-expanded) .uxui-toolkit-content img[src*="api.iconify.design"] {
+  filter:brightness(0) invert(1);
+}
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-toolkit-tile svg,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-element-tile svg,
+.ux-ui-studio:not(.is-expanded) .uxui-toolkit-content .uxui-preset-target svg {
+  color:var(--color-fg) !important;
+  stroke:currentColor;
+}
+/* The color grid and token color inputs stay colorful because they edit real design values. */
