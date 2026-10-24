@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
+import { requirePaystackVerificationSecret } from "./provider-config";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -189,7 +190,9 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   if (!/^[a-f0-9-]{36}$/i.test(reference)) {
     throw Object.assign(new Error("The payment reference is invalid."), { code: "INVALID_PAYMENT_REFERENCE", status: 400 });
   }
-  const configuration = requireLiveFunding();
+  // Settlement remains available when new checkout is paused. The launch and
+  // enforcement switches govern initiating a new payment, not fulfilling an existing one.
+  const verificationSecret = requirePaystackVerificationSecret(process.env);
   const sql = await getSql();
   const intents = await sql.query<{
     id: string; provider: string; amount_minor: number | string; currency: string;
@@ -205,7 +208,7 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   if (intent.status === "credited") return { status: "credited" as const, creditedSubunits: 0 };
 
   const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-    headers: { Authorization: `Bearer ${configuration.secret}`, Accept: "application/json" },
+    headers: { Authorization: `Bearer ${verificationSecret}`, Accept: "application/json" },
     signal: AbortSignal.timeout(12_000),
   });
   const payload = await response.json() as {
@@ -236,11 +239,13 @@ export async function verifyAndCreditPaystackReference(reference: string) {
 }
 
 export async function handlePaystackWebhook(request: Request) {
-  const configuration = requireLiveFunding();
+  // Webhooks must remain verifiable during a checkout kill switch so settled
+  // payments can be reconciled and no customer payment is silently stranded.
+  const verificationSecret = requirePaystackVerificationSecret(process.env);
   const signature = request.headers.get("x-paystack-signature") ?? "";
   const raw = await request.text();
   if (raw.length > 256_000) throw Object.assign(new Error("Webhook payload is too large."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
-  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET || configuration.secret;
+  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET?.trim() || verificationSecret;
   const expected = createHmac("sha512", webhookSecret).update(raw).digest("hex");
   if (!/^[a-f0-9]{128}$/i.test(signature) ||
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
