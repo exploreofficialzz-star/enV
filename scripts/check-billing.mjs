@@ -191,6 +191,16 @@ assert.match(paystackService, /readBoundedBytes\(request, 256_000\)/,
 assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook")), /request\.text\(\)/,
   "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
+assert.match(paystackService, /REFUND_DISPUTE_RECONCILIATION_REQUIRED/);
+for (const event of ["charge.dispute.create", "charge.dispute.remind", "charge.dispute.resolve", "refund.pending", "refund.processing", "refund.needs-attention", "refund.failed", "refund.processed"]) {
+  assert.ok(paystackService.includes('"' + event + '"'), `Paystack ${event} must not be acknowledged before reconciliation is implemented`);
+}
+assert.match(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
+  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must not be acknowledged before reconciliation is implemented`);
+}
+assert.match(paystackRoute, /billing-paystack-webhook/);
+assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
 assert.match(paystackService, /readSafePackPrice\(process\.env\.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS\)/,
