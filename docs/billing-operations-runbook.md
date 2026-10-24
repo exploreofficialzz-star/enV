@@ -13,6 +13,8 @@
 
 The server-side Paystack and Cryptomus web checkout adapters are present, but that is not sufficient for real-money launch. The current release does not yet implement complete refund/dispute reconciliation or a tested wallet-credit reversal policy. Paystack's webhook handler currently processes successful charges; Cryptomus refund-state callbacks are not fully reconciled into wallet reversals. A refunded or disputed charge must never be allowed to leave spendable credits without an explicit, audited decision.
 
+Until that work is complete, signed Paystack refund/dispute events and Cryptomus `refund_process`, `refund_fail` and `refund_paid` callbacks deliberately return HTTP 503 with `REFUND_DISPUTE_RECONCILIATION_REQUIRED` or `CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED`. They are not acknowledged as successfully handled or silently ignored. This is a delivery/reconciliation guard, **not** refund processing: no wallet balance is reversed by these callbacks, and operators must use provider delivery history plus the purchase ledger for manual investigation. Keep new checkout disabled.
+
 Keep all of these gates false until the corresponding tests and operator procedures are signed off:
 
 - `BILLING_LAUNCH_ENABLED=false`
