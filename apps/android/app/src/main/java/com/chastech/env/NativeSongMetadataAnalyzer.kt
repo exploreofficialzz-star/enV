@@ -91,6 +91,7 @@ import java.util.zip.ZipOutputStream
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
@@ -411,7 +412,7 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
         val lower = name.lowercase(Locale.ROOT)
         if (!seen.add(name)) continue
         if (lower.endsWith(".zip")) {
-            val zipBytes = readBounded(context.contentResolver.openInputStream(uri) ?: error("Cannot open $name."), SONG_MAX_ZIP_BYTES.toLong())
+            val zipBytes = (context.contentResolver.openInputStream(uri) ?: error("Cannot open $name.")).use { readBoundedContent(it, SONG_MAX_ZIP_BYTES.toLong()) }
             val extracted = extractNativeSongZip(zipBytes)
             for (entry in extracted) {
                 bytesTotal += entry.sizeBytes
@@ -452,7 +453,7 @@ private fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
                 zip.closeEntry()
                 continue
             }
-            val fileBytes = readBounded(zip, SONG_MAX_TRACK_BYTES.toLong())
+            val fileBytes = readCurrentEntryBounded(zip, SONG_MAX_TRACK_BYTES.toLong())
             expanded += fileBytes.size
             require(expanded <= SONG_MAX_ZIP_EXPANDED_BYTES) { "ZIP expands beyond 60 MB." }
             results += NativeSongSource(name = name.split('/').filter { it.isNotBlank() }.joinToString(" — "), bytes = fileBytes, sizeBytes = fileBytes.size.toLong())
@@ -462,26 +463,27 @@ private fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
     return results
 }
 
-private fun readBounded(input: InputStream, limit: Long): ByteArray {
-    input.use { source ->
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(16 * 1024)
-        var total = 0L
-        while (true) {
-            val count = source.read(buffer)
-            if (count < 0) break
-            total += count
-            require(total <= limit) { "File exceeds the safe local processing limit." }
-            output.write(buffer, 0, count)
-        }
-        return output.toByteArray()
+private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(16 * 1024)
+    var total = 0L
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        total += count
+        require(total <= limit) { "File exceeds the safe local processing limit." }
+        output.write(buffer, 0, count)
     }
+    return output.toByteArray()
 }
+
+private fun readCurrentEntryBounded(input: InputStream, limit: Long): ByteArray =
+    readBoundedContent(input, limit)
 
 private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource): NativeSongScan {
     val bytes = item.bytes ?: withContext(Dispatchers.IO) {
         val stream = item.uri?.let { context.contentResolver.openInputStream(it) } ?: error("Cannot open ${item.name}.")
-        readBounded(stream, SONG_MAX_TRACK_BYTES.toLong())
+        stream.use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) }
     }
     require(bytes.isNotEmpty()) { "This file is empty." }
     require(bytes.size <= SONG_MAX_TRACK_BYTES) { "This track exceeds 20 MB." }
@@ -503,7 +505,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
         val tempoFinal = tempo ?: bpmTag?.takeIf { it in 1.0..300.0 }?.roundToInt()
         val ext = item.name.substringAfterLast('.', "").lowercase(Locale.ROOT)
         val technical = JSONObject()
-            .put("container", meta.optString("container").ifBlank { JSONObject.NULL })
+            .put("container", meta.optString("container").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("codec", decoded?.codec ?: meta.optString("codec").ifBlank { JSONObject.NULL })
             .put("extension", ext)
             .put("mime_type", meta.optString("mime_type"))
@@ -516,16 +518,16 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
             .put("peak_dbfs", peak?.takeIf { it > 0f }?.let { 20.0 * kotlin.math.log10(it.toDouble()) } ?: JSONObject.NULL)
             .put("rms_dbfs", rms?.takeIf { it > 0.0 }?.let { 20.0 * kotlin.math.log10(it) } ?: JSONObject.NULL)
         val identity = JSONObject()
-            .put("title", meta.optString("title").ifBlank { JSONObject.NULL })
-            .put("artist", meta.optString("artist").ifBlank { JSONObject.NULL })
-            .put("album", meta.optString("album").ifBlank { JSONObject.NULL })
-            .put("album_artist", meta.optString("album_artist").ifBlank { JSONObject.NULL })
-            .put("release_date", meta.optString("year").ifBlank { JSONObject.NULL })
+            .put("title", meta.optString("title").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("artist", meta.optString("artist").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("album", meta.optString("album").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("album_artist", meta.optString("album_artist").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("release_date", meta.optString("year").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("artwork_available", false)
         val report = JSONObject()
             .put("schema_version", "1.0")
             .put("filename", item.name)
-            .put("genre", meta.optString("genre").ifBlank { JSONObject.NULL })
+            .put("genre", meta.optString("genre").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("sub_style", JSONObject.NULL)
             .put("language", JSONArray())
             .put("tempo_bpm", tempoFinal ?: JSONObject.NULL)
@@ -587,7 +589,7 @@ private fun mimeFromExtension(extension: String): String = when (extension.lower
     "ogg", "oga" -> "audio/ogg"; "opus" -> "audio/opus"; "aac" -> "audio/aac"; else -> "application/octet-stream"
 }
 
-private fun decodeNativeSong(file: File, metadataDuration: Double): NativeDecodedSong? {
+private suspend fun decodeNativeSong(file: File, metadataDuration: Double): NativeDecodedSong? {
     val extractor = MediaExtractor()
     var decoder: MediaCodec? = null
     try {
@@ -620,7 +622,7 @@ private fun decodeNativeSong(file: File, metadataDuration: Double): NativeDecode
         var outputDone = false
         var idleLoops = 0
         while (!outputDone && idleLoops < 1000) {
-            currentCoroutineContextSafeNoop()
+            currentCoroutineContext().ensureActive()
             if (!inputDone) {
                 val inputIndex = decoder.dequeueInputBuffer(10_000)
                 if (inputIndex >= 0) {
@@ -679,14 +681,13 @@ private fun decodeNativeSong(file: File, metadataDuration: Double): NativeDecode
         if (count < SONG_ANALYSIS_RATE) return null
         return NativeDecodedSong(samples.copyOf(count), SONG_ANALYSIS_RATE, originalRate, sourceChannels,
             count.toDouble() / SONG_ANALYSIS_RATE, mime, if (format.containsKey(MediaFormat.KEY_BIT_RATE)) format.getInteger(MediaFormat.KEY_BIT_RATE) else null)
-    } catch (_: Throwable) {
+    } catch (failure: Throwable) {
+        if (failure is CancellationException) throw failure
         return null
     } finally {
         runCatching { decoder?.stop() }; runCatching { decoder?.release() }; extractor.release()
     }
 }
-
-private fun currentCoroutineContextSafeNoop() { /* The UI cancellation token stops the queue between tracks. */ }
 
 private fun buildNativeSongExcerpt(samples: FloatArray): Pair<ByteArray, Double>? {
     if (samples.size < SONG_ANALYSIS_RATE * 3) return null
@@ -745,12 +746,14 @@ private fun formatNativeBytes(bytes: Long): String = when {
 }
 private fun jsonStringList(array: JSONArray?): List<String> = array?.let { values -> (0 until values.length()).mapNotNull { values.optString(it).takeIf(String::isNotBlank) } } ?: emptyList()
 private fun itemWarnings(report: JSONObject): List<String> = jsonStringList(report.optJSONArray("warnings"))
+@Composable
 private fun nativeMetric(label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("$label:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
     }
 }
+@Composable
 private fun nativeTagList(label: String, vararg values: String) {
     val actual = values.filter { it.isNotBlank() && it != "null" && it != "unknown" }
     if (actual.isNotEmpty()) {
