@@ -12,6 +12,15 @@ const labels: Record<UrlMediaProvider | "generic", string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   x: "X / Twitter",
+  audiomack: "Audiomack",
+  soundcloud: "SoundCloud",
+  bandcamp: "Bandcamp",
+  mixcloud: "Mixcloud",
+  audius: "Audius",
+  jamendo: "Jamendo",
+  hearthis: "HearThis",
+  bandlab: "BandLab",
+  boomplay: "Boomplay",
 };
 
 const hosts: Record<Exclude<UrlMediaProvider, "generic">, string[]> = {
@@ -20,6 +29,15 @@ const hosts: Record<Exclude<UrlMediaProvider, "generic">, string[]> = {
   facebook: ["facebook.com", "fb.watch"],
   instagram: ["instagram.com"],
   x: ["x.com", "twitter.com"],
+  audiomack: ["audiomack.com"],
+  soundcloud: ["soundcloud.com", "on.soundcloud.com"],
+  bandcamp: ["bandcamp.com"],
+  mixcloud: ["mixcloud.com"],
+  audius: ["audius.co"],
+  jamendo: ["jamendo.com"],
+  hearthis: ["hearthis.at"],
+  bandlab: ["bandlab.com"],
+  boomplay: ["boomplay.com"],
 };
 
 function detectProvider(value: string): UrlMediaProvider | null {
