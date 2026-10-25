@@ -9,7 +9,7 @@ import type { AiTaskId } from "./contracts.ts";
 import { AI_LIMITS, ALT_STYLES, CAPTION_PLATFORMS, IMAGE_MIME_TYPES, JSON_GOALS, SQL_DIALECTS, TITLE_PLATFORMS, TONES } from "./contracts.ts";
 
 export type AiFieldKind = "textarea" | "text" | "select" | "number" | "checkbox" | "image" | "audio";
-export type AiResultKind = "captions" | "titles" | "regex" | "sql" | "json" | "alt-text" | "transcript";
+export type AiResultKind = "captions" | "titles" | "regex" | "sql" | "json" | "alt-text" | "transcript" | "music-analysis";
 
 export interface AiFieldSpec {
   name: string;
@@ -175,7 +175,7 @@ export const AI_FEATURES: readonly AiFeature[] = [
     title: "Identify genre and tags with AI",
     description: "Upload a short music clip to estimate genre, sub-style, audible languages, mood, instruments and vocal style. Predictions can be wrong; local signal analysis works without AI.",
     actionLabel: "Identify music tags",
-    resultKind: "json",
+    resultKind: "music-analysis",
     requiresConsent: true,
     consentLabel: "I understand this audio recording will be sent to enV AI for classification.",
     fields: [
