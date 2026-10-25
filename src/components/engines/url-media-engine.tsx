@@ -21,6 +21,16 @@ const labels: Record<UrlMediaProvider | "generic", string> = {
   hearthis: "HearThis",
   bandlab: "BandLab",
   boomplay: "Boomplay",
+  zingmp3: "Zing MP3",
+  netease: "NetEase Music",
+  "yandex-music": "Yandex Music",
+  archive: "Internet Archive",
+  audioboom: "Audioboom",
+  reverbnation: "ReverbNation",
+  soundclick: "SoundClick",
+  spreaker: "Spreaker",
+  podomatic: "Podomatic",
+  freesound: "Freesound",
 };
 
 const hosts: Record<Exclude<UrlMediaProvider, "generic">, string[]> = {
@@ -38,6 +48,16 @@ const hosts: Record<Exclude<UrlMediaProvider, "generic">, string[]> = {
   hearthis: ["hearthis.at"],
   bandlab: ["bandlab.com"],
   boomplay: ["boomplay.com"],
+  zingmp3: ["zingmp3.vn"],
+  netease: ["music.163.com"],
+  "yandex-music": ["music.yandex.com", "music.yandex.ru"],
+  archive: ["archive.org"],
+  audioboom: ["audioboom.com"],
+  reverbnation: ["reverbnation.com"],
+  soundclick: ["soundclick.com"],
+  spreaker: ["spreaker.com"],
+  podomatic: ["podomatic.com"],
+  freesound: ["freesound.org"],
 };
 
 function detectProvider(value: string): UrlMediaProvider | null {
