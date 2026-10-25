@@ -31,6 +31,8 @@ assert.match(source, /if-range/);
 assert.match(source, /from "\.\/media\/provider-registry\.mjs"/);
 assert.match(source, /from "\.\/media\/url-security\.mjs"/);
 assert.match(source, /parseAudiomackAlbumPage/);
+assert.match(source, /classifyProviderFailure\(provider, detail/);
+assert.match(source, /detailCodes/);
 assert.match(source, /inspectAudiomackAlbumPage/);
 assert.match(source, /audiomackPageFallbackFailure/);
 assert.match(source, /Public-page fallback:/);
@@ -38,6 +40,8 @@ assert.match(source, /Try an individual song URL or an authorized direct audio-f
 assert.match(dockerfile, /COPY scripts\/media\/provider-registry\.mjs \.\/scripts\/media\/provider-registry\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/audiomack-page-parser\.mjs \.\/scripts\/media\/audiomack-page-parser\.mjs/);
 assert.match(dockerfile, /node --check scripts\/media\/audiomack-page-parser\.mjs/);
+assert.match(dockerfile, /COPY scripts\/media\/provider-errors\.mjs \.\/scripts\/media\/provider-errors\.mjs/);
+assert.match(dockerfile, /node --check scripts\/media\/provider-errors\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
 assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
 assert.match(dockerfile, /node --version/);
