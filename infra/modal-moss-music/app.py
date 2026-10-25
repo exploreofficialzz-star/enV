@@ -78,23 +78,38 @@ download_image = modal.Image.debian_slim(python_version="3.12").pip_install("hug
     memory=8192,
 )
 def download_model() -> dict[str, Any]:
-    """Download model weights to persistent storage once, not on every cold start."""
-    from huggingface_hub import snapshot_download
+    """Download model weights once and persist the exact upstream revision."""
+    from huggingface_hub import HfApi, snapshot_download
 
     target = pathlib.Path(MODEL_DIR)
-    if (target / "config.json").exists() and (target / "model.safetensors.index.json").exists():
-        return {"ok": True, "downloaded": False, "model": MODEL_REPO, "revision": MODEL_REVISION}
+    manifest_path = pathlib.Path(MODEL_MANIFEST)
+    if (target / "config.json").exists() and (target / "model.safetensors.index.json").exists() and manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            manifest = {}
+        if manifest.get("repo") == MODEL_REPO and manifest.get("requested_ref") == MODEL_REVISION and isinstance(manifest.get("resolved_revision"), str):
+            return {"ok": True, "downloaded": False, "model": MODEL_REPO, "revision": manifest["resolved_revision"]}
+
+    # Resolve the mutable ref once to an immutable SHA, and then download exactly that SHA.
+    info = HfApi().model_info(repo_id=MODEL_REPO, revision=MODEL_REVISION)
+    resolved_revision = info.sha
+    if not isinstance(resolved_revision, str) or len(resolved_revision) != 40:
+        raise RuntimeError("Hugging Face did not return a full immutable commit SHA for the model revision.")
+
+    if target.exists():
+        import shutil
+        shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id=MODEL_REPO,
-        revision=MODEL_REVISION,
-        local_dir=str(target),
-    )
+    snapshot_download(repo_id=MODEL_REPO, revision=resolved_revision, local_dir=str(target))
     if not (target / "config.json").exists() or not (target / "model.safetensors.index.json").exists():
         raise RuntimeError("Model download completed without the required configuration and weight index.")
+    manifest_path.write_text(
+        json.dumps({"repo": MODEL_REPO, "requested_ref": MODEL_REVISION, "resolved_revision": resolved_revision}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     model_volume.commit()
-    return {"ok": True, "downloaded": True, "model": MODEL_REPO, "revision": MODEL_REVISION}
-
+    return {"ok": True, "downloaded": True, "model": MODEL_REPO, "revision": resolved_revision}
 
 @app.local_entrypoint()
 def download_weights() -> None:
