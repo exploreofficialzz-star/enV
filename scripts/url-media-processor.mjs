@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
+import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -325,6 +326,75 @@ async function handleDirectDownload(req, res, url, body, signal) {
   }
 }
 
+async function readBoundedText(response, maxBytes) {
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > maxBytes) throw new Error("SOURCE_UNAVAILABLE: Audiomack page metadata is too large.");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("SOURCE_UNAVAILABLE: Audiomack page metadata exceeds the safe inspection limit.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function isAudiomackAlbumUrl(url) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  return parts.length >= 3 && (parts[0].toLowerCase() === "album" || parts[1]?.toLowerCase() === "album");
+}
+
+async function inspectAudiomackAlbumPage(url, signal) {
+  const { response, url: finalUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: {
+      accept: "text/html,application/xhtml+xml",
+      "user-agent": "Mozilla/5.0 (compatible; enVMusicDownloader/1.0)",
+    },
+  }, signal);
+  const finalHost = finalUrl.hostname.toLowerCase();
+  if (finalHost !== "audiomack.com" && finalHost !== "www.audiomack.com") {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack redirected to an unexpected host.");
+  }
+  if (!response.ok) throw new Error("SOURCE_UNAVAILABLE: Audiomack returned HTTP " + response.status + " for its album page.");
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (contentType && !contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack did not return an HTML album page.");
+  }
+  const html = await readBoundedText(response, 8 * 1024 * 1024);
+  const parsed = parseAudiomackAlbumPage(html, finalUrl.toString());
+  if (!parsed.entries.length) return null;
+  return {
+    provider: "audiomack",
+    title: parsed.title || "Audiomack album",
+    uploader: parsed.uploader,
+    album: parsed.title || undefined,
+    webpageUrl: finalUrl.toString(),
+    isPlaylist: true,
+    entries: parsed.entries,
+    truncated: parsed.truncated,
+    formats: [],
+  };
+}
+
 async function handleInfo(req, res) {
   const body = await readJson(req);
   const { url: rawUrl, provider: requestedProvider, includePlaylist = false } = body;
@@ -333,6 +403,19 @@ async function handleInfo(req, res) {
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
+    try {
+      const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
+      if (albumInfo?.entries?.length) {
+        json(res, 200, albumInfo);
+        return;
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      const failure = error instanceof Error ? error.message : String(error);
+      console.warn("[url-media] Audiomack page-link fallback unavailable: " + failure.slice(0, 240));
+    }
+  }
   if (provider === "generic") {
     const info = await inspectDirectUrl(url, controller.signal);
     json(res, 200, info);
