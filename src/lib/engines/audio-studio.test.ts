@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { amplitudeDbfs, approximateLufs, browserSeparationLimitSeconds, estimateBpm, estimateBitrateKbpsFromSize, estimateBrowserSeparationWorkingSetBytes, estimateCompressedAudioBytes, estimateKey, estimatePcmAudioBytes, humReduceSamples, isSupportedDemucsStemTensorDims, noiseGateSamples, rms, suggestCapoShapes, suggestDiatonicChords, trimSilenceBounds } from "./audio-studio.ts";
-import { analyzeMusicAudio } from "./music-analysis.ts";
+import { analyzeMusicAudio, type MusicAnalysisResult } from "./music-analysis.ts";
+import { createMusicAnalysisProfile } from "../media/music-analysis-profile.ts";
 import { normalizeMusicModelClassification } from "../media/music-analysis-response.ts";
 
 test("audio analysis uses correct amplitude and RMS dBFS math", () => {
@@ -199,4 +200,59 @@ test("music model response normalizer returns unknown fields as unknown", () => 
   assert.deepEqual(result.instruments, []);
   assert.equal(result.vocal_style, null);
   assert.deepEqual(result.genre_candidates, []);
+});
+
+
+test("Music Analyzer song profile exports the requested top-level metadata fields", () => {
+  const sampleRate = 8000;
+  const pcm = Float32Array.from({ length: sampleRate * 4 }, (_, i) => 0.5 * Math.sin(2 * Math.PI * 440 * i / sampleRate));
+  const local = analyzeMusicAudio({
+    channels: [pcm], sampleRate, fileName: "afro-pop-demo.wav", fileSizeBytes: 64000, mimeType: "audio/wav",
+    metadata: { title: "Demo", artist: "Unknown Artist", genre: "Legacy file tag", bpm: "120" },
+  });
+  const classified: MusicAnalysisResult = {
+    ...local,
+    classification: {
+      ...local.classification,
+      genre: "Afrobeats",
+      sub_style: "Afro-pop",
+      language: ["Nigerian Pidgin", "Yoruba"],
+      mood: ["upbeat"],
+      instruments: ["drums", "bass"],
+      vocal_style: "melodic",
+      genre_candidates: [{ label: "Afrobeats", score: 0.86 }, { label: "Pop", score: 0.42 }],
+      status: "model_completed",
+      note: "Best-effort model predictions.",
+    },
+  };
+
+  const profile = createMusicAnalysisProfile(classified);
+  assert.equal(profile.schema_version, "env.music-profile.v1");
+  assert.equal(profile.genre, "Afrobeats");
+  assert.equal(profile.sub_style, "Afro-pop");
+  assert.deepEqual(profile.language, ["Nigerian Pidgin", "Yoruba"]);
+  assert.equal(profile.tempo_bpm, local.rhythm.tempo_bpm);
+  assert.equal(profile.title, "Demo");
+  assert.equal(profile.metadata.embedded_genre, "Legacy file tag");
+  assert.equal(profile.analysis_status.genre, "model_estimate");
+  assert.equal(profile.analysis_status.language, "model_estimate");
+  assert.equal(profile.analysis_status.tempo_bpm, "signal_estimate");
+  assert.equal(profile.analysis_status.classification, "model_completed");
+  assert.equal(profile.genre_candidates[0]?.score, 0.86);
+});
+
+test("Music Analyzer song profile never promotes embedded genre metadata into AI classification", () => {
+  const local = analyzeMusicAudio({
+    channels: [new Float32Array(8000)], sampleRate: 8000,
+    fileName: "tagged-only.wav", fileSizeBytes: 16000,
+    metadata: { genre: "Afrobeats" },
+  });
+
+  const profile = createMusicAnalysisProfile(local);
+  assert.equal(profile.genre, null);
+  assert.equal(profile.metadata.embedded_genre, "Afrobeats");
+  assert.equal(profile.analysis_status.genre, "unknown");
+  assert.equal(profile.analysis_status.language, "unknown");
+  assert.equal(profile.analysis_status.classification, "requires_model");
+  assert.equal(profile.analysis_status.tempo_bpm, "unavailable");
 });
