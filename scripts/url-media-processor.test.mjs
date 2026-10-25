@@ -43,7 +43,7 @@ assert.equal(urlMediaProcessorPath("POST", "/api/backend/url-media/download"), "
 assert.equal(urlMediaProcessorPath("GET", "/api/backend/url-media/download"), null);
 assert.equal(urlMediaProcessorPath("POST", "/api/backend/tool"), null);
 
-for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x", "audiomack", "soundcloud", "bandcamp", "mixcloud", "audius", "jamendo", "hearthis", "bandlab", "boomplay"]) {
+for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x", "audiomack", "soundcloud", "bandcamp", "mixcloud", "audius", "jamendo", "hearthis", "bandlab", "boomplay", "zingmp3", "netease", "yandex-music", "archive", "audioboom", "reverbnation", "soundclick", "spreaker", "podomatic", "freesound"]) {
   assert.match(registry, new RegExp(provider));
 }
 assert.match(registry, /export function createProviderAdapter/);
@@ -67,6 +67,9 @@ assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic"
 assert.equal(detectProvider(new URL("https://audiomack.com/artist/song")), "audiomack");
 assert.equal(detectProvider(new URL("https://on.soundcloud.com/example")), "soundcloud");
 assert.equal(detectProvider(new URL("https://artist.bandcamp.com/album/record")), "bandcamp");
+assert.equal(detectProvider(new URL("https://zingmp3.vn/album/example")), "zingmp3");
+assert.equal(detectProvider(new URL("https://music.163.com/#/album?id=123")), "netease");
+assert.equal(detectProvider(new URL("https://music.yandex.com/album/123")), "yandex-music");
 assert.match(source, /includePlaylist = false/);
 assert.match(source, /--yes-playlist/);
 assert.match(source, /--flat-playlist/);
