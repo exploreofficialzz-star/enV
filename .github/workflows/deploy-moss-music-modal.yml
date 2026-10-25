@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deploy:
     name: Download model and deploy private Modal endpoint
-    if: \${{ inputs.approve_gpu_deployment == true }}
+    if: ${{ inputs.approve_gpu_deployment == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
