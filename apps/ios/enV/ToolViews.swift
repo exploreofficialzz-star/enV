@@ -3551,6 +3551,134 @@ private struct NativeMusicLiveVideoStudioView: View {
     }
 }
 
+private struct NativeMusicSourceTrack: Sendable {
+    let title: String
+    let url: URL
+    let ext: String
+    let isProviderPage: Bool
+}
+
+private let nativeMusicAPIEndpoint = URL(string: "https://env-q3mq.onrender.com/api/backend/url-media")!
+
+private func nativeMusicAPIError(_ data: Data, status: Int) -> NSError {
+    if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        for key in ["message", "error"] {
+            if let message = object[key] as? String, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(message.prefix(900))])
+            }
+        }
+    }
+    if let body = String(data: data, encoding: .utf8), !body.isEmpty,
+       !body.lowercased().contains("<html"), !body.lowercased().contains("<!doctype") {
+        return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(body.prefix(700))])
+    }
+    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: "enV media service returned HTTP \(status). Retry later or use a supported public media URL."])
+}
+
+private func nativeMusicPostJSON(_ path: String, body: [String: Any]) async throws -> [String: Any] {
+    var request = URLRequest(url: nativeMusicAPIEndpoint.appendingPathComponent(path))
+    request.httpMethod = "POST"
+    request.timeoutInterval = 180
+    request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw NSError(domain: "enVMusicDownloader", code: 1, userInfo: [NSLocalizedDescriptionKey: "enV media service returned an invalid response."])
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        throw nativeMusicAPIError(data, status: http.statusCode)
+    }
+    guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw NSError(domain: "enVMusicDownloader", code: 2, userInfo: [NSLocalizedDescriptionKey: "enV media service returned invalid media metadata. Retry later."])
+    }
+    return object
+}
+
+private func nativeMusicResolve(_ source: NativeMusicSourceTrack) async throws -> [NativeMusicSourceTrack] {
+    let info = try await nativeMusicPostJSON("info", body: [
+        "url": source.url.absoluteString,
+        "includePlaylist": true
+    ])
+    let entries = info["entries"] as? [[String: Any]] ?? []
+    if !entries.isEmpty {
+        guard entries.count <= 50 else {
+            throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "This collection has more than 50 tracks. Split it into smaller batches."])
+        }
+        let resolved = entries.enumerated().compactMap { index, entry -> NativeMusicSourceTrack? in
+            let rawURL = (entry["webpageUrl"] as? String) ?? (entry["webpage_url"] as? String) ?? (entry["url"] as? String) ?? ""
+            guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https", url.host != nil else { return nil }
+            let title = (entry["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return NativeMusicSourceTrack(title: (title?.isEmpty == false ? title! : "Track \(index + 1)"), url: url, ext: "mp3", isProviderPage: true)
+        }
+        if !resolved.isEmpty { return resolved }
+    }
+
+    let path = source.url.path.lowercased()
+    let isCollection = (info["isPlaylist"] as? Bool == true) || path.contains("/album/") || path.contains("/playlist/")
+    if isCollection {
+        throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "enV could not find any downloadable tracks in this album or playlist. Check that the collection is public and supported by the source."])
+    }
+
+    let infoTitle = (info["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let title = infoTitle?.isEmpty == false ? infoTitle! : source.title
+    let formats = info["formats"] as? [[String: Any]] ?? []
+    let reportedExtension = formats.first?["ext"] as? String
+    let ext = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma"].contains(reportedExtension ?? "")
+        ? reportedExtension!
+        : source.ext
+    return [NativeMusicSourceTrack(title: title, url: source.url, ext: ext, isProviderPage: source.isProviderPage)]
+}
+
+private func nativeMusicDownload(_ track: NativeMusicSourceTrack, maxBytes: Int64) async throws -> (temporary: URL, bytes: Int64, ext: String) {
+    guard maxBytes > 0 else {
+        throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "The collection reached enV's 200 MB batch limit."])
+    }
+    var request = URLRequest(url: nativeMusicAPIEndpoint.appendingPathComponent("download"))
+    request.httpMethod = "POST"
+    request.timeoutInterval = 600
+    request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+    request.setValue("audio/mpeg, audio/*, application/octet-stream", forHTTPHeaderField: "Accept")
+    request.httpBody = try JSONSerialization.data(withJSONObject: [
+        "url": track.url.absoluteString,
+        "format": "mp3",
+        "audioOnly": true,
+        "maxBytes": Int(maxBytes)
+    ])
+    let (temporary, response) = try await URLSession.shared.download(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 6, userInfo: [NSLocalizedDescriptionKey: "enV media service returned an invalid download response."])
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        let data = (try? Data(contentsOf: temporary)) ?? Data()
+        try? FileManager.default.removeItem(at: temporary)
+        throw nativeMusicAPIError(data, status: http.statusCode)
+    }
+    let mime = (http.mimeType ?? "").lowercased()
+    guard mime.hasPrefix("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream" else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 7, userInfo: [NSLocalizedDescriptionKey: "enV media service did not return an audio file for \(track.title)."])
+    }
+    let bytes = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+    guard bytes > 0, bytes <= maxBytes else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 8, userInfo: [NSLocalizedDescriptionKey: "The file is empty or exceeds the permitted track or collection size."])
+    }
+    let ext: String
+    switch mime {
+    case "audio/mpeg", "audio/mp3": ext = "mp3"
+    case "audio/mp4", "audio/x-m4a": ext = "m4a"
+    case "audio/aac", "audio/x-aac": ext = "aac"
+    case "audio/flac", "audio/x-flac": ext = "flac"
+    case "audio/wav", "audio/x-wav", "audio/wave": ext = "wav"
+    case "audio/ogg": ext = ["oga", "opus"].contains(track.ext) ? track.ext : "ogg"
+    case "audio/opus": ext = "opus"
+    default: ext = track.ext
+    }
+    return (temporary, bytes, ext)
+}
+
 private struct NativeMusicDownloaderView: View {
     @State private var mode = "Online"
     @State private var collectionType = "Playlist"
@@ -3573,7 +3701,7 @@ private struct NativeMusicDownloaderView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Label("Music Downloader", systemImage: "arrow.down.circle")
                     .font(.envScaled(size: 18, weight: .semibold))
-                Text("Save authorized direct audio files online, or import music already on this device for offline use.")
+                Text("Download authorized public music links or direct audio files online, or import music already on this device for offline use.")
                     .font(.envScaled(size: 13))
                     .foregroundStyle(.secondary)
             }
@@ -3592,7 +3720,7 @@ private struct NativeMusicDownloaderView: View {
                 .textFieldStyle(.roundedBorder)
 
             if mode == "Online" {
-                Text("Direct audio-file URLs")
+                Text("Music links or direct audio-file URLs")
                     .font(.envScaled(size: 14, weight: .semibold))
                 TextEditor(text: $directURLs)
                     .font(.system(size: 13, design: .monospaced))
@@ -3600,7 +3728,7 @@ private struct NativeMusicDownloaderView: View {
                     .padding(4)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
                     .accessibilityLabel("Direct audio file URLs")
-                Text("One public HTTPS audio URL per line. Use “Track title | URL” to name a file. Albums and playlists download as a batch into a folder in the enV offline library.")
+                Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio file URL. Use “Track title | URL” for direct files. Collections are resolved through the shared enV media service and saved into the offline library.")
                     .font(.envScaled(size: 12))
                     .foregroundStyle(.secondary)
                 Toggle("I own these tracks or am authorized to download them", isOn: $rightsConfirmed)
@@ -3613,7 +3741,7 @@ private struct NativeMusicDownloaderView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isWorking)
-                Text("Streaming links from Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio are not direct audio files. Use each service’s official offline/download option or supply a direct audio URL offered by the rights holder.")
+                Text("Protected catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline/download feature. Provider support varies; enV cannot bypass sign-in, DRM, or app-only restrictions. Only download content you own or are authorized to export.")
                     .font(.envScaled(size: 12))
                     .foregroundStyle(.secondary)
             } else {
@@ -3681,10 +3809,13 @@ private struct NativeMusicDownloaderView: View {
         }
     }
 
-    private func validatedTracks() throws -> [(title: String, url: URL, ext: String)] {
-        var result: [(title: String, url: URL, ext: String)] = []
+    private func validatedTracks() throws -> [NativeMusicSourceTrack] {
+        var result: [NativeMusicSourceTrack] = []
         var seen = Set<String>()
-        let platformDomains = ["spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"]
+        let protectedDomains = [
+            "spotify.com", "apple.com", "deezer.com", "amazon.com", "tidal.com", "pandora.com",
+            "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"
+        ]
         for (index, rawLine) in directURLs.components(separatedBy: .newlines).enumerated() {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.isEmpty || line.hasPrefix("#") { continue }
@@ -3697,28 +3828,26 @@ private struct NativeMusicDownloaderView: View {
                 throw NSError(domain: "enVMusicDownloader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): enter a public HTTPS URL without embedded credentials."])
             }
             let host = hostValue.replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
-            if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") || host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil {
+            if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") ||
+               host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil || host.contains(":") {
                 throw NSError(domain: "enVMusicDownloader", code: 2, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): local and IP-literal hosts are not supported."])
             }
-            if platformDomains.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
-                throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): streaming-service pages cannot be downloaded as portable tracks. Use the service’s official offline feature or a rights-holder-provided audio URL."])
+            if protectedDomains.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
+                throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): this protected streaming catalog cannot be exported by enV. Use its official download/offline feature or an authorized direct audio-file URL."])
             }
-            let ext = url.pathExtension.lowercased()
-            guard extensions.contains(ext) else {
-                throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): use a direct URL ending in a supported audio extension such as .mp3, .m4a, .flac or .wav."])
-            }
+            let extCandidate = url.pathExtension.lowercased()
+            let isDirectAudio = extensions.contains(extCandidate)
+            let ext = isDirectAudio ? extCandidate : "mp3"
+            let normalizedTitle = title.isEmpty ? (url.lastPathComponent.isEmpty ? "Track \(index + 1)" : url.lastPathComponent) : title
             if seen.insert(url.absoluteString.lowercased()).inserted {
-                result.append((title.isEmpty ? url.lastPathComponent : title, url, ext))
+                result.append(NativeMusicSourceTrack(title: normalizedTitle, url: url, ext: ext, isProviderPage: !isDirectAudio))
             }
         }
         guard !result.isEmpty else {
-            throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "Add at least one direct audio-file URL."])
+            throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "Add at least one supported public music link or direct audio-file URL."])
         }
         guard result.count <= 50 else {
-            throw NSError(domain: "enVMusicDownloader", code: 6, userInfo: [NSLocalizedDescriptionKey: "A batch can contain at most 50 tracks. Split larger playlists into smaller batches."])
-        }
-        if collectionType == "Track" && result.count != 1 {
-            throw NSError(domain: "enVMusicDownloader", code: 7, userInfo: [NSLocalizedDescriptionKey: "For a single-track download, provide exactly one URL or select Album / Playlist."])
+            throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "A batch can contain at most 50 links. Split larger collections into smaller batches."])
         }
         return result
     }
@@ -3730,59 +3859,57 @@ private struct NativeMusicDownloaderView: View {
             errorMessage = "Confirm that you own the tracks or have permission to download them."
             return
         }
-        let tracks: [(title: String, url: URL, ext: String)]
+        let tracks: [NativeMusicSourceTrack]
         do { tracks = try validatedTracks() }
         catch { errorMessage = error.localizedDescription; return }
 
         let folder = collectionFolder(collectionName)
         isWorking = true
-        status = "Starting download…"
+        status = "Resolving links and preparing downloads…"
         transferTask = Task {
-            let outcome = await Task.detached(priority: .userInitiated) { [extensions = self.extensions, trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
+            let outcome = await Task.detached(priority: .userInitiated) { [trackLimit = self.trackLimit, batchLimit = self.batchLimit, collectionType = self.collectionType] in
                 var saved: [URL] = []
                 var failures: [String] = []
                 var totalBytes: Int64 = 0
                 do {
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                    for (index, track) in tracks.enumerated() {
+                    var resolvedTracks: [NativeMusicSourceTrack] = []
+                    for source in tracks {
                         try Task.checkCancellation()
                         do {
-                            let request = URLRequest(url: track.url)
-                            let (temporary, response) = try await URLSession.shared.download(for: request)
-                            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                                throw NSError(domain: "enVMusicDownloader", code: 8, userInfo: [NSLocalizedDescriptionKey: "The source returned an unsuccessful HTTP response."])
+                            resolvedTracks.append(contentsOf: try await nativeMusicResolve(source))
+                        } catch {
+                            failures.append(source.title + ": " + error.localizedDescription)
+                        }
+                    }
+                    guard !resolvedTracks.isEmpty else {
+                        throw NSError(domain: "enVMusicDownloader", code: 9, userInfo: [NSLocalizedDescriptionKey: failures.first ?? "No downloadable tracks were found."])
+                    }
+                    guard resolvedTracks.count <= 50 else {
+                        throw NSError(domain: "enVMusicDownloader", code: 10, userInfo: [NSLocalizedDescriptionKey: "This collection resolves to more than 50 tracks. Split it into smaller batches."])
+                    }
+                    if collectionType == "Track" && resolvedTracks.count != 1 {
+                        throw NSError(domain: "enVMusicDownloader", code: 11, userInfo: [NSLocalizedDescriptionKey: "This link resolves to multiple tracks. Choose Album or Playlist to download a collection."])
+                    }
+
+                    for track in resolvedTracks {
+                        try Task.checkCancellation()
+                        do {
+                            let remaining = batchLimit - totalBytes
+                            let downloaded = try await nativeMusicDownload(track, maxBytes: min(trackLimit, remaining))
+                            guard totalBytes + downloaded.bytes <= batchLimit else {
+                                try? FileManager.default.removeItem(at: downloaded.temporary)
+                                throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: "The collection reached the 200 MB batch limit."])
                             }
-                            if let finalURL = response.url {
-                                let host = (finalURL.host ?? "").lowercased().replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
-                                let protectedDomains = ["spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"]
-                                let isProtected = protectedDomains.contains { host == $0 || host.hasSuffix("." + $0) }
-                                let isIPLiteral = host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil || host.contains(":")
-                                let isLocalHost = host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
-                                guard finalURL.scheme?.lowercased() == "https", !isProtected, !isIPLiteral, !isLocalHost else {
-                                    throw NSError(domain: "enVMusicDownloader", code: 15, userInfo: [NSLocalizedDescriptionKey: "The source redirected to an insecure, local, or protected streaming host."])
-                                }
-                            }
-                            let mime = (http.mimeType ?? "").lowercased()
-                            guard mime.hasPrefix("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream" else {
-                                throw NSError(domain: "enVMusicDownloader", code: 9, userInfo: [NSLocalizedDescriptionKey: "The source did not return a direct audio file."])
-                            }
-                            let size = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
-                            guard size > 0 && size <= trackLimit else {
-                                throw NSError(domain: "enVMusicDownloader", code: 10, userInfo: [NSLocalizedDescriptionKey: "The file is empty or exceeds the 50 MB per-track limit."])
-                            }
-                            guard totalBytes + size <= batchLimit else {
-                                throw NSError(domain: "enVMusicDownloader", code: 11, userInfo: [NSLocalizedDescriptionKey: "The collection reached the 200 MB batch limit."])
-                            }
-                            let dest = Self.uniqueFile(in: folder, name: track.title, ext: track.ext)
-                            try FileManager.default.moveItem(at: temporary, to: dest)
-                            saved.append(dest)
-                            totalBytes += size
+                            let destination = Self.uniqueFile(in: folder, name: track.title, ext: downloaded.ext)
+                            try FileManager.default.moveItem(at: downloaded.temporary, to: destination)
+                            saved.append(destination)
+                            totalBytes += downloaded.bytes
                         } catch is CancellationError {
                             throw CancellationError()
                         } catch {
                             failures.append(track.title + ": " + error.localizedDescription)
                         }
-                        _ = index
                     }
                 } catch {
                     failures.append(error.localizedDescription)
