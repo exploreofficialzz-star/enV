@@ -5,9 +5,9 @@ import { downloadBlob } from "@/lib/utils";
 import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
 
-const LOCAL_FILE_LIMIT = 50 * 1024 * 1024;
+const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
 const MODEL_FILE_LIMIT = 25 * 1024 * 1024;
-const MAX_AUDIO_DURATION_SECONDS = 5 * 60;
+const MAX_AUDIO_DURATION_SECONDS = 2 * 60;
 
 type ModelClassification = MusicAnalysisResult["classification"];
 
@@ -148,7 +148,7 @@ export function MusicAnalyzerStudio() {
       return selected ? URL.createObjectURL(selected) : "";
     });
     if (selected && selected.size > LOCAL_FILE_LIMIT) {
-      setError("Choose a file smaller than 50 MB for predictable on-device analysis, especially on phones.");
+      setError("Choose a file smaller than 25 MB for predictable on-device analysis, especially on phones.");
     }
   }
 
@@ -158,7 +158,7 @@ export function MusicAnalyzerStudio() {
       return;
     }
     if (file.size > LOCAL_FILE_LIMIT) {
-      setError("This file is larger than the 50 MB on-device analysis limit. Choose a smaller file.");
+      setError("This file is larger than the 25 MB on-device analysis limit. Choose a smaller file.");
       return;
     }
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -171,7 +171,7 @@ export function MusicAnalyzerStudio() {
     setNotice("Checking file duration, then measuring the audio on this device. Nothing is uploaded for local analysis.");
     try {
       const probedDuration = await probeAudioDuration(file);
-      if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 5 minutes. Split longer files into sections first.");
+      if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
       const bytes = await file.arrayBuffer();
       const context = new Ctx();
       let buffer: AudioBuffer;
@@ -260,7 +260,7 @@ export function MusicAnalyzerStudio() {
         <label className="mt-3 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-accent">
           <Upload size={24} className="mb-2 text-accent" aria-hidden="true" />
           <span className="text-sm font-medium">{file ? "Choose a different audio file" : "Select an audio file"}</span>
-          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 50 MB and 5 minutes</span>
+          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 25 MB and 2 minutes</span>
           <input className="sr-only" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" onChange={(event) => { chooseFile(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} />
         </label>
         {file ? (
