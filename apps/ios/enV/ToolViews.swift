@@ -2621,6 +2621,7 @@ private struct NativeSongMetadataAnalyzerView: View {
         notice = "Adding files…"
         do {
             let existing = tracks.reduce(Int64(0)) { $0 + Int64($1.data.count) }
+            let existingCount = tracks.count
             let incoming = try await Task.detached(priority: .userInitiated) { () throws -> [NativeSongAnalysisTrack] in
                 var output: [NativeSongAnalysisTrack] = []
                 var batchBytes = existing
@@ -2635,7 +2636,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                             batchBytes += Int64(entry.data.count)
                             guard batchBytes <= 60 * 1024 * 1024 else { throw NativeNativeError.message("Batch exceeds 60 MB.") }
                             output.append(entry)
-                            guard output.count + tracks.count <= 50 else { throw NativeNativeError.message("Choose up to 50 tracks.") }
+                            guard output.count + existingCount <= 50 else { throw NativeNativeError.message("Choose up to 50 tracks.") }
                         }
                     } else {
                         let ext = url.pathExtension.lowercased()
@@ -2996,7 +2997,7 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
         let name = decodedName.replacingOccurrences(of: "\\", with: "/")
         guard name.count <= 1024 && !name.hasPrefix("/") && !name.split(separator: "/").contains("..") &&
             !name.split(separator: "/").contains(".") && !name.unicodeScalars.contains(where: { $0.value < 32 }) &&
-            !name.hasPrefix("~") && !name.range(of: #"^[A-Za-z]:"# , options: .regularExpression).map({ _ in true }).unwrap(or: false) else {
+            !name.hasPrefix("~") && name.range(of: #"^[A-Za-z]:"# , options: .regularExpression) == nil else {
             throw NativeNativeError.message("ZIP contains an unsafe path.")
         }
         guard seen.insert(name).inserted else { throw NativeNativeError.message("ZIP contains duplicate paths.") }
