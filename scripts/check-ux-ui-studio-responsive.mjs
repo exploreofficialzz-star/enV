@@ -68,6 +68,16 @@ assert.ok(mobileComposition.includes("flex:0 0 auto !important;") && mobileCompo
 assert.ok(mobileComposition.includes(".uxui-mobile-controls") && mobileComposition.includes("min-height:88px;"), "Movement/transform controller remains below the preview");
 assert.ok(mobileComposition.includes(".uxui-context-controls") && mobileComposition.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Selected-element editing tools remain below the movement controller");
 assert.ok(!mobileComposition.includes(".ux-ui-studio.target-tablet") && !mobileComposition.includes(".ux-ui-studio.target-desktop"), "This layout pass is limited to the mobile target");
+
+const mobileStageIndex = engine.indexOf('className="uxui-canvas-stage"');
+const mobileToolbarIndex = engine.indexOf('className="uxui-bottom-toolbar"');
+const mobileControllerIndex = engine.indexOf('className="uxui-mobile-controls"');
+const mobileContextIndex = engine.indexOf('className="uxui-context-controls"');
+assert.ok(mobileStageIndex >= 0 && mobileStageIndex < mobileToolbarIndex, "The phone preview appears before the primary editing toolbar");
+assert.ok(mobileToolbarIndex < mobileControllerIndex, "Movement and transform controls render under the primary toolbar");
+assert.ok(mobileControllerIndex < mobileContextIndex, "Selected-element editing tools render after movement/transform controls");
+assert.ok(deviceFormula.includes("Math.min(") && deviceFormula.includes("canvasStageSize.width / (requestedDeviceWidth + deviceFrameChromeWidth)") && deviceFormula.includes("canvasStageSize.height / (requestedDeviceHeight + deviceFrameChromeHeight)"), "Mobile fitting chooses one scale factor constrained by both axes rather than stretching each axis independently");
+assert.ok(engine.includes('"--uxui-cutout-width":') && engine.includes('"--uxui-device-border":') && engine.includes('"--uxui-device-padding":'), "Phone notch, border and padding share the device scale");
 const responsiveRules = styles.slice(styles.lastIndexOf("UX/UI Studio responsive pass"));
 assert.ok(responsiveRules.includes("height:auto !important; min-height:0 !important; max-height:none !important"), "Editor no longer forces a viewport-height crop");
 assert.ok(responsiveRules.includes("target-desktop .uxui-mobile-controls { display:none !important; }"), "Desktop hides the movement controller");
