@@ -1,0 +1,64 @@
+name: Deploy MOSS-Music to Modal
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_gpu_deployment:
+        description: "I checked Modal billing and approve downloading the model and deploying its GPU-backed endpoint."
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modal-moss-music-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Download model and deploy private Modal endpoint
+    if: \${{ inputs.approve_gpu_deployment == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MODAL_TOKEN_ID: \${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: \${{ secrets.MODAL_TOKEN_SECRET }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Validate Modal credentials without printing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$MODAL_TOKEN_ID" || -z "$MODAL_TOKEN_SECRET" ]]; then
+            echo "::error::Add MODAL_TOKEN_ID and MODAL_TOKEN_SECRET as GitHub Actions repository secrets before running this workflow."
+            exit 1
+          fi
+
+      - name: Install Modal CLI
+        run: python -m pip install --upgrade pip modal
+
+      - name: Download model weights to the persistent Modal Volume
+        run: modal run infra/modal-moss-music/app.py::download_weights
+
+      - name: Deploy the authenticated GPU-backed inference service
+        run: modal deploy infra/modal-moss-music/app.py
+
+      - name: Print deployment inspection instructions
+        shell: bash
+        run: |
+          echo "Deployment command completed. In the Modal dashboard, open Apps > env-moss-music > serve_api."
+          echo "Copy the actual HTTPS Web URL and append /healthz for a readiness check."
+          echo "The analyzer URL must be the same Web URL with /analyze appended."
+          echo "Do not paste any tokens into workflow logs or client-side configuration."
