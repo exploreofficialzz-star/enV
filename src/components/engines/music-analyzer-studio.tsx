@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { downloadBlob } from "@/lib/utils";
 import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
+import { AI_LIMITS } from "@/lib/ai/contracts";
+import { prepareAudioForAi, runAiTask } from "@/lib/ai/client/ai-client";
 
 const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
-const MODEL_FILE_LIMIT = 25 * 1024 * 1024;
+const MODEL_FILE_LIMIT = AI_LIMITS.audioBytesMax;
 const MAX_AUDIO_DURATION_SECONDS = 2 * 60;
 
 type ModelClassification = MusicAnalysisResult["classification"];
@@ -69,45 +71,6 @@ function listValue(value: string[]): string {
   return value.length ? value.join(", ") : "Not identified";
 }
 
-function normalizeModelResult(value: unknown): ModelClassification {
-  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const rawClassification = raw.classification && typeof raw.classification === "object"
-    ? raw.classification as Record<string, unknown>
-    : raw;
-  const candidates = Array.isArray(rawClassification.genre_candidates)
-    ? rawClassification.genre_candidates
-    : Array.isArray(raw.predictions) ? raw.predictions
-      : Array.isArray(value) ? value : [];
-  const genreCandidates = candidates.slice(0, 12).flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const candidate = item as Record<string, unknown>;
-    const label = candidate.label ?? candidate.genre ?? candidate.class;
-    if (typeof label !== "string" || !label.trim()) return [];
-    const scoreValue = candidate.score ?? candidate.confidence ?? candidate.probability;
-    const score = typeof scoreValue === "number" && Number.isFinite(scoreValue)
-      ? Math.min(1, Math.max(0, scoreValue))
-      : null;
-    return [{ label: label.trim(), score }];
-  });
-  const toText = (input: unknown): string | null =>
-    typeof input === "string" && input.trim() ? input.trim() : null;
-  const toList = (input: unknown): string[] => {
-    const values = Array.isArray(input) ? input : typeof input === "string" ? [input] : [];
-    return values.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim()).slice(0, 30);
-  };
-  const explicitGenre = toText(rawClassification.genre);
-  return {
-    genre: explicitGenre ?? genreCandidates[0]?.label ?? null,
-    sub_style: toText(rawClassification.sub_style ?? rawClassification.subStyle),
-    language: toList(rawClassification.language ?? rawClassification.languages),
-    mood: toList(rawClassification.mood ?? rawClassification.moods),
-    instruments: toList(rawClassification.instruments ?? rawClassification.instrumentation),
-    vocal_style: toText(rawClassification.vocal_style ?? rawClassification.vocalStyle),
-    genre_candidates: genreCandidates,
-    status: "model_completed",
-    note: "Model predictions are estimates. Fields omitted by the configured model remain unknown; verify uncertain labels before relying on them.",
-  };
-}
 
 export function MusicAnalyzerStudio() {
   const [file, setFile] = useState<File | null>(null);
@@ -209,24 +172,24 @@ export function MusicAnalyzerStudio() {
       return;
     }
     if (!allowModelUpload) {
-      setError("Confirm the upload consent before sending audio to the configured model service.");
+      setError("Confirm the upload consent before sending audio to enV's configured AI model.");
       return;
     }
     if (file.size > MODEL_FILE_LIMIT) {
-      setError("Model-based analysis accepts files up to 25 MB. Local analysis results are still available.");
+      setError("enV's built-in AI tagging accepts files up to about 2.8 MB. Local signal measurements still work on larger files.");
       return;
     }
     setModelBusy(true);
     setError("");
     setNotice("Sending the selected audio to the configured enV model service, as you approved.");
     try {
-      const body = new FormData();
-      body.append("audio", file, file.name);
-      const response = await fetch("/api/music-analysis", { method: "POST", body, headers: { Accept: "application/json" } });
-      const payload = await response.json().catch(() => ({})) as { message?: string; classification?: unknown };
-      if (!response.ok) throw new Error(payload.message || "The model service could not analyze this audio.");
-      const classification = normalizeModelResult(payload.classification);
-      setAnalysis((current) => current ? { ...current, classification } : current);
+      const prepared = await prepareAudioForAi(file);
+      const response = await runAiTask("music.analysis.classify", {
+        audioBase64: prepared.base64,
+        mimeType: prepared.mimeType,
+        filename: prepared.filename,
+      });
+      setAnalysis((current) => current ? { ...current, classification: response.result } : current);
       setNotice("Model response received. Review the predicted labels and scores; the model may be wrong, particularly on mixed vocals or unfamiliar styles.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Model-based analysis failed.");
