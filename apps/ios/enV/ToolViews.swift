@@ -2960,13 +2960,19 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
     let searchStart = max(0, bytes.count - 22 - 65_535)
     var endRecord: Int?
     for offset in stride(from: bytes.count - 22, through: searchStart, by: -1) {
-        if try u32(offset) == 0x06054b50, offset + 22 + (try u16(offset + 20)) == bytes.count {
-            endRecord = offset
-            break
+        let signature = try u32(offset)
+        if signature == 0x06054b50 {
+            let commentLength = try u16(offset + 20)
+            if offset + 22 + commentLength == bytes.count {
+                endRecord = offset
+                break
+            }
         }
     }
     guard let end = endRecord else { throw NativeNativeError.message("Invalid ZIP archive.") }
-    guard try u16(end + 4) == 0 && u16(end + 6) == 0 else { throw NativeNativeError.message("Split ZIP archives are not supported.") }
+    let diskNumber = try u16(end + 4)
+    let centralDisk = try u16(end + 6)
+    guard diskNumber == 0 && centralDisk == 0 else { throw NativeNativeError.message("Split ZIP archives are not supported.") }
     let entryCount = try u16(end + 10)
     let dirSize = try u32(end + 12)
     let dirOffset = try u32(end + 16)
@@ -3003,7 +3009,8 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
         guard seen.insert(name).inserted else { throw NativeNativeError.message("ZIP contains duplicate paths.") }
         let mode = external >> 16
         if (madeBy >> 8) == 3 && mode & 0xf000 == 0xa000 { throw NativeNativeError.message("ZIP symbolic links are not supported.") }
-        guard localOffset + 30 <= dirOffset && (try u32(localOffset)) == 0x04034b50 else { throw NativeNativeError.message("ZIP local header is damaged.") }
+        guard localOffset + 30 <= dirOffset else { throw NativeNativeError.message("ZIP local header is damaged.") }
+        guard try u32(localOffset) == 0x04034b50 else { throw NativeNativeError.message("ZIP local header is damaged.") }
         let localFlags = try u16(localOffset + 6)
         let localMethod = try u16(localOffset + 8)
         let localNameLen = try u16(localOffset + 26)
