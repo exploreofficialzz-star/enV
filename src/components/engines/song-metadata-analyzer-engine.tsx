@@ -301,7 +301,7 @@ async function analyzeLocal(
   }
 
   if (mode === "full" && includeAi && !semantic && !aiWarning) aiWarning = "Full AI analysis did not return a result.";
-  if (mode === "full" && !includeAi) aiWarning = "AI analysis is unavailable or was not enabled; local results are still included.";
+  if (mode === "full" && !includeAi) aiWarning = "AI classification was not run; local analysis results are included.";
   if (aiWarning) warnings.push(aiWarning);
   if (!decodedSuccessfully) warnings.push("Technical and embedded tags may still be available, but BPM/key and semantic audio analysis need a decodable file.");
   const bpmFromTag = bpmTag !== null && bpmTag > 0 && bpmTag <= 300 ? bpmTag : null;
@@ -512,10 +512,6 @@ export function SongMetadataAnalyzerEngine() {
 
   async function startAnalysis() {
     if (busy || !tracks.length) return;
-    if (mode === "full" && !aiConsent) {
-      setError("Confirm AI processing before Full Analysis.");
-      return;
-    }
     setBusy(true);
     setError("");
     setNotice("");
@@ -639,7 +635,7 @@ export function SongMetadataAnalyzerEngine() {
             </button>
             <button type="button" disabled={busy} onClick={() => setMode("full")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "full" ? "bg-surface shadow-sm" : "text-muted-foreground"}`}>
               <span className="block text-sm font-semibold">Full Analysis</span>
-              <span className="mt-0.5 block text-[11px]">Genre, mood, vocals</span>
+              <span className="mt-0.5 block text-[11px]">Local signals, optional AI tags</span>
             </button>
           </div>
 
@@ -647,25 +643,24 @@ export function SongMetadataAnalyzerEngine() {
             <div className="space-y-2 rounded-xl border border-border p-3">
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1 accent-primary" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} disabled={busy} />
-                <span>Send short song excerpts to AI for music understanding.</span>
+                <span>Add AI music understanding by sending short excerpts.</span>
               </label>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className={`size-2 rounded-full ${aiAvailability === true ? "bg-emerald-500" : aiAvailability === false ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
-                {aiAvailability === true ? "AI available" : aiAvailability === false ? "AI unavailable · Quick Scan still works" : "Checking AI setup…"}
-              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Local analysis runs in this tab too. AI tags are added only when you opt in and the service is configured.
+              </p>
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing || (mode === "full" && (!aiConsent || aiAvailability !== true))} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <Sparkles size={16} /> : <Activity size={16} />}
-              {busy ? "Analyzing…" : mode === "full" ? (aiAvailability === true ? "Analyze with AI" : aiAvailability === false ? "AI unavailable" : "Checking AI…") : "Scan songs"}
+              {busy ? "Analyzing…" : mode === "full" ? (aiAvailability === true && aiConsent ? "Analyze with AI" : "Run local analysis") : "Scan songs"}
             </button>
             {busy
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
               : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" title="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">Local by default. Full Analysis sends short excerpts after consent.</p>
+          <p className="text-[11px] text-muted-foreground">{mode === "full" ? "Local signals always run. Short excerpts are sent only after consent and when the AI service is configured." : "Quick Scan runs on this device; your audio is not uploaded."}</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
