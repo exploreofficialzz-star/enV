@@ -23,6 +23,7 @@ object NativeAiEngine {
         "sql-formatter" to "developer.sql.explain",
         "json-validator" to "developer.json.explain",
         "alt-text-generator" to "image.alt.generate",
+        "audio-analyze-studio" to "music.analysis.classify",
         "video-audio-extractor" to "video.transcript.generate",
     )
 
@@ -212,6 +213,12 @@ object NativeAiEngine {
                 values["context"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { put("context", it) }
                 put("style", values["style"] ?: "concise")
                 put("language", values["language"] ?: "en")
+            }
+            "music.analysis.classify" -> JSONObject().apply {
+                val file = values["audio"] as JSONObject
+                put("audioBase64", file.optString("base64"))
+                put("mimeType", file.optString("mimeType"))
+                put("filename", file.optString("filename"))
             }
             "video.transcript.generate" -> JSONObject().apply {
                 val file = values["audio"] as JSONObject
