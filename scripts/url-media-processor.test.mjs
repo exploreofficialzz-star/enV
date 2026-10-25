@@ -8,6 +8,7 @@ import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
 const registry = await readFile(new URL("./media/provider-registry.mjs", import.meta.url), "utf8");
 const dockerfile = await readFile(new URL("../processor/Dockerfile", import.meta.url), "utf8");
+const audiomackPatch = await readFile(new URL("./media/patch-ytdlp-audiomack.py", import.meta.url), "utf8");
 const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
 
 assert.match(source, /assertPublicHostname/);
@@ -44,6 +45,10 @@ assert.match(dockerfile, /COPY scripts\/media\/provider-errors\.mjs \.\/scripts\
 assert.match(dockerfile, /node --check scripts\/media\/provider-errors\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
 assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
+assert.match(dockerfile, /--pre/);
+assert.match(dockerfile, /patch-ytdlp-audiomack\.py/);
+assert.match(audiomackPatch, /http:\/\/www\.audiomack\.com\/api\/music\/url\//);
+assert.match(audiomackPatch, /https:\/\/api\.audiomack\.com\/music\/url\//);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
 assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);
