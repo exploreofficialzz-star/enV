@@ -102,11 +102,15 @@ const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-a
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
-for (const marker of ["Analyze on this device", "Export JSON", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
+const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
+for (const marker of ["Analyze on this device", "Song profile JSON", "Full analysis", "createMusicAnalysisProfile", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
 }
 for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
   assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
+}
+for (const marker of ["env.music-profile.v1", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
+  assert.ok(musicAnalysisProfile.includes(marker), `Music Analyzer profile export contract missing: ${marker}`);
 }
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
