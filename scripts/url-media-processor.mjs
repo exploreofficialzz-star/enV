@@ -201,7 +201,7 @@ function errorPayload(error) {
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
   const retryable = ["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
   const safeMessage = message.replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n\t]+/g, " ").slice(0, 900);
-  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(safeMessage);
+  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's collection resolver could not enumerate its tracks/i.test(safeMessage);
   const explicitDetail = safeMessage.match(/^[A-Z_]+:\s*(.+)$/);
   const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
   const publicMessage = audiomackAlbumFailure
@@ -366,9 +366,11 @@ async function readBoundedText(response, maxBytes) {
   return new TextDecoder().decode(bytes);
 }
 
-function isAudiomackAlbumUrl(url) {
-  const parts = url.pathname.split("/").filter(Boolean);
-  return parts.length >= 3 && (parts[0].toLowerCase() === "album" || parts[1]?.toLowerCase() === "album");
+function isAudiomackCollectionUrl(url) {
+  const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
+  // Audiomack publicly exposes both artist/album/slug and artist/playlist/slug.
+  return parts.length >= 3 && ["album", "playlist", "playlists"].some((kind) =>
+    parts[0] === kind || parts[1] === kind);
 }
 
 /**
@@ -418,7 +420,7 @@ async function inspectAudiomackAlbumPage(url, signal) {
   if (!parsed.entries.length) return null;
   return {
     provider: "audiomack",
-    title: parsed.title || "Audiomack album",
+    title: parsed.title || "Audiomack collection",
     uploader: parsed.uploader,
     album: parsed.title || undefined,
     webpageUrl: finalUrl.toString(),
@@ -438,7 +440,7 @@ async function handleInfo(req, res) {
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
   let audiomackPageFallbackFailure = "";
-  if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
     try {
       const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
       if (albumInfo?.entries?.length) {
@@ -491,7 +493,7 @@ async function handleInfo(req, res) {
         }
       }
       const message = error instanceof Error ? error.message : String(error);
-      if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
+      if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
         const detail = message.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(-260);
         const pageFailure = audiomackPageFallbackFailure || "The public page fallback did not return track links.";
         throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list. Public-page fallback: " + pageFailure + " Extractor detail: " + detail + ". Try an individual song URL or an authorized direct audio-file URL.");
