@@ -1,6 +1,7 @@
 package com.chastech.env
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
@@ -11,6 +12,12 @@ class MainActivityLaunchTest {
 
     @Test
     fun launchShowsNativeCatalogHome() {
+        // CatalogGate reads and parses the bundled catalog asynchronously on Dispatchers.IO.
+        // Wait for the real home content instead of racing the initial launch screen.
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
