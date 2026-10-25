@@ -13,6 +13,11 @@ test("Web music downloader uses the shared inspect and download API", async () =
   assert.match(engine, /downloadUrlMedia\(/);
   assert.match(client, /apiUrl\("\/api\/backend\/url-media"\)/);
   assert.match(client, /includePlaylist: options\.includePlaylist/);
+  const policy = await source("../src/lib/media/music-downloader-policy.ts");
+  const catalog = await source("../src/lib/catalog-data.ts");
+  assert.match(policy, /export function validateMusicSourceUrl/);
+  assert.match(policy, /MUSIC_PROVIDER_PAGE_DOMAINS/);
+  assert.match(catalog, /supported public song, album and playlist pages/);
 });
 
 test("Android music downloader resolves supported public pages through the shared API", async () => {
