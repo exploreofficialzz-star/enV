@@ -5,7 +5,31 @@ import { ResultPanel } from "@/components/engines/result-panel";
 import { inspectUrlMedia, type UrlMediaInfo, type UrlMediaProvider } from "@/lib/media/url-media";
 
 const labels: Record<UrlMediaProvider | "generic", string> = {
-  generic: "Supported video URL", youtube: "YouTube", tiktok: "TikTok", facebook: "Facebook", instagram: "Instagram", x: "X / Twitter",
+  generic: "Supported media URL",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  x: "X / Twitter",
+  audiomack: "Audiomack",
+  soundcloud: "SoundCloud",
+  bandcamp: "Bandcamp",
+  mixcloud: "Mixcloud",
+  audius: "Audius",
+  jamendo: "Jamendo",
+  hearthis: "HearThis",
+  bandlab: "BandLab",
+  boomplay: "Boomplay",
+  zingmp3: "Zing MP3",
+  netease: "NetEase Music",
+  "yandex-music": "Yandex Music",
+  archive: "Internet Archive",
+  audioboom: "Audioboom",
+  reverbnation: "ReverbNation",
+  soundclick: "SoundClick",
+  spreaker: "Spreaker",
+  podomatic: "Podomatic",
+  freesound: "Freesound",
 };
 
 export function UrlMediaInfoEngine({ provider }: { provider: UrlMediaProvider | "generic" }) {
