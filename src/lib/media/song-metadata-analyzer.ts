@@ -174,7 +174,10 @@ function u32(view: DataView, offset: number): number {
 
 function isUnsafeArchivePath(name: string): boolean {
   const normalized = name.replace(/\\/g, "/");
-  return normalized.startsWith("/") ||
+  return !name ||
+    name.length > 1024 ||
+    /[\\u0000-\\u001f\\u007f]/.test(name) ||
+    normalized.startsWith("/") ||
     /^[a-z]:/i.test(normalized) ||
     normalized.split("/").some((part) => part === ".." || part === ".");
 }
@@ -232,6 +235,7 @@ export function inspectSongZip(
 
   const entries: ZipEntryHeader[] = [];
   const seenNames = new Set<string>();
+  const localRanges: Array<{ start: number; end: number }> = [];
   let cursor = directoryOffset;
   let totalUncompressedBytes = 0;
   for (let index = 0; index < totalEntries; index += 1) {
@@ -248,7 +252,7 @@ export function inspectSongZip(
     const localHeaderOffset = u32(view, cursor + 42);
     const variableEnd = cursor + 46 + nameLength + extraLength + commentLength;
     if (variableEnd > directoryOffset + directorySize) throw new Error("This ZIP directory entry is truncated.");
-    if (flags & 1) throw new Error("Password-protected ZIP files are not supported.");
+    if (flags & 0x41) throw new Error("Encrypted ZIP entries are not supported.");
     if (methodValue !== 0 && methodValue !== 8) throw new Error("This ZIP uses an unsupported compression method.");
     if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localHeaderOffset === 0xffffffff) {
       throw new Error("ZIP64 entries are not supported by this local analyzer yet.");
@@ -256,6 +260,26 @@ export function inspectSongZip(
     const rawName = bytes.subarray(cursor + 46, cursor + 46 + nameLength);
     const name = new TextDecoder((flags & 0x0800) !== 0 ? "utf-8" : "windows-1252").decode(rawName);
     if (!name || isUnsafeArchivePath(name)) throw new Error("This ZIP contains an unsafe file path.");
+    if (localHeaderOffset >= directoryOffset || localHeaderOffset + 30 > directoryOffset) {
+      throw new Error("This ZIP has an invalid local file header offset.");
+    }
+    if (u32(view, localHeaderOffset) !== 0x04034b50) throw new Error("This ZIP has a damaged local file header.");
+    const localFlags = u16(view, localHeaderOffset + 6);
+    const localMethod = u16(view, localHeaderOffset + 8);
+    const localNameLength = u16(view, localHeaderOffset + 26);
+    const localExtraLength = u16(view, localHeaderOffset + 28);
+    if (localFlags !== flags || localMethod !== methodValue) throw new Error("This ZIP has mismatched local and central headers.");
+    const localNameStart = localHeaderOffset + 30;
+    const localNameEnd = localNameStart + localNameLength;
+    const dataStart = localNameEnd + localExtraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataStart > directoryOffset || dataEnd > directoryOffset || dataEnd < dataStart) {
+      throw new Error("This ZIP has a file payload outside its data area.");
+    }
+    const localName = new TextDecoder((localFlags & 0x0800) !== 0 ? "utf-8" : "windows-1252")
+      .decode(bytes.subarray(localNameStart, localNameEnd));
+    if (localName !== name) throw new Error("This ZIP has mismatched local and central filenames.");
+    localRanges.push({ start: localHeaderOffset, end: dataEnd });
     if (seenNames.has(name)) throw new Error("This ZIP contains duplicate file paths.");
     seenNames.add(name);
     const isDirectory = name.endsWith("/");
@@ -275,6 +299,12 @@ export function inspectSongZip(
     cursor = variableEnd;
   }
   if (cursor !== directoryOffset + directorySize) throw new Error("This ZIP directory has unexpected trailing data.");
+  localRanges.sort((a, b) => a.start - b.start);
+  for (let index = 1; index < localRanges.length; index += 1) {
+    if (localRanges[index]!.start < localRanges[index - 1]!.end) {
+      throw new Error("This ZIP contains overlapping file payloads.");
+    }
+  }
   return { entries, totalUncompressedBytes };
 }
 
