@@ -9,7 +9,7 @@
 
 ## Supported source contract
 
-The tool does not scrape music-service web pages, request users' streaming credentials, extract protected streams, bypass DRM, or convert an offline entitlement into a portable audio file. Spotify, Apple Music, YouTube Music, Deezer, Amazon Music, TIDAL and SoundCloud page URLs are identified as service pages, not direct audio URLs. Their own offline/download workflows remain the supported route for protected catalog tracks. Artists and rights holders can supply direct download links for material that is available to save.
+The tool does not scrape music-service web pages, request users' streaming credentials, extract protected streams, bypass DRM, or convert an offline entitlement into a portable audio file. Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio page URLs are recognized as service pages, not direct audio URLs. These names are detected consistently on Web, Android and iOS so users get a clear message instead of a misleading download attempt. The provider's official offline/download flow remains the supported route for protected catalog tracks. Artists and rights holders can supply direct download links for material they are authorized to distribute.
 
 The Web client needs CORS permission from the remote host to read remote response bytes. A public URL alone does not guarantee browser access. Android and iOS native networking are not subject to browser CORS, but the URL must still be public HTTPS and the response must be a direct audio file. Sources requiring an interactive login or user cookies are not supported by the URL-only flow.
 
