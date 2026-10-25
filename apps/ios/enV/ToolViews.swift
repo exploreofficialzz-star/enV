@@ -2467,12 +2467,14 @@ private struct NativeSongMetadataAnalyzerView: View {
                 .disabled(tracks.isEmpty || busy || (fullAnalysis && (!uploadConsent || aiAvailable != true)))
 
                 if busy {
-                    Button("Stop", systemImage: "pause.circle") {
+                    Button {
                         currentTask?.cancel()
                         notice = "Stopping… completed results are kept."
+                    } label: {
+                        Label("Stop", systemImage: "pause.circle")
+                            .frame(maxWidth: .infinity, minHeight: 40)
                     }
                     .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(.secondary) }
@@ -2489,9 +2491,12 @@ private struct NativeSongMetadataAnalyzerView: View {
                     Text("\(analyzedCount) of \(tracks.count)").font(.caption).foregroundStyle(.secondary)
                 }
                 if tracks.isEmpty {
-                    ContentUnavailableView("No songs yet", systemImage: "music.note.list",
-                                           description: Text("Add audio files or a ZIP collection."))
-                        .frame(maxWidth: .infinity, minHeight: 110)
+                    VStack(spacing: 8) {
+                        Image(systemName: "music.note.list").font(.title2).foregroundStyle(.secondary)
+                        Text("No songs yet").font(.subheadline.weight(.medium))
+                        Text("Add audio files or a ZIP collection.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 110)
                 } else {
                     ForEach(tracks) { track in
                         HStack(spacing: 9) {
@@ -2555,7 +2560,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                     if !warnings.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
                             Text("Notes").font(.caption.weight(.semibold))
-                            ForEach(Array(warnings.prefix(5).enumerated()), id: \.offset) { _, warning in
+                            ForEach(Array(warnings.prefix(5)), id: \.self) { warning in
                                 Text("• \(warning)").font(.caption).foregroundStyle(.secondary)
                             }
                         }
