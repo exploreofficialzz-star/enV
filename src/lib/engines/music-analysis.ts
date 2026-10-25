@@ -1,5 +1,5 @@
 import type { MusicMetadata } from "../media/music-metadata.ts";
-import { amplitudeDbfs, approximateLufs, estimateBpm, estimateKey, rms } from "./audio-studio.ts";
+import { amplitudeDbfs, approximateLufs, estimateBpm, estimateKey } from "./audio-studio.ts";
 
 export type MusicAnalysisInput = {
   channels: readonly Float32Array[];
@@ -164,6 +164,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
 
   let peak = 0, sumSquares = 0, totalSamples = 0, clippedSamples = 0, zeroCrossings = 0;
   let previousSample: number | null = null;
+  const representative = channels[0]!;
   const windowSamples = Math.max(1, Math.round(input.sampleRate * 0.1));
   const windowRms: number[] = [];
   let silenceWindows = 0, totalWindows = 0;
@@ -172,9 +173,14 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   for (let start = 0; start < frames; start += windowSamples) {
     const end = Math.min(frames, start + windowSamples);
     let windowSquares = 0, windowCount = 0;
-    for (const channel of channels) {
+    for (let channelIndex = 0; channelIndex < channels.length; channelIndex++) {
+      const channel = channels[channelIndex]!;
       for (let i = start; i < end; i++) {
         const sample = channel[i] ?? 0;
+        if (channelIndex === 0) {
+          if (previousSample !== null && ((sample >= 0 && previousSample < 0) || (sample < 0 && previousSample >= 0))) zeroCrossings++;
+          previousSample = sample;
+        }
         const absolute = Math.abs(sample);
         peak = Math.max(peak, absolute);
         sumSquares += sample * sample;
@@ -190,16 +196,6 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
     totalWindows++;
   }
 
-  const representative = channels[0]!;
-  const zcrStep = Math.max(1, Math.floor(input.sampleRate / 11025));
-  let zcrComparisons = 0;
-  previousSample = representative[0] ?? 0;
-  for (let i = zcrStep; i < representative.length; i += zcrStep) {
-    const current = representative[i] ?? 0;
-    if ((current >= 0 && (previousSample ?? 0) < 0) || (current < 0 && (previousSample ?? 0) >= 0)) zeroCrossings++;
-    zcrComparisons++;
-    previousSample = current;
-  }
 
   const spreadDb = windowRms.map((value) => value > 0 ? 20 * Math.log10(value) : -120);
   const p95 = quantile(spreadDb, 0.95), p10 = quantile(spreadDb, 0.10);
@@ -211,7 +207,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const tempo = estimateBpm(tempoSamples, input.sampleRate);
   const key = estimateKey(keySamples, input.sampleRate);
   const spectrum = spectralFeatures(representative, input.sampleRate);
-  const zcr = zcrComparisons ? zeroCrossings / zcrComparisons : null;
+  const zcr = frames > 1 ? zeroCrossings / (frames - 1) : null;
   const metadata = input.metadata ?? {};
   const taggedBpm = metadata.bpm ? Number(metadata.bpm) : NaN;
 
