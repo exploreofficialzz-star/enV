@@ -217,7 +217,7 @@ const catalog = parseGeneratedCatalog(catalogSource);
 // catalog.ts appends the dedicated studio catalog after its 10,000 generated
 // entries. The AI audit must validate the final exported tool set, not only the
 // generated JSON payload, or it will incorrectly reject real supplemental tools.
-const audioStudioCatalogMatch = catalogSource.match(/const audioStudioTools:\\s*ToolMeta\\[\\]\\s*=\\s*(\\[[\\s\\S]*?\\n\\]);/);
+const audioStudioCatalogMatch = catalogSource.match(/const audioStudioTools:\s*ToolMeta\[\]\s*=\s*(\[[\s\S]*?\n\]);/);
 if (audioStudioCatalogMatch) {
   let supplementalTools;
   try {
