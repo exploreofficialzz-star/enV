@@ -2354,7 +2354,7 @@ private struct NativeAudioWavJoinerToolView: View {
 }
 
 
-private struct NativeSongAnalysisTrack: Identifiable {
+struct NativeSongAnalysisTrack: Identifiable {
     let id = UUID()
     let filename: String
     let data: Data
@@ -2965,7 +2965,7 @@ private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
     }).joined(separator: "\r\n")
 }
 
-private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
+func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
     guard data.count >= 22 && data.count <= 30 * 1024 * 1024 else { throw NativeNativeError.message("ZIP must be 30 MB or smaller.") }
     let bytes = [UInt8](data)
     func u16(_ offset: Int) throws -> Int {
