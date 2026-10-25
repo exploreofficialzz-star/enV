@@ -344,8 +344,12 @@ async function analyzeLocal(
       mime_type: file.type || mimeForExtension(extensionOf(file.name)),
       duration_seconds: compactNumber(durationSeconds, 3),
       file_size_bytes: file.size,
-      bitrate_bps: header.encodedBitrateBps ?? (averageBitrate ? Math.round(averageBitrate) : null),
-      bitrate_source: header.encodedBitrateBps !== null ? "stream_header" : averageBitrate ? "file_size_duration_estimate" : null,
+      bitrate_bps: header.container === "WAVE" && header.encodedBitrateBps !== null
+        ? header.encodedBitrateBps
+        : (averageBitrate ? Math.round(averageBitrate) : null),
+      bitrate_source: header.container === "WAVE" && header.encodedBitrateBps !== null
+        ? "stream_header"
+        : averageBitrate ? "file_size_duration_estimate" : null,
       bitrate_mode: null,
       sample_rate_hz: sampleRateHz,
       analysis_sample_rate_hz: analysisSampleRate,
