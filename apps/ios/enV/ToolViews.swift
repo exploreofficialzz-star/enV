@@ -3073,9 +3073,11 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
     }
     guard cursor == dirOffset + dirSize else { throw NativeNativeError.message("ZIP directory has unexpected trailing data.") }
     localRanges.sort { $0.0 < $1.0 }
-    for index in 1..<localRanges.count {
-        guard localRanges[index].0 >= localRanges[index - 1].1 else {
-            throw NativeNativeError.message("ZIP entries overlap each other.")
+    if localRanges.count > 1 {
+        for index in 1..<localRanges.count {
+            guard localRanges[index].0 >= localRanges[index - 1].1 else {
+                throw NativeNativeError.message("ZIP entries overlap each other.")
+            }
         }
     }
     return output
