@@ -46,6 +46,14 @@ test("Audiomack server errors are surfaced as source resolver failures", () => {
   assert.match(failure.message, /not proof that the URL is invalid or that an account is required/i);
 });
 
+
+test("Audiomack album invalid-track errors are a resolver failure, not an invalid user URL", () => {
+  const failure = classifyProviderFailure("audiomack", "ERROR: [audiomack:album] Invalid url for track 0 of album url https://audiomack.com/evadolee/album/promise-land");
+  assert.match(failure.message, /^SOURCE_UNAVAILABLE:/);
+  assert.match(failure.message, /legacy music endpoint rejected/i);
+  assert.doesNotMatch(failure.message, /evadolee/);
+});
+
 test("no downloadable format is not confused with an unsupported URL", () => {
   assert.match(classifyProviderFailure("Bandcamp", "Requested format is not available").message, /^NO_DOWNLOADABLE_FORMAT:/);
   assert.match(classifyProviderFailure("Unknown", "Unsupported URL").message, /^UNSUPPORTED_SOURCE:/);
