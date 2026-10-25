@@ -223,7 +223,7 @@ export function loadAiConfig(env: Env = process.env): AiConfig {
 export function isProviderConfigured(config: AiConfig, provider: ProviderId): boolean {
   if (!config.providerOrder.includes(provider)) return false;
   if (provider === "mock") return !config.production;
-  if (provider === "moss_music") return config.mossMusicEndpoint !== null && config.keys.moss_music !== null;
+  if (provider === "moss_music") return config.mossMusicEndpoint !== null && config.keys.moss_music !== null && config.keys.moss_music.reveal().length >= 32;
   return config.keys[provider] !== null;
 }
 
@@ -260,6 +260,7 @@ export function validateAiConfig(config: AiConfig): ConfigValidation {
     }
   }
   if ((config.mossMusicEndpoint === null) !== (config.keys.moss_music === null)) warnings.push("MOSS_MUSIC_ENDPOINT and MOSS_MUSIC_TOKEN must both be configured before the self-hosted MOSS-Music provider can run.");
+  if (config.keys.moss_music && config.keys.moss_music.reveal().length < 32) warnings.push("MOSS_MUSIC_TOKEN must be at least 32 characters; MOSS-Music remains unavailable until a longer random token is configured.");
   if (config.keys.gemini && config.geminiTier === "unknown") {
     warnings.push("AI_GEMINI_TIER is not set: Gemini is treated as a free tier that may use content to improve Google products, so privacy-sensitive tasks (images, audio, JSON) will not use it. Set AI_GEMINI_TIER=paid if billing is enabled.");
   }
