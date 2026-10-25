@@ -106,7 +106,7 @@ function signalLevels(samples: Float32Array): { peakDbfs: number | null; rmsDbfs
   };
 }
 
-function createMusicSampleWav(buffer: AudioBuffer): { bytes: Uint8Array; durationSeconds: number } {
+function createMusicSampleWav(buffer: AudioBuffer, monoChannel?: Float32Array): { bytes: Uint8Array; durationSeconds: number } {
   const targetRate = 16_000;
   const sectionSeconds = Math.min(20, Math.max(1, buffer.duration / 3));
   const starts = [
@@ -126,7 +126,7 @@ function createMusicSampleWav(buffer: AudioBuffer): { bytes: Uint8Array; duratio
   view.setUint16(22, 1, true); view.setUint32(24, targetRate, true); view.setUint32(28, targetRate * 2, true);
   view.setUint16(32, 2, true); view.setUint16(34, 16, true); writeText(36, "data"); view.setUint32(40, dataBytes, true);
 
-  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+  const channels = monoChannel ? [monoChannel] : Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
   let outIndex = 0;
   for (let section = 0; section < starts.length; section += 1) {
     const startFrame = Math.floor(starts[section] * buffer.sampleRate);
@@ -256,7 +256,7 @@ async function analyzeLocal(
           tempoBpm = estimateBpm(mono, decoded.sampleRate);
           key = estimateKey(mono, decoded.sampleRate);
           if (includeAi && mode === "full") {
-            const excerpt = createMusicSampleWav({ ...decoded, getChannelData: (index: number) => mono } as AudioBuffer);
+            const excerpt = createMusicSampleWav(decoded, mono);
             sampleDurationSeconds = excerpt.durationSeconds;
             if (excerpt.bytes.byteLength > 2_800_000) {
               aiWarning = "The sampled audio is too large for the current AI request limit.";
