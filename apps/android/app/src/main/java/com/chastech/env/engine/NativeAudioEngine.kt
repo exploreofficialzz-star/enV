@@ -19,6 +19,7 @@ object NativeAudioEngine {
     )
 
     fun operationFor(tool: ToolRecord): String? {
+        if (tool.id == "song-metadata-analyzer") return "song-metadata-analyzer"
         if (tool.id == "music-live-video-studio") return "live-video-studio"
         if (tool.id in setOf("music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet")) return "music-studio"
         if (tool.id == "audio-recorder") return "record-mic"
