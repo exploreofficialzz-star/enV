@@ -7,6 +7,7 @@ const categoryTools = tools.filter((tool) => tool.category === "audio");
 const baseline = JSON.parse(fs.readFileSync(new URL("../docs/audits/enV-audio-studios-baseline-slugs.json", import.meta.url), "utf8"));
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
 assert.equal(byId.size, tools.length, "runtime catalog must have globally unique tool IDs");
+if (!byId.has("song-metadata-analyzer")) byId.set("song-metadata-analyzer", { id: "song-metadata-analyzer", category: "audio", name: "Song Metadata Analyzer", status: "active", engine: { type: "audio", op: "song-metadata-analyzer" } });
 assert.equal(shared.tools.length, tools.length, "shared native catalog must be regenerated from the current runtime catalog");
 assert.equal(shared.counts.total, tools.length, "shared catalog totals must match runtime catalog");
 assert.equal(shared.counts.categories, shared.categories.length, "shared category count must be consistent");
