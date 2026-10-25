@@ -3618,11 +3618,27 @@ private func nativeMusicPostJSON(_ path: String, body: [String: Any]) async thro
     return object
 }
 
+private func nativeMusicCollectionPage(_ url: URL) -> Bool {
+    let segments = url.pathComponents.map { $0.lowercased() }
+    if segments.contains(where: { ["album", "albums", "playlist", "playlists", "sets"].contains($0) }) { return true }
+    let host = url.host?.lowercased() ?? ""
+    let youtube = host == "youtube.com" || host.hasSuffix(".youtube.com")
+    return youtube && (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "list" }) == true)
+}
+
 private func nativeMusicResolve(_ source: NativeMusicSourceTrack) async throws -> [NativeMusicSourceTrack] {
-    let info = try await nativeMusicPostJSON("info", body: [
-        "url": source.url.absoluteString,
-        "includePlaylist": true
-    ])
+    let info: [String: Any]
+    do {
+        info = try await nativeMusicPostJSON("info", body: [
+            "url": source.url.absoluteString,
+            "includePlaylist": true
+        ])
+    } catch {
+        // Retry a failed metadata lookup as audio only for an individual song.
+        // Never collapse a whole album or playlist into a single-track request.
+        if nativeMusicCollectionPage(source.url) { throw error }
+        return [source]
+    }
     let entries = info["entries"] as? [[String: Any]] ?? []
     if !entries.isEmpty {
         guard entries.count <= 50 else {
@@ -3637,8 +3653,7 @@ private func nativeMusicResolve(_ source: NativeMusicSourceTrack) async throws -
         if !resolved.isEmpty { return resolved }
     }
 
-    let path = source.url.path.lowercased()
-    let isCollection = (info["isPlaylist"] as? Bool == true) || path.contains("/album/") || path.contains("/playlist/")
+    let isCollection = (info["isPlaylist"] as? Bool == true) || nativeMusicCollectionPage(source.url)
     if isCollection {
         throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "enV could not find any downloadable tracks in this album or playlist. Check that the collection is public and supported by the source."])
     }
