@@ -35,7 +35,7 @@ function safeName(value, fallback = "download.bin") {
 function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
   return new Promise((resolve, reject) => {
     const playlistMode = includePlaylist ? "--yes-playlist" : "--no-playlist";
-    const child = spawn(YTDLP_BIN, [playlistMode, "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(YTDLP_BIN, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
