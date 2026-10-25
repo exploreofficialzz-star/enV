@@ -8,7 +8,7 @@ const musicDownloaderTool: ToolMeta = {
   id: "music-downloader",
   name: "Music Downloader",
   slug: "music-downloader",
-  description: "Download authorized direct audio files online, or organize music already on your device into offline album and playlist archives.",
+  description: "Download authorized tracks from supported public song, album and playlist pages or direct audio files, and organize music offline on your device.",
   category: "audio",
   subcategory: "Music",
   keywords: ["music", "downloader", "download", "offline", "online", "song", "track", "album", "playlist", "mp3", "audio file"],
