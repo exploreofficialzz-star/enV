@@ -58,6 +58,7 @@ export function getAiRuntime(): AiRuntime {
               outputTokens: event.usage.outputTokens,
               totalTokens: event.usage.totalTokens,
               audioSeconds: event.usage.audioSeconds,
+              computeSeconds: event.usage.computeSeconds ?? null,
               cached: event.cached,
               attempts: event.attempts,
               latencyMs: event.latencyMs,
