@@ -3613,7 +3613,7 @@ private struct NativeMusicDownloaderView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isWorking)
-                Text("Streaming links from Spotify, Apple Music, YouTube Music, Deezer, Amazon Music, TIDAL and SoundCloud are not direct audio files. Use each service’s official offline-download feature or supply a direct audio URL offered by the rights holder.")
+                Text("Streaming links from Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio are not direct audio files. Use each service’s official offline/download option or supply a direct audio URL offered by the rights holder.")
                     .font(.envScaled(size: 12))
                     .foregroundStyle(.secondary)
             } else {
@@ -3684,7 +3684,7 @@ private struct NativeMusicDownloaderView: View {
     private func validatedTracks() throws -> [(title: String, url: URL, ext: String)] {
         var result: [(title: String, url: URL, ext: String)] = []
         var seen = Set<String>()
-        let platformDomains = ["spotify.com", "apple.com", "youtube.com", "youtu.be", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com"]
+        let platformDomains = ["spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"]
         for (index, rawLine) in directURLs.components(separatedBy: .newlines).enumerated() {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.isEmpty || line.hasPrefix("#") { continue }
@@ -3754,7 +3754,7 @@ private struct NativeMusicDownloaderView: View {
                             }
                             if let finalURL = response.url {
                                 let host = (finalURL.host ?? "").lowercased().replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
-                                let protectedDomains = ["spotify.com", "apple.com", "youtube.com", "youtu.be", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com"]
+                                let protectedDomains = ["spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"]
                                 let isProtected = protectedDomains.contains { host == $0 || host.hasSuffix("." + $0) }
                                 let isIPLiteral = host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil || host.contains(":")
                                 let isLocalHost = host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
