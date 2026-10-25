@@ -7,6 +7,7 @@ import type {
   AltTextResult,
   CaptionResult,
   JsonExplainResult,
+  MusicClassificationResult,
   RegexExplainResult,
   SqlExplainResult,
   TitleResult,
@@ -33,6 +34,8 @@ export function AiResultView({ kind, result }: { kind: AiResultKind; result: unk
       return <AltTextView result={result as AltTextResult} />;
     case "transcript":
       return <TranscriptView result={result as TranscriptResult} />;
+    case "music-analysis":
+      return <MusicClassificationView result={result as MusicClassificationResult} />;
     default:
       return null;
   }
@@ -243,6 +246,52 @@ function TranscriptView({ result }: { result: TranscriptResult }) {
         ) : null}
       </div>
       {result.language ? <p className="text-xs text-muted">Detected language: {result.language}</p> : null}
+    </div>
+  );
+}
+
+
+function MusicClassificationView({ result }: { result: MusicClassificationResult }) {
+  const fields = [
+    { label: "Genre", value: result.genre },
+    { label: "Sub-style", value: result.sub_style },
+    { label: "Vocal style", value: result.vocal_style },
+  ];
+  const lists = [
+    { label: "Languages", values: result.language },
+    { label: "Mood", values: result.mood },
+    { label: "Instruments", values: result.instruments },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {fields.map((field) => (
+          <div key={field.label} className="min-w-0 rounded-lg border border-border bg-surface-2 p-3">
+            <p className="text-xs text-muted">{field.label}</p>
+            <p className="mt-1 break-words text-sm font-semibold">{field.value ?? "Not identified"}</p>
+          </div>
+        ))}
+        {lists.map((field) => (
+          <div key={field.label} className="min-w-0 rounded-lg border border-border bg-surface-2 p-3">
+            <p className="text-xs text-muted">{field.label}</p>
+            <p className="mt-1 break-words text-sm font-semibold">{field.values.length ? field.values.join(", ") : "Not identified"}</p>
+          </div>
+        ))}
+      </div>
+      {result.genre_candidates.length ? (
+        <Section title="Genre candidates">
+          <ul className="space-y-2 text-sm">
+            {result.genre_candidates.map((candidate, index) => (
+              <li key={candidate.label + "-" + index} className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+                <span className="break-words">{candidate.label}</span>
+                <span className="shrink-0 text-xs text-muted">{candidate.score === null ? "Score not supplied" : (candidate.score * 100).toFixed(1) + "% · model estimate"}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+      <p className="text-xs leading-5 text-muted">{result.note}</p>
+      <div className="flex justify-end"><CopyButton text={JSON.stringify(result, null, 2)} /></div>
     </div>
   );
 }
