@@ -308,7 +308,8 @@ export function validateModelRegistry(models: readonly ModelRecord[] = MODEL_REG
     if (!(COST_CLASSES as readonly string[]).includes(m.costClass)) fail("unknown cost class");
 
     const has = (c: (typeof CAPABILITIES)[number]) => m.capabilities.includes(c);
-    if (has("STRUCTURED_TEXT") !== (m.structuredOutput !== "none")) fail("STRUCTURED_TEXT capability and structuredOutput disagree");
+    if (has("STRUCTURED_TEXT") && m.structuredOutput === "none") fail("STRUCTURED_TEXT capability requires a structured-output mode");
+    if (!has("STRUCTURED_TEXT") && m.structuredOutput !== "none" && !has("AUDIO_UNDERSTANDING") && !has("VISION_ANALYSIS")) fail("structured output without a text, audio-understanding or vision capability");
     if (has("VISION_ANALYSIS") && !m.inputModalities.includes("image")) fail("vision model without image input");
     if (has("SPEECH_TO_TEXT")) {
       if (!m.inputModalities.includes("audio")) fail("speech model without audio input");
