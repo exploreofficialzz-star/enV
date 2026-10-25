@@ -87,7 +87,7 @@ for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]
 const payload = {
   schemaVersion: 1,
   catalogVersion,
-  counts: { total: tools.length, active, planned, categories: categories.length },
+  counts: { total: expandedTools.length, active, planned, categories: categories.length },
   categories,
   tools: expandedTools,
 };
