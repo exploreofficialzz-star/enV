@@ -60,7 +60,7 @@ function videoAdapter(format, provider) {
 export function createProviderAdapter(provider, format, audioOnly) {
   if (audioOnly) {
     const adapter = audioAdapter(format);
-    return { ...adapter, post: [...adapter.post, "--embed-metadata", "--embed-thumbnail"] };
+    return { ...adapter, post: [...adapter.post, "--embed-metadata"] };
   }
   return videoAdapter(format, provider);
 }
