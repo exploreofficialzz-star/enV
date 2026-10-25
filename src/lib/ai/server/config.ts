@@ -8,7 +8,7 @@
  * - Optional providers may be absent; the app and the deterministic tools keep working.
  */
 import { inspect } from "node:util";
-import { COST_CLASSES, PROVIDER_IDS } from "../types.ts";
+import { COST_CLASSES, COST_RANK, PROVIDER_IDS } from "../types.ts";
 import type { CostClass, ProviderId } from "../types.ts";
 
 export class SecretString {
@@ -260,6 +260,8 @@ export function validateAiConfig(config: AiConfig): ConfigValidation {
     }
   }
   if ((config.mossMusicEndpoint === null) !== (config.keys.moss_music === null)) warnings.push("MOSS_MUSIC_ENDPOINT and MOSS_MUSIC_TOKEN must both be configured before the self-hosted MOSS-Music provider can run.");
+  if (config.mossMusicEndpoint && config.keys.moss_music && config.keys.moss_music.reveal().length >= 32 && !config.providerOrder.includes("moss_music")) warnings.push("MOSS-Music is configured but not listed in AI_PROVIDER_ORDER, so audio tagging will not use it.");
+  if (config.mossMusicEndpoint && config.keys.moss_music && config.keys.moss_music.reveal().length >= 32 && COST_RANK[config.maxCostClass] < COST_RANK.STANDARD) warnings.push("MOSS-Music is a STANDARD-cost GPU model and is excluded by AI_MAX_COST_CLASS; set AI_MAX_COST_CLASS=STANDARD after reviewing the Modal budget.");
   if (config.keys.moss_music && config.keys.moss_music.reveal().length < 32) warnings.push("MOSS_MUSIC_TOKEN must be at least 32 characters; MOSS-Music remains unavailable until a longer random token is configured.");
   if (config.keys.gemini && config.geminiTier === "unknown") {
     warnings.push("AI_GEMINI_TIER is not set: Gemini is treated as a free tier that may use content to improve Google products, so privacy-sensitive tasks (images, audio, JSON) will not use it. Set AI_GEMINI_TIER=paid if billing is enabled.");
