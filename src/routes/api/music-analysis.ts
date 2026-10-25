@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { normalizeMusicModelClassification } from "@/lib/media/music-analysis-response";
+import { AI_LIMITS } from "@/lib/ai/contracts.ts";
+import { apiUrl } from "@/lib/api/base.ts";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 90_000;
@@ -68,18 +70,16 @@ function isRateLimited(request: Request): boolean {
 
 async function handleMusicAnalysis({ request }: { request: Request }): Promise<Response> {
   const endpointValue = String(process.env.MUSIC_ANALYSIS_ENDPOINT ?? "").trim();
-  if (!endpointValue) {
-    return errorResponse(503, "MUSIC_ANALYSIS_NOT_CONFIGURED", "AI tagging is not configured on this enV deployment. Local audio measurements are still available; configure MUSIC_ANALYSIS_ENDPOINT to enable model-based classification.");
-  }
-
-  let endpoint: URL;
-  try {
-    endpoint = new URL(endpointValue);
-  } catch {
-    return errorResponse(503, "MUSIC_ANALYSIS_CONFIGURATION_INVALID", "The configured music-analysis endpoint is not a valid URL.");
-  }
-  if (endpoint.protocol !== "https:") {
-    return errorResponse(503, "MUSIC_ANALYSIS_CONFIGURATION_INVALID", "MUSIC_ANALYSIS_ENDPOINT must use HTTPS in this deployment.");
+  let endpoint: URL | null = null;
+  if (endpointValue) {
+    try {
+      endpoint = new URL(endpointValue);
+    } catch {
+      return errorResponse(503, "MUSIC_ANALYSIS_CONFIGURATION_INVALID", "The configured music-analysis endpoint is not a valid URL.");
+    }
+    if (endpoint.protocol !== "https:") {
+      return errorResponse(503, "MUSIC_ANALYSIS_CONFIGURATION_INVALID", "MUSIC_ANALYSIS_ENDPOINT must use HTTPS in this deployment.");
+    }
   }
 
   const origin = request.headers.get("origin");
@@ -140,6 +140,89 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
     return errorResponse(415, "MUSIC_ANALYSIS_UNSUPPORTED_MEDIA", "The selected file does not appear to be a supported audio format.");
   }
 
+  if (!endpoint) {
+    if (file.size > AI_LIMITS.audioBytesMax) {
+      return errorResponse(413, "MUSIC_ANALYSIS_BUILTIN_LIMIT", "The built-in enV AI path accepts audio files up to 2.8 MB. Shorten/compress the clip or configure MUSIC_ANALYSIS_ENDPOINT for a separately hosted model.");
+    }
+    const extension = name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "";
+    const inferredMime: Record<string, string> = {
+      mp3: "audio/mpeg",
+      wav: "audio/wav",
+      m4a: "audio/mp4",
+      mp4: "audio/mp4",
+      ogg: "audio/ogg",
+      oga: "audio/ogg",
+      flac: "audio/flac",
+      webm: "audio/webm",
+    };
+    const mimeType = [file.type, inferredMime[extension]].find((value) => value && (AI_LIMITS.audioBytesMax > 0) && [
+      "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a",
+      "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/flac",
+    ].includes(value)) ?? "";
+    if (!mimeType) {
+      return errorResponse(415, "MUSIC_ANALYSIS_UNSUPPORTED_MEDIA", "The built-in AI path supports MP3, WAV, M4A, OGG, FLAC and WebM audio.");
+    }
+    try {
+      const audioBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+      const forwardedHeaders = new Headers({
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Sec-Fetch-Site": "same-origin",
+      });
+      const cookie = request.headers.get("cookie");
+      if (cookie) forwardedHeaders.set("Cookie", cookie);
+      const sourceIp = request.headers.get("cf-connecting-ip")
+        ?? request.headers.get("x-real-ip")
+        ?? request.headers.get("x-forwarded-for");
+      if (sourceIp) forwardedHeaders.set("X-Forwarded-For", sourceIp);
+      const upstream = await fetch(apiUrl("/api/ai/run"), {
+        method: "POST",
+        headers: forwardedHeaders,
+        body: JSON.stringify({
+          task: "music.analysis.classify",
+          input: { audioBase64, mimeType, filename: file.name },
+        }),
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        cache: "no-store",
+      });
+      const setCookie = upstream.headers.get("set-cookie");
+      const payload = await upstream.json().catch(() => null) as {
+        ok?: boolean;
+        data?: { result?: unknown };
+        error?: { code?: string; message?: string };
+      } | null;
+      if (!upstream.ok || !payload?.ok || payload.data?.result === undefined) {
+        const code = payload?.error?.code ?? "MUSIC_ANALYSIS_AI_UNAVAILABLE";
+        const message = payload?.error?.message ?? "enV's configured AI service could not classify this clip. Check its AI provider and model settings.";
+        const response = errorResponse(upstream.status || 502, code, message);
+        if (setCookie) response.headers.set("Set-Cookie", setCookie);
+        return response;
+      }
+      const classification = payload.data.result as Record<string, unknown>;
+      const hasUsableLabels = Boolean(
+        classification.genre
+        || classification.sub_style
+        || classification.vocal_style
+        || (Array.isArray(classification.language) && classification.language.length)
+        || (Array.isArray(classification.mood) && classification.mood.length)
+        || (Array.isArray(classification.instruments) && classification.instruments.length)
+        || (Array.isArray(classification.genre_candidates) && classification.genre_candidates.length)
+      );
+      if (!hasUsableLabels) return errorResponse(502, "MUSIC_ANALYSIS_NO_LABELS", "The AI service returned no recognized music tags. Try a clearer clip.");
+      const response = Response.json({ ok: true, classification }, {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      });
+      if (setCookie) response.headers.set("Set-Cookie", setCookie);
+      return response;
+    } catch (cause) {
+      const timedOut = cause instanceof Error && cause.name === "TimeoutError";
+      return errorResponse(timedOut ? 504 : 502, timedOut ? "MUSIC_ANALYSIS_TIMEOUT" : "MUSIC_ANALYSIS_AI_UNAVAILABLE", timedOut
+        ? "The configured enV AI service took too long to respond. Try a shorter clip."
+        : "The configured enV AI service could not be reached. Local measurements remain available.");
+    }
+  }
+
   const token = String(process.env.MUSIC_ANALYSIS_TOKEN ?? "").trim();
   const headers = new Headers({
     "Content-Type": file.type || "application/octet-stream",
@@ -148,7 +231,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
   if (token) headers.set("Authorization", "Bearer " + token);
 
   try {
-    const upstream = await fetch(endpoint, {
+    const upstream = await fetch(endpoint!, {
       method: "POST",
       headers,
       body: file,
