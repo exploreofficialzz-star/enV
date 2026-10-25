@@ -31,7 +31,7 @@ RUN node --check processor/server.mjs \
   && node --check processor/url-media-route.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
-  && node --check scripts/media/audiomack-page-parser.mjs
+  && node --check scripts/media/audiomack-page-parser.mjs \\
   && node --check scripts/media/provider-errors.mjs \
   && node --version \
   && ffmpeg -version >/dev/null \
