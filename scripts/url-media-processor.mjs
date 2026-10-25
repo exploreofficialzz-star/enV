@@ -551,7 +551,7 @@ async function handleDownload(req, res) {
   // On deployments with Audiomack consumer credentials, the official public
   // API returns fresh, short-lived media URLs for eligible tracks. Never turn
   // a stream-only response into a standalone download through a fallback.
-  if (provider === "audiomack" && audioOnly && audiomackApiConfigured()) {
+  if (provider === "audiomack" && audioOnly && ["mp3", "best"].includes(String(format)) && audiomackApiConfigured()) {
     try {
       const sourceUrl = await resolveAudiomackOfficialAudio(url.toString(), controller.signal);
       if (sourceUrl) {
