@@ -65,7 +65,7 @@ test("vision needs an explicit cost ceiling AND a paid-tier or free-tier acknowl
 });
 
 test("MOSS-Music is eligible for audio tagging only when endpoint, token and STANDARD cost class are configured", () => {
-  const base = { MOSS_MUSIC_ENDPOINT: "https://private.modal.run/analyze", MOSS_MUSIC_TOKEN: "test-private-token-long-enough", AI_MAX_COST_CLASS: "STANDARD" };
+  const base = { MOSS_MUSIC_ENDPOINT: "https://private.modal.run/analyze", MOSS_MUSIC_TOKEN: "test-private-token-long-enough-12345", AI_MAX_COST_CLASS: "STANDARD" };
   assert.deepEqual(keys(context(base), "audio.music.analyze"), ["moss_music:MOSS-Music-8B-Instruct"]);
   assert.deepEqual(keys(context({ ...base, AI_MAX_COST_CLASS: "LOW" }), "audio.music.analyze"), []);
   assert.deepEqual(keys(context({ ...base, MOSS_MUSIC_TOKEN: "" }), "audio.music.analyze"), []);
