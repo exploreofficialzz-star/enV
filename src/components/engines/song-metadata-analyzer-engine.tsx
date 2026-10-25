@@ -8,7 +8,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
 import { MUSIC_AUDIO_EXTENSIONS } from "@/lib/media/music-downloader-policy";
 import {
-  inspectAudioHeader, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
+  crc32, inspectAudioHeader, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
 } from "@/lib/media/song-metadata-analyzer";
 import { amplitudeDbfs, estimateBpm, estimateKey, rms } from "@/lib/engines/audio-studio";
 import { bytesToBase64, fetchAiAvailability, runAiTask } from "@/lib/ai/client/ai-client";
@@ -435,6 +435,7 @@ export function SongMetadataAnalyzerEngine() {
               if (entry.isDirectory || !MUSIC_AUDIO_EXTENSIONS.has(extensionOf(entry.name))) continue;
               const data = inflated[entry.name];
               if (!data || data.byteLength !== entry.uncompressedSize) throw new Error("An archive entry failed its size check.");
+              if (crc32(data) !== entry.crc32) throw new Error("An archive entry failed its CRC checksum.");
               if (data.byteLength > limits.maxTrackBytes) throw new Error(`${entry.name} exceeds the per-track limit.`);
               extractedBytes += data.byteLength;
               if (extractedBytes > limits.maxExpandedBytes) throw new Error("Expanded audio exceeds the batch limit.");
