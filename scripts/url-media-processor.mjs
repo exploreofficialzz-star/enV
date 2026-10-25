@@ -322,7 +322,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
 
 async function handleInfo(req, res) {
   const body = await readJson(req);
-  const { url: rawUrl, provider: requestedProvider } = body;
+  const { url: rawUrl, provider: requestedProvider, includePlaylist = false } = body;
   const { url, provider } = providerForUrl(rawUrl);
   if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
