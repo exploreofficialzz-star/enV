@@ -415,6 +415,7 @@ export function SongMetadataAnalyzerEngine() {
           }
           try {
             const zipBytes = new Uint8Array(await file.arrayBuffer());
+            const zipAdditions: File[] = [];
             const inspection = inspectSongZip(zipBytes, {
               maxZipBytes: limits.maxZipBytes,
               maxExpandedBytes: limits.maxExpandedBytes,
@@ -431,13 +432,17 @@ export function SongMetadataAnalyzerEngine() {
               if (data.byteLength > limits.maxTrackBytes) throw new Error(`${entry.name} exceeds the per-track limit.`);
               extractedBytes += data.byteLength;
               if (extractedBytes > limits.maxExpandedBytes) throw new Error("Expanded audio exceeds the batch limit.");
+              if (accepted >= SONG_ANALYZER_LIMITS.maxTracks) throw new Error("A ZIP may contain at most 50 audio tracks.");
               const safeName = entry.name.replace(/\\/g, "/").split("/").filter(Boolean).join(" — ");
-              additions.push(new File([data], safeName, { type: mimeForExtension(extensionOf(entry.name)) }));
+              const fileBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+              zipAdditions.push(new File([fileBuffer], safeName, { type: mimeForExtension(extensionOf(entry.name)) }));
               accepted += 1;
-              if (accepted > SONG_ANALYZER_LIMITS.maxTracks) throw new Error("A ZIP may contain at most 50 audio tracks.");
             }
             if (!accepted) warnings.push(`${file.name}: no supported audio tracks found.`);
-            else warnings.push(`${file.name}: added ${accepted} audio track${accepted === 1 ? "" : "s"}.`);
+            else {
+              additions.push(...zipAdditions);
+              warnings.push(`${file.name}: added ${accepted} audio track${accepted === 1 ? "" : "s"}.`);
+            }
           } catch (zipError) {
             warnings.push(`${file.name}: ${zipError instanceof Error ? zipError.message : "ZIP could not be read"}`);
           }
@@ -563,7 +568,8 @@ export function SongMetadataAnalyzerEngine() {
       "processing-issues.json": strToU8(JSON.stringify(failed, null, 2)),
     };
     const zip = zipSync(archive, { level: 6 });
-    downloadBlob(new Blob([zip], { type: "application/zip" }), "song-analysis-report.zip");
+    const zipBuffer = zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer;
+    downloadBlob(new Blob([zipBuffer], { type: "application/zip" }), "song-analysis-report.zip");
   }
 
   const selectedReport = selected?.report;
