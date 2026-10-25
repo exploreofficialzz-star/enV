@@ -83,14 +83,15 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
   }
 
   const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).origin !== new URL(request.url).origin) {
-        return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "Music analysis requests must come from the enV application origin.");
-      }
-    } catch {
-      return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "The request origin could not be validated.");
+  if (!origin) {
+    return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "Submit model analysis from the enV application interface.");
+  }
+  try {
+    if (new URL(origin).origin !== new URL(request.url).origin) {
+      return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "Music analysis requests must come from the enV application origin.");
     }
+  } catch {
+    return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "The request origin could not be validated.");
   }
   if (isRateLimited(request)) {
     return errorResponse(429, "MUSIC_ANALYSIS_RATE_LIMITED", "Too many model requests from this connection. Try again in a few minutes.");
@@ -150,7 +151,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
     const upstream = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: await file.arrayBuffer(),
+      body: file,
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       cache: "no-store",
     });
