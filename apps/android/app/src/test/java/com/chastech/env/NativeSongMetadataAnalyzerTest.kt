@@ -28,7 +28,7 @@ class NativeSongMetadataAnalyzerTest {
         val result = extractNativeSongZip(zip)
         assertEquals(1, result.size)
         assertEquals("album — track.mp3", result.single().name)
-        assertArrayEquals(audio, result.single().bytes)
+        assertArrayEquals(audio, result.single().bytes!!)
     }
 
     @Test
