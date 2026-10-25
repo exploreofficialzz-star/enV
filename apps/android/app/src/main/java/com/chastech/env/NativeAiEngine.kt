@@ -272,17 +272,17 @@ object NativeAiEngine {
                 "Instruments" to result.optJSONArray("instruments")?.let { array -> (0 until array.length()).joinToString(", ") { array.optString(it) } }.orEmpty().ifBlank { null },
                 "Vocal style" to result.optString("vocal_style", "").takeIf { it.isNotBlank() && it != "null" },
             )
-            append(labels.joinToString("\\n") { (label, value) -> "$label: ${value ?: "Not identified"}" })
+            append(labels.joinToString("\n") { (label, value) -> "$label: ${value ?: "Not identified"}" })
             val candidates = result.optJSONArray("genre_candidates")
             if (candidates != null && candidates.length() > 0) {
-                append("\\n\\nGenre candidates")
+                append("\n\nGenre candidates")
                 for (index in 0 until candidates.length()) {
                     val candidate = candidates.optJSONObject(index) ?: continue
                     val score = if (candidate.isNull("score")) "score unavailable" else "${(candidate.optDouble("score") * 100).let { String.format("%.1f", it) }}%"
-                    append("\\n• ${candidate.optString("label")}: $score")
+                    append("\n• ${candidate.optString("label")}: $score")
                 }
             }
-            append("\\n\\n").append(result.optString("note", "AI-generated tags are estimates; review uncertain labels."))
+            append("\n\n").append(result.optString("note", "AI-generated tags are estimates; review uncertain labels."))
         }
         "video.transcript.generate" -> buildString { append(result.optString("text")); val segments=result.optJSONArray("segments"); if (segments != null && segments.length()>0) { appendLine(); appendLine(); appendLine("Timestamped segments"); for (i in 0 until minOf(segments.length(), 1000)) { val s=segments.optJSONObject(i) ?: continue; appendLine("${formatTime(s.optDouble("start"))} → ${formatTime(s.optDouble("end"))}: ${s.optString("text")}") } } }.trim()
         else -> result.toString()
