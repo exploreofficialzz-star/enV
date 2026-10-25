@@ -343,6 +343,7 @@ async function analyzeLocal(
       status: semantic ? "full" : mode === "quick" ? "quick" : "partial",
       local_audio_decoded: decodedSuccessfully,
       semantic_analysis: semantic ? "completed" : mode === "quick" ? "skipped_by_choice" : "unavailable",
+      genre_source: semantic?.genre ? "music_model" : embeddedGenre ? "embedded_tag" : "unavailable",
       excerpt_seconds_sent_to_ai: sampleDurationSeconds,
       ai_request_id: aiRequestId,
       tempo_source: tempoBpm !== null ? "audio_estimate" : bpmFromTag !== null ? "embedded_tag" : "unavailable",
@@ -597,7 +598,7 @@ export function SongMetadataAnalyzerEngine() {
           >
             <Upload size={23} className="mb-2 text-primary" />
             <strong className="text-sm">Drop songs or a ZIP here</strong>
-            <span className="mt-1 text-xs text-muted-foreground">MP3, WAV, FLAC, M4A, OGG and more</span>
+            <span className="mt-1 text-xs text-muted-foreground">MP3, WAV, FLAC, M4A, OGG · browser support varies</span>
             <input
               ref={pickerRef} type="file" multiple
               accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,.aiff,.aif,.wma,.webm,.zip,audio/*,application/zip"
@@ -627,7 +628,7 @@ export function SongMetadataAnalyzerEngine() {
               </label>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className={`size-2 rounded-full ${aiAvailability === true ? "bg-emerald-500" : aiAvailability === false ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
-                {aiAvailability === true ? "AI available" : aiAvailability === false ? "AI not configured · Quick Scan still works" : "Checking AI setup…"}
+                {aiAvailability === true ? "AI available" : aiAvailability === false ? "AI unavailable · Quick Scan still works" : "Checking AI setup…"}
               </div>
             </div>
           )}
@@ -641,7 +642,7 @@ export function SongMetadataAnalyzerEngine() {
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
               : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" title="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">Files stay on your device unless you enable Full Analysis.</p>
+          <p className="text-[11px] text-muted-foreground">Local by default. Full Analysis sends short excerpts after consent.</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
@@ -698,8 +699,8 @@ export function SongMetadataAnalyzerEngine() {
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { label: "Tempo", value: selectedReport.tempo_bpm ? `${selectedReport.tempo_bpm} BPM` : "—" },
-              { label: "Key", value: selectedReport.key || "—" },
+              { label: selectedReport.tempo_source === "audio_estimate" ? "Est. BPM" : selectedReport.tempo_source === "embedded_tag" ? "Tag BPM" : "Tempo", value: selectedReport.tempo_bpm ? `${selectedReport.tempo_bpm} BPM` : "—" },
+              { label: selectedReport.analysis.key_source === "audio_estimate" ? "Est. key" : "Key", value: selectedReport.key || "—" },
               { label: "Duration", value: durationLabel(selectedReport.technical.duration_seconds) },
               { label: "Energy", value: selectedReport.energy === "unknown" ? "—" : selectedReport.energy },
             ].map((item) => <div key={item.label} className="rounded-xl bg-surface-2 p-3"><span className="block text-[11px] text-muted-foreground">{item.label}</span><strong className="mt-1 block truncate text-sm capitalize">{item.value}</strong></div>)}
