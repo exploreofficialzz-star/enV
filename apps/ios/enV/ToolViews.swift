@@ -5700,6 +5700,27 @@ enum NativeAiEngine {
             if let long = result["longDescription"] as? String, !long.isEmpty { text += "\n\n\(long)" }
             if result["containsText"] as? Bool == true, let found = result["textInImage"] as? String, !found.isEmpty { text += "\n\nText in image: \(found)" }
             return text
+        case "music.analysis.classify":
+            let languages = (result["language"] as? [String] ?? []).joined(separator: ", ")
+            let moods = (result["mood"] as? [String] ?? []).joined(separator: ", ")
+            let instruments = (result["instruments"] as? [String] ?? []).joined(separator: ", ")
+            let fields: [(String, String?)] = [
+                ("Genre", result["genre"] as? String),
+                ("Sub-style", result["sub_style"] as? String),
+                ("Languages", languages.isEmpty ? nil : languages),
+                ("Mood", moods.isEmpty ? nil : moods),
+                ("Instruments", instruments.isEmpty ? nil : instruments),
+                ("Vocal style", result["vocal_style"] as? String)
+            ]
+            var text = fields.map { $0.0 + ": " + ($0.1 ?? "Not identified") }.joined(separator: "\n")
+            if let candidates = result["genre_candidates"] as? [[String:Any]], !candidates.isEmpty {
+                text += "\n\nGenre candidates\n" + candidates.map { item in
+                    let score = (item["score"] as? NSNumber).map { String(format: "%.1f%%", $0.doubleValue * 100) } ?? "score unavailable"
+                    return "• \(item["label"] as? String ?? "Unknown"): \(score)"
+                }.joined(separator: "\n")
+            }
+            text += "\n\n" + (result["note"] as? String ?? "AI-generated tags are estimates; review uncertain labels.")
+            return text
         case "video.transcript.generate": return result["text"] as? String ?? ""
         default: return ""
         }
