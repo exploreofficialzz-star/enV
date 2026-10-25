@@ -2693,6 +2693,10 @@ private struct NativeSongMetadataAnalyzerView: View {
                 var scan = try await Task.detached(priority: .userInitiated) {
                     try nativeSongAnalyzeAudio(track.data, filename: track.filename)
                 }.value
+                if Task.isCancelled {
+                    updateTrack(track.id) { $0.status = "Cancelled" }
+                    continue
+                }
                 var semanticDone = false
                 if fullAnalysis && uploadConsent {
                     if let excerpt = nativeSongAudioExcerpt(scan.monoSamples16k) {
@@ -2712,6 +2716,10 @@ private struct NativeSongMetadataAnalyzerView: View {
                         nativeSongAppendWarning(&scan.report, "Audio is too short for semantic analysis.")
                     }
                 }
+                if Task.isCancelled {
+                    updateTrack(track.id) { $0.status = "Cancelled" }
+                    continue
+                }
                 let status = fullAnalysis && !semanticDone ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
                 updateTrack(track.id) {
                     $0.report = scan.report
@@ -2723,8 +2731,14 @@ private struct NativeSongMetadataAnalyzerView: View {
             }
             progress = Int(Double(index + 1) / Double(max(1, queue.count)) * 100)
         }
-        if Task.isCancelled { notice = "Stopped. Completed results are kept." }
-        else if notice.isEmpty { notice = "Batch complete." }
+        if Task.isCancelled {
+            for track in queue where track.status == "Queued" || track.status == "Analyzing" {
+                updateTrack(track.id) { $0.status = "Cancelled" }
+            }
+            notice = "Stopped. Completed results are kept."
+        } else if notice.isEmpty {
+            notice = "Batch complete."
+        }
         busy = false
         currentTask = nil
     }
@@ -2978,12 +2992,15 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
     let diskNumber = try u16(end + 4)
     let centralDisk = try u16(end + 6)
     guard diskNumber == 0 && centralDisk == 0 else { throw NativeNativeError.message("Split ZIP archives are not supported.") }
+    let entriesOnDisk = try u16(end + 8)
     let entryCount = try u16(end + 10)
+    guard entriesOnDisk == entryCount else { throw NativeNativeError.message("ZIP directory entry counts do not match.") }
     let dirSize = try u32(end + 12)
     let dirOffset = try u32(end + 16)
     guard entryCount <= 500 && dirOffset + dirSize <= end else { throw NativeNativeError.message("ZIP entry list is too large or damaged.") }
     var cursor = dirOffset
     var seen = Set<String>()
+    var localRanges: [(Int, Int)] = []
     var expanded = 0
     var output = [NativeSongAnalysisTrack]()
     for _ in 0..<entryCount {
@@ -3007,7 +3024,7 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
         guard let decodedName = String(data: nameData, encoding: .utf8), !decodedName.isEmpty else { throw NativeNativeError.message("ZIP filenames must be UTF-8.") }
         let name = decodedName.replacingOccurrences(of: "\\", with: "/")
         guard name.count <= 1024 && !name.hasPrefix("/") && !name.split(separator: "/").contains("..") &&
-            !name.split(separator: "/").contains(".") && !name.unicodeScalars.contains(where: { $0.value < 32 }) &&
+            !name.split(separator: "/").contains(".") && !name.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) &&
             !name.hasPrefix("~") && name.range(of: #"^[A-Za-z]:"# , options: .regularExpression) == nil else {
             throw NativeNativeError.message("ZIP contains an unsafe path.")
         }
@@ -3025,6 +3042,7 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
         guard localFlags == flags && localMethod == method && payloadEnd <= dirOffset && payloadEnd >= payloadStart else { throw NativeNativeError.message("ZIP payload is outside the archive bounds.") }
         let localName = Data(bytes[(localOffset + 30)..<(localOffset + 30 + localNameLen)])
         guard localName == nameData else { throw NativeNativeError.message("ZIP local filename does not match.") }
+        localRanges.append((localOffset, payloadEnd))
         cursor = next
         if name.hasSuffix("/") { continue }
         guard uncompressedSize <= 20 * 1024 * 1024 else { throw NativeNativeError.message("ZIP entry exceeds 20 MB.") }
@@ -3054,6 +3072,12 @@ private func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrac
         guard output.count <= 50 else { throw NativeNativeError.message("ZIP contains more than 50 audio files.") }
     }
     guard cursor == dirOffset + dirSize else { throw NativeNativeError.message("ZIP directory has unexpected trailing data.") }
+    localRanges.sort { $0.0 < $1.0 }
+    for index in 1..<localRanges.count {
+        guard localRanges[index].0 >= localRanges[index - 1].1 else {
+            throw NativeNativeError.message("ZIP entries overlap each other.")
+        }
+    }
     return output
 }
 
