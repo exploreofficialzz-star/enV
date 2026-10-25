@@ -6,10 +6,19 @@ const PROTECTED_PLATFORMS = [
   { label: "Spotify", domains: ["spotify.com", "open.spotify.com"] },
   { label: "Apple Music", domains: ["music.apple.com", "apple.com"] },
   { label: "YouTube Music", domains: ["music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com"] },
+  { label: "Audiomack", domains: ["audiomack.com"] },
+  { label: "Boomplay", domains: ["boomplay.com"] },
   { label: "Deezer", domains: ["deezer.com"] },
   { label: "Amazon Music", domains: ["music.amazon.com", "amazon.com"] },
   { label: "TIDAL", domains: ["tidal.com"] },
   { label: "SoundCloud", domains: ["soundcloud.com"] },
+  { label: "Pandora", domains: ["pandora.com"] },
+  { label: "Mixcloud", domains: ["mixcloud.com"] },
+  { label: "Anghami", domains: ["anghami.com"] },
+  { label: "Qobuz", domains: ["qobuz.com"] },
+  { label: "Napster", domains: ["napster.com"] },
+  { label: "JioSaavn", domains: ["jiosaavn.com"] },
+  { label: "iHeartRadio", domains: ["iheart.com"] },
 ];
 
 export type MusicCollectionEntry = { title: string; url: string; line: number };
