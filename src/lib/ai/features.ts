@@ -170,6 +170,19 @@ export const AI_FEATURES: readonly AiFeature[] = [
     ],
   },
   {
+    toolId: "audio-analyze-studio",
+    taskId: "music.analysis.classify",
+    title: "Identify genre and tags with AI",
+    description: "Upload a short music clip to estimate genre, sub-style, audible languages, mood, instruments and vocal style. Predictions can be wrong; local signal analysis works without AI.",
+    actionLabel: "Identify music tags",
+    resultKind: "json",
+    requiresConsent: true,
+    consentLabel: "I understand this audio recording will be sent to enV AI for classification.",
+    fields: [
+      { name: "audio", label: "Music audio", kind: "audio", required: true, accept: "audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac", help: "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB." },
+    ],
+  },
+  {
     toolId: "video-audio-extractor",
     taskId: "video.transcript.generate",
     title: "Transcribe audio with AI",
