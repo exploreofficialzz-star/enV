@@ -44,7 +44,7 @@ class AccessibilityUiAuditTest {
     fun homeScreenHasUsableSearchAndFrameworkAccessibilityChecks() {
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
-        composeRule.onNodeWithText("A focused toolkit for\\neveryday work.").assertIsDisplayed()
+        composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
 
         // Compose 1.8+ runs Android Accessibility Test Framework checks on the real semantics tree.
         // Failures are diagnostic evidence (labels, target size, contrast, traversal), not source heuristics.
