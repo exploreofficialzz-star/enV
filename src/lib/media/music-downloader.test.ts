@@ -6,6 +6,7 @@ import {
   protectedMusicPlatform,
   validateDirectMusicUrl,
 } from "./music-downloader-policy.ts";
+import { extractMusicMetadata } from "./music-metadata.ts";
 
 test("accepts direct HTTPS audio files and preserves query strings", () => {
   const result = validateDirectMusicUrl("https://cdn.example.org/artist/track.MP3?download=1");
@@ -62,4 +63,64 @@ test("parses titled rows, ignores M3U comments, deduplicates, and caps batch siz
 
 test("rejects malformed JSON manifests", () => {
   assert.match(parseMusicCollectionLines("[not json]").error ?? "", /invalid/);
+});
+
+
+function id3TextFrame(id: string, value: string): Uint8Array {
+  const text = new TextEncoder().encode(value);
+  const payload = new Uint8Array(text.length + 1);
+  payload[0] = 3;
+  payload.set(text, 1);
+  const frame = new Uint8Array(10 + payload.length);
+  for (let index = 0; index < 4; index += 1) frame[index] = id.charCodeAt(index);
+  const size = payload.length;
+  frame[4] = (size >>> 24) & 0xff;
+  frame[5] = (size >>> 16) & 0xff;
+  frame[6] = (size >>> 8) & 0xff;
+  frame[7] = size & 0xff;
+  frame.set(payload, 10);
+  return frame;
+}
+
+function id3Fixture(frames: Uint8Array[]): Uint8Array {
+  const size = frames.reduce((sum, frame) => sum + frame.length, 0);
+  const header = new Uint8Array(10);
+  header.set([0x49, 0x44, 0x33, 3, 0, 0]);
+  header[6] = (size >>> 21) & 0x7f;
+  header[7] = (size >>> 14) & 0x7f;
+  header[8] = (size >>> 7) & 0x7f;
+  header[9] = size & 0x7f;
+  const output = new Uint8Array(10 + size);
+  output.set(header, 0);
+  let offset = 10;
+  for (const frame of frames) {
+    output.set(frame, offset);
+    offset += frame.length;
+  }
+  return output;
+}
+
+test("extracts embedded ID3 title, artist, album, year, genre, track and duration", () => {
+  const bytes = id3Fixture([
+    id3TextFrame("TIT2", "Northern Lights"),
+    id3TextFrame("TPE1", "Mira Stone"),
+    id3TextFrame("TALB", "After Hours"),
+    id3TextFrame("TDRC", "2024-06-18"),
+    id3TextFrame("TCON", "Alternative"),
+    id3TextFrame("TRCK", "03/11"),
+    id3TextFrame("TLEN", "242000"),
+  ]);
+  const metadata = extractMusicMetadata(bytes, "fallback.mp3");
+  assert.equal(metadata.title, "Northern Lights");
+  assert.equal(metadata.artist, "Mira Stone");
+  assert.equal(metadata.album, "After Hours");
+  assert.equal(metadata.year, "2024");
+  assert.equal(metadata.genre, "Alternative");
+  assert.equal(metadata.trackNumber, "03/11");
+  assert.equal(metadata.durationSeconds, 242);
+});
+
+test("uses a readable filename as the title when the audio contains no title tag", () => {
+  const metadata = extractMusicMetadata(new Uint8Array(), "Northern%20Lights.mp3");
+  assert.equal(metadata.title, "Northern Lights");
 });
