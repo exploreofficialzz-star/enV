@@ -240,18 +240,23 @@ async function analyzeLocal(
       if (decoded.duration > 15 * 60) {
         warnings.push("Track is longer than 15 minutes; signal analysis was skipped to protect device memory.");
       } else {
-        const memoryBytes = decoded.length * decoded.numberOfChannels * 4;
+        const memoryBytes = decoded.length * (decoded.numberOfChannels + 1) * 4;
         if (memoryBytes > 180 * 1024 * 1024) {
           warnings.push("Decoded audio exceeds the local memory budget; tempo/key analysis was skipped.");
         } else {
-          const primaryChannel = decoded.getChannelData(0);
-          const levels = signalLevels(primaryChannel);
+          // Analyze a downmixed signal so instruments on the right channel are not ignored.
+          const mono = new Float32Array(decoded.length);
+          for (let channelIndex = 0; channelIndex < decoded.numberOfChannels; channelIndex += 1) {
+            const channel = decoded.getChannelData(channelIndex);
+            for (let frame = 0; frame < channel.length; frame += 1) mono[frame] += channel[frame] / decoded.numberOfChannels;
+          }
+          const levels = signalLevels(mono);
           peakDbfs = levels.peakDbfs;
           rmsDbfs = levels.rmsDbfs;
-          tempoBpm = estimateBpm(primaryChannel, decoded.sampleRate);
-          key = estimateKey(primaryChannel, decoded.sampleRate);
+          tempoBpm = estimateBpm(mono, decoded.sampleRate);
+          key = estimateKey(mono, decoded.sampleRate);
           if (includeAi && mode === "full") {
-            const excerpt = createMusicSampleWav(decoded);
+            const excerpt = createMusicSampleWav({ ...decoded, getChannelData: (index: number) => mono } as AudioBuffer);
             sampleDurationSeconds = excerpt.durationSeconds;
             if (excerpt.bytes.byteLength > 2_800_000) {
               aiWarning = "The sampled audio is too large for the current AI request limit.";
