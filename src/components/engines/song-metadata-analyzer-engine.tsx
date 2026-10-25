@@ -449,6 +449,7 @@ export function SongMetadataAnalyzerEngine() {
             let accepted = 0;
             for (const entry of inspection.entries) {
               if (entry.isDirectory || !MUSIC_AUDIO_EXTENSIONS.has(extensionOf(entry.name))) continue;
+              if (entry.uncompressedSize <= 0) throw new Error("ZIP contains an empty audio track: " + entry.name);
               const data = inflated[entry.name];
               if (!data || data.byteLength !== entry.uncompressedSize) throw new Error("An archive entry failed its size check.");
               if (crc32(data) !== entry.crc32) throw new Error("An archive entry failed its CRC checksum.");
