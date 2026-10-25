@@ -26,9 +26,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 APP_NAME = "env-moss-music"
 MODEL_REPO = "OpenMOSS-Team/MOSS-Music-8B-Instruct"
-# Hugging Face model revision observed on 2026-10-25. Update deliberately after reviewing
-# the upstream model card/code, then rerun tag-quality and output-contract tests.
-MODEL_REVISION = "fce7f83"
+# Resolve the upstream ref to an immutable commit SHA on the first download. The resolved
+# SHA is written to the persistent volume manifest, avoiding an invented or stale pin.
+MODEL_REVISION = "main"
+MODEL_MANIFEST = "/models/MOSS-Music-8B-Instruct/.env-model-manifest.json"
 # Official OpenMOSS SGLang commit selected for reproducible MOSS-Audio/MOSS-Music serving.
 SGLANG_REVISION = "6c3a99cf413f623541aae7ee14744f5a3c062a47"
 MODEL_DIR = "/models/MOSS-Music-8B-Instruct"
