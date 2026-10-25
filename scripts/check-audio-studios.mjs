@@ -111,7 +111,7 @@ for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
 }
-for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_NOT_CONFIGURED", "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification"]) {
+for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_NOT_CONFIGURED", "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "MUSIC_ANALYSIS_NO_LABELS", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification"]) {
   assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
 }
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
