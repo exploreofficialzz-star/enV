@@ -190,8 +190,10 @@ export function MusicDownloaderEngine() {
         setProgress("Downloading " + (index + 1) + " of " + parsed.entries.length + ": " + (entry.title || ("track " + (index + 1))));
         try {
           const track = await fetchTrack(entry, controller.signal);
+          if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
+            throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ". Split it into smaller batches.");
+          }
           totalBytes += track.bytes.byteLength;
-          if (totalBytes > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ". Split it into smaller batches.");
           tracks.push(track);
         } catch (cause) {
           if ((cause as Error)?.name === "AbortError") throw cause;

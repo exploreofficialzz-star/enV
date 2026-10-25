@@ -3752,6 +3752,16 @@ private struct NativeMusicDownloaderView: View {
                             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                                 throw NSError(domain: "enVMusicDownloader", code: 8, userInfo: [NSLocalizedDescriptionKey: "The source returned an unsuccessful HTTP response."])
                             }
+                            if let finalURL = response.url {
+                                let host = (finalURL.host ?? "").lowercased().replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
+                                let protectedDomains = ["spotify.com", "apple.com", "youtube.com", "youtu.be", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com"]
+                                let isProtected = protectedDomains.contains { host == $0 || host.hasSuffix("." + $0) }
+                                let isIPLiteral = host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil || host.contains(":")
+                                let isLocalHost = host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
+                                guard finalURL.scheme?.lowercased() == "https", !isProtected, !isIPLiteral, !isLocalHost else {
+                                    throw NSError(domain: "enVMusicDownloader", code: 15, userInfo: [NSLocalizedDescriptionKey: "The source redirected to an insecure, local, or protected streaming host."])
+                                }
+                            }
                             let mime = (http.mimeType ?? "").lowercased()
                             guard mime.hasPrefix("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream" else {
                                 throw NSError(domain: "enVMusicDownloader", code: 9, userInfo: [NSLocalizedDescriptionKey: "The source did not return a direct audio file."])

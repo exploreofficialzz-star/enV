@@ -47,11 +47,8 @@ function isPrivateOrLocalHost(host: string): boolean {
   if (!ipv4) return normalized.includes(":");
   const octets = ipv4.slice(1).map(Number);
   if (octets.some((part) => part < 0 || part > 255)) return true;
-  const [a, b] = octets;
-  return a === 0 || a === 10 || a === 127 || a >= 224 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168);
+  // Match native Android/iOS behavior: never accept IP literals, even public ones.
+  return true;
 }
 
 export function isSafeMusicOrigin(raw: string): { ok: true; url: string } | { ok: false; reason: string; platform?: string } {

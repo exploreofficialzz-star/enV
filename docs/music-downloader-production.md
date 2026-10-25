@@ -15,7 +15,7 @@ The Web client needs CORS permission from the remote host to read remote respons
 
 ## Validation and security
 
-The Web policy rejects non-HTTPS URLs, embedded URL credentials, protected service pages, local hostnames, IP-literal hosts and unsupported file extensions. The UI uses credential-free fetches, follows redirects only after applying the final-host safety policy, bounds response sizes, and rejects HTML/video MIME types. The native implementations validate public HTTPS source URLs and extension, reject known streaming-page domains, and do not embed service secrets or session tokens.
+The Web policy rejects non-HTTPS URLs, embedded URL credentials, protected service pages, local hostnames, IP-literal hosts and unsupported file extensions. The UI uses credential-free fetches, follows redirects only after applying the final-host safety policy, bounds response sizes, and rejects HTML/video MIME types. The native implementations validate public HTTPS source URLs and extension, reject IP literals and known streaming-page domains, and validate the final response URL after redirects. They do not embed service secrets or session tokens.
 
 The Android download queue validates HEAD responses before enqueueing. A source that does not expose a supported content type or a usable content length is rejected with an actionable error. The iOS direct download validates HTTP status, content type, file size, and the app-managed destination. Offline import validates audio extensions and bounded file size before copying into the app library.
 

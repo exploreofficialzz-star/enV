@@ -21,6 +21,7 @@ test("rejects non-HTTPS URLs, web pages, IP literals, and local hosts", () => {
   assert.equal(validateDirectMusicUrl("https://cdn.example.org/playlist/123").ok, false);
   assert.equal(isSafeMusicOrigin("https://127.0.0.1/track.mp3").ok, false);
   assert.equal(isSafeMusicOrigin("https://router.local/track.mp3").ok, false);
+  assert.equal(isSafeMusicOrigin("https://8.8.8.8/track.mp3").ok, false);
 });
 
 test("recognizes protected streaming pages without treating them as audio downloads", () => {
