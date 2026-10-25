@@ -6,7 +6,7 @@ const MUSIC_DOWNLOADER_META = {
   id: "music-downloader",
   name: "Music Downloader",
   slug: "music-downloader",
-  description: "Download authorized direct audio files online, or package tracks already on your device for offline use.",
+  description: "Download authorized tracks from supported public song, album and playlist pages or direct audio files, and organize music offline on your device.",
   category: "audio",
   icon: "Download",
   popularity: 10000,
