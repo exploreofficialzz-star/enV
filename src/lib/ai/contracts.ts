@@ -12,6 +12,7 @@ export const AI_TASK_IDS = [
   "developer.json.explain",
   "image.alt.generate",
   "video.transcript.generate",
+  "audio.music.analyze",
   "assistant.chat",
 ] as const;
 export type AiTaskId = (typeof AI_TASK_IDS)[number];
@@ -80,6 +81,21 @@ export interface TranscriptResult {
   durationSeconds: number | null;
   segments: { start: number; end: number; text: string }[];
 }
+export interface MusicAnalysisResult {
+  genre: string | null;
+  sub_style: string | null;
+  language: string[];
+  energy: "low" | "mid" | "high" | "very_high" | "unknown";
+  mood: string[];
+  theme: string[];
+  setting: string[];
+  vocals: string[];
+  instruments: string[];
+  descriptions: string[];
+  lyric_evidence: string;
+  warnings: string[];
+}
+
 export interface AssistantChatResult {
   reply: string;
   recommendedToolIds: string[];
@@ -93,5 +109,6 @@ export interface AiTaskResultMap {
   "developer.json.explain": JsonExplainResult;
   "image.alt.generate": AltTextResult;
   "video.transcript.generate": TranscriptResult;
+  "audio.music.analyze": MusicAnalysisResult;
   "assistant.chat": AssistantChatResult;
 }
