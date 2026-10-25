@@ -15,6 +15,16 @@ export const PROVIDERS = {
   hearthis: ["hearthis.at"],
   bandlab: ["bandlab.com"],
   boomplay: ["boomplay.com"],
+  zingmp3: ["zingmp3.vn"],
+  netease: ["music.163.com"],
+  "yandex-music": ["music.yandex.com", "music.yandex.ru"],
+  archive: ["archive.org"],
+  audioboom: ["audioboom.com"],
+  reverbnation: ["reverbnation.com"],
+  soundclick: ["soundclick.com"],
+  spreaker: ["spreaker.com"],
+  podomatic: ["podomatic.com"],
+  freesound: ["freesound.org"],
 };
 const PROVIDER_BY_HOST = new Map(
   Object.entries(PROVIDERS).flatMap(([provider, hosts]) => hosts.map((host) => [host, provider])),
