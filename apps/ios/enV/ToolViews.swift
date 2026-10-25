@@ -3551,6 +3551,14 @@ private struct NativeMusicLiveVideoStudioView: View {
     }
 }
 
+private let nativeMusicProviderPageDomains = [
+    "youtube.com", "youtu.be", "youtube-nocookie.com", "tiktok.com", "facebook.com", "fb.watch",
+    "instagram.com", "x.com", "twitter.com", "audiomack.com", "soundcloud.com", "bandcamp.com",
+    "mixcloud.com", "audius.co", "jamendo.com", "hearthis.at", "bandlab.com", "boomplay.com",
+    "zingmp3.vn", "music.163.com", "music.yandex.com", "music.yandex.ru", "archive.org",
+    "audioboom.com", "reverbnation.com", "soundclick.com", "spreaker.com", "podomatic.com", "freesound.org"
+]
+
 private struct NativeMusicSourceTrack: Sendable {
     let title: String
     let url: URL
@@ -3558,7 +3566,13 @@ private struct NativeMusicSourceTrack: Sendable {
     let isProviderPage: Bool
 }
 
-private let nativeMusicAPIEndpoint = URL(string: "https://env-q3mq.onrender.com/api/backend/url-media")!
+private var nativeMusicAPIEndpoint: URL {
+    let configured = (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let candidate = URL(string: configured)
+    let base = candidate.flatMap { $0.host == nil ? nil : $0 } ?? URL(string: "https://env-q3mq.onrender.com")!
+    return ["api", "backend", "url-media"].reduce(base) { $0.appendingPathComponent($1) }
+}
 
 private func nativeMusicAPIError(_ data: Data, status: Int) -> NSError {
     if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -3837,10 +3851,14 @@ private struct NativeMusicDownloaderView: View {
             }
             let extCandidate = url.pathExtension.lowercased()
             let isDirectAudio = extensions.contains(extCandidate)
+            let isProviderPage = !isDirectAudio && nativeMusicProviderPageDomains.contains { host == $0 || host.hasSuffix("." + $0) }
+            guard isDirectAudio || isProviderPage else {
+                throw NSError(domain: "enVMusicDownloader", code: 16, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): use a supported public song, album or playlist page, or a direct HTTPS audio-file URL ending in .mp3, .m4a, .flac or .wav."])
+            }
             let ext = isDirectAudio ? extCandidate : "mp3"
             let normalizedTitle = title.isEmpty ? (url.lastPathComponent.isEmpty ? "Track \(index + 1)" : url.lastPathComponent) : title
             if seen.insert(url.absoluteString.lowercased()).inserted {
-                result.append(NativeMusicSourceTrack(title: normalizedTitle, url: url, ext: ext, isProviderPage: !isDirectAudio))
+                result.append(NativeMusicSourceTrack(title: normalizedTitle, url: url, ext: ext, isProviderPage: isProviderPage))
             }
         }
         guard !result.isEmpty else {
