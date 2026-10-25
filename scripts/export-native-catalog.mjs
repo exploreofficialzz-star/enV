@@ -45,9 +45,6 @@ const exportedTools = [
   ...runtimeCatalogExtensions.filter((extension) =>
     extension.platformRuntimeExtension !== true && !tools.some((tool) => tool.id === extension.id)),
 ];
-const catalogToolIds = new Set(exportedTools.map((tool) => tool.id));
-const exportedAndroidToolIds = new Set([...androidToolIds].filter((id) => catalogToolIds.has(id)));
-const exportedIosToolIds = new Set([...iosToolIds].filter((id) => catalogToolIds.has(id)));
 const categoryIds = new Set(categories.map((category) => category.id));
 if (categoryIds.size !== categories.length) {
   throw new Error("Category IDs in src/data/categories.ts must be unique.");
@@ -88,6 +85,9 @@ const iosToolIds = readImplementedIds(
   "apps/ios/native-tool-coverage.txt",
   "apps/ios/native-family-coverage",
 );
+const catalogToolIds = new Set(exportedTools.map((tool) => tool.id));
+const exportedAndroidToolIds = new Set([...androidToolIds].filter((id) => catalogToolIds.has(id)));
+const exportedIosToolIds = new Set([...iosToolIds].filter((id) => catalogToolIds.has(id)));
 const toolsById = new Map(expandedTools.map((tool) => [tool.id, tool]));
 for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]) {
   const invalid = [...ids].filter((id) => !toolsById.has(id) || toolsById.get(id).status === "planned");
