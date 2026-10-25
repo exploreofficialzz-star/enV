@@ -3059,6 +3059,7 @@ func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
         }
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
         guard nativeSongExtensions.contains(ext) else { continue }
+        guard uncompressedSize > 0 else { throw NativeNativeError.message("ZIP contains an empty audio track.") }
         let compressed = Data(bytes[payloadStart..<payloadEnd])
         let unpacked: Data
         if method == 0 {
