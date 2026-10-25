@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { amplitudeDbfs, approximateLufs, browserSeparationLimitSeconds, estimateBpm, estimateBitrateKbpsFromSize, estimateBrowserSeparationWorkingSetBytes, estimateCompressedAudioBytes, estimateKey, estimatePcmAudioBytes, humReduceSamples, isSupportedDemucsStemTensorDims, noiseGateSamples, rms, suggestCapoShapes, suggestDiatonicChords, trimSilenceBounds } from "./audio-studio.ts";
 import { analyzeMusicAudio } from "./music-analysis.ts";
+import { normalizeMusicModelClassification } from "../media/music-analysis-response.ts";
 
 test("audio analysis uses correct amplitude and RMS dBFS math", () => {
   assert.equal(amplitudeDbfs(1), 0);
@@ -142,4 +143,49 @@ test("Music Analyzer handles silence and short signals without fabricating tempo
 test("Music Analyzer rejects invalid sample rate and mismatched channel lengths", () => {
   assert.throws(() => analyzeMusicAudio({ channels: [new Float32Array(8)], sampleRate: 0, fileName: "bad.wav", fileSizeBytes: 8 }), /Sample rate/);
   assert.throws(() => analyzeMusicAudio({ channels: [new Float32Array(8), new Float32Array(7)], sampleRate: 8000, fileName: "bad.wav", fileSizeBytes: 8 }), /same frame count/);
+});
+
+test("music model response normalizer preserves semantic tags and clamps scores", () => {
+  const result = normalizeMusicModelClassification({
+    classification: {
+      genre: "Afrobeats", sub_style: "Afro-pop", language: ["Pidgin", "Yoruba"],
+      mood: ["upbeat"], instruments: ["drums", "bass"], vocal_style: "melodic",
+      genre_candidates: [{ label: "Afrobeats", score: 1.2 }, { label: "Pop", score: -0.2 }],
+    },
+  });
+  assert.equal(result.genre, "Afrobeats");
+  assert.equal(result.sub_style, "Afro-pop");
+  assert.deepEqual(result.language, ["Pidgin", "Yoruba"]);
+  assert.deepEqual(result.mood, ["upbeat"]);
+  assert.deepEqual(result.instruments, ["drums", "bass"]);
+  assert.equal(result.vocal_style, "melodic");
+  assert.deepEqual(result.genre_candidates.map((candidate) => candidate.score), [1, 0]);
+  assert.equal(result.status, "model_completed");
+});
+
+test("music model response normalizer accepts classifier arrays but never invents absent tags", () => {
+  const result = normalizeMusicModelClassification([
+    { label: "Electronic", score: 0.75 },
+    { label: "Rock", score: 0.3 },
+  ]);
+  assert.equal(result.genre, "Electronic");
+  assert.deepEqual(result.genre_candidates.map((candidate) => candidate.label), ["Electronic", "Rock"]);
+  assert.equal(result.sub_style, null);
+  assert.deepEqual(result.language, []);
+  assert.deepEqual(result.mood, []);
+  assert.deepEqual(result.instruments, []);
+});
+
+test("music model response normalizer rejects malformed labels and non-finite scores", () => {
+  const result = normalizeMusicModelClassification({ predictions: [
+    { label: " ", score: 0.5 },
+    { label: "Vocal", score: Number.NaN },
+    { class: "Percussive", confidence: 2 },
+    "not an object",
+  ] });
+  assert.deepEqual(result.genre_candidates, [
+    { label: "Vocal", score: null },
+    { label: "Percussive", score: 1 },
+  ]);
+  assert.equal(result.genre, "Vocal");
 });
