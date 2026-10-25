@@ -47,7 +47,9 @@ test("provider failures have shared actionable diagnostics and are bundled into 
   const errors = await source("../scripts/media/provider-errors.mjs");
   const docker = await source("../processor/Dockerfile");
   assert.match(processor, /classifyProviderFailure\(provider, detail/);
-  assert.match(errors, /Audiomack's legacy extractor API is returning an empty or invalid JSON response/);
+  assert.match(errors, /Audiomack returned an empty or invalid JSON response from its track resolver/);
+  assert.match(errors, /SOURCE_CHALLENGE/);
+  assert.match(processor, /classifyProviderFailure\(provider, detail/);
   assert.match(errors, /RATE_LIMITED/);
   assert.match(errors, /AUTH_REQUIRED/);
   assert.match(docker, /COPY scripts\/media\/provider-errors\.mjs/);
