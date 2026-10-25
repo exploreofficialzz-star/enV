@@ -10,6 +10,7 @@ final class CatalogCoreTests: XCTestCase {
         let tool = extended.tools.first { $0.id == "music-downloader" }
         XCTAssertEqual(tool?.category, "audio")
         XCTAssertEqual(tool?.engine.id, "music-downloader")
+        XCTAssertEqual(tool?.engine.type, "audio")
     }
 
 

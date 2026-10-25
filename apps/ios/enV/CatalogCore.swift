@@ -201,7 +201,7 @@ extension Catalog {
             status: "active",
             disclaimer: nil,
             related: ["audio-file-inspector", "music-studio", "audio-to-wav"],
-            engine: ToolEngine(type: "custom", id: "music-downloader", op: "music-downloader", configuration: [:])
+            engine: ToolEngine(type: "audio", id: "music-downloader", op: "music-downloader", configuration: [:])
         )
         return Catalog(
             schemaVersion: schemaVersion,
