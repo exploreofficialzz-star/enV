@@ -10,6 +10,7 @@ import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
+import { shouldTryGenericExtractor, genericExtractorArgs } from "./media/extraction-strategy.mjs";
 import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
@@ -66,6 +67,22 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
       resolve({ stdout, stderr });
     });
   });
+}
+
+async function runYtdlpWithGenericFallback(args, cwd, signal, provider, includePlaylist = false) {
+  try {
+    return await runYtdlp(args, cwd, signal, provider, includePlaylist);
+  } catch (error) {
+    if (!shouldTryGenericExtractor(error, includePlaylist) || signal?.aborted) throw error;
+    console.warn(`[url-media] provider=${provider} extractor metadata failed; trying generic public HTML media extraction once`);
+    try {
+      return await runYtdlp(genericExtractorArgs(args), cwd, signal, provider, false);
+    } catch {
+      // Preserve the original provider-specific diagnostic instead of hiding
+      // it under the less-specific generic HTML extractor's final error.
+      throw error;
+    }
+  }
 }
 
 function runFfprobe(file, signal) {
@@ -487,7 +504,7 @@ async function handleInfo(req, res) {
     ];
     let stdout;
     try {
-      ({ stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
+      ({ stdout } = await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
     } catch (error) {
       // The provider extractor can be outdated even when an artist offers a
       // direct file on the public song page. Use this safe, opt-in HTML fallback
@@ -601,7 +618,7 @@ async function handleDownload(req, res) {
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
     const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
     try {
-      await runYtdlp(args, jobDir, controller.signal, provider);
+      await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider);
     } catch (error) {
       const code = String(error?.message || "");
       if (!/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) throw error;
