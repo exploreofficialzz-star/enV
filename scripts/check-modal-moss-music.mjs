@@ -13,7 +13,7 @@ const syntax = spawnSync(python, [
   sourcePath,
 ], { encoding: "utf8" });
 assert.equal(syntax.error, undefined, "Python is required to syntax-check the Modal service: " + (syntax.error?.message ?? ""));
-assert.equal(syntax.status, 0, \`Modal service Python syntax check failed:\n\${syntax.stdout}\n\${syntax.stderr}\`);
+assert.equal(syntax.status, 0, "Modal service Python syntax check failed:\n" + syntax.stdout + "\n" + syntax.stderr);
 
 const requirements = [
   ["pinned MOSS-Music repository", /OpenMOSS-Team\/MOSS-Music-8B-Instruct/],
