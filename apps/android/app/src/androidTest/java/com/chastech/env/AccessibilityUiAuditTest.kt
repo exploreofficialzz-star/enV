@@ -3,6 +3,7 @@ package com.chastech.env
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -18,8 +19,18 @@ class AccessibilityUiAuditTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<MainActivity>()
 
+    private fun awaitHomeScreenReady() {
+        // The activity first shows a launch state while CatalogGate reads its bundled
+        // catalog on Dispatchers.IO. Wait for the actual home tree before testing it.
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithText("A focused toolkit for\\neveryday work.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun primaryActionsExposeNamesAndSearchNavigationWorks() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithContentDescription("Home").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Saved tools").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Tools").assertIsDisplayed().assertIsEnabled()
@@ -34,6 +45,7 @@ class AccessibilityUiAuditTest {
     @Test
     @SdkSuppress(minSdkVersion = 34)
     fun homeScreenHasUsableSearchAndFrameworkAccessibilityChecks() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
