@@ -53,7 +53,7 @@ private fun musicSafeName(raw: String, fallback: String): String =
     raw.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "-").trim().take(90).ifBlank { fallback }
 
 private fun musicProtectedHost(host: String): Boolean {
-    val domains = listOf("spotify.com", "apple.com", "youtube.com", "youtu.be", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com")
+    val domains = listOf("spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com")
     return domains.any { host == it || host.endsWith(".$it") }
 }
 
@@ -310,6 +310,6 @@ fun NativeMusicDownloaderScreen() {
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Text("Protected Spotify, Apple Music, YouTube Music and other streaming pages are not extracted. Use those services' official offline downloads or supply direct downloadable audio from a rights holder. Limits: 50 tracks, 50 MB per track, 200 MB per offline import.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Protected streaming pages from Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio are not extracted. Use each service's official offline/download option, or supply direct audio from a rights holder. Limits: 50 tracks, 50 MB per track, 200 MB per import.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
