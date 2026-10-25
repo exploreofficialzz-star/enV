@@ -37,7 +37,9 @@ export function buildGeminiBody(request: AdapterRequest): Record<string, unknown
   const parts = request.user.map((part) => {
     if (part.type === "text") return { text: part.text };
     if (part.type === "image") return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
-    if (part.type === "audio") return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
+    if (part.type === "audio" && request.capability === "AUDIO_ANALYSIS") {
+      return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
+    }
     throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
   });
   const generationConfig: Record<string, unknown> = { temperature: request.temperature, maxOutputTokens: request.maxOutputTokens };
