@@ -397,7 +397,7 @@ fun NativeSongMetadataAnalyzerScreen() {
 
 private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSongSource> {
     val result = mutableListOf<NativeSongSource>()
-    val seen = mutableSetOf<String>()
+    val seenUris = mutableSetOf<String>()
     var bytesTotal = 0L
     for (uri in uris) {
         val info = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
@@ -410,7 +410,7 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
         } ?: ("audio-file" to -1L)
         val name = info.first
         val lower = name.lowercase(Locale.ROOT)
-        if (!seen.add(name)) continue
+        if (!seenUris.add(uri.toString())) continue
         if (lower.endsWith(".zip")) {
             val zipBytes = (context.contentResolver.openInputStream(uri) ?: error("Cannot open $name.")).use { readBoundedContent(it, SONG_MAX_ZIP_BYTES.toLong()) }
             val extracted = extractNativeSongZip(zipBytes)
@@ -425,11 +425,23 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
         val ext = lower.substringAfterLast('.', "")
         if (ext !in nativeSongExtensions && context.contentResolver.getType(uri)?.startsWith("audio/") != true) continue
         val size = info.second
-        if (size == 0L || size > SONG_MAX_TRACK_BYTES) continue
-        if (size > 0) bytesTotal += size
+        require(size != 0L) { "$name is empty." }
+        require(size < 0L || size <= SONG_MAX_TRACK_BYTES) { "$name exceeds the 20 MB track limit." }
         require(result.size < SONG_MAX_TRACKS) { "Choose up to 50 tracks." }
-        require(bytesTotal <= SONG_MAX_BATCH_BYTES) { "Batch exceeds 60 MB." }
-        result += NativeSongSource(name = name, uri = uri, sizeBytes = size.coerceAtLeast(0))
+        if (size < 0L) {
+            // Some document providers omit SIZE. Read bounded bytes now so the batch cap stays real.
+            val bytes = (context.contentResolver.openInputStream(uri) ?: error("Cannot open $name.")).use {
+                readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong())
+            }
+            require(bytes.isNotEmpty()) { "$name is empty." }
+            bytesTotal += bytes.size
+            require(bytesTotal <= SONG_MAX_BATCH_BYTES) { "Batch exceeds 60 MB." }
+            result += NativeSongSource(name = name, bytes = bytes, sizeBytes = bytes.size.toLong())
+        } else {
+            bytesTotal += size
+            require(bytesTotal <= SONG_MAX_BATCH_BYTES) { "Batch exceeds 60 MB." }
+            result += NativeSongSource(name = name, uri = uri, sizeBytes = size)
+        }
     }
     return result
 }
@@ -624,6 +636,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
         val stream = item.uri?.let { context.contentResolver.openInputStream(it) } ?: error("Cannot open ${item.name}.")
         stream.use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) }
     }
+    require(item.sizeBytes <= 0L || item.sizeBytes == bytes.size.toLong()) { "File size changed after import. Add the track again." }
     require(bytes.isNotEmpty()) { "This file is empty." }
     require(bytes.size <= SONG_MAX_TRACK_BYTES) { "This track exceeds 20 MB." }
     val temp = File.createTempFile("env-song-", ".audio", context.cacheDir)
