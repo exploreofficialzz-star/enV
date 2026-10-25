@@ -177,6 +177,7 @@ async function downloadMusicTrack(
     url,
     audioOnly: !directLink,
     format: directLink ? "best" : "mp3",
+    maxBytes: MAX_TRACK_BYTES,
   }, signal);
   if (!blob.size) throw new Error("The source returned an empty audio file.");
   if (blob.size > MAX_TRACK_BYTES) throw new Error("A track exceeds " + formatFileSize(MAX_TRACK_BYTES) + ".");
@@ -254,8 +255,8 @@ export function MusicDownloaderEngine() {
               controller.signal,
               setProgress,
             );
+            if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
             totalBytes += track.bytes.byteLength;
-            if (totalBytes > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
             tracks.push(track);
             continue;
           }
@@ -294,8 +295,8 @@ export function MusicDownloaderEngine() {
                 controller.signal,
                 (message) => setProgress(message + " · track " + (tracks.length + 1)),
               );
+              if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
               totalBytes += track.bytes.byteLength;
-              if (totalBytes > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
               tracks.push(track);
             } catch (cause) {
               if ((cause as Error)?.name === "AbortError") throw cause;
