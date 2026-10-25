@@ -18,7 +18,8 @@ test("generic extraction never bypasses account/DRM, bot protection, network lim
   for (const code of ["AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "PRIVATE_CONTENT", "RATE_LIMITED", "NETWORK_TIMEOUT", "SERVER_CAPACITY"]) {
     assert.equal(shouldTryGenericExtractor(new Error(code + ": blocked")), false, code);
   }
-  assert.equal(shouldTryGenericExtractor(new Error("SOURCE_UNAVAILABLE: invalid metadata JSON"), true), true);
+  assert.equal(shouldTryGenericExtractor(new Error("SOURCE_UNAVAILABLE: invalid metadata JSON")), true);
+  assert.equal(shouldTryGenericExtractor(new Error("SOURCE_UNAVAILABLE: invalid metadata JSON"), true), false);
   assert.equal(shouldTryGenericExtractor(new Error("PROVIDER_ERROR: bad request"), true), false);
   assert.equal(shouldTryGenericExtractor(new Error("SOURCE_UNAVAILABLE: empty metadata JSON"), true), false);
 });
