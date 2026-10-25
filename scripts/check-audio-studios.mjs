@@ -97,6 +97,18 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
     assert.ok(processor.toLowerCase().includes(marker.toLowerCase()), `native WAV processor is missing ${marker}`);
   }
 }
+const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
+const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
+const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
+for (const marker of ["Analyze on this device", "Export JSON", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here"]) {
+  assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
+}
+for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
+  assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
+}
+for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_NOT_CONFIGURED"]) {
+  assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
+}
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);
