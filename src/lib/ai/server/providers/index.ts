@@ -5,6 +5,7 @@ import { createGeminiAdapter } from "./gemini.ts";
 import { createGroqAdapter } from "./groq.ts";
 import type { FetchLike } from "./http.ts";
 import { createMockAdapter } from "./mock.ts";
+import { createMossMusicAdapter } from "./moss_music.ts";
 import { createOpenRouterAdapter } from "./openrouter.ts";
 
 export type AdapterSet = Partial<Record<ProviderId, ProviderAdapter>>;
@@ -15,6 +16,13 @@ export function createAdapters(config: AiConfig, fetchImpl?: FetchLike): Adapter
   if (config.keys.openrouter) adapters.openrouter = createOpenRouterAdapter({ apiKey: key("openrouter"), fetchImpl });
   if (config.keys.groq) adapters.groq = createGroqAdapter({ apiKey: key("groq"), fetchImpl });
   if (config.keys.gemini) adapters.gemini = createGeminiAdapter({ apiKey: key("gemini"), fetchImpl });
+  if (config.mossMusicEndpoint && config.keys.moss_music) {
+    adapters.moss_music = createMossMusicAdapter({
+      endpoint: () => config.mossMusicEndpoint,
+      token: () => config.keys.moss_music?.reveal() ?? null,
+      fetchImpl,
+    });
+  }
   if (!config.production && config.providerOrder.includes("mock")) adapters.mock = createMockAdapter();
   return adapters;
 }
