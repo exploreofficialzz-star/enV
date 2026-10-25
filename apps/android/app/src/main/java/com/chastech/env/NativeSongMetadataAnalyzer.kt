@@ -378,7 +378,7 @@ fun NativeSongMetadataAnalyzerScreen() {
                         nativeMetric("Key", report.optString("key").takeIf { it.isNotBlank() && it != "null" } ?: "—")
                         nativeMetric("Energy", report.optString("energy").takeIf { it.isNotBlank() && it != "unknown" } ?: "—")
                     }
-                    nativeTagList("STYLE", report.optString("genre"), report.optString("sub_style"), jsonStringList(report.optJSONArray("language")))
+                    nativeTagList("STYLE", report.optString("genre"), report.optString("sub_style"), *jsonStringList(report.optJSONArray("language")).toTypedArray())
                     nativeTagList("MOOD", *jsonStringList(report.optJSONArray("mood")).toTypedArray())
                     nativeTagList("THEMES", *jsonStringList(report.optJSONArray("theme")).toTypedArray())
                     nativeTagList("VOCALS", *jsonStringList(report.optJSONArray("vocals")).toTypedArray())
