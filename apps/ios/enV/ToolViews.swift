@@ -1977,7 +1977,7 @@ enum NativeAudioWavProcessor {
             ],
             "rhythm": [
                 "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
-                "method": "10 ms RMS-energy novelty autocorrelation; best-effort estimate",
+                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate",
                 "status": tempo == nil ? "unavailable" : "estimated"
             ],
             "tonality": [
