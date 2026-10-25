@@ -3,6 +3,7 @@ package com.chastech.env
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -20,6 +21,12 @@ class AccessibilityUiAuditTest {
 
     @Test
     fun primaryActionsExposeNamesAndSearchNavigationWorks() {
+        // The native catalog is parsed off the UI thread before EnVApp (and its navigation
+        // controls) replaces the launch screen. Wait for that explicit ready-state signal.
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithContentDescription("Home")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithContentDescription("Home").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Saved tools").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Tools").assertIsDisplayed().assertIsEnabled()
