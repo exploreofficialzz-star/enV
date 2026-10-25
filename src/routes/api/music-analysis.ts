@@ -209,7 +209,11 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
         if (setCookie) response.headers.set("Set-Cookie", setCookie);
         return response;
       }
-      const classification = payload.data.result as Record<string, unknown>;
+      const result = payload.data.result;
+      if (!result || typeof result !== "object" || Array.isArray(result)) {
+        return errorResponse(502, "MUSIC_ANALYSIS_INVALID_AI_RESULT", "The AI service returned a result in an unexpected format.");
+      }
+      const classification = result as Record<string, unknown>;
       const hasUsableLabels = Boolean(
         classification.genre
         || classification.sub_style
