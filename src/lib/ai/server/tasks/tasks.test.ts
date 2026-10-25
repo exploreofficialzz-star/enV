@@ -232,5 +232,5 @@ test("music classification requires a supported audio signature and bounded inpu
   assert.ok(bad("music.analysis.classify", { audioBase64: Buffer.alloc(180, 1).toString("base64"), mimeType: "audio/mpeg" }).length > 0);
   assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/unknown" }).length > 0);
   assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "x".repeat(121) }).length > 0);
-  assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", extra: "ignored by the schema" }).length === 0);
+  assert.ok(ok("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", extra: "ignored by the schema" }).user.length > 0);
 });
