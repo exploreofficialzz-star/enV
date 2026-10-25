@@ -14,7 +14,7 @@ const MUSIC_DOWNLOADER_META = {
   clientSide: true,
   status: "active",
   isNew: true,
-  keywords: ["music", "download", "offline", "online", "album", "playlist", "audio file"],
+  keywords: ["music", "download", "offline", "online", "album", "playlist", "audio file", "spotify", "apple music", "youtube music", "audiomack", "boomplay", "deezer", "amazon music", "tidal", "soundcloud", "pandora", "mixcloud", "anghami", "qobuz", "napster", "jiosaavn", "iheart radio"],
   tags: ["music", "download", "album", "playlist", "offline", "online", "audio"],
   detailShard: "00",
 };
