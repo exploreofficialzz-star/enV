@@ -163,8 +163,8 @@ private fun musicApiBase(): String {
 
 private fun musicApiError(status: Int, body: String): String {
     val parsed = runCatching { JSONObject(body) }.getOrNull()
-    val message = parsed?.optString("message")?.takeIf { it.isNotBlank() && it != "null" }
-        ?: parsed?.optString("error")?.takeIf { it.isNotBlank() && it != "null" }
+    val message = parsed?.optString("message")?.takeIf { it.isNotBlank() && it.lowercase(Locale.ROOT) !in setOf("true", "false", "null") }
+        ?: parsed?.optString("error")?.takeIf { it.isNotBlank() && it.lowercase(Locale.ROOT) !in setOf("true", "false", "null") }
     return message ?: "enV media service returned HTTP $status. Please retry or use an authorized direct audio URL."
 }
 
@@ -430,6 +430,9 @@ fun NativeMusicDownloaderScreen() {
                                     }
                                 }
 
+                                require(providerTrackCount + directTracks.size <= 50) {
+                                    "This collection has more than 50 tracks. Split it into smaller batches."
+                                }
                                 var checkedBytes = providerBytes
                                 directTracks.forEach { track ->
                                     checkedBytes += preflightMusicTrack(track)
