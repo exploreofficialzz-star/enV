@@ -334,15 +334,9 @@ async function handleInfo(req, res) {
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
   if (provider === "generic") {
-    try {
-      const info = await inspectDirectUrl(url, controller.signal);
-      json(res, 200, info);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.startsWith("UNSUPPORTED_SOURCE:") && !message.startsWith("SOURCE_UNAVAILABLE:")) throw error;
-      // Give yt-dlp's registered extractors a chance on public provider pages that are not direct files.
-    }
+    const info = await inspectDirectUrl(url, controller.signal);
+    json(res, 200, info);
+    return;
   }
 
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-url-info-"));
@@ -428,15 +422,8 @@ async function handleDownload(req, res) {
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
   if (provider === "generic") {
-    try {
-      await inspectDirectUrl(url, controller.signal);
-      await handleDirectDownload(req, res, url, body, controller.signal);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.startsWith("UNSUPPORTED_SOURCE:") && !message.startsWith("SOURCE_UNAVAILABLE:")) throw error;
-      // Public pages can still be handled by a registered yt-dlp extractor below.
-    }
+    await handleDirectDownload(req, res, url, body, controller.signal);
+    return;
   }
 
   const supportedFormats = new Set(["mp4", "webm", "mp3", "m4a", "best"]);
