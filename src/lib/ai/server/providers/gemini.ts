@@ -1,4 +1,4 @@
-/** SERVER ONLY. Google Gemini adapter (generateContent REST API, image input, JSON schema output). */
+/** SERVER ONLY. Google Gemini adapter (generateContent REST API, image/audio input, JSON schema output). */
 import { AiError } from "../../errors.ts";
 import type { AdapterRequest, AdapterResult, Capability, FinishReason, JsonSchema, ProviderAdapter } from "../../types.ts";
 import { asRecord, numberOrNull, postForJson } from "./http.ts";
@@ -6,7 +6,7 @@ import type { FetchLike } from "./http.ts";
 
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-const GEMINI_CAPABILITIES: readonly Capability[] = ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS"];
+const GEMINI_CAPABILITIES: readonly Capability[] = ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS", "AUDIO_ANALYSIS"];
 
 /** Keywords the Gemini structured-output schema subset is known to accept. Everything else is dropped. */
 const KEPT_KEYS = new Set(["type", "properties", "required", "items", "enum", "minItems", "maxItems", "minimum", "maximum", "description", "title", "anyOf"]);
@@ -37,6 +37,7 @@ export function buildGeminiBody(request: AdapterRequest): Record<string, unknown
   const parts = request.user.map((part) => {
     if (part.type === "text") return { text: part.text };
     if (part.type === "image") return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
+    if (part.type === "audio") return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
     throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
   });
   const generationConfig: Record<string, unknown> = { temperature: request.temperature, maxOutputTokens: request.maxOutputTokens };
