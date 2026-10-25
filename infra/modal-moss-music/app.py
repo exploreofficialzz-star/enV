@@ -29,6 +29,8 @@ MODEL_REPO = "OpenMOSS-Team/MOSS-Music-8B-Instruct"
 # Hugging Face model revision observed on 2026-10-25. Update deliberately after reviewing
 # the upstream model card/code, then rerun tag-quality and output-contract tests.
 MODEL_REVISION = "fce7f83"
+# Official OpenMOSS SGLang commit selected for reproducible MOSS-Audio/MOSS-Music serving.
+SGLANG_REVISION = "6c3a99cf413f623541aae7ee14744f5a3c062a47"
 MODEL_DIR = "/models/MOSS-Music-8B-Instruct"
 SGLANG_URL = "http://127.0.0.1:30000"
 MAX_AUDIO_BYTES = 2_800_000
@@ -48,7 +50,10 @@ sglang_image = (
     )
     .apt_install("git", "ffmpeg", "curl")
     .run_commands(
-        "git clone --depth 1 -b moss-audio https://github.com/OpenMOSS/sglang.git /opt/sglang",
+        "git init /opt/sglang",
+        "git -C /opt/sglang remote add origin https://github.com/OpenMOSS/sglang.git",
+        f"git -C /opt/sglang fetch --depth 1 origin {SGLANG_REVISION}",
+        "git -C /opt/sglang checkout --detach FETCH_HEAD",
         "python -m pip install --upgrade pip",
         "python -m pip install --no-cache-dir -e '/opt/sglang/python[all]'",
     )
