@@ -62,7 +62,7 @@ export function createMossMusicAdapter(options: MossMusicAdapterOptions): Provid
         model: request.model,
         url: endpoint,
         headers: {
-          authorization: \`Bearer \${token}\`,
+          authorization: "Bearer " + token,
           "content-type": "application/json",
           accept: "application/json",
         },
