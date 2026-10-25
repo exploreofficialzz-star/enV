@@ -148,6 +148,7 @@ export interface ZipEntryHeader {
   name: string;
   compressedSize: number;
   uncompressedSize: number;
+  crc32: number;
   method: 0 | 8;
   localHeaderOffset: number;
   isDirectory: boolean;
@@ -243,6 +244,7 @@ export function inspectSongZip(
     const madeBy = u16(view, cursor + 4);
     const flags = u16(view, cursor + 8);
     const methodValue = u16(view, cursor + 10);
+    const expectedCrc32 = u32(view, cursor + 16);
     const compressedSize = u32(view, cursor + 20);
     const uncompressedSize = u32(view, cursor + 24);
     const nameLength = u16(view, cursor + 28);
@@ -295,7 +297,7 @@ export function inspectSongZip(
       }
       if (uncompressedSize > 0 && compressedSize === 0) throw new Error("This ZIP has an invalid zero-size compressed entry.");
     }
-    entries.push({ name, compressedSize, uncompressedSize, method: methodValue as 0 | 8, localHeaderOffset, isDirectory });
+    entries.push({ name, compressedSize, uncompressedSize, crc32: expectedCrc32, method: methodValue as 0 | 8, localHeaderOffset, isDirectory });
     cursor = variableEnd;
   }
   if (cursor !== directoryOffset + directorySize) throw new Error("This ZIP directory has unexpected trailing data.");
@@ -306,6 +308,18 @@ export function inspectSongZip(
     }
   }
   return { entries, totalUncompressedBytes };
+}
+
+/** IEEE CRC-32 used by ZIP central directory entries. */
+export function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) !== 0 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 export function csvCell(value: unknown): string {
