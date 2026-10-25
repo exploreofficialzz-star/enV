@@ -178,7 +178,6 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
       const forwardedHeaders = new Headers({
         "Content-Type": "application/json",
         Accept: "application/json",
-        "Sec-Fetch-Site": "same-origin",
       });
       const cookie = request.headers.get("cookie");
       if (cookie) forwardedHeaders.set("Cookie", cookie);
@@ -206,7 +205,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
         const code = payload?.error?.code ?? "MUSIC_ANALYSIS_AI_UNAVAILABLE";
         const message = payload?.error?.message ?? "enV's configured AI service could not classify this clip. Check its AI provider and model settings.";
         const response = errorResponse(upstream.status || 502, code, message);
-        if (setCookie) response.headers.set("Set-Cookie", setCookie);
+        if (setCookie) response.headers.set("Set-Cookie", setCookie.replace(/;\s*Path=\/api\/ai\b/i, "; Path=/"));
         return response;
       }
       const result = payload.data.result;
@@ -228,7 +227,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
         status: 200,
         headers: { "Cache-Control": "no-store" },
       });
-      if (setCookie) response.headers.set("Set-Cookie", setCookie);
+      if (setCookie) response.headers.set("Set-Cookie", setCookie.replace(/;\s*Path=\/api\/ai\b/i, "; Path=/"));
       return response;
     } catch (cause) {
       const timedOut = cause instanceof Error && cause.name === "TimeoutError";
