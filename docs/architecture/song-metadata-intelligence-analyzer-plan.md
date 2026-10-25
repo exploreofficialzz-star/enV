@@ -1,6 +1,6 @@
 # Song Metadata Intelligence Analyzer — Research & Implementation Plan
 
-**Status:** Research and design proposal; no feature implementation in this change  
+**Status:** Implementation and verification reference. Executable Web, Android, and iOS tool flows are included in this branch; semantic-model quality, singing-ASR coverage, and target-domain accuracy still require benchmark validation before making accuracy claims.  
 **Date:** 2026-10-25  
 **Target:** enV Web, Android, and iOS as independent clients with a versioned shared analysis contract  
 **Proposed tool slug:** `song-metadata-analyzer`
