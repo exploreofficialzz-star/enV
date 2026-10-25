@@ -6,9 +6,9 @@ ENV NODE_ENV=production \
     npm_config_audit=false \
     PYTHONDONTWRITEBYTECODE=1
 
+# yt-dlp recommends the nightly channel for frequently changing site extractors.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates \
-  # yt-dlp recommends nightly for frequently changing extractors such as YouTube.
   && python3 -m pip install --break-system-packages --no-cache-dir --pre "yt-dlp[default,curl-cffi]" \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
