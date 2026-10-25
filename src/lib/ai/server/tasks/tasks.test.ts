@@ -228,7 +228,7 @@ test("transcription: signature check, limits and normalization of the provider t
 
 test("music classification requires a supported audio signature and bounded input", () => {
   const prepared = ok("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "wedding-track.mp3" });
-  assert.ok((prepared.user.find((part) => part.type === "audio") as { type: "audio"; mimeType: string }).mimeType === "audio/mpeg");
+  assert.ok(prepared.user.some((part) => part.type === "audio" && part.mimeType === "audio/mpeg"));
   assert.ok(bad("music.analysis.classify", { audioBase64: Buffer.alloc(180, 1).toString("base64"), mimeType: "audio/mpeg" }).length > 0);
   assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/unknown" }).length > 0);
   assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "x".repeat(121) }).length > 0);
