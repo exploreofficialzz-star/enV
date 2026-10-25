@@ -225,7 +225,19 @@ async function analyzeLocal(
 
   if (!header.container && !file.type.startsWith("audio/")) warnings.push("The file type could not be confirmed from its header.");
   const AudioContextConstructor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) {
+  // Estimate the decoded PCM footprint before asking the browser to allocate it.
+  // decodeAudioData allocates the decoded buffers first, so a post-decode check alone is too late.
+  const conservativeBitrate = Math.max(32_000, Math.min(header.encodedBitrateBps ?? 64_000, 128_000));
+  const preflightDuration = durationSeconds ?? (file.size * 8 / conservativeBitrate);
+  const preflightSampleRate = header.sourceSampleRateHz ?? 48_000;
+  const preflightChannels = channels ?? 2;
+  const projectedMemoryBytes = preflightDuration * preflightSampleRate * (preflightChannels + 1) * 4;
+  const shouldSkipDecode = !Number.isFinite(projectedMemoryBytes) ||
+    preflightDuration > 15 * 60 ||
+    projectedMemoryBytes > 180 * 1024 * 1024;
+  if (shouldSkipDecode) {
+    warnings.push("Estimated decoded audio exceeds the local memory budget; signal and AI analysis were skipped.");
+  } else if (!AudioContextConstructor) {
     warnings.push("This browser cannot decode audio for tempo/key analysis.");
   } else {
     const context = new AudioContextConstructor();
