@@ -9,6 +9,7 @@ import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequest
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
+import { audiomackApiConfigured, inspectAudiomackOfficial, resolveAudiomackOfficialAudio } from "./media/audiomack-api.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
@@ -413,6 +414,20 @@ async function handleInfo(req, res) {
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  // Prefer Audiomack's documented OAuth-signed public music API when this
+  // deployment has app-level consumer credentials. No listener account is needed.
+  if (provider === "audiomack" && audiomackApiConfigured()) {
+    try {
+      const official = await inspectAudiomackOfficial(url.toString(), controller.signal);
+      if (official && (!official.isPlaylist || official.entries.length)) {
+        json(res, 200, official);
+        return;
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      console.warn("[url-media] Audiomack public API metadata unavailable; trying public page and extractor fallbacks.");
+    }
+  }
   let audiomackPageFallbackFailure = "";
   if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
     try {
@@ -533,6 +548,21 @@ async function handleDownload(req, res) {
     return;
   }
 
+  // On deployments with Audiomack consumer credentials, the official public
+  // API returns fresh, short-lived media URLs for eligible tracks. Never turn
+  // a stream-only response into a standalone download through a fallback.
+  if (provider === "audiomack" && audioOnly && audiomackApiConfigured()) {
+    try {
+      const sourceUrl = await resolveAudiomackOfficialAudio(url.toString(), controller.signal);
+      if (sourceUrl) {
+        await handleDirectDownload(req, res, sourceUrl, body, controller.signal);
+        return;
+      }
+    } catch (error) {
+      if (error?.name === "AbortError" || String(error?.message || "").startsWith("DOWNLOAD_NOT_PERMITTED:")) throw error;
+      console.warn("[url-media] Audiomack public API audio unavailable; trying extractor fallback.");
+    }
+  }
   const supportedFormats = new Set(["mp4", "webm", "mp3", "m4a", "best"]);
   if (!supportedFormats.has(String(format))) throw new Error("Unsupported output format.");
   if (audioOnly && !["mp3", "m4a", "best"].includes(String(format))) throw new Error("Audio-only mode requires an audio format.");
