@@ -15,6 +15,35 @@ function errorResponse(status: number, code: string, message: string) {
   });
 }
 
+async function readBoundedBody(request: Request, maximumBytes: number): Promise<Uint8Array> {
+  const reader = request.body?.getReader();
+  if (!reader) throw new Error("MUSIC_ANALYSIS_EMPTY_BODY");
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      if (!item.value) continue;
+      totalBytes += item.value.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("MUSIC_ANALYSIS_BODY_TOO_LARGE");
+      }
+      chunks.push(item.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -124,9 +153,27 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
     return errorResponse(413, "MUSIC_ANALYSIS_FILE_TOO_LARGE", "Model analysis accepts files up to 25 MB.");
   }
 
+  let boundedBody: Uint8Array;
+  try {
+    boundedBody = await readBoundedBody(request, MAX_AUDIO_BYTES + 512 * 1024);
+  } catch (cause) {
+    if (cause instanceof Error && cause.message === "MUSIC_ANALYSIS_BODY_TOO_LARGE") {
+      return errorResponse(413, "MUSIC_ANALYSIS_FILE_TOO_LARGE", "The complete upload must stay within the 25 MB audio limit plus a small multipart-header allowance.");
+    }
+    return errorResponse(400, "MUSIC_ANALYSIS_INVALID_UPLOAD", "The upload body could not be read. Choose the audio file again and retry.");
+  }
+
   let form: FormData;
   try {
-    form = await request.formData();
+    const formHeaders = new Headers(request.headers);
+    formHeaders.delete("content-length");
+    formHeaders.delete("transfer-encoding");
+    const boundedRequest = new Request(request.url, {
+      method: "POST",
+      headers: formHeaders,
+      body: new Blob([boundedBody.buffer as ArrayBuffer]),
+    });
+    form = await boundedRequest.formData();
   } catch {
     return errorResponse(400, "MUSIC_ANALYSIS_INVALID_UPLOAD", "Send one audio file in the multipart field named audio.");
   }
