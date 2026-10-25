@@ -1629,6 +1629,7 @@ enum NativeAudioEngine {
     ]
 
     static func operation(for tool: Tool) -> String? {
+        if tool.id == "song-metadata-analyzer" { return "song-metadata-analyzer" }
         if tool.id == "music-live-video-studio" { return "live-video-studio" }
         if tool.id == "audio-recorder" { return "record-mic" }
         if let fileOp = nativeWavOperations[tool.id] { return "file:\(fileOp)" }
@@ -4061,7 +4062,9 @@ private struct NativeAudioToolView: View {
 
     var body: some View {
         let operation = NativeAudioEngine.operation(for: tool) ?? "guide"
-        if operation == "record-mic" {
+        if operation == "song-metadata-analyzer" {
+            NativeSongMetadataAnalyzerView(title: tool.name)
+        } else if operation == "record-mic" {
             NativeAudioRecorderToolView(title: tool.name)
         } else if operation == "generate-tone" || operation == "generate-metronome" {
             NativeAudioGeneratorToolView(operation: operation, title: tool.name)
