@@ -17,7 +17,8 @@ assert.equal(syntax.status, 0, "Modal service Python syntax check failed:\n" + s
 
 const requirements = [
   ["pinned MOSS-Music repository", /OpenMOSS-Team\/MOSS-Music-8B-Instruct/],
-  ["pinned model revision", /MODEL_REVISION\s*=\s*"[0-9a-f]{7,40}"/],
+  ["mutable model ref resolved to immutable SHA", /HfApi\(\)\.model_info[\s\S]*?resolved_revision = info\.sha/],
+  ["resolved model SHA persisted on volume", /"resolved_revision": resolved_revision/],
   ["pinned OpenMOSS SGLang revision", /SGLANG_REVISION\s*=\s*"[0-9a-f]{40}"/],
   ["persistent weights volume", /modal\.Volume\.from_name\("env-moss-music-models"/],
   ["A100 40GB runtime", /gpu="A100-40GB"/],
