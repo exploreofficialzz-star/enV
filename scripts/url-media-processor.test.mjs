@@ -39,8 +39,8 @@ assert.match(dockerfile, /node --check scripts\/media\/extraction-strategy\.mjs/
 assert.match(source, /detailCodes/);
 assert.match(source, /inspectAudiomackAlbumPage/);
 assert.match(source, /audiomackPageFallbackFailure/);
-assert.match(source, /Public-page fallback:/);
-assert.match(source, /Try an individual song URL or an authorized direct audio-file URL/);
+assert.match(source, /legacy album API extractor cannot recover those links/);
+assert.match(source, /public collection page did not expose readable song links/);
 assert.match(dockerfile, /COPY scripts\/media\/provider-registry\.mjs \.\/scripts\/media\/provider-registry\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/audiomack-page-parser\.mjs \.\/scripts\/media\/audiomack-page-parser\.mjs/);
 assert.match(dockerfile, /node --check scripts\/media\/audiomack-page-parser\.mjs/);
