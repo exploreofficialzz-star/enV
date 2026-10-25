@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ModelRecord } from "../../types.ts";
+import { estimateCost } from "../core/usage.ts";
 import { deriveCostClass, findModel, MODEL_REGISTRY, modelKey, resolvePricing, validateModelRegistry } from "./models.ts";
 
 test("the shipped registry is internally consistent", () => {
@@ -37,6 +38,9 @@ test("MOSS-Music compute price is registered as STANDARD and its estimate is exp
   assert.equal(moss.pricing?.perComputeHour, 2.0988);
   assert.equal(moss.sensitiveOk, true);
   assert.equal(moss.maxAudioBytes, 2_800_000);
+  const cost = estimateCost(moss, { inputTokens: null, outputTokens: null, totalTokens: null, audioSeconds: null, computeSeconds: 6.25 }, Date.parse("2026-10-25T12:00:00Z"));
+  assert.equal(cost.usd, 0.003644);
+  assert.equal(cost.basis, "estimated");
 });
 
 test("free-tier and unverified-privacy routes are not allowed for sensitive tasks by default", () => {
