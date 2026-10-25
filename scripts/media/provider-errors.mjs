@@ -30,7 +30,7 @@ export function classifyProviderFailure(provider, diagnostic) {
   }
   if (/failed to parse json|jsondecodeerror|unable to download json metadata/i.test(detail)) {
     if (/audiomack/i.test(name) || /\[audiomack\]/i.test(detail)) {
-      return new Error("SOURCE_UNAVAILABLE: Audiomack returned an empty or invalid JSON response from its track resolver even after enV's API-host compatibility patch. This usually indicates a provider-side API change, temporary blocking, or unavailable content; it is not necessarily a bad album URL. Try again later or use an authorized direct audio-file URL or the provider's official download feature.");
+      return new Error("SOURCE_UNAVAILABLE: Audiomack returned an empty or invalid JSON response from its track resolver while resolving public metadata. This usually indicates a provider-side API change, temporary blocking, or unavailable content; it is not necessarily a bad album URL. Try again later or use an authorized direct audio-file URL or the provider's official download feature.");
     }
     return new Error(`SOURCE_UNAVAILABLE: ${name} returned an invalid metadata response. The provider's resolver may have changed or be temporarily unavailable; retry later or use an authorized direct media URL.`);
   }
@@ -41,7 +41,13 @@ export function classifyProviderFailure(provider, diagnostic) {
       /http error 5[0-9][0-9]|internal server error|bad gateway|service unavailable|empty response|temporarily unavailable/i.test(detail)) {
     return new Error("SOURCE_UNAVAILABLE: Audiomack's track resolver returned a server error or empty response. This is an upstream source-resolution failure, not proof that the URL is invalid or that an account is required. Retry later or use an authorized direct audio-file URL or the provider's official download feature.");
   }
-  if (/http error 404|not found|does not exist|has been removed|video unavailable|track unavailable|invalid url for track/i.test(detail)) {
+  // Audiomack's old album extractor reports "Invalid url for track 0"
+  // when its metadata API responds with an error. That message alone does NOT
+  // establish that a publicly playable album URL is invalid.
+  if (/audiomack/i.test(name) && /invalid url(?: for track \\d+ of album url)?/i.test(detail)) {
+    return new Error("SOURCE_UNAVAILABLE: Audiomack's legacy music endpoint rejected the song or album lookup. The public page may still be playable; the extractor needs an updated provider-compatible resolution method. This is not proof that the music or URL is invalid.");
+  }
+  if (/http error 404|not found|does not exist|has been removed|video unavailable|track unavailable/i.test(detail)) {
     return new Error(`SOURCE_UNAVAILABLE: ${name} reports that this content is unavailable to the processor. Confirm the item is public and retry later.`);
   }
   if (/unsupported url|no suitable extractor|not a valid url|unsupported url scheme/i.test(detail)) {

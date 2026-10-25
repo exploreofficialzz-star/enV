@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   isSafeMusicOrigin,
+  isLikelyMusicCollectionUrl,
   parseMusicCollectionLines,
   protectedMusicPlatform,
   validateDirectMusicUrl,
@@ -56,6 +57,25 @@ test("accepts supported public music pages for server-side resolution", () => {
     assert.equal(parseMusicCollectionLines(url).entries[0]?.url, url);
   }
   assert.equal(validateMusicSourceUrl("https://example.com/not-audio-or-provider").ok, false);
+});
+
+test("detects collection pages without incorrectly retrying album URLs as single songs", () => {
+  for (const link of [
+    "https://audiomack.com/evadolee/album/promise-land?share-user-id=118614535",
+    "https://www.youtube.com/playlist?list=PL_example",
+    "https://music.youtube.com/watch?v=abc&list=PL_example",
+    "https://soundcloud.com/artist/sets/collection",
+    "https://artist.bandcamp.com/album/release",
+    "https://www.boomplay.com/albums/12345",
+  ]) assert.equal(isLikelyMusicCollectionUrl(link), true, link);
+  for (const link of [
+    "https://audiomack.com/evadolee/song/demo",
+    "https://music.youtube.com/watch?v=abc",
+    "https://soundcloud.com/artist/track",
+    "https://artist.bandcamp.com/track/song",
+    "https://www.boomplay.com/songs/12345",
+    "not a url",
+  ]) assert.equal(isLikelyMusicCollectionUrl(link), false, link);
 });
 
 test("parses titled rows, ignores M3U comments, deduplicates, and caps batch size", () => {

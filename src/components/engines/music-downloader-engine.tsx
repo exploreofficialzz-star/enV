@@ -6,6 +6,7 @@ import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-meta
 import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
 import {
   MUSIC_AUDIO_EXTENSIONS,
+  isLikelyMusicCollectionUrl,
   parseMusicCollectionLines,
 } from "@/lib/media/music-downloader-policy";
 
@@ -231,7 +232,23 @@ export function MusicDownloaderEngine() {
             continue;
           }
 
-          const info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: true });
+          let info: UrlMediaInfo;
+          try {
+            info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: true });
+          } catch (inspectionError) {
+            if ((inspectionError as Error)?.name === "AbortError" || isLikelyMusicCollectionUrl(entry.url)) throw inspectionError;
+            // Some extractors resolve/download a single audio stream even when
+            // their playlist/metadata path fails. Do not discard the track here.
+            setProgress("Metadata unavailable; attempting direct song extraction…");
+            const track = await downloadMusicTrack(entry.url, entry.url, undefined, entry.title, controller.signal, setProgress);
+            if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
+            totalBytes += track.bytes.byteLength;
+            tracks.push(track);
+            continue;
+          }
+          if (info.isPlaylist && !info.entries?.length) {
+            throw new Error("This collection could not be expanded into track links; no audio-only download was attempted for the entire album or playlist.");
+          }
           if (!collectionTitle && info.entries?.length) {
             collectionTitle = info.album || info.title || "";
           }

@@ -92,7 +92,12 @@ function collectJsonTracks(value, baseUrl, output, depth = 0) {
   const type = String(value["@type"] || value.type || value.kind || value.media_type || "").toLowerCase();
   const slug = value.url_slug || value.slug || value.permalink;
   const artistSlug = value.artist?.url_slug || value.artist?.slug || value.artist_slug || value.uploader?.url_slug;
-  if (slug && artistSlug && /song|track|musicrecording/.test(type)) {
+  // Audiomack's public page hydration sometimes omits an explicit track type.
+  // Accept records with track-specific attributes, but never infer a song from
+  // an album/playlist/artist object merely because it has a slug and artist.
+  const hasTrackIdentity = Boolean(value.song_id || value.track_id || value.track_number || value.trackNumber || value.audio_url);
+  const looksLikeTrack = /song|track|musicrecording/.test(type) || (!type && hasTrackIdentity);
+  if (slug && artistSlug && looksLikeTrack && !/album|playlist|artist/.test(type)) {
     const trackUrl = parseTrackUrl("/" + artistSlug + "/song/" + slug, baseUrl);
     if (trackUrl) {
       output.set(trackUrl.path, {
