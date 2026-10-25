@@ -20,6 +20,7 @@ COPY scripts/media-processor.mjs ./scripts/media-processor.mjs
 COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
 COPY scripts/media/processor-admission.mjs ./scripts/media/processor-admission.mjs
 COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
+COPY scripts/media/audiomack-page-parser.mjs ./scripts/media/audiomack-page-parser.mjs
 COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
 COPY scripts/media/yt-dlp-output.mjs ./scripts/media/yt-dlp-output.mjs
 COPY scripts/transcription-processor.mjs ./scripts/transcription-processor.mjs
@@ -29,6 +30,7 @@ RUN node --check processor/server.mjs \
   && node --check processor/url-media-route.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
+  && node --check scripts/media/audiomack-page-parser.mjs \
   && node --version \
   && ffmpeg -version >/dev/null \
   && yt-dlp --version
