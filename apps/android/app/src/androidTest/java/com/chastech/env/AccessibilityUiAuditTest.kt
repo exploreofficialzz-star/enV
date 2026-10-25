@@ -28,6 +28,12 @@ class AccessibilityUiAuditTest {
         }
     }
 
+    private fun awaitTextVisible(text: String) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun primaryActionsExposeNamesAndSearchNavigationWorks() {
         awaitHomeScreenReady()
@@ -37,8 +43,11 @@ class AccessibilityUiAuditTest {
         composeRule.onNodeWithContentDescription("More options").assertIsDisplayed().assertIsEnabled()
 
         composeRule.onNodeWithContentDescription("More options").performClick()
+        awaitTextVisible("Search tools")
         composeRule.onNodeWithText("Search tools").assertIsDisplayed().performClick()
+        awaitTextVisible("Find a tool by name, category, or keyword.")
         composeRule.onNodeWithText("Find a tool by name, category, or keyword.").assertIsDisplayed()
+        awaitTextVisible("Start typing to see matching tools.")
         composeRule.onNodeWithText("Start typing to see matching tools.").assertIsDisplayed()
     }
 
