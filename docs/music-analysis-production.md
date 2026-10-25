@@ -6,12 +6,12 @@ The Music Analyzer always computes its local signal measurements in the browser.
 
 Configure these server-side environment variables on the enV web deployment:
 
-- `MUSIC_ANALYSIS_ENDPOINT` — required HTTPS URL for a trusted audio-classification or music-understanding endpoint.
-- `MUSIC_ANALYSIS_TOKEN` — optional bearer token, stored only on the server and never sent to the browser.
+- `MUSIC_ANALYSIS_ENDPOINT` — optional HTTPS URL for a trusted audio-classification or music-understanding endpoint. When omitted, the route uses enV’s existing AI service for clips up to 2.8 MB.
+- `MUSIC_ANALYSIS_TOKEN` — optional bearer token for the custom endpoint, stored only on the server and never sent to the browser.
 
-The configured endpoint receives a `POST` request whose body is the selected audio file as raw bytes. The `Content-Type` is the file's detected MIME type, falling back to `application/octet-stream`. The service must return JSON. enV limits model uploads to 25 MB and gives the endpoint up to 90 seconds to respond.
+When configured, the custom endpoint receives a `POST` request whose body is the selected audio file as raw bytes. The `Content-Type` is the file's detected MIME type, falling back to `application/octet-stream`. The service must return JSON. enV limits model uploads to 25 MB and gives the endpoint up to 90 seconds to respond.
 
-The route requires a same-origin `Origin` header, bounds the complete multipart body before parsing it, limits an individual audio file to 25 MB, and applies a best-effort per-process limit of 10 model requests per source IP in a 10-minute window. Because serverless instances do not share in-memory counters, a production deployment should additionally apply shared/edge rate limits at the ingress. The endpoint can return a structured object such as:
+The route requires a same-origin `Origin` header, bounds the complete multipart body before parsing it, limits an individual audio file to 25 MB, and applies a best-effort per-process limit of 10 model requests per source IP in a 10-minute window. Because serverless instances do not share in-memory counters, a production deployment should additionally apply shared/edge rate limits at the ingress. The custom endpoint can return a structured object such as:
 
 ```json
 {
@@ -36,6 +36,16 @@ Local analysis does not upload the audio. The user must explicitly enable model 
 
 Tempo and key are best-effort DSP estimates. The loudness field is an RMS-based proxy, not a standards-compliant integrated LUFS measurement. The signal features do not independently identify a genre, sub-style, language, mood or instrument. Language detection on singing or mixed vocals should be treated as uncertain unless the configured model was evaluated for that use case and the target languages, including Pidgin and Yoruba.
 
+
+
+
+## Built-in enV AI route
+
+For small clips, the analyzer calls the existing enV AI task `music.analysis.classify`, which routes audio through the Gemini Interactions API. The browser must receive the clear upload-consent checkbox before starting this request. Inline audio requests are limited here to 2.8 MB to stay inside enV's existing API request-body budget; longer clips can still be measured locally, or can use the optional custom endpoint.
+
+Built-in semantic tags require the existing AI service to be configured with `AI_ENABLED=true`, a valid `GEMINI_API_KEY`, `AI_MAX_COST_CLASS=STANDARD`, and `AI_GEMINI_TIER=paid`. Gemini's free tier is intentionally not treated as approved for sensitive audio. Configure these values on the backend that serves `/api/ai/run`, not in client-side `VITE_*` variables. The Gemini adapter uses the Interactions API's audio input and structured JSON response format; audio request storage is disabled on the interaction where supported.
+
+The standard AI router keeps its normal session/quota/rate limits and usage accounting for this task. Model costs apply and vary by input audio length and output usage. If the backend does not have a compatible paid Gemini model configured, the endpoint reports a configuration/routing error and leaves the local measurements intact.
 
 ## Choosing and validating the semantic model
 
