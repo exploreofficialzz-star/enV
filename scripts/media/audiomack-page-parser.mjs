@@ -167,7 +167,7 @@ export function parseAudiomackAlbumPage(html, pageUrl) {
     // flight-data strings, with slashes escaped as \\u002F or \\/. Normalize only
     // those escape sequences; never evaluate script code or invent song slugs.
     const normalized = raw.replace(/\\\\+u002f/gi, "/").replace(/\\\\+x2f/gi, "/").replace(/\\\\+\\\//g, "/");
-    const serializedPattern = /(?:https?:\\/\\/(?:www\\.)?audiomack\\.com)?\\/([a-z0-9._-]+)\\/song\\/([a-z0-9._-]+)/gi;
+    const serializedPattern = /(?:https?:\/\/(?:www\.)?audiomack\.com)?\/([a-z0-9._-]+)\/song\/([a-z0-9._-]+)/gi;
     let serialized;
     while ((serialized = serializedPattern.exec(normalized))) {
       const trackUrl = parseTrackUrl("/" + serialized[1] + "/song/" + serialized[2], base);
