@@ -153,7 +153,7 @@ function providerForUrl(raw) {
   try { url = new URL(String(raw || "").trim()); } catch { throw new Error("INVALID_URL: Enter a valid http(s) URL."); }
   if (!/^https?:$/.test(url.protocol)) throw new Error("INVALID_URL: Only http and https URLs are supported.");
   const directAudio = /\.(?:mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff|aif|wma|webm)$/i.test(url.pathname);
-  return { url, provider: directAudio ? "generic" : detectProvider(url) };
+  return { url, provider: directAudio ? "generic" : detectProvider(url), directAudio };
 }
 
 const PUBLIC_ERROR_MESSAGES = {
@@ -328,8 +328,8 @@ async function handleDirectDownload(req, res, url, body, signal) {
 async function handleInfo(req, res) {
   const body = await readJson(req);
   const { url: rawUrl, provider: requestedProvider, includePlaylist = false } = body;
-  const { url, provider } = providerForUrl(rawUrl);
-  if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
+  const { url, provider, directAudio } = providerForUrl(rawUrl);
+  if (requestedProvider && requestedProvider !== provider && !directAudio) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
