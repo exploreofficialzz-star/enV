@@ -29,9 +29,10 @@ function safeName(value, fallback = "download.bin") {
   return base || fallback;
 }
 
-function runYtdlp(args, cwd, signal, provider) {
+function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const playlistMode = includePlaylist ? "--yes-playlist" : "--no-playlist";
+    const child = spawn(YTDLP_BIN, [playlistMode, "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
@@ -335,8 +336,12 @@ async function handleInfo(req, res) {
 
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-url-info-"));
   try {
-    const args = ["--dump-single-json", "--skip-download", "--no-warnings", url.toString()];
-    const { stdout } = await runYtdlp(args, jobDir, controller.signal, provider);
+    const args = [
+      "--dump-single-json", "--skip-download", "--no-warnings",
+      ...(includePlaylist ? ["--flat-playlist", "--playlist-end", "50"] : []),
+      url.toString(),
+    ];
+    const { stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist));
     const metadata = parseYtDlpJson(stdout);
     if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: Media exceeds the configured duration limit.");
 
@@ -352,14 +357,39 @@ async function handleInfo(req, res) {
       note: format.format_note ? String(format.format_note) : undefined,
     })).filter((format) => format.formatId || format.ext);
 
+    const entries = Array.isArray(metadata.entries)
+      ? metadata.entries.slice(0, 50).map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const entryUrl = String(entry.webpage_url || entry.original_url || entry.url || "");
+          const resolvedUrl = /^https?:\/\//i.test(entryUrl)
+            ? entryUrl
+            : provider === "youtube" && entry.id
+              ? "https://www.youtube.com/watch?v=" + encodeURIComponent(String(entry.id))
+              : entryUrl;
+          return resolvedUrl ? {
+            id: entry.id ? String(entry.id) : undefined,
+            title: String(entry.title || entry.fulltitle || "Untitled track"),
+            uploader: entry.uploader || entry.artist ? String(entry.uploader || entry.artist) : undefined,
+            album: entry.album || entry.album_title ? String(entry.album || entry.album_title) : undefined,
+            duration: typeof entry.duration === "number" ? entry.duration : undefined,
+            thumbnail: entry.thumbnail ? String(entry.thumbnail) : undefined,
+            webpageUrl: resolvedUrl,
+          } : null;
+        }).filter(Boolean)
+      : [];
     json(res, 200, {
       provider,
       id: metadata.id ? String(metadata.id) : undefined,
-      title: String(metadata.title || metadata.fulltitle || "Untitled media"),
-      uploader: metadata.uploader ? String(metadata.uploader) : undefined,
+      title: String(metadata.title || metadata.fulltitle || metadata.album || metadata.album_title || "Untitled media"),
+      uploader: metadata.uploader || metadata.artist ? String(metadata.uploader || metadata.artist) : undefined,
+      album: metadata.album || metadata.album_title ? String(metadata.album || metadata.album_title) : undefined,
+      releaseYear: metadata.release_year || metadata.release_date || metadata.upload_date ? String(metadata.release_year || metadata.release_date || metadata.upload_date) : undefined,
       duration: typeof metadata.duration === "number" ? metadata.duration : undefined,
       thumbnail: metadata.thumbnail ? String(metadata.thumbnail) : undefined,
       webpageUrl: metadata.webpage_url ? String(metadata.webpage_url) : url.toString(),
+      isPlaylist: metadata._type === "playlist" || metadata._type === "multi_video" || entries.length > 0,
+      entries,
+      truncated: Array.isArray(metadata.entries) && metadata.entries.length > entries.length,
       live: Boolean(metadata.is_live),
       width: typeof metadata.width === "number" ? metadata.width : undefined,
       height: typeof metadata.height === "number" ? metadata.height : undefined,
