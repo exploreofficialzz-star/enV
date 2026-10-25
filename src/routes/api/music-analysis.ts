@@ -68,6 +68,14 @@ function normalizeResponse(value: unknown) {
 
 function isRateLimited(request: Request): boolean {
   const now = Date.now();
+  if (requestCounts.size > 5000) {
+    for (const [key, value] of requestCounts) if (value.resetAt <= now) requestCounts.delete(key);
+    while (requestCounts.size > 5000) {
+      const oldest = requestCounts.keys().next().value;
+      if (oldest === undefined) break;
+      requestCounts.delete(oldest);
+    }
+  }
   const ip = request.headers.get("cf-connecting-ip")
     ?? request.headers.get("x-real-ip")
     ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
