@@ -3,17 +3,12 @@ export const MUSIC_AUDIO_EXTENSIONS = new Set([
 ]);
 
 const PROTECTED_PLATFORMS = [
-  { label: "Spotify", domains: ["spotify.com", "open.spotify.com"] },
+  { label: "Spotify", domains: ["spotify.com"] },
   { label: "Apple Music", domains: ["music.apple.com", "apple.com"] },
-  { label: "YouTube Music", domains: ["music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com"] },
-  { label: "Audiomack", domains: ["audiomack.com"] },
-  { label: "Boomplay", domains: ["boomplay.com"] },
   { label: "Deezer", domains: ["deezer.com"] },
   { label: "Amazon Music", domains: ["music.amazon.com", "amazon.com"] },
   { label: "TIDAL", domains: ["tidal.com"] },
-  { label: "SoundCloud", domains: ["soundcloud.com"] },
   { label: "Pandora", domains: ["pandora.com"] },
-  { label: "Mixcloud", domains: ["mixcloud.com"] },
   { label: "Anghami", domains: ["anghami.com"] },
   { label: "Qobuz", domains: ["qobuz.com"] },
   { label: "Napster", domains: ["napster.com"] },
@@ -21,9 +16,24 @@ const PROTECTED_PLATFORMS = [
   { label: "iHeartRadio", domains: ["iheart.com"] },
 ];
 
+// Keep this allowlist aligned with scripts/media/provider-registry.mjs and both native downloaders.
+// A provider can still refuse extraction, require authentication, or disallow a particular download.
+export const MUSIC_PROVIDER_PAGE_DOMAINS = [
+  "youtube.com", "youtu.be", "youtube-nocookie.com", "tiktok.com", "facebook.com", "fb.watch",
+  "instagram.com", "x.com", "twitter.com", "audiomack.com", "soundcloud.com", "bandcamp.com",
+  "mixcloud.com", "audius.co", "jamendo.com", "hearthis.at", "bandlab.com", "boomplay.com",
+  "zingmp3.vn", "music.163.com", "music.yandex.com", "music.yandex.ru", "archive.org",
+  "audioboom.com", "reverbnation.com", "soundclick.com", "spreaker.com", "podomatic.com", "freesound.org",
+];
+
 export type MusicCollectionEntry = { title: string; url: string; line: number };
 export type DirectUrlValidation =
   | { ok: true; url: string; extension: string }
+  | { ok: false; reason: string; platform?: string };
+
+export type MusicSourceValidation =
+  | { ok: true; url: string; kind: "direct-audio"; extension: string }
+  | { ok: true; url: string; kind: "provider-page"; extension: "" }
   | { ok: false; reason: string; platform?: string };
 
 function hostMatches(host: string, domain: string): boolean {
@@ -90,6 +100,32 @@ export function isSafeMusicOrigin(raw: string): { ok: true; url: string } | { ok
   return { ok: true, url: parsed.href };
 }
 
+export function validateMusicSourceUrl(raw: string): MusicSourceValidation {
+  const source = isSafeMusicOrigin(raw.trim());
+  if (!source.ok) return source;
+  let parsed: URL;
+  try {
+    parsed = new URL(source.url);
+  } catch {
+    return { ok: false, reason: "Enter a complete HTTPS URL." };
+  }
+
+  const extension = parsed.pathname.split("/").pop()?.split(".").pop()?.toLowerCase() ?? "";
+  if (MUSIC_AUDIO_EXTENSIONS.has(extension)) {
+    return { ok: true, url: parsed.href, kind: "direct-audio", extension };
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  if (MUSIC_PROVIDER_PAGE_DOMAINS.some((domain) => hostMatches(host, domain))) {
+    return { ok: true, url: parsed.href, kind: "provider-page", extension: "" };
+  }
+
+  return {
+    ok: false,
+    reason: "Use a supported public song, album or playlist page, or a direct HTTPS audio-file URL ending in a supported audio extension.",
+  };
+}
+
 export function validateDirectMusicUrl(raw: string): DirectUrlValidation {
   const source = isSafeMusicOrigin(raw.trim());
   if (!source.ok) return source;
@@ -109,10 +145,10 @@ export function validateDirectMusicUrl(raw: string): DirectUrlValidation {
   return { ok: true, url: parsed.href, extension };
 }
 
-/** Accept one direct HTTPS URL per line or "Track title | URL"; JSON URL manifests are also accepted. */
+/** Accept supported public music pages or direct HTTPS audio URLs per line; JSON URL manifests are also accepted. */
 export function parseMusicCollectionLines(input: string): { entries: MusicCollectionEntry[]; error?: string } {
   const trimmed = input.trim();
-  if (!trimmed) return { entries: [], error: "Add at least one direct audio-file URL." };
+  if (!trimmed) return { entries: [], error: "Add at least one supported public music page or direct audio-file URL." };
 
   let sourceLines: string[];
   if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
@@ -143,6 +179,7 @@ export function parseMusicCollectionLines(input: string): { entries: MusicCollec
 
   const seen = new Set<string>();
   const entries: MusicCollectionEntry[] = [];
+  let validationError = "";
   sourceLines.forEach((raw, index) => {
     const line = raw.trim();
     if (!line || line.startsWith("#")) return;
@@ -150,11 +187,18 @@ export function parseMusicCollectionLines(input: string): { entries: MusicCollec
     const title = separator >= 0 ? line.slice(0, separator).trim() : "";
     const url = (separator >= 0 ? line.slice(separator + 1) : line).trim();
     if (!url) return;
-    const key = url.toLowerCase();
+    const validated = validateMusicSourceUrl(url);
+    if (!validated.ok) {
+      validationError = validationError || `Line ${index + 1}: ${validated.reason}`;
+      return;
+    }
+    const key = validated.url.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    entries.push({ title, url, line: index + 1 });
+    entries.push({ title, url: validated.url, line: index + 1 });
   });
+
+  if (validationError) return { entries: [], error: validationError };
 
   if (!entries.length) return { entries: [], error: "No audio URLs were found. Use one direct audio-file URL per line or a JSON manifest." };
   if (entries.length > 50) return { entries: [], error: "A batch can contain at most 50 tracks. Split larger playlists into smaller batches." };
