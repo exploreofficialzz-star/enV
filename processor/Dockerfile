@@ -24,14 +24,12 @@ COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
 COPY scripts/media/audiomack-page-parser.mjs ./scripts/media/audiomack-page-parser.mjs
 COPY scripts/media/provider-errors.mjs ./scripts/media/provider-errors.mjs
 COPY scripts/media/public-download-links.mjs ./scripts/media/public-download-links.mjs
-COPY scripts/media/patch-ytdlp-audiomack.py ./scripts/media/patch-ytdlp-audiomack.py
 COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
 COPY scripts/media/yt-dlp-output.mjs ./scripts/media/yt-dlp-output.mjs
 COPY scripts/transcription-processor.mjs ./scripts/transcription-processor.mjs
 COPY scripts/faster-whisper-runner.py ./scripts/faster-whisper-runner.py
 
-RUN python3 scripts/media/patch-ytdlp-audiomack.py \
-  && node --check processor/server.mjs \
+RUN node --check processor/server.mjs \
   && node --check processor/url-media-route.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
