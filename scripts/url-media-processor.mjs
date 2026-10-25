@@ -57,12 +57,9 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
       if (stdoutExceeded) return reject(new Error("PROVIDER_ERROR: The media provider returned too much metadata."));
       if (code !== 0) {
         const detail = stderr.trim().slice(-1200);
-        if (/sign in to confirm|login required|authentication required|please log in/i.test(detail)) {
-          return reject(new Error(`AUTH_REQUIRED: ${provider || "The provider"} requires sign-in or is challenging the processor's anonymous request. Use content accessible to the processor or configure a provider cookie file on the processor.`));
-        }
-        if (/unexpected response from webpage request|ip address is blocked|captcha/i.test(detail)) {
-          return reject(new Error(`SOURCE_UNAVAILABLE: ${provider || "The provider"} is challenging or blocking the processor request. Confirm the post is publicly available in the service region, then retry later.`));
-        }
+        // Keep authentication, bot challenges, rate limits, and provider errors
+        // in one classifier so "sign in to confirm you're not a bot" is not
+        // incorrectly surfaced as a mandatory user login.
         return reject(classifyProviderFailure(provider, detail || `Media downloader exited with code ${code}.`));
       }
       resolve({ stdout, stderr });
@@ -164,6 +161,7 @@ const PUBLIC_ERROR_MESSAGES = {
   SOURCE_UNAVAILABLE: "We couldn’t reach this source. Check the URL and try again later.",
   PRIVATE_CONTENT: "This content is private. enV can process only content that is publicly accessible.",
   AUTH_REQUIRED: "This source requires sign-in. Use publicly accessible content or configure supported provider access.",
+  SOURCE_CHALLENGE: "The source is challenging or blocking the processor request. This does not necessarily mean sign-in is required; retry later.",
   DOWNLOAD_NOT_PERMITTED: "This source does not permit downloading through enV.",
   NO_DOWNLOADABLE_FORMAT: "No downloadable format is available for this content.",
   FORMAT_UNAVAILABLE: "The selected media format is unavailable for this source.",
@@ -189,7 +187,7 @@ function errorPayload(error) {
   const message = error instanceof Error ? error.message : String(error);
   const known = [
     "INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "PRIVATE_CONTENT",
-    "AUTH_REQUIRED", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT",
+    "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT",
     "FORMAT_UNAVAILABLE", "MANIFEST_PARSE_FAILED", "SEGMENT_FAILED",
     "RANGE_UNSUPPORTED", "RESUME_INVALID", "NETWORK_TIMEOUT", "RATE_LIMITED",
     "PROVIDER_ERROR", "FFMPEG_UNAVAILABLE", "FFMPEG_FAILED", "DISK_FULL",
@@ -200,11 +198,11 @@ function errorPayload(error) {
   const code = prefixedCode ||
     (/request body is too large/i.test(message) ? "REQUEST_TOO_LARGE" :
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
-  const retryable = ["SOURCE_UNAVAILABLE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
+  const retryable = ["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
   const safeMessage = message.replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n\t]+/g, " ").slice(0, 900);
   const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(safeMessage);
   const explicitDetail = safeMessage.match(/^[A-Z_]+:\s*(.+)$/);
-  const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
+  const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
   const publicMessage = audiomackAlbumFailure
     ? safeMessage.replace(/^SOURCE_UNAVAILABLE:\s*/i, "")
     : detailCodes.has(code) && explicitDetail
@@ -218,7 +216,7 @@ function errorStatus(code) {
   if (code === "RATE_LIMITED") return 429;
   if (["FILE_TOO_LARGE", "DURATION_TOO_LONG", "REQUEST_TOO_LARGE"].includes(code)) return 413;
   if (code === "JOB_TIMEOUT") return 504;
-  if (["SOURCE_UNAVAILABLE", "SERVER_CAPACITY", "NETWORK_TIMEOUT"].includes(code)) return 503;
+  if (["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "SERVER_CAPACITY", "NETWORK_TIMEOUT"].includes(code)) return 503;
   return 400;
 }
 
