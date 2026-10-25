@@ -32,6 +32,26 @@ test("recognizes protected streaming pages without treating them as audio downlo
   assert.equal(validateDirectMusicUrl("https://music.apple.com/us/album/example").ok, false);
 });
 
+test("recognizes Audiomack, Boomplay and a broad set of streaming providers consistently", () => {
+  const samples: Array<[string, string]> = [
+    ["https://audiomack.com/artist/song", "Audiomack"],
+    ["https://www.boomplay.com/songs/123", "Boomplay"],
+    ["https://music.youtube.com/playlist?list=example", "YouTube Music"],
+    ["https://pandora.com/artist/song", "Pandora"],
+    ["https://www.mixcloud.com/artist/show/", "Mixcloud"],
+    ["https://play.anghami.com/song/123", "Anghami"],
+    ["https://play.qobuz.com/album/123", "Qobuz"],
+    ["https://play.napster.com/album/123", "Napster"],
+    ["https://www.jiosaavn.com/song/example", "JioSaavn"],
+    ["https://www.iheart.com/artist/example", "iHeartRadio"],
+  ];
+  for (const [url, label] of samples) {
+    assert.equal(protectedMusicPlatform(url)?.label, label, url);
+    assert.equal(validateDirectMusicUrl(url).ok, false, url);
+  }
+  assert.equal(validateDirectMusicUrl("https://www.audiomack.com/artist/song.mp3").ok, false);
+});
+
 test("parses titled rows, ignores M3U comments, deduplicates, and caps batch size", () => {
   const parsed = parseMusicCollectionLines("#EXTM3U\n#EXTINF:-1,ignored\nTrack A | https://cdn.example.org/a.mp3\nhttps://cdn.example.org/b.m4a\nhttps://cdn.example.org/a.mp3");
   assert.equal(parsed.entries.length, 2);
