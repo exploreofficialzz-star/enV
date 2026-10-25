@@ -61,10 +61,11 @@ Honest behaviour notes:
 
 ## Providers and models
 
-Registry rows were checked against provider documentation on **2026-09-30**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
+Most registry rows were checked against provider documentation on **2026-09-30**; the MOSS-Music/Modal row was researched on **2026-10-25**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
 
 | Provider | Model id | Used for | Cost class | List price | Sensitive tasks |
 | --- | --- | --- | --- | --- | --- |
+| Modal (self-hosted) | `MOSS-Music-8B-Instruct` | music tagging/understanding, structured JSON | STANDARD | A100 40 GB list rate about $2.0988 per GPU hour; enV estimates cost from measured inference time | yes, after consent; not a lyric provider |
 | Groq | `openai/gpt-oss-20b` | text, structured (strict schema) | LOW | $0.075 in / $0.30 out per 1M tokens | yes |
 | Groq | `openai/gpt-oss-120b` | text, structured (strict schema) | LOW | $0.15 / $0.60 | yes |
 | Groq | `whisper-large-v3-turbo` | speech-to-text | LOW | $0.04 per audio hour | yes |
@@ -73,7 +74,7 @@ Registry rows were checked against provider documentation on **2026-09-30**. Pri
 | OpenRouter | `openai/gpt-oss-20b` | text, structured | LOW | about $0.02 / $0.10 (varies by upstream) | yes (`data_collection: deny` is sent) |
 | Gemini | `gemini-3.8-flash` | vision, structured | STANDARD | $0.75 / $3.75 through 2026-12-31, then $1.50 / $7.50 | only with `AI_GEMINI_TIER=paid` |
 
-Cost classes come from list price: FREE = zero; LOW ≤ $1 per 1M tokens (input + output) or ≤ $0.25 per audio hour; STANDARD ≤ $10; above that PREMIUM. Gemini's date-based price change is encoded (`pricingUntil`).
+Cost classes come from list price: FREE = zero; LOW ≤ $1 per 1M tokens (input + output) or ≤ $0.25 per audio hour; GPU compute rates up to $1/hour are LOW and up to $10/hour are STANDARD; above that PREMIUM. GPU cost estimates use the model service's measured inference time and exclude cold-start/idle time and non-GPU charges. Gemini's date-based price change is encoded (`pricingUntil`).
 
 Routing order among eligible models: healthy before recently-failing, then **cheapest cost class**, then the task's preference (quality or speed), then `AI_PROVIDER_ORDER`, then model priority. Eligibility removes models that are unconfigured, disabled, lack the capability or structured-output support, exceed `AI_MAX_COST_CLASS`, are paid while the daily budget is spent, are not allowed for sensitive input, have an open circuit, or cannot take the file size.
 
@@ -88,10 +89,11 @@ All optional. See `.env.example`. Never prefix a secret with `VITE_`.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY` | unset | Provider keys (server only). `GOOGLE_AI_API_KEY` is accepted as an alias for `GEMINI_API_KEY`. |
+| `MOSS_MUSIC_ENDPOINT`, `MOSS_MUSIC_TOKEN` | unset | Optional HTTPS `/analyze` URL and shared bearer token for the private Modal-hosted MOSS-Music service. Both are required. Keep the token server-only. See [Modal deployment guide](modal-moss-music.md). |
 | `GOOGLE_AI_API_KEY` | unset | Alias for `GEMINI_API_KEY`. |
 | `AI_ENABLED` | `true` | Master switch. |
-| `AI_PROVIDER_ORDER` | `groq,openrouter,gemini` | Providers allowed to be used and the tie-break order. `mock` is accepted outside production for local development. |
-| `AI_MAX_COST_CLASS` | `LOW` | Highest cost class allowed (`FREE`, `LOW`, `STANDARD`, `PREMIUM`). Vision needs `STANDARD`. |
+| `AI_PROVIDER_ORDER` | `moss_music,groq,openrouter,gemini` | Providers allowed to be used and the tie-break order. `mock` is accepted outside production for local development. |
+| `AI_MAX_COST_CLASS` | `LOW` | Highest cost class allowed (`FREE`, `LOW`, `STANDARD`, `PREMIUM`). Set `STANDARD` to allow Modal MOSS-Music and the registered vision model. |
 | `AI_GEMINI_TIER` | unknown | `paid` if billing is on for the Gemini project; `free` otherwise. Unknown is treated as free for privacy routing. |
 | `AI_SENSITIVE_ALLOW_FREE_TIER` | `false` | Accept routing sensitive tasks to free-tier / may-train models. |
 | `AI_DAILY_BUDGET_USD` | `2` | Estimated daily spend after which paid models stop being used. `0` means free models only. |
@@ -109,6 +111,10 @@ All optional. See `.env.example`. Never prefix a secret with `VITE_`.
 | `AI_SESSION_SECRET` | random per instance | Signs anonymous session cookies. Set it in production. |
 
 Invalid values never crash the app: they fall back to the default and are reported by `npm run check:ai` and the diagnostics endpoint.
+
+## Hosting MOSS-Music on Modal
+
+See [docs/modal-moss-music.md](modal-moss-music.md) for the exact model-serving/runtime steps, private endpoint authentication, environment configuration, smoke tests, cost guardrails and the Vercel cold-start caveat. Configure MOSS variables in the app-side environment that runs `/api/ai/run`; the Render gateway is only a proxy to application routes.
 
 ## Deploying on Vercel
 

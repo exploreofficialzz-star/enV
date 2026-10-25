@@ -10,7 +10,20 @@ test("defaults are safe: enabled, no providers, LOW cost ceiling, no auth requir
   assert.equal(config.maxCostClass, "LOW");
   assert.equal(config.requireAuth, false);
   assert.equal(config.limits.maxBodyBytes, 4_000_000);
-  assert.deepEqual(config.providerOrder, ["groq", "openrouter", "gemini"]);
+  assert.deepEqual(config.providerOrder, ["moss_music", "groq", "openrouter", "gemini"]);
+});
+
+test("MOSS-Music is configured only with a valid HTTPS endpoint and server-only token", () => {
+  const missing = loadAiConfig({ AI_PROVIDER_ORDER: "moss_music", MOSS_MUSIC_ENDPOINT: "https://example.modal.run/analyze" });
+  assert.equal(isProviderConfigured(missing, "moss_music"), false);
+  assert.ok(validateAiConfig(missing).warnings.some((warning) => warning.includes("MOSS_MUSIC_ENDPOINT and MOSS_MUSIC_TOKEN")));
+  const ready = loadAiConfig({ AI_PROVIDER_ORDER: "moss_music", MOSS_MUSIC_ENDPOINT: "https://example.modal.run/analyze", MOSS_MUSIC_TOKEN: "private-token-123456789012345678901234567890" });
+  assert.equal(isProviderConfigured(ready, "moss_music"), true);
+  assert.equal(ready.keys.moss_music?.toString(), "[REDACTED]");
+  assert.ok(validateAiConfig(loadAiConfig({ MOSS_MUSIC_ENDPOINT: "https://example.modal.run/analyze", MOSS_MUSIC_TOKEN: "private-token-123456789012345678901234567890", AI_PROVIDER_ORDER: "groq" })).warnings.some((warning) => warning.includes("not listed in AI_PROVIDER_ORDER")));
+  assert.ok(validateAiConfig(ready).warnings.some((warning) => warning.includes("AI_MAX_COST_CLASS=STANDARD")));
+  assert.equal(isProviderConfigured(loadAiConfig({ AI_PROVIDER_ORDER: "moss_music", MOSS_MUSIC_ENDPOINT: "https://example.modal.run/analyze", MOSS_MUSIC_TOKEN: "short" }), "moss_music"), false);
+  assert.equal(loadAiConfig({ AI_PROVIDER_ORDER: "moss_music", MOSS_MUSIC_ENDPOINT: "http://bad.example/analyze", MOSS_MUSIC_TOKEN: "private-token-123456789012345678901234567890" }).mossMusicEndpoint, null);
 });
 
 test("keys are wrapped and never leak through JSON, inspect or string conversion", () => {

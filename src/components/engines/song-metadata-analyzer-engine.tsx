@@ -279,7 +279,7 @@ async function analyzeLocal(
                   mimeType: "audio/wav",
                   filename: file.name.slice(0, 120),
                   sampledSeconds: excerpt.durationSeconds,
-                }, { signal, timeoutMs: 90_000 });
+                }, { signal, timeoutMs: 180_000 });
                 semantic = response.result;
                 aiRequestId = response.meta.requestId || null;
                 warnings.push(...response.meta.warnings);

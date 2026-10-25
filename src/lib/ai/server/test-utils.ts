@@ -28,6 +28,7 @@ export interface TestCoreOptions {
 export function testCore(options: TestCoreOptions = {}) {
   const config = testConfig(options.env);
   const adapters = {
+    moss_music: createMockAdapter({ id: "moss_music", script: options.scripts?.moss_music }),
     groq: createMockAdapter({ id: "groq", script: options.scripts?.groq }),
     openrouter: createMockAdapter({ id: "openrouter", script: options.scripts?.openrouter }),
     gemini: createMockAdapter({ id: "gemini", script: options.scripts?.gemini }),

@@ -64,7 +64,7 @@ function resolveSpecifier(from, specifier) {
 const NODE_BUILTINS = new Set(["fs", "path", "crypto", "os", "child_process", "util", "stream", "http", "https", "net", "zlib", "buffer", "url", "vm", "worker_threads"]);
 const PROVIDER_SDKS = [/^openai($|\/)/, /^@anthropic-ai\//, /^@google\/(generative-ai|genai)/, /^groq-sdk/, /^@openrouter\//, /^ai($|\/)/, /^@ai-sdk\//, /^@huggingface\//, /^cohere-ai/, /^@mistralai\//];
 const PROVIDER_HOSTS = /(api\.groq\.com|openrouter\.ai|generativelanguage\.googleapis\.com|api\.openai\.com|api\.anthropic\.com|api-inference\.huggingface\.co|router\.huggingface\.co|api\.cohere\.(ai|com)|api\.mistral\.ai)/;
-const SECRET_NAMES = ["OPENROUTER_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "HF_TOKEN", "AI_ADMIN_TOKEN", "AI_SESSION_SECRET"];
+const SECRET_NAMES = ["OPENROUTER_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "HF_TOKEN", "AI_ADMIN_TOKEN", "AI_SESSION_SECRET", "MOSS_MUSIC_TOKEN"];
 
 // ------------------------------------------------------------------ 1. client/server boundary
 const browserFiles = srcFiles.filter((f) => {

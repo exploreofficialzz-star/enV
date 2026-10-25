@@ -8,7 +8,7 @@
  * - Optional providers may be absent; the app and the deterministic tools keep working.
  */
 import { inspect } from "node:util";
-import { COST_CLASSES, PROVIDER_IDS } from "../types.ts";
+import { COST_CLASSES, COST_RANK, PROVIDER_IDS } from "../types.ts";
 import type { CostClass, ProviderId } from "../types.ts";
 
 export class SecretString {
@@ -59,6 +59,8 @@ export interface AiConfig {
   authConfigured: boolean;
   /** Origin of the app's own auth API (from BETTER_AUTH_URL), used to look up the signed-in user. */
   authBaseUrl: string | null;
+  /** Optional private MOSS-Music inference service on Modal. */
+  mossMusicEndpoint: string | null;
   cacheEnabled: boolean;
   debug: boolean;
   adminToken: SecretString | null;
@@ -79,9 +81,10 @@ export const SECRET_ENV_NAMES = [
   "HF_TOKEN",
   "AI_ADMIN_TOKEN",
   "AI_SESSION_SECRET",
+  "MOSS_MUSIC_TOKEN",
 ] as const;
 
-const DEFAULT_ORDER = "groq,openrouter,gemini";
+const DEFAULT_ORDER = "moss_music,groq,openrouter,gemini";
 
 function read(env: Env, name: string): string | undefined {
   const value = env[name]?.trim();
@@ -126,6 +129,20 @@ function readOrigin(env: Env, name: string, issues: string[]): string | null {
     return url.origin;
   } catch {
     issues.push(`${name} must be an http(s) URL; ignoring it for AI sign-in checks.`);
+    return null;
+  }
+}
+
+function readMusicEndpoint(env: Env, issues: string[]): string | null {
+  const raw = read(env, "MOSS_MUSIC_ENDPOINT");
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const localHttp = env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:";
+    if (url.protocol !== "https:" && !localHttp) throw new Error("scheme");
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    issues.push("MOSS_MUSIC_ENDPOINT must be an HTTPS URL (HTTP is allowed only for localhost in development); MOSS-Music will remain unavailable.");
     return null;
   }
 }
@@ -175,6 +192,7 @@ export function loadAiConfig(env: Env = process.env): AiConfig {
       openrouter: secret(read(env, "OPENROUTER_API_KEY")),
       groq: secret(read(env, "GROQ_API_KEY")),
       gemini: secret(read(env, "GEMINI_API_KEY") ?? read(env, "GOOGLE_AI_API_KEY")),
+      moss_music: secret(read(env, "MOSS_MUSIC_TOKEN")),
     },
     providerOrder,
     disabledModels: new Set(readList(env, "AI_DISABLED_MODELS", false)),
@@ -185,6 +203,7 @@ export function loadAiConfig(env: Env = process.env): AiConfig {
     requireAuth: readBool(env, "AI_REQUIRE_AUTH", false, issues),
     authConfigured: read(env, "VITE_AUTH_ENABLED") === "true",
     authBaseUrl: readOrigin(env, "BETTER_AUTH_URL", issues),
+    mossMusicEndpoint: readMusicEndpoint(env, issues),
     cacheEnabled: readBool(env, "AI_CACHE_ENABLED", true, issues),
     debug: readBool(env, "AI_DEBUG", false, issues),
     adminToken: secret(read(env, "AI_ADMIN_TOKEN")),
@@ -204,6 +223,7 @@ export function loadAiConfig(env: Env = process.env): AiConfig {
 export function isProviderConfigured(config: AiConfig, provider: ProviderId): boolean {
   if (!config.providerOrder.includes(provider)) return false;
   if (provider === "mock") return !config.production;
+  if (provider === "moss_music") return config.mossMusicEndpoint !== null && config.keys.moss_music !== null && config.keys.moss_music.reveal().length >= 32;
   return config.keys[provider] !== null;
 }
 
@@ -239,6 +259,10 @@ export function validateAiConfig(config: AiConfig): ConfigValidation {
       warnings.push(`${provider} has a key but is not listed in AI_PROVIDER_ORDER, so it will not be used.`);
     }
   }
+  if ((config.mossMusicEndpoint === null) !== (config.keys.moss_music === null)) warnings.push("MOSS_MUSIC_ENDPOINT and MOSS_MUSIC_TOKEN must both be configured before the self-hosted MOSS-Music provider can run.");
+  if (config.mossMusicEndpoint && config.keys.moss_music && config.keys.moss_music.reveal().length >= 32 && !config.providerOrder.includes("moss_music")) warnings.push("MOSS-Music is configured but not listed in AI_PROVIDER_ORDER, so audio tagging will not use it.");
+  if (config.mossMusicEndpoint && config.keys.moss_music && config.keys.moss_music.reveal().length >= 32 && COST_RANK[config.maxCostClass] < COST_RANK.STANDARD) warnings.push("MOSS-Music is a STANDARD-cost GPU model and is excluded by AI_MAX_COST_CLASS; set AI_MAX_COST_CLASS=STANDARD after reviewing the Modal budget.");
+  if (config.keys.moss_music && config.keys.moss_music.reveal().length < 32) warnings.push("MOSS_MUSIC_TOKEN must be at least 32 characters; MOSS-Music remains unavailable until a longer random token is configured.");
   if (config.keys.gemini && config.geminiTier === "unknown") {
     warnings.push("AI_GEMINI_TIER is not set: Gemini is treated as a free tier that may use content to improve Google products, so privacy-sensitive tasks (images, audio, JSON) will not use it. Set AI_GEMINI_TIER=paid if billing is enabled.");
   }

@@ -11,6 +11,7 @@ import type { CostClass, ModelPricing, ModelRecord, ProviderId } from "../../typ
 import { CAPABILITIES, COST_CLASSES, PROVIDER_IDS } from "../../types.ts";
 
 const CHECKED = "Checked against provider docs on 2026-09-30.";
+const MOSS_CHECKED = "Checked against the OpenMOSS MOSS-Music README and SGLang serving guide on 2026-10-25.";
 
 export const MODEL_REGISTRY: readonly ModelRecord[] = [
   {
@@ -186,6 +187,31 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     notes: `${CHECKED} Model id and the two-stage pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01) are from ai.google.dev/gemini-api/docs/latest-model. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
   },
   {
+    provider: "moss_music",
+    modelId: "MOSS-Music-8B-Instruct",
+    displayName: "MOSS-Music 8B Instruct (self-hosted on Modal)",
+    capabilities: ["AUDIO_UNDERSTANDING"],
+    inputModalities: ["audio", "text"],
+    outputModalities: ["text"],
+    contextWindow: 32_768,
+    maxOutputTokens: 1_800,
+    structuredOutput: "json-schema",
+    toolCalling: false,
+    streaming: false,
+    costClass: "STANDARD",
+    free: false,
+    pricing: { perComputeHour: 2.0988 },
+    quality: "best",
+    latency: "slow",
+    priority: 1,
+    enabled: true,
+    reasoning: false,
+    outputHeadroomTokens: 0,
+    sensitiveOk: true,
+    maxAudioBytes: 2_800_000,
+    notes: `${MOSS_CHECKED} The Instruct checkpoint is about 9.1B parameters, Apache-2.0, and the project's guide recommends SGLang with the OpenMOSS moss-audio branch. Modal A100 40 GB GPU list rate was $0.000583/second ($2.0988/hour) on this date. This estimate uses measured inference wall time and excludes GPU container cold start, warm-idle time, CPU/RAM and other charges; use Modal's billing dashboard as the source of truth. Free Starter credits offset eligible compute, they do not make the listed service unlimited or zero-cost.`,
+  },
+  {
     provider: "mock",
     modelId: "mock-text",
     displayName: "Mock text model (tests and local development only)",
@@ -253,6 +279,10 @@ export function resolvePricing(model: ModelRecord, at: number): ModelPricing | n
 /** Cost class implied by a price list: FREE, then blended $/1M tokens (or $/audio hour) bands. */
 export function deriveCostClass(pricing: ModelPricing | null): CostClass | null {
   if (!pricing) return null;
+  if (pricing.perComputeHour !== undefined) {
+    if (pricing.perComputeHour <= 0) return "FREE";
+    return pricing.perComputeHour <= 1 ? "LOW" : pricing.perComputeHour <= 10 ? "STANDARD" : "PREMIUM";
+  }
   const tokens = (pricing.inputPerMTok ?? 0) + (pricing.outputPerMTok ?? 0);
   const audio = pricing.perAudioHour ?? 0;
   if (tokens === 0 && audio === 0) return "FREE";
@@ -278,7 +308,8 @@ export function validateModelRegistry(models: readonly ModelRecord[] = MODEL_REG
     if (!(COST_CLASSES as readonly string[]).includes(m.costClass)) fail("unknown cost class");
 
     const has = (c: (typeof CAPABILITIES)[number]) => m.capabilities.includes(c);
-    if (has("STRUCTURED_TEXT") !== (m.structuredOutput !== "none")) fail("STRUCTURED_TEXT capability and structuredOutput disagree");
+    if (has("STRUCTURED_TEXT") && m.structuredOutput === "none") fail("STRUCTURED_TEXT capability requires a structured-output mode");
+    if (!has("STRUCTURED_TEXT") && m.structuredOutput !== "none" && !has("AUDIO_UNDERSTANDING") && !has("VISION_ANALYSIS")) fail("structured output without a text, audio-understanding or vision capability");
     if (has("VISION_ANALYSIS") && !m.inputModalities.includes("image")) fail("vision model without image input");
     if (has("SPEECH_TO_TEXT")) {
       if (!m.inputModalities.includes("audio")) fail("speech model without audio input");
