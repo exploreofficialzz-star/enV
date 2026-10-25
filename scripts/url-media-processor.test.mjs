@@ -138,4 +138,4 @@ assert.deepEqual(
 assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWith("https://audiomack.com/evadolee/song/")));
 assert.equal(audiomackAlbumPage.uploader, "Evado");
 assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
-\n
+
