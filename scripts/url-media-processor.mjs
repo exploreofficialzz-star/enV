@@ -9,6 +9,7 @@ import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequest
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
+import { classifyProviderFailure } from "./media/provider-errors.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -62,7 +63,7 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
         if (/unexpected response from webpage request|ip address is blocked|captcha|too many requests/i.test(detail)) {
           return reject(new Error(`SOURCE_UNAVAILABLE: ${provider || "The provider"} is challenging or blocking the processor request. Confirm the post is publicly available in the service region, then retry later.`));
         }
-        return reject(new Error(`Media downloader failed (code ${code}). ${detail}`));
+        return reject(classifyProviderFailure(provider, detail || `Media downloader exited with code ${code}.`));
       }
       resolve({ stdout, stderr });
     });
@@ -200,10 +201,15 @@ function errorPayload(error) {
     (/request body is too large/i.test(message) ? "REQUEST_TOO_LARGE" :
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
   const retryable = ["SOURCE_UNAVAILABLE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
-  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(message);
+  const safeMessage = message.replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n\t]+/g, " ").slice(0, 900);
+  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(safeMessage);
+  const explicitDetail = safeMessage.match(/^[A-Z_]+:\s*(.+)$/);
+  const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
   const publicMessage = audiomackAlbumFailure
-    ? message.replace(/^SOURCE_UNAVAILABLE:\s*/i, "")
-    : PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR;
+    ? safeMessage.replace(/^SOURCE_UNAVAILABLE:\s*/i, "")
+    : detailCodes.has(code) && explicitDetail
+      ? explicitDetail[1]
+      : PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR;
   return { code, message: publicMessage, retryable };
 }
 
