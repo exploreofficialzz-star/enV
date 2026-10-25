@@ -25,9 +25,33 @@ const musicDownloaderTool: ToolMeta = {
   isNew: true,
 };
 
-const allTools: ToolMeta[] = catalogTools.some((tool) => tool.id === musicDownloaderTool.id)
-  ? catalogTools
-  : [...catalogTools, musicDownloaderTool];
+
+const songMetadataAnalyzerTool: ToolMeta = {
+  id: "song-metadata-analyzer",
+  name: "Song Metadata Analyzer",
+  slug: "song-metadata-analyzer",
+  description: "Analyze songs for genre, tempo, key, mood, vocals and instruments. Process batches and export reports.",
+  category: "audio",
+  subcategory: "Music",
+  keywords: ["song", "music", "metadata", "analyzer", "analyser", "bpm", "tempo", "key", "genre", "mood", "instruments", "vocals", "batch", "zip", "afrobeats", "afro-pop"],
+  tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "mood", "batch", "audio"],
+  icon: "AudioLines",
+  popularity: 9900,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["audio-file-inspector", "music-studio", "music-downloader"],
+  engine: { type: "custom", id: "song-metadata-analyzer" },
+  isNew: true,
+};
+
+const allTools: ToolMeta[] = [
+  ...catalogTools,
+  ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
+];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));
 const accessibilityStudios = makeAccessibilityStudioTools(allTools);
