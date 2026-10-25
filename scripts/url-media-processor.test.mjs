@@ -77,7 +77,7 @@ for (const url of [
 }
 assert.equal(detectProvider(new URL("https://vt.tiktok.com/ZSydNwHA1/")), "tiktok");
 assert.deepEqual(createProviderRequestArgs("generic", {}), []);
-assert.deepEqual(createProviderAdapter("audiomack", "mp3", true).post, ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K", "--embed-metadata", "--embed-thumbnail"]);
+assert.deepEqual(createProviderAdapter("audiomack", "mp3", true).post, ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K", "--embed-metadata"]);
 assert.deepEqual(createProviderRequestArgs("tiktok", {}), ["--impersonate", "chrome"]);
 assert.deepEqual(createProviderRequestArgs("youtube", { URL_MEDIA_YOUTUBE_COOKIES_FILE: "/etc/secrets/youtube.txt" }), ["--cookies", "/etc/secrets/youtube.txt"]);
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
@@ -138,3 +138,4 @@ assert.deepEqual(
 assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWith("https://audiomack.com/evadolee/song/")));
 assert.equal(audiomackAlbumPage.uploader, "Evado");
 assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
+\n
