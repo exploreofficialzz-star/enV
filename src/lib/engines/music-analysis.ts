@@ -208,7 +208,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const key = estimateKey(keySamples, input.sampleRate);
   const spectrum = spectralFeatures(representative, input.sampleRate);
   const zcr = frames > 1 ? zeroCrossings / (frames - 1) : null;
-  const metadata = input.metadata ?? {};
+  const metadata: MusicMetadata = input.metadata ?? {};
   const taggedBpm = metadata.bpm ? Number(metadata.bpm) : NaN;
 
   return {
