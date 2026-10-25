@@ -280,6 +280,7 @@ export function validateModelRegistry(models: readonly ModelRecord[] = MODEL_REG
     const has = (c: (typeof CAPABILITIES)[number]) => m.capabilities.includes(c);
     if (has("STRUCTURED_TEXT") !== (m.structuredOutput !== "none")) fail("STRUCTURED_TEXT capability and structuredOutput disagree");
     if (has("VISION_ANALYSIS") && !m.inputModalities.includes("image")) fail("vision model without image input");
+    if (has("AUDIO_ANALYSIS") && (!m.inputModalities.includes("audio") || !m.outputModalities.includes("text"))) fail("audio analysis model needs audio input and text output");
     if (has("SPEECH_TO_TEXT")) {
       if (!m.inputModalities.includes("audio")) fail("speech model without audio input");
       if (!m.maxAudioBytes || m.maxAudioBytes <= 0) fail("speech model without maxAudioBytes");
