@@ -163,13 +163,10 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 2048 -cores 2
-          # Avoid flaky ADB shell settings calls on hosted emulators; instrumentation tests do not require animations to be disabled.
+          # Give the API 30 emulator enough RAM and keep device setup under the runner action's control.
+          # Avoid manually restarting ADB before boot; this runner has repeatedly lost the emulator shell.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-snapshot-load -noaudio -no-boot-anim -memory 4096 -cores 2 -camera-back none -camera-front none
           disable-animations: false
-          pre-emulator-launch-script: |
-            adb kill-server || true
-            adb start-server
-            adb devices
           script: cd apps/android && ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
       - name: Upload Android instrumentation test evidence
         if: always()
