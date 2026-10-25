@@ -140,7 +140,7 @@ function readMusicEndpoint(env: Env, issues: string[]): string | null {
     const url = new URL(raw);
     const localHttp = env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:";
     if (url.protocol !== "https:" && !localHttp) throw new Error("scheme");
-    return url.toString().replace(/\\/$/, "");
+    return url.toString().replace(/\/+$/, "");
   } catch {
     issues.push("MOSS_MUSIC_ENDPOINT must be an HTTPS URL (HTTP is allowed only for localhost in development); MOSS-Music will remain unavailable.");
     return null;
