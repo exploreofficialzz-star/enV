@@ -139,6 +139,7 @@ import com.chastech.env.data.nativeDisclaimerText
 import com.chastech.env.data.relatedTools
 import com.chastech.env.data.fromJson
 import com.chastech.env.data.withMusicDownloader
+import com.chastech.env.data.withSongMetadataAnalyzer
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeAudioEngine
 import com.chastech.env.engine.NativeAudioWavProcessor
@@ -216,7 +217,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader() }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -1301,6 +1302,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 @Composable
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
+    if (tool.id == "song-metadata-analyzer") { NativeSongMetadataAnalyzerScreen(); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)

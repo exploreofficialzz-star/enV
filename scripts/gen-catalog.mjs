@@ -914,6 +914,7 @@ addCross("design", ["Color", "Gradient", "Shadow", "Border", "Button", "Card", "
 addCross("webdesign", ["Responsive Layout", "Typography Scale", "Spacing Scale", "Grid", "Flexbox", "CSS", "Tailwind", "HTML", "Form", "Navigation", "Hero Section", "Pricing Table", "Footer", "Modal", "Toast", "Tooltip", "Tabs", "Accordion", "Carousel", "Design Token"], ["Generator", "Builder", "Preview", "Checklist", "Snippet Generator"], "A {platform} helper for web design and interface work.");
 
 add([
+  ["song-metadata-analyzer","Song Metadata Analyzer","audio","Analyze song genre, style, language, tempo, key, mood, vocals, instruments, and technical metadata. Batch multiple tracks or ZIP collections and export JSON or CSV reports.","audio","song-metadata-analyzer","song metadata music analyzer bpm key genre mood vocals instruments batch zip afrobeats afro-pop",1,99,"n"],
   ["audio-file-inspector","Audio File Inspector","audio","Inspect duration, sample rate, channels, frames, and local file size.","audio","inspector","audio file metadata inspector",1,93,"n"],
   ["audio-duration-tool","Audio Duration Tool","audio","Read the decoded duration of a local audio file.","audio","duration","audio duration length",0,86],
   ["audio-waveform-generator","Audio Waveform Generator","audio","Generate a downloadable waveform PNG from a local audio file.","audio","waveform","audio waveform visualizer",1,92],
@@ -1773,11 +1774,11 @@ for (const tool of tools) {
   tool.requiresAuth = false;
 }
 
-const localAudioOps = new Set(["webcodecs-audio-checker","audio-file-inspector","audio-duration-tool","audio-waveform-generator","audio-to-wav","audio-trimmer","audio-reverser","audio-normalizer","audio-fade-in","audio-fade-out","audio-to-mono","audio-to-stereo","audio-peak-meter","audio-rms-meter","audio-silence-detector","audio-channel-balance","audio-dc-offset-checker","audio-joiner"]);
+const localAudioOps = new Set(["webcodecs-audio-checker","song-metadata-analyzer","audio-file-inspector","audio-duration-tool","audio-waveform-generator","audio-to-wav","audio-trimmer","audio-reverser","audio-normalizer","audio-fade-in","audio-fade-out","audio-to-mono","audio-to-stereo","audio-peak-meter","audio-rms-meter","audio-silence-detector","audio-channel-balance","audio-dc-offset-checker","audio-joiner"]);
 for (const tool of tools) {
   if (tool.category !== "audio" || !localAudioOps.has(tool.id)) continue;
   const opMap = {
-    "webcodecs-audio-checker": "webcodecs-audio",
+    "webcodecs-audio-checker": "webcodecs-audio", "song-metadata-analyzer": "song-metadata-analyzer",
     "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-waveform-generator": "waveform",
     "audio-to-wav": "to-wav", "audio-trimmer": "trim", "audio-reverser": "reverse", "audio-normalizer": "normalize",
     "audio-fade-in": "fade-in", "audio-fade-out": "fade-out", "audio-to-mono": "mono", "audio-to-stereo": "stereo",

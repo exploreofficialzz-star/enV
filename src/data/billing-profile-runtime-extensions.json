@@ -1,0 +1,33 @@
+{
+  "pricingVersion": "env-metering-preview-2026-10-18-v1",
+  "toolCount": 1,
+  "profiles": [
+    {
+      "toolId": "song-metadata-analyzer",
+      "toolName": "Song Metadata Analyzer",
+      "category": "audio",
+      "toolStatus": "active",
+      "engineType": "custom",
+      "clientSide": true,
+      "requiresBackend": false,
+      "executionMode": "local-device",
+      "billingKey": "local.audio_processing",
+      "pricingMode": "per-unit-hypothesis",
+      "provisionalSubunitsPerUnit": 500,
+      "unitLabel": "operation",
+      "meteringDimensions": [
+        "operation-count",
+        "duration",
+        "sample-rate",
+        "channels"
+      ],
+      "optionalAiAssistProfile": null,
+      "premiumRequired": false,
+      "adsEligible": false,
+      "priceStatus": "provisional",
+      "manualAuditRequired": true,
+      "classificationReason": "Local execution metadata plus audio category/engine; duration-sensitive billing needs tool instrumentation.",
+      "pricingVersion": "env-metering-preview-2026-10-18-v1"
+    }
+  ]
+}

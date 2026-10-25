@@ -220,6 +220,48 @@ extension Catalog {
     }
 }
 
+
+extension Catalog {
+    /// Adds the native Song Metadata Analyzer when loading an older generated catalog.
+    func includingSongMetadataAnalyzer() -> Catalog {
+        guard !tools.contains(where: { $0.id == "song-metadata-analyzer" }) else { return self }
+        let tool = Tool(
+            id: "song-metadata-analyzer",
+            name: "Song Metadata Analyzer",
+            slug: "song-metadata-analyzer",
+            description: "Analyze genre, tempo, key, mood, vocals and instruments. Batch songs and export reports.",
+            category: "audio",
+            subcategory: "Music",
+            keywords: ["song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"],
+            tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"],
+            icon: "AudioLines",
+            popularity: 9900,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["audio-file-inspector", "music-studio", "music-downloader"],
+            engine: ToolEngine(type: "audio", id: "song-metadata-analyzer", op: "song-metadata-analyzer", configuration: [:])
+        )
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: (tools + [tool]).sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory
+                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                    : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+}
+
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -314,7 +356,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer()
     }
 }
 

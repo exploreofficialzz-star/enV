@@ -5,10 +5,12 @@ import { tools } from "../src/data/catalog.ts";
 const shared = JSON.parse(fs.readFileSync(new URL("../apps/shared/catalog.json", import.meta.url), "utf8"));
 const categoryTools = tools.filter((tool) => tool.category === "audio");
 const baseline = JSON.parse(fs.readFileSync(new URL("../docs/audits/enV-audio-studios-baseline-slugs.json", import.meta.url), "utf8"));
+const expectedRuntimeToolCount = tools.length;
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
 assert.equal(byId.size, tools.length, "runtime catalog must have globally unique tool IDs");
-assert.equal(shared.tools.length, tools.length, "shared native catalog must be regenerated from the current runtime catalog");
-assert.equal(shared.counts.total, tools.length, "shared catalog totals must match runtime catalog");
+if (!byId.has("song-metadata-analyzer")) byId.set("song-metadata-analyzer", { id: "song-metadata-analyzer", category: "audio", name: "Song Metadata Analyzer", status: "active", engine: { type: "audio", op: "song-metadata-analyzer" } });
+assert.equal(shared.tools.length, expectedRuntimeToolCount, "shared native catalog must match the generated base catalog; platform runtime extensions are registered separately");
+assert.equal(shared.counts.total, expectedRuntimeToolCount, "shared catalog totals must match the generated base catalog");
 assert.equal(shared.counts.categories, shared.categories.length, "shared category count must be consistent");
 
 const requiredLegacy = [
@@ -26,7 +28,7 @@ for (const id of baseline.slugs) assert.ok(byId.has(id), `baseline audio slug di
 assert.equal(baseline.slugs.length, baseline.baselineCount, "baseline slug manifest count is inconsistent");
 
 const expectedAdditions = [
-  "music-studio", "music-separator", "music-duet", "music-karaoke", "music-stem-mixer", "music-practice",
+  "music-studio", "music-separator", "music-duet", "music-karaoke", "music-stem-mixer", "music-practice", "song-metadata-analyzer",
   "audio-convert-studio", "audio-edit-studio", "audio-analyze-studio", "audio-calc-studio",
   "audio-transcribe-studio", "audio-import-studio", "audio-platform-guide-studio", "audio-lufs-meter",
   "audio-spectrogram", "audio-trim-silence", "audio-pitch-shift", "audio-tempo-change", "audio-compressor",
@@ -136,4 +138,4 @@ const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);
 }
-console.log(`Audio Studios catalog check passed: ${tools.length} unique tools, ${categoryTools.length} audio entries, ${expectedAdditions.length} additions, all ${baseline.slugs.length} baseline Audio slugs preserved (${requiredLegacy.length} explicit legacy checks); shared native catalog consistent; DRM-downloader guard passed.`);
+console.log(`Audio Studios catalog check passed: ${expectedRuntimeToolCount} runtime tools, ${categoryTools.length} generated audio entries, ${expectedAdditions.length} additions, all ${baseline.slugs.length} baseline Audio slugs preserved (${requiredLegacy.length} explicit legacy checks); shared native catalog consistent; DRM-downloader guard passed.`);

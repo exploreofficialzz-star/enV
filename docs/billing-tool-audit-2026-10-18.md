@@ -8,9 +8,10 @@ Generated from the authoritative Web catalogue metadata. This is a first-pass cl
 - Local-device profiles: **9824**
 - Cloud/remote profiles: **201**
 - Profiles requiring manual audit: **10,025**
-- Android native tool IDs covered by this registry: **7,782 / 7,782**
-- iOS native tool IDs covered by this registry: **7,782 / 7,782**
+- Android native tool IDs covered by this registry: **7,783 / 7,783**
+- iOS native tool IDs covered by this registry: **7,783 / 7,783**
 - Advertising eligible in this monetization plan: **0**
+- The base catalogue profile index remains at **10,025** entries; the native-only `song-metadata-analyzer` extension has a separate provisional profile in `src/data/billing-profile-runtime-extensions.json`.
 
 ## Count by billing rule
 

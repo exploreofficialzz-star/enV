@@ -5,8 +5,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { tools } = await import("../src/data/catalog.ts");
+const { tools: catalogTools } = await import("../src/data/catalog.ts");
+const { getAllTools } = await import("../src/lib/registry.ts");
 const nativeInventory = JSON.parse(await readFile(join(root, "apps/shared/native-engine-inventory.json"), "utf8"));
+
+// Native-only tools can live in the runtime registry without belonging to the
+// generated base catalogue. Keep the base profile artifacts deterministic and store
+// those explicit runtime extensions in a small, separately generated profile index.
+const baseToolIds = new Set(catalogTools.map((tool) => tool.id));
+const registryTools = getAllTools();
+const runtimeExtensionTools = [];
+for (const id of new Set(nativeInventory.runtimeExtensionIds ?? [])) {
+  if (baseToolIds.has(id)) continue;
+  const runtimeTool = registryTools.find((tool) => tool.id === id);
+  if (!runtimeTool) throw new Error(`Native runtime extension "${id}" has no registered tool metadata.`);
+  runtimeExtensionTools.push(runtimeTool);
+}
+const tools = catalogTools;
 const { METERED_OPERATION_RULES, PRICING_VERSION } = await import("../src/lib/billing/catalog.ts");
 const ruleById = new Map(METERED_OPERATION_RULES.map((rule) => [rule.id, rule]));
 
@@ -119,9 +134,13 @@ function profile(tool) {
 
 const sortedTools = [...tools].sort((a, b) => a.id.localeCompare(b.id));
 const profiles = sortedTools.map(profile);
-const duplicateIds = profiles.filter((p, i) => profiles.findIndex((other) => other.toolId === p.toolId) !== i).map((p) => p.toolId);
+const runtimeExtensionProfiles = [...runtimeExtensionTools]
+  .sort((a, b) => a.id.localeCompare(b.id))
+  .map(profile);
+const allGeneratedProfiles = [...profiles, ...runtimeExtensionProfiles];
+const duplicateIds = allGeneratedProfiles.filter((p, i) => allGeneratedProfiles.findIndex((other) => other.toolId === p.toolId) !== i).map((p) => p.toolId);
 if (duplicateIds.length) throw new Error(`Duplicate tool profile IDs: ${duplicateIds.slice(0, 10).join(", ")}`);
-const profileIds = new Set(profiles.map((p) => p.toolId));
+const profileIds = new Set(allGeneratedProfiles.map((p) => p.toolId));
 const nativeToolCoverage = {};
 for (const [platform, key] of [["Android", "androidToolIds"], ["iOS", "iosToolIds"]]) {
   const ids = nativeInventory[key];
@@ -138,6 +157,7 @@ await mkdir(dirname(dataPath), { recursive: true });
 await writeFile(dataPath, `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: profiles.length, profiles }, null, 2)}\n`);
 const indexProfiles = profiles.map(({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }) => ({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }));
 await writeFile(join(root, "src/data/billing-profile-index.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: indexProfiles.length, profiles: indexProfiles })}\n`);
+await writeFile(join(root, "src/data/billing-profile-runtime-extensions.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: runtimeExtensionProfiles.length, profiles: runtimeExtensionProfiles }, null, 2)}\n`);
 
 const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.set(p[key], (map.get(p[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 const byRule = countBy("billingKey");

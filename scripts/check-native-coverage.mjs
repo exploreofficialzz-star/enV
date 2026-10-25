@@ -12,6 +12,24 @@ if (audioStudioBlock) {
     if (!catalog.some((tool) => tool.id === match[1])) catalog.push({ id: match[1], status: match[2], category: 'audio', engine: { type: 'audio' } });
   }
 }
+// Platform-specific runtime extensions do not have to live in the generated 10,000-tool base catalog.
+const platformRuntimeExtensions = [
+  { id: 'song-metadata-analyzer', status: 'active', category: 'audio', engine: { type: 'audio' } },
+];
+for (const tool of platformRuntimeExtensions) {
+  if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);
+}
+const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', import.meta.url), 'utf8');
+const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
+const iosAnalyzerRoutes = fs.readFileSync(new URL('../apps/ios/enV/ToolViews.swift', import.meta.url), 'utf8');
+for (const [label, source, marker] of [
+  ['Android screen dispatch', nativeAnalyzerRoute, 'NativeSongMetadataAnalyzerScreen()'],
+  ['Android engine route', nativeAnalyzerEngine, 'song-metadata-analyzer'],
+  ['iOS native screen dispatch', iosAnalyzerRoutes, 'NativeSongMetadataAnalyzerView(title: tool.name)'],
+  ['iOS engine route', iosAnalyzerRoutes, 'if tool.id == "song-metadata-analyzer"'],
+]) {
+  if (!source.includes(marker)) throw new Error(`Song Metadata Analyzer missing ${label}.`);
+}
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));
 const readIds = (platform) => {

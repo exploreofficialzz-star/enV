@@ -1,7 +1,7 @@
 /** SERVER ONLY. Media tasks: image alt text (vision) and audio transcription (speech-to-text). */
 import { z } from "zod";
 import { ALT_STYLES, AI_LIMITS, AUDIO_MIME_TYPES, IMAGE_MIME_TYPES } from "../../contracts.ts";
-import type { AltTextResult, MusicClassificationResult, TranscriptResult } from "../../contracts.ts";
+import type { AltTextResult, MusicAnalysisResult, MusicClassificationResult, TranscriptResult } from "../../contracts.ts";
 import { sha256Hex } from "../core/ids.ts";
 import { cleanOutputText, UNTRUSTED_GUARD, wrapUntrusted } from "../security/sanitize.ts";
 import { defineTask } from "./define.ts";
@@ -230,6 +230,137 @@ export const musicAnalysisTask = defineTask({
     } };
   },
 });
+const MusicAnalysisInput = z
+  .object({
+    audioBase64: z.string().min(100).max(AI_LIMITS.audioBase64Max).regex(BASE64, "The audio must be base64 encoded."),
+    mimeType: z.enum(AUDIO_MIME_TYPES),
+    filename: z.string().trim().max(120).optional(),
+    sampledSeconds: z.number().finite().min(1).max(65),
+  })
+  .refine((value) => audioSignatureMatches(value.audioBase64), { message: "The audio sample does not look like a supported audio file." });
+
+const MusicAnalysisOutput = z.object({
+  genre: z.string().trim().max(60).nullable(),
+  sub_style: z.string().trim().max(80).nullable(),
+  language: z.array(z.string().trim().min(1).max(40)).max(8),
+  energy: z.enum(["low", "mid", "high", "very_high", "unknown"]),
+  mood: z.array(z.string().trim().min(1).max(40)).max(8),
+  theme: z.array(z.string().trim().min(1).max(50)).max(8),
+  setting: z.array(z.string().trim().min(1).max(40)).max(6),
+  vocals: z.array(z.string().trim().min(1).max(60)).max(12),
+  instruments: z.array(z.string().trim().min(1).max(60)).max(16),
+  descriptions: z.array(z.string().trim().min(1).max(350)).max(3),
+  lyric_evidence: z.string().max(280),
+  warnings: z.array(z.string().trim().min(1).max(160)).max(8),
+});
+
+function cleanLabels(values: readonly string[], limit: number): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const raw of values) {
+    const label = cleanOutputText(raw, 60);
+    const key = label.toLocaleLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    output.push(label);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+/**
+ * Semantic audio task: this runs only when the user deliberately invokes Full Analysis.
+ * The input is a bounded, locally prepared excerpt set rather than a large original song file.
+ */
+export const songMetadataAnalysisTask = defineTask({
+  kind: "structured",
+  capability: "AUDIO_UNDERSTANDING",
+  id: "audio.music.analyze",
+  version: "2026-10-25.2",
+  description: "Analyze short representative music excerpts for genre, mood, vocals, instruments, language and grounded descriptions.",
+  privacy: "sensitive",
+  remoteProcessingAllowed: true,
+  minQuality: "balanced",
+  prefer: "quality",
+  rateUnits: 8,
+  timeoutMs: 70_000,
+  attemptTimeoutMs: 60_000,
+  maxOutputTokens: 1800,
+  temperature: 0.1,
+  input: MusicAnalysisInput,
+  output: MusicAnalysisOutput,
+  jsonSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["genre", "sub_style", "language", "energy", "mood", "theme", "setting", "vocals", "instruments", "descriptions", "lyric_evidence", "warnings"],
+    properties: {
+      genre: { type: ["string", "null"], maxLength: 60 },
+      sub_style: { type: ["string", "null"], maxLength: 80 },
+      language: { type: "array", maxItems: 8, items: { type: "string", maxLength: 40 } },
+      energy: { type: "string", enum: ["low", "mid", "high", "very_high", "unknown"] },
+      mood: { type: "array", maxItems: 8, items: { type: "string", maxLength: 40 } },
+      theme: { type: "array", maxItems: 8, items: { type: "string", maxLength: 50 } },
+      setting: { type: "array", maxItems: 6, items: { type: "string", maxLength: 40 } },
+      vocals: { type: "array", maxItems: 12, items: { type: "string", maxLength: 60 } },
+      instruments: { type: "array", maxItems: 16, items: { type: "string", maxLength: 60 } },
+      descriptions: { type: "array", maxItems: 3, items: { type: "string", maxLength: 350 } },
+      lyric_evidence: { type: "string", maxLength: 280 },
+      warnings: { type: "array", maxItems: 8, items: { type: "string", maxLength: 160 } },
+    },
+  },
+  prompt(input, { boundary }) {
+    const system = [
+      "You are a careful music-analysis classifier. Return only structured findings supported by the supplied audio.",
+      UNTRUSTED_GUARD,
+      "The audio contains up to three short excerpts from one song, sampled locally from different points. It is not the complete recording.",
+      "Identify the broad genre and a more specific style only when the sound supports them. Hybrid or unfamiliar genres are allowed; use null when unknown.",
+      "Detect languages only when audible lyrics/speech support them. Mixed-language singing may list more than one language. Do not infer language from artist or filename.",
+      "Describe audible vocal presentation and instruments. Only label a specific instrument or processing effect (such as autotune) when it is distinctly supported by the mix; otherwise choose a broader description or omit it.",
+      "Mood and energy are perceptual descriptions. Themes must be grounded in clear lyrical meaning; do not invent a story when the words are unclear.",
+      "Setting means a likely listening/activity context suggested by the music, not the real physical location where the track was recorded.",
+      "Do not guess the singer's identity, ethnicity, or verified gender identity. If vocal register/presentation is uncertain, omit it.",
+      "Write up to three short, distinct descriptions. Do not quote song lyrics; summarize any lyrical evidence briefly and in your own words.",
+      "Use empty lists and null when unsupported. Include concise warnings for uncertainty or insufficient evidence. Do not fabricate numeric confidence scores.",
+      "Reply with only a JSON object that matches the provided schema.",
+    ].join("\n");
+    const context = [
+      "Analyze the attached music excerpts.",
+      `Approximate supplied audio duration: ${input.sampledSeconds.toFixed(1)} seconds.`,
+      input.filename ? `Original filename (untrusted label only): ${wrapUntrusted("FILENAME", input.filename, boundary)}` : "",
+      "The excerpts may omit the main chorus or some languages. Report only what can be heard in the supplied material.",
+    ].filter(Boolean).join("\n");
+    return {
+      system,
+      user: [
+        { type: "text", text: context },
+        { type: "audio", mimeType: input.mimeType, dataBase64: input.audioBase64, filename: "music-samples.wav" },
+      ],
+      fingerprint: JSON.stringify([sha256Hex(input.audioBase64), input.mimeType, input.sampledSeconds]),
+      inputBytes: decodedSize(input.audioBase64),
+    };
+  },
+  finalize(output): { ok: true; value: MusicAnalysisResult; warnings: string[] } {
+    const genre = output.genre ? cleanOutputText(output.genre, 60) : null;
+    const subStyle = output.sub_style ? cleanOutputText(output.sub_style, 80) : null;
+    const value: MusicAnalysisResult = {
+      genre: genre && !/^unknown$/i.test(genre) ? genre : null,
+      sub_style: subStyle && !/^unknown$/i.test(subStyle) ? subStyle : null,
+      language: cleanLabels(output.language, 8),
+      energy: output.energy,
+      mood: cleanLabels(output.mood, 8),
+      theme: cleanLabels(output.theme, 8),
+      setting: cleanLabels(output.setting, 6),
+      vocals: cleanLabels(output.vocals, 12),
+      instruments: cleanLabels(output.instruments, 16),
+      descriptions: output.descriptions.map((item) => cleanOutputText(item, 350)).filter(Boolean).slice(0, 3),
+      lyric_evidence: cleanOutputText(output.lyric_evidence, 280),
+      warnings: cleanLabels(output.warnings, 8),
+    };
+    const warnings = value.warnings.length ? value.warnings : [];
+    return { ok: true, value, warnings };
+  },
+});
+
 export const transcribeTask = defineTask({
   kind: "transcript",
   id: "video.transcript.generate",

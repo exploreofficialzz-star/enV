@@ -44,6 +44,7 @@ test("every structured task: schema is strict-compatible and its own example pas
     "developer.json.explain": { json: '{"a":1}' },
     "image.alt.generate": { imageBase64: png(), mimeType: "image/png" },
     "music.analysis.classify": { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "wedding-track.mp3" },
+    "audio.music.analyze": { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "sample-afrobeats.mp3", sampledSeconds: 60 },
     "assistant.chat": { messages: [{ role: "user", content: "Help me organize a short work plan." }], candidates: [{ id: "work-planner", name: "Work Planner", description: "Organize daily work tasks.", category: "productivity" }] },
   };
   for (const t of ALL_TASKS.filter((x) => x.structured)) {

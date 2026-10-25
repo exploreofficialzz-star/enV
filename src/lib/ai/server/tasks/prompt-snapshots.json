@@ -34,5 +34,9 @@
   "assistant.chat": {
     "version": "2026-10-19.1",
     "hash": "8010d37828cf6b62"
+  },
+  "audio.music.analyze": {
+    "version": "2026-10-25.2",
+    "hash": "1da15af2c23626e0"
   }
 }
