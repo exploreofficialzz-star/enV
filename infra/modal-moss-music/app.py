@@ -150,6 +150,8 @@ def _model_text(response_json: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 @asynccontextmanager
 async def lifespan(web_app: FastAPI):
+    if len(os.environ.get("MOSS_MUSIC_TOKEN", "")) < 32:
+        raise RuntimeError("MOSS_MUSIC_TOKEN must be configured with at least 32 characters before serving requests.")
     model_path = pathlib.Path(MODEL_DIR)
     if not (model_path / "config.json").exists() or not (model_path / "model.safetensors.index.json").exists():
         raise RuntimeError("MOSS-Music weights are missing. Run the download_weights entry point first.")
@@ -204,6 +206,14 @@ async def lifespan(web_app: FastAPI):
 web_app = FastAPI(title="enV MOSS-Music Inference", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
+@web_app.middleware("http")
+async def enforce_private_response_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 def _check_bearer(request: Request) -> None:
     configured = os.environ.get("MOSS_MUSIC_TOKEN", "")
     authorization = request.headers.get("authorization", "")
@@ -228,9 +238,12 @@ async def analyze(request: Request) -> dict[str, Any]:
     length = request.headers.get("content-length")
     if length and length.isdigit() and int(length) > MAX_JSON_BYTES:
         raise HTTPException(status_code=413, detail="Request body is too large.")
-    raw = await request.body()
-    if len(raw) > MAX_JSON_BYTES:
-        raise HTTPException(status_code=413, detail="Request body is too large.")
+    received = bytearray()
+    async for chunk in request.stream():
+        if len(received) + len(chunk) > MAX_JSON_BYTES:
+            raise HTTPException(status_code=413, detail="Request body is too large.")
+        received.extend(chunk)
+    raw = bytes(received)
     try:
         body = AnalyzeRequest.model_validate_json(raw)
     except ValidationError:
