@@ -119,7 +119,7 @@ function mergeMetadata(
   explicitTitle?: string,
 ): MusicMetadata {
   const extracted = extractMusicMetadata(bytes, fallbackName);
-  const source = upstream || {};
+  const source: Partial<Pick<UrlMediaInfo, "title" | "uploader" | "album" | "releaseYear" | "duration">> = upstream ?? {};
   const year = typeof source.releaseYear === "string"
     ? source.releaseYear.match(/\b(?:19|20)\d{2}\b/)?.[0]
     : undefined;
