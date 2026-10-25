@@ -5,6 +5,7 @@ import {
   parseMusicCollectionLines,
   protectedMusicPlatform,
   validateDirectMusicUrl,
+  validateMusicSourceUrl,
 } from "./music-downloader-policy.ts";
 import { extractMusicMetadata } from "./music-metadata.ts";
 
@@ -25,32 +26,36 @@ test("rejects non-HTTPS URLs, web pages, IP literals, and local hosts", () => {
   assert.equal(isSafeMusicOrigin("https://8.8.8.8/track.mp3").ok, false);
 });
 
-test("recognizes protected streaming pages without treating them as audio downloads", () => {
+test("blocks DRM/app-only catalogs while leaving public extractors available", () => {
   assert.equal(protectedMusicPlatform("https://open.spotify.com/album/example")?.label, "Spotify");
   assert.equal(protectedMusicPlatform("https://music.apple.com/us/album/example")?.label, "Apple Music");
-  assert.equal(protectedMusicPlatform("https://music.youtube.com/playlist?list=example")?.label, "YouTube Music");
+  assert.equal(protectedMusicPlatform("https://pandora.com/artist/song")?.label, "Pandora");
+  assert.equal(protectedMusicPlatform("https://music.youtube.com/playlist?list=example"), null);
+  assert.equal(protectedMusicPlatform("https://audiomack.com/artist/song"), null);
   assert.equal(validateDirectMusicUrl("https://open.spotify.com/track/example").ok, false);
   assert.equal(validateDirectMusicUrl("https://music.apple.com/us/album/example").ok, false);
+  assert.equal(parseMusicCollectionLines("https://open.spotify.com/album/example").entries.length, 0);
+  assert.match(parseMusicCollectionLines("https://open.spotify.com/album/example").error ?? "", /protected streaming/i);
 });
 
-test("recognizes Audiomack, Boomplay and a broad set of streaming providers consistently", () => {
-  const samples: Array<[string, string]> = [
-    ["https://audiomack.com/artist/song", "Audiomack"],
-    ["https://www.boomplay.com/songs/123", "Boomplay"],
-    ["https://music.youtube.com/playlist?list=example", "YouTube Music"],
-    ["https://pandora.com/artist/song", "Pandora"],
-    ["https://www.mixcloud.com/artist/show/", "Mixcloud"],
-    ["https://play.anghami.com/song/123", "Anghami"],
-    ["https://play.qobuz.com/album/123", "Qobuz"],
-    ["https://play.napster.com/album/123", "Napster"],
-    ["https://www.jiosaavn.com/song/example", "JioSaavn"],
-    ["https://www.iheart.com/artist/example", "iHeartRadio"],
+test("accepts supported public music pages for server-side resolution", () => {
+  const samples = [
+    "https://audiomack.com/artist/song",
+    "https://www.boomplay.com/songs/123",
+    "https://music.youtube.com/playlist?list=example",
+    "https://www.youtube.com/watch?v=example",
+    "https://www.mixcloud.com/artist/show/",
+    "https://soundcloud.com/artist/track",
+    "https://artist.bandcamp.com/album/example",
+    "https://archive.org/details/authorized-audio",
   ];
-  for (const [url, label] of samples) {
-    assert.equal(protectedMusicPlatform(url)?.label, label, url);
-    assert.equal(validateDirectMusicUrl(url).ok, false, url);
+  for (const url of samples) {
+    const result = validateMusicSourceUrl(url);
+    assert.equal(result.ok, true, url);
+    if (result.ok) assert.equal(result.kind, "provider-page", url);
+    assert.equal(parseMusicCollectionLines(url).entries[0]?.url, url);
   }
-  assert.equal(validateDirectMusicUrl("https://www.audiomack.com/artist/song.mp3").ok, false);
+  assert.equal(validateMusicSourceUrl("https://example.com/not-audio-or-provider").ok, false);
 });
 
 test("parses titled rows, ignores M3U comments, deduplicates, and caps batch size", () => {
