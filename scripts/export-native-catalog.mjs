@@ -23,6 +23,8 @@ const runtimeCatalogExtensions = [
     keywords: ["song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"],
     tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"],
     icon: "AudioLines",
+    iconBackground: "#0f766e",
+    iconAccent: "#67e8f9",
     popularity: 9900,
     featured: true,
     clientSide: true,
