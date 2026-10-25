@@ -311,9 +311,9 @@ export function MusicAnalyzerStudio() {
             </div>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">{analysis.classification.note}</p>
             <div className="mt-4 rounded-xl border border-border bg-background p-3">
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={allowModelUpload} onChange={(event) => setAllowModelUpload(event.target.checked)} /><span><strong>Allow model analysis</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">This sends the selected audio to the model service configured by enV. The service endpoint and its retention policy are controlled by the deployment. Local analysis above does not upload audio.</span></span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={allowModelUpload} onChange={(event) => setAllowModelUpload(event.target.checked)} /><span><strong>Allow model analysis</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">This uploads the selected audio to enV AI, or to a custom endpoint configured by the deployment. The backend controls processing and retention. Local analysis above never uploads audio. Built-in AI accepts clips up to 2.8 MB; larger files need a configured custom endpoint.</span></span></label>
               <Button type="button" className="mt-3" variant="outline" disabled={!allowModelUpload || modelBusy || !file || file.size > MODEL_FILE_LIMIT} onClick={() => void runModelAnalysis()}>{modelBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Requesting model…</> : <><Sparkles size={16} className="mr-2" />Identify genre and tags</>}</Button>
-              {file && file.size > MODEL_FILE_LIMIT ? <p className="mt-2 text-xs text-muted-foreground">Model tagging requires a file up to 25 MB; on-device measurements are still available.</p> : null}
+              {file && file.size > MODEL_FILE_LIMIT ? <p className="mt-2 text-xs text-muted-foreground">Model tagging requires a file up to 25 MB with a custom endpoint; built-in AI accepts up to 2.8 MB. On-device measurements remain available.</p> : null}
             </div>
             {analysis.classification.genre_candidates.length ? (
               <div className="mt-4">
