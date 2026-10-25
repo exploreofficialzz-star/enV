@@ -23,7 +23,7 @@ class AccessibilityUiAuditTest {
         // The activity first shows a launch state while CatalogGate reads its bundled
         // catalog on Dispatchers.IO. Wait for the actual home tree before testing it.
         composeRule.waitUntil(timeoutMillis = 15_000) {
-            composeRule.onAllNodesWithText("A focused toolkit for\\neveryday work.")
+            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
                 .fetchSemanticsNodes().isNotEmpty()
         }
     }
