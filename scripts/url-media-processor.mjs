@@ -409,6 +409,7 @@ async function handleInfo(req, res) {
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  let audiomackPageFallbackFailure = "";
   if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
     try {
       const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
@@ -416,10 +417,12 @@ async function handleInfo(req, res) {
         json(res, 200, albumInfo);
         return;
       }
+      audiomackPageFallbackFailure = "The public album page did not expose any usable track links.";
     } catch (error) {
       if (error?.name === "AbortError") throw error;
       const failure = error instanceof Error ? error.message : String(error);
-      console.warn("[url-media] Audiomack page-link fallback unavailable: " + failure.slice(0, 240));
+      audiomackPageFallbackFailure = failure.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(0, 220);
+      console.warn("[url-media] Audiomack page-link fallback unavailable: " + audiomackPageFallbackFailure);
     }
   }
   if (provider === "generic") {
@@ -440,8 +443,10 @@ async function handleInfo(req, res) {
       ({ stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url) && /invalid url for track \d+ of album url/i.test(message)) {
-        throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list, and the public page did not expose usable per-song links. Try an individual song URL or a direct authorized audio-file URL.");
+      if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
+        const detail = message.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(-260);
+        const pageFailure = audiomackPageFallbackFailure || "The public page fallback did not return track links.";
+        throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list. Public-page fallback: " + pageFailure + " Extractor detail: " + detail + ". Try an individual song URL or an authorized direct audio-file URL.");
       }
       throw error;
     }
