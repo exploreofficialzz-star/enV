@@ -238,7 +238,13 @@ test("music classification requires a supported audio signature and bounded inpu
 
 
 test("song metadata tagging never surfaces lyric content", () => {
-  const result = task("audio.music.analyze").finalize({
+  const prepared = ok("audio.music.analyze", {
+    audioBase64: mp3(),
+    mimeType: "audio/mpeg",
+    filename: "test-track.mp3",
+    sampledSeconds: 60,
+  });
+  const result = prepared.accept(reply({
     genre: "Afrobeats",
     sub_style: "Afro-pop",
     language: ["English"],
@@ -251,7 +257,7 @@ test("song metadata tagging never surfaces lyric content", () => {
     descriptions: ["A bright, rhythm-led pop production."],
     lyric_evidence: "This content must never be shown as lyric evidence.",
     warnings: [],
-  });
+  }), B);
   assert.equal(result.ok, true);
-  if (result.ok) assert.equal(result.value.lyric_evidence, "");
+  if (result.ok) assert.equal((result.value as { lyric_evidence: string }).lyric_evidence, "");
 });
