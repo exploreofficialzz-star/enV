@@ -27,3 +27,17 @@ The feature tests cover direct URL validation, local/IP rejection, protected-ser
 ## Provider failure handling
 
 The shared processor now distinguishes a genuine authentication requirement from a source anti-bot/CAPTCHA/IP challenge. In particular, YouTube's “sign in to confirm you're not a bot” message is reported as a source challenge rather than a definite account-login requirement. Some public pages can still be blocked from datacenter IPs; enV reports that honestly instead of retrying aggressively or attempting to bypass access controls. Rate limits and provider API failures remain separately classified.
+
+
+## Audiomack public API adapter (optional, server-side)
+
+The Render URL-media worker can use Audiomack's documented public `https://api.audiomack.com/v1` metadata and play endpoints as an alternative to yt-dlp's legacy `/api/music/url/` extractor. To enable this path, set both **server-only** environment variables on the Render processor service:
+
+- `URL_MEDIA_AUDIOMACK_CONSUMER_KEY`: the app consumer key issued by Audiomack.
+- `URL_MEDIA_AUDIOMACK_CONSUMER_SECRET`: the app consumer secret issued by Audiomack.
+
+The worker signs public API requests with OAuth 1.0a **consumer-only credentials**; this does not ask individual enV users for Audiomack accounts. Never include these variables in `VITE_*` or commit credentials to GitHub.
+
+For a song, the worker first retrieves its official metadata, refuses standalone downloads when `stream_only` is not explicitly `no`, then obtains a fresh short-lived audio URL from `POST /v1/music/:id/play` and streams through the existing public-hostname, content-type, and size checks. Albums use the official track list for playlist expansion. When the app credentials are unavailable or public metadata fails, the existing public-page / yt-dlp fallback remains. A provider permission denial is not bypassed by fallback.
+
+**Verification is mandatory:** an API health check does not prove that a given source can be downloaded. Validate an authorized public song, a publicly listed album, a stream-only song, and a cross-provider regression test after deployment. Do not claim complete Audiomack functionality from an unverified API response or a successful Docker build.
