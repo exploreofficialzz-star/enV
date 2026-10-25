@@ -1,4 +1,4 @@
-/** SERVER ONLY. Google Gemini adapter (generateContent REST API, image input, JSON schema output). */
+/** SERVER ONLY. Google Gemini adapter (generateContent plus Interactions API audio input and structured JSON output). */
 import { AiError } from "../../errors.ts";
 import type { AdapterRequest, AdapterResult, Capability, FinishReason, JsonSchema, ProviderAdapter } from "../../types.ts";
 import { asRecord, numberOrNull, postForJson } from "./http.ts";
