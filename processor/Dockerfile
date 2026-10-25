@@ -22,7 +22,6 @@ COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
 COPY scripts/media/processor-admission.mjs ./scripts/media/processor-admission.mjs
 COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
 COPY scripts/media/audiomack-page-parser.mjs ./scripts/media/audiomack-page-parser.mjs
-COPY scripts/media/audiomack-api.mjs ./scripts/media/audiomack-api.mjs
 COPY scripts/media/provider-errors.mjs ./scripts/media/provider-errors.mjs
 COPY scripts/media/patch-ytdlp-audiomack.py ./scripts/media/patch-ytdlp-audiomack.py
 COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
@@ -36,7 +35,6 @@ RUN python3 scripts/media/patch-ytdlp-audiomack.py \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
   && node --check scripts/media/audiomack-page-parser.mjs \
-  && node --check scripts/media/audiomack-api.mjs \
   && node --check scripts/media/provider-errors.mjs \
   && node --version \
   && ffmpeg -version >/dev/null \
