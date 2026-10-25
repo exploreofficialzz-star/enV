@@ -1618,7 +1618,7 @@ private extension Double {
 /// Offline native audio estimates and platform guidance. Heavy stem AI and browser-only formats remain web-first.
 enum NativeAudioEngine {
     private static let nativeWavOperations: [String: String] = [
-        "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
+        "audio-analyze-studio": "analyze", "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
         "audio-peak-meter": "peak", "audio-rms-meter": "rms", "audio-silence-detector": "silence", "audio-dc-offset-checker": "dc-offset",
         "audio-to-mono": "mono", "audio-to-stereo": "stereo", "audio-reverser": "reverse", "audio-normalizer": "normalize",
         "voice-noise-reducer": "voice-noise-reducer", "voice-noise-gate": "voice-noise-gate", "audio-hum-reducer": "audio-hum-reducer",
@@ -1833,13 +1833,14 @@ enum NativeAudioWavProcessor {
                         targetSampleRateHz: Int = 44_100, noiseStrength: Double = 0.8, gateThresholdDB: Double = -42,
                         humFrequencyHz: Int = 50, silenceThresholdDB: Double = -50, fadeDurationMs: Double = 1000,
                         eqLowDB: Double = 0, eqMidDB: Double = 0, eqHighDB: Double = 0,
-                        compressorThresholdDB: Double = -18, compressorRatio: Double = 4, targetChannels: Int = 2) throws -> NativeAudioWavResult {
+                        compressorThresholdDB: Double = -18, compressorRatio: Double = 4, targetChannels: Int = 2, fileName: String = "audio.wav") throws -> NativeAudioWavResult {
         let input = try decode(data), duration = input.durationSeconds
         let peak = input.channels.map { NativeAudioDsp.peakAmplitude($0) }.max() ?? 0
         let rms = sqrt(input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) * Double($1) } } / max(1, Double(input.frames * input.channels.count)))
         let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
         func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
         switch operation {
+        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms), outputWav: nil, durationSeconds: duration)
         case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
         case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
         case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
@@ -1894,6 +1895,269 @@ enum NativeAudioWavProcessor {
         let output = try encodePCM16(sampleRateHz: rate, channels: channels)
         let outDuration = Double(channels.first?.count ?? 0) / Double(rate)
         return NativeAudioWavResult(report: "\(detail)\nOutput: 16-bit PCM WAV\nSample rate: \(rate) Hz\nChannels: \(channels.count)\nDuration: \(number(outDuration)) s\nOutput size: \(output.count) bytes\nProcessed on this device; no upload performed.", outputWav: output, durationSeconds: outDuration)
+    }
+
+    private struct NativeSpectrum {
+        let centroidHz: Double?
+        let rolloff85Hz: Double?
+        let flatness: Double?
+    }
+
+    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double) throws -> String {
+        let frames = input.frames, rate = input.sampleRateHz, duration = input.durationSeconds
+        let windowFrames = max(1, rate / 10)
+        var windowLevels: [Double] = []
+        var clipped: Int64 = 0, totalSamples: Int64 = 0, silentWindows = 0, totalWindows = 0
+        for start in stride(from: 0, to: frames, by: windowFrames) {
+            let stop = min(frames, start + windowFrames)
+            var sumSquares = 0.0, count = 0
+            for channel in input.channels {
+                for index in start..<stop {
+                    let sample = Double(channel[index])
+                    sumSquares += sample * sample
+                    if abs(sample) >= 0.999 { clipped += 1 }
+                    totalSamples += 1
+                    count += 1
+                }
+            }
+            let windowRMS = sqrt(sumSquares / Double(max(1, count)))
+            windowLevels.append(windowRMS > 0 ? 20 * log10(windowRMS) : -120)
+            if windowRMS < 0.001 { silentWindows += 1 }
+            totalWindows += 1
+        }
+        let sortedLevels = windowLevels.sorted()
+        func percentile(_ q: Double) -> Double? {
+            guard !sortedLevels.isEmpty else { return nil }
+            let index = min(sortedLevels.count - 1, max(0, Int((Double(sortedLevels.count - 1) * q).rounded())))
+            return sortedLevels[index]
+        }
+        let spread: Double?
+        if let p95 = percentile(0.95), let p10 = percentile(0.10) { spread = max(0, p95 - p10) } else { spread = nil }
+        let representative = input.channels.first ?? []
+        var crossings = 0
+        if representative.count > 1 {
+            for index in 1..<representative.count {
+                let previous = representative[index - 1], current = representative[index]
+                if (current >= 0 && previous < 0) || (current < 0 && previous >= 0) { crossings += 1 }
+            }
+        }
+        let zcr = representative.count > 1 ? Double(crossings) / Double(representative.count - 1) : nil
+        let tempoSamples = Array(representative.prefix(min(representative.count, rate * 90)))
+        let keySamples = Array(representative.prefix(min(representative.count, rate * 30)))
+        let tempo = estimateTempoBPM(tempoSamples, sampleRateHz: rate)
+        let key = estimateMusicalKey(keySamples, sampleRateHz: rate)
+        let spectrum = calculateSpectrum(representative, sampleRateHz: rate)
+        func nullable(_ value: Double?) -> Any {
+            guard let value, value.isFinite else { return NSNull() }
+            return value
+        }
+        let payload: [String: Any] = [
+            "schema_version": "env.music-analysis.v1",
+            "source": [
+                "file_name": fileName.isEmpty ? "audio.wav" : fileName,
+                "mime_type": "audio/wav",
+                "file_size_bytes": fileSizeBytes
+            ],
+            "metadata": [
+                "title": NSNull(), "artist": NSNull(), "album": NSNull(), "album_artist": NSNull(),
+                "year": NSNull(), "embedded_genre": NSNull(), "track_number": NSNull(), "disc_number": NSNull(),
+                "composer": NSNull(), "publisher": NSNull(), "tagged_bpm": NSNull()
+            ],
+            "audio": [
+                "duration_seconds": duration,
+                "sample_rate_hz": rate,
+                "channels": input.channels.count,
+                "peak_dbfs": nullable(peak > 0 ? 20 * log10(peak) : nil),
+                "rms_dbfs": nullable(rms > 0 ? 20 * log10(rms) : nil),
+                "estimated_loudness_lufs": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
+                "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
+                "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
+                "windowed_rms_spread_db": nullable(spread),
+                "metric_scope_seconds": min(duration, 30)
+            ],
+            "rhythm": [
+                "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
+                "method": "10 ms RMS-energy novelty autocorrelation; best-effort estimate",
+                "status": tempo == nil ? "unavailable" : "estimated"
+            ],
+            "tonality": [
+                "key": key.map { $0 as Any } ?? NSNull(),
+                "method": "4096-point chroma-template correlation; best-effort estimate",
+                "status": key == nil ? "unavailable" : "estimated"
+            ],
+            "timbre": [
+                "spectral_centroid_hz": nullable(spectrum.centroidHz),
+                "spectral_rolloff_85_hz": nullable(spectrum.rolloff85Hz),
+                "spectral_flatness": nullable(spectrum.flatness),
+                "zero_crossing_rate": nullable(zcr),
+                "interpretation": "Signal features do not independently identify genre, instruments, mood or language."
+            ],
+            "classification": [
+                "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
+                "mood": [String](), "instruments": [String](), "vocal_style": NSNull(),
+                "genre_candidates": [[String: Any]](), "status": "requires_model",
+                "note": "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."
+            ]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        guard let report = String(data: data, encoding: .utf8) else { throw NativeSimpleError.message("Could not encode the analysis report as JSON.") }
+        return report
+    }
+
+    private static func estimateTempoBPM(_ samples: [Float], sampleRateHz: Int) -> Int? {
+        guard sampleRateHz > 0, samples.count >= sampleRateHz * 2 else { return nil }
+        let hop = max(128, Int((Double(sampleRateHz) * 0.01).rounded()))
+        var envelope: [Double] = []
+        var start = 0
+        while start + hop <= samples.count {
+            var sum = 0.0
+            for index in start..<(start + hop) { let value = Double(samples[index]); sum += value * value }
+            envelope.append(sqrt(sum / Double(hop)))
+            start += hop
+        }
+        guard envelope.count >= 2 else { return nil }
+        var novelty = [Double](repeating: 0, count: envelope.count)
+        for index in 1..<envelope.count { novelty[index] = max(0, envelope[index] - envelope[index - 1]) }
+        let minLag = max(1, Int(floor(60.0 / 180.0 / (Double(hop) / Double(sampleRateHz)))))
+        let maxLag = min(novelty.count - 1, Int(ceil(60.0 / 55.0 / (Double(hop) / Double(sampleRateHz)))))
+        guard maxLag > minLag else { return nil }
+        var bestLag = 0, bestScore = -Double.infinity
+        for lag in minLag...maxLag {
+            var score = 0.0, normA = 0.0, normB = 0.0
+            for index in lag..<novelty.count {
+                score += novelty[index] * novelty[index - lag]
+                normA += novelty[index] * novelty[index]
+                normB += novelty[index - lag] * novelty[index - lag]
+            }
+            score /= sqrt(max(normA * normB, 1e-12))
+            if score > bestScore { bestScore = score; bestLag = lag }
+        }
+        guard bestScore >= 0.04, bestLag > 0 else { return nil }
+        var bpm = 60.0 / (Double(bestLag * hop) / Double(sampleRateHz))
+        while bpm < 70 { bpm *= 2 }
+        while bpm > 180 { bpm /= 2 }
+        return Int(bpm.rounded())
+    }
+
+    private static func calculateSpectrum(_ samples: [Float], sampleRateHz: Int) -> NativeSpectrum {
+        let size = 2048
+        guard samples.count >= size, sampleRateHz > 0 else { return NativeSpectrum(centroidHz: nil, rolloff85Hz: nil, flatness: nil) }
+        var real = [Double](repeating: 0, count: size), imag = [Double](repeating: 0, count: size)
+        var centroids: [Double] = [], rolloffs: [Double] = [], flatnesses: [Double] = []
+        let lastStart = min(samples.count - size, max(0, sampleRateHz * 30 - size))
+        var start = 0
+        while start <= lastStart {
+            for i in 0..<size {
+                real[i] = Double(samples[start + i]) * (0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(size - 1)))
+                imag[i] = 0
+            }
+            fft(&real, &imag)
+            var magnitudes = [Double](repeating: 0, count: size / 2)
+            var total = 0.0, weighted = 0.0, logTotal = 0.0
+            for bin in 1..<(size / 2) {
+                let magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                total += magnitude
+                weighted += magnitude * Double(bin * sampleRateHz) / Double(size)
+                logTotal += log(max(magnitude, 1e-12))
+            }
+            if total > 1e-10 {
+                centroids.append(weighted / total)
+                var cumulative = 0.0, rollBin = size / 2 - 1
+                for bin in 1..<(size / 2) {
+                    cumulative += magnitudes[bin]
+                    if cumulative >= total * 0.85 { rollBin = bin; break }
+                }
+                rolloffs.append(Double(rollBin * sampleRateHz) / Double(size))
+                let bins = Double(size / 2 - 1)
+                let arithmetic = total / bins
+                let geometric = exp(logTotal / bins)
+                flatnesses.append(arithmetic > 0 ? geometric / arithmetic : 0)
+            }
+            start += 4096
+        }
+        func mean(_ values: [Double]) -> Double? { values.isEmpty ? nil : values.reduce(0, +) / Double(values.count) }
+        return NativeSpectrum(centroidHz: mean(centroids), rolloff85Hz: mean(rolloffs), flatness: mean(flatnesses))
+    }
+
+    private static func estimateMusicalKey(_ samples: [Float], sampleRateHz: Int) -> String? {
+        guard sampleRateHz > 0, samples.count >= sampleRateHz * 3 else { return nil }
+        let size = 4096, hop = max(4096, Int(Double(sampleRateHz) * 0.4))
+        var chroma = [Double](repeating: 0, count: 12)
+        var real = [Double](repeating: 0, count: size), imag = [Double](repeating: 0, count: size)
+        var start = 0, frames = 0
+        while start + size <= samples.count && frames < 180 {
+            for i in 0..<size {
+                real[i] = Double(samples[start + i]) * (0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(size - 1)))
+                imag[i] = 0
+            }
+            fft(&real, &imag)
+            for bin in 2..<(size / 2) {
+                let frequency = Double(bin * sampleRateHz) / Double(size)
+                if frequency < 55 || frequency > 2200 { continue }
+                let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+                chroma[(midi % 12 + 12) % 12] += hypot(real[bin], imag[bin])
+            }
+            frames += 1
+            start += hop
+        }
+        guard chroma.reduce(0, +) > 0 else { return nil }
+        let mean = chroma.reduce(0, +) / 12
+        let normalized = chroma.map { $0 - mean }
+        let names = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"]
+        let major = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+        let minor = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+        var bestScore = -Double.infinity
+        var bestLabel: String?
+        for tonic in 0..<12 {
+            for (mode, profile) in [("major", major), ("minor", minor)] {
+                let profileMean = profile.reduce(0, +) / 12
+                var score = 0.0, normA = 0.0, normB = 0.0
+                for i in 0..<12 {
+                    let sample = normalized[(i + tonic) % 12], weight = profile[i] - profileMean
+                    score += sample * weight
+                    normA += sample * sample
+                    normB += weight * weight
+                }
+                score /= sqrt(max(normA * normB, 1e-12))
+                if score > bestScore { bestScore = score; bestLabel = names[tonic] + " " + mode }
+            }
+        }
+        return bestScore >= 0.06 ? bestLabel : nil
+    }
+
+    private static func fft(_ real: inout [Double], _ imag: inout [Double]) {
+        let n = real.count
+        var j = 0
+        for i in 1..<n {
+            var bit = n >> 1
+            while (j & bit) != 0 { j ^= bit; bit >>= 1 }
+            j ^= bit
+            if i < j {
+                real.swapAt(i, j)
+                imag.swapAt(i, j)
+            }
+        }
+        var length = 2
+        while length <= n {
+            let angle = -2 * Double.pi / Double(length)
+            let wrStep = cos(angle), wiStep = sin(angle)
+            var base = 0
+            while base < n {
+                var wr = 1.0, wi = 0.0
+                for index in 0..<(length / 2) {
+                    let even = base + index, odd = even + length / 2
+                    let oddR = real[odd] * wr - imag[odd] * wi
+                    let oddI = real[odd] * wi + imag[odd] * wr
+                    real[odd] = real[even] - oddR; imag[odd] = imag[even] - oddI
+                    real[even] += oddR; imag[even] += oddI
+                    let nextWr = wr * wrStep - wi * wiStep
+                    wi = wr * wiStep + wi * wrStep; wr = nextWr
+                }
+                base += length
+            }
+            length <<= 1
+        }
     }
 
     private static func trimSilenceBounds(_ channels: [[Float]], thresholdDB: Double, sampleRateHz: Int) -> (Int, Int) {
