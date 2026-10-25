@@ -3982,6 +3982,78 @@ private func nativeMusicDownload(_ track: NativeMusicSourceTrack, maxBytes: Int6
     return (temporary, bytes, ext)
 }
 
+private enum NativeMusicArchive {
+    private static func u16(_ value: UInt16, _ data: inout Data) {
+        data.append(contentsOf: [UInt8(value & 0xff), UInt8((value >> 8) & 0xff)])
+    }
+    private static func u32(_ value: UInt32, _ data: inout Data) {
+        u16(UInt16(value & 0xffff), &data)
+        u16(UInt16((value >> 16) & 0xffff), &data)
+    }
+    private static let crcTable: [UInt32] = (0..<256).map { index in
+        var value = UInt32(index)
+        for _ in 0..<8 { value = (value & 1) == 1 ? (value >> 1) ^ 0xedb88320 : value >> 1 }
+        return value
+    }
+    private static func crc32(_ contents: Data) -> UInt32 {
+        var crc: UInt32 = 0xffffffff
+        for byte in contents { crc = (crc >> 8) ^ crcTable[Int((crc ^ UInt32(byte)) & 0xff)] }
+        return crc ^ 0xffffffff
+    }
+    static func create(files: [URL], at destination: URL) throws {
+        guard !files.isEmpty && files.count <= 50 else {
+            throw NSError(domain: "enVMusicArchive", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose 1 to 50 audio files for ZIP export."])
+        }
+        guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+            throw NSError(domain: "enVMusicArchive", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to create the ZIP file."])
+        }
+        do {
+            let writer = try FileHandle(forWritingTo: destination)
+            defer { try? writer.close() }
+            var directory = Data()
+            var offset: UInt32 = 0
+            for file in files {
+                let fileName = Data(file.lastPathComponent.utf8)
+                let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
+                guard fileName.count <= 65535 && bytes.count <= 50 * 1024 * 1024 else {
+                    throw NSError(domain: "enVMusicArchive", code: 3, userInfo: [NSLocalizedDescriptionKey: "An audio file exceeds the archive limit."])
+                }
+                let length = UInt32(bytes.count)
+                let checksum = crc32(bytes)
+                var local = Data()
+                u32(0x04034b50, &local)
+                u16(20, &local); u16(0, &local); u16(0, &local); u16(0, &local); u16(0, &local)
+                u32(checksum, &local); u32(length, &local); u32(length, &local)
+                u16(UInt16(fileName.count), &local); u16(0, &local)
+                local.append(fileName)
+                try writer.write(contentsOf: local)
+                try writer.write(contentsOf: bytes)
+
+                var entry = Data()
+                u32(0x02014b50, &entry)
+                u16(20, &entry); u16(20, &entry); u16(0, &entry); u16(0, &entry)
+                u16(0, &entry); u16(0, &entry)
+                u32(checksum, &entry); u32(length, &entry); u32(length, &entry)
+                u16(UInt16(fileName.count), &entry); u16(0, &entry); u16(0, &entry)
+                u16(0, &entry); u16(0, &entry); u32(0, &entry); u32(offset, &entry)
+                entry.append(fileName)
+                directory.append(entry)
+                offset += UInt32(local.count) + length
+            }
+            try writer.write(contentsOf: directory)
+            var end = Data()
+            u32(0x06054b50, &end)
+            u16(0, &end); u16(0, &end)
+            u16(UInt16(files.count), &end); u16(UInt16(files.count), &end)
+            u32(UInt32(directory.count), &end); u32(offset, &end); u16(0, &end)
+            try writer.write(contentsOf: end)
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+}
+
 private struct NativeMusicDownloaderView: View {
     @State private var mode = "Online"
     @State private var collectionType = "Playlist"
@@ -3994,6 +4066,9 @@ private struct NativeMusicDownloaderView: View {
     @State private var showFileImporter = false
     @State private var savedFiles: [URL] = []
     @State private var transferTask: Task<Void, Never>?
+    @State private var previewTracks: [NativeMusicSourceTrack] = []
+    @State private var showAllPreview = false
+    @State private var zipExportURL: URL?
 
     private let extensions = Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma"])
     private let trackLimit: Int64 = 50 * 1024 * 1024
@@ -4037,13 +4112,55 @@ private struct NativeMusicDownloaderView: View {
                 Toggle("I own these tracks or am authorized to download them", isOn: $rightsConfirmed)
                     .font(.envScaled(size: 13))
                 Button {
-                    startOnlineDownloads()
+                    startMusicPreview()
                 } label: {
-                    Label(isWorking ? "Downloading…" : (collectionType == "Track" ? "Download track" : "Download " + collectionType.lowercased()), systemImage: "arrow.down.to.line")
+                    Label(isWorking ? "Inspecting…" : "Preview songs", systemImage: "list.bullet")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isWorking)
+                if !previewTracks.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("${previewTracks.count} tracks · metadata preview")
+                            .font(.envScaled(size: 15, weight: .semibold))
+                        ForEach(Array(previewTracks.prefix(showAllPreview ? previewTracks.count : 10).enumerated()), id: \.offset) { index, track in
+                            HStack(spacing: 8) {
+                                Text("${index + 1}. ${track.title}")
+                                    .font(.envScaled(size: 12))
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Button("Download") { startOnlineDownloads(only: track) }
+                                    .buttonStyle(.bordered)
+                                    .disabled(isWorking)
+                                    .accessibilityLabel("Download ${track.title}")
+                            }
+                        }
+                        if previewTracks.count > 10 {
+                            Button(showAllPreview ? "Show less" : "See more (${previewTracks.count - 10})") {
+                                showAllPreview.toggle()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        Text("Track availability is checked when downloading. Unavailable tracks are skipped.")
+                            .font(.envScaled(size: 11))
+                            .foregroundStyle(.secondary)
+                        Button { startOnlineDownloads() } label: {
+                            Label("Download ZIP (${previewTracks.count} tracks)", systemImage: "doc.zipper")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
+                        if let zipExportURL {
+                            ShareLink(item: zipExportURL) {
+                                Label("Share or save ZIP in Files", systemImage: "square.and.arrow.up")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+                }
                 Text("Protected catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline/download feature. Provider support varies; enV cannot bypass sign-in, DRM, or app-only restrictions. Only download content you own or are authorized to export.")
                     .font(.envScaled(size: 12))
                     .foregroundStyle(.secondary)
@@ -4104,6 +4221,8 @@ private struct NativeMusicDownloaderView: View {
                 .foregroundStyle(.secondary)
         }
         .onAppear { refreshLibrary() }
+        .onChange(of: directURLs) { _ in previewTracks = []; zipExportURL = nil }
+        .onChange(of: collectionType) { _ in previewTracks = []; zipExportURL = nil }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): importLocalFiles(urls)
@@ -4159,54 +4278,84 @@ private struct NativeMusicDownloaderView: View {
         return result
     }
 
-    private func startOnlineDownloads() {
+    private func startMusicPreview() {
         errorMessage = nil
         status = ""
+        zipExportURL = nil
+        previewTracks = []
         guard rightsConfirmed else {
-            errorMessage = "Confirm that you own the tracks or have permission to download them."
+            errorMessage = "Confirm you have permission to download these tracks and the source permits downloads."
             return
         }
-        let tracks: [NativeMusicSourceTrack]
-        do { tracks = try validatedTracks() }
+        let sources: [NativeMusicSourceTrack]
+        do { sources = try validatedTracks() }
         catch { errorMessage = error.localizedDescription; return }
+        isWorking = true
+        status = "Finding track titles…"
+        transferTask = Task {
+            let outcome = await Task.detached(priority: .userInitiated) { () -> (tracks: [NativeMusicSourceTrack], warnings: [String]) in
+                var entries: [NativeMusicSourceTrack] = []
+                var warnings: [String] = []
+                for source in sources {
+                    do {
+                        try Task.checkCancellation()
+                        entries.append(contentsOf: try await nativeMusicResolve(source))
+                    } catch {
+                        warnings.append(source.title + ": " + error.localizedDescription)
+                    }
+                }
+                var seen = Set<String>()
+                let unique = entries.filter { seen.insert($0.url.absoluteString).inserted }
+                return (Array(unique.prefix(50)), warnings)
+            }.value
+            isWorking = false
+            transferTask = nil
+            if outcome.tracks.isEmpty {
+                errorMessage = outcome.warnings.first ?? "No tracks could be previewed."
+            } else if collectionType == "Track" && outcome.tracks.count != 1 {
+                errorMessage = "Choose Album or Playlist to preview multiple tracks."
+            } else {
+                previewTracks = outcome.tracks
+                showAllPreview = false
+                status = "Found ${outcome.tracks.count} songs. Review the list before downloading." +
+                    (outcome.warnings.isEmpty ? "" : " ${outcome.warnings.count} link(s) could not be inspected.")
+            }
+        }
+    }
 
+    private func startOnlineDownloads(only selected: NativeMusicSourceTrack? = nil) {
+        errorMessage = nil
+        status = ""
+        zipExportURL = nil
+        guard rightsConfirmed else {
+            errorMessage = "Confirm you have permission to download these tracks."
+            return
+        }
+        let tracks = selected.map { [$0] } ?? previewTracks
+        guard !tracks.isEmpty else {
+            errorMessage = "Preview the songs before downloading."
+            return
+        }
+        let zipRequested = selected == nil
         let folder = collectionFolder(collectionName)
         isWorking = true
-        status = "Resolving links and preparing downloads…"
+        status = zipRequested ? "Preparing songs for ZIP…" : "Downloading ${tracks[0].title}…"
         transferTask = Task {
-            let outcome = await Task.detached(priority: .userInitiated) { [trackLimit = self.trackLimit, batchLimit = self.batchLimit, collectionType = self.collectionType] in
+            let outcome = await Task.detached(priority: .userInitiated) { [trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
                 var saved: [URL] = []
                 var failures: [String] = []
                 var totalBytes: Int64 = 0
+                var zipped: URL?
                 do {
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                    var resolvedTracks: [NativeMusicSourceTrack] = []
-                    for source in tracks {
-                        try Task.checkCancellation()
-                        do {
-                            resolvedTracks.append(contentsOf: try await nativeMusicResolve(source))
-                        } catch {
-                            failures.append(source.title + ": " + error.localizedDescription)
-                        }
-                    }
-                    guard !resolvedTracks.isEmpty else {
-                        throw NSError(domain: "enVMusicDownloader", code: 9, userInfo: [NSLocalizedDescriptionKey: failures.first ?? "No downloadable tracks were found."])
-                    }
-                    guard resolvedTracks.count <= 50 else {
-                        throw NSError(domain: "enVMusicDownloader", code: 10, userInfo: [NSLocalizedDescriptionKey: "This collection resolves to more than 50 tracks. Split it into smaller batches."])
-                    }
-                    if collectionType == "Track" && resolvedTracks.count != 1 {
-                        throw NSError(domain: "enVMusicDownloader", code: 11, userInfo: [NSLocalizedDescriptionKey: "This link resolves to multiple tracks. Choose Album or Playlist to download a collection."])
-                    }
-
-                    for track in resolvedTracks {
+                    for track in tracks {
                         try Task.checkCancellation()
                         do {
                             let remaining = batchLimit - totalBytes
                             let downloaded = try await nativeMusicDownload(track, maxBytes: min(trackLimit, remaining))
                             guard totalBytes + downloaded.bytes <= batchLimit else {
                                 try? FileManager.default.removeItem(at: downloaded.temporary)
-                                throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: "The collection reached the 200 MB batch limit."])
+                                throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: "Collection exceeds 200 MB."])
                             }
                             let destination = Self.uniqueFile(in: folder, name: track.title, ext: downloaded.ext)
                             try FileManager.default.moveItem(at: downloaded.temporary, to: destination)
@@ -4218,20 +4367,30 @@ private struct NativeMusicDownloaderView: View {
                             failures.append(track.title + ": " + error.localizedDescription)
                         }
                     }
+                    if zipRequested && !saved.isEmpty {
+                        let archive = folder.appendingPathComponent("enV-music-${UUID().uuidString}.zip")
+                        try NativeMusicArchive.create(files: saved, at: archive)
+                        zipped = archive
+                    }
                 } catch {
                     failures.append(error.localizedDescription)
                 }
-                return (saved: saved, failures: failures, totalBytes: totalBytes)
+                return (saved: saved, failures: failures, totalBytes: totalBytes, zip: zipped)
             }.value
             isWorking = false
             transferTask = nil
             refreshLibrary()
+            zipExportURL = outcome.zip
             if outcome.saved.isEmpty {
                 errorMessage = outcome.failures.first ?? "No audio files were downloaded."
                 status = "No files saved."
             } else {
-                status = "Saved \(outcome.saved.count) track(s) (\(ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file)))." +
-                    (outcome.failures.isEmpty ? "" : " Some tracks failed: " + outcome.failures.prefix(3).joined(separator: "; "))
+                status = "${outcome.saved.count} track(s) saved · ${ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file)}." +
+                    (outcome.zip == nil ? "" : " ZIP ready: tap Share or save ZIP in Files.") +
+                    (outcome.failures.isEmpty ? "" : " ${outcome.failures.count} unavailable: " + outcome.failures.prefix(3).joined(separator: "; "))
+            }
+            if zipRequested && outcome.zip == nil && !outcome.saved.isEmpty {
+                errorMessage = "The tracks were saved to the library, but the ZIP could not be prepared."
             }
         }
     }
