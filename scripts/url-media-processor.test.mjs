@@ -43,7 +43,7 @@ assert.equal(urlMediaProcessorPath("POST", "/api/backend/url-media/download"), "
 assert.equal(urlMediaProcessorPath("GET", "/api/backend/url-media/download"), null);
 assert.equal(urlMediaProcessorPath("POST", "/api/backend/tool"), null);
 
-for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x"]) {
+for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x", "audiomack", "soundcloud", "bandcamp", "mixcloud", "audius", "jamendo", "hearthis", "bandlab", "boomplay"]) {
   assert.match(registry, new RegExp(provider));
 }
 assert.match(registry, /export function createProviderAdapter/);
@@ -63,6 +63,13 @@ assert.deepEqual(createProviderRequestArgs("generic", {}), []);
 assert.deepEqual(createProviderRequestArgs("tiktok", {}), ["--impersonate", "chrome"]);
 assert.deepEqual(createProviderRequestArgs("youtube", { URL_MEDIA_YOUTUBE_COOKIES_FILE: "/etc/secrets/youtube.txt" }), ["--cookies", "/etc/secrets/youtube.txt"]);
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
+assert.equal(detectProvider(new URL("https://audiomack.com/artist/song")), "audiomack");
+assert.equal(detectProvider(new URL("https://on.soundcloud.com/example")), "soundcloud");
+assert.equal(detectProvider(new URL("https://artist.bandcamp.com/album/record")), "bandcamp");
+assert.match(source, /includePlaylist = false/);
+assert.match(source, /--yes-playlist/);
+assert.match(source, /--flat-playlist/);
+assert.match(source, /"playlist-end", "50"/);
 assert.deepEqual(parseYtDlpJson('{"title":"clean"}'), { title: "clean" });
 assert.deepEqual(parseYtDlpJson('WARNING: extractor note\n{"title":"after warning"}\nfinished'), { title: "after warning" });
 assert.deepEqual(parseYtDlpJson('preamble\n{\n  "title": "pretty",\n  "description": "brace } in string"\n}\ntrailer'), {
