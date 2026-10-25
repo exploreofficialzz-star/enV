@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { apiUrl } from "@/lib/api/base";
 import { mediaErrorMessage } from "@/lib/media/shared-media";
-export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x";
+export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" | "audiomack" | "soundcloud" | "bandcamp" | "mixcloud" | "audius" | "jamendo" | "hearthis" | "bandlab" | "boomplay";
 
 export interface UrlMediaRequest {
   url: string;
@@ -71,14 +71,29 @@ export interface UrlMediaFormatInfo {
   note?: string;
 }
 
+export interface UrlMediaPlaylistEntry {
+  id?: string;
+  title: string;
+  uploader?: string;
+  album?: string;
+  duration?: number;
+  thumbnail?: string;
+  webpageUrl: string;
+}
+
 export interface UrlMediaInfo {
   provider: UrlMediaProvider;
   id?: string;
   title: string;
   uploader?: string;
+  album?: string;
+  releaseYear?: string;
   duration?: number;
   thumbnail?: string;
   webpageUrl?: string;
+  isPlaylist?: boolean;
+  entries?: UrlMediaPlaylistEntry[];
+  truncated?: boolean;
   live?: boolean;
   width?: number;
   height?: number;
@@ -88,13 +103,13 @@ export interface UrlMediaInfo {
   formats: UrlMediaFormatInfo[];
 }
 
-export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, signal?: AbortSignal): Promise<UrlMediaInfo> {
+export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, signal?: AbortSignal, options: { includePlaylist?: boolean } = {}): Promise<UrlMediaInfo> {
   const { endpoint } = getUrlMediaConfig();
   if (!endpoint) throw new Error("No URL media service is configured.");
   const response = await fetch(`${endpoint.replace(/\/$/, "")}/info`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url, provider }),
+    body: JSON.stringify({ url, provider, includePlaylist: options.includePlaylist ?? false }),
     signal,
   });
   const raw = await response.text().catch(() => "");
