@@ -2,6 +2,7 @@ package com.chastech.env
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Rule
 import org.junit.Test
@@ -9,8 +10,16 @@ import org.junit.Test
 class MainActivityLaunchTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
+    private fun awaitHomeScreenReady() {
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun launchShowsNativeCatalogHome() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
