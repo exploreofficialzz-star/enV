@@ -204,7 +204,9 @@ export function MusicDownloaderEngine() {
       if (!tracks.length) throw new Error(failed[0] || "No tracks could be downloaded.");
       const title = safeName(collectionName, "My music");
       if (collectionType === "track" && tracks.length === 1) {
-        downloadBlob(new Blob([tracks[0].bytes], { type: tracks[0].extension === "mp3" ? "audio/mpeg" : "audio/" + tracks[0].extension }), tracks[0].name);
+        const singleTrackBytes = new Uint8Array(tracks[0].bytes.byteLength);
+        singleTrackBytes.set(tracks[0].bytes);
+        downloadBlob(new Blob([singleTrackBytes.buffer], { type: tracks[0].extension === "mp3" ? "audio/mpeg" : "audio/" + tracks[0].extension }), tracks[0].name);
       } else {
         const archive = buildArchive(title, tracks);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + "-" + collectionType + ".zip");
