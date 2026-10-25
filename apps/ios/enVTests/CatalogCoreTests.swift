@@ -11,6 +11,9 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(tool?.category, "audio")
         XCTAssertEqual(tool?.engine.id, "music-downloader")
         XCTAssertEqual(tool?.engine.type, "audio")
+        XCTAssertEqual(extended.webSearch("Audiomack").first?.id, "music-downloader")
+        XCTAssertEqual(extended.webSearch("Boomplay").first?.id, "music-downloader")
+        XCTAssertEqual(extended.webSearch("YouTube Music").first?.id, "music-downloader")
     }
 
 
