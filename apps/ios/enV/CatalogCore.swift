@@ -187,7 +187,7 @@ extension Catalog {
             id: "music-downloader",
             name: "Music Downloader",
             slug: "music-downloader",
-            description: "Download direct audio files online or import and organize tracks for offline use.",
+            description: "Download authorized tracks from supported public music pages or direct audio files, or import and organize music offline.",
             category: "audio",
             subcategory: "Music",
             keywords: ["music", "download", "offline", "online", "track", "album", "playlist", "audio", "spotify", "apple music", "youtube", "youtube music", "audiomack", "boomplay", "deezer", "amazon music", "tidal", "soundcloud", "pandora", "mixcloud", "anghami", "qobuz", "napster", "jiosaavn", "iheart radio"],
