@@ -9,6 +9,7 @@ import {
   validateMusicSourceUrl,
 } from "./music-downloader-policy.ts";
 import { extractMusicMetadata } from "./music-metadata.ts";
+import { getUrlMediaConfig, inspectUrlMedia, downloadUrlMedia } from "./url-media.ts";
 
 test("accepts direct HTTPS audio files and preserves query strings", () => {
   const result = validateDirectMusicUrl("https://cdn.example.org/artist/track.MP3?download=1");
@@ -149,3 +150,45 @@ test("uses a readable filename as the title when the audio contains no title tag
   const metadata = extractMusicMetadata(new Uint8Array(), "Northern%20Lights.mp3");
   assert.equal(metadata.title, "Northern Lights");
 });
+
+test("Vercel preview music requests use the active origin rather than browser-to-Render CORS", async () => {
+  assert.equal(getUrlMediaConfig().endpoint, "/api/backend/url-media");
+  const previous = globalThis.fetch;
+  const called: Array<{ url: string; body: Record<string, unknown>; credentials?: RequestCredentials }> = [];
+  globalThis.fetch = async (input, init) => {
+    called.push({
+      url: String(input),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      credentials: init?.credentials,
+    });
+    if (String(input).endsWith("/info")) return new Response(JSON.stringify({
+      provider: "audiomack", title: "Promise Land", isPlaylist: true, entries: [
+        { title: "Test Track", webpageUrl: "https://audiomack.com/evadolee/song/test-track" }
+      ], formats: [],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(new Blob([new Uint8Array([73, 68, 51])], { type: "audio/mpeg" }), { status: 200 });
+  };
+  try {
+    const info = await inspectUrlMedia("https://audiomack.com/evadolee/album/promise-land", undefined, undefined, { includePlaylist: true });
+    assert.equal(info.title, "Promise Land");
+    assert.equal(info.entries?.length, 1);
+    const blob = await downloadUrlMedia({ url: "https://audiomack.com/evadolee/song/test-track", audioOnly: true, format: "mp3" });
+    assert.equal(blob.size, 3);
+    assert.deepEqual(called.map((x) => x.url), ["/api/backend/url-media/info", "/api/backend/url-media/download"]);
+    assert.ok(called.every((x) => x.credentials === "same-origin"));
+    assert.equal(called[0].body.includePlaylist, true);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("unreachable preview media API shows an actionable error instead of Failed to fetch", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError("Failed to fetch"); };
+  try {
+    await assert.rejects(inspectUrlMedia("https://audiomack.com/artist/song/test"), /media API could not be reached from this deployment/);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
