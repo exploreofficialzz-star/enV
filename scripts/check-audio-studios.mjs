@@ -138,4 +138,18 @@ const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);
 }
+
+const audioCategoryRoute = fs.readFileSync(new URL("../src/routes/tools/$category/index.tsx", import.meta.url), "utf8");
+const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
+assert.ok(!audioCategoryRoute.includes("AudioControlRoom"), "Audio category route must be the standard catalogue layout");
+for (const obsoleteCopy of ["enV / audio control room", "Make the next move in the mix.", "Browse studio lanes", "A familiar signal path"]) {
+  assert.ok(!audioCategoryRoute.includes(obsoleteCopy), `Audio category still contains removed Control Room copy: ${obsoleteCopy}`);
+}
+assert.ok(songMetadataAnalyzer.includes('const includeAi = mode === "full" && aiConsent && aiAvailability === true;'), "AI audio upload must require both explicit consent and a ready service");
+assert.ok(songMetadataAnalyzer.includes("Local analysis runs in this tab too."), "Full Analysis must disclose its local fallback");
+assert.ok(songMetadataAnalyzer.includes('disabled={!tracks.length || busy || importing}'), "Full Analysis must not be disabled when AI is unavailable or consent is off");
+assert.ok(songMetadataAnalyzer.includes("Run local analysis"), "Full Analysis must expose a usable local analysis action without AI");
+assert.ok(!songMetadataAnalyzer.includes("AI unavailable · Quick Scan still works"), "The obsolete AI-unavailable status dot must be removed");
+assert.ok(!songMetadataAnalyzer.includes('setError("Confirm AI processing before Full Analysis.")'), "AI consent must gate upload only, not local analysis");
+
 console.log(`Audio Studios catalog check passed: ${expectedRuntimeToolCount} runtime tools, ${categoryTools.length} generated audio entries, ${expectedAdditions.length} additions, all ${baseline.slugs.length} baseline Audio slugs preserved (${requiredLegacy.length} explicit legacy checks); shared native catalog consistent; DRM-downloader guard passed.`);
