@@ -371,6 +371,7 @@ async function handleInfo(req, res) {
             title: String(entry.title || entry.fulltitle || "Untitled track"),
             uploader: entry.uploader || entry.artist ? String(entry.uploader || entry.artist) : undefined,
             album: entry.album || entry.album_title ? String(entry.album || entry.album_title) : undefined,
+            releaseYear: entry.release_year || entry.release_date || entry.upload_date ? String(entry.release_year || entry.release_date || entry.upload_date) : undefined,
             duration: typeof entry.duration === "number" ? entry.duration : undefined,
             thumbnail: entry.thumbnail ? String(entry.thumbnail) : undefined,
             webpageUrl: resolvedUrl,
