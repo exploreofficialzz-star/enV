@@ -5,11 +5,11 @@ import { captionTask, titleTask } from "./creators.ts";
 import { assistantChatTask } from "./assistant.ts";
 import type { RegisteredTask } from "./define.ts";
 import { jsonExplainTask, regexExplainTask, sqlExplainTask } from "./developer.ts";
-import { altTextTask, transcribeTask } from "./media.ts";
+import { altTextTask, musicAnalysisTask, transcribeTask } from "./media.ts";
 
 export type TaskRegistry = ReadonlyMap<string, RegisteredTask>;
 
-export const ALL_TASKS: readonly RegisteredTask[] = [captionTask, titleTask, regexExplainTask, sqlExplainTask, jsonExplainTask, altTextTask, transcribeTask, assistantChatTask];
+export const ALL_TASKS: readonly RegisteredTask[] = [captionTask, titleTask, regexExplainTask, sqlExplainTask, jsonExplainTask, altTextTask, musicAnalysisTask, transcribeTask, assistantChatTask];
 
 export function buildTaskRegistry(tasks: readonly RegisteredTask[] = ALL_TASKS): TaskRegistry {
   return new Map(tasks.map((task) => [task.id, task]));
