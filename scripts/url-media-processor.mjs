@@ -273,6 +273,10 @@ async function inspectDirectUrl(url, signal) {
 }
 
 async function handleDirectDownload(req, res, url, body, signal) {
+  const requestedMaxBytes = Number(body.maxBytes);
+  const maxBytes = Number.isFinite(requestedMaxBytes) && requestedMaxBytes > 0
+    ? Math.min(MAX_OUTPUT_BYTES, Math.floor(requestedMaxBytes))
+    : MAX_OUTPUT_BYTES;
   const requestedRange = Number.isInteger(body.resumeFrom) && body.resumeFrom > 0 ? body.resumeFrom : 0;
   const headers = { accept: "video/*,audio/*,application/octet-stream,*/*;q=0.5" };
   if (requestedRange) {
@@ -284,7 +288,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
   const contentType = response.headers.get("content-type") || "application/octet-stream";
   if (!mediaMimeAllowed(contentType)) throw new Error("UNSUPPORTED_SOURCE: The URL does not identify a supported audio/video resource.");
   const contentLength = Number(response.headers.get("content-length") || 0) || undefined;
-  if (contentLength && contentLength > MAX_OUTPUT_BYTES) throw new Error("FILE_TOO_LARGE: The remote media exceeds the configured size limit.");
+  if (contentLength && contentLength > maxBytes) throw new Error("FILE_TOO_LARGE: The remote media exceeds the configured size limit.");
   if (requestedRange && response.status !== 206) throw new Error("RESUME_INVALID: The server did not honor the requested byte range.");
   if (!response.body) throw new Error("SOURCE_UNAVAILABLE: The media response did not contain a body.");
   const outHeaders = {
@@ -310,7 +314,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
       if (done) break;
       if (!value) continue;
       bytes += value.byteLength;
-      if (bytes > MAX_OUTPUT_BYTES) throw new Error("FILE_TOO_LARGE: The downloaded media exceeded the configured size limit.");
+      if (bytes > maxBytes) throw new Error("FILE_TOO_LARGE: The downloaded media exceeded the configured size limit.");
       if (!res.write(Buffer.from(value))) await new Promise((resolve) => res.once("drain", resolve));
     }
     res.end();
@@ -407,6 +411,10 @@ async function handleInfo(req, res) {
 async function handleDownload(req, res) {
   const body = await readJson(req);
   const { url: rawUrl, provider: requestedProvider, format = "mp4", audioOnly = false } = body;
+  const requestedMaxBytes = Number(body.maxBytes);
+  const maxBytes = Number.isFinite(requestedMaxBytes) && requestedMaxBytes > 0
+    ? Math.min(MAX_OUTPUT_BYTES, Math.floor(requestedMaxBytes))
+    : MAX_OUTPUT_BYTES;
   const { url, provider } = providerForUrl(rawUrl);
   if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
@@ -425,7 +433,7 @@ async function handleDownload(req, res) {
   try {
     const outputTemplate = path.join(jobDir, `${randomUUID()}-%(title).120s.%(ext)s`);
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
-    const args = ["--max-filesize", `${MAX_OUTPUT_BYTES}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
+    const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
     await runYtdlp(args, jobDir, controller.signal, provider);
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
@@ -433,13 +441,13 @@ async function handleDownload(req, res) {
       if (!entry.isFile()) continue;
       const file = path.join(jobDir, entry.name);
       const stat = await fs.stat(file);
-      if (stat.size > MAX_OUTPUT_BYTES) continue;
+      if (stat.size > maxBytes) continue;
       candidates.push({ file, stat });
     }
     if (!candidates.length) throw new Error("The provider returned no downloadable media within the configured limits.");
     candidates.sort((a,b) => b.stat.size - a.stat.size);
     const chosen = candidates[0];
-    await verifyDownloadedMedia(chosen.file, MAX_OUTPUT_BYTES, controller.signal);
+    await verifyDownloadedMedia(chosen.file, maxBytes, controller.signal);
     const data = await fs.readFile(chosen.file);
     const ext = path.extname(chosen.file).toLowerCase().replace(".", "") || "bin";
     const mime = ext === "mp4" ? "video/mp4" : ext === "webm" ? "video/webm" : ext === "mp3" ? "audio/mpeg" : ext === "m4a" ? "audio/mp4" : "application/octet-stream";
