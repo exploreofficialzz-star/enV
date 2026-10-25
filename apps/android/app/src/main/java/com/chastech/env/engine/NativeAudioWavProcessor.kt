@@ -2,6 +2,8 @@ package com.chastech.env.engine
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -10,6 +12,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.sin
+import kotlin.math.roundToInt
 
 /**
  * Native-first PCM WAV processor used by Android's offline Audio tools.
@@ -196,6 +199,7 @@ object NativeAudioWavProcessor {
         compressorThresholdDb: Double = -18.0,
         compressorRatio: Double = 4.0,
         targetChannels: Int = 2,
+        fileName: String = "audio.wav",
     ): NativeAudioWavResult {
         val input = decode(bytes)
         val duration = input.durationSeconds
@@ -203,6 +207,7 @@ object NativeAudioWavProcessor {
         val rms = if (input.frames == 0) 0.0 else sqrt(input.channels.sumOf { channel -> channel.sumOf { it.toDouble() * it } } / (input.frames.toDouble() * input.channels.size))
         val dc = if (input.frames == 0) 0.0 else input.channels.sumOf { channel -> channel.sumOf { it.toDouble() } } / (input.frames.toDouble() * input.channels.size)
         when (operation) {
+            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms), durationSeconds = duration)
             "inspector" -> return NativeAudioWavResult("WAV inspector\nDuration: ${fmt(duration)} s\nSample rate: ${input.sampleRateHz} Hz\nChannels: ${input.channels.size}\nFrames per channel: ${input.frames}\nSource encoding: ${input.sourceBits}-bit ${if (input.sourceEncoding == 3) "IEEE float" else "PCM"}\nSource size: ${bytes.size} bytes", durationSeconds = duration)
             "duration" -> return NativeAudioWavResult("Duration: ${fmt(duration)} seconds\nSample rate: ${input.sampleRateHz} Hz", durationSeconds = duration)
             "peak" -> return NativeAudioWavResult("Peak amplitude: ${fmt(peak)}\nPeak level: ${fmt(NativeAudioDsp.amplitudeDbfs(peak))} dBFS\nSource channels: ${input.channels.size}", durationSeconds = duration)
@@ -288,6 +293,266 @@ object NativeAudioWavProcessor {
         val encoded = encodePcm16(rate, channels)
         val outputDuration = channels.firstOrNull()?.size?.toDouble()?.div(rate) ?: 0.0
         return NativeAudioWavResult("$detail\nOutput: 16-bit PCM WAV\nSample rate: $rate Hz\nChannels: ${channels.size}\nDuration: ${fmt(outputDuration)} s\nOutput size: ${encoded.size} bytes\nProcessed on this device; no upload performed.", encoded, outputDuration)
+    }
+
+    private data class NativeSpectrum(val centroidHz: Double?, val rolloff85Hz: Double?, val flatness: Double?)
+
+    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double): String {
+        val frames = input.frames
+        val rate = input.sampleRateHz
+        val duration = input.durationSeconds
+        var clippedSamples = 0L
+        var totalSamples = 0L
+        val windowFrames = max(1, rate / 10)
+        val windowLevels = mutableListOf<Double>()
+        var silentWindows = 0
+        var totalWindows = 0
+        for (start in 0 until frames step windowFrames) {
+            val stop = min(frames, start + windowFrames)
+            var sumSquares = 0.0
+            var count = 0
+            for (channel in input.channels) for (i in start until stop) {
+                val sample = channel[i].toDouble()
+                sumSquares += sample * sample
+                if (abs(sample) >= 0.999) clippedSamples++
+                totalSamples++
+                count++
+            }
+            val windowRms = if (count > 0) sqrt(sumSquares / count) else 0.0
+            windowLevels += if (windowRms > 0.0) 20.0 * kotlin.math.log10(windowRms) else -120.0
+            if (windowRms < 0.001) silentWindows++
+            totalWindows++
+        }
+        val sortedLevels = windowLevels.sorted()
+        fun percentile(q: Double): Double? {
+            if (sortedLevels.isEmpty()) return null
+            val index = ((sortedLevels.size - 1) * q).roundToInt().coerceIn(0, sortedLevels.lastIndex)
+            return sortedLevels[index]
+        }
+        val p95 = percentile(0.95)
+        val p10 = percentile(0.10)
+        val spread = if (p95 != null && p10 != null) max(0.0, p95 - p10) else null
+        val representative = input.channels.firstOrNull() ?: FloatArray(0)
+        val zcr = if (frames > 1) {
+            var crossings = 0L
+            for (i in 1 until frames) {
+                val previous = representative[i - 1]
+                val current = representative[i]
+                if ((current >= 0f && previous < 0f) || (current < 0f && previous >= 0f)) crossings++
+            }
+            crossings.toDouble() / (frames - 1)
+        } else null
+        val tempo = estimateTempoBpm(representative.copyOfRange(0, min(representative.size, rate * 90)), rate)
+        val key = estimateMusicalKey(representative.copyOfRange(0, min(representative.size, rate * 30)), rate)
+        val spectrum = calculateSpectrum(representative, rate)
+        val json = JSONObject()
+            .put("schema_version", "env.music-analysis.v1")
+            .put("source", JSONObject()
+                .put("file_name", fileName.ifBlank { "audio.wav" })
+                .put("mime_type", "audio/wav")
+                .put("file_size_bytes", fileSizeBytes))
+            .put("metadata", JSONObject()
+                .put("title", JSONObject.NULL).put("artist", JSONObject.NULL).put("album", JSONObject.NULL)
+                .put("album_artist", JSONObject.NULL).put("year", JSONObject.NULL).put("embedded_genre", JSONObject.NULL)
+                .put("track_number", JSONObject.NULL).put("disc_number", JSONObject.NULL).put("composer", JSONObject.NULL)
+                .put("publisher", JSONObject.NULL).put("tagged_bpm", JSONObject.NULL))
+            .put("audio", JSONObject()
+                .put("duration_seconds", duration)
+                .put("sample_rate_hz", rate)
+                .put("channels", input.channels.size)
+                .put("peak_dbfs", jsonNumberOrNull(if (peak > 0) 20.0 * kotlin.math.log10(peak) else Double.NEGATIVE_INFINITY))
+                .put("rms_dbfs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) else Double.NEGATIVE_INFINITY))
+                .put("estimated_loudness_lufs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) - 0.691 else Double.NEGATIVE_INFINITY))
+                .put("clipped_sample_percent", if (totalSamples > 0) clippedSamples.toDouble() * 100.0 / totalSamples else 0.0)
+                .put("silence_percent", if (totalWindows > 0) silentWindows.toDouble() * 100.0 / totalWindows else 0.0)
+                .put("windowed_rms_spread_db", jsonNumberOrNull(spread ?: Double.NaN))
+                .put("metric_scope_seconds", min(duration, 30.0)))
+            .put("rhythm", JSONObject()
+                .put("tempo_bpm", tempo?.let { it } ?: JSONObject.NULL)
+                .put("method", "10 ms RMS-energy novelty autocorrelation; best-effort estimate")
+                .put("status", if (tempo != null) "estimated" else "unavailable"))
+            .put("tonality", JSONObject()
+                .put("key", key ?: JSONObject.NULL)
+                .put("method", "4096-point chroma-template correlation; best-effort estimate")
+                .put("status", if (key != null) "estimated" else "unavailable"))
+            .put("timbre", JSONObject()
+                .put("spectral_centroid_hz", jsonNumberOrNull(spectrum.centroidHz ?: Double.NaN))
+                .put("spectral_rolloff_85_hz", jsonNumberOrNull(spectrum.rolloff85Hz ?: Double.NaN))
+                .put("spectral_flatness", jsonNumberOrNull(spectrum.flatness ?: Double.NaN))
+                .put("zero_crossing_rate", jsonNumberOrNull(zcr ?: Double.NaN))
+                .put("interpretation", "Signal features do not independently identify genre, instruments, mood or language."))
+            .put("classification", JSONObject()
+                .put("genre", JSONObject.NULL).put("sub_style", JSONObject.NULL)
+                .put("language", JSONArray()).put("mood", JSONArray()).put("instruments", JSONArray())
+                .put("vocal_style", JSONObject.NULL).put("genre_candidates", JSONArray())
+                .put("status", "requires_model")
+                .put("note", "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."))
+        return json.toString(2)
+    }
+
+    private fun jsonNumberOrNull(value: Double): Any = if (value.isFinite()) value else JSONObject.NULL
+
+    private fun estimateTempoBpm(samples: FloatArray, sampleRateHz: Int): Int? {
+        if (sampleRateHz <= 0 || samples.size < sampleRateHz * 2) return null
+        val hop = max(128, (sampleRateHz * 0.01).roundToInt())
+        val envelope = ArrayList<Double>()
+        var start = 0
+        while (start + hop <= samples.size) {
+            var sum = 0.0
+            for (i in start until start + hop) { val value = samples[i].toDouble(); sum += value * value }
+            envelope += sqrt(sum / hop)
+            start += hop
+        }
+        if (envelope.size < 2) return null
+        val novelty = DoubleArray(envelope.size) { i -> if (i == 0) 0.0 else max(0.0, envelope[i] - envelope[i - 1]) }
+        val minLag = max(1, floor(60.0 / 180.0 / (hop.toDouble() / sampleRateHz)).toInt())
+        val maxLag = min(novelty.lastIndex, ceil(60.0 / 55.0 / (hop.toDouble() / sampleRateHz)).toInt())
+        if (maxLag <= minLag) return null
+        var bestLag = 0
+        var bestScore = Double.NEGATIVE_INFINITY
+        for (lag in minLag..maxLag) {
+            var score = 0.0; var normA = 0.0; var normB = 0.0
+            for (i in lag until novelty.size) {
+                score += novelty[i] * novelty[i - lag]
+                normA += novelty[i] * novelty[i]
+                normB += novelty[i - lag] * novelty[i - lag]
+            }
+            score /= sqrt(max(normA * normB, 1e-12))
+            if (score > bestScore) { bestScore = score; bestLag = lag }
+        }
+        if (bestScore < 0.04 || bestLag <= 0) return null
+        var bpm = 60.0 / (bestLag * hop.toDouble() / sampleRateHz)
+        while (bpm < 70) bpm *= 2
+        while (bpm > 180) bpm /= 2
+        return bpm.roundToInt()
+    }
+
+    private fun calculateSpectrum(samples: FloatArray, sampleRateHz: Int): NativeSpectrum {
+        val size = 2048
+        if (samples.size < size || sampleRateHz <= 0) return NativeSpectrum(null, null, null)
+        val real = DoubleArray(size)
+        val imag = DoubleArray(size)
+        val centroids = mutableListOf<Double>()
+        val rolloffs = mutableListOf<Double>()
+        val flatnesses = mutableListOf<Double>()
+        val lastStart = min(samples.size - size, max(0, sampleRateHz * 30 - size))
+        var start = 0
+        while (start <= lastStart) {
+            for (i in 0 until size) {
+                real[i] = samples[start + i] * (0.5 - 0.5 * kotlin.math.cos(2.0 * Math.PI * i / (size - 1)))
+                imag[i] = 0.0
+            }
+            fft(real, imag)
+            val mags = DoubleArray(size / 2)
+            var total = 0.0; var weighted = 0.0; var logTotal = 0.0
+            for (bin in 1 until size / 2) {
+                val magnitude = kotlin.math.hypot(real[bin], imag[bin])
+                mags[bin] = magnitude
+                total += magnitude
+                weighted += magnitude * (bin.toDouble() * sampleRateHz / size)
+                logTotal += kotlin.math.ln(max(magnitude, 1e-12))
+            }
+            if (total > 1e-10) {
+                centroids += weighted / total
+                var cumulative = 0.0; var rollBin = size / 2 - 1
+                for (bin in 1 until size / 2) {
+                    cumulative += mags[bin]
+                    if (cumulative >= total * 0.85) { rollBin = bin; break }
+                }
+                rolloffs += rollBin.toDouble() * sampleRateHz / size
+                val arithmetic = total / (size / 2 - 1)
+                val geometric = kotlin.math.exp(logTotal / (size / 2 - 1))
+                flatnesses += if (arithmetic > 0) geometric / arithmetic else 0.0
+            }
+            start += 4096
+        }
+        fun mean(values: List<Double>): Double? = if (values.isEmpty()) null else values.average()
+        return NativeSpectrum(mean(centroids), mean(rolloffs), mean(flatnesses))
+    }
+
+    private fun estimateMusicalKey(samples: FloatArray, sampleRateHz: Int): String? {
+        if (sampleRateHz <= 0 || samples.size < sampleRateHz * 3) return null
+        val size = 4096
+        val hop = max(size, (sampleRateHz * 0.4).toInt())
+        val chroma = DoubleArray(12)
+        val real = DoubleArray(size)
+        val imag = DoubleArray(size)
+        var start = 0
+        var frames = 0
+        while (start + size <= samples.size && frames < 180) {
+            for (i in 0 until size) {
+                real[i] = samples[start + i] * (0.5 - 0.5 * kotlin.math.cos(2.0 * Math.PI * i / (size - 1)))
+                imag[i] = 0.0
+            }
+            fft(real, imag)
+            for (bin in 2 until size / 2) {
+                val frequency = bin.toDouble() * sampleRateHz / size
+                if (frequency < 55 || frequency > 2200) continue
+                val midi = round(69.0 + 12.0 * kotlin.math.ln(frequency / 440.0) / kotlin.math.ln(2.0)).toInt()
+                val magnitude = kotlin.math.hypot(real[bin], imag[bin])
+                chroma[((midi % 12) + 12) % 12] += magnitude
+            }
+            frames++
+            start += hop
+        }
+        if (chroma.sum() <= 0.0) return null
+        val mean = chroma.average()
+        val normalized = DoubleArray(12) { chroma[it] - mean }
+        val names = arrayOf("C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B")
+        val major = doubleArrayOf(6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)
+        val minor = doubleArrayOf(6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17)
+        var bestScore = Double.NEGATIVE_INFINITY
+        var bestLabel: String? = null
+        for (tonic in 0 until 12) {
+            for ((mode, profile) in listOf("major" to major, "minor" to minor)) {
+                val average = profile.average()
+                var score = 0.0; var normA = 0.0; var normB = 0.0
+                for (i in 0 until 12) {
+                    val sample = normalized[(i + tonic) % 12]
+                    val weight = profile[i] - average
+                    score += sample * weight
+                    normA += sample * sample
+                    normB += weight * weight
+                }
+                score /= sqrt(max(normA * normB, 1e-12))
+                if (score > bestScore) { bestScore = score; bestLabel = names[tonic] + " " + mode }
+            }
+        }
+        return if (bestScore >= 0.06) bestLabel else null
+    }
+
+    private fun fft(real: DoubleArray, imag: DoubleArray) {
+        val n = real.size
+        var j = 0
+        for (i in 1 until n) {
+            var bit = n shr 1
+            while ((j and bit) != 0) { j = j xor bit; bit = bit shr 1 }
+            j = j xor bit
+            if (i < j) {
+                val r = real[i]; real[i] = real[j]; real[j] = r
+                val im = imag[i]; imag[i] = imag[j]; imag[j] = im
+            }
+        }
+        var length = 2
+        while (length <= n) {
+            val angle = -2.0 * Math.PI / length
+            val wrStep = kotlin.math.cos(angle); val wiStep = kotlin.math.sin(angle)
+            var base = 0
+            while (base < n) {
+                var wr = 1.0; var wi = 0.0
+                for (k in 0 until length / 2) {
+                    val even = base + k; val odd = even + length / 2
+                    val oddR = real[odd] * wr - imag[odd] * wi
+                    val oddI = real[odd] * wi + imag[odd] * wr
+                    real[odd] = real[even] - oddR; imag[odd] = imag[even] - oddI
+                    real[even] += oddR; imag[even] += oddI
+                    val nextWr = wr * wrStep - wi * wiStep
+                    wi = wr * wiStep + wi * wrStep; wr = nextWr
+                }
+                base += length
+            }
+            length = length shl 1
+        }
     }
 
     private fun trimSilenceBounds(channels: List<FloatArray>, sampleRateHz: Int, thresholdDb: Double): Pair<Int, Int> {
