@@ -10,7 +10,7 @@ import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
-import { extractExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
+import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -391,9 +391,18 @@ async function discoverExplicitAudioDownload(url, signal) {
     return null;
   }
   const html = await readBoundedText(response, 2 * 1024 * 1024);
-  const download = extractExplicitPublicAudioLink(html, pageUrl.toString());
-  if (download) await assertPublicHostname(download.hostname);
-  return download;
+  // Validate actual response type: URLs for signed files may have no extension,
+  // while player/HTML URLs can misleadingly be labelled "Download".
+  for (const candidate of extractExplicitPublicAudioLinks(html, pageUrl.toString())) {
+    try {
+      const verified = await probeExplicitPublicAudioLink(candidate, fetchPublic, signal);
+      if (verified) return verified;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      // Continue to another explicitly offered file, if any.
+    }
+  }
+  return null;
 }
 
 async function inspectAudiomackAlbumPage(url, signal) {
