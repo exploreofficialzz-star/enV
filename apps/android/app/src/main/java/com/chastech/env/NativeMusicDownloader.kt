@@ -42,20 +42,34 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.util.Locale
+import java.util.UUID
+import org.json.JSONObject
 
 private const val MUSIC_TRACK_LIMIT = 50L * 1024L * 1024L
 private const val MUSIC_BATCH_LIMIT = 200L * 1024L * 1024L
 private val musicAudioExtensions = setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma")
 
-private data class DirectMusicTrack(val title: String, val url: String, val extension: String)
+private data class DirectMusicTrack(val title: String, val url: String, val extension: String, val isProviderPage: Boolean = false)
 
 private fun musicSafeName(raw: String, fallback: String): String =
     raw.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "-").trim().take(90).ifBlank { fallback }
 
-private fun musicProtectedHost(host: String): Boolean {
-    val domains = listOf("spotify.com", "apple.com", "music.youtube.com", "youtube.com", "youtu.be", "youtube-nocookie.com", "audiomack.com", "boomplay.com", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com", "pandora.com", "mixcloud.com", "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com")
-    return domains.any { host == it || host.endsWith(".$it") }
-}
+private val musicProviderPageDomains = listOf(
+    "youtube.com", "youtu.be", "youtube-nocookie.com", "tiktok.com", "facebook.com", "fb.watch",
+    "instagram.com", "x.com", "twitter.com", "audiomack.com", "soundcloud.com", "bandcamp.com",
+    "mixcloud.com", "audius.co", "jamendo.com", "hearthis.at", "bandlab.com", "boomplay.com",
+    "zingmp3.vn", "music.163.com", "music.yandex.com", "music.yandex.ru", "archive.org",
+    "audioboom.com", "reverbnation.com", "soundclick.com", "spreaker.com", "podomatic.com", "freesound.org"
+)
+private val musicProtectedPageDomains = listOf(
+    "spotify.com", "apple.com", "deezer.com", "amazon.com", "tidal.com", "pandora.com",
+    "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"
+)
+private fun musicHostMatches(host: String, domains: List<String>): Boolean =
+    domains.any { host == it || host.endsWith(".$it") }
+private fun musicProtectedHost(host: String): Boolean = musicHostMatches(host, musicProtectedPageDomains)
+private fun musicSupportedProviderPage(host: String): Boolean =
+    musicHostMatches(host, musicProviderPageDomains) && !musicProtectedHost(host)
 
 private fun preflightMusicTrack(track: DirectMusicTrack): Long {
     var current = URL(track.url)
@@ -106,27 +120,160 @@ private fun parseDirectMusicTracks(raw: String): List<DirectMusicTrack> {
         val separator = line.indexOf('|')
         val title = if (separator >= 0) line.substring(0, separator).trim() else ""
         val value = if (separator >= 0) line.substring(separator + 1).trim() else line
-        val parsed = runCatching { URI(value) }.getOrElse { throw IllegalArgumentException("Line ${index + 1}: enter a valid direct URL.") }
+        val parsed = runCatching { URI(value) }.getOrElse { throw IllegalArgumentException("Line ${index + 1}: enter a valid URL.") }
         require(parsed.scheme.equals("https", ignoreCase = true) && !parsed.host.isNullOrBlank() && parsed.userInfo == null) {
             "Line ${index + 1}: use a public HTTPS URL without embedded credentials."
         }
         val host = parsed.host.lowercase(Locale.ROOT)
-        require(host != "localhost" && !host.endsWith(".localhost") && !host.endsWith(".local") && !Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host)) {
+        require(host != "localhost" && !host.endsWith(".localhost") && !host.endsWith(".local") &&
+            !Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host)) {
             "Line ${index + 1}: local and IP-literal hosts are not supported."
         }
-        require(!musicProtectedHost(host)) {
-            "Line ${index + 1}: streaming-service page links are not direct audio downloads. Use the service's official offline feature or a rights-holder-provided audio URL."
-        }
         val extension = parsed.path.substringAfterLast('/', "").substringAfterLast('.', "").lowercase(Locale.ROOT)
-        require(extension in musicAudioExtensions) {
-            "Line ${index + 1}: use a direct URL ending in a supported audio extension such as .mp3, .m4a, .flac or .wav."
+        val directAudio = extension in musicAudioExtensions && !musicProtectedHost(host)
+        val providerPage = !directAudio && musicSupportedProviderPage(host)
+        require(directAudio || providerPage) {
+            if (musicProtectedHost(host)) {
+                "Line ${index + 1}: this service's protected catalog cannot be exported by enV. Use its official offline/download feature or an authorized direct audio-file URL."
+            } else {
+                "Line ${index + 1}: use a supported public media page or a direct HTTPS audio URL ending in .mp3, .m4a, .flac or .wav."
+            }
         }
-        val track = DirectMusicTrack(title.ifBlank { parsed.path.substringAfterLast('/').ifBlank { "track-${index + 1}.$extension" } }, parsed.toString(), extension)
+        val track = DirectMusicTrack(
+            title.ifBlank { parsed.path.substringAfterLast('/').ifBlank { "track-${index + 1}" } },
+            parsed.toString(),
+            if (directAudio) extension else "mp3",
+            providerPage
+        )
         tracks.putIfAbsent(track.url.lowercase(Locale.ROOT), track)
     }
-    require(tracks.isNotEmpty()) { "Add at least one direct audio-file URL." }
-    require(tracks.size <= 50) { "A batch can contain at most 50 tracks. Split larger playlists into smaller batches." }
+    require(tracks.isNotEmpty()) { "Add at least one supported public media page or direct audio-file URL." }
+    require(tracks.size <= 50) { "A batch can contain at most 50 tracks. Split larger collections into smaller batches." }
     return tracks.values.toList()
+}
+
+private fun musicApiBase(): String {
+    val base = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true) || BuildConfig.DEBUG) {
+        "The enV API must use HTTPS in release builds."
+    }
+    require(base.isNotBlank()) { "The enV API base URL is not configured in this app build." }
+    return base
+}
+
+private fun musicApiError(status: Int, body: String): String {
+    val parsed = runCatching { JSONObject(body) }.getOrNull()
+    val message = parsed?.optString("message")?.takeIf { it.isNotBlank() && it != "null" }
+        ?: parsed?.optString("error")?.takeIf { it.isNotBlank() && it != "null" }
+    return message ?: "enV media service returned HTTP $status. Please retry or use an authorized direct audio URL."
+}
+
+private fun postMusicApiJson(path: String, payload: JSONObject): JSONObject {
+    val connection = URL(musicApiBase() + path).openConnection() as HttpURLConnection
+    connection.requestMethod = "POST"
+    connection.connectTimeout = 20000
+    connection.readTimeout = 60000
+    connection.doOutput = true
+    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+    connection.setRequestProperty("Accept", "application/json")
+    try {
+        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        if (status !in 200..299) throw IllegalStateException(musicApiError(status, body))
+        return runCatching { JSONObject(body) }.getOrElse {
+            throw IllegalStateException("enV media service returned invalid metadata. Retry later or use a supported public media URL.")
+        }
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: Boolean): List<DirectMusicTrack> {
+    val info = postMusicApiJson(
+        "/api/backend/url-media/info",
+        JSONObject().put("url", track.url).put("includePlaylist", includePlaylist)
+    )
+    val entries = info.optJSONArray("entries")
+    if (entries != null && entries.length() > 0) {
+        require(entries.length() <= 50) { "This collection has more than 50 tracks. Split it into smaller batches." }
+        val resolved = mutableListOf<DirectMusicTrack>()
+        for (index in 0 until entries.length()) {
+            val entry = entries.optJSONObject(index) ?: continue
+            val url = entry.optString("webpageUrl").ifBlank { entry.optString("webpage_url") }
+            if (!url.startsWith("https://", ignoreCase = true)) continue
+            resolved += DirectMusicTrack(entry.optString("title").ifBlank { "Track ${index + 1}" }, url, "mp3", true)
+        }
+        if (resolved.isNotEmpty()) return resolved
+    }
+    return listOf(track.copy(title = info.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: track.title))
+}
+
+private fun downloadProviderMusicTrack(
+    track: DirectMusicTrack,
+    folder: File,
+    maxBatchRemaining: Long
+): Pair<File, Long> {
+    require(maxBatchRemaining > 0L) { "The online batch reached the 200 MB limit." }
+    folder.mkdirs()
+    val payload = JSONObject()
+        .put("url", track.url)
+        .put("format", "mp3")
+        .put("audioOnly", true)
+        .put("maxBytes", minOf(MUSIC_TRACK_LIMIT, maxBatchRemaining))
+    val connection = URL(musicApiBase() + "/api/backend/url-media/download").openConnection() as HttpURLConnection
+    connection.requestMethod = "POST"
+    connection.connectTimeout = 20000
+    connection.readTimeout = 300000
+    connection.doOutput = true
+    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+    connection.setRequestProperty("Accept", "audio/mpeg, audio/*, application/octet-stream")
+    var temp: File? = null
+    try {
+        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            throw IllegalStateException(musicApiError(status, body))
+        }
+        val mime = (connection.contentType ?: "").substringBefore(';').trim().lowercase(Locale.ROOT)
+        require(mime.startsWith("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream") {
+            "enV media service did not return an audio file for ${track.title}."
+        }
+        val base = musicSafeName(track.title, "track")
+        val tempFile = File(folder, ".env-${UUID.randomUUID()}.part")
+        temp = tempFile
+        var count = 0L
+        connection.inputStream.buffered().use { input ->
+            FileOutputStream(tempFile).buffered().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    count += read
+                    require(count <= MUSIC_TRACK_LIMIT && count <= maxBatchRemaining) {
+                        "The downloaded track or batch exceeds enV's size limit."
+                    }
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+        require(count > 0L) { "The source returned an empty audio file for ${track.title}." }
+        var destination = File(folder, "$base.mp3")
+        var suffix = 2
+        while (destination.exists()) {
+            destination = File(folder, "$base ($suffix).mp3")
+            suffix += 1
+        }
+        require(tempFile.renameTo(destination)) { "enV could not save ${track.title} to the offline library." }
+        return destination to count
+    } catch (failure: Throwable) {
+        temp?.delete()
+        throw failure
+    } finally {
+        connection.disconnect()
+    }
 }
 
 private fun queryMusicFileName(context: Context, uri: Uri): String {
@@ -237,8 +384,8 @@ fun NativeMusicDownloaderScreen() {
         OutlinedTextField(collectionName, { collectionName = it.take(100) }, label = { Text("Album or playlist name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
 
         if (mode == "Online downloads") {
-            OutlinedTextField(urls, { urls = it; rightsConfirmed = false }, label = { Text("Direct audio URLs") }, placeholder = { Text("https://cdn.example.com/track.mp3\nTrack name | https://cdn.example.com/track.m4a") }, modifier = Modifier.fillMaxWidth().height(150.dp), minLines = 4)
-            Text("One public HTTPS audio-file URL per line. Use “Track title | URL” to name a track. Playlist and album batches save each track to the device's Music folder.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(urls, { urls = it; rightsConfirmed = false }, label = { Text("Music links or direct audio URLs") }, placeholder = { Text("Audiomack, YouTube Music, SoundCloud song/album/playlist URL\nTrack name | https://cdn.example.com/track.mp3") }, modifier = Modifier.fillMaxWidth().height(150.dp), minLines = 4)
+            Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio-file URL. Use “Track title | URL” for direct files. Provider downloads are saved to this device’s enV offline library; direct files use Android download notifications."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it })
                 Text("I own these tracks or am authorized to download them.", style = MaterialTheme.typography.bodySmall)
@@ -262,38 +409,76 @@ fun NativeMusicDownloaderScreen() {
                 scope.launch {
                     val queued = withContext(Dispatchers.IO) {
                         runCatching {
-                            var checkedBytes = 0L
-                            tracks.forEach { track ->
-                                checkedBytes += preflightMusicTrack(track)
-                                require(checkedBytes <= MUSIC_BATCH_LIMIT) { "The online batch exceeds 200 MB. Split it into smaller batches." }
-                            }
-                            val manager = context.getSystemService(DownloadManager::class.java)
-                            val queuedIds = mutableListOf<Long>()
+                            val directTracks = tracks.filterNot { it.isProviderPage }
+                            val pageTracks = tracks.filter { it.isProviderPage }
+                            val savedPageFiles = mutableListOf<File>()
                             try {
-                                tracks.forEachIndexed { index, track ->
-                                    val sourceName = musicSafeName(track.title, "track-${index + 1}")
-                                    val base = musicSafeName(collectionName, "music")
-                                    val rawName = "enV-" + base + "-" + sourceName
-                                    val cleanName = rawName.take(140)
-                                    val fileName = if (cleanName.endsWith("." + track.extension, true)) cleanName else cleanName + "." + track.extension
-                                    val request = DownloadManager.Request(Uri.parse(track.url))
-                                        .setTitle(track.title)
-                                        .setDescription("enV Music Downloader · " + collectionType.lowercase(Locale.ROOT))
-                                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                        .setAllowedOverMetered(true)
-                                        .setAllowedOverRoaming(false)
-                                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, fileName)
-                                    queuedIds += manager.enqueue(request)
+                                val root = File(context.filesDir, "music-downloader/" + musicSafeName(collectionName, "My music"))
+                                var providerBytes = 0L
+                                var providerTrackCount = 0
+                                pageTracks.forEach { page ->
+                                    val resolved = resolveProviderMusicPage(page, collectionType != "Track")
+                                    require(providerTrackCount + resolved.size <= 50) {
+                                        "The resolved collection has more than 50 tracks. Split it into smaller batches."
+                                    }
+                                    resolved.forEach { track ->
+                                        val remaining = MUSIC_BATCH_LIMIT - providerBytes
+                                        val (file, size) = downloadProviderMusicTrack(track, root, remaining)
+                                        savedPageFiles += file
+                                        providerBytes += size
+                                        providerTrackCount += 1
+                                    }
                                 }
+
+                                var checkedBytes = providerBytes
+                                directTracks.forEach { track ->
+                                    checkedBytes += preflightMusicTrack(track)
+                                    require(checkedBytes <= MUSIC_BATCH_LIMIT) {
+                                        "The online batch exceeds 200 MB. Split it into smaller batches."
+                                    }
+                                }
+                                val queuedIds = mutableListOf<Long>()
+                                if (directTracks.isNotEmpty()) {
+                                    val manager = context.getSystemService(DownloadManager::class.java)
+                                    try {
+                                        directTracks.forEachIndexed { index, track ->
+                                            val sourceName = musicSafeName(track.title, "track-${index + 1}")
+                                            val base = musicSafeName(collectionName, "music")
+                                            val rawName = "enV-" + base + "-" + sourceName
+                                            val cleanName = rawName.take(140)
+                                            val fileName = if (cleanName.endsWith("." + track.extension, true)) cleanName else cleanName + "." + track.extension
+                                            val request = DownloadManager.Request(Uri.parse(track.url))
+                                                .setTitle(track.title)
+                                                .setDescription("enV Music Downloader · " + collectionType.lowercase(Locale.ROOT))
+                                                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                                .setAllowedOverMetered(true)
+                                                .setAllowedOverRoaming(false)
+                                                .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, fileName)
+                                            queuedIds += manager.enqueue(request)
+                                        }
+                                    } catch (failure: Throwable) {
+                                        if (queuedIds.isNotEmpty()) manager.remove(*queuedIds.toLongArray())
+                                        throw failure
+                                    }
+                                }
+                                Pair(queuedIds.size, providerTrackCount)
                             } catch (failure: Throwable) {
-                                if (queuedIds.isNotEmpty()) manager.remove(*queuedIds.toLongArray())
+                                savedPageFiles.forEach { it.delete() }
                                 throw failure
                             }
-                            queuedIds.size
                         }
                     }
-                    queued.onSuccess { count -> status = "Queued $count track(s). Android will show system download notifications; completed files remain available offline in Music." }
-                        .onFailure { failure -> error = failure.message ?: "Android could not queue these downloads." }
+                    queued.onSuccess { result ->
+                        val (queuedCount, savedCount) = result
+                        savedTracks.clear()
+                        savedTracks.addAll(listOfflineMusic(context))
+                        status = buildList {
+                            if (savedCount > 0) add("Saved $savedCount provider track(s) to enV’s offline library.")
+                            if (queuedCount > 0) add("Queued $queuedCount direct track(s); Android will show system download notifications and save them in Music.")
+                        }.joinToString(" ")
+                    }.onFailure { failure ->
+                        error = failure.message ?: "enV could not complete these music downloads."
+                    }
                     busy = false
                 }
             }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Queueing downloads…" else if (collectionType == "Track") "Download track" else "Download " + collectionType.lowercase(Locale.ROOT)) }
@@ -310,6 +495,6 @@ fun NativeMusicDownloaderScreen() {
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Text("Protected streaming pages from Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio are not extracted. Use each service's official offline/download option, or supply direct audio from a rights holder. Limits: 50 tracks, 50 MB per track, 200 MB per import.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Supported public providers are resolved only where their source permits downloading. Protected app-only catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline feature. enV does not sign in, bypass DRM or export restricted offline entitlements. Limits: 50 tracks, 50 MB per track, 200 MB per batch."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
