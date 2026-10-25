@@ -24,7 +24,7 @@ if (missingCategories.length) {
 }
 const active = tools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = tools.length - active;
-const catalogVersion = createHash("sha256").update(catalogSource + JSON.stringify(runtimeCatalogExtensions)).digest("hex").slice(0, 12);
+const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
     const path = new URL(relativePath, root);
