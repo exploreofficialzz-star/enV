@@ -2635,7 +2635,12 @@ private struct NativeSongMetadataAnalyzerView: View {
                     defer { if opened { url.stopAccessingSecurityScopedResource() } }
                     let name = url.lastPathComponent
                     if url.pathExtension.lowercased() == "zip" {
+                        let zipSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                        guard zipSize > 0 && zipSize <= 30 * 1024 * 1024 else {
+                            throw NativeNativeError.message("ZIP must be between 1 byte and 30 MB.")
+                        }
                         let zipData = try Data(contentsOf: url, options: [.mappedIfSafe])
+                        guard zipData.count == zipSize else { throw NativeNativeError.message("ZIP size changed during import.") }
                         let entries = try nativeSongUnpackZIP(zipData)
                         for entry in entries {
                             batchBytes += Int64(entry.data.count)
@@ -3023,7 +3028,7 @@ func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
         let nameData = Data(bytes[nameStart..<(nameStart + nameLen)])
         guard let decodedName = String(data: nameData, encoding: .utf8), !decodedName.isEmpty else { throw NativeNativeError.message("ZIP filenames must be UTF-8.") }
         let name = decodedName.replacingOccurrences(of: "\\", with: "/")
-        guard name.count <= 1024 && !name.hasPrefix("/") && !name.split(separator: "/").contains("..") &&
+        guard name.utf8.count <= 1024 && !name.hasPrefix("/") && !name.split(separator: "/").contains("..") &&
             !name.split(separator: "/").contains(".") && !name.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) &&
             !name.hasPrefix("~") && name.range(of: #"^[A-Za-z]:"# , options: .regularExpression) == nil else {
             throw NativeNativeError.message("ZIP contains an unsafe path.")
@@ -3048,6 +3053,10 @@ func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
         guard uncompressedSize <= 20 * 1024 * 1024 else { throw NativeNativeError.message("ZIP entry exceeds 20 MB.") }
         expanded += uncompressedSize
         guard expanded <= 60 * 1024 * 1024 else { throw NativeNativeError.message("ZIP expands beyond 60 MB.") }
+        if uncompressedSize > 1024 * 1024 && compressedSize > 0 &&
+            Double(uncompressedSize) / Double(compressedSize) > 250 {
+            throw NativeNativeError.message("ZIP contains an unusually high compression ratio.")
+        }
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
         guard nativeSongExtensions.contains(ext) else { continue }
         let compressed = Data(bytes[payloadStart..<payloadEnd])
