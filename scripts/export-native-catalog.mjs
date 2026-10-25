@@ -58,6 +58,9 @@ if (missingCategories.length) {
 const active = exportedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = exportedTools.length - active;
 const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
+const runtimeInventoryVersion = createHash("sha256")
+  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+  .digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
     const path = new URL(relativePath, root);
@@ -85,9 +88,6 @@ const iosToolIds = readImplementedIds(
   "apps/ios/native-tool-coverage.txt",
   "apps/ios/native-family-coverage",
 );
-const catalogToolIds = new Set(exportedTools.map((tool) => tool.id));
-const exportedAndroidToolIds = new Set([...androidToolIds].filter((id) => catalogToolIds.has(id)));
-const exportedIosToolIds = new Set([...iosToolIds].filter((id) => catalogToolIds.has(id)));
 const toolsById = new Map(expandedTools.map((tool) => [tool.id, tool]));
 for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]) {
   const invalid = [...ids].filter((id) => !toolsById.has(id) || toolsById.get(id).status === "planned");
@@ -106,7 +106,7 @@ const output = new URL("../apps/shared/catalog.json", import.meta.url);
 mkdirSync(dirname(fileURLToPath(output)), { recursive: true });
 writeFileSync(output, `${JSON.stringify(payload)}\n`);
 const familyMap = new Map();
-for (const tool of exportedTools) {
+for (const tool of expandedTools) {
   const family = tool.engine.type;
   const entry = familyMap.get(family) ?? {
     family,
@@ -120,12 +120,14 @@ for (const tool of exportedTools) {
   entry.total += 1;
   entry[tool.status === "planned" ? "planned" : "active"] += 1;
   entry.uniqueConfigurations.add(JSON.stringify(tool.engine));
-  if (tool.status !== "planned" && exportedAndroidToolIds.has(tool.id)) entry.androidImplemented += 1;
-  if (tool.status !== "planned" && exportedIosToolIds.has(tool.id)) entry.iosImplemented += 1;
+  if (tool.status !== "planned" && androidToolIds.has(tool.id)) entry.androidImplemented += 1;
+  if (tool.status !== "planned" && iosToolIds.has(tool.id)) entry.iosImplemented += 1;
   familyMap.set(family, entry);
 }
 const inventory = {
-  catalogVersion,
+  catalogVersion: runtimeInventoryVersion,
+  baseCatalogVersion: catalogVersion,
+  runtimeExtensionIds: runtimeCatalogExtensions.filter((extension) => extension.platformRuntimeExtension === true && !tools.some((tool) => tool.id === extension.id)).map((extension) => extension.id),
   source: "src/data/catalog.ts",
   platforms: { android: "Kotlin", ios: "Swift" },
   families: [...familyMap.values()]
@@ -134,15 +136,15 @@ const inventory = {
       ...family,
       uniqueConfigurations: uniqueConfigurations.size,
     })),
-  androidToolIds: [...exportedAndroidToolIds].sort(),
-  iosToolIds: [...exportedIosToolIds].sort(),
+  androidToolIds: [...androidToolIds].sort(),
+  iosToolIds: [...iosToolIds].sort(),
   summary: {
-    totalTools: exportedTools.length,
-    activeTools: active,
-    plannedTools: planned,
+    totalTools: expandedTools.length,
+    activeTools: expandedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+    plannedTools: expandedTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
     engineFamilies: familyMap.size,
-    androidImplemented: exportedAndroidToolIds.size,
-    iosImplemented: exportedIosToolIds.size,
+    androidImplemented: androidToolIds.size,
+    iosImplemented: iosToolIds.size,
   },
 };
 const inventoryOutput = new URL("../apps/shared/native-engine-inventory.json", import.meta.url);
