@@ -6,10 +6,7 @@ import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-meta
 import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
 import {
   MUSIC_AUDIO_EXTENSIONS,
-  isSafeMusicOrigin,
   parseMusicCollectionLines,
-  validateDirectMusicUrl,
-  type MusicCollectionEntry,
 } from "@/lib/media/music-downloader-policy";
 
 type DownloadResult = { name: string; bytes: Uint8Array; extension: string; source: string; metadata: MusicMetadata };
@@ -40,43 +37,6 @@ function archivePath(name: string, used: Set<string>, fallback: string): string 
   }
   used.add(candidate.toLowerCase());
   return candidate;
-}
-
-async function readBounded(response: Response, limit: number, signal: AbortSignal): Promise<Uint8Array> {
-  const declaredSize = Number(response.headers.get("content-length") ?? 0);
-  if (declaredSize > limit) throw new Error("This track exceeds the " + formatFileSize(limit) + " per-track limit.");
-  if (!response.body) {
-    const body = new Uint8Array(await response.arrayBuffer());
-    if (body.byteLength > limit) throw new Error("This track exceeds the " + formatFileSize(limit) + " per-track limit.");
-    return body;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      if (signal.aborted) throw new DOMException("Download cancelled.", "AbortError");
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > limit) {
-        await reader.cancel();
-        throw new Error("This track exceeds the " + formatFileSize(limit) + " per-track limit.");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const output = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    output.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return output;
 }
 
 function trackFileName(metadata: MusicMetadata, fallback: string, extension: string): string {
