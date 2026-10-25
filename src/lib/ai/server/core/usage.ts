@@ -12,6 +12,10 @@ export function estimateCost(model: ModelRecord, usage: Usage, at: number): Cost
   if (model.free) return { usd: 0, basis: "estimated" };
   const pricing = resolvePricing(model, at);
   if (!pricing) return { usd: null, basis: "unknown" };
+  if (pricing.perComputeHour !== undefined) {
+    if (usage.computeSeconds == null || !Number.isFinite(usage.computeSeconds) || usage.computeSeconds < 0) return { usd: null, basis: "unknown" };
+    return { usd: round((usage.computeSeconds / 3600) * pricing.perComputeHour), basis: "estimated" };
+  }
   if (pricing.perAudioHour !== undefined) {
     if (usage.audioSeconds === null) return { usd: null, basis: "unknown" };
     return { usd: round((usage.audioSeconds / 3600) * pricing.perAudioHour), basis: "estimated" };
