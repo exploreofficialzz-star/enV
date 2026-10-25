@@ -675,7 +675,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
             .put("album", meta.optString("album").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("album_artist", meta.optString("album_artist").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("release_date", meta.optString("year").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
-            .put("artwork_available", false)
+            .put("artwork_available", meta.optBoolean("artwork_available", false))
         val report = JSONObject()
             .put("schema_version", "1.0")
             .put("filename", item.name)
@@ -713,8 +713,13 @@ private fun readNativeMetadata(file: File): JSONObject {
         retriever.setDataSource(file.absolutePath)
         fun text(key: Int): String? = retriever.extractMetadata(key)?.trim()?.takeIf { it.isNotEmpty() }
         val duration = text(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.div(1000.0)
-        val mime = text(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+        val mime = text(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)?.lowercase(Locale.ROOT)
         val bitRate = text(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()
+        val extension = file.extension.lowercase(Locale.ROOT)
+        val resolvedMime = mime ?: mimeFromExtension(extension)
+        val container = nativeAudioContainer(extension, mime)
+        val codec = nativeAudioCodec(extension, mime)
+        val artworkAvailable = runCatching { retriever.embeddedPicture?.isNotEmpty() == true }.getOrDefault(false)
         meta.put("title", text(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: JSONObject.NULL)
             .put("artist", text(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: JSONObject.NULL)
             .put("album", text(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: JSONObject.NULL)
@@ -723,17 +728,49 @@ private fun readNativeMetadata(file: File): JSONObject {
             .put("genre", text(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: JSONObject.NULL)
             .put("embedded_bpm", JSONObject.NULL)
             .put("track_number", text(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER) ?: JSONObject.NULL)
+            .put("disc_number", JSONObject.NULL)
             .put("composer", text(MediaMetadataRetriever.METADATA_KEY_COMPOSER) ?: JSONObject.NULL)
+            .put("publisher", JSONObject.NULL)
             .put("copyright", JSONObject.NULL)
-            .put("container", mime ?: mimeFromExtension(file.extension))
-            .put("codec", mime ?: JSONObject.NULL)
-            .put("mime_type", mime ?: mimeFromExtension(file.extension))
+            .put("comment", JSONObject.NULL)
+            .put("artwork_available", artworkAvailable)
+            .put("container", container ?: JSONObject.NULL)
+            .put("codec", codec ?: JSONObject.NULL)
+            .put("mime_type", resolvedMime)
             .put("duration_seconds", duration ?: JSONObject.NULL)
             .put("bitrate_bps", bitRate ?: JSONObject.NULL)
     } finally {
         retriever.release()
     }
     return meta
+}
+
+private fun nativeAudioContainer(extension: String, mime: String?): String? {
+    return when {
+        extension == "mp3" || mime == "audio/mpeg" -> "MPEG Audio"
+        extension == "wav" || mime == "audio/wav" || mime == "audio/x-wav" -> "WAVE"
+        extension == "flac" || mime == "audio/flac" -> "FLAC"
+        extension in setOf("m4a", "mp4", "3gp") || mime?.contains("mp4") == true || mime?.contains("3gpp") == true -> "ISO Base Media / MP4"
+        extension in setOf("ogg", "oga", "opus") || mime?.contains("ogg") == true -> "Ogg"
+        extension in setOf("aif", "aiff") || mime == "audio/aiff" -> "AIFF"
+        extension == "webm" || mime == "audio/webm" -> "WebM / Matroska"
+        extension == "amr" || mime == "audio/amr" -> "AMR"
+        else -> null
+    }
+}
+
+private fun nativeAudioCodec(extension: String, mime: String?): String? {
+    return when {
+        mime == "audio/mpeg" || extension == "mp3" -> "MPEG Audio"
+        mime == "audio/flac" || extension == "flac" -> "FLAC"
+        mime == "audio/opus" || extension == "opus" -> "Opus"
+        mime == "audio/aiff" || extension in setOf("aif", "aiff") -> "AIFF audio"
+        mime == "audio/wav" || mime == "audio/x-wav" || extension == "wav" -> "WAVE audio (PCM encoding not confirmed)"
+        mime == "audio/ogg" || extension in setOf("ogg", "oga") -> "Ogg audio (Vorbis/Opus not confirmed)"
+        mime == "audio/aac" || extension == "aac" -> "AAC"
+        mime == "audio/amr" || extension == "amr" -> "AMR"
+        else -> null
+    }
 }
 
 private fun mimeFromExtension(extension: String): String = when (extension.lowercase(Locale.ROOT)) {
