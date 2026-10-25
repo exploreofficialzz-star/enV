@@ -6912,7 +6912,16 @@ private struct NativeAiAssistPanel: View {
             do {
                 let access = url.startAccessingSecurityScopedResource()
                 defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let raw = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: try Data(contentsOf: url))
+                let maximumBytes = fileField?.kind == .audio ? 2_800_000 : 2_400_000
+                let maximumLabel = fileField?.kind == .audio ? "2.8 MB" : "2.4 MB"
+                if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, fileSize > maximumBytes {
+                    throw NSError(domain: "enV.NativeAiAssist", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose a file no larger than \(maximumLabel). Nothing was sent."])
+                }
+                let data = try Data(contentsOf: url)
+                guard data.count <= maximumBytes else {
+                    throw NSError(domain: "enV.NativeAiAssist", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose a file no larger than \(maximumLabel). Nothing was sent."])
+                }
+                let raw = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: data)
                 if fileField?.kind == .image { selectedFile = try NativeAiClient.prepareImage(raw) }
                 else { selectedFile = try NativeAiClient.prepareAudio(raw) }
             } catch { selectedFile = nil; notice = error.localizedDescription }
