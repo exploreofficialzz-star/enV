@@ -243,7 +243,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       windowed_rms_spread_db: spread,
       metric_scope_seconds: Number(Math.min(durationSeconds, 30).toFixed(2)),
     },
-    rhythm: { tempo_bpm: tempo, method: "10 ms energy-envelope autocorrelation; best-effort estimate", status: tempo === null ? "unavailable" : "estimated" },
+    rhythm: { tempo_bpm: tempo, method: "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate", status: tempo === null ? "unavailable" : "estimated" },
     tonality: { key, method: "chroma-template correlation; best-effort estimate", status: key === null ? "unavailable" : "estimated" },
     timbre: {
       spectral_centroid_hz: spectrum.centroid,
