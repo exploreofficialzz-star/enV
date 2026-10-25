@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { normalizeMusicModelClassification } from "@/lib/media/music-analysis-response";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 90_000;
 const RATE_LIMIT_WINDOW_MS = 10 * 60_000;
 const RATE_LIMIT_REQUESTS = 10;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
-
-type Candidate = { label: string; score: number | null };
 
 function errorResponse(status: number, code: string, message: string) {
   return Response.json({ ok: false, code, message }, {
@@ -42,57 +41,6 @@ async function readBoundedBody(request: Request, maximumBytes: number): Promise<
     offset += chunk.byteLength;
   }
   return body;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function textValue(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
-}
-
-function stringList(value: unknown): string[] {
-  const items = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-  return items
-    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
-    .map((item) => item.trim().slice(0, 100))
-    .slice(0, 30);
-}
-
-function normalizeResponse(value: unknown) {
-  const root = isRecord(value) ? value : {};
-  const nested = isRecord(root.classification)
-    ? root.classification
-    : isRecord(root.result) ? root.result
-      : isRecord(root.prediction) ? root.prediction
-        : root;
-  const list = Array.isArray(value) ? value
-    : Array.isArray(root.predictions) ? root.predictions
-      : Array.isArray(root.labels) ? root.labels
-        : Array.isArray(nested.genre_candidates) ? nested.genre_candidates
-          : [];
-  const candidates: Candidate[] = list.slice(0, 12).flatMap((item) => {
-    if (!isRecord(item)) return [];
-    const label = textValue(item.label ?? item.genre ?? item.class ?? item.name);
-    if (!label) return [];
-    const scoreValue = item.score ?? item.confidence ?? item.probability;
-    const score = typeof scoreValue === "number" && Number.isFinite(scoreValue)
-      ? Math.min(1, Math.max(0, scoreValue))
-      : null;
-    return [{ label, score }];
-  });
-  return {
-    genre: textValue(nested.genre) ?? candidates[0]?.label ?? null,
-    sub_style: textValue(nested.sub_style ?? nested.subStyle),
-    language: stringList(nested.language ?? nested.languages),
-    mood: stringList(nested.mood ?? nested.moods),
-    instruments: stringList(nested.instruments ?? nested.instrumentation),
-    vocal_style: textValue(nested.vocal_style ?? nested.vocalStyle),
-    genre_candidates: candidates,
-    status: "model_completed" as const,
-    note: "Model predictions are estimates. Fields omitted by the configured model remain unknown; verify uncertain labels before relying on them.",
-  };
 }
 
 function isRateLimited(request: Request): boolean {
@@ -219,7 +167,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
     } catch {
       return errorResponse(502, "MUSIC_ANALYSIS_INVALID_MODEL_RESPONSE", "The configured model service returned invalid JSON.");
     }
-    return Response.json({ ok: true, classification: normalizeResponse(response) }, {
+    return Response.json({ ok: true, classification: normalizeMusicModelClassification(response) }, {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
