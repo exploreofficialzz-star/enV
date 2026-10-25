@@ -176,7 +176,7 @@ function isUnsafeArchivePath(name: string): boolean {
   const normalized = name.replace(/\\/g, "/");
   return !name ||
     name.length > 1024 ||
-    /[\\u0000-\\u001f\\u007f]/.test(name) ||
+    /[\u0000-\u001f\u007f]/.test(name) ||
     normalized.startsWith("/") ||
     /^[a-z]:/i.test(normalized) ||
     normalized.split("/").some((part) => part === ".." || part === ".");
