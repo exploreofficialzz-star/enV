@@ -12,6 +12,9 @@ class CatalogModelsTest {
         assertEquals(1, catalog.counts.total)
         assertEquals(1, catalog.counts.active)
         assertEquals("music-downloader", catalog.search("music downloader").first().id)
+        assertEquals("music-downloader", catalog.search("Audiomack").first().id)
+        assertEquals("music-downloader", catalog.search("Boomplay").first().id)
+        assertEquals("music-downloader", catalog.search("YouTube Music").first().id)
         assertEquals(catalog, catalog.withMusicDownloader())
     }
 
