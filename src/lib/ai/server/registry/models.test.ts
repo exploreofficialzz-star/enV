@@ -9,7 +9,7 @@ test("the shipped registry is internally consistent", () => {
 
 test("every real provider has at least one model and every capability has a real model", () => {
   for (const provider of ["groq", "openrouter", "gemini"] as const) assert.ok(MODEL_REGISTRY.some((m) => m.provider === provider), provider);
-  for (const capability of ["STRUCTURED_TEXT", "VISION_ANALYSIS", "SPEECH_TO_TEXT"] as const) {
+  for (const capability of ["STRUCTURED_TEXT", "VISION_ANALYSIS", "SPEECH_TO_TEXT", "AUDIO_ANALYSIS"] as const) {
     assert.ok(MODEL_REGISTRY.some((m) => m.provider !== "mock" && m.capabilities.includes(capability)), capability);
   }
 });
@@ -44,6 +44,7 @@ test("the validator catches inconsistent rows", () => {
   assert.ok(broken({ pricing: null }).some((p) => p.includes("needs pricing")));
   assert.ok(broken({ structuredOutput: "none" }).some((p) => p.includes("disagree")));
   assert.ok(broken({ capabilities: ["SPEECH_TO_TEXT"] }).some((p) => p.includes("audio")));
+  assert.ok(broken({ capabilities: ["AUDIO_ANALYSIS"] }).some((p) => p.includes("audio input and text output")));
   assert.ok(broken({ notes: "" }).some((p) => p.includes("notes")));
   assert.ok(broken({ pricingUntil: "2027-01-01" }).some((p) => p.includes("pricingAfter")));
   assert.ok(validateModelRegistry([base, base]).some((p) => p.includes("duplicate")));
