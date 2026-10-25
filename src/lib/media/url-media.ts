@@ -76,6 +76,7 @@ export interface UrlMediaPlaylistEntry {
   title: string;
   uploader?: string;
   album?: string;
+  releaseYear?: string;
   duration?: number;
   thumbnail?: string;
   webpageUrl: string;
