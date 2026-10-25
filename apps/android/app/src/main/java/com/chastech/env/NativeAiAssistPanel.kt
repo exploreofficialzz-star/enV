@@ -152,6 +152,13 @@ private object NativeAiAssistFeatures {
             true, "I understand this image is sent to an external AI service.",
         ))
         add(AssistFeature(
+            "audio-analyze-studio", "Identify genre and tags with AI",
+            "Upload a short music clip to estimate genre, sub-style, audible languages, mood, instruments and vocal style. Predictions can be wrong; local signal analysis works without AI.",
+            "Identify music tags", "music.analysis.classify",
+            listOf(AssistField("audio", "Music audio", AssistKind.AUDIO, required = true, accept = "audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac", help = "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB.")),
+            true, "I understand this audio recording will be sent to enV AI for classification.",
+        ))
+        add(AssistFeature(
             "video-audio-extractor", "Transcribe audio with AI", "Upload a short audio clip (up to about 2.8 MB) to get a transcript with timestamps. Longer recordings are not supported yet. Extract and compress the audio first.",
             "Transcribe", "video.transcript.generate",
             listOf(
