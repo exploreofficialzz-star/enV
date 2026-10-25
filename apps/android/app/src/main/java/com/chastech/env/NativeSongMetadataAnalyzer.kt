@@ -441,22 +441,30 @@ private fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
     val results = mutableListOf<NativeSongSource>()
     val seen = mutableSetOf<String>()
     var expanded = 0L
+    var entriesSeen = 0
     ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
         while (true) {
             val entry = zip.nextEntry ?: break
+            entriesSeen += 1
+            require(entriesSeen <= 500) { "ZIP contains too many entries." }
             require(results.size < SONG_MAX_TRACKS || entry.isDirectory) { "ZIP contains more than 50 audio tracks." }
             val name = entry.name.replace('\\', '/')
             require(name.isNotBlank() && !name.startsWith("/") && !Regex("^[A-Za-z]:").containsMatchIn(name) &&
                 !name.split('/').any { it == ".." || it == "." } && name.none { it.code < 32 }) { "ZIP contains an unsafe path." }
             require(seen.add(name)) { "ZIP contains duplicate paths." }
-            if (entry.isDirectory || name.substringAfterLast('.', "").lowercase(Locale.ROOT) !in nativeSongExtensions) {
+            if (entry.isDirectory) {
                 zip.closeEntry()
                 continue
             }
+            // Drain every file through a bound, including non-audio entries, so a ZIP bomb
+            // cannot hide in a readme or unrelated file that the analyzer later ignores.
             val fileBytes = readCurrentEntryBounded(zip, SONG_MAX_TRACK_BYTES.toLong())
             expanded += fileBytes.size
             require(expanded <= SONG_MAX_ZIP_EXPANDED_BYTES) { "ZIP expands beyond 60 MB." }
-            results += NativeSongSource(name = name.split('/').filter { it.isNotBlank() }.joinToString(" — "), bytes = fileBytes, sizeBytes = fileBytes.size.toLong())
+            val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+            if (extension in nativeSongExtensions) {
+                results += NativeSongSource(name = name.split('/').filter { it.isNotBlank() }.joinToString(" — "), bytes = fileBytes, sizeBytes = fileBytes.size.toLong())
+            }
             zip.closeEntry()
         }
     }
