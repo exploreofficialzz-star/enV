@@ -32,8 +32,9 @@ class AccessibilityUiAuditTest {
         composeRule.onNodeWithContentDescription("Tools").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("More options").assertIsDisplayed().assertIsEnabled()
 
-        composeRule.onNodeWithContentDescription("More options").performClick()
-        composeRule.onNodeWithText("Search tools").assertIsDisplayed().performClick()
+        // Search is opened from the actual home search action, not from the overflow menu.
+        // Keep this navigation assertion tied to the screen's real, user-visible entry point.
+        composeRule.onNodeWithContentDescription("Search all tools").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Find a tool by name, category, or keyword.").assertIsDisplayed()
         composeRule.onNodeWithText("Start typing to see matching tools.").assertIsDisplayed()
     }
