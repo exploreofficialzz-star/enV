@@ -22,7 +22,12 @@ const PROVIDER_BY_HOST = new Map(
 
 export function detectProvider(url) {
   const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-  return PROVIDER_BY_HOST.get(hostname) || "generic";
+  const exact = PROVIDER_BY_HOST.get(hostname);
+  if (exact) return exact;
+  for (const [provider, hosts] of Object.entries(PROVIDERS)) {
+    if (hosts.some((host) => hostname.endsWith("." + host))) return provider;
+  }
+  return "generic";
 }
 
 function audioAdapter(format) {
