@@ -235,3 +235,23 @@ test("music classification requires a supported audio signature and bounded inpu
   assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "x".repeat(121) }).length > 0);
   assert.ok(ok("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", extra: "ignored by the schema" }).user.length > 0);
 });
+
+
+test("song metadata tagging never surfaces lyric content", () => {
+  const result = task("audio.music.analyze").finalize({
+    genre: "Afrobeats",
+    sub_style: "Afro-pop",
+    language: ["English"],
+    energy: "mid",
+    mood: ["uplifting"],
+    theme: [],
+    setting: [],
+    vocals: ["lead vocal"],
+    instruments: ["drums", "bass"],
+    descriptions: ["A bright, rhythm-led pop production."],
+    lyric_evidence: "This content must never be shown as lyric evidence.",
+    warnings: [],
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.value.lyric_evidence, "");
+});
