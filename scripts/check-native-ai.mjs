@@ -89,6 +89,9 @@ for (const [label, text] of screens) {
 }
 if (!androidAssistantSource.includes("candidates") || !androidAssistantSource.includes("onTool(tool.id)")) fail("Android assistant is missing catalog-backed, tappable tool recommendations");
 if (!iosAssistantSource.includes("candidates:") || !iosAssistantSource.includes("NavigationLink(value: tool)")) fail("iOS assistant is missing catalog-backed, tappable tool recommendations");
+if (!featureSource.includes('toolId: "audio-analyze-studio"') || !featureSource.includes('taskId: "music.analysis.classify"') || !featureSource.includes('requiresConsent: true')) fail("Music Analyzer AI mapping is not consent-gated");
+if (!androidSource.includes('"audio-analyze-studio" to "music.analysis.classify"') || !androidAssistSource.includes('"music.analysis.classify"')) fail("Android Music Analyzer AI task is not connected to the shared client");
+if (!iosSource.includes('"audio-analyze-studio":"music.analysis.classify"') || !iosSource.includes('NativeAiAssistFeature(toolID: "audio-analyze-studio"') || !iosSource.includes('case "music.analysis.classify":')) fail("iOS Music Analyzer AI task or consent-gated result formatter is missing");
 if (!(iosAssistantSource.indexOf("if !message.isUser && !message.recommendedToolIds.isEmpty") < iosAssistantSource.indexOf(".background(message.isUser ? Color.envAccentSoft : Color.envCard"))) fail("iOS assistant recommendations must be grouped inside the assistant reply bubble");
 if (!androidAssistantSource.includes("activeRequestHandle?.cancel()") || !androidAssistantSource.includes('NativeAiClient.run(context, "assistant.chat", input, requestHandle)')) fail("Android assistant Stop does not cancel the active network request");
 if (!iosAssistantSource.includes('Button("Stop", action: stopRequest)') || !iosAssistantSource.includes("private func stopRequest()") || !iosAssistantSource.includes("activeRequest?.cancel()")) fail("iOS assistant Stop does not cancel the active task");
