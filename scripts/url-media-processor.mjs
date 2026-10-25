@@ -8,6 +8,10 @@ import { randomUUID } from "node:crypto";
 import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
+import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
+import { classifyProviderFailure } from "./media/provider-errors.mjs";
+import { shouldTryGenericExtractor, genericExtractorArgs } from "./media/extraction-strategy.mjs";
+import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -29,9 +33,10 @@ function safeName(value, fallback = "download.bin") {
   return base || fallback;
 }
 
-function runYtdlp(args, cwd, signal, provider) {
+function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, ["--no-playlist", "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const playlistMode = includePlaylist ? "--yes-playlist" : "--no-playlist";
+    const child = spawn(YTDLP_BIN, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
@@ -54,17 +59,30 @@ function runYtdlp(args, cwd, signal, provider) {
       if (stdoutExceeded) return reject(new Error("PROVIDER_ERROR: The media provider returned too much metadata."));
       if (code !== 0) {
         const detail = stderr.trim().slice(-1200);
-        if (/sign in to confirm|login required|authentication required|please log in/i.test(detail)) {
-          return reject(new Error(`AUTH_REQUIRED: ${provider || "The provider"} requires sign-in or is challenging the processor's anonymous request. Use content accessible to the processor or configure a provider cookie file on the processor.`));
-        }
-        if (/unexpected response from webpage request|ip address is blocked|captcha|too many requests/i.test(detail)) {
-          return reject(new Error(`SOURCE_UNAVAILABLE: ${provider || "The provider"} is challenging or blocking the processor request. Confirm the post is publicly available in the service region, then retry later.`));
-        }
-        return reject(new Error(`Media downloader failed (code ${code}). ${detail}`));
+        // Keep authentication, bot challenges, rate limits, and provider errors
+        // in one classifier so "sign in to confirm you're not a bot" is not
+        // incorrectly surfaced as a mandatory user login.
+        return reject(classifyProviderFailure(provider, detail || `Media downloader exited with code ${code}.`));
       }
       resolve({ stdout, stderr });
     });
   });
+}
+
+async function runYtdlpWithGenericFallback(args, cwd, signal, provider, includePlaylist = false) {
+  try {
+    return await runYtdlp(args, cwd, signal, provider, includePlaylist);
+  } catch (error) {
+    if (!shouldTryGenericExtractor(error, includePlaylist) || signal?.aborted) throw error;
+    console.warn(`[url-media] provider=${provider} extractor metadata failed; trying generic public HTML media extraction once`);
+    try {
+      return await runYtdlp(genericExtractorArgs(args), cwd, signal, provider, false);
+    } catch {
+      // Preserve the original provider-specific diagnostic instead of hiding
+      // it under the less-specific generic HTML extractor's final error.
+      throw error;
+    }
+  }
 }
 
 function runFfprobe(file, signal) {
@@ -151,7 +169,8 @@ function providerForUrl(raw) {
   let url;
   try { url = new URL(String(raw || "").trim()); } catch { throw new Error("INVALID_URL: Enter a valid http(s) URL."); }
   if (!/^https?:$/.test(url.protocol)) throw new Error("INVALID_URL: Only http and https URLs are supported.");
-  return { url, provider: detectProvider(url) };
+  const directAudio = /\.(?:mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff|aif|wma|webm)$/i.test(url.pathname);
+  return { url, provider: directAudio ? "generic" : detectProvider(url), directAudio };
 }
 
 const PUBLIC_ERROR_MESSAGES = {
@@ -160,6 +179,7 @@ const PUBLIC_ERROR_MESSAGES = {
   SOURCE_UNAVAILABLE: "We couldn’t reach this source. Check the URL and try again later.",
   PRIVATE_CONTENT: "This content is private. enV can process only content that is publicly accessible.",
   AUTH_REQUIRED: "This source requires sign-in. Use publicly accessible content or configure supported provider access.",
+  SOURCE_CHALLENGE: "The source is challenging or blocking the processor request. This does not necessarily mean sign-in is required; retry later.",
   DOWNLOAD_NOT_PERMITTED: "This source does not permit downloading through enV.",
   NO_DOWNLOADABLE_FORMAT: "No downloadable format is available for this content.",
   FORMAT_UNAVAILABLE: "The selected media format is unavailable for this source.",
@@ -185,7 +205,7 @@ function errorPayload(error) {
   const message = error instanceof Error ? error.message : String(error);
   const known = [
     "INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "PRIVATE_CONTENT",
-    "AUTH_REQUIRED", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT",
+    "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT",
     "FORMAT_UNAVAILABLE", "MANIFEST_PARSE_FAILED", "SEGMENT_FAILED",
     "RANGE_UNSUPPORTED", "RESUME_INVALID", "NETWORK_TIMEOUT", "RATE_LIMITED",
     "PROVIDER_ERROR", "FFMPEG_UNAVAILABLE", "FFMPEG_FAILED", "DISK_FULL",
@@ -196,8 +216,17 @@ function errorPayload(error) {
   const code = prefixedCode ||
     (/request body is too large/i.test(message) ? "REQUEST_TOO_LARGE" :
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
-  const retryable = ["SOURCE_UNAVAILABLE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
-  return { code, message: PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR, retryable };
+  const retryable = ["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
+  const safeMessage = message.replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n\t]+/g, " ").slice(0, 900);
+  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's collection resolver could not enumerate its tracks/i.test(safeMessage);
+  const explicitDetail = safeMessage.match(/^[A-Z_]+:\s*(.+)$/);
+  const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
+  const publicMessage = audiomackAlbumFailure
+    ? safeMessage.replace(/^SOURCE_UNAVAILABLE:\s*/i, "")
+    : detailCodes.has(code) && explicitDetail
+      ? explicitDetail[1]
+      : PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR;
+  return { code, message: publicMessage, retryable };
 }
 
 function errorStatus(code) {
@@ -205,7 +234,7 @@ function errorStatus(code) {
   if (code === "RATE_LIMITED") return 429;
   if (["FILE_TOO_LARGE", "DURATION_TOO_LONG", "REQUEST_TOO_LARGE"].includes(code)) return 413;
   if (code === "JOB_TIMEOUT") return 504;
-  if (["SOURCE_UNAVAILABLE", "SERVER_CAPACITY", "NETWORK_TIMEOUT"].includes(code)) return 503;
+  if (["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "SERVER_CAPACITY", "NETWORK_TIMEOUT"].includes(code)) return 503;
   return 400;
 }
 
@@ -272,6 +301,10 @@ async function inspectDirectUrl(url, signal) {
 }
 
 async function handleDirectDownload(req, res, url, body, signal) {
+  const requestedMaxBytes = Number(body.maxBytes);
+  const maxBytes = Number.isFinite(requestedMaxBytes) && requestedMaxBytes > 0
+    ? Math.min(MAX_OUTPUT_BYTES, Math.floor(requestedMaxBytes))
+    : MAX_OUTPUT_BYTES;
   const requestedRange = Number.isInteger(body.resumeFrom) && body.resumeFrom > 0 ? body.resumeFrom : 0;
   const headers = { accept: "video/*,audio/*,application/octet-stream,*/*;q=0.5" };
   if (requestedRange) {
@@ -283,7 +316,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
   const contentType = response.headers.get("content-type") || "application/octet-stream";
   if (!mediaMimeAllowed(contentType)) throw new Error("UNSUPPORTED_SOURCE: The URL does not identify a supported audio/video resource.");
   const contentLength = Number(response.headers.get("content-length") || 0) || undefined;
-  if (contentLength && contentLength > MAX_OUTPUT_BYTES) throw new Error("FILE_TOO_LARGE: The remote media exceeds the configured size limit.");
+  if (contentLength && contentLength > maxBytes) throw new Error("FILE_TOO_LARGE: The remote media exceeds the configured size limit.");
   if (requestedRange && response.status !== 206) throw new Error("RESUME_INVALID: The server did not honor the requested byte range.");
   if (!response.body) throw new Error("SOURCE_UNAVAILABLE: The media response did not contain a body.");
   const outHeaders = {
@@ -309,7 +342,7 @@ async function handleDirectDownload(req, res, url, body, signal) {
       if (done) break;
       if (!value) continue;
       bytes += value.byteLength;
-      if (bytes > MAX_OUTPUT_BYTES) throw new Error("FILE_TOO_LARGE: The downloaded media exceeded the configured size limit.");
+      if (bytes > maxBytes) throw new Error("FILE_TOO_LARGE: The downloaded media exceeded the configured size limit.");
       if (!res.write(Buffer.from(value))) await new Promise((resolve) => res.once("drain", resolve));
     }
     res.end();
@@ -319,14 +352,143 @@ async function handleDirectDownload(req, res, url, body, signal) {
   }
 }
 
+async function readBoundedText(response, maxBytes) {
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > maxBytes) throw new Error("SOURCE_UNAVAILABLE: Audiomack page metadata is too large.");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("SOURCE_UNAVAILABLE: Audiomack page metadata exceeds the safe inspection limit.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function isAudiomackCollectionUrl(url) {
+  const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
+  // Audiomack publicly exposes both artist/album/slug and artist/playlist/slug.
+  return parts.length >= 3 && ["album", "playlist", "playlists"].some((kind) =>
+    parts[0] === kind || parts[1] === kind);
+}
+
+/**
+ * Fallback shared by all registered providers: only follow a page's explicit,
+ * HTTPS audio-file download link. A streaming player URL is not enough.
+ * fetchPublic enforces public-DNS checks on each redirect before requesting it.
+ */
+async function discoverExplicitAudioDownload(url, signal) {
+  if (isPublicMediaCollectionPage(url.toString())) return null;
+  const { response, url: pageUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; enV-Music-Downloader/1.0)" },
+  }, signal);
+  if (!response.ok) return null;
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+    if (response.body) await response.body.cancel().catch(() => undefined);
+    return null;
+  }
+  const html = await readBoundedText(response, 2 * 1024 * 1024);
+  // Validate actual response type: URLs for signed files may have no extension,
+  // while player/HTML URLs can misleadingly be labelled "Download".
+  for (const candidate of extractExplicitPublicAudioLinks(html, pageUrl.toString())) {
+    try {
+      const verified = await probeExplicitPublicAudioLink(candidate, fetchPublic, signal);
+      if (verified) return verified;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      // Continue to another explicitly offered file, if any.
+    }
+  }
+  return null;
+}
+
+async function inspectAudiomackAlbumPage(url, signal) {
+  const { response, url: finalUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: {
+      accept: "text/html,application/xhtml+xml",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "accept-language": "en-US,en;q=0.9",
+      "cache-control": "no-cache",
+    },
+  }, signal);
+  const finalHost = finalUrl.hostname.toLowerCase();
+  if (finalHost !== "audiomack.com" && finalHost !== "www.audiomack.com") {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack redirected to an unexpected host.");
+  }
+  if (!response.ok) throw new Error("SOURCE_UNAVAILABLE: Audiomack returned HTTP " + response.status + " for its album page.");
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (contentType && !contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack did not return an HTML album page.");
+  }
+  const html = await readBoundedText(response, 8 * 1024 * 1024);
+  const parsed = parseAudiomackAlbumPage(html, finalUrl.toString());
+  if (!parsed.entries.length) return null;
+  return {
+    provider: "audiomack",
+    title: parsed.title || "Audiomack collection",
+    uploader: parsed.uploader,
+    album: parsed.title || undefined,
+    webpageUrl: finalUrl.toString(),
+    isPlaylist: true,
+    entries: parsed.entries,
+    truncated: parsed.truncated,
+    formats: [],
+  };
+}
+
 async function handleInfo(req, res) {
   const body = await readJson(req);
-  const { url: rawUrl, provider: requestedProvider } = body;
-  const { url, provider } = providerForUrl(rawUrl);
-  if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
+  const { url: rawUrl, provider: requestedProvider, includePlaylist = false } = body;
+  const { url, provider, directAudio } = providerForUrl(rawUrl);
+  if (requestedProvider && requestedProvider !== provider && !directAudio) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  let audiomackPageFallbackFailure = "";
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
+    try {
+      const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
+      if (albumInfo?.entries?.length) {
+        json(res, 200, albumInfo);
+        return;
+      }
+      audiomackPageFallbackFailure = "The public collection page did not expose usable song links.";
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      const failure = error instanceof Error ? error.message : String(error);
+      audiomackPageFallbackFailure = failure.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(0, 220);
+      console.warn("[url-media] Audiomack page-link fallback unavailable: " + audiomackPageFallbackFailure);
+    }
+  }
+  // yt-dlp's historical Audiomack album extractor loops over the obsolete
+  // /api/music/url/album endpoint. Running it after public-page discovery fails
+  // produces a misleading JSON error, not a usable album track list.
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack's public collection page did not expose readable song links. " +
+      (audiomackPageFallbackFailure || "Track enumeration was unavailable.") +
+      " The legacy album API extractor cannot recover those links. No audio was downloaded.");
+  }
   if (provider === "generic") {
     const info = await inspectDirectUrl(url, controller.signal);
     json(res, 200, info);
@@ -335,8 +497,38 @@ async function handleInfo(req, res) {
 
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-url-info-"));
   try {
-    const args = ["--dump-single-json", "--skip-download", "--no-warnings", url.toString()];
-    const { stdout } = await runYtdlp(args, jobDir, controller.signal, provider);
+    const args = [
+      "--dump-single-json", "--skip-download", "--no-warnings",
+      ...(includePlaylist ? ["--flat-playlist", "--playlist-end", "50"] : []),
+      url.toString(),
+    ];
+    let stdout;
+    try {
+      ({ stdout } = await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
+    } catch (error) {
+      // The provider extractor can be outdated even when an artist offers a
+      // direct file on the public song page. Use this safe, opt-in HTML fallback
+      // for all supported providers, never as an album/playlist shortcut.
+      const code = String(error?.message || "");
+      if (/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) {
+        try {
+          const publicDownload = await discoverExplicitAudioDownload(url, controller.signal);
+          if (publicDownload) {
+            json(res, 200, {
+              provider, title: publicDownload.pathname.split("/").pop()?.replace(/\\.[^.]+$/, "") || "Downloadable audio",
+              webpageUrl: url.toString(), isPlaylist: false, entries: [],
+              formats: [{ formatId: "direct-file", ext: path.extname(publicDownload.pathname).slice(1), note: "Artist-provided public file download" }],
+            });
+            return;
+          }
+        } catch (fallbackError) {
+          if (fallbackError?.name === "AbortError") throw fallbackError;
+          // Keep the original provider error when the optional fallback fails.
+        }
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
     const metadata = parseYtDlpJson(stdout);
     if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: Media exceeds the configured duration limit.");
 
@@ -352,14 +544,40 @@ async function handleInfo(req, res) {
       note: format.format_note ? String(format.format_note) : undefined,
     })).filter((format) => format.formatId || format.ext);
 
+    const entries = Array.isArray(metadata.entries)
+      ? metadata.entries.slice(0, 50).map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const entryUrl = String(entry.webpage_url || entry.original_url || entry.url || "");
+          const resolvedUrl = /^https?:\/\//i.test(entryUrl)
+            ? entryUrl
+            : provider === "youtube" && entry.id
+              ? "https://www.youtube.com/watch?v=" + encodeURIComponent(String(entry.id))
+              : entryUrl;
+          return resolvedUrl ? {
+            id: entry.id ? String(entry.id) : undefined,
+            title: String(entry.title || entry.fulltitle || "Untitled track"),
+            uploader: entry.uploader || entry.artist ? String(entry.uploader || entry.artist) : undefined,
+            album: entry.album || entry.album_title ? String(entry.album || entry.album_title) : undefined,
+            releaseYear: entry.release_year || entry.release_date || entry.upload_date ? String(entry.release_year || entry.release_date || entry.upload_date) : undefined,
+            duration: typeof entry.duration === "number" ? entry.duration : undefined,
+            thumbnail: entry.thumbnail ? String(entry.thumbnail) : undefined,
+            webpageUrl: resolvedUrl,
+          } : null;
+        }).filter(Boolean)
+      : [];
     json(res, 200, {
       provider,
       id: metadata.id ? String(metadata.id) : undefined,
-      title: String(metadata.title || metadata.fulltitle || "Untitled media"),
-      uploader: metadata.uploader ? String(metadata.uploader) : undefined,
+      title: String(metadata.title || metadata.fulltitle || metadata.album || metadata.album_title || "Untitled media"),
+      uploader: metadata.uploader || metadata.artist ? String(metadata.uploader || metadata.artist) : undefined,
+      album: metadata.album || metadata.album_title ? String(metadata.album || metadata.album_title) : undefined,
+      releaseYear: metadata.release_year || metadata.release_date || metadata.upload_date ? String(metadata.release_year || metadata.release_date || metadata.upload_date) : undefined,
       duration: typeof metadata.duration === "number" ? metadata.duration : undefined,
       thumbnail: metadata.thumbnail ? String(metadata.thumbnail) : undefined,
       webpageUrl: metadata.webpage_url ? String(metadata.webpage_url) : url.toString(),
+      isPlaylist: metadata._type === "playlist" || metadata._type === "multi_video" || entries.length > 0,
+      entries,
+      truncated: Array.isArray(metadata.entries) && metadata.entries.length > entries.length,
       live: Boolean(metadata.is_live),
       width: typeof metadata.width === "number" ? metadata.width : undefined,
       height: typeof metadata.height === "number" ? metadata.height : undefined,
@@ -376,8 +594,12 @@ async function handleInfo(req, res) {
 async function handleDownload(req, res) {
   const body = await readJson(req);
   const { url: rawUrl, provider: requestedProvider, format = "mp4", audioOnly = false } = body;
-  const { url, provider } = providerForUrl(rawUrl);
-  if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
+  const requestedMaxBytes = Number(body.maxBytes);
+  const maxBytes = Number.isFinite(requestedMaxBytes) && requestedMaxBytes > 0
+    ? Math.min(MAX_OUTPUT_BYTES, Math.floor(requestedMaxBytes))
+    : MAX_OUTPUT_BYTES;
+  const { url, provider, directAudio } = providerForUrl(rawUrl);
+  if (requestedProvider && requestedProvider !== provider && !directAudio) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
@@ -394,21 +616,32 @@ async function handleDownload(req, res) {
   try {
     const outputTemplate = path.join(jobDir, `${randomUUID()}-%(title).120s.%(ext)s`);
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
-    const args = ["--max-filesize", `${MAX_OUTPUT_BYTES}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
-    await runYtdlp(args, jobDir, controller.signal, provider);
+    const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
+    try {
+      await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider);
+    } catch (error) {
+      const code = String(error?.message || "");
+      if (!/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) throw error;
+      let publicDownload = null;
+      try { publicDownload = await discoverExplicitAudioDownload(url, controller.signal); }
+      catch (fallbackError) { if (fallbackError?.name === "AbortError") throw fallbackError; }
+      if (!publicDownload) throw error;
+      await handleDirectDownload(req, res, publicDownload, body, controller.signal);
+      return;
+    }
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       const file = path.join(jobDir, entry.name);
       const stat = await fs.stat(file);
-      if (stat.size > MAX_OUTPUT_BYTES) continue;
+      if (stat.size > maxBytes) continue;
       candidates.push({ file, stat });
     }
     if (!candidates.length) throw new Error("The provider returned no downloadable media within the configured limits.");
     candidates.sort((a,b) => b.stat.size - a.stat.size);
     const chosen = candidates[0];
-    await verifyDownloadedMedia(chosen.file, MAX_OUTPUT_BYTES, controller.signal);
+    await verifyDownloadedMedia(chosen.file, maxBytes, controller.signal);
     const data = await fs.readFile(chosen.file);
     const ext = path.extname(chosen.file).toLowerCase().replace(".", "") || "bin";
     const mime = ext === "mp4" ? "video/mp4" : ext === "webm" ? "video/webm" : ext === "mp3" ? "audio/mpeg" : ext === "m4a" ? "audio/mp4" : "application/octet-stream";
@@ -423,11 +656,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
   if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV URL media processor", downloader: YTDLP_BIN, providers: Object.keys(PROVIDERS), ready: await commandExists() });
   if (req.method === "POST" && req.url === "/info") {
-    try { await handleInfo(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/info causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
+    try { await handleInfo(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/info causeType=${error instanceof Error ? error.name : "UnknownError"} diagnostic=${String(error instanceof Error ? error.message : error).replace(/https?:\/\/\S+/g, "[url]").replace(/[\r\n]+/g, " ").slice(0, 320)}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   if (req.method === "POST" && req.url === "/download") {
-    try { await handleDownload(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/download causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
+    try { await handleDownload(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/download causeType=${error instanceof Error ? error.name : "UnknownError"} diagnostic=${String(error instanceof Error ? error.message : error).replace(/https?:\/\/\S+/g, "[url]").replace(/[\r\n]+/g, " ").slice(0, 320)}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   json(res, 404, { error: "Not found." });

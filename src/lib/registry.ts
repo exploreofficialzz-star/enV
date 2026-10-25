@@ -1,8 +1,33 @@
-import { tools as allTools } from "@/data/catalog";
+import { tools as catalogTools } from "@/data/catalog";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
+
+const musicDownloaderTool: ToolMeta = {
+  id: "music-downloader",
+  name: "Music Downloader",
+  slug: "music-downloader",
+  description: "Download authorized tracks from supported public song, album and playlist pages or direct audio files, and organize music offline on your device.",
+  category: "audio",
+  subcategory: "Music",
+  keywords: ["music", "downloader", "download", "offline", "online", "song", "track", "album", "playlist", "mp3", "audio file"],
+  tags: ["music", "download", "album", "playlist", "offline", "online", "audio"],
+  icon: "Download",
+  popularity: 10000,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["audio-file-inspector", "music-studio", "audio-to-wav"],
+  engine: { type: "custom", id: "music-downloader" },
+  isNew: true,
+};
+
+const allTools: ToolMeta[] = catalogTools.some((tool) => tool.id === musicDownloaderTool.id)
+  ? catalogTools
+  : [...catalogTools, musicDownloaderTool];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));
 const accessibilityStudios = makeAccessibilityStudioTools(allTools);

@@ -11,6 +11,8 @@ class MainActivityLaunchTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
     private fun awaitHomeScreenReady() {
+        // CatalogGate reads the shared catalog on Dispatchers.IO; wait for its real
+        // destination rather than racing the launch screen.
         composeRule.waitUntil(timeoutMillis = 15_000) {
             composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
                 .fetchSemanticsNodes().isNotEmpty()

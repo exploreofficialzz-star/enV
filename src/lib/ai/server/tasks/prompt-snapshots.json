@@ -27,6 +27,10 @@
     "version": "2026-09-30.1",
     "hash": "3a2fb21b1db79bfc"
   },
+  "music.analysis.classify": {
+    "version": "2026-10-25.1",
+    "hash": "e5112938e03216c3"
+  },
   "assistant.chat": {
     "version": "2026-10-19.1",
     "hash": "8010d37828cf6b62"

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { parseGeneratedCatalog } from "../../../scripts/catalog-reader.mjs";
+import { parseFinalCatalog } from "../../../scripts/catalog-reader.mjs";
 import { AI_LIMITS, AI_TASK_IDS } from "./contracts.ts";
 import { AI_FEATURES, buildFeatureInput, defaultValuesFor, getAiFeature, validateFeatureValues } from "./features.ts";
 import type { FileValue } from "./features.ts";
 
-const catalog = parseGeneratedCatalog(readFileSync(new URL("../../data/catalog.ts", import.meta.url), "utf8")) as { id: string; status: string; category: string; clientSide?: boolean }[];
+const catalog = parseFinalCatalog(readFileSync(new URL("../../data/catalog.ts", import.meta.url), "utf8")) as { id: string; status: string; category: string; clientSide?: boolean }[];
 
 test("every AI feature is bound to a real, active catalog tool and a real task", () => {
   const seen = new Set<string>();

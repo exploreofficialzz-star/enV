@@ -9,7 +9,7 @@ test("the shipped registry is internally consistent", () => {
 
 test("every real provider has at least one model and every capability has a real model", () => {
   for (const provider of ["groq", "openrouter", "gemini"] as const) assert.ok(MODEL_REGISTRY.some((m) => m.provider === provider), provider);
-  for (const capability of ["STRUCTURED_TEXT", "VISION_ANALYSIS", "SPEECH_TO_TEXT"] as const) {
+  for (const capability of ["STRUCTURED_TEXT", "VISION_ANALYSIS", "SPEECH_TO_TEXT", "AUDIO_UNDERSTANDING"] as const) {
     assert.ok(MODEL_REGISTRY.some((m) => m.provider !== "mock" && m.capabilities.includes(capability)), capability);
   }
 });

@@ -50,6 +50,7 @@ assert.match(urlMedia, /YouTube Terms and applicable law/);
 assert.match(urlMedia, /I own this media or have permission to process it/);
 
 const audioEngine = fs.readFileSync(new URL("../src/components/engines/audio-engine.tsx", import.meta.url), "utf8");
+assert.match(audioEngine, /toolId === "audio-analyze-studio"\) return <MusicAnalyzerStudio \/>/, "Music Analyzer route must render the actual analyzer");
 for (const operation of ["voice-noise-reducer", "voice-noise-gate", "audio-hum-reducer", "audio-trim-silence", "audio-lufs-meter", "audio-spectrogram", "volume-local", "resample-local", "channels-local"]) {
   assert.ok(audioEngine.includes(operation), `local processor route missing: ${operation}`);
 }
@@ -97,6 +98,36 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
     assert.ok(processor.toLowerCase().includes(marker.toLowerCase()), `native WAV processor is missing ${marker}`);
   }
 }
+const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
+const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
+const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
+const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
+for (const marker of ["Analyze on this device", "Export JSON", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
+  assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
+}
+for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
+  assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
+}
+for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
+  assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
+}
+for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_BUILTIN_LIMIT", "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "MUSIC_ANALYSIS_NO_LABELS", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification", "AI_LIMITS.audioBytesMax", "music.analysis.classify", "apiUrl(\"/api/ai/run\")"]) {
+  assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
+}
+const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
+const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
+const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
+const androidNativeAudioTests = fs.readFileSync(new URL("../apps/android/app/src/test/java/com/chastech/env/engine/NativeAudioEngineTest.kt", import.meta.url), "utf8");
+const iosNativeAudioViews = fs.readFileSync(new URL("../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
+const iosNativeAudioTests = fs.readFileSync(new URL("../apps/ios/enVTests/NativeAudioEngineTests.swift", import.meta.url), "utf8");
+assert.ok(androidNativeAudioEngine.includes('"audio-analyze-studio" to "analyze"'), "Android Music Analyzer must have an explicit native operation mapping");
+assert.ok(androidNativeAudioProcessor.includes('"analyze" -> return NativeAudioWavResult(musicAnalysisReport'), "Android WAV processor must calculate a native analysis report");
+assert.ok(androidNativeAudioForm.includes('fileName = selectedName'), "Android Analyzer must preserve the selected source filename");
+assert.ok(androidNativeAudioTests.includes("musicAnalyzerHasAnExplicitNativeWavRoute"), "Android native Analyzer route must be tested");
+assert.ok(iosNativeAudioViews.includes('"audio-analyze-studio": "analyze"'), "iOS Music Analyzer must have an explicit native operation mapping");
+assert.ok(iosNativeAudioViews.includes('case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport'), "iOS WAV processor must calculate a native analysis report");
+assert.ok(iosNativeAudioViews.includes("fileName: selectedName"), "iOS Analyzer must preserve the selected source filename");
+assert.ok(iosNativeAudioTests.includes("testMusicAnalyzerRoutesToNativeWavAndProducesHonestJSON"), "iOS native Analyzer must have a JSON contract test");
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);

@@ -1,0 +1,204 @@
+name: Production live connectivity smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-live-smoke.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-live-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Verify public production services
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check production homepage
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 4 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-home.html \
+            --write-out 'Homepage HTTP %{http_code}; downloaded %{size_download} bytes\n' \
+            https://envtools.store/
+          test -s /tmp/env-home.html
+
+      - name: Check Render API readiness and processor health
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 4 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 10 --max-time 45 \
+            --output /tmp/env-render-health.json \
+            --write-out 'Render health HTTP %{http_code}; downloaded %{size_download} bytes\n' \
+            https://env-q3mq.onrender.com/health
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const health = JSON.parse(fs.readFileSync('/tmp/env-render-health.json', 'utf8'));
+          const failures = [];
+          if (health.ok !== true || health.ready !== true) failures.push('Render API does not report ready=true.');
+          if (health.applicationApiOrigin !== 'https://envtools.store') failures.push('Render API is not pointing at the canonical application origin.');
+          if (health.authentication !== true) failures.push('Processor shared-secret authentication is not enabled.');
+          for (const required of ['media', 'url-media']) {
+            if (health.processors?.[required] !== true) failures.push(`Required processor "${required}" is not ready.`);
+          }
+          if (failures.length) {
+            for (const failure of failures) console.error(`FAIL: ${failure}`);
+            process.exit(1);
+          }
+          console.log(`Render API ready; processors: ${Object.entries(health.processors).map(([name, ready]) => `${name}=${ready}`).join(', ')}`);
+          NODE
+
+      - name: Check application backend gateway readiness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-backend-health.json \
+            --write-out 'Backend gateway HTTP %{http_code}; downloaded %{size_download} bytes\n' \
+            https://envtools.store/api/backend/health
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const health = JSON.parse(fs.readFileSync('/tmp/env-backend-health.json', 'utf8'));
+          const failures = [];
+          if (health.ok !== true || health.ready !== true) failures.push('Application backend gateway does not report ready=true.');
+          if (health.processors?.media !== true) failures.push('Application backend media processor is not configured.');
+          if (health.processors?.urlMedia !== true) failures.push('Application backend URL-media processor is not configured.');
+          if (failures.length) {
+            for (const failure of failures) console.error(`FAIL: ${failure}`);
+            process.exit(1);
+          }
+          console.log('Application backend gateway and required processors report ready.');
+          NODE
+
+      - name: Check payment funding-options contract
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-funding-options.json \
+            --write-out 'Payment funding-options HTTP %{http_code}; downloaded %{size_download} bytes\\n' \
+            https://envtools.store/api/billing/funding-options
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const response = JSON.parse(fs.readFileSync('/tmp/env-funding-options.json', 'utf8'));
+          const data = response?.data;
+          const failures = [];
+          const providers = Array.isArray(data?.providers) ? data.providers : [];
+          const required = new Map([['paystack', 'NGN'], ['cryptomus', 'USD']]);
+          if (response?.ok !== true || !data || providers.length !== required.size) {
+            failures.push('Funding-options response is missing one or more configured provider contracts.');
+          }
+          for (const [id, currency] of required) {
+            const provider = providers.find((item) => item?.id === id);
+            if (!provider) {
+              failures.push(`Missing payment provider contract: ${id}.`);
+              continue;
+            }
+            if (typeof provider.enabled !== 'boolean' || provider.currency !== currency ||
+                !Array.isArray(provider.packs) ||
+                provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000') {
+              failures.push(`The ${id} funding-options contract is malformed.`);
+              continue;
+            }
+            for (const pack of provider.packs) {
+              if (pack.amountMinor !== null && (!Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
+                failures.push(`The ${id} provider returned an invalid token-pack amount.`);
+              }
+              if (provider.enabled && (!Number.isSafeInteger(provider.pricePerTokenMinor) ||
+                  provider.pricePerTokenMinor <= 0 || !Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
+                failures.push(`The enabled ${id} provider is missing a valid configured price.`);
+              }
+            }
+          }
+          if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {
+            failures.push('The aggregate anyEnabled flag does not match provider availability.');
+          }
+          if (failures.length) {
+            for (const failure of failures) console.error(`FAIL: ${failure}`);
+            process.exit(1);
+          }
+          console.log(`Payment API contract healthy; Paystack enabled=${providers.find((provider) => provider.id === 'paystack')?.enabled === true}; Cryptomus enabled=${providers.find((provider) => provider.id === 'cryptomus')?.enabled === true}. This contract check does not imply live provider approval.`);
+          NODE
+
+      - name: Check account session API
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_code=""
+          for attempt in 1 2 3 4; do
+            status_code="$(curl --silent --show-error --location \
+              --connect-timeout 10 --max-time 30 \
+              --output /tmp/env-auth-session.json \
+              --write-out '%{http_code}' \
+              https://envtools.store/api/auth/get-session || true)"
+            if [ "$status_code" = "200" ]; then break; fi
+            sleep 3
+          done
+          echo "Auth session HTTP ${status_code:-000}"
+          if [ "$status_code" != "200" ]; then
+            AUTH_STATUS="$status_code" node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          let body = {};
+          try { body = JSON.parse(fs.readFileSync('/tmp/env-auth-session.json', 'utf8')); } catch {}
+          console.error(`FAIL: Account session endpoint returned HTTP ${process.env.AUTH_STATUS || '000'}; public error code=${body?.error ?? 'unavailable'}.`);
+          NODE
+            exit 1
+          fi
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const session = JSON.parse(fs.readFileSync('/tmp/env-auth-session.json', 'utf8'));
+          if (session && typeof session !== 'object') {
+            console.error('FAIL: Account session endpoint returned an unexpected response.');
+            process.exit(1);
+          }
+          console.log(`Account session endpoint healthy; signed-in session=${Boolean(session?.user)}.`);
+          NODE
+
+      - name: Check AI status endpoint contract
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            --output /tmp/env-ai-status.json \
+            --write-out 'AI status HTTP %{http_code}; downloaded %{size_download} bytes\n' \
+            https://envtools.store/api/ai/status
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const status = JSON.parse(fs.readFileSync('/tmp/env-ai-status.json', 'utf8'));
+          const entries = Object.values(status.tasks ?? {});
+          const available = entries.filter((task) => task?.available === true).length;
+          const reasons = entries.reduce((counts, task) => {
+            const reason = task?.available === true ? 'available' : (task?.reason ?? 'unspecified');
+            counts[reason] = (counts[reason] ?? 0) + 1;
+            return counts;
+          }, {});
+          if (status.ok !== true || status.enabled !== true || entries.length === 0 || available === 0) {
+            console.error(`FAIL: AI is not operational. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
+            process.exit(1);
+          }
+          console.log(`AI status healthy; enabled=true; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
+          NODE

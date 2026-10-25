@@ -43,11 +43,15 @@ test("every structured task: schema is strict-compatible and its own example pas
     "developer.sql.explain": { sql: "SELECT id FROM users WHERE active = 1" },
     "developer.json.explain": { json: '{"a":1}' },
     "image.alt.generate": { imageBase64: png(), mimeType: "image/png" },
+    "music.analysis.classify": { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "wedding-track.mp3" },
     "assistant.chat": { messages: [{ role: "user", content: "Help me organize a short work plan." }], candidates: [{ id: "work-planner", name: "Work Planner", description: "Organize daily work tasks.", category: "productivity" }] },
   };
   for (const t of ALL_TASKS.filter((x) => x.structured)) {
     assert.deepEqual(strictSchemaProblems(t.jsonSchema!), [], t.id);
-    const example = exampleFromSchema(t.jsonSchema!);
+    const schemaExample = exampleFromSchema(t.jsonSchema!);
+    const example = t.id === "music.analysis.classify"
+      ? { genre: "Afrobeats", sub_style: "Afro-pop", language: ["Nigerian Pidgin", "Yoruba"], mood: ["upbeat"], instruments: ["drums", "bass"], vocal_style: "melodic", genre_candidates: [{ label: "Afrobeats", score: 0.86 }] }
+      : schemaExample;
     assert.deepEqual(validateJsonSchema(example, t.jsonSchema!), [], t.id);
     const prepared = ok(t.id, examples[t.id]);
     const accepted = prepared.accept(reply(example), B);
@@ -220,4 +224,13 @@ test("transcription: signature check, limits and normalization of the provider t
   const silent = prepared.accept({ ...result, text: "", transcript: { text: "", segments: [] } }, B);
   assert.ok(silent.ok && silent.warnings[0]!.includes("No speech"));
   assert.ok(!prepared.accept({ ...result, transcript: undefined }, B).ok);
+});
+
+test("music classification requires a supported audio signature and bounded input", () => {
+  const prepared = ok("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "wedding-track.mp3" });
+  assert.ok(prepared.user.some((part) => part.type === "audio" && part.mimeType === "audio/mpeg"));
+  assert.ok(bad("music.analysis.classify", { audioBase64: Buffer.alloc(180, 1).toString("base64"), mimeType: "audio/mpeg" }).length > 0);
+  assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/unknown" }).length > 0);
+  assert.ok(bad("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "x".repeat(121) }).length > 0);
+  assert.ok(ok("music.analysis.classify", { audioBase64: mp3(), mimeType: "audio/mpeg", extra: "ignored by the schema" }).user.length > 0);
 });

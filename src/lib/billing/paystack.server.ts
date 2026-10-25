@@ -1,38 +1,43 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
+import { readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config";
+import { readBoundedBytes } from "./bounded-json.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
-function positiveSafeInteger(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function publicOrigin(): string | null {
-  const raw = process.env.BETTER_AUTH_URL;
+  const raw = process.env.BETTER_AUTH_URL?.trim();
   if (!raw) return null;
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") return null;
+    const production = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+    if (parsed.protocol !== "https:" && production) return null;
     return parsed.origin;
   } catch { return null; }
 }
 
 export function getFundingOptions() {
+  // Do not accept new payments until refund/dispute reconciliation and the
+  // support runbook are explicitly signed off. Existing transactions can still
+  // be verified and settled by the separate Paystack settlement credential path.
+  const refundDisputeHandlingApproved = process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
   const launchChecksPassed = process.env.BILLING_LAUNCH_ENABLED === "true" &&
-    process.env.BILLING_ENFORCEMENT_ENABLED === "true" && Boolean(publicOrigin());
-  const pricePerTokenMinor = positiveSafeInteger(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO);
+    process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
+    refundDisputeHandlingApproved && Boolean(publicOrigin());
+  const pricePerTokenMinor = readSafePackPrice(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS);
   const paystackApproved = process.env.PAYSTACK_PROVIDER_APPROVED === "true";
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? "";
+  const cryptomusMerchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
+  const cryptomusApiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
   const enabled = launchChecksPassed && paystackApproved &&
-    Boolean(process.env.PAYSTACK_SECRET_KEY) && pricePerTokenMinor !== null;
+    Boolean(paystackSecret) && pricePerTokenMinor !== null;
 
-  const cryptoPricePerTokenMinor = positiveSafeInteger(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS);
+  const cryptoPricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
   const cryptomusEnabled = launchChecksPassed &&
     process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
-    Boolean(process.env.CRYPTOMUS_MERCHANT_ID) &&
-    Boolean(process.env.CRYPTOMUS_PAYMENT_API_KEY) &&
+    /^[a-f0-9-]{36}$/i.test(cryptomusMerchantId) &&
+    Boolean(cryptomusApiKey) &&
     cryptoPricePerTokenMinor !== null;
 
   const packsFor = (price: number | null, currency: string) => TOKEN_PACKS.map((tokens) => ({
@@ -44,12 +49,16 @@ export function getFundingOptions() {
     ? "Choose a token pack. Payment is verified by enV before tokens are added."
     : !paystackApproved
       ? "Card and local payments are unavailable until Paystack has explicitly approved enV's token-wallet business model."
-      : "Secure card checkout is not configured for this deployment. No payment was taken.";
+      : !refundDisputeHandlingApproved
+        ? "Payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
+        : "Secure card checkout is not configured for this deployment. No payment was taken.";
   const cryptomusMessage = cryptomusEnabled
     ? "Choose a token pack. enV verifies the final crypto invoice with Cryptomus before crediting your wallet."
     : process.env.CRYPTOMUS_PROVIDER_APPROVED !== "true"
       ? "Crypto payments are unavailable until Cryptomus onboarding and the required compliance review are approved."
-      : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
+      : !refundDisputeHandlingApproved
+        ? "Crypto payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
+        : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
 
   return {
     enabled,
@@ -84,7 +93,7 @@ export function getFundingOptions() {
 
 function requireLiveFunding() {
   const options = getFundingOptions();
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
   if (!options.enabled || !secret || !options.pricePerTokenMinor) {
     throw Object.assign(new Error(options.message), { code: "PAYMENTS_NOT_CONFIGURED", status: 503 });
   }
@@ -189,7 +198,9 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   if (!/^[a-f0-9-]{36}$/i.test(reference)) {
     throw Object.assign(new Error("The payment reference is invalid."), { code: "INVALID_PAYMENT_REFERENCE", status: 400 });
   }
-  const configuration = requireLiveFunding();
+  // Settlement remains available when new checkout is paused. The launch and
+  // enforcement switches govern initiating a new payment, not fulfilling an existing one.
+  const verificationSecret = requirePaystackVerificationSecret(process.env);
   const sql = await getSql();
   const intents = await sql.query<{
     id: string; provider: string; amount_minor: number | string; currency: string;
@@ -205,7 +216,7 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   if (intent.status === "credited") return { status: "credited" as const, creditedSubunits: 0 };
 
   const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-    headers: { Authorization: `Bearer ${configuration.secret}`, Accept: "application/json" },
+    headers: { Authorization: `Bearer ${verificationSecret}`, Accept: "application/json" },
     signal: AbortSignal.timeout(12_000),
   });
   const payload = await response.json() as {
@@ -236,12 +247,16 @@ export async function verifyAndCreditPaystackReference(reference: string) {
 }
 
 export async function handlePaystackWebhook(request: Request) {
-  const configuration = requireLiveFunding();
+  // Webhooks must remain verifiable during a checkout kill switch so settled
+  // payments can be reconciled and no customer payment is silently stranded.
+  const verificationSecret = requirePaystackVerificationSecret(process.env);
   const signature = request.headers.get("x-paystack-signature") ?? "";
-  const raw = await request.text();
-  if (raw.length > 256_000) throw Object.assign(new Error("Webhook payload is too large."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
-  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET || configuration.secret;
-  const expected = createHmac("sha512", webhookSecret).update(raw).digest("hex");
+  const rawBytes = await readBoundedBytes(request, 256_000);
+  if (!rawBytes) throw Object.assign(new Error("Webhook payload is too large or unreadable."), { code: "WEBHOOK_TOO_LARGE", status: 413 });
+  let raw: string;
+  try { raw = new TextDecoder("utf-8", { fatal: true }).decode(rawBytes); }
+  catch { throw Object.assign(new Error("The webhook payload is not valid UTF-8."), { code: "INVALID_WEBHOOK", status: 400 }); }
+  const expected = createHmac("sha512", verificationSecret).update(rawBytes).digest("hex");
   if (!/^[a-f0-9]{128}$/i.test(signature) ||
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
     throw Object.assign(new Error("The payment-provider signature is invalid."), { code: "INVALID_WEBHOOK_SIGNATURE", status: 401 });
@@ -249,6 +264,24 @@ export async function handlePaystackWebhook(request: Request) {
   let body: { event?: unknown; data?: { reference?: unknown } };
   try { body = JSON.parse(raw) as { event?: unknown; data?: { reference?: unknown } }; }
   catch { throw Object.assign(new Error("The webhook payload is invalid."), { code: "INVALID_WEBHOOK", status: 400 }); }
+  // Do not acknowledge refund/dispute events as handled while wallet reversals are
+  // still unsupported. A non-2xx response keeps delivery visible for provider retry.
+  const reconciliationEvents = [
+    "charge.dispute.create",
+    "charge.dispute.remind",
+    "charge.dispute.resolve",
+    "refund.pending",
+    "refund.processing",
+    "refund.needs-attention",
+    "refund.failed",
+    "refund.processed",
+  ];
+  if (typeof body.event === "string" && reconciliationEvents.includes(body.event)) {
+    throw Object.assign(new Error("A refund or dispute callback requires manual wallet reconciliation; no wallet balance was changed."), {
+      code: "REFUND_DISPUTE_RECONCILIATION_REQUIRED",
+      status: 503,
+    });
+  }
   if (body.event !== "charge.success") return { ignored: true };
   if (typeof body.data?.reference !== "string") {
     throw Object.assign(new Error("The payment event did not include a reference."), { code: "INVALID_WEBHOOK", status: 400 });

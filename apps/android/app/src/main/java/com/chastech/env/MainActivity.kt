@@ -138,6 +138,7 @@ import com.chastech.env.data.featuredOrPopular
 import com.chastech.env.data.nativeDisclaimerText
 import com.chastech.env.data.relatedTools
 import com.chastech.env.data.fromJson
+import com.chastech.env.data.withMusicDownloader
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeAudioEngine
 import com.chastech.env.engine.NativeAudioWavProcessor
@@ -215,7 +216,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()) }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -981,7 +982,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1299,6 +1300,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 
 @Composable
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
+    if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)
@@ -1729,7 +1731,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
         }
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
-    val analyzer = operation in setOf("inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
+    val analyzer = operation in setOf("analyze", "inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text("∿", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
@@ -1786,6 +1788,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
                                 compressorThresholdDb = compressorThreshold.toDoubleOrNull() ?: -18.0,
                                 compressorRatio = compressorRatio.toDoubleOrNull() ?: 4.0,
                                 targetChannels = targetChannels.toIntOrNull() ?: 2,
+                                fileName = selectedName,
                             )
                         }
                     }.fold({ result ->

@@ -1,11 +1,9 @@
-/** Bounded JSON object reader: limits streamed bytes even when Content-Length is absent. */
-export async function readBoundedJsonObject(
+/** Bounded request-body reader: enforces a byte cap while streaming, before buffering the full body. */
+export async function readBoundedBytes(
   request: Request,
-  maxBytes = 4_096,
-): Promise<Record<string, unknown> | null> {
+  maxBytes: number,
+): Promise<Uint8Array | null> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) return null;
-  const contentType = (request.headers.get("content-type") ?? "").split(";", 1)[0]?.trim().toLowerCase();
-  if (contentType !== "application/json") return null;
 
   const contentLengthHeader = request.headers.get("content-length");
   if (contentLengthHeader !== null) {
@@ -46,6 +44,18 @@ export async function readBoundedJsonObject(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  return bytes;
+}
+
+/** Bounded JSON object reader: validates content type and strictly decodes UTF-8. */
+export async function readBoundedJsonObject(
+  request: Request,
+  maxBytes = 4_096,
+): Promise<Record<string, unknown> | null> {
+  const contentType = (request.headers.get("content-type") ?? "").split(";", 1)[0]?.trim().toLowerCase();
+  if (contentType !== "application/json") return null;
+  const bytes = await readBoundedBytes(request, maxBytes);
+  if (!bytes) return null;
 
   try {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);

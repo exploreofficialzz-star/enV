@@ -81,10 +81,100 @@ try {
         // Wait for the real React tool effect before clicking SSR markup; a pre-hydration click can be dropped.
         await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
         await page.getByRole('heading', { name: 'UX/UI Studio', exact: true, level: 2 }).waitFor({ state: 'visible', timeout });
-        await page.getByRole('button', { name: /New project/i }).click();
+        // Exercise a user-selected Tablet preference across a full reload before creating a project.
+        await page.getByRole('button', { name: 'Start with Tablet' }).click();
+        await page.waitForFunction(() => window.localStorage.getItem('env-ux-ui-studio-device-target-v1') === 'tablet', null, { timeout });
+        await page.reload({ waitUntil: 'domcontentloaded', timeout });
+        await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === 'ux-ui-studio', null, { timeout });
+        await page.waitForFunction(() => document.querySelector('[aria-label="Start with Tablet"]')?.getAttribute('aria-pressed') === 'true', null, { timeout });
+        await page.getByRole('button', { name: /Add project/i }).click();
         const studio = page.locator('section.ux-ui-studio');
         await studio.waitFor({ state: 'visible', timeout });
+        await page.locator('.uxui-device-tablet').waitFor({ state: 'visible', timeout });
+        const startupState = await studio.evaluate((node) => ({
+          className: node.className,
+          storedTarget: window.localStorage.getItem('env-ux-ui-studio-device-target-v1'),
+        }));
+        if (!startupState.className.includes('target-tablet') || startupState.storedTarget !== 'tablet') {
+          throw new Error('Add project did not open the previously selected Tablet view. State: ' + JSON.stringify(startupState));
+        }
+        // Continue testing the mobile editing experience and its no-overflow guarantee too.
+        await page.getByRole('button', { name: 'Mobile', exact: true }).click();
         await page.locator('.uxui-device-mobile').waitFor({ state: 'visible', timeout });
+
+        // The fullscreen header must reuse the real site logo assets for both themes.
+        const fullscreenLogoSources = await page.locator('.uxui-fullscreen-logo img').evaluateAll((images) =>
+          images.map((image) => image.getAttribute('src')));
+        if (!fullscreenLogoSources.includes('/logo-home-transparent.png') || !fullscreenLogoSources.includes('/logo-home-dark.png')) {
+          throw new Error('Fullscreen Studio header is not using the canonical enV logo assets: ' + JSON.stringify(fullscreenLogoSources));
+        }
+
+        // Audit the actual full-screen Toolkit modal layout before using any of its pages.
+        await page.getByLabel('Add elements', { exact: true }).click();
+        const toolkitDialog = page.getByRole('dialog', { name: 'Studio toolkit', exact: true });
+        await toolkitDialog.waitFor({ state: 'visible', timeout });
+        const toolkitLayout = await toolkitDialog.evaluate((drawer) => {
+          const styles = getComputedStyle(drawer);
+          const content = drawer.querySelector('.uxui-toolkit-content');
+          const contentStyles = content ? getComputedStyle(content) : null;
+          const tabs = drawer.querySelectorAll('.uxui-toolkit-tabs [role="tab"]');
+          return {
+            display: styles.display,
+            flexDirection: styles.flexDirection,
+            width: drawer.getBoundingClientRect().width,
+            height: drawer.getBoundingClientRect().height,
+            contentDisplay: contentStyles?.display || '',
+            contentFlex: contentStyles?.flex || '',
+            contentOverflowY: contentStyles?.overflowY || '',
+            contentHeight: content?.getBoundingClientRect().height || 0,
+            tabs: tabs.length,
+          };
+        });
+        if (toolkitLayout.display !== 'flex' || toolkitLayout.flexDirection !== 'column'
+          || toolkitLayout.width < 250 || toolkitLayout.height < 250
+          || toolkitLayout.contentOverflowY !== 'auto' || toolkitLayout.contentHeight < 80
+          || toolkitLayout.tabs !== 7) {
+          throw new Error('Fullscreen Toolkit modal lost its bounded flex/scroll layout: ' + JSON.stringify(toolkitLayout));
+        }
+
+        // Switch through every top-level Toolkit page and verify that its panel gets real space.
+        for (const tabName of ['All 26', 'Elements', 'Icons', 'Shapes', 'Fonts', 'Presets', 'Tokens']) {
+          await page.getByRole('tab', { name: tabName, exact: true }).click();
+          const panelState = await page.locator('.uxui-toolkit-content').evaluate((panel) => ({
+            height: panel.getBoundingClientRect().height,
+            childCount: panel.children.length,
+            overflowY: getComputedStyle(panel).overflowY,
+            visible: getComputedStyle(panel).display !== 'none' && getComputedStyle(panel).visibility !== 'hidden',
+          }));
+          const activeCount = await page.locator('.uxui-toolkit-tabs [role="tab"][aria-selected="true"]').count();
+          if (!panelState.visible || panelState.height < 80 || panelState.childCount < 1
+            || panelState.overflowY !== 'auto' || activeCount !== 1) {
+            throw new Error('Toolkit page failed to render in fullscreen: ' + tabName + ' ' + JSON.stringify(panelState));
+          }
+        }
+
+        // Exercise every one of the 26 connected Toolkit tiles, not only the Elements tab.
+        await page.getByRole('tab', { name: 'All 26', exact: true }).click();
+        const toolkitNames = await page.locator('.uxui-toolkit-tile .uxui-toolkit-tile-label').allTextContents();
+        if (toolkitNames.length !== 26) throw new Error('Expected 26 Toolkit entries, found ' + toolkitNames.length);
+        for (const toolkitName of toolkitNames.map((name) => name.trim()).filter(Boolean)) {
+          await page.getByRole('tab', { name: 'All 26', exact: true }).click();
+          const tile = page.locator('.uxui-toolkit-tile').filter({ hasText: toolkitName }).first();
+          await tile.waitFor({ state: 'visible', timeout });
+          await tile.click();
+          const selectedPageState = await page.locator('.uxui-toolkit-tabs').evaluate((tabs) => ({
+            selectedCount: tabs.querySelectorAll('[role="tab"][aria-selected="true"]').length,
+            activeTab: tabs.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || '',
+            drawerVisible: !!tabs.closest('[role="dialog"]')?.checkVisibility(),
+            contentHeight: tabs.closest('[role="dialog"]')?.querySelector('.uxui-toolkit-content')?.getBoundingClientRect().height || 0,
+          }));
+          if (selectedPageState.selectedCount !== 1 || !selectedPageState.drawerVisible || selectedPageState.contentHeight < 80) {
+            throw new Error('Toolkit tile did not open a usable connected page: ' + toolkitName + ' ' + JSON.stringify(selectedPageState));
+          }
+        }
+        await page.getByRole('tab', { name: 'All 26', exact: true }).click();
+        await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
+
         // The sketch-first workspace hides the screen/layer inspector until explicitly opened.
         await page.getByRole('button', { name: 'App screens and layers' }).click();
         await page.getByLabel('Project name').waitFor({ state: 'visible', timeout });

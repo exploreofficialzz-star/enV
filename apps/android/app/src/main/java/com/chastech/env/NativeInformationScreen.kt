@@ -1129,28 +1129,33 @@ private fun SocialLinksSection(brand: String) {
         )
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).widthIn(min = 800.dp, max = 800.dp).padding(horizontal = 32.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             profiles.forEach { profile ->
-                androidx.compose.material3.IconButton(
-                    onClick = {
-                        profile.url?.let { url -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
-                    },
-                    enabled = profile.url != null,
-                    modifier = Modifier.size(64.dp).semantics {
-                        contentDescription = if (profile.url != null) {
-                            "Follow $owner on ${profile.platform}"
-                        } else {
-                            "The Facebook profile for $owner has not been linked yet"
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clickable(enabled = profile.url != null) {
+                            profile.url?.let { url ->
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                            }
                         }
-                    },
+                        .semantics {
+                            contentDescription = if (profile.url != null) {
+                                "Follow $owner on ${profile.platform}"
+                            } else {
+                                "The Facebook profile for $owner has not been linked yet"
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
                 ) {
                     androidx.compose.foundation.Image(
                         painter = androidx.compose.ui.res.painterResource(profile.iconRes),
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(20.dp),
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
                     )
                 }

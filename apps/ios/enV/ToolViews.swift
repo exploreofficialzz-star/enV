@@ -494,6 +494,7 @@ enum NativeCoverage {
     static func usesBackend(_ tool: Tool) -> Bool { NativeBackendEngine.supports(tool) }
     static func isLocallyExecutable(_ tool: Tool) -> Bool {
         if usesBackend(tool) || tool.isPlanned { return false }
+        if tool.id == "music-downloader" { return true }
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
         case "audio": return NativeAudioEngine.supports(tool)
@@ -532,7 +533,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if ["music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet"].contains(tool.id) { NativeMusicStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if tool.id == "music-downloader" { NativeMusicDownloaderView() } else if ["music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet"].contains(tool.id) { NativeMusicStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -1617,7 +1618,7 @@ private extension Double {
 /// Offline native audio estimates and platform guidance. Heavy stem AI and browser-only formats remain web-first.
 enum NativeAudioEngine {
     private static let nativeWavOperations: [String: String] = [
-        "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
+        "audio-analyze-studio": "analyze", "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
         "audio-peak-meter": "peak", "audio-rms-meter": "rms", "audio-silence-detector": "silence", "audio-dc-offset-checker": "dc-offset",
         "audio-to-mono": "mono", "audio-to-stereo": "stereo", "audio-reverser": "reverse", "audio-normalizer": "normalize",
         "voice-noise-reducer": "voice-noise-reducer", "voice-noise-gate": "voice-noise-gate", "audio-hum-reducer": "audio-hum-reducer",
@@ -1832,13 +1833,14 @@ enum NativeAudioWavProcessor {
                         targetSampleRateHz: Int = 44_100, noiseStrength: Double = 0.8, gateThresholdDB: Double = -42,
                         humFrequencyHz: Int = 50, silenceThresholdDB: Double = -50, fadeDurationMs: Double = 1000,
                         eqLowDB: Double = 0, eqMidDB: Double = 0, eqHighDB: Double = 0,
-                        compressorThresholdDB: Double = -18, compressorRatio: Double = 4, targetChannels: Int = 2) throws -> NativeAudioWavResult {
+                        compressorThresholdDB: Double = -18, compressorRatio: Double = 4, targetChannels: Int = 2, fileName: String = "audio.wav") throws -> NativeAudioWavResult {
         let input = try decode(data), duration = input.durationSeconds
         let peak = input.channels.map { NativeAudioDsp.peakAmplitude($0) }.max() ?? 0
         let rms = sqrt(input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) * Double($1) } } / max(1, Double(input.frames * input.channels.count)))
         let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
         func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
         switch operation {
+        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms), outputWav: nil, durationSeconds: duration)
         case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
         case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
         case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
@@ -1893,6 +1895,269 @@ enum NativeAudioWavProcessor {
         let output = try encodePCM16(sampleRateHz: rate, channels: channels)
         let outDuration = Double(channels.first?.count ?? 0) / Double(rate)
         return NativeAudioWavResult(report: "\(detail)\nOutput: 16-bit PCM WAV\nSample rate: \(rate) Hz\nChannels: \(channels.count)\nDuration: \(number(outDuration)) s\nOutput size: \(output.count) bytes\nProcessed on this device; no upload performed.", outputWav: output, durationSeconds: outDuration)
+    }
+
+    private struct NativeSpectrum {
+        let centroidHz: Double?
+        let rolloff85Hz: Double?
+        let flatness: Double?
+    }
+
+    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double) throws -> String {
+        let frames = input.frames, rate = input.sampleRateHz, duration = input.durationSeconds
+        let windowFrames = max(1, rate / 10)
+        var windowLevels: [Double] = []
+        var clipped: Int64 = 0, totalSamples: Int64 = 0, silentWindows = 0, totalWindows = 0
+        for start in stride(from: 0, to: frames, by: windowFrames) {
+            let stop = min(frames, start + windowFrames)
+            var sumSquares = 0.0, count = 0
+            for channel in input.channels {
+                for index in start..<stop {
+                    let sample = Double(channel[index])
+                    sumSquares += sample * sample
+                    if abs(sample) >= 0.999 { clipped += 1 }
+                    totalSamples += 1
+                    count += 1
+                }
+            }
+            let windowRMS = sqrt(sumSquares / Double(max(1, count)))
+            windowLevels.append(windowRMS > 0 ? 20 * log10(windowRMS) : -120)
+            if windowRMS < 0.001 { silentWindows += 1 }
+            totalWindows += 1
+        }
+        let sortedLevels = windowLevels.sorted()
+        func percentile(_ q: Double) -> Double? {
+            guard !sortedLevels.isEmpty else { return nil }
+            let index = min(sortedLevels.count - 1, max(0, Int((Double(sortedLevels.count - 1) * q).rounded())))
+            return sortedLevels[index]
+        }
+        let spread: Double?
+        if let p95 = percentile(0.95), let p10 = percentile(0.10) { spread = max(0, p95 - p10) } else { spread = nil }
+        let representative = input.channels.first ?? []
+        var crossings = 0
+        if representative.count > 1 {
+            for index in 1..<representative.count {
+                let previous = representative[index - 1], current = representative[index]
+                if (current >= 0 && previous < 0) || (current < 0 && previous >= 0) { crossings += 1 }
+            }
+        }
+        let zcr = representative.count > 1 ? Double(crossings) / Double(representative.count - 1) : nil
+        let tempoSamples = Array(representative.prefix(min(representative.count, rate * 90)))
+        let keySamples = Array(representative.prefix(min(representative.count, rate * 30)))
+        let tempo = estimateTempoBPM(tempoSamples, sampleRateHz: rate)
+        let key = estimateMusicalKey(keySamples, sampleRateHz: rate)
+        let spectrum = calculateSpectrum(representative, sampleRateHz: rate)
+        func nullable(_ value: Double?) -> Any {
+            guard let value, value.isFinite else { return NSNull() }
+            return value
+        }
+        let payload: [String: Any] = [
+            "schema_version": "env.music-analysis.v1",
+            "source": [
+                "file_name": fileName.isEmpty ? "audio.wav" : fileName,
+                "mime_type": "audio/wav",
+                "file_size_bytes": fileSizeBytes
+            ],
+            "metadata": [
+                "title": NSNull(), "artist": NSNull(), "album": NSNull(), "album_artist": NSNull(),
+                "year": NSNull(), "embedded_genre": NSNull(), "track_number": NSNull(), "disc_number": NSNull(),
+                "composer": NSNull(), "publisher": NSNull(), "tagged_bpm": NSNull()
+            ],
+            "audio": [
+                "duration_seconds": duration,
+                "sample_rate_hz": rate,
+                "channels": input.channels.count,
+                "peak_dbfs": nullable(peak > 0 ? 20 * log10(peak) : nil),
+                "rms_dbfs": nullable(rms > 0 ? 20 * log10(rms) : nil),
+                "estimated_loudness_lufs": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
+                "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
+                "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
+                "windowed_rms_spread_db": nullable(spread),
+                "metric_scope_seconds": min(duration, 30)
+            ],
+            "rhythm": [
+                "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
+                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate",
+                "status": tempo == nil ? "unavailable" : "estimated"
+            ],
+            "tonality": [
+                "key": key.map { $0 as Any } ?? NSNull(),
+                "method": "4096-point chroma-template correlation; best-effort estimate",
+                "status": key == nil ? "unavailable" : "estimated"
+            ],
+            "timbre": [
+                "spectral_centroid_hz": nullable(spectrum.centroidHz),
+                "spectral_rolloff_85_hz": nullable(spectrum.rolloff85Hz),
+                "spectral_flatness": nullable(spectrum.flatness),
+                "zero_crossing_rate": nullable(zcr),
+                "interpretation": "Signal features do not independently identify genre, instruments, mood or language."
+            ],
+            "classification": [
+                "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
+                "mood": [String](), "instruments": [String](), "vocal_style": NSNull(),
+                "genre_candidates": [[String: Any]](), "status": "requires_model",
+                "note": "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."
+            ]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        guard let report = String(data: data, encoding: .utf8) else { throw NativeSimpleError.message("Could not encode the analysis report as JSON.") }
+        return report
+    }
+
+    private static func estimateTempoBPM(_ samples: [Float], sampleRateHz: Int) -> Int? {
+        guard sampleRateHz > 0, samples.count >= sampleRateHz * 2 else { return nil }
+        let hop = max(128, Int((Double(sampleRateHz) * 0.01).rounded()))
+        var envelope: [Double] = []
+        var start = 0
+        while start + hop <= samples.count {
+            var sum = 0.0
+            for index in start..<(start + hop) { let value = Double(samples[index]); sum += value * value }
+            envelope.append(sqrt(sum / Double(hop)))
+            start += hop
+        }
+        guard envelope.count >= 2 else { return nil }
+        var novelty = [Double](repeating: 0, count: envelope.count)
+        for index in 1..<envelope.count { novelty[index] = max(0, envelope[index] - envelope[index - 1]) }
+        let minLag = max(1, Int(floor(60.0 / 180.0 / (Double(hop) / Double(sampleRateHz)))))
+        let maxLag = min(novelty.count - 1, Int(ceil(60.0 / 55.0 / (Double(hop) / Double(sampleRateHz)))))
+        guard maxLag > minLag else { return nil }
+        var bestLag = 0, bestScore = -Double.infinity
+        for lag in minLag...maxLag {
+            var score = 0.0, normA = 0.0, normB = 0.0
+            for index in lag..<novelty.count {
+                score += novelty[index] * novelty[index - lag]
+                normA += novelty[index] * novelty[index]
+                normB += novelty[index - lag] * novelty[index - lag]
+            }
+            score /= sqrt(max(normA * normB, 1e-12))
+            if score > bestScore { bestScore = score; bestLag = lag }
+        }
+        guard bestScore >= 0.04, bestLag > 0 else { return nil }
+        var bpm = 60.0 / (Double(bestLag * hop) / Double(sampleRateHz))
+        while bpm < 70 { bpm *= 2 }
+        while bpm > 180 { bpm /= 2 }
+        return Int(bpm.rounded())
+    }
+
+    private static func calculateSpectrum(_ samples: [Float], sampleRateHz: Int) -> NativeSpectrum {
+        let size = 2048
+        guard samples.count >= size, sampleRateHz > 0 else { return NativeSpectrum(centroidHz: nil, rolloff85Hz: nil, flatness: nil) }
+        var real = [Double](repeating: 0, count: size), imag = [Double](repeating: 0, count: size)
+        var centroids: [Double] = [], rolloffs: [Double] = [], flatnesses: [Double] = []
+        let lastStart = min(samples.count - size, max(0, sampleRateHz * 30 - size))
+        var start = 0
+        while start <= lastStart {
+            for i in 0..<size {
+                real[i] = Double(samples[start + i]) * (0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(size - 1)))
+                imag[i] = 0
+            }
+            fft(&real, &imag)
+            var magnitudes = [Double](repeating: 0, count: size / 2)
+            var total = 0.0, weighted = 0.0, logTotal = 0.0
+            for bin in 1..<(size / 2) {
+                let magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                total += magnitude
+                weighted += magnitude * Double(bin * sampleRateHz) / Double(size)
+                logTotal += log(max(magnitude, 1e-12))
+            }
+            if total > 1e-10 {
+                centroids.append(weighted / total)
+                var cumulative = 0.0, rollBin = size / 2 - 1
+                for bin in 1..<(size / 2) {
+                    cumulative += magnitudes[bin]
+                    if cumulative >= total * 0.85 { rollBin = bin; break }
+                }
+                rolloffs.append(Double(rollBin * sampleRateHz) / Double(size))
+                let bins = Double(size / 2 - 1)
+                let arithmetic = total / bins
+                let geometric = exp(logTotal / bins)
+                flatnesses.append(arithmetic > 0 ? geometric / arithmetic : 0)
+            }
+            start += 4096
+        }
+        func mean(_ values: [Double]) -> Double? { values.isEmpty ? nil : values.reduce(0, +) / Double(values.count) }
+        return NativeSpectrum(centroidHz: mean(centroids), rolloff85Hz: mean(rolloffs), flatness: mean(flatnesses))
+    }
+
+    private static func estimateMusicalKey(_ samples: [Float], sampleRateHz: Int) -> String? {
+        guard sampleRateHz > 0, samples.count >= sampleRateHz * 3 else { return nil }
+        let size = 4096, hop = max(4096, Int(Double(sampleRateHz) * 0.4))
+        var chroma = [Double](repeating: 0, count: 12)
+        var real = [Double](repeating: 0, count: size), imag = [Double](repeating: 0, count: size)
+        var start = 0, frames = 0
+        while start + size <= samples.count && frames < 180 {
+            for i in 0..<size {
+                real[i] = Double(samples[start + i]) * (0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(size - 1)))
+                imag[i] = 0
+            }
+            fft(&real, &imag)
+            for bin in 2..<(size / 2) {
+                let frequency = Double(bin * sampleRateHz) / Double(size)
+                if frequency < 55 || frequency > 2200 { continue }
+                let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+                chroma[(midi % 12 + 12) % 12] += hypot(real[bin], imag[bin])
+            }
+            frames += 1
+            start += hop
+        }
+        guard chroma.reduce(0, +) > 0 else { return nil }
+        let mean = chroma.reduce(0, +) / 12
+        let normalized = chroma.map { $0 - mean }
+        let names = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"]
+        let major = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+        let minor = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+        var bestScore = -Double.infinity
+        var bestLabel: String?
+        for tonic in 0..<12 {
+            for (mode, profile) in [("major", major), ("minor", minor)] {
+                let profileMean = profile.reduce(0, +) / 12
+                var score = 0.0, normA = 0.0, normB = 0.0
+                for i in 0..<12 {
+                    let sample = normalized[(i + tonic) % 12], weight = profile[i] - profileMean
+                    score += sample * weight
+                    normA += sample * sample
+                    normB += weight * weight
+                }
+                score /= sqrt(max(normA * normB, 1e-12))
+                if score > bestScore { bestScore = score; bestLabel = names[tonic] + " " + mode }
+            }
+        }
+        return bestScore >= 0.06 ? bestLabel : nil
+    }
+
+    private static func fft(_ real: inout [Double], _ imag: inout [Double]) {
+        let n = real.count
+        var j = 0
+        for i in 1..<n {
+            var bit = n >> 1
+            while (j & bit) != 0 { j ^= bit; bit >>= 1 }
+            j ^= bit
+            if i < j {
+                real.swapAt(i, j)
+                imag.swapAt(i, j)
+            }
+        }
+        var length = 2
+        while length <= n {
+            let angle = -2 * Double.pi / Double(length)
+            let wrStep = cos(angle), wiStep = sin(angle)
+            var base = 0
+            while base < n {
+                var wr = 1.0, wi = 0.0
+                for index in 0..<(length / 2) {
+                    let even = base + index, odd = even + length / 2
+                    let oddR = real[odd] * wr - imag[odd] * wi
+                    let oddI = real[odd] * wi + imag[odd] * wr
+                    real[odd] = real[even] - oddR; imag[odd] = imag[even] - oddI
+                    real[even] += oddR; imag[even] += oddI
+                    let nextWr = wr * wrStep - wi * wiStep
+                    wi = wr * wiStep + wi * wrStep; wr = nextWr
+                }
+                base += length
+            }
+            length <<= 1
+        }
     }
 
     private static func trimSilenceBounds(_ channels: [[Float]], thresholdDB: Double, sampleRateHz: Int) -> (Int, Int) {
@@ -2516,7 +2781,8 @@ private struct NativeAudioWaveFileToolView: View {
                 eqHighDB: Double(values["high"] ?? "0") ?? 0,
                 compressorThresholdDB: Double(values["threshold"] ?? "-18") ?? -18,
                 compressorRatio: Double(values["ratio"] ?? "4") ?? 4,
-                targetChannels: Int(values["channels"] ?? "2") ?? 2
+                targetChannels: Int(values["channels"] ?? "2") ?? 2,
+                fileName: selectedName
             )
             output = result.report; error = nil
             if let wav = result.outputWav { pendingData = wav; showExporter = true }
@@ -3547,6 +3813,666 @@ private struct NativeMusicLiveVideoStudioView: View {
             }
             finalURL = output; status = "Final MP4 ready. The selected \(presetID) preset was rendered on the microphone track before the backing mix. Review voice/backing balance before sharing."
         } catch { self.error = error.localizedDescription; status = "Mix failed; original camera recording remains available for another attempt." }
+    }
+}
+
+private let nativeMusicProviderPageDomains = [
+    "youtube.com", "youtu.be", "youtube-nocookie.com", "tiktok.com", "facebook.com", "fb.watch",
+    "instagram.com", "x.com", "twitter.com", "audiomack.com", "soundcloud.com", "bandcamp.com",
+    "mixcloud.com", "audius.co", "jamendo.com", "hearthis.at", "bandlab.com", "boomplay.com",
+    "zingmp3.vn", "music.163.com", "music.yandex.com", "music.yandex.ru", "archive.org",
+    "audioboom.com", "reverbnation.com", "soundclick.com", "spreaker.com", "podomatic.com", "freesound.org"
+]
+
+private struct NativeMusicSourceTrack: Sendable {
+    let title: String
+    let url: URL
+    let ext: String
+    let isProviderPage: Bool
+}
+
+private var nativeMusicAPIEndpoint: URL {
+    let configured = (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let candidate = URL(string: configured)
+    let base = candidate.flatMap { $0.host == nil ? nil : $0 } ?? URL(string: "https://env-q3mq.onrender.com")!
+    return ["api", "backend", "url-media"].reduce(base) { $0.appendingPathComponent($1) }
+}
+
+private func nativeMusicAPIError(_ data: Data, status: Int) -> NSError {
+    let fallback = "enV media service returned HTTP \(status). Retry later or use a supported public media URL."
+    if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        for key in ["message", "error"] {
+            if let message = object[key] as? String {
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty && !["true", "false", "null"].contains(trimmed.lowercased()) {
+                    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(trimmed.prefix(900))])
+                }
+            }
+        }
+        return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: fallback])
+    }
+    if let body = String(data: data, encoding: .utf8) {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && !trimmed.lowercased().contains("<html") && !trimmed.lowercased().contains("<!doctype")
+            && !trimmed.hasPrefix("{") && !trimmed.hasPrefix("[")
+            && !["true", "false", "null"].contains(trimmed.lowercased()) {
+            return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(trimmed.prefix(700))])
+        }
+    }
+    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: fallback])
+}
+
+private func nativeMusicPostJSON(_ path: String, body: [String: Any]) async throws -> [String: Any] {
+    var request = URLRequest(url: nativeMusicAPIEndpoint.appendingPathComponent(path))
+    request.httpMethod = "POST"
+    request.timeoutInterval = 180
+    request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw NSError(domain: "enVMusicDownloader", code: 1, userInfo: [NSLocalizedDescriptionKey: "enV media service returned an invalid response."])
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        throw nativeMusicAPIError(data, status: http.statusCode)
+    }
+    guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw NSError(domain: "enVMusicDownloader", code: 2, userInfo: [NSLocalizedDescriptionKey: "enV media service returned invalid media metadata. Retry later."])
+    }
+    return object
+}
+
+private func nativeMusicCollectionPage(_ url: URL) -> Bool {
+    let segments = url.pathComponents.map { $0.lowercased() }
+    if segments.contains(where: { ["album", "albums", "playlist", "playlists", "sets"].contains($0) }) { return true }
+    let host = url.host?.lowercased() ?? ""
+    let youtube = host == "youtube.com" || host.hasSuffix(".youtube.com")
+    return youtube && (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "list" }) == true)
+}
+
+private func nativeMusicResolve(_ source: NativeMusicSourceTrack) async throws -> [NativeMusicSourceTrack] {
+    let info: [String: Any]
+    do {
+        info = try await nativeMusicPostJSON("info", body: [
+            "url": source.url.absoluteString,
+            "includePlaylist": true
+        ])
+    } catch {
+        // Retry a failed metadata lookup as audio only for an individual song.
+        // Never collapse a whole album or playlist into a single-track request.
+        if nativeMusicCollectionPage(source.url) { throw error }
+        return [source]
+    }
+    let entries = info["entries"] as? [[String: Any]] ?? []
+    if !entries.isEmpty {
+        guard entries.count <= 50 else {
+            throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "This collection has more than 50 tracks. Split it into smaller batches."])
+        }
+        let resolved = entries.enumerated().compactMap { index, entry -> NativeMusicSourceTrack? in
+            let rawURL = (entry["webpageUrl"] as? String) ?? (entry["webpage_url"] as? String) ?? (entry["url"] as? String) ?? ""
+            guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https", url.host != nil else { return nil }
+            let title = (entry["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return NativeMusicSourceTrack(title: (title?.isEmpty == false ? title! : "Track \(index + 1)"), url: url, ext: "mp3", isProviderPage: true)
+        }
+        if !resolved.isEmpty { return resolved }
+    }
+
+    let isCollection = (info["isPlaylist"] as? Bool == true) || nativeMusicCollectionPage(source.url)
+    if isCollection {
+        throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "enV could not find any downloadable tracks in this album or playlist. Check that the collection is public and supported by the source."])
+    }
+
+    let infoTitle = (info["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let title = infoTitle?.isEmpty == false ? infoTitle! : source.title
+    let formats = info["formats"] as? [[String: Any]] ?? []
+    let reportedExtension = formats.first?["ext"] as? String
+    let ext = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma"].contains(reportedExtension ?? "")
+        ? reportedExtension!
+        : source.ext
+    return [NativeMusicSourceTrack(title: title, url: source.url, ext: ext, isProviderPage: source.isProviderPage)]
+}
+
+private func nativeMusicDownload(_ track: NativeMusicSourceTrack, maxBytes: Int64) async throws -> (temporary: URL, bytes: Int64, ext: String) {
+    guard maxBytes > 0 else {
+        throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "The collection reached enV's 200 MB batch limit."])
+    }
+    var request = URLRequest(url: nativeMusicAPIEndpoint.appendingPathComponent("download"))
+    request.httpMethod = "POST"
+    request.timeoutInterval = 600
+    request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+    request.setValue("audio/mpeg, audio/*, application/octet-stream", forHTTPHeaderField: "Accept")
+    request.httpBody = try JSONSerialization.data(withJSONObject: [
+        "url": track.url.absoluteString,
+        "format": "mp3",
+        "audioOnly": true,
+        "maxBytes": Int(maxBytes)
+    ])
+    let (temporary, response) = try await URLSession.shared.download(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 6, userInfo: [NSLocalizedDescriptionKey: "enV media service returned an invalid download response."])
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        let data = (try? Data(contentsOf: temporary)) ?? Data()
+        try? FileManager.default.removeItem(at: temporary)
+        throw nativeMusicAPIError(data, status: http.statusCode)
+    }
+    let mime = (http.mimeType ?? "").lowercased()
+    guard mime.hasPrefix("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream" else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 7, userInfo: [NSLocalizedDescriptionKey: "enV media service did not return an audio file for \(track.title)."])
+    }
+    let bytes = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+    guard bytes > 0, bytes <= maxBytes else {
+        try? FileManager.default.removeItem(at: temporary)
+        throw NSError(domain: "enVMusicDownloader", code: 8, userInfo: [NSLocalizedDescriptionKey: "The file is empty or exceeds the permitted track or collection size."])
+    }
+    let ext: String
+    switch mime {
+    case "audio/mpeg", "audio/mp3": ext = "mp3"
+    case "audio/mp4", "audio/x-m4a": ext = "m4a"
+    case "audio/aac", "audio/x-aac": ext = "aac"
+    case "audio/flac", "audio/x-flac": ext = "flac"
+    case "audio/wav", "audio/x-wav", "audio/wave": ext = "wav"
+    case "audio/ogg": ext = ["oga", "opus"].contains(track.ext) ? track.ext : "ogg"
+    case "audio/opus": ext = "opus"
+    default: ext = track.ext
+    }
+    return (temporary, bytes, ext)
+}
+
+private enum NativeMusicArchive {
+    private static func u16(_ value: UInt16, _ data: inout Data) {
+        data.append(contentsOf: [UInt8(value & 0xff), UInt8((value >> 8) & 0xff)])
+    }
+    private static func u32(_ value: UInt32, _ data: inout Data) {
+        u16(UInt16(value & 0xffff), &data)
+        u16(UInt16((value >> 16) & 0xffff), &data)
+    }
+    private static let crcTable: [UInt32] = (0..<256).map { index in
+        var value = UInt32(index)
+        for _ in 0..<8 { value = (value & 1) == 1 ? (value >> 1) ^ 0xedb88320 : value >> 1 }
+        return value
+    }
+    private static func crc32(_ contents: Data) -> UInt32 {
+        var crc: UInt32 = 0xffffffff
+        for byte in contents { crc = (crc >> 8) ^ crcTable[Int((crc ^ UInt32(byte)) & 0xff)] }
+        return crc ^ 0xffffffff
+    }
+    static func create(files: [URL], at destination: URL) throws {
+        guard !files.isEmpty && files.count <= 50 else {
+            throw NSError(domain: "enVMusicArchive", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose 1 to 50 audio files for ZIP export."])
+        }
+        guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+            throw NSError(domain: "enVMusicArchive", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to create the ZIP file."])
+        }
+        do {
+            let writer = try FileHandle(forWritingTo: destination)
+            defer { try? writer.close() }
+            var directory = Data()
+            var offset: UInt32 = 0
+            for file in files {
+                let fileName = Data(file.lastPathComponent.utf8)
+                let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
+                guard fileName.count <= 65535 && bytes.count <= 50 * 1024 * 1024 else {
+                    throw NSError(domain: "enVMusicArchive", code: 3, userInfo: [NSLocalizedDescriptionKey: "An audio file exceeds the archive limit."])
+                }
+                let length = UInt32(bytes.count)
+                let checksum = crc32(bytes)
+                var local = Data()
+                u32(0x04034b50, &local)
+                u16(20, &local); u16(0, &local); u16(0, &local); u16(0, &local); u16(0, &local)
+                u32(checksum, &local); u32(length, &local); u32(length, &local)
+                u16(UInt16(fileName.count), &local); u16(0, &local)
+                local.append(fileName)
+                try writer.write(contentsOf: local)
+                try writer.write(contentsOf: bytes)
+
+                var entry = Data()
+                u32(0x02014b50, &entry)
+                u16(20, &entry); u16(20, &entry); u16(0, &entry); u16(0, &entry)
+                u16(0, &entry); u16(0, &entry)
+                u32(checksum, &entry); u32(length, &entry); u32(length, &entry)
+                u16(UInt16(fileName.count), &entry); u16(0, &entry); u16(0, &entry)
+                u16(0, &entry); u16(0, &entry); u32(0, &entry); u32(offset, &entry)
+                entry.append(fileName)
+                directory.append(entry)
+                offset += UInt32(local.count) + length
+            }
+            try writer.write(contentsOf: directory)
+            var end = Data()
+            u32(0x06054b50, &end)
+            u16(0, &end); u16(0, &end)
+            u16(UInt16(files.count), &end); u16(UInt16(files.count), &end)
+            u32(UInt32(directory.count), &end); u32(offset, &end); u16(0, &end)
+            try writer.write(contentsOf: end)
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
+    }
+}
+
+private struct NativeMusicDownloaderView: View {
+    @State private var mode = "Online"
+    @State private var collectionType = "Playlist"
+    @State private var collectionName = "My music"
+    @State private var directURLs = ""
+    @State private var rightsConfirmed = false
+    @State private var isWorking = false
+    @State private var status = ""
+    @State private var errorMessage: String?
+    @State private var showFileImporter = false
+    @State private var savedFiles: [URL] = []
+    @State private var transferTask: Task<Void, Never>?
+    @State private var previewTracks: [NativeMusicSourceTrack] = []
+    @State private var showAllPreview = false
+    @State private var zipExportURL: URL?
+
+    private let extensions = Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma"])
+    private let trackLimit: Int64 = 50 * 1024 * 1024
+    private let batchLimit: Int64 = 200 * 1024 * 1024
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Music Downloader", systemImage: "arrow.down.circle")
+                    .font(.envScaled(size: 18, weight: .semibold))
+                Text("Download authorized public music links or direct audio files online, or import music already on this device for offline use.")
+                    .font(.envScaled(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            Picker("Source", selection: $mode) {
+                Text("Online").tag("Online")
+                Text("Offline library").tag("Offline")
+            }
+            .pickerStyle(.segmented)
+            Picker("Collection type", selection: $collectionType) {
+                Text("Track").tag("Track")
+                Text("Album").tag("Album")
+                Text("Playlist").tag("Playlist")
+            }
+            .pickerStyle(.segmented)
+            TextField("Album or playlist name", text: $collectionName)
+                .textFieldStyle(.roundedBorder)
+
+            if mode == "Online" {
+                Text("Music links or direct audio-file URLs")
+                    .font(.envScaled(size: 14, weight: .semibold))
+                TextEditor(text: $directURLs)
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(minHeight: 135)
+                    .padding(4)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                    .accessibilityLabel("Direct audio file URLs")
+                Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio file URL. Use “Track title | URL” for direct files. Collections are resolved through the shared enV media service and saved into the offline library.")
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+                Toggle("I own these tracks or am authorized to download them", isOn: $rightsConfirmed)
+                    .font(.envScaled(size: 13))
+                Button {
+                    startMusicPreview()
+                } label: {
+                    Label(isWorking ? "Inspecting…" : "Preview songs", systemImage: "list.bullet")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isWorking)
+                if !previewTracks.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("\(previewTracks.count) tracks · metadata preview")
+                            .font(.envScaled(size: 15, weight: .semibold))
+                        ForEach(Array(previewTracks.prefix(showAllPreview ? previewTracks.count : 10).enumerated()), id: \.offset) { index, track in
+                            HStack(spacing: 8) {
+                                Text("\(index + 1). \(track.title)")
+                                    .font(.envScaled(size: 12))
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Button("Download") { startOnlineDownloads(only: track) }
+                                    .buttonStyle(.bordered)
+                                    .disabled(isWorking)
+                                    .accessibilityLabel("Download \(track.title)")
+                            }
+                        }
+                        if previewTracks.count > 10 {
+                            Button(showAllPreview ? "Show less" : "See more (\(previewTracks.count - 10))") {
+                                showAllPreview.toggle()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        Text("Track availability is checked when downloading. Unavailable tracks are skipped.")
+                            .font(.envScaled(size: 11))
+                            .foregroundStyle(.secondary)
+                        Button { startOnlineDownloads() } label: {
+                            Label("Download ZIP (\(previewTracks.count) tracks)", systemImage: "doc.zipper")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
+                        if let zipExportURL {
+                            ShareLink(item: zipExportURL) {
+                                Label("Share or save ZIP in Files", systemImage: "square.and.arrow.up")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
+                }
+                Text("Protected catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline/download feature. Provider support varies; enV cannot bypass sign-in, DRM, or app-only restrictions. Only download content you own or are authorized to export.")
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Label("Import audio for offline use", systemImage: "folder.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isWorking)
+                Text("\(savedFiles.count) audio file(s) currently stored in the enV offline library.")
+                    .font(.envScaled(size: 13))
+                if savedFiles.isEmpty {
+                    Text("Imported tracks stay in this app’s local Documents folder until you share or remove them.")
+                        .font(.envScaled(size: 12))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(savedFiles, id: \.absoluteString) { file in
+                        HStack(spacing: 8) {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(Color.envAccent)
+                            Text(file.lastPathComponent)
+                                .font(.envScaled(size: 12))
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            ShareLink(item: file) {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .accessibilityLabel("Export \(file.lastPathComponent)")
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            }
+
+            if isWorking {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(status.isEmpty ? "Working…" : status)
+                        .font(.envScaled(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else if !status.isEmpty {
+                Text(status)
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.red)
+                    .accessibilityAddTraits(.isStaticText)
+            }
+            Text("Limits: 50 tracks per batch, 50 MB per track, 200 MB per batch. Direct sources must allow downloads. enV does not sign in to services, extract protected streams, or bypass DRM.")
+                .font(.envScaled(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { refreshLibrary() }
+        .onChange(of: directURLs) { _ in previewTracks = []; zipExportURL = nil }
+        .onChange(of: collectionType) { _ in previewTracks = []; zipExportURL = nil }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): importLocalFiles(urls)
+            case .failure(let error): errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func validatedTracks() throws -> [NativeMusicSourceTrack] {
+        var result: [NativeMusicSourceTrack] = []
+        var seen = Set<String>()
+        let protectedDomains = [
+            "spotify.com", "apple.com", "deezer.com", "amazon.com", "tidal.com", "pandora.com",
+            "anghami.com", "qobuz.com", "napster.com", "jiosaavn.com", "iheart.com"
+        ]
+        for (index, rawLine) in directURLs.components(separatedBy: .newlines).enumerated() {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            let pieces = line.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            let title = pieces.count == 2 ? String(pieces[0]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let urlText = String(pieces.last ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = URL(string: urlText), let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  components.scheme?.lowercased() == "https", components.user == nil, components.password == nil,
+                  let hostValue = components.host?.lowercased(), !hostValue.isEmpty else {
+                throw NSError(domain: "enVMusicDownloader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): enter a public HTTPS URL without embedded credentials."])
+            }
+            let host = hostValue.replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
+            if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") ||
+               host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil || host.contains(":") {
+                throw NSError(domain: "enVMusicDownloader", code: 2, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): local and IP-literal hosts are not supported."])
+            }
+            if protectedDomains.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
+                throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): this protected streaming catalog cannot be exported by enV. Use its official download/offline feature or an authorized direct audio-file URL."])
+            }
+            let extCandidate = url.pathExtension.lowercased()
+            let isDirectAudio = extensions.contains(extCandidate)
+            let isProviderPage = !isDirectAudio && nativeMusicProviderPageDomains.contains { host == $0 || host.hasSuffix("." + $0) }
+            guard isDirectAudio || isProviderPage else {
+                throw NSError(domain: "enVMusicDownloader", code: 16, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): use a supported public song, album or playlist page, or a direct HTTPS audio-file URL ending in .mp3, .m4a, .flac or .wav."])
+            }
+            let ext = isDirectAudio ? extCandidate : "mp3"
+            let normalizedTitle = title.isEmpty ? (url.lastPathComponent.isEmpty ? "Track \(index + 1)" : url.lastPathComponent) : title
+            if seen.insert(url.absoluteString.lowercased()).inserted {
+                result.append(NativeMusicSourceTrack(title: normalizedTitle, url: url, ext: ext, isProviderPage: isProviderPage))
+            }
+        }
+        guard !result.isEmpty else {
+            throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "Add at least one supported public music link or direct audio-file URL."])
+        }
+        guard result.count <= 50 else {
+            throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "A batch can contain at most 50 links. Split larger collections into smaller batches."])
+        }
+        return result
+    }
+
+    private func startMusicPreview() {
+        errorMessage = nil
+        status = ""
+        zipExportURL = nil
+        previewTracks = []
+        guard rightsConfirmed else {
+            errorMessage = "Confirm you have permission to download these tracks and the source permits downloads."
+            return
+        }
+        let sources: [NativeMusicSourceTrack]
+        do { sources = try validatedTracks() }
+        catch { errorMessage = error.localizedDescription; return }
+        isWorking = true
+        status = "Finding track titles…"
+        transferTask = Task {
+            let outcome = await Task.detached(priority: .userInitiated) { () -> (tracks: [NativeMusicSourceTrack], warnings: [String]) in
+                var entries: [NativeMusicSourceTrack] = []
+                var warnings: [String] = []
+                for source in sources {
+                    do {
+                        try Task.checkCancellation()
+                        entries.append(contentsOf: try await nativeMusicResolve(source))
+                    } catch {
+                        warnings.append(source.title + ": " + error.localizedDescription)
+                    }
+                }
+                var seen = Set<String>()
+                let unique = entries.filter { seen.insert($0.url.absoluteString).inserted }
+                return (Array(unique.prefix(50)), warnings)
+            }.value
+            isWorking = false
+            transferTask = nil
+            if outcome.tracks.isEmpty {
+                errorMessage = outcome.warnings.first ?? "No tracks could be previewed."
+            } else if collectionType == "Track" && outcome.tracks.count != 1 {
+                errorMessage = "Choose Album or Playlist to preview multiple tracks."
+            } else {
+                previewTracks = outcome.tracks
+                showAllPreview = false
+                status = "Found \(outcome.tracks.count) songs. Review the list before downloading." +
+                    (outcome.warnings.isEmpty ? "" : " \(outcome.warnings.count) link(s) could not be inspected.")
+            }
+        }
+    }
+
+    private func startOnlineDownloads(only selected: NativeMusicSourceTrack? = nil) {
+        errorMessage = nil
+        status = ""
+        zipExportURL = nil
+        guard rightsConfirmed else {
+            errorMessage = "Confirm you have permission to download these tracks."
+            return
+        }
+        let tracks = selected.map { [$0] } ?? previewTracks
+        guard !tracks.isEmpty else {
+            errorMessage = "Preview the songs before downloading."
+            return
+        }
+        let zipRequested = selected == nil
+        let folder = collectionFolder(collectionName)
+        isWorking = true
+        status = zipRequested ? "Preparing songs for ZIP…" : "Downloading \(tracks[0].title)…"
+        transferTask = Task {
+            let outcome = await Task.detached(priority: .userInitiated) { [trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
+                var saved: [URL] = []
+                var failures: [String] = []
+                var totalBytes: Int64 = 0
+                var zipped: URL?
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    for track in tracks {
+                        try Task.checkCancellation()
+                        do {
+                            let remaining = batchLimit - totalBytes
+                            let downloaded = try await nativeMusicDownload(track, maxBytes: min(trackLimit, remaining))
+                            guard totalBytes + downloaded.bytes <= batchLimit else {
+                                try? FileManager.default.removeItem(at: downloaded.temporary)
+                                throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: "Collection exceeds 200 MB."])
+                            }
+                            let destination = Self.uniqueFile(in: folder, name: track.title, ext: downloaded.ext)
+                            try FileManager.default.moveItem(at: downloaded.temporary, to: destination)
+                            saved.append(destination)
+                            totalBytes += downloaded.bytes
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            failures.append(track.title + ": " + error.localizedDescription)
+                        }
+                    }
+                    if zipRequested && !saved.isEmpty {
+                        let archive = folder.appendingPathComponent("enV-music-\(UUID().uuidString).zip")
+                        try NativeMusicArchive.create(files: saved, at: archive)
+                        zipped = archive
+                    }
+                } catch {
+                    failures.append(error.localizedDescription)
+                }
+                return (saved: saved, failures: failures, totalBytes: totalBytes, zip: zipped)
+            }.value
+            isWorking = false
+            transferTask = nil
+            refreshLibrary()
+            zipExportURL = outcome.zip
+            if outcome.saved.isEmpty {
+                errorMessage = outcome.failures.first ?? "No audio files were downloaded."
+                status = "No files saved."
+            } else {
+                status = "\(outcome.saved.count) track(s) saved · \(ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file))." +
+                    (outcome.zip == nil ? "" : " ZIP ready: tap Share or save ZIP in Files.") +
+                    (outcome.failures.isEmpty ? "" : " \(outcome.failures.count) unavailable: " + outcome.failures.prefix(3).joined(separator: "; "))
+            }
+            if zipRequested && outcome.zip == nil && !outcome.saved.isEmpty {
+                errorMessage = "The tracks were saved to the library, but the ZIP could not be prepared."
+            }
+        }
+    }
+
+    private func importLocalFiles(_ urls: [URL]) {
+        errorMessage = nil
+        status = ""
+        guard !urls.isEmpty else { return }
+        guard urls.count <= 50 else {
+            errorMessage = "Choose at most 50 tracks per import."
+            return
+        }
+        isWorking = true
+        status = "Importing local audio…"
+        let folder = collectionFolder(collectionName)
+        transferTask = Task {
+            let result = await Task.detached(priority: .userInitiated) { [extensions = self.extensions, trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
+                var copied: [URL] = []
+                var totalBytes: Int64 = 0
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    for source in urls {
+                        try Task.checkCancellation()
+                        let didAccess = source.startAccessingSecurityScopedResource()
+                        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
+                        let ext = source.pathExtension.lowercased()
+                        guard extensions.contains(ext) else {
+                            throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: source.lastPathComponent + " is not a supported audio file."])
+                        }
+                        let size = (try FileManager.default.attributesOfItem(atPath: source.path)[.size] as? NSNumber)?.int64Value ?? 0
+                        guard size > 0 && size <= trackLimit else {
+                            throw NSError(domain: "enVMusicDownloader", code: 13, userInfo: [NSLocalizedDescriptionKey: source.lastPathComponent + " is empty or exceeds the 50 MB per-track limit."])
+                        }
+                        guard totalBytes + size <= batchLimit else {
+                            throw NSError(domain: "enVMusicDownloader", code: 14, userInfo: [NSLocalizedDescriptionKey: "The import exceeds the 200 MB batch limit."])
+                        }
+                        let dest = Self.uniqueFile(in: folder, name: source.deletingPathExtension().lastPathComponent, ext: ext)
+                        try FileManager.default.copyItem(at: source, to: dest)
+                        copied.append(dest)
+                        totalBytes += size
+                    }
+                    return (copied: copied, totalBytes: totalBytes, error: Optional<String>.none)
+                } catch {
+                    copied.forEach { try? FileManager.default.removeItem(at: $0) }
+                    return (copied: [URL](), totalBytes: Int64(0), error: Optional(error.localizedDescription))
+                }
+            }.value
+            isWorking = false
+            transferTask = nil
+            refreshLibrary()
+            if let error = result.2 { errorMessage = error }
+            else { status = "Imported \(result.0.count) track(s) for offline use (\(ByteCountFormatter.string(fromByteCount: result.1, countStyle: .file)))." }
+        }
+    }
+
+    private func collectionFolder(_ name: String) -> URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let root = documents.appendingPathComponent("Music Downloader", isDirectory: true)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
+        let clean = String(name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: .whitespacesAndNewlines)
+        return root.appendingPathComponent(clean.isEmpty ? "My music" : String(clean.prefix(80)), isDirectory: true)
+    }
+
+    private static func uniqueFile(in folder: URL, name: String, ext: String) -> URL {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
+        let cleanName = String(name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = cleanName.isEmpty ? "track" : String(cleanName.prefix(90))
+        var candidate = folder.appendingPathComponent(base).appendingPathExtension(ext)
+        var index = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = folder.appendingPathComponent(base + " (" + String(index) + ")").appendingPathExtension(ext)
+            index += 1
+        }
+        return candidate
+    }
+
+    private func refreshLibrary() {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let root = documents.appendingPathComponent("Music Downloader", isDirectory: true)
+        savedFiles = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])?.allObjects as? [URL] ?? [])
+            .filter { extensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
     }
 }
 
@@ -4738,7 +5664,7 @@ enum NativeAiEngine {
     static let contentBriefTools: Set<String> = ["content-brief-generator"]
     static let adCopyTools: Set<String> = ["ad-copy-generator"]
     static let titleTools: Set<String> = ["youtube-title-generator", "tiktok-title-generator", "instagram-title-generator", "podcast-title-generator", "title-generator"]
-    static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "video-audio-extractor":"video.transcript.generate"]
+    static let exactTasks: [String:String] = ["regex-tester":"developer.regex.explain", "sql-formatter":"developer.sql.explain", "json-validator":"developer.json.explain", "alt-text-generator":"image.alt.generate", "audio-analyze-studio":"music.analysis.classify", "video-audio-extractor":"video.transcript.generate"]
 
     static func supports(_ toolID: String) -> Bool { captionTools.contains(toolID) || promptTools.contains(toolID) || bioTools.contains(toolID) || productTools.contains(toolID) || ideaTools.contains(toolID) || resumeTools.contains(toolID) || rewriteTools.contains(toolID) || emailTools.contains(toolID) || metaTools.contains(toolID) || hookTools.contains(toolID) || improverTools.contains(toolID) || contentBriefTools.contains(toolID) || adCopyTools.contains(toolID) || titleTools.contains(toolID) || exactTasks[toolID] != nil || NativeAiMicroEngine.supports(toolID) }
     static func isLocalCaption(_ toolID: String) -> Bool { captionTools.contains(toolID) }
@@ -4881,6 +5807,9 @@ enum NativeAiEngine {
             var input: [String:Any] = ["imageBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "style": values["style"] ?? "concise", "language": values["language"] ?? "en"]
             if let context = values["context"] as? String, !context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input["context"] = context.trimmingCharacters(in: .whitespacesAndNewlines) }
             return input
+        case "music.analysis.classify":
+            guard let file else { return values }
+            return ["audioBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "filename": file.name]
         case "video.transcript.generate":
             guard let file else { return values }
             var input: [String:Any] = ["audioBase64": file.data.base64EncodedString(), "mimeType": file.mimeType, "filename": file.name]
@@ -4929,6 +5858,27 @@ enum NativeAiEngine {
             var text = result["altText"] as? String ?? ""
             if let long = result["longDescription"] as? String, !long.isEmpty { text += "\n\n\(long)" }
             if result["containsText"] as? Bool == true, let found = result["textInImage"] as? String, !found.isEmpty { text += "\n\nText in image: \(found)" }
+            return text
+        case "music.analysis.classify":
+            let languages = (result["language"] as? [String] ?? []).joined(separator: ", ")
+            let moods = (result["mood"] as? [String] ?? []).joined(separator: ", ")
+            let instruments = (result["instruments"] as? [String] ?? []).joined(separator: ", ")
+            let fields: [(String, String?)] = [
+                ("Genre", result["genre"] as? String),
+                ("Sub-style", result["sub_style"] as? String),
+                ("Languages", languages.isEmpty ? nil : languages),
+                ("Mood", moods.isEmpty ? nil : moods),
+                ("Instruments", instruments.isEmpty ? nil : instruments),
+                ("Vocal style", result["vocal_style"] as? String)
+            ]
+            var text = fields.map { $0.0 + ": " + ($0.1 ?? "Not identified") }.joined(separator: "\n")
+            if let candidates = result["genre_candidates"] as? [[String:Any]], !candidates.isEmpty {
+                text += "\n\nGenre candidates\n" + candidates.map { item in
+                    let score = (item["score"] as? NSNumber).map { String(format: "%.1f%%", $0.doubleValue * 100) } ?? "score unavailable"
+                    return "• \(item["label"] as? String ?? "Unknown"): \(score)"
+                }.joined(separator: "\n")
+            }
+            text += "\n\n" + (result["note"] as? String ?? "AI-generated tags are estimates; review uncertain labels.")
             return text
         case "video.transcript.generate": return result["text"] as? String ?? ""
         default: return ""
@@ -6039,6 +6989,7 @@ private enum NativeAiAssistFeatureRegistry {
         NativeAiAssistFeature(toolID: "sql-formatter", taskID: "developer.sql.explain", title: "Explain this SQL with AI", description: "Get a clause-by-clause explanation and risk warnings. The statement is never executed.", actionLabel: "Explain SQL", resultKind: "sql", fields: [NativeAiAssistField(name: "sql", label: "SQL statement", kind: .textarea, required: true, maxLength: 6000, monospace: true), NativeAiAssistField(name: "dialect", label: "Dialect", kind: .select, options: ["generic", "postgresql", "mysql", "sqlite", "sqlserver"].map { NativeAiAssistOption(value: $0, label: $0.capitalized) }, defaultValue: "generic")]),
         NativeAiAssistFeature(toolID: "json-validator", taskID: "developer.json.explain", title: "Describe this JSON with AI", description: "Get a summary of the structure and likely issues. Secret-looking values are masked before sending, but avoid pasting real personal data.", actionLabel: "Describe JSON", resultKind: "json", fields: [NativeAiAssistField(name: "json", label: "JSON", kind: .textarea, required: true, maxLength: 20_000, monospace: true), NativeAiAssistField(name: "goal", label: "Focus", kind: .select, options: [NativeAiAssistOption(value: "describe", label: "Describe"), NativeAiAssistOption(value: "find-issues", label: "Find issues")], defaultValue: "describe")], requiresConsent: true, consentLabel: "I understand this JSON is sent to an external AI service."),
         NativeAiAssistFeature(toolID: "alt-text-generator", taskID: "image.alt.generate", title: "Write alt text from an image with AI", description: "Upload an image and get alt text plus a longer description. Large images are shrunk in your browser first. Review the result before publishing.", actionLabel: "Write alt text", resultKind: "alt-text", fields: [NativeAiAssistField(name: "image", label: "Image", kind: .image, required: true, help: "JPEG, PNG or WebP."), NativeAiAssistField(name: "context", label: "Page context (optional)", kind: .text, maxLength: 300, placeholder: "Where will this image appear?"), NativeAiAssistField(name: "style", label: "Style", kind: .select, options: [NativeAiAssistOption(value: "concise", label: "Concise"), NativeAiAssistOption(value: "descriptive", label: "Descriptive")], defaultValue: "concise"), language], requiresConsent: true, consentLabel: "I understand this image is sent to an external AI service."),
+        NativeAiAssistFeature(toolID: "audio-analyze-studio", taskID: "music.analysis.classify", title: "Identify genre and tags with AI", description: "Upload a short music clip to estimate genre, sub-style, audible languages, mood, instruments and vocal style. Predictions can be wrong; local signal analysis works without AI.", actionLabel: "Identify music tags", resultKind: "music-analysis", fields: [NativeAiAssistField(name: "audio", label: "Music audio", kind: .audio, required: true, help: "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB.")], requiresConsent: true, consentLabel: "I understand this audio recording will be sent to enV AI for classification."),
         NativeAiAssistFeature(toolID: "video-audio-extractor", taskID: "video.transcript.generate", title: "Transcribe audio with AI", description: "Upload a short audio clip (up to about 2.8 MB) to get a transcript with timestamps. Longer recordings are not supported yet. Extract and compress the audio first.", actionLabel: "Transcribe", resultKind: "transcript", fields: [NativeAiAssistField(name: "audio", label: "Audio file", kind: .audio, required: true, help: "MP3, M4A, WAV, WebM, OGG or FLAC, up to 2.8 MB."), NativeAiAssistField(name: "language", label: "Language code (optional)", kind: .text, maxLength: 3, placeholder: "auto-detect", help: "Two letters, for example en or fr.")], requiresConsent: true, consentLabel: "I understand this recording is sent to an external AI service.")
     ]
 
@@ -6120,7 +7071,16 @@ private struct NativeAiAssistPanel: View {
             do {
                 let access = url.startAccessingSecurityScopedResource()
                 defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let raw = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: try Data(contentsOf: url))
+                let maximumBytes = fileField?.kind == .audio ? 2_800_000 : 2_400_000
+                let maximumLabel = fileField?.kind == .audio ? "2.8 MB" : "2.4 MB"
+                if let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, fileSize > maximumBytes {
+                    throw NSError(domain: "enV.NativeAiAssist", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose a file no larger than \(maximumLabel). Nothing was sent."])
+                }
+                let data = try Data(contentsOf: url)
+                guard data.count <= maximumBytes else {
+                    throw NSError(domain: "enV.NativeAiAssist", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose a file no larger than \(maximumLabel). Nothing was sent."])
+                }
+                let raw = NativeBackendFile(name: url.lastPathComponent, mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream", data: data)
                 if fileField?.kind == .image { selectedFile = try NativeAiClient.prepareImage(raw) }
                 else { selectedFile = try NativeAiClient.prepareAudio(raw) }
             } catch { selectedFile = nil; notice = error.localizedDescription }

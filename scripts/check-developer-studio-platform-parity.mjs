@@ -55,7 +55,7 @@ assert.match(iosTools, /iconName|marginLeft|fontFamily/, 'iOS design layers must
 const uxStudioCss = readFileSync('src/styles.css', 'utf8');
 assert.match(webUx, /uxui-device-shell/, 'Web preview must use a target-specific device mockup');
 assert.match(webUx, /uxui-home-heading/, 'The Studio home must keep a clear heading for accessible orientation');
-assert.match(webUx, /aria-label="New project"/, 'First-run Studio home must provide a labelled blank-project action');
+assert.match(webUx, /aria-label="Add project"/, 'First-run Studio home must provide a labelled Add project action');
 assert.match(webUx, /className="uxui-inspector/, 'Project title and layers must remain in the right-side inspector');
 assert.match(webUx, /No layers yet/, 'A blank project must start with an empty layer list');
 assert.match(webUx, /uxui-quick-style/, 'Common corner styling must be available without opening technical settings');

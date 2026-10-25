@@ -46,6 +46,7 @@ import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
 import { DocumentToolsEngine } from "@/components/engines/document-tools-engine";
 import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
 import { EventTemplateEngine } from "@/components/engines/event-template-engine";
+import { MusicDownloaderEngine } from "@/components/engines/music-downloader-engine";
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
@@ -66,6 +67,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
+  if (tool.id === "music-downloader") return <MusicDownloaderEngine />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
   if (tool.requiresBackend && tool.engine.type === "custom") return <BackendToolEngine toolId={tool.id} category={tool.category} />;
   // Accessibility Studios must override legacy per-tool engine metadata (for example,

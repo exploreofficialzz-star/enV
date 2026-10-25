@@ -6,9 +6,10 @@ ENV NODE_ENV=production \
     npm_config_audit=false \
     PYTHONDONTWRITEBYTECODE=1
 
+# yt-dlp recommends the nightly channel for frequently changing site extractors.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates \
-  && python3 -m pip install --break-system-packages --no-cache-dir "yt-dlp[default,curl-cffi]" \
+  && python3 -m pip install --break-system-packages --no-cache-dir --pre "yt-dlp[default,curl-cffi]" \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -20,6 +21,10 @@ COPY scripts/media-processor.mjs ./scripts/media-processor.mjs
 COPY scripts/url-media-processor.mjs ./scripts/url-media-processor.mjs
 COPY scripts/media/processor-admission.mjs ./scripts/media/processor-admission.mjs
 COPY scripts/media/provider-registry.mjs ./scripts/media/provider-registry.mjs
+COPY scripts/media/audiomack-page-parser.mjs ./scripts/media/audiomack-page-parser.mjs
+COPY scripts/media/provider-errors.mjs ./scripts/media/provider-errors.mjs
+COPY scripts/media/extraction-strategy.mjs ./scripts/media/extraction-strategy.mjs
+COPY scripts/media/public-download-links.mjs ./scripts/media/public-download-links.mjs
 COPY scripts/media/url-security.mjs ./scripts/media/url-security.mjs
 COPY scripts/media/yt-dlp-output.mjs ./scripts/media/yt-dlp-output.mjs
 COPY scripts/transcription-processor.mjs ./scripts/transcription-processor.mjs
@@ -29,6 +34,10 @@ RUN node --check processor/server.mjs \
   && node --check processor/url-media-route.mjs \
   && node --check scripts/media-processor.mjs \
   && node --check scripts/url-media-processor.mjs \
+  && node --check scripts/media/audiomack-page-parser.mjs \
+  && node --check scripts/media/provider-errors.mjs \
+  && node --check scripts/media/extraction-strategy.mjs \
+  && node --check scripts/media/public-download-links.mjs \
   && node --version \
   && ffmpeg -version >/dev/null \
   && yt-dlp --version

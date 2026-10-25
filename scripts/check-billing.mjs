@@ -7,6 +7,8 @@ const migration = await read("migrations/0002_billing.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const paystackWebhookRoute = await read("server/routes/api/billing/paystack/webhook.post.ts");
+const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
 const cryptomusVerifyRoute = await read("server/routes/api/billing/cryptomus/verify.post.ts");
@@ -147,6 +149,10 @@ assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY/);
 assert.match(cryptomusService, /createHash\("md5"\)/);
 assert.match(cryptomusService, /timingSafeEqual/);
+assert.match(cryptomusService, /readBoundedBytes\(request, 256_000\)/,
+  "Cryptomus webhook bodies must be limited while streaming");
+assert.doesNotMatch(cryptomusService.slice(cryptomusService.indexOf("export async function handleCryptomusWebhook")), /request\.text\(\)/,
+  "Cryptomus webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(cryptomusService, /verifyAndCreditCryptomusReference/);
 assert.match(cryptomusService, /invoice\.is_final !== true/);
 assert.match(cryptomusService, /invoice\.order_id !== reference/);
@@ -168,12 +174,63 @@ assert.match(pairNativePage, /Generate pairing code/);
 assert.match(envExample, /PAYSTACK_PROVIDER_APPROVED=false/);
 assert.match(envExample, /CRYPTOMUS_PROVIDER_APPROVED=false/);
 assert.match(envExample, /BILLING_LAUNCH_ENABLED=false/);
+assert.match(envExample, /BILLING_ENFORCEMENT_ENABLED=false/);
+assert.match(envExample, /BILLING_REFUND_DISPUTE_HANDLING_APPROVED=false/,
+  "new payments must remain gated until refund/dispute handling has been approved");
+assert.match(paystackService, /BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true"/,
+  "Paystack/Cryptomus checkout must require the refund/dispute readiness gate");
 assert.match(paystackService, /PAYMENTS_NOT_CONFIGURED/);
 assert.match(paystackService, /BILLING_LAUNCH_ENABLED === "true"/);
 assert.match(paystackService, /BILLING_ENFORCEMENT_ENABLED === "true"/);
-assert.match(paystackService, /createHmac\("sha512"/);
+assert.match(paystackService, /createHmac\("sha512", verificationSecret\)/,
+  "Paystack webhook HMAC must use the same secret that verifies transactions");
+assert.doesNotMatch(envExample, /PAYSTACK_WEBHOOK_SECRET=/,
+  "Paystack does not expose a separate webhook-signing secret in this integration");
 assert.match(paystackService, /timingSafeEqual/);
+assert.match(paystackService, /readBoundedBytes\(request, 256_000\)/,
+  "Paystack webhook bodies must be limited while streaming");
+assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook")), /request\.text\(\)/,
+  "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
+assert.match(paystackService, /REFUND_DISPUTE_RECONCILIATION_REQUIRED/);
+for (const event of ["charge.dispute.create", "charge.dispute.remind", "charge.dispute.resolve", "refund.pending", "refund.processing", "refund.needs-attention", "refund.failed", "refund.processed"]) {
+  assert.ok(paystackService.includes('"' + event + '"'), `Paystack ${event} must not be acknowledged before reconciliation is implemented`);
+}
+assert.match(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
+  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must not be acknowledged before reconciliation is implemented`);
+}
+assert.match(paystackWebhookRoute, /billing-paystack-webhook/);
+assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
+assert.match(paystackProviderConfig, /readSafePackPrice/);
+assert.match(paystackService, /readSafePackPrice\(process\.env\.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS\)/,
+  "Paystack prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /readSafePackPrice\(process\.env\.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS\)/,
+  "Cryptomus prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
+  "whitespace-only Paystack credentials must not enable checkout");
+assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY\?\.trim\(\)/,
+  "whitespace-only Cryptomus credentials must not enable checkout");
+assert.match(paystackService, /process\.env\.VERCEL === "1"/,
+  "Vercel deployments must require HTTPS payment callback origins");
+assert.match(cryptomusService, /process\.env\.VERCEL === "1"/,
+  "Vercel deployments must require HTTPS crypto callback origins");
+assert.doesNotMatch(paystackProviderConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
+  "settlement credentials must not inherit the new-checkout kill switch");
+const paystackSettlement = paystackService.slice(
+  paystackService.indexOf("export async function verifyAndCreditPaystackReference"),
+  paystackService.indexOf("export async function handlePaystackWebhook"),
+);
+assert.match(paystackSettlement, /requirePaystackVerificationSecret\(process\.env\)/,
+  "existing Paystack payments must remain verifiable when new checkout is disabled");
+assert.doesNotMatch(paystackSettlement, /requireLiveFunding\(/,
+  "existing transaction verification must not be blocked by the new-checkout launch gates");
+const paystackWebhookSettlement = paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook"));
+assert.match(paystackWebhookSettlement, /requirePaystackVerificationSecret\(process\.env\)/,
+  "Paystack webhook verification must remain available during checkout shutdown");
+assert.doesNotMatch(paystackWebhookSettlement, /requireLiveFunding\(/,
+  "Paystack webhook settlement must not depend on the new-checkout launch gates");
 assert.match(rewardsMigration, /billing_referral_profiles/);
 assert.match(rewardsMigration, /billing_referrals/);
 assert.match(rewardsMigration, /billing_reward_events/);

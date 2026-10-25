@@ -16,7 +16,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { parseFinalCatalog } from "./catalog-reader.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -211,7 +211,7 @@ else {
   }
 }
 
-const catalog = parseGeneratedCatalog(read(join(root, "src", "data", "catalog.ts")));
+const catalog = parseFinalCatalog(read(join(root, "src", "data", "catalog.ts")));
 const toolsById = new Map(catalog.map((t) => [t.id, t]));
 const seenTools = new Set();
 for (const feature of AI_FEATURES) {

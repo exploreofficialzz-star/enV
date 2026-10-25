@@ -6,6 +6,25 @@ export const PROVIDERS = {
   facebook: ["facebook.com", "m.facebook.com", "fb.watch"],
   instagram: ["instagram.com"],
   x: ["x.com", "twitter.com"],
+  audiomack: ["audiomack.com"],
+  soundcloud: ["soundcloud.com", "on.soundcloud.com"],
+  bandcamp: ["bandcamp.com"],
+  mixcloud: ["mixcloud.com"],
+  audius: ["audius.co"],
+  jamendo: ["jamendo.com"],
+  hearthis: ["hearthis.at"],
+  bandlab: ["bandlab.com"],
+  boomplay: ["boomplay.com"],
+  zingmp3: ["zingmp3.vn"],
+  netease: ["music.163.com"],
+  "yandex-music": ["music.yandex.com", "music.yandex.ru"],
+  archive: ["archive.org"],
+  audioboom: ["audioboom.com"],
+  reverbnation: ["reverbnation.com"],
+  soundclick: ["soundclick.com"],
+  spreaker: ["spreaker.com"],
+  podomatic: ["podomatic.com"],
+  freesound: ["freesound.org"],
 };
 const PROVIDER_BY_HOST = new Map(
   Object.entries(PROVIDERS).flatMap(([provider, hosts]) => hosts.map((host) => [host, provider])),
@@ -13,7 +32,12 @@ const PROVIDER_BY_HOST = new Map(
 
 export function detectProvider(url) {
   const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-  return PROVIDER_BY_HOST.get(hostname) || "generic";
+  const exact = PROVIDER_BY_HOST.get(hostname);
+  if (exact) return exact;
+  for (const [provider, hosts] of Object.entries(PROVIDERS)) {
+    if (hosts.some((host) => hostname.endsWith("." + host))) return provider;
+  }
+  return "generic";
 }
 
 function audioAdapter(format) {
@@ -34,7 +58,10 @@ function videoAdapter(format, provider) {
 }
 
 export function createProviderAdapter(provider, format, audioOnly) {
-  if (audioOnly) return audioAdapter(format);
+  if (audioOnly) {
+    const adapter = audioAdapter(format);
+    return { ...adapter, post: [...adapter.post, "--embed-metadata"] };
+  }
   return videoAdapter(format, provider);
 }
 
