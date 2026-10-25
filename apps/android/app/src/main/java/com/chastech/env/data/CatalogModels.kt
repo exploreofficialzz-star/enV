@@ -132,6 +132,33 @@ fun Catalog.withMusicDownloader(): Catalog {
     )
 }
 
+fun Catalog.withSongMetadataAnalyzer(): Catalog {
+    if (tools.any { it.id == "song-metadata-analyzer" }) return this
+    val tool = ToolRecord(
+        id = "song-metadata-analyzer",
+        name = "Song Metadata Analyzer",
+        slug = "song-metadata-analyzer",
+        description = "Analyze genre, tempo, key, mood, vocals and instruments. Batch songs and export reports.",
+        category = "audio",
+        keywords = listOf("song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"),
+        tags = listOf("song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"),
+        icon = "AudioLines",
+        popularity = 9900,
+        featured = true,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = listOf("audio-file-inspector", "music-studio", "music-downloader"),
+        engine = EngineInfo("audio", "song-metadata-analyzer"),
+        subcategory = "Music",
+    )
+    return copy(
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        tools = (tools + tool).sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 private val webSearchSynonyms = mapOf(
     "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
     "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),
