@@ -181,7 +181,7 @@ export function parseAudiomackAlbumPage(html, pageUrl) {
 
   const albumSlug = base.pathname.split("/").filter(Boolean).at(-1) || "";
   const heading = stripMarkup((page.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i) || [])[1]);
-  const albumTitle = stripMarkup(meta["og:title"] || meta["twitter:title"] || heading).replace(/\s*[|–-]\s*Audiomack\s*$/i, "").trim() || slugTitle(albumSlug);
+  const albumTitle = slugTitle(albumSlug) || stripMarkup(meta["og:title"] || meta["twitter:title"] || heading);
   const uploader = stripMarkup(meta["music:musician"] || meta["article:author"] || "") || undefined;
   const results = Array.from(entries.values()).slice(0, 50);
   return {
