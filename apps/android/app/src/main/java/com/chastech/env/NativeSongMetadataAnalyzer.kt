@@ -563,6 +563,7 @@ internal fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
 
         val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
         if (extension !in nativeSongExtensions) continue
+        require(uncompressedSize > 0) { "ZIP contains an empty audio track." }
         val compressed = bytes.copyOfRange(payloadStart, payloadEnd)
         val decoded = when (method) {
             0 -> {
