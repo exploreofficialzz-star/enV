@@ -40,6 +40,12 @@ test("Audiomack legacy JSON errors identify a provider resolver problem", () => 
   assert.doesNotMatch(failure.message, /^AUTH_REQUIRED:/);
 });
 
+test("Audiomack server errors are surfaced as source resolver failures", () => {
+  const failure = classifyProviderFailure("Audiomack", "Unable to get track metadata: HTTP Error 500: Internal Server Error");
+  assert.match(failure.message, /^SOURCE_UNAVAILABLE:/);
+  assert.match(failure.message, /not proof that the URL is invalid or that an account is required/i);
+});
+
 test("no downloadable format is not confused with an unsupported URL", () => {
   assert.match(classifyProviderFailure("Bandcamp", "Requested format is not available").message, /^NO_DOWNLOADABLE_FORMAT:/);
   assert.match(classifyProviderFailure("Unknown", "Unsupported URL").message, /^UNSUPPORTED_SOURCE:/);
