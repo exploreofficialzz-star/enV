@@ -3,6 +3,7 @@ package com.chastech.env
 import android.app.DownloadManager
 import android.content.Context
 import android.content.ContentValues
+import android.os.Build
 import android.provider.MediaStore
 import android.net.Uri
 import android.os.Environment
@@ -335,6 +336,31 @@ fun NativeMusicDownloaderScreen() {
     var error by remember { mutableStateOf("") }
     val previewTracks = remember { mutableStateListOf<DirectMusicTrack>() }
     var showAllPreview by remember { mutableStateOf(false) }
+    var pendingZip by remember { mutableStateOf<File?>(null) }
+    val zipSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { destination ->
+        val archive = pendingZip
+        pendingZip = null
+        if (archive != null) {
+            if (destination == null) {
+                archive.delete()
+                status = "ZIP save cancelled; tracks remain in your enV offline library."
+            } else {
+                busy = true
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openOutputStream(destination)?.use { output ->
+                                archive.inputStream().buffered().use { it.copyTo(output) }
+                            } ?: throw IllegalStateException("Unable to save the ZIP at the selected location.")
+                        }.also { archive.delete() }
+                    }
+                    saved.onSuccess { status = "ZIP saved to your selected folder." }
+                        .onFailure { error = it.message ?: "ZIP export failed; tracks remain in enV's offline library." }
+                    busy = false
+                }
+            }
+        }
+    }
     val savedTracks = remember { mutableStateListOf<File>().apply { addAll(listOfflineMusic(context)) } }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -405,6 +431,7 @@ fun NativeMusicDownloaderScreen() {
                 val failures = mutableListOf<String>()
                 var bytes = 0L
                 var exported = false
+                var manualArchive: File? = null
                 try {
                     val root = File(context.filesDir, "music-downloader/" + musicSafeName(collectionName, "My music"))
                     for (track in selection) {
@@ -433,39 +460,51 @@ fun NativeMusicDownloaderScreen() {
                                     archive.closeEntry()
                                 }
                             }
-                            val values = ContentValues().apply {
-                                put(MediaStore.MediaColumns.DISPLAY_NAME, "enV-" + musicSafeName(collectionName, "music") + ".zip")
-                                put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
-                                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                                put(MediaStore.MediaColumns.IS_PENDING, 1)
-                            }
-                            val resolver = context.contentResolver
-                            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                                ?: throw IllegalStateException("Android could not create the ZIP in Downloads.")
-                            try {
-                                resolver.openOutputStream(uri)?.use { output -> temporary.inputStream().use { it.copyTo(output) } }
-                                    ?: throw IllegalStateException("Android could not write the ZIP.")
-                                resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-                                exported = true
-                            } catch (cause: Exception) {
-                                resolver.delete(uri, null, null)
-                                throw cause
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                val values = ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, "enV-" + musicSafeName(collectionName, "music") + ".zip")
+                                    put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                                }
+                                val resolver = context.contentResolver
+                                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                                    ?: throw IllegalStateException("Android could not create the ZIP in Downloads.")
+                                try {
+                                    resolver.openOutputStream(uri)?.use { output -> temporary.inputStream().use { it.copyTo(output) } }
+                                        ?: throw IllegalStateException("Android could not write the ZIP.")
+                                    resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+                                    exported = true
+                                } catch (cause: Exception) {
+                                    resolver.delete(uri, null, null)
+                                    throw cause
+                                }
+                            } else {
+                                // Android 8–9 requires Storage Access Framework to save a ZIP
+                                // without asking for broad external storage permissions.
+                                manualArchive = temporary
                             }
                         } finally {
-                            temporary.delete()
+                            if (manualArchive != temporary) temporary.delete()
                         }
                     }
                 } catch (cause: Exception) {
                     failures += cause.message ?: "Could not finish the collection."
                 }
-                Triple(succeeded.size, failures, exported)
+                Triple(succeeded.size, failures, Pair(exported, manualArchive))
             }
             savedTracks.clear()
             savedTracks.addAll(listOfflineMusic(context))
-            val (count, failures, exported) = outcome
+            val (count, failures, exportResult) = outcome
+            val (exported, archiveToSave) = exportResult
             status = if (exported) "Saved ZIP to Downloads with $count track(s)." else if (count > 0) "Saved $count track(s) to the enV offline library." else "No audio files were saved."
             if (failures.isNotEmpty()) error = "${failures.size} track(s) unavailable: " + failures.take(3).joinToString("; ")
             busy = false
+            if (archiveToSave != null) {
+                pendingZip = archiveToSave
+                status = "Choose a folder to save the ZIP. Completed tracks are also in your enV library."
+                zipSaveLauncher.launch("enV-" + musicSafeName(collectionName, "music") + ".zip")
+            }
         }
     }
 
