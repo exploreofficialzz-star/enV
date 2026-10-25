@@ -64,36 +64,6 @@ function mimeForExtension(extension: string): string {
   return types[extension] || "application/octet-stream";
 }
 
-async function fetchTrack(entry: MusicCollectionEntry, signal: AbortSignal): Promise<DownloadResult> {
-  const valid = validateDirectMusicUrl(entry.url);
-  if (!valid.ok) throw new Error("Line " + entry.line + ": " + valid.reason);
-  const response = await fetch(valid.url, { method: "GET", credentials: "omit", redirect: "follow", signal });
-  if (!response.ok) throw new Error("Line " + entry.line + ": source returned HTTP " + response.status + ".");
-  if (response.url) {
-    const safeFinal = isSafeMusicOrigin(response.url);
-    if (!safeFinal.ok) throw new Error("Line " + entry.line + ": the source redirected to a blocked or protected host.");
-  }
-  const mime = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (mime === "text/html" || mime === "application/xhtml+xml" || mime.startsWith("video/")) {
-    throw new Error("Line " + entry.line + ": the source returned a web page or video, not a direct audio file.");
-  }
-  if (mime && !mime.startsWith("audio/") && mime !== "application/octet-stream" && mime !== "binary/octet-stream") {
-    throw new Error('Line ' + entry.line + ': unsupported content type "' + mime + '".');
-  }
-  const bytes = await readBounded(response, MAX_TRACK_BYTES, signal);
-  if (!bytes.byteLength) throw new Error("Line " + entry.line + ": the audio file was empty.");
-  const sourceName = entry.title || new URL(valid.url).pathname.split("/").pop() || ("track-" + entry.line);
-  const extension = extensionFromName(sourceName) || valid.extension;
-  const metadata = extractMusicMetadata(bytes, sourceName);
-  return {
-    name: trackFileName(metadata, sourceName, extension),
-    bytes,
-    extension,
-    source: valid.url,
-    metadata,
-  };
-}
-
 function buildArchive(title: string, tracks: DownloadResult[]): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   const used = new Set<string>();
