@@ -2781,7 +2781,8 @@ private struct NativeAudioWaveFileToolView: View {
                 eqHighDB: Double(values["high"] ?? "0") ?? 0,
                 compressorThresholdDB: Double(values["threshold"] ?? "-18") ?? -18,
                 compressorRatio: Double(values["ratio"] ?? "4") ?? 4,
-                targetChannels: Int(values["channels"] ?? "2") ?? 2
+                targetChannels: Int(values["channels"] ?? "2") ?? 2,
+                fileName: selectedName
             )
             output = result.report; error = nil
             if let wav = result.outputWav { pendingData = wav; showExporter = true }
