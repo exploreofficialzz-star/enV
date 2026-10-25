@@ -73,7 +73,7 @@ assert.equal(detectProvider(new URL("https://music.yandex.com/album/123")), "yan
 assert.match(source, /includePlaylist = false/);
 assert.match(source, /--yes-playlist/);
 assert.match(source, /--flat-playlist/);
-assert.match(source, /"playlist-end", "50"/);
+assert.match(source, /"--playlist-end", "50"/);
 assert.deepEqual(parseYtDlpJson('{"title":"clean"}'), { title: "clean" });
 assert.deepEqual(parseYtDlpJson('WARNING: extractor note\n{"title":"after warning"}\nfinished'), { title: "after warning" });
 assert.deepEqual(parseYtDlpJson('preamble\n{\n  "title": "pretty",\n  "description": "brace } in string"\n}\ntrailer'), {
