@@ -166,7 +166,8 @@ jobs:
           fi
       # Native launch and accessibility checks are release gates. An emulator
       # infrastructure failure must remain visible and must not publish unverified artifacts.
-      # Enable host KVM first to prevent software acceleration and Android service loss.
+      # Enable host KVM first: prior runs silently used software acceleration and lost
+      # Android package-manager services before instrumentation tests began.
       - name: Enable KVM for Android emulator
         shell: bash
         run: |
