@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { parseFinalCatalog } from "./catalog-reader.mjs";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const migration = await read("migrations/0002_billing.sql");
@@ -60,6 +61,9 @@ const profiles = JSON.parse(profilesText);
 const profileIndex = JSON.parse(profileIndexText);
 const nativeInventory = JSON.parse(nativeInventoryText);
 const profileIds = new Set(profiles.profiles.map((profile) => profile.toolId));
+const runtimeCatalog = parseFinalCatalog(await read("src/data/catalog.ts"));
+const expectedRuntimeToolIds = new Set(runtimeCatalog.map((tool) => tool.id));
+for (const id of nativeInventory.runtimeExtensionIds ?? []) expectedRuntimeToolIds.add(id);
 
 for (const table of ["billing_accounts", "billing_credit_ledger", "billing_reservations", "billing_purchase_intents", "billing_entitlements", "billing_entitlement_events", "billing_webhook_events", "billing_usage_events"]) {
   assert.match(migration, new RegExp(`create table if not exists ${table}\\b`, "i"), `missing table ${table}`);
@@ -125,7 +129,8 @@ assert.match(tokenGuidePage, /Estimated token guide for every enV tool/, "the ov
 assert.match(tokenGuidePage, /Number\.MAX_SAFE_INTEGER/, "token guide search must cover the full catalogue");
 assert.match(tokenGuidePage, /Show more tools \(/, "token guide must allow users to browse beyond the first results");
 assert.match(tokenGuidePage, /token button on the home page/, "guide must direct account-usage reviews to the Home token button");
-assert.equal(profiles.toolCount, 10_025, "full catalogue must be profiled");
+assert.equal(profiles.toolCount, expectedRuntimeToolIds.size, "every base-catalog and native runtime-extension tool must be profiled");
+assert.deepEqual([...expectedRuntimeToolIds].filter((id) => !profileIds.has(id)), [], "every runtime tool must have an auditable billing profile");
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
 assert.equal(new Set(profiles.profiles.map((profile) => profile.toolId)).size, profiles.toolCount, "tool billing profiles must have unique IDs");
 assert.ok(profiles.profiles.every((profile) => profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "every generated row must be provisional, manually audited and ad-free");
