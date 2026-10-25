@@ -12,7 +12,6 @@ function cleanDiagnostic(value) {
 export function classifyProviderFailure(provider, diagnostic) {
   const name = String(provider || "The provider").replace(/[^a-z0-9 -]/gi, "").slice(0, 60) || "The provider";
   const detail = cleanDiagnostic(diagnostic);
-  const lower = detail.toLowerCase();
 
   if (/sign in to confirm|login required|authentication required|please log in|cookies are required/i.test(detail)) {
     return new Error(`AUTH_REQUIRED: ${name} requires a sign-in or authenticated session that enV's public-link flow does not provide. Use an authorized public download URL or the provider's official download feature.`);
