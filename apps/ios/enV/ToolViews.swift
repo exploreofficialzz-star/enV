@@ -2695,7 +2695,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }.value
                 var semanticDone = false
                 if fullAnalysis && uploadConsent {
-                    if let excerpt = nativeSongAudioExcerpt(scan.samples16k) {
+                    if let excerpt = nativeSongAudioExcerpt(scan.monoSamples16k) {
                         do {
                             let response = try await NativeAiClient.runWithMetadata(task: "audio.music.analyze", input: [
                                 "audioBase64": excerpt.data.base64EncodedString(),
@@ -2750,7 +2750,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 document = NativeSongAnalysisDocument(data: try nativeSongZIPStore([("song-analysis.json", json), ("song-analysis.csv", csv), ("processing-issues.json", issues)]))
             }
             showExporter = true
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 }
 
@@ -2906,15 +2906,15 @@ private func nativeSongAudioExcerpt(_ samples: [Float]) -> (data: Data, seconds:
     let sampleCount = section * 3 + gap * 2
     var data = Data()
     data.reserveCapacity(44 + sampleCount * 2)
-    data.append(contentsOf: Array("RIFF".utf8)); data.appendLE(UInt32(36 + sampleCount * 2))
-    data.append(contentsOf: Array("WAVEfmt ".utf8)); data.appendLE(UInt32(16))
-    data.appendLE(UInt16(1)); data.appendLE(UInt16(1))
-    data.appendLE(UInt32(rate)); data.appendLE(UInt32(rate * 2)); data.appendLE(UInt16(2)); data.appendLE(UInt16(16))
-    data.append(contentsOf: Array("data".utf8)); data.appendLE(UInt32(sampleCount * 2))
+    data.append(contentsOf: Array("RIFF".utf8)); data.appendNativeLE(UInt32(36 + sampleCount * 2))
+    data.append(contentsOf: Array("WAVEfmt ".utf8)); data.appendNativeLE(UInt32(16))
+    data.appendNativeLE(UInt16(1)); data.appendNativeLE(UInt16(1))
+    data.appendNativeLE(UInt32(rate)); data.appendNativeLE(UInt32(rate * 2)); data.appendNativeLE(UInt16(2)); data.appendNativeLE(UInt16(16))
+    data.append(contentsOf: Array("data".utf8)); data.appendNativeLE(UInt32(sampleCount * 2))
     for (index, start) in starts.enumerated() {
         for sample in samples[start..<(start + section)] {
             let clipped = max(-1, min(1, sample))
-            data.appendLE(Int16((clipped < 0 ? clipped * 32768 : clipped * 32767).rounded()))
+            data.appendNativeLE(Int16((clipped < 0 ? clipped * 32768 : clipped * 32767).rounded()))
         }
         if index < starts.count - 1 { data.append(Data(repeating: 0, count: gap * 2)) }
     }
@@ -3100,7 +3100,7 @@ private extension Data {
     mutating func appendNativeASCII(_ value: String) { append(contentsOf: value.utf8) }
     mutating func appendNativeLE<T: FixedWidthInteger>(_ value: T) {
         var little = value.littleEndian
-        withUnsafeBytes(of: &little) { append(contentsOf: $0) }
+        Swift.withUnsafeBytes(of: &little) { append(contentsOf: $0) }
     }
 }
 
