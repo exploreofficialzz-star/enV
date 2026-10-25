@@ -220,7 +220,12 @@ fun NativeAiAssistPanel(tool: ToolRecord) {
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        val raw = readAssistFile(context, uri) ?: error("That file could not be read.")
+                        val maximumBytes = when (fileField.kind) {
+                            AssistKind.AUDIO -> NATIVE_AI_AUDIO_MAX_BYTES
+                            AssistKind.IMAGE -> NATIVE_AI_IMAGE_MAX_BYTES
+                            else -> NATIVE_AI_AUDIO_MAX_BYTES
+                        }
+                        val raw = readAssistFile(context, uri, maximumBytes) ?: error("That file could not be read.")
                         when (fileField.kind) {
                             AssistKind.IMAGE -> NativeAiClient.prepareImage(raw)
                             AssistKind.AUDIO -> NativeAiClient.prepareAudio(raw)
@@ -426,10 +431,27 @@ private fun validateAssist(feature: AssistFeature, values: Map<String, Any?>, fi
     return null
 }
 
-private fun readAssistFile(context: Context, uri: Uri): InputFile? = runCatching {
+private const val NATIVE_AI_IMAGE_MAX_BYTES = 2_400_000
+private const val NATIVE_AI_AUDIO_MAX_BYTES = 2_800_000
+
+private fun readAssistFile(context: Context, uri: Uri, maximumBytes: Int): InputFile? = runCatching {
     val name = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "upload.bin"
     val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+        val output = java.io.ByteArrayOutputStream(minOf(maximumBytes, 64 * 1024))
+        val buffer = ByteArray(16 * 1024)
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            require(total <= maximumBytes) {
+                "Choose a file under ${if (mime.startsWith("audio/")) "2.8 MB" else "2.4 MB"} for this AI task. Nothing was sent."
+            }
+            output.write(buffer, 0, read)
+        }
+        output.toByteArray()
+    } ?: return@runCatching null
     InputFile(name, mime, bytes)
 }.getOrNull()
 
