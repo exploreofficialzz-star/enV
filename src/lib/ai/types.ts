@@ -17,7 +17,7 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export const PROVIDER_IDS = ["openrouter", "groq", "gemini", "mock"] as const;
+export const PROVIDER_IDS = ["moss_music", "openrouter", "groq", "gemini", "mock"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export const COST_CLASSES = ["FREE", "LOW", "STANDARD", "PREMIUM"] as const;
@@ -46,6 +46,8 @@ export interface Usage {
   outputTokens: number | null;
   totalTokens: number | null;
   audioSeconds: number | null;
+  /** Wall-clock model-serving time, for self-hosted GPU cost estimates; excludes cold-start/idle overhead. */
+  computeSeconds?: number | null;
 }
 
 export interface CostEstimate {
@@ -111,6 +113,8 @@ export interface ModelPricing {
   outputPerMTok?: number;
   /** USD per hour of audio. */
   perAudioHour?: number;
+  /** USD per GPU compute hour for hosted/self-hosted model inference estimates. */
+  perComputeHour?: number;
 }
 
 export interface ModelQuota {
