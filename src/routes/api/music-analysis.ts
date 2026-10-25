@@ -168,7 +168,20 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
     } catch {
       return errorResponse(502, "MUSIC_ANALYSIS_INVALID_MODEL_RESPONSE", "The configured model service returned invalid JSON.");
     }
-    return Response.json({ ok: true, classification: normalizeMusicModelClassification(response) }, {
+    const classification = normalizeMusicModelClassification(response);
+    const hasUsableLabels = Boolean(
+      classification.genre
+      || classification.sub_style
+      || classification.vocal_style
+      || classification.language.length
+      || classification.mood.length
+      || classification.instruments.length
+      || classification.genre_candidates.length
+    );
+    if (!hasUsableLabels) {
+      return errorResponse(502, "MUSIC_ANALYSIS_NO_LABELS", "The configured model returned JSON but no recognized music tags. Check the endpoint's response schema.");
+    }
+    return Response.json({ ok: true, classification }, {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
