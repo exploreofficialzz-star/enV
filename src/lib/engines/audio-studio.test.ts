@@ -189,3 +189,14 @@ test("music model response normalizer rejects malformed labels and non-finite sc
   ]);
   assert.equal(result.genre, "Vocal");
 });
+
+test("music model response normalizer returns unknown fields as unknown", () => {
+  const result = normalizeMusicModelClassification({});
+  assert.equal(result.genre, null);
+  assert.equal(result.sub_style, null);
+  assert.deepEqual(result.language, []);
+  assert.deepEqual(result.mood, []);
+  assert.deepEqual(result.instruments, []);
+  assert.equal(result.vocal_style, null);
+  assert.deepEqual(result.genre_candidates, []);
+});
