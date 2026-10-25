@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { strToU8, zipSync } from "fflate";
-import { csvCell, inspectAudioHeader, inspectSongZip, songsToCsv, tempoBandFromBpm } from "./song-metadata-analyzer.ts";
+import { crc32, csvCell, inspectAudioHeader, inspectSongZip, songsToCsv, tempoBandFromBpm } from "./song-metadata-analyzer.ts";
+
+test("ZIP CRC-32 matches the standard IEEE test vector", () => {
+  assert.equal(crc32(new TextEncoder().encode("123456789")), 0xcbf43926);
+});
 
 test("tempo bands are deterministic and unknown values remain unknown", () => {
   assert.equal(tempoBandFromBpm(null), "unknown");
