@@ -5,8 +5,21 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { tools } = await import("../src/data/catalog.ts");
+const { tools: catalogTools } = await import("../src/data/catalog.ts");
+const { getAllTools } = await import("../src/lib/registry.ts");
 const nativeInventory = JSON.parse(await readFile(join(root, "apps/shared/native-engine-inventory.json"), "utf8"));
+
+// Native runtime-only tools need profiles too. They are deliberately absent from the
+// generated base catalog, so include only IDs explicitly declared as runtime extensions.
+const toolsById = new Map(catalogTools.map((tool) => [tool.id, tool]));
+const registryTools = getAllTools();
+for (const id of nativeInventory.runtimeExtensionIds ?? []) {
+  if (toolsById.has(id)) continue;
+  const runtimeTool = registryTools.find((tool) => tool.id === id);
+  if (!runtimeTool) throw new Error(`Native runtime extension "${id}" has no registered tool metadata.`);
+  toolsById.set(id, runtimeTool);
+}
+const tools = [...toolsById.values()];
 const { METERED_OPERATION_RULES, PRICING_VERSION } = await import("../src/lib/billing/catalog.ts");
 const ruleById = new Map(METERED_OPERATION_RULES.map((rule) => [rule.id, rule]));
 
