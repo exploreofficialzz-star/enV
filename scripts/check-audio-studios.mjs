@@ -26,7 +26,7 @@ for (const id of baseline.slugs) assert.ok(byId.has(id), `baseline audio slug di
 assert.equal(baseline.slugs.length, baseline.baselineCount, "baseline slug manifest count is inconsistent");
 
 const expectedAdditions = [
-  "music-studio", "music-separator", "music-duet", "music-karaoke", "music-stem-mixer", "music-practice",
+  "music-studio", "music-separator", "music-duet", "music-karaoke", "music-stem-mixer", "music-practice", "song-metadata-analyzer",
   "audio-convert-studio", "audio-edit-studio", "audio-analyze-studio", "audio-calc-studio",
   "audio-transcribe-studio", "audio-import-studio", "audio-platform-guide-studio", "audio-lufs-meter",
   "audio-spectrogram", "audio-trim-silence", "audio-pitch-shift", "audio-tempo-change", "audio-compressor",
