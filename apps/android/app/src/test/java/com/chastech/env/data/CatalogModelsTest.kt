@@ -5,6 +5,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogModelsTest {
+    @Test fun runtimeMusicDownloaderAdditionIsUniqueAndSearchable() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withMusicDownloader()
+        assertEquals(1, catalog.tools.count { it.id == "music-downloader" })
+        assertEquals(1, catalog.counts.total)
+        assertEquals(1, catalog.counts.active)
+        assertEquals("music-downloader", catalog.search("music downloader").first().id)
+        assertEquals("music-downloader", catalog.search("Audiomack").first().id)
+        assertEquals("music-downloader", catalog.search("Boomplay").first().id)
+        assertEquals("music-downloader", catalog.search("YouTube Music").first().id)
+        assertEquals(catalog, catalog.withMusicDownloader())
+    }
+
     @Test fun accessibilitySearchUsesEightStudiosAndKeepsLegacyAliases() {
         val ids = listOf("contrast-checker", "alt-text-checker", "focus-state-checker", "text-readability-checker", "aria-checker", "motion-checker", "keyboard-navigation-checker", "form-checker")
         val sources = ids.map { id -> ToolRecord(id, id, id, "", "accessibility", emptyList(), emptyList(), "Accessibility", 10, false, true, false, false, "active", emptyList(), EngineInfo("custom", id)) }

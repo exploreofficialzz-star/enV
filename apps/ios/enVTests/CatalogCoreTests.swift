@@ -2,6 +2,21 @@ import XCTest
 @testable import enV
 
 final class CatalogCoreTests: XCTestCase {
+    func testMusicDownloaderIsAvailableInTheNativeCatalogExtension() {
+        let extended = catalog.includingMusicDownloader()
+        XCTAssertEqual(extended.tools.filter { $0.id == "music-downloader" }.count, 1)
+        XCTAssertEqual(extended.counts.total, catalog.counts.total + 1)
+        XCTAssertEqual(extended.counts.active, catalog.counts.active + 1)
+        let tool = extended.tools.first { $0.id == "music-downloader" }
+        XCTAssertEqual(tool?.category, "audio")
+        XCTAssertEqual(tool?.engine.id, "music-downloader")
+        XCTAssertEqual(tool?.engine.type, "audio")
+        XCTAssertEqual(extended.webSearch("Audiomack").first?.id, "music-downloader")
+        XCTAssertEqual(extended.webSearch("Boomplay").first?.id, "music-downloader")
+        XCTAssertEqual(extended.webSearch("YouTube Music").first?.id, "music-downloader")
+    }
+
+
     private let catalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 2, planned: 1, categories: 1), categories: [ToolCategory(id: "text", name: "Text", description: "Text tools", blurb: "Text", icon: "Type")], tools: [
         Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", subcategory: nil, keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
         Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", subcategory: nil, keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
