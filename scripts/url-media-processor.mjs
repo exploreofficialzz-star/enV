@@ -10,6 +10,7 @@ import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
+import { extractExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -370,6 +371,29 @@ function isAudiomackAlbumUrl(url) {
   return parts.length >= 3 && (parts[0].toLowerCase() === "album" || parts[1]?.toLowerCase() === "album");
 }
 
+/**
+ * Fallback shared by all registered providers: only follow a page's explicit,
+ * HTTPS audio-file download link. A streaming player URL is not enough.
+ * fetchPublic enforces public-DNS checks on each redirect before requesting it.
+ */
+async function discoverExplicitAudioDownload(url, signal) {
+  if (isPublicMediaCollectionPage(url.toString())) return null;
+  const { response, url: pageUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; enV-Music-Downloader/1.0)" },
+  }, signal);
+  if (!response.ok) return null;
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+    if (response.body) await response.body.cancel().catch(() => undefined);
+    return null;
+  }
+  const html = await readBoundedText(response, 2 * 1024 * 1024);
+  const download = extractExplicitPublicAudioLink(html, pageUrl.toString());
+  if (download) await assertPublicHostname(download.hostname);
+  return download;
+}
+
 async function inspectAudiomackAlbumPage(url, signal) {
   const { response, url: finalUrl } = await fetchPublic(url.toString(), {
     method: "GET",
@@ -446,6 +470,26 @@ async function handleInfo(req, res) {
     try {
       ({ stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
     } catch (error) {
+      // The provider extractor can be outdated even when an artist offers a
+      // direct file on the public song page. Use this safe, opt-in HTML fallback
+      // for all supported providers, never as an album/playlist shortcut.
+      const code = String(error?.message || "");
+      if (/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) {
+        try {
+          const publicDownload = await discoverExplicitAudioDownload(url, controller.signal);
+          if (publicDownload) {
+            json(res, 200, {
+              provider, title: publicDownload.pathname.split("/").pop()?.replace(/\\.[^.]+$/, "") || "Downloadable audio",
+              webpageUrl: url.toString(), isPlaylist: false, entries: [],
+              formats: [{ formatId: "direct-file", ext: path.extname(publicDownload.pathname).slice(1), note: "Artist-provided public file download" }],
+            });
+            return;
+          }
+        } catch (fallbackError) {
+          if (fallbackError?.name === "AbortError") throw fallbackError;
+          // Keep the original provider error when the optional fallback fails.
+        }
+      }
       const message = error instanceof Error ? error.message : String(error);
       if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
         const detail = message.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(-260);
@@ -542,7 +586,18 @@ async function handleDownload(req, res) {
     const outputTemplate = path.join(jobDir, `${randomUUID()}-%(title).120s.%(ext)s`);
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
     const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
-    await runYtdlp(args, jobDir, controller.signal, provider);
+    try {
+      await runYtdlp(args, jobDir, controller.signal, provider);
+    } catch (error) {
+      const code = String(error?.message || "");
+      if (!/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) throw error;
+      let publicDownload = null;
+      try { publicDownload = await discoverExplicitAudioDownload(url, controller.signal); }
+      catch (fallbackError) { if (fallbackError?.name === "AbortError") throw fallbackError; }
+      if (!publicDownload) throw error;
+      await handleDirectDownload(req, res, publicDownload, body, controller.signal);
+      return;
+    }
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
     for (const entry of entries) {
