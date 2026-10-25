@@ -190,7 +190,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     provider: "moss_music",
     modelId: "MOSS-Music-8B-Instruct",
     displayName: "MOSS-Music 8B Instruct (self-hosted on Modal)",
-    capabilities: ["AUDIO_UNDERSTANDING", "STRUCTURED_TEXT"],
+    capabilities: ["AUDIO_UNDERSTANDING"],
     inputModalities: ["audio", "text"],
     outputModalities: ["text"],
     contextWindow: 32_768,
