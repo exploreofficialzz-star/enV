@@ -4,11 +4,9 @@ import { Button } from "@/components/ui/button";
 import { downloadBlob } from "@/lib/utils";
 import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
-import { AI_LIMITS } from "@/lib/ai/contracts";
-import { prepareAudioForAi, runAiTask } from "@/lib/ai/client/ai-client";
 
 const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
-const MODEL_FILE_LIMIT = AI_LIMITS.audioBytesMax;
+const MODEL_FILE_LIMIT = 25 * 1024 * 1024;
 const MAX_AUDIO_DURATION_SECONDS = 2 * 60;
 
 function formatBytes(bytes: number): string {
@@ -179,15 +177,15 @@ export function MusicAnalyzerStudio() {
     }
     setModelBusy(true);
     setError("");
-    setNotice("Sending the selected audio to the configured enV model service, as you approved.");
+    setNotice("Sending the selected audio to the configured enV AI route, as you approved.");
     try {
-      const prepared = await prepareAudioForAi(file);
-      const response = await runAiTask("music.analysis.classify", {
-        audioBase64: prepared.base64,
-        mimeType: prepared.mimeType,
-        filename: prepared.filename,
-      });
-      setAnalysis((current) => current ? { ...current, classification: response.result } : current);
+      const body = new FormData();
+      body.append("audio", file, file.name);
+      const response = await fetch("/api/music-analysis", { method: "POST", body, headers: { Accept: "application/json" } });
+      const payload = await response.json().catch(() => ({})) as { message?: string; classification?: MusicAnalysisResult["classification"] };
+      if (!response.ok) throw new Error(payload.message || "The model service could not analyze this audio.");
+      if (!payload.classification) throw new Error("The model service returned no classification result.");
+      setAnalysis((current) => current ? { ...current, classification: payload.classification! } : current);
       setNotice("Model response received. Review the predicted labels and scores; the model may be wrong, particularly on mixed vocals or unfamiliar styles.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Model-based analysis failed.");
@@ -272,9 +270,9 @@ export function MusicAnalyzerStudio() {
             </div>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">{analysis.classification.note}</p>
             <div className="mt-4 rounded-xl border border-border bg-background p-3">
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={allowModelUpload} onChange={(event) => setAllowModelUpload(event.target.checked)} /><span><strong>Allow model analysis</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">This uploads the selected audio to enV AI, or to a custom endpoint configured by the deployment. The backend controls processing and retention. Local analysis above never uploads audio. Built-in AI accepts clips up to 2.8 MB; larger files need a configured custom endpoint.</span></span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={allowModelUpload} onChange={(event) => setAllowModelUpload(event.target.checked)} /><span><strong>Allow model analysis</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">This uploads the selected audio to enV AI, or to a custom classifier endpoint if the deployment has one configured. Provider privacy and retention depend on deployment settings. Local analysis above never uploads audio. Built-in AI accepts clips up to about 2.8 MB; larger files need a configured custom endpoint.</span></span></label>
               <Button type="button" className="mt-3" variant="outline" disabled={!allowModelUpload || modelBusy || !file || file.size > MODEL_FILE_LIMIT} onClick={() => void runModelAnalysis()}>{modelBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Requesting model…</> : <><Sparkles size={16} className="mr-2" />Identify genre and tags</>}</Button>
-              {file && file.size > MODEL_FILE_LIMIT ? <p className="mt-2 text-xs text-muted-foreground">Model tagging requires a file up to 25 MB with a custom endpoint; built-in AI accepts up to 2.8 MB. On-device measurements remain available.</p> : null}
+              {file && file.size > MODEL_FILE_LIMIT ? <p className="mt-2 text-xs text-muted-foreground">Built-in AI accepts up to about 2.8 MB; larger clips require a configured custom endpoint. On-device measurements remain available.</p> : null}
             </div>
             {analysis.classification.genre_candidates.length ? (
               <div className="mt-4">
