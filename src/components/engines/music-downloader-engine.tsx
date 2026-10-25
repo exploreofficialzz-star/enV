@@ -11,6 +11,14 @@ import {
 } from "@/lib/media/music-downloader-policy";
 
 type DownloadResult = { name: string; bytes: Uint8Array; extension: string; source: string; metadata: MusicMetadata };
+type PreviewTrack = {
+  url: string;
+  source: string;
+  metadata?: Pick<UrlMediaInfo, "title" | "uploader" | "album" | "releaseYear" | "duration"> | UrlMediaPlaylistEntry;
+  title: string;
+};
+type MusicPreview = { title: string; tracks: PreviewTrack[]; truncated: boolean; warnings: string[] };
+const PREVIEW_PAGE_SIZE = 10;
 const MAX_TRACK_BYTES = 50 * 1024 * 1024;
 const MAX_COLLECTION_BYTES = 200 * 1024 * 1024;
 
@@ -174,6 +182,9 @@ export function MusicDownloaderEngine() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
+  const [preview, setPreview] = useState<MusicPreview | null>(null);
+  const [showAllTracks, setShowAllTracks] = useState(false);
+  const [trackStates, setTrackStates] = useState<Record<number, string>>({});
   const abortRef = useRef<AbortController | null>(null);
   const manifestInputRef = useRef<HTMLInputElement | null>(null);
   const localFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -183,6 +194,8 @@ export function MusicDownloaderEngine() {
     setError("");
     try {
       setUrlText(await file.text());
+      setPreview(null);
+      setTrackStates({});
       setMode("online");
       setRightsConfirmed(false);
       setResult("Link list loaded.");
@@ -191,12 +204,15 @@ export function MusicDownloaderEngine() {
     }
   }
 
-  async function runOnline() {
+  async function previewOnline() {
     setError("");
     setResult("");
     setProgress("");
+    setPreview(null);
+    setShowAllTracks(false);
+    setTrackStates({});
     if (!rightsConfirmed) {
-      setError("Please confirm you own these tracks or have permission to download them, and the source permits downloads.");
+      setError("Confirm that you have permission to download these tracks and that the source permits file downloads.");
       return;
     }
     const parsed = parseMusicCollectionLines(urlText);
@@ -208,114 +224,132 @@ export function MusicDownloaderEngine() {
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    const tracks: DownloadResult[] = [];
-    const failures: string[] = [];
-    let totalBytes = 0;
-    let collectionTitle = "";
+    const items: PreviewTrack[] = [];
+    const warnings: string[] = [];
+    const seen = new Set<string>();
+    let title = "";
+    let truncated = false;
     try {
       for (let index = 0; index < parsed.entries.length; index += 1) {
         const entry = parsed.entries[index];
-        setProgress("Reading link " + (index + 1) + " of " + parsed.entries.length + "…");
+        setProgress("Finding songs · link " + (index + 1) + " of " + parsed.entries.length + "…");
         try {
           if (isDirectAudioLink(entry.url)) {
-            const track = await downloadMusicTrack(
-              entry.url,
-              entry.url,
-              undefined,
-              entry.title,
-              controller.signal,
-              setProgress,
-            );
-            if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
-            totalBytes += track.bytes.byteLength;
-            tracks.push(track);
+            if (!seen.has(entry.url)) {
+              items.push({ url: entry.url, source: entry.url, title: entry.title || new URL(entry.url).pathname.split("/").pop() || "Track" });
+              seen.add(entry.url);
+            }
             continue;
           }
 
           let info: UrlMediaInfo;
           try {
             info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: true });
-          } catch (inspectionError) {
-            if ((inspectionError as Error)?.name === "AbortError" || isLikelyMusicCollectionUrl(entry.url)) throw inspectionError;
-            // Some extractors resolve/download a single audio stream even when
-            // their playlist/metadata path fails. Do not discard the track here.
-            setProgress("Metadata unavailable; attempting direct song extraction…");
-            const track = await downloadMusicTrack(entry.url, entry.url, undefined, entry.title, controller.signal, setProgress);
-            if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
-            totalBytes += track.bytes.byteLength;
-            tracks.push(track);
-            continue;
+          } catch (cause) {
+            if ((cause as Error)?.name === "AbortError") throw cause;
+            if (isLikelyMusicCollectionUrl(entry.url)) throw cause;
+            // A failed single-song metadata lookup need not block a later authorized download.
+            warnings.push((entry.title || entry.url) + ": metadata could not be previewed; download availability is unverified.");
+            info = { provider: "generic", title: entry.title || "Track", formats: [], isPlaylist: false, webpageUrl: entry.url };
           }
-          if (info.isPlaylist && !info.entries?.length) {
-            throw new Error("This collection could not be expanded into track links; no audio-only download was attempted for the entire album or playlist.");
+          const entries = info.entries?.filter((item) => item.webpageUrl?.startsWith("https://")) || [];
+          if ((info.isPlaylist || isLikelyMusicCollectionUrl(entry.url)) && !entries.length) {
+            throw new Error("The collection did not provide any valid individual track links.");
           }
-          if (!collectionTitle && info.entries?.length) {
-            collectionTitle = info.album || info.title || "";
-          }
-          const items: Array<{ url: string; source: string; metadata: Pick<UrlMediaInfo, "title" | "uploader" | "album" | "releaseYear" | "duration"> | UrlMediaPlaylistEntry; explicitTitle: string }> =
-            info.entries?.length
-              ? info.entries.map((item) => ({
-                  url: item.webpageUrl,
-                  source: entry.url,
-                  metadata: { ...item, album: item.album || info.album || info.title },
-                  explicitTitle: item.title,
-                }))
-              : [{
-                  url: entry.url,
-                  source: entry.url,
-                  metadata: info,
-                  explicitTitle: entry.title,
-                }];
-
-          if (info.truncated) {
-            setProgress("This collection has more than 50 items. Preparing the first 50 tracks…");
-          }
-          for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
-            if (tracks.length >= 50) throw new Error("A collection can contain at most 50 tracks. Split larger collections into smaller batches.");
-            const item = items[itemIndex];
-            try {
-              const track = await downloadMusicTrack(
-                item.url,
-                item.source,
-                item.metadata,
-                item.explicitTitle,
-                controller.signal,
-                (message) => setProgress(message + " · track " + (tracks.length + 1)),
-              );
-              if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) throw new Error("The collection exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
-              totalBytes += track.bytes.byteLength;
-              tracks.push(track);
-            } catch (cause) {
-              if ((cause as Error)?.name === "AbortError") throw cause;
-              failures.push((item.explicitTitle || item.url) + ": " + (cause instanceof Error ? cause.message : "Download failed."));
-            }
+          if (entries.length && !title) title = info.album || info.title || "";
+          truncated = truncated || Boolean(info.truncated);
+          const resolved: PreviewTrack[] = entries.length ? entries.map((item) => ({
+            url: item.webpageUrl,
+            source: entry.url,
+            metadata: { ...item, album: item.album || info.album || info.title },
+            title: item.title,
+          })) : [{
+            url: entry.url,
+            source: entry.url,
+            metadata: info,
+            title: entry.title || info.title || "Track",
+          }];
+          for (const item of resolved) {
+            if (seen.has(item.url)) continue;
+            if (items.length >= 50) { truncated = true; break; }
+            seen.add(item.url);
+            items.push(item);
           }
         } catch (cause) {
           if ((cause as Error)?.name === "AbortError") throw cause;
-          failures.push((entry.title || entry.url) + ": " + (cause instanceof Error ? cause.message : "This link could not be processed."));
+          warnings.push((entry.title || entry.url) + ": " + (cause instanceof Error ? cause.message : "Could not inspect this link."));
         }
       }
+      if (!items.length) throw new Error(warnings[0] || "No tracks could be previewed from these links.");
+      setPreview({ title: title || (parsed.entries.length === 1 ? (parsed.entries[0].title || "Music collection") : "My music"), tracks: items, truncated, warnings });
+      setResult("Found " + items.length + " track(s). Review the list before downloading.");
+      setProgress("");
+    } catch (cause) {
+      if ((cause as Error)?.name === "AbortError") setProgress("Preview cancelled.");
+      else setError(cause instanceof Error ? cause.message : "Unable to preview songs.");
+    } finally {
+      abortRef.current = null;
+      setBusy(false);
+    }
+  }
 
-      if (!tracks.length) throw new Error(failures[0] || "No downloadable tracks were found in these links.");
-      if (tracks.length === 1) {
-        const track = tracks[0];
-        const copy = new Uint8Array(track.bytes.byteLength);
-        copy.set(track.bytes);
-        downloadBlob(new Blob([copy.buffer], { type: mimeForExtension(track.extension) }), track.name);
-      } else {
-        const title = safeName(collectionTitle || inferredCollectionTitle(tracks), "My music");
-        const archive = buildArchive(title, tracks);
+  async function downloadPreview(trackIndex?: number) {
+    if (!preview || busy) return;
+    setError("");
+    setResult("");
+    setProgress("");
+    if (!rightsConfirmed) {
+      setError("Confirm you have permission to download these tracks.");
+      return;
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setBusy(true);
+    const collected: DownloadResult[] = [];
+    const failures: string[] = [];
+    let totalBytes = 0;
+    const indices = trackIndex === undefined ? preview.tracks.map((_, i) => i) : [trackIndex];
+    try {
+      for (const index of indices) {
+        const item = preview.tracks[index];
+        if (!item) continue;
+        setTrackStates((previous) => ({ ...previous, [index]: "Downloading…" }));
+        setProgress("Downloading " + (indices.indexOf(index) + 1) + " of " + indices.length + ": " + item.title);
+        try {
+          const track = await downloadMusicTrack(item.url, item.source, item.metadata, item.title, controller.signal, setProgress);
+          if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
+            throw new Error("Batch size exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
+          }
+          totalBytes += track.bytes.byteLength;
+          collected.push(track);
+          setTrackStates((previous) => ({ ...previous, [index]: "Ready" }));
+          if (trackIndex !== undefined) {
+            downloadBlob(new Blob([new Uint8Array(track.bytes).buffer], { type: mimeForExtension(track.extension) }), track.name);
+          }
+        } catch (cause) {
+          if ((cause as Error)?.name === "AbortError") throw cause;
+          const message = cause instanceof Error ? cause.message : "Download failed.";
+          setTrackStates((previous) => ({ ...previous, [index]: "Unavailable" }));
+          failures.push(item.title + ": " + message);
+        }
+      }
+      if (trackIndex === undefined && collected.length) {
+        const title = safeName(preview.title || inferredCollectionTitle(collected), "My music");
+        const archive = buildArchive(title, collected);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
-      setResult("Downloaded " + tracks.length + " track(s) · " + formatFileSize(totalBytes) + ".");
-      setProgress(
-        (failures.length ? failures.length + " item(s) could not be downloaded. " : "") +
-        (tracks.length > 1 ? "Your collection includes a playlist and detected track metadata." : "Available song metadata has been read."),
-      );
-      if (failures.length) setError(failures.slice(0, 5).join("\n") + (failures.length > 5 ? "\n…and " + (failures.length - 5) + " more." : ""));
+      if (collected.length) {
+        setResult((trackIndex === undefined ? "ZIP prepared with " : "Downloaded ") + collected.length + " track(s) · " + formatFileSize(totalBytes) +
+          (failures.length ? ". " + failures.length + " unavailable track(s) were skipped." : "."));
+      }
+      if (failures.length) {
+        setError(failures.slice(0, 5).join("\n") + (failures.length > 5 ? "\n…and " + (failures.length - 5) + " more." : ""));
+      }
+      if (!collected.length && !failures.length) setError("No audio was downloaded.");
+      setProgress("");
     } catch (cause) {
-      if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled.");
-      else setError(cause instanceof Error ? cause.message : "The download could not be completed.");
+      if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled. Completed tracks were not added to a ZIP.");
+      else setError(cause instanceof Error ? cause.message : "Unable to download the selected music.");
     } finally {
       abortRef.current = null;
       setBusy(false);
@@ -394,12 +428,39 @@ export function MusicDownloaderEngine() {
             <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import list</button>
             <input ref={manifestInputRef} type="file" accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" className="hidden" onChange={(event) => void importManifest(event.target.files?.[0])} />
           </div>
-          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
+          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
             <input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
             <span>I have permission to download this music and the source allows downloads.</span>
           </label>
-          <Button type="button" onClick={() => void runOnline()} disabled={busy} className="w-full">{busy ? "Downloading…" : "Download music"}</Button>
+          <Button type="button" onClick={() => void previewOnline()} disabled={busy} className="w-full">{busy ? "Inspecting music…" : "Preview songs"}</Button>
+          {preview ? (
+            <section className="space-y-3 rounded-2xl border border-border bg-surface-2 p-3 sm:p-4" aria-label="Track preview">
+              <div>
+                <h3 className="text-base font-semibold break-words">{preview.title}</h3>
+                <p className="text-sm text-muted">{preview.tracks.length} track(s) found{preview.truncated ? " · first 50 shown" : ""}. Track names are metadata only; availability is verified when downloading.</p>
+              </div>
+              <div className="space-y-2">
+                {(showAllTracks ? preview.tracks : preview.tracks.slice(0, PREVIEW_PAGE_SIZE)).map((track, index) => (
+                  <div key={track.url + index} className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-background p-2.5">
+                    <span className="w-6 shrink-0 text-center text-xs text-muted">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium" title={track.title}>{track.title}</p>
+                      <p className="truncate text-xs text-muted">{track.metadata?.uploader || "Track"}{trackStates[index] ? " · " + trackStates[index] : ""}</p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void downloadPreview(index)} disabled={busy} aria-label={"Download " + track.title}>Download</Button>
+                  </div>
+                ))}
+              </div>
+              {preview.tracks.length > PREVIEW_PAGE_SIZE ? (
+                <button type="button" className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-background" onClick={() => setShowAllTracks((value) => !value)}>
+                  {showAllTracks ? "Show less" : "See more (" + (preview.tracks.length - PREVIEW_PAGE_SIZE) + " tracks)"}
+                </button>
+              ) : null}
+              {preview.warnings.length ? <p role="status" className="whitespace-pre-wrap text-xs text-muted">{preview.warnings.length} link(s) could not be fully inspected. {preview.warnings.slice(0, 2).join(" ")}</p> : null}
+              <Button type="button" onClick={() => void downloadPreview()} disabled={busy} className="w-full">{busy ? "Preparing ZIP…" : "Download ZIP (" + preview.tracks.length + " tracks)"}</Button>
+            </section>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-3 rounded-2xl border border-border p-3 sm:p-4">
