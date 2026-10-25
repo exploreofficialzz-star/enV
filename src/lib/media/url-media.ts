@@ -8,6 +8,7 @@ export interface UrlMediaRequest {
   provider?: UrlMediaProvider;
   format?: "mp4" | "webm" | "mp3" | "m4a" | "best";
   audioOnly?: boolean;
+  maxBytes?: number;
 }
 
 export function getUrlMediaConfig() {
