@@ -7,6 +7,7 @@ import { extractMusicMetadata } from "@/lib/media/music-metadata";
 
 const LOCAL_FILE_LIMIT = 50 * 1024 * 1024;
 const MODEL_FILE_LIMIT = 25 * 1024 * 1024;
+const MAX_AUDIO_DURATION_SECONDS = 5 * 60;
 
 type ModelClassification = MusicAnalysisResult["classification"];
 
@@ -29,6 +30,39 @@ function formatDuration(seconds: number): string {
 
 function displayNumber(value: number | null, suffix = ""): string {
   return value === null || !Number.isFinite(value) ? "Not available" : String(value) + suffix;
+}
+
+async function probeAudioDuration(file: File): Promise<number> {
+  const url = URL.createObjectURL(file);
+  const media = document.createElement("audio");
+  media.preload = "metadata";
+  let timeout: number | undefined;
+  try {
+    const duration = await new Promise<number>((resolve, reject) => {
+      const finish = (callback: (value: number | Error) => void, value: number | Error) => {
+        if (timeout !== undefined) window.clearTimeout(timeout);
+        media.onloadedmetadata = null;
+        media.onerror = null;
+        callback(value);
+      };
+      media.onloadedmetadata = () => {
+        const durationSeconds = media.duration;
+        if (Number.isFinite(durationSeconds) && durationSeconds > 0) finish((value) => resolve(value as number), durationSeconds);
+        else finish((value) => reject(value as Error), new Error("The browser could not determine this file's duration safely before decoding."));
+      };
+      media.onerror = () => finish((value) => reject(value as Error), new Error("The browser could not read this audio file's metadata. Try MP3, WAV or M4A."));
+      timeout = window.setTimeout(() => finish((value) => reject(value as Error), new Error("Reading audio metadata timed out. Try a shorter or more compatible audio file.")), 10000);
+      media.src = url;
+      media.load();
+    });
+    return duration;
+  } finally {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+    URL.revokeObjectURL(url);
+  }
 }
 
 function listValue(value: string[]): string {
@@ -134,8 +168,10 @@ export function MusicAnalyzerStudio() {
     }
     setBusy(true);
     setError("");
-    setNotice("Decoding and measuring this file on your device. The audio is not uploaded for local analysis.");
+    setNotice("Checking file duration, then measuring the audio on this device. Nothing is uploaded for local analysis.");
     try {
+      const probedDuration = await probeAudioDuration(file);
+      if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 5 minutes. Split longer files into sections first.");
       const bytes = await file.arrayBuffer();
       const context = new Ctx();
       let buffer: AudioBuffer;
@@ -145,7 +181,7 @@ export function MusicAnalyzerStudio() {
         await context.close().catch(() => undefined);
       }
       if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
-      if (buffer.duration > 20 * 60) throw new Error("For device memory safety, analyze audio clips up to 20 minutes at a time.");
+      if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 5 minutes. Split longer files into sections first.");
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
       const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
       const result = analyzeMusicAudio({
@@ -224,7 +260,7 @@ export function MusicAnalyzerStudio() {
         <label className="mt-3 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-accent">
           <Upload size={24} className="mb-2 text-accent" aria-hidden="true" />
           <span className="text-sm font-medium">{file ? "Choose a different audio file" : "Select an audio file"}</span>
-          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 50 MB</span>
+          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 50 MB and 5 minutes</span>
           <input className="sr-only" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" onChange={(event) => { chooseFile(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} />
         </label>
         {file ? (
