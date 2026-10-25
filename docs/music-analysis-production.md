@@ -56,3 +56,49 @@ A reasonable candidate for a separately deployed adapter is [OpenMOSS MOSS-Music
 Do not assume a model accurately detects Nigerian Pidgin, Yoruba, or code-switched lyrics just because it can caption music or transcribe some singing. Its published singing-ASR benchmark description specifically mentions Chinese and English. Evaluate Nigerian-language clips with consented, reviewed ground truth before marking those labels reliable. Unknown and low-confidence fields must stay unknown or visibly uncertain.
 
 The Discogs-EffNet ONNX mirror is another music-style classifier, but its published model card specifies CC-BY-NC-SA 4.0 / non-commercial terms. Do not ship it in a commercial enV build without confirming the applicable license and obtaining any needed permission.
+
+
+## Song profile JSON export
+
+The Analyzer offers two distinct exports. **Song profile JSON** is the compact, integration-friendly contract env.music-profile.v1: the principal fields are top-level (genre, sub_style, language, tempo_bpm, key, mood, instruments, and vocal_style) so downstream cataloging workflows do not have to infer field names from the detailed report. **Full analysis** preserves the complete nested env.music-analysis.v1 diagnostics.
+
+The profile keeps three sources distinct:
+
+- Semantic labels such as genre, sub-style, language, mood and instruments are model estimates only. If no model result exists, those fields stay null or empty and their analysis_status values say unknown.
+- Tempo and key come from local signal-analysis estimates. Their provenance states signal_estimate or unavailable; they are not presented as model-verified facts.
+- Embedded ID3/container tags stay under metadata. An embedded genre tag never gets promoted into the top-level genre field.
+
+The profile also preserves the original source, technical audio metrics, timbral metrics, candidate scores and explanatory notes. Candidate scores are uncalibrated model estimates, not verified probabilities. A sample output is illustrative only:
+
+```json
+{
+  "schema_version": "env.music-profile.v1",
+  "genre": "Afrobeats",
+  "sub_style": "Afro-pop",
+  "language": ["Nigerian Pidgin", "Yoruba"],
+  "tempo_bpm": 112,
+  "key": "A minor",
+  "mood": ["upbeat"],
+  "instruments": ["drums", "bass"],
+  "vocal_style": "melodic",
+  "genre_candidates": [{ "label": "Afrobeats", "score": 0.86 }],
+  "title": null,
+  "artist": null,
+  "album": null,
+  "duration_seconds": 183.4,
+  "analysis_status": {
+    "classification": "model_completed",
+    "genre": "model_estimate",
+    "sub_style": "model_estimate",
+    "language": "model_estimate",
+    "mood": "model_estimate",
+    "instruments": "model_estimate",
+    "vocal_style": "model_estimate",
+    "tempo_bpm": "signal_estimate",
+    "key": "signal_estimate",
+    "file_metadata": "unknown"
+  }
+}
+```
+
+The example labels are not fixed output. The selected audio and configured model determine the actual result; no example classification is bundled as a fallback.
