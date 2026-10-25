@@ -15,7 +15,9 @@ test("Web music downloader uses the shared inspect and download API", async () =
   assert.match(client, /credentials: "same-origin"/);
   assert.doesNotMatch(client, /VITE_URL_MEDIA_PROCESSOR_URL|https:\/\/env-q3mq\.onrender\.com/);
   const route = await source("../server/routes/api/backend/url-media/[action].post.ts");
-  assert.match(route, /backendConfig\(\)\.urlMedia \|\| "https:\/\/env-q3mq\.onrender\.com\/api\/backend\/url-media"/);
+  assert.match(route, /const configured = backendConfig\(\)\.urlMedia/);
+  assert.match(route, /const gateway = "https:\/\/env-q3mq\.onrender\.com\/api\/backend\/url-media"/);
+  assert.match(route, /!configured \|\|/);
   assert.match(route, /proxyRequest\(event\.req, joinUrl\(upstream, action\)/);
   assert.match(client, /includePlaylist: options\.includePlaylist/);
   const policy = await source("../src/lib/media/music-downloader-policy.ts");
