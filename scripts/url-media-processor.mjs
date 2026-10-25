@@ -422,8 +422,8 @@ async function handleDownload(req, res) {
   const maxBytes = Number.isFinite(requestedMaxBytes) && requestedMaxBytes > 0
     ? Math.min(MAX_OUTPUT_BYTES, Math.floor(requestedMaxBytes))
     : MAX_OUTPUT_BYTES;
-  const { url, provider } = providerForUrl(rawUrl);
-  if (requestedProvider && requestedProvider !== provider) throw new Error("Provider does not match the supplied URL.");
+  const { url, provider, directAudio } = providerForUrl(rawUrl);
+  if (requestedProvider && requestedProvider !== provider && !directAudio) throw new Error("Provider does not match the supplied URL.");
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
