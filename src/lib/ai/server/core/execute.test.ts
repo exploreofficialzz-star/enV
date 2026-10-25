@@ -277,7 +277,7 @@ test("logs carry metadata only: no prompts, inputs, outputs or keys", async () =
   await run(core, { input: { topic: "TOPSECRET-TOPIC-12345 about my unreleased product" } });
   const dump = JSON.stringify(logs);
   assert.ok(!dump.includes("TOPSECRET") && !dump.includes("unreleased") && !dump.includes("Fresh bread"));
-  for (const key of Object.values(config.keys)) assert.ok(!dump.includes(key!.reveal()));
+  for (const key of Object.values(config.keys)) if (key) assert.ok(!dump.includes(key.reveal()));
   const summary = logs.find((l) => l.event === "ai.request")!;
   assert.equal(summary.status, "ok");
   assert.equal(summary.fallbackUsed, true);
@@ -318,7 +318,7 @@ test("diagnostics expose routing and health but never key material", async () =>
   const { core, config } = testCore();
   await run(core);
   const dump = JSON.stringify(core.diagnostics());
-  for (const key of Object.values(config.keys)) assert.ok(!dump.includes(key!.reveal()));
+  for (const key of Object.values(config.keys)) if (key) assert.ok(!dump.includes(key.reveal()));
   const d = core.diagnostics() as { providers: { id: string; configured: boolean }[]; modelRegistryProblems: string[]; routing: Record<string, { candidates: string[] }> };
   assert.deepEqual(d.modelRegistryProblems, []);
   assert.equal(d.providers.find((p) => p.id === "groq")!.configured, true);
