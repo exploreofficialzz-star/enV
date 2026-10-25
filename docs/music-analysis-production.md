@@ -11,7 +11,7 @@ Configure these server-side environment variables on the enV web deployment:
 
 The configured endpoint receives a `POST` request whose body is the selected audio file as raw bytes. The `Content-Type` is the file's detected MIME type, falling back to `application/octet-stream`. The service must return JSON. enV limits model uploads to 25 MB and gives the endpoint up to 90 seconds to respond.
 
-The endpoint can return a structured object such as:
+The route checks the request origin when the browser supplies an Origin header, bounds the complete multipart body before parsing it, limits an individual audio file to 25 MB, and applies a best-effort per-process limit of 10 model requests per source IP in a 10-minute window. Because serverless instances do not share in-memory counters, a production deployment should additionally apply shared/edge rate limits at the ingress. The endpoint can return a structured object such as:
 
 ```json
 {
