@@ -84,7 +84,7 @@ interface BaseSpec<I> {
 export interface StructuredSpec<I, O> extends BaseSpec<I> {
   kind: "structured";
   /** Use "VISION_ANALYSIS" when the prompt includes an image. */
-  capability?: "STRUCTURED_TEXT" | "VISION_ANALYSIS" | "AUDIO_ANALYSIS";
+  capability?: "STRUCTURED_TEXT" | "VISION_ANALYSIS" | "AUDIO_UNDERSTANDING";
   output: SafeParser<O>;
   jsonSchema: JsonSchema;
   finalize(output: O, input: I): Finalized;

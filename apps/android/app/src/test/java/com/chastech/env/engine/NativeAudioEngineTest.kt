@@ -32,6 +32,30 @@ class NativeAudioEngineTest {
     }
 
     @Test
+    fun musicAnalyzerHasAnExplicitNativeWavRoute() {
+        val analyzer = ToolRecord(
+            id = "audio-analyze-studio",
+            name = "Music Analyzer",
+            slug = "audio-analyze-studio",
+            description = "Analyze WAV audio measurements locally.",
+            category = "audio",
+            keywords = listOf("music", "analysis", "wav"),
+            tags = listOf("audio-studio"),
+            icon = "activity",
+            popularity = 80,
+            featured = false,
+            clientSide = true,
+            requiresBackend = false,
+            requiresAuth = false,
+            status = "active",
+            related = emptyList(),
+            engine = EngineInfo(type = "audio", id = "audio-analyze-studio")
+        )
+        assertEquals("file:analyze", NativeAudioEngine.operationFor(analyzer))
+        assertTrue(NativeAudioEngine.supports(analyzer))
+    }
+
+    @Test
     fun sixtySecondsAt128KbpsUsesDecimalMegabytes() {
         val result = NativeAudioEngine.calculate("bitrate", "podcast", 60.0, 128.0, 44_100.0, 2, 16, 120.0, 4)
         assertTrue(result, "0.96 MB" in result)

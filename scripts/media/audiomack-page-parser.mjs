@@ -92,7 +92,12 @@ function collectJsonTracks(value, baseUrl, output, depth = 0) {
   const type = String(value["@type"] || value.type || value.kind || value.media_type || "").toLowerCase();
   const slug = value.url_slug || value.slug || value.permalink;
   const artistSlug = value.artist?.url_slug || value.artist?.slug || value.artist_slug || value.uploader?.url_slug;
-  if (slug && artistSlug && /song|track|musicrecording/.test(type)) {
+  // Audiomack's public page hydration sometimes omits an explicit track type.
+  // Accept records with track-specific attributes, but never infer a song from
+  // an album/playlist/artist object merely because it has a slug and artist.
+  const hasTrackIdentity = Boolean(value.song_id || value.track_id || value.track_number || value.trackNumber || value.audio_url);
+  const looksLikeTrack = /song|track|musicrecording/.test(type) || (!type && hasTrackIdentity);
+  if (slug && artistSlug && looksLikeTrack && !/album|playlist|artist/.test(type)) {
     const trackUrl = parseTrackUrl("/" + artistSlug + "/song/" + slug, baseUrl);
     if (trackUrl) {
       output.set(trackUrl.path, {
@@ -158,9 +163,13 @@ export function parseAudiomackAlbumPage(html, pageUrl) {
     if (looksJson) {
       try { collectJsonTracks(JSON.parse(raw), base, entries); } catch { /* Not every page JSON script is standalone JSON. */ }
     }
-    const serializedPattern = /(?:https?:\\?\/\\?\/(?:www\.)?audiomack\.com)?\\?\/([a-z0-9._-]+)\\?\/song\\?\/([a-z0-9._-]+)\/?/gi;
+    // Next.js App Router can stream public track links inside serialized
+    // flight-data strings, with slashes escaped as \\u002F or \\/. Normalize only
+    // those escape sequences; never evaluate script code or invent song slugs.
+    const normalized = raw.replace(/\\+u002f/gi, "/").replace(/\\+x2f/gi, "/").replace(/\\+\//g, "/");
+    const serializedPattern = /(?:https?:\/\/(?:www\.)?audiomack\.com)?\/([a-z0-9._-]+)\/song\/([a-z0-9._-]+)/gi;
     let serialized;
-    while ((serialized = serializedPattern.exec(raw))) {
+    while ((serialized = serializedPattern.exec(normalized))) {
       const trackUrl = parseTrackUrl("/" + serialized[1] + "/song/" + serialized[2], base);
       if (!trackUrl || trackUrl.path === base.pathname.toLowerCase() || entries.has(trackUrl.path)) continue;
       entries.set(trackUrl.path, {

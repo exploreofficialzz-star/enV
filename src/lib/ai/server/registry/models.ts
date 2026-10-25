@@ -163,7 +163,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     provider: "gemini",
     modelId: "gemini-3.8-flash",
     displayName: "Gemini 3.8 Flash",
-    capabilities: ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS", "AUDIO_ANALYSIS"],
+    capabilities: ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS", "AUDIO_UNDERSTANDING"],
     inputModalities: ["text", "image", "audio"],
     outputModalities: ["text"],
     contextWindow: 1_000_000,
@@ -183,7 +183,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     reasoning: true,
     outputHeadroomTokens: 2500,
     sensitiveOk: false,
-    notes: `${CHECKED} Model id and the two-stage pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01) are from ai.google.dev/gemini-api/docs/latest-model. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. This model is also registered for audio input based on the official Gemini audio understanding documentation. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
+    notes: `${CHECKED} Model id and the two-stage pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01) are from ai.google.dev/gemini-api/docs/latest-model. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
   },
   {
     provider: "mock",
@@ -280,7 +280,6 @@ export function validateModelRegistry(models: readonly ModelRecord[] = MODEL_REG
     const has = (c: (typeof CAPABILITIES)[number]) => m.capabilities.includes(c);
     if (has("STRUCTURED_TEXT") !== (m.structuredOutput !== "none")) fail("STRUCTURED_TEXT capability and structuredOutput disagree");
     if (has("VISION_ANALYSIS") && !m.inputModalities.includes("image")) fail("vision model without image input");
-    if (has("AUDIO_ANALYSIS") && (!m.inputModalities.includes("audio") || !m.outputModalities.includes("text"))) fail("audio analysis model needs audio input and text output");
     if (has("SPEECH_TO_TEXT")) {
       if (!m.inputModalities.includes("audio")) fail("speech model without audio input");
       if (!m.maxAudioBytes || m.maxAudioBytes <= 0) fail("speech model without maxAudioBytes");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AiError } from "../../errors.ts";
 import type { AdapterRequest } from "../../types.ts";
-import { toGeminiSchema, buildGeminiBody, createGeminiAdapter, parseGeminiResponse } from "./gemini.ts";
+import { toGeminiSchema, buildGeminiBody, buildGeminiInteractionBody, createGeminiAdapter, parseGeminiResponse, parseGeminiInteractionResponse } from "./gemini.ts";
 import { audioFilename, createGroqAdapter } from "./groq.ts";
 import { parseRetryAfter } from "./http.ts";
 import type { FetchLike } from "./http.ts";
@@ -210,4 +210,49 @@ test("retry-after parsing accepts seconds and HTTP dates and clamps", () => {
   const future = new Date(Date.now() + 30_000).toUTCString();
   const parsed = parseRetryAfter(future)!;
   assert.ok(parsed >= 28 && parsed <= 31, String(parsed));
+});
+
+
+test("gemini interactions: audio payload and structured output use the official endpoint", async () => {
+  const response = json({
+    id: "interaction-1", model: "gemini-3.8-flash", status: "completed",
+    steps: [{ type: "model_output", content: [{ type: "text", text: '{"genre":"Afrobeats"}' }] }],
+    usage: { total_input_tokens: 120, total_output_tokens: 40, total_thought_tokens: 5, total_tokens: 165 },
+  });
+  const { calls, fetchImpl } = recorder([response]);
+  const adapter = createGeminiAdapter({ apiKey: () => KEY, fetchImpl });
+  const audioRequest = request({
+    capability: "AUDIO_UNDERSTANDING", model: "gemini-3.8-flash",
+    jsonSchema: { type: "object", required: ["genre"], properties: { genre: { type: "string" } } },
+    user: [{ type: "text", text: "Classify this clip" }, { type: "audio", mimeType: "audio/mpeg", dataBase64: "SUQzAAAA" }],
+  });
+  const result = await adapter.execute(audioRequest);
+  assert.equal(calls[0]!.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
+  assert.equal(headerOf(calls[0]!, "x-goog-api-key"), KEY);
+  assert.ok(!calls[0]!.url.includes("SECRETKEY") && !calls[0]!.url.includes("key="));
+  const sent = body(calls[0]!);
+  assert.equal(sent.model, "gemini-3.8-flash");
+  assert.equal(sent.store, false);
+  assert.equal(sent.system_instruction, "system prompt");
+  assert.deepEqual(sent.input[0], { type: "text", text: "Classify this clip" });
+  assert.deepEqual(sent.input[1], { type: "audio", data: "SUQzAAAA", mime_type: "audio/mpeg" });
+  const m4aBody = buildGeminiInteractionBody(request({ capability: "AUDIO_UNDERSTANDING", user: [{ type: "audio", mimeType: "audio/mp4", dataBase64: "AAAA" }] }));
+  assert.deepEqual((m4aBody.input as Array<Record<string, unknown>>)[0], { type: "audio", data: "AAAA", mime_type: "audio/m4a" });
+  assert.equal(sent.response_format.mime_type, "application/json");
+  assert.deepEqual(sent.response_format.schema, { type: "object", required: ["genre"], properties: { genre: { type: "string" } } });
+  assert.equal(sent.generation_config.max_output_tokens, 100);
+  assert.equal(result.text, '{"genre":"Afrobeats"}');
+  assert.deepEqual(result.usage, { inputTokens: 120, outputTokens: 45, totalTokens: 165, audioSeconds: null });
+  assert.equal(result.reportedModel, "gemini-3.8-flash");
+  assert.equal(adapter.supports("AUDIO_UNDERSTANDING", "gemini-3.8-flash"), true);
+});
+
+test("gemini interactions: output_text fallback, incomplete and bad responses are explicit", () => {
+  const direct = parseGeminiInteractionResponse({ output_text: '{"genre":"Rock"}', status: "completed" }, { model: "gemini-3.8-flash" });
+  assert.equal(direct.text, '{"genre":"Rock"}');
+  const incomplete = parseGeminiInteractionResponse({ output_text: "partial", status: "incomplete" }, { model: "gemini-3.8-flash" });
+  assert.equal(incomplete.finishReason, "length");
+  assert.throws(() => parseGeminiInteractionResponse({ status: "failed", steps: [] }, { model: "m" }), { code: "AI_PROVIDER_BAD_RESPONSE" });
+  assert.throws(() => parseGeminiInteractionResponse({ status: "completed", steps: [] }, { model: "m" }), { code: "AI_PROVIDER_BAD_RESPONSE" });
+  assert.throws(() => buildGeminiInteractionBody(request({ capability: "AUDIO_UNDERSTANDING", user: [{ type: "text", text: "no audio" }] })), { code: "AI_INVALID_INPUT" });
 });

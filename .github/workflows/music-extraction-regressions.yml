@@ -1,0 +1,42 @@
+name: Music Downloader extraction regressions
+
+on:
+  pull_request:
+    paths:
+      - "scripts/media/**"
+      - "scripts/url-media-processor.mjs"
+      - "scripts/url-media-processor.test.mjs"
+      - "processor/Dockerfile"
+      - ".github/workflows/music-extraction-regressions.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/media/**"
+      - "scripts/url-media-processor.mjs"
+      - "scripts/url-media-processor.test.mjs"
+      - "processor/Dockerfile"
+      - ".github/workflows/music-extraction-regressions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  music-extraction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+      - name: Validate processor and pure extractors
+        run: |
+          node --check scripts/url-media-processor.mjs
+          node --check scripts/media/public-download-links.mjs
+          node --check scripts/media/audiomack-page-parser.mjs
+          node --check scripts/media/extraction-strategy.mjs
+      - name: Test multi-provider extraction, API failure modes, and Audiomack public-page parsing
+        run: |
+          node --test scripts/media/public-download-links.test.mjs scripts/media/audiomack-page-parser.test.mjs scripts/media/extraction-strategy.test.mjs scripts/media/provider-errors.test.mjs
+          node scripts/url-media-processor.test.mjs

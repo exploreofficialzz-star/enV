@@ -8,7 +8,7 @@ object NativeAudioEngine {
     private val platformPrefixes = listOf("podcast-", "discord-", "spotify-", "instagram-", "apple-music-", "youtube-", "tiktok-", "twitch-")
 
     private val nativeWavOperations = mapOf(
-        "audio-file-inspector" to "inspector", "audio-duration-tool" to "duration", "audio-trimmer" to "trim", "audio-to-wav" to "to-wav",
+        "audio-analyze-studio" to "analyze", "audio-file-inspector" to "inspector", "audio-duration-tool" to "duration", "audio-trimmer" to "trim", "audio-to-wav" to "to-wav",
         "audio-peak-meter" to "peak", "audio-rms-meter" to "rms", "audio-silence-detector" to "silence", "audio-dc-offset-checker" to "dc-offset",
         "audio-to-mono" to "mono", "audio-to-stereo" to "stereo", "audio-reverser" to "reverse", "audio-normalizer" to "normalize",
         "voice-noise-reducer" to "voice-noise-reducer", "voice-noise-gate" to "voice-noise-gate", "audio-hum-reducer" to "audio-hum-reducer",

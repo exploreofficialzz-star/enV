@@ -8,7 +8,6 @@ import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
 const registry = await readFile(new URL("./media/provider-registry.mjs", import.meta.url), "utf8");
 const dockerfile = await readFile(new URL("../processor/Dockerfile", import.meta.url), "utf8");
-const audiomackPatch = await readFile(new URL("./media/patch-ytdlp-audiomack.py", import.meta.url), "utf8");
 const gateway = await readFile(new URL("../processor/server.mjs", import.meta.url), "utf8");
 
 assert.match(source, /assertPublicHostname/);
@@ -33,11 +32,15 @@ assert.match(source, /from "\.\/media\/provider-registry\.mjs"/);
 assert.match(source, /from "\.\/media\/url-security\.mjs"/);
 assert.match(source, /parseAudiomackAlbumPage/);
 assert.match(source, /classifyProviderFailure\(provider, detail/);
+assert.match(source, /runYtdlpWithGenericFallback/);
+assert.match(source, /shouldTryGenericExtractor/);
+assert.match(dockerfile, /COPY scripts\/media\/extraction-strategy\.mjs/);
+assert.match(dockerfile, /node --check scripts\/media\/extraction-strategy\.mjs/);
 assert.match(source, /detailCodes/);
 assert.match(source, /inspectAudiomackAlbumPage/);
 assert.match(source, /audiomackPageFallbackFailure/);
-assert.match(source, /Public-page fallback:/);
-assert.match(source, /Try an individual song URL or an authorized direct audio-file URL/);
+assert.match(source, /legacy album API extractor cannot recover those links/);
+assert.match(source, /public collection page did not expose readable song links/);
 assert.match(dockerfile, /COPY scripts\/media\/provider-registry\.mjs \.\/scripts\/media\/provider-registry\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/audiomack-page-parser\.mjs \.\/scripts\/media\/audiomack-page-parser\.mjs/);
 assert.match(dockerfile, /node --check scripts\/media\/audiomack-page-parser\.mjs/);
@@ -46,9 +49,6 @@ assert.match(dockerfile, /node --check scripts\/media\/provider-errors\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
 assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
 assert.match(dockerfile, /--pre/);
-assert.match(dockerfile, /patch-ytdlp-audiomack\.py/);
-assert.match(audiomackPatch, /http:\/\/www\.audiomack\.com\/api\/music\/url\//);
-assert.match(audiomackPatch, /https:\/\/api\.audiomack\.com\/music\/url\//);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
 assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);
@@ -77,7 +77,7 @@ for (const url of [
 }
 assert.equal(detectProvider(new URL("https://vt.tiktok.com/ZSydNwHA1/")), "tiktok");
 assert.deepEqual(createProviderRequestArgs("generic", {}), []);
-assert.deepEqual(createProviderAdapter("audiomack", "mp3", true).post, ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K", "--embed-metadata", "--embed-thumbnail"]);
+assert.deepEqual(createProviderAdapter("audiomack", "mp3", true).post, ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K", "--embed-metadata"]);
 assert.deepEqual(createProviderRequestArgs("tiktok", {}), ["--impersonate", "chrome"]);
 assert.deepEqual(createProviderRequestArgs("youtube", { URL_MEDIA_YOUTUBE_COOKIES_FILE: "/etc/secrets/youtube.txt" }), ["--cookies", "/etc/secrets/youtube.txt"]);
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
@@ -138,3 +138,4 @@ assert.deepEqual(
 assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWith("https://audiomack.com/evadolee/song/")));
 assert.equal(audiomackAlbumPage.uploader, "Evado");
 assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
+

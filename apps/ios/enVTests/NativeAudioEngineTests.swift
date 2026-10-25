@@ -27,6 +27,47 @@ final class NativeAudioEngineTests: XCTestCase {
         XCTAssertTrue(NativeAudioEngine.supports(recorder))
     }
 
+    func testMusicAnalyzerRoutesToNativeWavAndProducesHonestJSON() throws {
+        let analyzer = Tool(
+            id: "audio-analyze-studio",
+            name: "Music Analyzer",
+            slug: "audio-analyze-studio",
+            description: "Analyze WAV audio measurements locally.",
+            category: "audio",
+            subcategory: "studio",
+            keywords: ["music", "analysis", "wav"],
+            tags: ["audio-studio"],
+            icon: "activity",
+            popularity: 80,
+            featured: false,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: [],
+            engine: ToolEngine(type: "audio", id: nil, op: "audio-analyze-studio")
+        )
+        XCTAssertEqual(NativeAudioEngine.operation(for: analyzer), "file:analyze")
+        XCTAssertTrue(NativeAudioEngine.supports(analyzer))
+
+        let sampleRate = 8_000
+        let tone = (0..<(sampleRate * 4)).map { index in
+            Float(0.5 * sin(2 * Double.pi * 440 * Double(index) / Double(sampleRate)))
+        }
+        let wav = try NativeAudioWavProcessor.encodePCM16(sampleRateHz: sampleRate, channels: [tone])
+        let result = try NativeAudioWavProcessor.process(wav, operation: "analyze", fileName: "tone.wav")
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.report.utf8)) as? [String: Any])
+        XCTAssertEqual(object["schema_version"] as? String, "env.music-analysis.v1")
+        let source = try XCTUnwrap(object["source"] as? [String: Any])
+        XCTAssertEqual(source["file_name"] as? String, "tone.wav")
+        let audio = try XCTUnwrap(object["audio"] as? [String: Any])
+        XCTAssertEqual(audio["duration_seconds"] as? Double, 4)
+        let classification = try XCTUnwrap(object["classification"] as? [String: Any])
+        XCTAssertEqual(classification["status"] as? String, "requires_model")
+        XCTAssertNil(classification["genre"] as? String)
+    }
+
     func testSixtySecondsAt128KbpsUsesDecimalMegabytes() throws {
         let result = try NativeAudioEngine.calculate(
             operation: "bitrate", platform: "podcast", duration: 60, bitrate: 128,

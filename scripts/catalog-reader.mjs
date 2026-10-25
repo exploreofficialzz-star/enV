@@ -17,8 +17,9 @@ export function parseGeneratedCatalog(source) {
 
 
 /**
- * Parse the final runtime catalog, including supplemental Audio Studio entries
- * appended after the generated JSON payload.
+ * Parse the final runtime catalog, including the supplemental Audio Studio entries
+ * appended by src/data/catalog.ts after the generated JSON payload.
+ * Use this only for checks that validate the complete exported catalog.
  * @param {string} source contents of src/data/catalog.ts
  * @returns {any[]}
  */

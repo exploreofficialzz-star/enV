@@ -1733,7 +1733,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
         }
     }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV audio output", text)) }
-    val analyzer = operation in setOf("inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
+    val analyzer = operation in setOf("analyze", "inspector", "duration", "peak", "rms", "silence", "dc-offset", "audio-lufs-meter")
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101923))) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text("∿", style = MaterialTheme.typography.headlineLarge, color = Color(0xFF67E8F9))
@@ -1790,6 +1790,7 @@ private fun NativeAudioWaveFileToolForm(operation: String, toolName: String) {
                                 compressorThresholdDb = compressorThreshold.toDoubleOrNull() ?: -18.0,
                                 compressorRatio = compressorRatio.toDoubleOrNull() ?: 4.0,
                                 targetChannels = targetChannels.toIntOrNull() ?: 2,
+                                fileName = selectedName,
                             )
                         }
                     }.fold({ result ->

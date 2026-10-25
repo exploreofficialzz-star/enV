@@ -10,6 +10,8 @@ import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
+import { shouldTryGenericExtractor, genericExtractorArgs } from "./media/extraction-strategy.mjs";
+import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -34,7 +36,7 @@ function safeName(value, fallback = "download.bin") {
 function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
   return new Promise((resolve, reject) => {
     const playlistMode = includePlaylist ? "--yes-playlist" : "--no-playlist";
-    const child = spawn(YTDLP_BIN, [playlistMode, "--restrict-filenames", "--js-runtimes", "node", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(YTDLP_BIN, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
@@ -65,6 +67,22 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
       resolve({ stdout, stderr });
     });
   });
+}
+
+async function runYtdlpWithGenericFallback(args, cwd, signal, provider, includePlaylist = false) {
+  try {
+    return await runYtdlp(args, cwd, signal, provider, includePlaylist);
+  } catch (error) {
+    if (!shouldTryGenericExtractor(error, includePlaylist) || signal?.aborted) throw error;
+    console.warn(`[url-media] provider=${provider} extractor metadata failed; trying generic public HTML media extraction once`);
+    try {
+      return await runYtdlp(genericExtractorArgs(args), cwd, signal, provider, false);
+    } catch {
+      // Preserve the original provider-specific diagnostic instead of hiding
+      // it under the less-specific generic HTML extractor's final error.
+      throw error;
+    }
+  }
 }
 
 function runFfprobe(file, signal) {
@@ -200,7 +218,7 @@ function errorPayload(error) {
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
   const retryable = ["SOURCE_UNAVAILABLE", "SOURCE_CHALLENGE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
   const safeMessage = message.replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n\t]+/g, " ").slice(0, 900);
-  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(safeMessage);
+  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's collection resolver could not enumerate its tracks/i.test(safeMessage);
   const explicitDetail = safeMessage.match(/^[A-Z_]+:\s*(.+)$/);
   const detailCodes = new Set(["INVALID_URL", "UNSUPPORTED_SOURCE", "SOURCE_UNAVAILABLE", "AUTH_REQUIRED", "SOURCE_CHALLENGE", "DOWNLOAD_NOT_PERMITTED", "NO_DOWNLOADABLE_FORMAT", "NETWORK_TIMEOUT", "RATE_LIMITED", "PROVIDER_ERROR"]);
   const publicMessage = audiomackAlbumFailure
@@ -365,9 +383,43 @@ async function readBoundedText(response, maxBytes) {
   return new TextDecoder().decode(bytes);
 }
 
-function isAudiomackAlbumUrl(url) {
-  const parts = url.pathname.split("/").filter(Boolean);
-  return parts.length >= 3 && (parts[0].toLowerCase() === "album" || parts[1]?.toLowerCase() === "album");
+function isAudiomackCollectionUrl(url) {
+  const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
+  // Audiomack publicly exposes both artist/album/slug and artist/playlist/slug.
+  return parts.length >= 3 && ["album", "playlist", "playlists"].some((kind) =>
+    parts[0] === kind || parts[1] === kind);
+}
+
+/**
+ * Fallback shared by all registered providers: only follow a page's explicit,
+ * HTTPS audio-file download link. A streaming player URL is not enough.
+ * fetchPublic enforces public-DNS checks on each redirect before requesting it.
+ */
+async function discoverExplicitAudioDownload(url, signal) {
+  if (isPublicMediaCollectionPage(url.toString())) return null;
+  const { response, url: pageUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; enV-Music-Downloader/1.0)" },
+  }, signal);
+  if (!response.ok) return null;
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+    if (response.body) await response.body.cancel().catch(() => undefined);
+    return null;
+  }
+  const html = await readBoundedText(response, 2 * 1024 * 1024);
+  // Validate actual response type: URLs for signed files may have no extension,
+  // while player/HTML URLs can misleadingly be labelled "Download".
+  for (const candidate of extractExplicitPublicAudioLinks(html, pageUrl.toString())) {
+    try {
+      const verified = await probeExplicitPublicAudioLink(candidate, fetchPublic, signal);
+      if (verified) return verified;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      // Continue to another explicitly offered file, if any.
+    }
+  }
+  return null;
 }
 
 async function inspectAudiomackAlbumPage(url, signal) {
@@ -394,7 +446,7 @@ async function inspectAudiomackAlbumPage(url, signal) {
   if (!parsed.entries.length) return null;
   return {
     provider: "audiomack",
-    title: parsed.title || "Audiomack album",
+    title: parsed.title || "Audiomack collection",
     uploader: parsed.uploader,
     album: parsed.title || undefined,
     webpageUrl: finalUrl.toString(),
@@ -414,20 +466,28 @@ async function handleInfo(req, res) {
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
   let audiomackPageFallbackFailure = "";
-  if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
     try {
       const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
       if (albumInfo?.entries?.length) {
         json(res, 200, albumInfo);
         return;
       }
-      audiomackPageFallbackFailure = "The public album page did not expose any usable track links.";
+      audiomackPageFallbackFailure = "The public collection page did not expose usable song links.";
     } catch (error) {
       if (error?.name === "AbortError") throw error;
       const failure = error instanceof Error ? error.message : String(error);
       audiomackPageFallbackFailure = failure.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(0, 220);
       console.warn("[url-media] Audiomack page-link fallback unavailable: " + audiomackPageFallbackFailure);
     }
+  }
+  // yt-dlp's historical Audiomack album extractor loops over the obsolete
+  // /api/music/url/album endpoint. Running it after public-page discovery fails
+  // produces a misleading JSON error, not a usable album track list.
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack's public collection page did not expose readable song links. " +
+      (audiomackPageFallbackFailure || "Track enumeration was unavailable.") +
+      " The legacy album API extractor cannot recover those links. No audio was downloaded.");
   }
   if (provider === "generic") {
     const info = await inspectDirectUrl(url, controller.signal);
@@ -444,14 +504,29 @@ async function handleInfo(req, res) {
     ];
     let stdout;
     try {
-      ({ stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
+      ({ stdout } = await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url)) {
-        const detail = message.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(-260);
-        const pageFailure = audiomackPageFallbackFailure || "The public page fallback did not return track links.";
-        throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list. Public-page fallback: " + pageFailure + " Extractor detail: " + detail + ". Try an individual song URL or an authorized direct audio-file URL.");
+      // The provider extractor can be outdated even when an artist offers a
+      // direct file on the public song page. Use this safe, opt-in HTML fallback
+      // for all supported providers, never as an album/playlist shortcut.
+      const code = String(error?.message || "");
+      if (/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) {
+        try {
+          const publicDownload = await discoverExplicitAudioDownload(url, controller.signal);
+          if (publicDownload) {
+            json(res, 200, {
+              provider, title: publicDownload.pathname.split("/").pop()?.replace(/\\.[^.]+$/, "") || "Downloadable audio",
+              webpageUrl: url.toString(), isPlaylist: false, entries: [],
+              formats: [{ formatId: "direct-file", ext: path.extname(publicDownload.pathname).slice(1), note: "Artist-provided public file download" }],
+            });
+            return;
+          }
+        } catch (fallbackError) {
+          if (fallbackError?.name === "AbortError") throw fallbackError;
+          // Keep the original provider error when the optional fallback fails.
+        }
       }
+      const message = error instanceof Error ? error.message : String(error);
       throw error;
     }
     const metadata = parseYtDlpJson(stdout);
@@ -542,7 +617,18 @@ async function handleDownload(req, res) {
     const outputTemplate = path.join(jobDir, `${randomUUID()}-%(title).120s.%(ext)s`);
     const adapter = createProviderAdapter(provider, String(format), Boolean(audioOnly));
     const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
-    await runYtdlp(args, jobDir, controller.signal, provider);
+    try {
+      await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider);
+    } catch (error) {
+      const code = String(error?.message || "");
+      if (!/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) throw error;
+      let publicDownload = null;
+      try { publicDownload = await discoverExplicitAudioDownload(url, controller.signal); }
+      catch (fallbackError) { if (fallbackError?.name === "AbortError") throw fallbackError; }
+      if (!publicDownload) throw error;
+      await handleDirectDownload(req, res, publicDownload, body, controller.signal);
+      return;
+    }
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
     for (const entry of entries) {

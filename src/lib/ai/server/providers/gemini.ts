@@ -1,4 +1,4 @@
-/** SERVER ONLY. Google Gemini adapter (generateContent REST API, image/audio input, JSON schema output). */
+/** SERVER ONLY. Google Gemini adapter (generateContent plus Interactions API audio input and structured JSON output). */
 import { AiError } from "../../errors.ts";
 import type { AdapterRequest, AdapterResult, Capability, FinishReason, JsonSchema, ProviderAdapter } from "../../types.ts";
 import { asRecord, numberOrNull, postForJson } from "./http.ts";
@@ -6,7 +6,7 @@ import type { FetchLike } from "./http.ts";
 
 export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-const GEMINI_CAPABILITIES: readonly Capability[] = ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS", "AUDIO_ANALYSIS"];
+const GEMINI_CAPABILITIES: readonly Capability[] = ["TEXT_GENERATION", "STRUCTURED_TEXT", "VISION_ANALYSIS", "AUDIO_UNDERSTANDING"];
 
 /** Keywords the Gemini structured-output schema subset is known to accept. Everything else is dropped. */
 const KEPT_KEYS = new Set(["type", "properties", "required", "items", "enum", "minItems", "maxItems", "minimum", "maximum", "description", "title", "anyOf"]);
@@ -33,13 +33,59 @@ export function toGeminiSchema(schema: JsonSchema): JsonSchema {
   return out;
 }
 
+/** Build an audio-only request for the Gemini Interactions API. */
+export function buildGeminiInteractionBody(request: AdapterRequest): Record<string, unknown> {
+  if (request.capability !== "AUDIO_UNDERSTANDING") {
+    throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
+  }
+  const input = request.user.map((part) => {
+    if (part.type === "text") return { type: "text", text: part.text };
+    if (part.type === "audio") return { type: "audio", data: part.dataBase64, mime_type: part.mimeType === "audio/mp4" || part.mimeType === "audio/x-m4a" ? "audio/m4a" : part.mimeType };
+    throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
+  });
+  if (!input.some((part) => part.type === "audio")) {
+    throw new AiError("AI_INVALID_INPUT", { provider: "gemini", model: request.model });
+  }
+  const body: Record<string, unknown> = {
+    model: request.model, input, system_instruction: request.system, store: false,
+    generation_config: { temperature: request.temperature, max_output_tokens: request.maxOutputTokens },
+  };
+  if (request.jsonSchema) body.response_format = { type: "text", mime_type: "application/json", schema: toGeminiSchema(request.jsonSchema) };
+  return body;
+}
+
+export function parseGeminiInteractionResponse(json: unknown, context: { model: string }): AdapterResult {
+  const root = asRecord(json);
+  const ctx = { provider: "gemini", model: context.model };
+  if (root.status === "failed" || root.status === "cancelled") throw new AiError("AI_PROVIDER_BAD_RESPONSE", ctx);
+  const outputText = typeof root.output_text === "string" ? root.output_text : "";
+  const steps = Array.isArray(root.steps) ? root.steps : [];
+  const pieces: string[] = [];
+  for (const rawStep of steps) {
+    const step = asRecord(rawStep);
+    if (step.type !== "model_output") continue;
+    const parts = Array.isArray(step.content) ? step.content : [];
+    for (const rawPart of parts) {
+      const part = asRecord(rawPart);
+      if (part.type === "text" && typeof part.text === "string") pieces.push(part.text);
+    }
+  }
+  const text = outputText.trim() ? outputText : pieces.join("");
+  if (!text.trim()) throw new AiError("AI_PROVIDER_BAD_RESPONSE", ctx);
+  const usage = asRecord(root.usage);
+  const visibleOutput = numberOrNull(usage.total_output_tokens);
+  const thoughts = numberOrNull(usage.total_thought_tokens);
+  return {
+    text,
+    usage: { inputTokens: numberOrNull(usage.total_input_tokens), outputTokens: visibleOutput === null ? null : visibleOutput + (thoughts ?? 0), totalTokens: numberOrNull(usage.total_tokens), audioSeconds: null },
+    finishReason: root.status === "incomplete" ? "length" : "stop",
+    reportedModel: typeof root.model === "string" ? root.model : undefined,
+  };
+}
 export function buildGeminiBody(request: AdapterRequest): Record<string, unknown> {
   const parts = request.user.map((part) => {
     if (part.type === "text") return { text: part.text };
     if (part.type === "image") return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
-    if (part.type === "audio" && request.capability === "AUDIO_ANALYSIS") {
-      return { inlineData: { mimeType: part.mimeType, data: part.dataBase64 } };
-    }
     throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
   });
   const generationConfig: Record<string, unknown> = { temperature: request.temperature, maxOutputTokens: request.maxOutputTokens };
@@ -113,10 +159,23 @@ export function createGeminiAdapter(options: { apiKey: () => string | null; base
     async execute(request) {
       const key = options.apiKey();
       if (!key) throw new AiError("AI_CONFIGURATION_ERROR", { provider: "gemini", model: request.model });
+      if (request.capability === "AUDIO_UNDERSTANDING") {
+        const json = await postForJson({
+          provider: "gemini",
+          model: request.model,
+          url: baseUrl + "/interactions",
+          // Keep the secret in a header, never in the URL or request body.
+          headers: { "x-goog-api-key": key, "content-type": "application/json" },
+          body: JSON.stringify(buildGeminiInteractionBody(request)),
+          signal: request.signal,
+          fetchImpl: options.fetchImpl,
+        });
+        return parseGeminiInteractionResponse(json, { model: request.model });
+      }
       const json = await postForJson({
         provider: "gemini",
         model: request.model,
-        url: `${baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`,
+        url: baseUrl + "/models/" + encodeURIComponent(request.model) + ":generateContent",
         // The key goes in a header, never in the URL, so it cannot end up in logs or stack traces.
         headers: { "x-goog-api-key": key, "content-type": "application/json" },
         body: JSON.stringify(buildGeminiBody(request)),

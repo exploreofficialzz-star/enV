@@ -145,6 +145,26 @@ export function validateDirectMusicUrl(raw: string): DirectUrlValidation {
   return { ok: true, url: parsed.href, extension };
 }
 
+/** Distinguish a collection page from a song before attempting an audio-only retry. */
+export function isLikelyMusicCollectionUrl(raw: string): boolean {
+  let url: URL;
+  try { url = new URL(raw); } catch { return false; }
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
+  const has = (value: string) => parts.includes(value);
+  if ((host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be") &&
+      (has("playlist") || url.searchParams.has("list"))) return true;
+  if (host === "audiomack.com" || host.endsWith(".audiomack.com")) {
+    return has("album") || has("playlist") || has("playlists");
+  }
+  if (host === "soundcloud.com" || host.endsWith(".soundcloud.com")) return has("sets");
+  if (host === "bandcamp.com" || host.endsWith(".bandcamp.com")) return has("album");
+  if (host === "boomplay.com" || host.endsWith(".boomplay.com")) return has("albums") || has("playlists");
+  if (host === "audius.co" || host.endsWith(".audius.co")) return has("playlist") || has("playlists");
+  if (host === "mixcloud.com" || host.endsWith(".mixcloud.com")) return has("playlists");
+  return has("playlist") || has("playlists") || has("album") || has("albums");
+}
+
 /** Accept supported public music pages or direct HTTPS audio URLs per line; JSON URL manifests are also accepted. */
 export function parseMusicCollectionLines(input: string): { entries: MusicCollectionEntry[]; error?: string } {
   const trimmed = input.trim();

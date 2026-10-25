@@ -2,6 +2,9 @@ package com.chastech.env
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.ContentValues
+import android.os.Build
+import android.provider.MediaStore
 import android.net.Uri
 import android.os.Environment
 import android.provider.OpenableColumns
@@ -43,6 +46,8 @@ import java.net.URI
 import java.net.URL
 import java.util.Locale
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import org.json.JSONObject
 
 private const val MUSIC_TRACK_LIMIT = 50L * 1024L * 1024L
@@ -190,11 +195,26 @@ private fun postMusicApiJson(path: String, payload: JSONObject): JSONObject {
     }
 }
 
+private fun musicPageIsCollection(raw: String): Boolean {
+    val uri = Uri.parse(raw)
+    val segments = uri.pathSegments.map { it.lowercase(Locale.ROOT) }
+    if (segments.any { it in setOf("album", "albums", "playlist", "playlists", "sets") }) return true
+    val host = uri.host?.lowercase(Locale.ROOT).orEmpty()
+    return (host == "youtube.com" || host.endsWith(".youtube.com")) && !uri.getQueryParameter("list").isNullOrBlank()
+}
+
 private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: Boolean): List<DirectMusicTrack> {
-    val info = postMusicApiJson(
+    val info = try {
+        postMusicApiJson(
         "/api/backend/url-media/info",
         JSONObject().put("url", track.url).put("includePlaylist", includePlaylist)
-    )
+        )
+    } catch (failure: Exception) {
+        // A provider's metadata endpoint can fail while its audio extractor works.
+        // Retry only an individual song, not a whole album/playlist as one track.
+        if (musicPageIsCollection(track.url)) throw failure
+        return listOf(track)
+    }
     val entries = info.optJSONArray("entries")
     if (entries != null && entries.length() > 0) {
         require(entries.length() <= 50) { "This collection has more than 50 tracks. Split it into smaller batches." }
@@ -206,6 +226,9 @@ private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: B
             resolved += DirectMusicTrack(entry.optString("title").ifBlank { "Track ${index + 1}" }, url, "mp3", true)
         }
         if (resolved.isNotEmpty()) return resolved
+    }
+    require(!info.optBoolean("isPlaylist", false) && !musicPageIsCollection(track.url)) {
+        "The album or playlist could not be expanded into public track links."
     }
     return listOf(track.copy(title = info.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: track.title))
 }
@@ -260,10 +283,20 @@ private fun downloadProviderMusicTrack(
             }
         }
         require(count > 0L) { "The source returned an empty audio file for ${track.title}." }
-        var destination = File(folder, "$base.mp3")
+        val outputExt = when (mime) {
+            "audio/mpeg", "audio/mp3" -> "mp3"
+            "audio/mp4", "audio/x-m4a" -> "m4a"
+            "audio/flac" -> "flac"
+            "audio/wav", "audio/x-wav" -> "wav"
+            "audio/aac" -> "aac"
+            "audio/ogg" -> "ogg"
+            "audio/opus" -> "opus"
+            else -> track.extension
+        }
+        var destination = File(folder, "$base.$outputExt")
         var suffix = 2
         while (destination.exists()) {
-            destination = File(folder, "$base ($suffix).mp3")
+            destination = File(folder, "$base ($suffix).$outputExt")
             suffix += 1
         }
         require(tempFile.renameTo(destination)) { "enV could not save ${track.title} to the offline library." }
@@ -301,6 +334,33 @@ fun NativeMusicDownloaderScreen() {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
+    val previewTracks = remember { mutableStateListOf<DirectMusicTrack>() }
+    var showAllPreview by remember { mutableStateOf(false) }
+    var pendingZip by remember { mutableStateOf<File?>(null) }
+    val zipSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { destination ->
+        val archive = pendingZip
+        pendingZip = null
+        if (archive != null) {
+            if (destination == null) {
+                archive.delete()
+                status = "ZIP save cancelled; tracks remain in your enV offline library."
+            } else {
+                busy = true
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openOutputStream(destination)?.use { output ->
+                                archive.inputStream().buffered().use { it.copyTo(output) }
+                            } ?: throw IllegalStateException("Unable to save the ZIP at the selected location.")
+                        }.also { archive.delete() }
+                    }
+                    saved.onSuccess { status = "ZIP saved to your selected folder." }
+                        .onFailure { error = it.message ?: "ZIP export failed; tracks remain in enV's offline library." }
+                    busy = false
+                }
+            }
+        }
+    }
     val savedTracks = remember { mutableStateListOf<File>().apply { addAll(listOfflineMusic(context)) } }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
@@ -360,6 +420,94 @@ fun NativeMusicDownloaderScreen() {
         }
     }
 
+    fun downloadSelectedMusic(selection: List<DirectMusicTrack>, zip: Boolean) {
+        if (busy || selection.isEmpty()) return
+        busy = true
+        error = ""
+        status = if (zip) "Preparing ZIP from selected tracks…" else "Downloading ${selection.first().title}…"
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                val succeeded = mutableListOf<File>()
+                val failures = mutableListOf<String>()
+                var bytes = 0L
+                var exported = false
+                var manualArchive: File? = null
+                try {
+                    val root = File(context.filesDir, "music-downloader/" + musicSafeName(collectionName, "My music"))
+                    for (track in selection) {
+                        try {
+                            val (file, count) = downloadProviderMusicTrack(track, root, MUSIC_BATCH_LIMIT - bytes)
+                            succeeded += file
+                            bytes += count
+                        } catch (cause: Exception) {
+                            failures += "${track.title}: ${cause.message ?: "Audio unavailable."}"
+                        }
+                    }
+                    if (zip && succeeded.isNotEmpty()) {
+                        val temporary = File(context.cacheDir, "env-music-${UUID.randomUUID()}.zip")
+                        try {
+                            ZipOutputStream(temporary.outputStream().buffered()).use { archive ->
+                                val usedNames = mutableSetOf<String>()
+                                succeeded.forEach { file ->
+                                    var name = file.name
+                                    var suffix = 2
+                                    while (!usedNames.add(name.lowercase(Locale.ROOT))) {
+                                        name = file.nameWithoutExtension + " ($suffix)." + file.extension
+                                        suffix++
+                                    }
+                                    archive.putNextEntry(ZipEntry(name))
+                                    file.inputStream().buffered().use { it.copyTo(archive) }
+                                    archive.closeEntry()
+                                }
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                val values = ContentValues().apply {
+                                    put(MediaStore.MediaColumns.DISPLAY_NAME, "enV-" + musicSafeName(collectionName, "music") + ".zip")
+                                    put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                                }
+                                val resolver = context.contentResolver
+                                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                                    ?: throw IllegalStateException("Android could not create the ZIP in Downloads.")
+                                try {
+                                    resolver.openOutputStream(uri)?.use { output -> temporary.inputStream().use { it.copyTo(output) } }
+                                        ?: throw IllegalStateException("Android could not write the ZIP.")
+                                    resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+                                    exported = true
+                                } catch (cause: Exception) {
+                                    resolver.delete(uri, null, null)
+                                    throw cause
+                                }
+                            } else {
+                                // Android 8–9 requires Storage Access Framework to save a ZIP
+                                // without asking for broad external storage permissions.
+                                manualArchive = temporary
+                            }
+                        } finally {
+                            if (manualArchive != temporary) temporary.delete()
+                        }
+                    }
+                } catch (cause: Exception) {
+                    failures += cause.message ?: "Could not finish the collection."
+                }
+                Triple(succeeded.size, failures, Pair(exported, manualArchive))
+            }
+            savedTracks.clear()
+            savedTracks.addAll(listOfflineMusic(context))
+            val (count, failures, exportResult) = outcome
+            val (exported, archiveToSave) = exportResult
+            status = if (exported) "Saved ZIP to Downloads with $count track(s)." else if (count > 0) "Saved $count track(s) to the enV offline library." else "No audio files were saved."
+            if (failures.isNotEmpty()) error = "${failures.size} track(s) unavailable: " + failures.take(3).joinToString("; ")
+            busy = false
+            if (archiveToSave != null) {
+                pendingZip = archiveToSave
+                status = "Choose a folder to save the ZIP. Completed tracks are also in your enV library."
+                zipSaveLauncher.launch("enV-" + musicSafeName(collectionName, "music") + ".zip")
+            }
+        }
+    }
+
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -376,7 +524,7 @@ fun NativeMusicDownloaderScreen() {
                 Text("Collection type", style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf("Track", "Album", "Playlist").forEach { option ->
-                        FilterChip(selected = collectionType == option, onClick = { collectionType = option }, label = { Text(option) })
+                        FilterChip(selected = collectionType == option, onClick = { collectionType = option; previewTracks.clear() }, label = { Text(option) })
                     }
                 }
             }
@@ -384,7 +532,7 @@ fun NativeMusicDownloaderScreen() {
         OutlinedTextField(collectionName, { collectionName = it.take(100) }, label = { Text("Album or playlist name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
 
         if (mode == "Online downloads") {
-            OutlinedTextField(urls, { urls = it; rightsConfirmed = false }, label = { Text("Music links or direct audio URLs") }, placeholder = { Text("Audiomack, YouTube Music, SoundCloud song/album/playlist URL\nTrack name | https://cdn.example.com/track.mp3") }, modifier = Modifier.fillMaxWidth().height(150.dp), minLines = 4)
+            OutlinedTextField(urls, { urls = it; rightsConfirmed = false; previewTracks.clear() }, label = { Text("Music links or direct audio URLs") }, placeholder = { Text("Audiomack, YouTube Music, SoundCloud song/album/playlist URL\nTrack name | https://cdn.example.com/track.mp3") }, modifier = Modifier.fillMaxWidth().height(150.dp), minLines = 4)
             Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio-file URL. Use “Track title | URL” for direct files. Provider downloads are saved to this device’s enV offline library; direct files use Android download notifications.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it })
@@ -394,97 +542,65 @@ fun NativeMusicDownloaderScreen() {
                 error = ""
                 status = ""
                 if (!rightsConfirmed) {
-                    error = "Confirm that you own the tracks or have permission to download them."
+                    error = "Confirm that you have permission and the source permits downloads."
                     return@Button
                 }
-                val tracks = runCatching { parseDirectMusicTracks(urls) }.getOrElse {
-                    error = it.message ?: "The audio URL list is invalid."
-                    return@Button
-                }
-                if (collectionType == "Track" && tracks.size != 1) {
-                    error = "For a single-track download, provide exactly one URL. Choose Album or Playlist for a batch."
+                val sources = runCatching { parseDirectMusicTracks(urls) }.getOrElse {
+                    error = it.message ?: "Enter supported music links."
                     return@Button
                 }
                 busy = true
+                status = "Finding track titles…"
                 scope.launch {
-                    val queued = withContext(Dispatchers.IO) {
+                    val outcome = withContext(Dispatchers.IO) {
                         runCatching {
-                            val directTracks = tracks.filterNot { it.isProviderPage }
-                            val pageTracks = tracks.filter { it.isProviderPage }
-                            val savedPageFiles = mutableListOf<File>()
-                            try {
-                                val root = File(context.filesDir, "music-downloader/" + musicSafeName(collectionName, "My music"))
-                                var providerBytes = 0L
-                                var providerTrackCount = 0
-                                pageTracks.forEach { page ->
-                                    val resolved = resolveProviderMusicPage(page, collectionType != "Track")
-                                    require(providerTrackCount + resolved.size <= 50) {
-                                        "The resolved collection has more than 50 tracks. Split it into smaller batches."
-                                    }
-                                    resolved.forEach { track ->
-                                        val remaining = MUSIC_BATCH_LIMIT - providerBytes
-                                        val (file, size) = downloadProviderMusicTrack(track, root, remaining)
-                                        savedPageFiles += file
-                                        providerBytes += size
-                                        providerTrackCount += 1
-                                    }
+                            val resolved = mutableListOf<DirectMusicTrack>()
+                            val warnings = mutableListOf<String>()
+                            for (source in sources) {
+                                try {
+                                    resolved += if (source.isProviderPage) resolveProviderMusicPage(source, true) else listOf(source)
+                                } catch (failure: Exception) {
+                                    warnings += "${source.title}: ${failure.message ?: "Metadata unavailable."}"
                                 }
-
-                                require(providerTrackCount + directTracks.size <= 50) {
-                                    "This collection has more than 50 tracks. Split it into smaller batches."
-                                }
-                                var checkedBytes = providerBytes
-                                directTracks.forEach { track ->
-                                    checkedBytes += preflightMusicTrack(track)
-                                    require(checkedBytes <= MUSIC_BATCH_LIMIT) {
-                                        "The online batch exceeds 200 MB. Split it into smaller batches."
-                                    }
-                                }
-                                val queuedIds = mutableListOf<Long>()
-                                if (directTracks.isNotEmpty()) {
-                                    val manager = context.getSystemService(DownloadManager::class.java)
-                                    try {
-                                        directTracks.forEachIndexed { index, track ->
-                                            val sourceName = musicSafeName(track.title, "track-${index + 1}")
-                                            val base = musicSafeName(collectionName, "music")
-                                            val rawName = "enV-" + base + "-" + sourceName
-                                            val cleanName = rawName.take(140)
-                                            val fileName = if (cleanName.endsWith("." + track.extension, true)) cleanName else cleanName + "." + track.extension
-                                            val request = DownloadManager.Request(Uri.parse(track.url))
-                                                .setTitle(track.title)
-                                                .setDescription("enV Music Downloader · " + collectionType.lowercase(Locale.ROOT))
-                                                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                                .setAllowedOverMetered(true)
-                                                .setAllowedOverRoaming(false)
-                                                .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, fileName)
-                                            queuedIds += manager.enqueue(request)
-                                        }
-                                    } catch (failure: Throwable) {
-                                        if (queuedIds.isNotEmpty()) manager.remove(*queuedIds.toLongArray())
-                                        throw failure
-                                    }
-                                }
-                                Pair(queuedIds.size, providerTrackCount)
-                            } catch (failure: Throwable) {
-                                savedPageFiles.forEach { it.delete() }
-                                throw failure
                             }
+                            require(resolved.isNotEmpty()) { warnings.firstOrNull() ?: "No tracks could be previewed." }
+                            require(resolved.size <= 50) { "The collection exceeds 50 tracks. Split it into batches." }
+                            require(collectionType != "Track" || resolved.size == 1) { "Choose Album or Playlist for multiple tracks." }
+                            Pair(resolved.distinctBy { it.url }, warnings)
                         }
                     }
-                    queued.onSuccess { result ->
-                        val (queuedCount, savedCount) = result
-                        savedTracks.clear()
-                        savedTracks.addAll(listOfflineMusic(context))
-                        status = buildList {
-                            if (savedCount > 0) add("Saved $savedCount provider track(s) to enV’s offline library.")
-                            if (queuedCount > 0) add("Queued $queuedCount direct track(s); Android will show system download notifications and save them in Music.")
-                        }.joinToString(" ")
-                    }.onFailure { failure ->
-                        error = failure.message ?: "enV could not complete these music downloads."
-                    }
+                    outcome.onSuccess { (resolved, warnings) ->
+                        previewTracks.clear()
+                        previewTracks.addAll(resolved)
+                        showAllPreview = false
+                        status = "Found ${resolved.size} song(s). Review before downloading." +
+                            if (warnings.isNotEmpty()) " ${warnings.size} link(s) could not be inspected." else ""
+                    }.onFailure { error = it.message ?: "Unable to preview this collection." }
                     busy = false
                 }
-            }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Queueing downloads…" else if (collectionType == "Track") "Download track" else "Download " + collectionType.lowercase(Locale.ROOT)) }
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Inspecting…" else "Preview songs") }
+            if (previewTracks.isNotEmpty()) {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("${previewTracks.size} tracks · metadata preview", style = MaterialTheme.typography.titleMedium)
+                        previewTracks.take(if (showAllPreview) previewTracks.size else 10).forEachIndexed { index, track ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text("${index + 1}. ${track.title}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                Button(onClick = { downloadSelectedMusic(listOf(track), false) }, enabled = !busy) { Text("Download") }
+                            }
+                        }
+                        if (previewTracks.size > 10) {
+                            Button(onClick = { showAllPreview = !showAllPreview }, enabled = !busy) {
+                                Text(if (showAllPreview) "Show less" else "See more (${previewTracks.size - 10})")
+                            }
+                        }
+                        Text("Track availability is verified when downloading. Unavailable songs will be skipped.", style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = { downloadSelectedMusic(previewTracks.toList(), true) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (busy) "Preparing ZIP…" else "Download ZIP (${previewTracks.size} tracks)")
+                        }
+                    }
+                }
+            }
         } else {
             Button(onClick = { importLauncher.launch(arrayOf("audio/*")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Import audio for offline use") }
             Text(savedTracks.size.toString() + " track(s) saved in this device's enV offline library.", style = MaterialTheme.typography.bodyMedium)

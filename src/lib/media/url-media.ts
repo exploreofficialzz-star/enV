@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { apiUrl } from "@/lib/api/base";
 import { mediaErrorMessage } from "@/lib/media/shared-media";
 export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" | "audiomack" | "soundcloud" | "bandcamp" | "mixcloud" | "audius" | "jamendo" | "hearthis" | "bandlab" | "boomplay" | "zingmp3" | "netease" | "yandex-music" | "archive" | "audioboom" | "reverbnation" | "soundclick" | "spreaker" | "podomatic" | "freesound";
 
@@ -11,11 +10,28 @@ export interface UrlMediaRequest {
   maxBytes?: number;
 }
 
+/**
+ * Preview deployments have different origins from envtools.store. Always
+ * connect browser media requests through the active deployment's own API
+ * instead of trying to fetch Render from the browser.
+ */
 export function getUrlMediaConfig() {
-  const endpoint = typeof import.meta !== "undefined" && typeof import.meta.env?.VITE_URL_MEDIA_PROCESSOR_URL === "string"
-    ? String(import.meta.env.VITE_URL_MEDIA_PROCESSOR_URL).trim()
-    : "";
-  return { endpoint: endpoint || apiUrl("/api/backend/url-media"), configured: true };
+  return { endpoint: "/api/backend/url-media", configured: true };
+}
+
+async function mediaRequest(endpoint: string, action: "info" | "download", payload: unknown, signal?: AbortSignal) {
+  try {
+    return await fetch(endpoint + "/" + action, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      credentials: "same-origin",
+      signal,
+    });
+  } catch (cause) {
+    if (signal?.aborted || (cause instanceof Error && cause.name === "AbortError")) throw cause;
+    throw new Error("The enV media API could not be reached from this deployment. Check its API connection and try again.");
+  }
 }
 
 export async function downloadUrlMedia(
@@ -25,12 +41,7 @@ export async function downloadUrlMedia(
 ) {
   const { endpoint } = getUrlMediaConfig();
   if (!endpoint) throw new Error("No URL media service is configured.");
-  const response = await fetch(`${endpoint.replace(/\/$/, "")}/download`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(request),
-    signal,
-  });
+  const response = await mediaRequest(endpoint, "download", request, signal);
   if (!response.ok) {
     const raw = await response.text().catch(() => "");
     let payload: unknown = raw;
@@ -108,12 +119,7 @@ export interface UrlMediaInfo {
 export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, signal?: AbortSignal, options: { includePlaylist?: boolean } = {}): Promise<UrlMediaInfo> {
   const { endpoint } = getUrlMediaConfig();
   if (!endpoint) throw new Error("No URL media service is configured.");
-  const response = await fetch(`${endpoint.replace(/\/$/, "")}/info`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ url, provider, includePlaylist: options.includePlaylist ?? false }),
-    signal,
-  });
+  const response = await mediaRequest(endpoint, "info", { url, provider, includePlaylist: options.includePlaylist ?? false }, signal);
   const raw = await response.text().catch(() => "");
   let payload: unknown = raw;
   try { payload = JSON.parse(raw); } catch {}
