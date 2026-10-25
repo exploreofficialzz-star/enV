@@ -164,6 +164,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 2048 -cores 2
+          # Avoid flaky ADB shell settings calls on hosted emulators; instrumentation tests do not require animations to be disabled.
+          disable-animations: false
           pre-emulator-launch-script: |
             adb kill-server || true
             adb start-server
