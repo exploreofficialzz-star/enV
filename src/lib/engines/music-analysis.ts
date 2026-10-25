@@ -1,5 +1,5 @@
 import type { MusicMetadata } from "../media/music-metadata.ts";
-import { amplitudeDbfs, approximateLufs, estimateBpm, estimateKey } from "./audio-studio.ts";
+import { amplitudeDbfs, estimateBpm, estimateKey } from "./audio-studio.ts";
 
 export type MusicAnalysisInput = {
   channels: readonly Float32Array[];
@@ -201,7 +201,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const p95 = quantile(spreadDb, 0.95), p10 = quantile(spreadDb, 0.10);
   const spread = p95 === null || p10 === null ? null : Number(Math.max(0, p95 - p10).toFixed(2));
   const rmsAmplitude = Math.sqrt(sumSquares / Math.max(1, totalSamples));
-  const lufsEstimate = approximateLufs(representative);
+  const lufsEstimate = rmsAmplitude > 0 ? 20 * Math.log10(rmsAmplitude) - 0.691 : Number.NEGATIVE_INFINITY;
   const tempoSamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 90)));
   const keySamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 30)));
   const tempo = estimateBpm(tempoSamples, input.sampleRate);
