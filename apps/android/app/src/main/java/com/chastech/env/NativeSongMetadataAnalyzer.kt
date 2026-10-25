@@ -110,7 +110,7 @@ private const val SONG_MAX_ZIP_EXPANDED_BYTES = 60 * 1024 * 1024
 private const val SONG_ANALYSIS_RATE = 16_000
 private const val SONG_MAX_ANALYSIS_SECONDS = 8 * 60
 
-private data class NativeSongSource(
+internal data class NativeSongSource(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val uri: Uri? = null,
@@ -436,39 +436,170 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
 
 private val nativeSongExtensions = setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "3gp", "mp4", "amr", "webm")
 
-private fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
-    require(bytes.size <= SONG_MAX_ZIP_BYTES) { "ZIP exceeds 30 MB." }
-    val results = mutableListOf<NativeSongSource>()
-    val seen = mutableSetOf<String>()
-    var expanded = 0L
-    var entriesSeen = 0
-    ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-        while (true) {
-            val entry = zip.nextEntry ?: break
-            entriesSeen += 1
-            require(entriesSeen <= 500) { "ZIP contains too many entries." }
-            require(results.size < SONG_MAX_TRACKS || entry.isDirectory) { "ZIP contains more than 50 audio tracks." }
-            val name = entry.name.replace('\\', '/')
-            require(name.isNotBlank() && !name.startsWith("/") && !Regex("^[A-Za-z]:").containsMatchIn(name) &&
-                !name.split('/').any { it == ".." || it == "." } && name.none { it.code < 32 }) { "ZIP contains an unsafe path." }
-            require(seen.add(name)) { "ZIP contains duplicate paths." }
-            if (entry.isDirectory) {
-                zip.closeEntry()
-                continue
-            }
-            // Drain every file through a bound, including non-audio entries, so a ZIP bomb
-            // cannot hide in a readme or unrelated file that the analyzer later ignores.
-            val fileBytes = readCurrentEntryBounded(zip, SONG_MAX_TRACK_BYTES.toLong())
-            expanded += fileBytes.size
-            require(expanded <= SONG_MAX_ZIP_EXPANDED_BYTES) { "ZIP expands beyond 60 MB." }
-            val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
-            if (extension in nativeSongExtensions) {
-                results += NativeSongSource(name = name.split('/').filter { it.isNotBlank() }.joinToString(" — "), bytes = fileBytes, sizeBytes = fileBytes.size.toLong())
-            }
-            zip.closeEntry()
+internal fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
+    require(bytes.size >= 22 && bytes.size <= SONG_MAX_ZIP_BYTES) { "ZIP must be between 22 bytes and 30 MB." }
+    fun u16(offset: Int): Int {
+        require(offset >= 0 && offset + 2 <= bytes.size) { "ZIP directory is damaged." }
+        return (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
+    }
+    fun u32(offset: Int): Long {
+        require(offset >= 0 && offset + 4 <= bytes.size) { "ZIP directory is damaged." }
+        return (bytes[offset].toLong() and 0xffL) or
+            ((bytes[offset + 1].toLong() and 0xffL) shl 8) or
+            ((bytes[offset + 2].toLong() and 0xffL) shl 16) or
+            ((bytes[offset + 3].toLong() and 0xffL) shl 24)
+    }
+
+    val searchStart = max(0, bytes.size - 22 - 65_535)
+    var endRecord = -1
+    for (offset in (bytes.size - 22 downTo searchStart)) {
+        if (u32(offset) == 0x06054b50L && offset + 22 + u16(offset + 20) == bytes.size) {
+            endRecord = offset
+            break
         }
     }
+    require(endRecord >= 0) { "This file is not a valid ZIP archive." }
+    require(u16(endRecord + 4) == 0 && u16(endRecord + 6) == 0) { "Split ZIP archives are not supported." }
+    val entriesOnDisk = u16(endRecord + 8)
+    val entryCount = u16(endRecord + 10)
+    val directorySize = u32(endRecord + 12)
+    val directoryOffset = u32(endRecord + 16)
+    require(entriesOnDisk == entryCount) { "ZIP directory counts do not match." }
+    require(entryCount <= 500 && directorySize != 0xffffffffL && directoryOffset != 0xffffffffL &&
+        directoryOffset + directorySize <= endRecord.toLong()) {
+        "ZIP contains too many entries or an invalid directory."
+    }
+    val directoryStart = directoryOffset.toInt()
+    val directoryEnd = (directoryOffset + directorySize).toInt()
+    var cursor = directoryStart
+    var expandedBytes = 0L
+    val seenNames = mutableSetOf<String>()
+    val localRanges = mutableListOf<Pair<Int, Int>>()
+    val results = mutableListOf<NativeSongSource>()
+    val utf8 = Charsets.UTF_8
+    val legacy = java.nio.charset.Charset.forName("windows-1252")
+
+    for (index in 0 until entryCount) {
+        require(u32(cursor) == 0x02014b50L) { "ZIP central directory entry is damaged." }
+        val madeBy = u16(cursor + 4)
+        val flags = u16(cursor + 8)
+        val method = u16(cursor + 10)
+        val crcExpected = u32(cursor + 16)
+        val compressedLong = u32(cursor + 20)
+        val uncompressedLong = u32(cursor + 24)
+        val nameLength = u16(cursor + 28)
+        val extraLength = u16(cursor + 30)
+        val commentLength = u16(cursor + 32)
+        val externalAttributes = u32(cursor + 38)
+        val localOffsetLong = u32(cursor + 42)
+        val nameStart = cursor + 46
+        val next = nameStart.toLong() + nameLength + extraLength + commentLength
+        require(next <= directoryEnd.toLong()) { "ZIP central directory entry is truncated." }
+        require(flags and 0x41 == 0) { "Encrypted ZIP entries are not supported." }
+        require(method == 0 || method == 8) { "Only stored and deflate-compressed ZIP entries are supported." }
+        require(compressedLong != 0xffffffffL && uncompressedLong != 0xffffffffL && localOffsetLong != 0xffffffffL) {
+            "ZIP64 archives are not supported by this analyzer."
+        }
+        require(compressedLong <= bytes.size && uncompressedLong <= SONG_MAX_ZIP_EXPANDED_BYTES &&
+            localOffsetLong < directoryOffset) { "ZIP entry size or offset is invalid." }
+        val compressedSize = compressedLong.toInt()
+        val uncompressedSize = uncompressedLong.toInt()
+        val localOffset = localOffsetLong.toInt()
+        val nameBytes = bytes.copyOfRange(nameStart, nameStart + nameLength)
+        val decodedName = String(nameBytes, if (flags and 0x0800 != 0) utf8 else legacy)
+        val name = decodedName.replace('\\', '/')
+        require(name.isNotBlank() && name.toByteArray(utf8).size <= 1024 &&
+            !name.startsWith("/") && !Regex("^[A-Za-z]:").containsMatchIn(name) &&
+            !name.split('/').any { it == ".." || it == "." } &&
+            name.none { it.code < 32 || it.code == 127 }) { "ZIP contains an unsafe path." }
+        require(seenNames.add(name)) { "ZIP contains duplicate paths." }
+        val unixMode = (externalAttributes ushr 16).toInt()
+        require(!((madeBy ushr 8) == 3 && (unixMode and 0xf000) == 0xa000)) { "ZIP symbolic links are not supported." }
+
+        require(localOffset + 30 <= directoryStart && u32(localOffset) == 0x04034b50L) {
+            "ZIP local file header is damaged."
+        }
+        val localFlags = u16(localOffset + 6)
+        val localMethod = u16(localOffset + 8)
+        val localNameLength = u16(localOffset + 26)
+        val localExtraLength = u16(localOffset + 28)
+        val localNameStart = localOffset + 30
+        val payloadStartLong = localNameStart.toLong() + localNameLength + localExtraLength
+        val payloadEndLong = payloadStartLong + compressedSize
+        require(localFlags == flags && localMethod == method &&
+            payloadStartLong <= directoryOffset && payloadEndLong <= directoryOffset &&
+            payloadEndLong >= payloadStartLong) { "ZIP entry payload is outside archive bounds." }
+        val payloadStart = payloadStartLong.toInt()
+        val payloadEnd = payloadEndLong.toInt()
+        val localNameEnd = localNameStart + localNameLength
+        require(localNameEnd <= directoryStart && bytes.copyOfRange(localNameStart, localNameEnd).contentEquals(nameBytes)) {
+            "ZIP local and central filenames do not match."
+        }
+        localRanges += localOffset to payloadEnd
+        cursor = next.toInt()
+
+        val isDirectory = name.endsWith("/")
+        if (isDirectory) continue
+        require(uncompressedSize <= SONG_MAX_TRACK_BYTES) { "A ZIP entry exceeds 20 MB." }
+        expandedBytes += uncompressedSize
+        require(expandedBytes <= SONG_MAX_ZIP_EXPANDED_BYTES) { "ZIP expands beyond 60 MB." }
+        if (uncompressedSize > 1024 * 1024 && compressedSize > 0 &&
+            uncompressedSize.toDouble() / compressedSize > 250.0) {
+            throw IllegalArgumentException("ZIP contains an unusually high compression ratio.")
+        }
+        require(uncompressedSize == 0 || compressedSize > 0) { "ZIP entry has an invalid zero-size payload." }
+
+        val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        if (extension !in nativeSongExtensions) continue
+        val compressed = bytes.copyOfRange(payloadStart, payloadEnd)
+        val decoded = when (method) {
+            0 -> {
+                require(compressed.size == uncompressedSize) { "Stored ZIP entry length does not match." }
+                compressed
+            }
+            8 -> inflateNativeSongEntry(compressed, uncompressedSize)
+            else -> error("Unsupported ZIP compression.")
+        }
+        val crc = java.util.zip.CRC32().apply { update(decoded) }.value
+        require(crc == crcExpected) { "ZIP entry checksum failed." }
+        val displayName = name.split('/').filter { it.isNotBlank() }.joinToString(" — ")
+        results += NativeSongSource(name = displayName, bytes = decoded, sizeBytes = decoded.size.toLong())
+        require(results.size <= SONG_MAX_TRACKS) { "ZIP contains more than 50 audio tracks." }
+    }
+    require(cursor == directoryEnd) { "ZIP directory has unexpected trailing data." }
+    localRanges.sortBy { it.first }
+    for (index in 1 until localRanges.size) {
+        require(localRanges[index].first >= localRanges[index - 1].second) { "ZIP entries overlap each other." }
+    }
     return results
+}
+
+private fun inflateNativeSongEntry(compressed: ByteArray, expectedSize: Int): ByteArray {
+    require(expectedSize in 1..SONG_MAX_TRACK_BYTES) { "Compressed ZIP entry has an invalid uncompressed size." }
+    val inflater = java.util.zip.Inflater(true)
+    try {
+        inflater.setInput(compressed)
+        val output = ByteArray(expectedSize)
+        var offset = 0
+        while (!inflater.finished() && offset < output.size) {
+            val count = try {
+                inflater.inflate(output, offset, output.size - offset)
+            } catch (failure: java.util.zip.DataFormatException) {
+                throw IllegalArgumentException("ZIP deflate stream is damaged.", failure)
+            }
+            if (count == 0) {
+                if (inflater.needsInput() || inflater.needsDictionary()) break
+                throw IllegalArgumentException("ZIP deflate stream made no progress.")
+            }
+            offset += count
+        }
+        require(inflater.finished() && offset == expectedSize && inflater.remaining == 0) {
+            "ZIP deflate output size does not match its directory."
+        }
+        return output
+    } finally {
+        inflater.end()
+    }
 }
 
 private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
