@@ -353,6 +353,7 @@ async def analyze(request: Request) -> dict[str, Any]:
     cpu=8,
     memory=49152,
     timeout=15 * 60,
+    startup_timeout=12 * 60,
     scaledown_window=60,
     max_containers=1,
     volumes={"/models": model_volume},

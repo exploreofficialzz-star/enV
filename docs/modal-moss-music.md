@@ -37,7 +37,18 @@ Generate a long random secret (at least 32 random bytes). In Modal Dashboard →
 
 Use the exact same value in the enV backend environment in Step 4. Do not paste it into GitHub, source code, an issue, or a chat. Creating the Secret in the dashboard avoids putting the raw value in shell history.
 
-## 3. Download weights and deploy
+## 3. Smartphone-friendly deployment using GitHub Actions
+
+The repository includes a manually triggered workflow named **Deploy MOSS-Music to Modal**. This avoids needing a local computer/terminal, but it needs a Modal API token and deliberately requires a cost-approval checkbox.
+
+1. In Modal, open **Settings → API tokens & service users** and create a token for CI/deployment. The token ID and token secret are credentials for deploying apps; they are different from the MOSS_MUSIC_TOKEN that protects the model endpoint. Modal's [token documentation](https://modal.com/docs/cli/latest/token) explains this distinction.
+2. In GitHub, open the enV repository → **Settings → Secrets and variables → Actions**. Add repository secrets named `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`, with their matching values. Never put these values in code or chat. Give the token only the permissions required for the Modal environment in which you created the `env-moss-music-api` secret.
+3. Open the repository's **Actions** tab → **Deploy MOSS-Music to Modal** → **Run workflow**. Select the main branch, review the input, and tick approval only after checking your Modal credit balance and billing/payment settings. The workflow then downloads model weights to the persistent volume and deploys the service.
+4. When it completes, open Modal's dashboard → **Apps** → **env-moss-music** → `serve_api`. Copy the actual generated HTTPS Web URL. Test `<URL>/healthz`; use `<URL>/analyze` for enV's server-side `MOSS_MUSIC_ENDPOINT` setting. Do not guess the generated hostname.
+
+This workflow is manual, not triggered by normal pushes. If the approval checkbox is not selected, it skips the deployment. A successful deployment command still needs a real health request and a cold/warm analyzer test before the feature is called operational.
+
+## 4. Download weights and deploy from a terminal
 
 From a checkout of the enV repository at the branch/commit that includes infra/modal-moss-music/app.py, run:
 
@@ -52,7 +63,7 @@ The serving image pins OpenMOSS SGLang commit 6c3a99cf413f623541aae7ee14744f5a3c
 
 After deployment, copy the HTTPS URL printed for the **serve_api** web function. The health endpoint is **/healthz** and the tagging endpoint is **/analyze**. Use Modal's actual generated URL; do not guess the workspace-specific hostname.
 
-## 4. Configure the enV AI backend
+## 5. Configure the enV AI backend
 
 On the host that runs the app-side /api/ai/run handler, add these server-only environment variables:
 
@@ -68,7 +79,7 @@ MOSS-Music is registered as **STANDARD** cost because GPU time is metered. The e
 
 Use the host's secure environment-variable UI. Redeploy/restart the app after changing variables. The endpoint and token are never browser configuration; never name either one VITE_*.
 
-## 5. Test before enabling users
+## 6. Test before enabling users
 
 1. Open the Modal function URL plus /healthz. Expect HTTP 200 and a small JSON response. This verifies the deployed model service started; it does not prove tagging quality.
 2. Run the enV Song Metadata Analyzer with a short, non-sensitive sample after explicitly opting in to remote analysis.
