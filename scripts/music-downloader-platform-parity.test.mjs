@@ -61,4 +61,8 @@ test("native catalog and production docs describe supported public music links c
     assert.match(text, /supported public music pages|supported public song, album and playlist pages|supported public music pages/i);
   }
   assert.match(docs, /both native apps resolve supported public song, album and playlist URLs through the same enV URL-media processor/i);
+  const readme = await source("../README.md");
+  assert.match(readme, /registered public-provider host allowlist/i);
+  assert.match(readme, /50 items/i);
+  assert.doesNotMatch(readme, /currently defines provider adapters for YouTube, TikTok, Facebook, Instagram, and X and uses `yt-dlp` only when the deployment explicitly provides that executable/i);
 });
