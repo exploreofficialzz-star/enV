@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { detectProvider, createProviderRequestArgs } from "./media/provider-registry.mjs";
+import { detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 
@@ -60,6 +60,7 @@ for (const url of [
 }
 assert.equal(detectProvider(new URL("https://vt.tiktok.com/ZSydNwHA1/")), "tiktok");
 assert.deepEqual(createProviderRequestArgs("generic", {}), []);
+assert.deepEqual(createProviderAdapter("audiomack", "mp3", true).post, ["--extract-audio", "--audio-format", "mp3", "--audio-quality", "192K", "--embed-metadata", "--embed-thumbnail"]);
 assert.deepEqual(createProviderRequestArgs("tiktok", {}), ["--impersonate", "chrome"]);
 assert.deepEqual(createProviderRequestArgs("youtube", { URL_MEDIA_YOUTUBE_COOKIES_FILE: "/etc/secrets/youtube.txt" }), ["--cookies", "/etc/secrets/youtube.txt"]);
 assert.equal(detectProvider(new URL("https://example.com/video.mp4")), "generic");
