@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { strToU8, zipSync } from "fflate";
 import { Button } from "@/components/ui/button";
 import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
+import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
 import {
   MUSIC_AUDIO_EXTENSIONS,
   isSafeMusicOrigin,
@@ -11,8 +12,7 @@ import {
   type MusicCollectionEntry,
 } from "@/lib/media/music-downloader-policy";
 
-type CollectionType = "track" | "album" | "playlist";
-type DownloadResult = { name: string; bytes: Uint8Array; extension: string; source: string };
+type DownloadResult = { name: string; bytes: Uint8Array; extension: string; source: string; metadata: MusicMetadata };
 const MAX_TRACK_BYTES = 50 * 1024 * 1024;
 const MAX_COLLECTION_BYTES = 200 * 1024 * 1024;
 
@@ -79,6 +79,31 @@ async function readBounded(response: Response, limit: number, signal: AbortSigna
   return output;
 }
 
+function trackFileName(metadata: MusicMetadata, fallback: string, extension: string): string {
+  const title = safeName(metadata.title || fallback.replace(/\.[a-z0-9]{1,8}$/i, ""), "track");
+  const artist = safeName(metadata.artist || "", "");
+  const base = artist && artist.toLocaleLowerCase() !== title.toLocaleLowerCase() ? artist + " - " + title : title;
+  const normalized = safeName(base, "track");
+  return normalized.toLocaleLowerCase().endsWith("." + extension) ? normalized : normalized + "." + extension;
+}
+
+function inferredCollectionTitle(tracks: DownloadResult[]): string {
+  const albums = Array.from(new Set(tracks.map((track) => track.metadata.album?.trim()).filter((album): album is string => Boolean(album))));
+  if (albums.length === 1) return safeName(albums[0], "My music");
+  const artists = Array.from(new Set(tracks.map((track) => track.metadata.albumArtist || track.metadata.artist).map((artist) => artist?.trim()).filter((artist): artist is string => Boolean(artist))));
+  if (artists.length === 1) return safeName(artists[0] + " - Collection", "My music");
+  return "My music";
+}
+
+function mimeForExtension(extension: string): string {
+  const types: Record<string, string> = {
+    mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav",
+    flac: "audio/flac", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/opus",
+    aiff: "audio/aiff", aif: "audio/aiff", wma: "audio/x-ms-wma", webm: "audio/webm",
+  };
+  return types[extension] || "application/octet-stream";
+}
+
 async function fetchTrack(entry: MusicCollectionEntry, signal: AbortSignal): Promise<DownloadResult> {
   const valid = validateDirectMusicUrl(entry.url);
   if (!valid.ok) throw new Error("Line " + entry.line + ": " + valid.reason);
@@ -97,32 +122,48 @@ async function fetchTrack(entry: MusicCollectionEntry, signal: AbortSignal): Pro
   }
   const bytes = await readBounded(response, MAX_TRACK_BYTES, signal);
   if (!bytes.byteLength) throw new Error("Line " + entry.line + ": the audio file was empty.");
-  const fileName = entry.title || new URL(valid.url).pathname.split("/").pop() || ("track-" + entry.line);
-  const extension = extensionFromName(fileName) || valid.extension;
-  const name = fileName.toLowerCase().endsWith("." + extension) ? fileName : fileName + "." + extension;
-  return { name: safeName(name, "track-" + entry.line + "." + extension), bytes, extension, source: valid.url };
+  const sourceName = entry.title || new URL(valid.url).pathname.split("/").pop() || ("track-" + entry.line);
+  const extension = extensionFromName(sourceName) || valid.extension;
+  const metadata = extractMusicMetadata(bytes, sourceName);
+  return {
+    name: trackFileName(metadata, sourceName, extension),
+    bytes,
+    extension,
+    source: valid.url,
+    metadata,
+  };
 }
 
-function buildArchive(title: string, tracks: Array<{ name: string; bytes: Uint8Array }>): Uint8Array {
+function buildArchive(title: string, tracks: DownloadResult[]): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   const used = new Set<string>();
   const playlist = ["#EXTM3U"];
+  const metadataTracks: Array<Record<string, unknown>> = [];
   tracks.forEach((track, index) => {
-    const path = archivePath(track.name, used, "track-" + (index + 1) + ".mp3");
+    const path = archivePath(track.name, used, "track-" + (index + 1) + "." + track.extension);
     files[path] = track.bytes;
-    playlist.push("#EXTINF:-1," + path.replace(/\.[^.]+$/, ""), path);
+    const label = [track.metadata.artist, track.metadata.title].filter(Boolean).join(" - ") || path.replace(/\.[^.]+$/, "");
+    const duration = track.metadata.durationSeconds && track.metadata.durationSeconds > 0 ? String(Math.round(track.metadata.durationSeconds)) : "-1";
+    playlist.push("#EXTINF:" + duration + "," + label, path);
+    const { artwork, ...tags } = track.metadata;
+    let artworkPath: string | undefined;
+    if (artwork?.bytes.length) {
+      const artworkExtension = artwork.mimeType.toLowerCase().includes("png") ? "png" : "jpg";
+      artworkPath = "cover-art/" + String(index + 1).padStart(2, "0") + "-" + (slugify(track.metadata.title || path) || "track") + "." + artworkExtension;
+      files[artworkPath] = artwork.bytes;
+    }
+    metadataTracks.push({ file: path, source: track.source, ...tags, artworkFile: artworkPath });
   });
   files["enV-playlist.m3u"] = strToU8(playlist.join("\n") + "\n");
+  files["track-metadata.json"] = strToU8(JSON.stringify({ collection: title, tracks: metadataTracks }, null, 2) + "\n");
   files["README.txt"] = strToU8(
-    title + "\n\nCreated with enV Music Downloader.\nThe archive contains the selected audio files and an M3U playlist. Keep copyright notices and license terms supplied by the original source.\n",
+    title + "\n\nCreated with enV Music Downloader.\nThe archive contains the selected audio files, an M3U playlist and the metadata detected in each file. Audio bytes are preserved unchanged. Keep copyright notices and license terms supplied by the original source.\n",
   );
   return zipSync(files, { level: 0 });
 }
 
 export function MusicDownloaderEngine() {
   const [mode, setMode] = useState<"online" | "offline">("online");
-  const [collectionType, setCollectionType] = useState<CollectionType>("playlist");
-  const [collectionName, setCollectionName] = useState("My music");
   const [urlText, setUrlText] = useState("");
   const [localFiles, setLocalFiles] = useState<File[]>([]);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
@@ -133,6 +174,7 @@ export function MusicDownloaderEngine() {
   const [platform, setPlatform] = useState<{ label: string; url: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const manifestInputRef = useRef<HTMLInputElement | null>(null);
+  const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function importManifest(file?: File) {
     if (!file) return;
@@ -140,9 +182,10 @@ export function MusicDownloaderEngine() {
     try {
       setUrlText(await file.text());
       setMode("online");
-      setResult("Loaded " + file.name + ". Review the list before starting the download.");
+      setRightsConfirmed(false);
+      setResult("Link list loaded.");
     } catch {
-      setError("The selected playlist manifest could not be read.");
+      setError("Could not read that link list.");
     }
   }
 
@@ -151,7 +194,7 @@ export function MusicDownloaderEngine() {
     setResult("");
     setPlatform(null);
     if (!rightsConfirmed) {
-      setError("Confirm that you own the tracks or have permission to download them.");
+      setError("Please confirm you have permission to download these files.");
       return;
     }
     const parsed = parseMusicCollectionLines(urlText);
@@ -159,15 +202,11 @@ export function MusicDownloaderEngine() {
       setError(parsed.error);
       return;
     }
-    if (collectionType === "track" && parsed.entries.length !== 1) {
-      setError("For a single-track download, provide exactly one URL. Choose Album or Playlist for a batch.");
-      return;
-    }
     const blocked = parsed.entries.find((entry) => protectedMusicPlatform(entry.url));
     if (blocked) {
       const info = protectedMusicPlatform(blocked.url);
       if (info) setPlatform(info);
-      setError((info?.label ?? "This service") + " link detected. Protected streaming pages cannot be converted into portable audio files.");
+      setError((info?.label ?? "This service") + " does not provide a direct audio-file link here. Use its official download option, or paste an authorized audio-file URL.");
       return;
     }
     for (const entry of parsed.entries) {
@@ -187,7 +226,7 @@ export function MusicDownloaderEngine() {
     try {
       for (let index = 0; index < parsed.entries.length; index += 1) {
         const entry = parsed.entries[index];
-        setProgress("Downloading " + (index + 1) + " of " + parsed.entries.length + ": " + (entry.title || ("track " + (index + 1))));
+        setProgress("Downloading " + (index + 1) + " of " + parsed.entries.length + "…");
         try {
           const track = await fetchTrack(entry, controller.signal);
           if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
@@ -198,23 +237,24 @@ export function MusicDownloaderEngine() {
         } catch (cause) {
           if ((cause as Error)?.name === "AbortError") throw cause;
           const failureMessage = cause instanceof TypeError
-            ? "The source blocked browser access (CORS) or could not be reached. Use a direct download URL that permits browser access."
+            ? "This host blocked browser access or could not be reached. Try a direct audio link that permits browser downloads."
             : (cause instanceof Error ? cause.message : "Download failed.");
           failed.push((entry.title || entry.url) + ": " + failureMessage);
         }
       }
       if (!tracks.length) throw new Error(failed[0] || "No tracks could be downloaded.");
-      const title = safeName(collectionName, "My music");
-      if (collectionType === "track" && tracks.length === 1) {
-        const singleTrackBytes = new Uint8Array(tracks[0].bytes.byteLength);
-        singleTrackBytes.set(tracks[0].bytes);
-        downloadBlob(new Blob([singleTrackBytes.buffer], { type: tracks[0].extension === "mp3" ? "audio/mpeg" : "audio/" + tracks[0].extension }), tracks[0].name);
+      if (tracks.length === 1) {
+        const track = tracks[0];
+        const singleTrackBytes = new Uint8Array(track.bytes.byteLength);
+        singleTrackBytes.set(track.bytes);
+        downloadBlob(new Blob([singleTrackBytes.buffer], { type: mimeForExtension(track.extension) }), track.name);
       } else {
+        const title = inferredCollectionTitle(tracks);
         const archive = buildArchive(title, tracks);
-        downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + "-" + collectionType + ".zip");
+        downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
-      setResult("Saved " + tracks.length + " of " + parsed.entries.length + " track(s) (" + formatFileSize(totalBytes) + ")." + (failed.length ? " " + failed.length + " track(s) failed; details are shown below." : ""));
-      setProgress(failed.length ? failed.join("\n") : "Complete. The browser saved the requested audio file or collection archive.");
+      setResult("Saved " + tracks.length + " track(s) · " + formatFileSize(totalBytes) + ".");
+      setProgress(failed.length ? failed.join("\n") : "Complete. Track names and available embedded metadata have been read from the audio files.");
     } catch (cause) {
       if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled.");
       else setError(cause instanceof Error ? cause.message : "The download failed.");
@@ -228,15 +268,11 @@ export function MusicDownloaderEngine() {
     setError("");
     setResult("");
     if (!localFiles.length) {
-      setError("Choose audio files from this device first.");
-      return;
-    }
-    if (collectionType === "track" && localFiles.length !== 1) {
-      setError("For a single-track save, select exactly one file. Choose Album or Playlist for a batch.");
+      setError("Choose audio files first.");
       return;
     }
     if (localFiles.length > 50) {
-      setError("A collection can contain at most 50 tracks at a time.");
+      setError("Choose at most 50 tracks at a time.");
       return;
     }
     const rejected = localFiles.find((file) => !extensionFromName(file.name) || (file.type && !file.type.startsWith("audio/") && file.type !== "application/octet-stream"));
@@ -246,97 +282,107 @@ export function MusicDownloaderEngine() {
     }
     const total = localFiles.reduce((sum, file) => sum + file.size, 0);
     if (localFiles.some((file) => file.size > MAX_TRACK_BYTES) || total > MAX_COLLECTION_BYTES) {
-      setError("Choose audio files under " + formatFileSize(MAX_TRACK_BYTES) + " each and under " + formatFileSize(MAX_COLLECTION_BYTES) + " in total.");
+      setError("Each track must be under " + formatFileSize(MAX_TRACK_BYTES) + " and the collection under " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
       return;
     }
     setBusy(true);
-    setProgress("Preparing your locally stored audio files…");
+    setProgress("Preparing your music…");
     try {
       const tracks: DownloadResult[] = [];
       for (let index = 0; index < localFiles.length; index += 1) {
         const file = localFiles[index];
-        setProgress("Preparing " + (index + 1) + " of " + localFiles.length + ": " + file.name);
-        tracks.push({ name: safeName(file.name, "track-" + (index + 1)), bytes: new Uint8Array(await file.arrayBuffer()), extension: extensionFromName(file.name), source: "local" });
+        setProgress("Preparing " + (index + 1) + " of " + localFiles.length + "…");
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const extension = extensionFromName(file.name);
+        const metadata = extractMusicMetadata(bytes, file.name);
+        tracks.push({
+          name: trackFileName(metadata, file.name, extension),
+          bytes,
+          extension,
+          source: "device",
+          metadata,
+        });
       }
-      const title = safeName(collectionName, "My music");
-      if (collectionType === "track" && tracks.length === 1) {
-        downloadBlob(localFiles[0], tracks[0].name);
+      if (tracks.length === 1) {
+        const track = tracks[0];
+        const copy = new Uint8Array(track.bytes.byteLength);
+        copy.set(track.bytes);
+        downloadBlob(new Blob([copy.buffer], { type: mimeForExtension(track.extension) }), track.name);
       } else {
+        const title = inferredCollectionTitle(tracks);
         const archive = buildArchive(title, tracks);
-        downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + "-" + collectionType + ".zip");
+        downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
-      setResult("Prepared " + tracks.length + " local track(s) (" + formatFileSize(total) + "). No tracks were uploaded.");
-      setProgress("Complete. Your local file or collection archive is ready.");
+      setResult("Prepared " + tracks.length + " track(s) · " + formatFileSize(total) + ".");
+      setProgress("Ready. Your music stays on this device; detected metadata is included with collection exports.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The offline collection could not be prepared.");
+      setError(cause instanceof Error ? cause.message : "Could not prepare this collection.");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-surface-2 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background">
             <span aria-hidden="true" className="text-xl">♫</span>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">Music Downloader</h2>
-            <p className="mt-1 text-sm text-muted">Download authorized audio files online, or package music already on your device for offline use.</p>
-          </div>
+          <h2 className="text-base font-semibold">Music Downloader</h2>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2" role="tablist" aria-label="Music source mode">
-          <button type="button" role="tab" aria-selected={mode === "online"} onClick={() => { setMode("online"); setError(""); }} className={"min-h-10 rounded-lg border px-3 text-sm font-medium " + (mode === "online" ? "border-accent bg-background text-fg" : "border-border text-muted hover:bg-background")}>Online downloads</button>
-          <button type="button" role="tab" aria-selected={mode === "offline"} onClick={() => { setMode("offline"); setError(""); }} className={"min-h-10 rounded-lg border px-3 text-sm font-medium " + (mode === "offline" ? "border-accent bg-background text-fg" : "border-border text-muted hover:bg-background")}>Offline collection</button>
+        <div className="mt-4 grid grid-cols-2 gap-2" role="tablist" aria-label="Music source">
+          <button type="button" role="tab" aria-selected={mode === "online"} onClick={() => { setMode("online"); setError(""); }} className={"min-h-10 rounded-lg border px-3 text-sm font-medium " + (mode === "online" ? "border-accent bg-background text-fg" : "border-border text-muted hover:bg-background")}>Online</button>
+          <button type="button" role="tab" aria-selected={mode === "offline"} onClick={() => { setMode("offline"); setError(""); }} className={"min-h-10 rounded-lg border px-3 text-sm font-medium " + (mode === "offline" ? "border-accent bg-background text-fg" : "border-border text-muted hover:bg-background")}>Offline</button>
         </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1.5 text-sm font-medium">Collection type
-          <select value={collectionType} onChange={(event) => setCollectionType(event.target.value as CollectionType)} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 font-normal">
-            <option value="track">Single track</option><option value="album">Album</option><option value="playlist">Playlist</option>
-          </select>
-        </label>
-        <label className="block space-y-1.5 text-sm font-medium">Collection or album name
-          <input value={collectionName} onChange={(event) => setCollectionName(event.target.value)} maxLength={100} className="w-full rounded-lg border border-border bg-background px-3 py-2.5 font-normal" placeholder="My music" />
-        </label>
       </div>
 
       {mode === "online" ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="music-download-urls" className="text-sm font-medium">Direct audio-file URLs</label>
-            <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import playlist manifest</button>
+            <label htmlFor="music-download-urls" className="text-sm font-medium">Music links</label>
+            <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import list</button>
             <input ref={manifestInputRef} type="file" accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" className="hidden" onChange={(event) => void importManifest(event.target.files?.[0])} />
           </div>
-          <textarea id="music-download-urls" value={urlText} onChange={(event) => setUrlText(event.target.value)} rows={6} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"https://downloads.example.com/track-01.mp3\nTrack two | https://cdn.example.com/track-02.m4a"} />
-          <p className="text-xs leading-relaxed text-muted">Use one direct HTTPS audio-file URL per line, or “Track title | URL”. JSON, TXT and M3U URL lists are accepted. Sources must permit downloads and serve the audio file directly. Web downloads also require the host to allow browser cross-origin access (CORS).</p>
-          <label className="flex min-h-11 items-start gap-2 rounded-xl border border-border p-3 text-sm">
-            <input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} className="mt-1" />
-            <span>I own these tracks or have permission to download and keep them.</span>
+          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste music links here, one per line\nTrack title | https://…/track.mp3"} />
+          <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
+            <input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
+            <span>I have permission to download these files.</span>
           </label>
-          <div className="rounded-xl border border-border p-3 text-sm">
-            <p className="font-medium">Streaming-service links</p>
-            <p className="mt-1 text-muted">Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio pages are not direct audio files. Use each service’s official offline/download option for protected catalog tracks, or supply a direct audio-file link provided by the rights holder.</p>
-            {platform ? <a href={platform.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center font-medium text-accent hover:underline">Open {platform.label}</a> : null}
-          </div>
-          <Button type="button" onClick={() => void runOnline()} disabled={busy} className="w-full sm:w-auto">{busy ? "Downloading…" : (collectionType === "track" ? "Download track" : "Download " + collectionType)}</Button>
+          <Button type="button" onClick={() => void runOnline()} disabled={busy} className="w-full">{busy ? "Downloading…" : "Download music"}</Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          <label htmlFor="music-offline-files" className="block text-sm font-medium">Audio files on this device</label>
-          <input id="music-offline-files" type="file" multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} onChange={(event) => setLocalFiles(Array.from(event.target.files ?? []))} className="block w-full rounded-xl border border-border bg-background p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:font-medium" />
-          <p className="text-sm text-muted">{localFiles.length ? localFiles.length + " file(s) selected · " + formatFileSize(localFiles.reduce((sum, file) => sum + file.size, 0)) : "Select tracks already stored on your device. File contents stay in this browser and are not uploaded."}</p>
-          <Button type="button" onClick={() => void runOffline()} disabled={busy || !localFiles.length} className="w-full sm:w-auto">{busy ? "Preparing…" : (collectionType === "track" ? "Save track" : "Create " + collectionType + " archive")}</Button>
+        <div className="space-y-3 rounded-2xl border border-border p-3 sm:p-4">
+          <input ref={localFileInputRef} id="music-offline-files" type="file" multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} onChange={(event) => { setLocalFiles(Array.from(event.target.files ?? [])); setError(""); setResult(""); }} className="hidden" />
+          <button type="button" onClick={() => localFileInputRef.current?.click()} className="flex min-h-20 w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-3 text-left hover:bg-background">
+            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-xl">♫</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">{localFiles.length ? "Change music files" : "Choose music files"}</span>
+              <span className="mt-1 block text-xs text-muted">MP3, M4A, FLAC, WAV and more</span>
+            </span>
+          </button>
+          {localFiles.length ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted">{localFiles.length} track(s) · {formatFileSize(localFiles.reduce((sum, file) => sum + file.size, 0))}</p>
+              <div className="space-y-1">
+                {localFiles.slice(0, 4).map((file) => (
+                  <div key={file.name + file.size} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate">{file.name}</span>
+                    <span className="shrink-0 text-xs text-muted">{formatFileSize(file.size)}</span>
+                  </div>
+                ))}
+                {localFiles.length > 4 ? <p className="text-xs text-muted">+{localFiles.length - 4} more</p> : null}
+              </div>
+            </div>
+          ) : null}
+          <Button type="button" onClick={() => void runOffline()} disabled={busy || !localFiles.length} className="w-full">{busy ? "Preparing…" : "Save offline collection"}</Button>
         </div>
       )}
 
       {busy ? <div className="space-y-2" role="status" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full w-1/3 animate-pulse rounded-full bg-accent" /></div><p className="text-sm text-muted">{progress}</p><Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button></div> : null}
-      {error ? <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
+      {error ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><p>{error}</p>{platform ? <a href={platform.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-8 items-center font-medium underline">Open {platform.label}</a> : null}</div> : null}
       {result ? <p role="status" className="rounded-xl border border-border bg-surface-2 p-3 text-sm">{result}</p> : null}
       {!busy && progress ? <p className="whitespace-pre-wrap break-words text-sm text-muted">{progress}</p> : null}
-      <p className="text-xs leading-relaxed text-muted">Limits: 50 tracks per batch, 50 MB per track and 200 MB per collection. Direct sources must permit access and browser downloads (including CORS access on the Web). This tool does not sign in to streaming services, extract their protected streams, or bypass DRM.</p>
     </div>
   );
 }
