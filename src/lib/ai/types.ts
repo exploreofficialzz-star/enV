@@ -13,6 +13,7 @@ export const CAPABILITIES = [
   "STRUCTURED_TEXT",
   "VISION_ANALYSIS",
   "SPEECH_TO_TEXT",
+  "AUDIO_ANALYSIS",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
