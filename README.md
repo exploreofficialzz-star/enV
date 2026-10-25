@@ -142,20 +142,20 @@ The service uses an allowlisted command shape, isolated temporary directories, b
 
 ## URL media processor
 
-`URL_MEDIA_PROCESSOR_URL` is the optional enV URL-media backend endpoint. The service in `scripts/url-media-processor.mjs` currently defines provider adapters for YouTube, TikTok, Facebook, Instagram, and X and uses `yt-dlp` only when the deployment explicitly provides that executable.
+`URL_MEDIA_PROCESSOR_URL` is the optional enV URL-media backend endpoint. The shared processor runs from `processor/Dockerfile`, which installs `yt-dlp` and FFmpeg, and uses `scripts/media/provider-registry.mjs` to route supported public pages from YouTube/YouTube Music, TikTok, Facebook, Instagram, X, Audiomack, SoundCloud, Bandcamp, Mixcloud, Audius, Jamendo, HearThis, BandLab, Boomplay, ZingMP3, NetEase Music, Yandex Music, Archive.org, Audioboom, ReverbNation, SoundClick, Spreaker, Podomatic, and Freesound. Real availability varies by provider, region, URL type, and download permission; provider registration is not a guarantee that a particular item can be exported.
 
 Security boundaries include:
 - HTTPS/HTTP only
-- explicit provider-host allowlist
+- registered public-provider host allowlist plus a generic direct-media path
 - DNS resolution with private/local IP rejection
-- no arbitrary provider URLs
-- `--no-playlist`
+- redirects are revalidated and only eligible public media responses are accepted
+- single-item mode disables playlist expansion by default; collection inspection is explicitly requested and capped at 50 items
 - configurable output-size and duration limits
 - request timeout and cancellation
 - isolated temporary job directories
 - no arbitrary downloader command input from clients
 
-The corresponding catalog downloader tools remain Coming Soon until a deployment has a real `yt-dlp` runtime and the provider operation has been validated end-to-end.
+Provider extraction is attempted only through the shared processor and only where the source permits it. Other catalog entries explicitly marked Coming Soon remain gated until their own client integration and end-to-end behavior are verified.
 
 ## Developer category audit & competitive research
 
