@@ -3,6 +3,7 @@ package com.chastech.env
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -18,22 +19,40 @@ class AccessibilityUiAuditTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<MainActivity>()
 
+    private fun awaitHomeScreenReady() {
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun awaitTextVisible(text: String) {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun primaryActionsExposeNamesAndSearchNavigationWorks() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithContentDescription("Home").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Saved tools").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("Tools").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithContentDescription("More options").assertIsDisplayed().assertIsEnabled()
 
         composeRule.onNodeWithContentDescription("More options").performClick()
+        awaitTextVisible("Search tools")
         composeRule.onNodeWithText("Search tools").assertIsDisplayed().performClick()
+        awaitTextVisible("Find a tool by name, category, or keyword.")
         composeRule.onNodeWithText("Find a tool by name, category, or keyword.").assertIsDisplayed()
+        awaitTextVisible("Start typing to see matching tools.")
         composeRule.onNodeWithText("Start typing to see matching tools.").assertIsDisplayed()
     }
 
     @Test
     @SdkSuppress(minSdkVersion = 34)
     fun homeScreenHasUsableSearchAndFrameworkAccessibilityChecks() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
