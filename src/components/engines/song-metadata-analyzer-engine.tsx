@@ -752,7 +752,7 @@ export function SongMetadataAnalyzerEngine() {
                 ["Average bitrate", selectedReport.technical.bitrate_bps ? `${Math.round(Number(selectedReport.technical.bitrate_bps) / 1000)} kbps` : "Unknown"],
                 ["Peak", selectedReport.technical.peak_dbfs != null ? `${selectedReport.technical.peak_dbfs} dBFS` : "—"],
                 ["RMS", selectedReport.technical.rms_dbfs != null ? `${selectedReport.technical.rms_dbfs} dBFS` : "—"],
-              ].map(([label, value]) => <div key={label}><span className="block text-muted-foreground">{label}</span><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
+              ] as Array<[string, unknown]>).map(([label, value]) => <div key={label}><span className="block text-muted-foreground">{label}</span><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
             </div>
             {selectedReport.warnings.length > 0 && <div className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200"><p className="font-semibold">Notes</p><ul className="mt-1 list-disc space-y-1 pl-4">{selectedReport.warnings.slice(0, 5).map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
           </details>
