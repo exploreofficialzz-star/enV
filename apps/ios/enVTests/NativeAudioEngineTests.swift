@@ -152,4 +152,30 @@ final class NativeAudioEngineTests: XCTestCase {
         XCTAssertThrowsError(try NativeAudioWavProcessor.generateTone(sampleRateHz: 8_000, durationSeconds: 1, frequencyHz: 4_000))
     }
 
+
+    func testSongMetadataAnalyzerRoutesToItsDedicatedNativeScreen() {
+        let analyzer = Tool(
+            id: "song-metadata-analyzer",
+            name: "Song Metadata Analyzer",
+            slug: "song-metadata-analyzer",
+            description: "Inspect song metadata and audio signals locally.",
+            category: "audio",
+            subcategory: "Music",
+            keywords: ["song", "metadata", "music", "analysis"],
+            tags: ["song", "audio"],
+            icon: "AudioLines",
+            popularity: 99,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["audio-file-inspector"],
+            engine: ToolEngine(type: "audio", id: "song-metadata-analyzer", op: "song-metadata-analyzer", configuration: [:])
+        )
+        XCTAssertEqual(NativeAudioEngine.operation(for: analyzer), "song-metadata-analyzer")
+        XCTAssertTrue(NativeAudioEngine.supports(analyzer))
+    }
+
 }
