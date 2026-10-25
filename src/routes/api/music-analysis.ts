@@ -160,9 +160,16 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
       flac: "audio/flac",
       webm: "audio/webm",
     };
-    const supportedMimes = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/flac"];
-    const rawMime = [file.type, inferredMime[extension]].find((value) => value && supportedMimes.includes(value)) ?? "";
-    const mimeType = rawMime === "audio/x-m4a" ? "audio/mp4" : rawMime === "audio/x-wav" ? "audio/wav" : rawMime;
+    const supportedMimes = ["audio/mpeg", "audio/mp4", "audio/wav", "audio/webm", "audio/ogg", "audio/flac"];
+    const normalizeMime = (value: string) => ({
+      "audio/mp3": "audio/mpeg",
+      "audio/x-m4a": "audio/mp4",
+      "audio/m4a": "audio/mp4",
+      "audio/x-wav": "audio/wav",
+    } as Record<string, string>)[value] ?? value;
+    const mimeType = [file.type, inferredMime[extension]]
+      .map((value) => value ? normalizeMime(value.toLowerCase()) : "")
+      .find((value) => supportedMimes.includes(value)) ?? "";
     if (!mimeType) {
       return errorResponse(415, "MUSIC_ANALYSIS_UNSUPPORTED_MEDIA", "The built-in AI path supports MP3, WAV, M4A, OGG, FLAC and WebM audio.");
     }
