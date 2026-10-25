@@ -3575,18 +3575,27 @@ private var nativeMusicAPIEndpoint: URL {
 }
 
 private func nativeMusicAPIError(_ data: Data, status: Int) -> NSError {
+    let fallback = "enV media service returned HTTP \(status). Retry later or use a supported public media URL."
     if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
         for key in ["message", "error"] {
-            if let message = object[key] as? String, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(message.prefix(900))])
+            if let message = object[key] as? String {
+                let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty && !["true", "false", "null"].contains(trimmed.lowercased()) {
+                    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(trimmed.prefix(900))])
+                }
             }
         }
+        return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: fallback])
     }
-    if let body = String(data: data, encoding: .utf8), !body.isEmpty,
-       !body.lowercased().contains("<html"), !body.lowercased().contains("<!doctype") {
-        return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(body.prefix(700))])
+    if let body = String(data: data, encoding: .utf8) {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && !trimmed.lowercased().contains("<html") && !trimmed.lowercased().contains("<!doctype")
+            && !trimmed.hasPrefix("{") && !trimmed.hasPrefix("[")
+            && !["true", "false", "null"].contains(trimmed.lowercased()) {
+            return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: String(trimmed.prefix(700))])
+        }
     }
-    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: "enV media service returned HTTP \(status). Retry later or use a supported public media URL."])
+    return NSError(domain: "enVMusicDownloader", code: status, userInfo: [NSLocalizedDescriptionKey: fallback])
 }
 
 private func nativeMusicPostJSON(_ path: String, body: [String: Any]) async throws -> [String: Any] {
