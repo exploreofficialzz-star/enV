@@ -47,7 +47,7 @@ async function readBoundedBody(request: Request, maximumBytes: number): Promise<
 
 function appCookiePath(cookie: string | null): string | null {
   if (!cookie) return null;
-  return cookie.replace(/;\\s*Path=\\/api\\/ai\\b/i, "; Path=/api");
+  return cookie.replace(/;\s*Path=\/api\/ai\b/i, "; Path=/api");
 }
 
 function isRateLimited(request: Request): boolean {
