@@ -34,3 +34,20 @@ test("does not mistake a bare album record for a downloadable song", () => {
   }) + "</script>";
   assert.equal(parseAudiomackAlbumPage(html, albumUrl).entries.length, 0);
 });
+
+test("extracts only real public Audiomack links from escaped Next.js flight data", () => {
+  const first = String.raw`\/evadolee\/song\/dna`;
+  const second = String.raw`\\u002Fevadolee\\u002Fsong\\u002Fby-now`;
+  const html = '<script>self.__next_f.push([1,"' + first + ' ' + second + '"]);</script>';
+  const parsed = parseAudiomackAlbumPage(html, albumUrl);
+  assert.deepEqual(parsed.entries.map((entry) => entry.webpageUrl), [
+    "https://audiomack.com/evadolee/song/dna",
+    "https://audiomack.com/evadolee/song/by-now",
+  ]);
+});
+
+test("does not manufacture audio URLs from publicly listed album song titles alone", () => {
+  const html = "<h1>Promise land</h1><ol><li>DNA</li><li>By Now</li></ol>";
+  const parsed = parseAudiomackAlbumPage(html, albumUrl);
+  assert.equal(parsed.entries.length, 0);
+});
