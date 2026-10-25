@@ -37,6 +37,10 @@ export function classifyProviderFailure(provider, diagnostic) {
   if (/http error 403|http error 401|forbidden|not authorized|access denied|geo.?restricted/i.test(detail)) {
     return new Error(`DOWNLOAD_NOT_PERMITTED: ${name} refused this request. The content may require authorization, be region-restricted, or not permit this download method. Use its official download feature or a direct URL the rights holder permits.`);
   }
+  if ((/audiomack/i.test(name) || /\\[audiomack\\]/i.test(detail)) &&
+      /http error 5\\d\\d|internal server error|bad gateway|service unavailable|empty response|temporarily unavailable/i.test(detail)) {
+    return new Error("SOURCE_UNAVAILABLE: Audiomack's track resolver returned a server error or empty response. This is an upstream source-resolution failure, not proof that the URL is invalid or that an account is required. Retry later or use an authorized direct audio-file URL or the provider's official download feature.");
+  }
   if (/http error 404|not found|does not exist|has been removed|video unavailable|track unavailable|invalid url for track/i.test(detail)) {
     return new Error(`SOURCE_UNAVAILABLE: ${name} reports that this content is unavailable to the processor. Confirm the item is public and retry later.`);
   }
