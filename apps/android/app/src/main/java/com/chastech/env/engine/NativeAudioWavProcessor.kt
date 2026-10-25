@@ -370,7 +370,7 @@ object NativeAudioWavProcessor {
                 .put("metric_scope_seconds", min(duration, 30.0)))
             .put("rhythm", JSONObject()
                 .put("tempo_bpm", tempo?.let { it } ?: JSONObject.NULL)
-                .put("method", "10 ms RMS-energy novelty autocorrelation; best-effort estimate")
+                .put("method", "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate")
                 .put("status", if (tempo != null) "estimated" else "unavailable"))
             .put("tonality", JSONObject()
                 .put("key", key ?: JSONObject.NULL)
