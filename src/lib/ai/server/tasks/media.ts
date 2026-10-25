@@ -188,7 +188,6 @@ export const musicAnalysisTask = defineTask({
   attemptTimeoutMs: 60_000,
   maxOutputTokens: 1800,
   temperature: 0.1,
-  cacheTtlSeconds: null,
   input: MusicAnalysisInput,
   output: MusicAnalysisOutput,
   jsonSchema: {
