@@ -4121,22 +4121,22 @@ private struct NativeMusicDownloaderView: View {
                 .disabled(isWorking)
                 if !previewTracks.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("${previewTracks.count} tracks · metadata preview")
+                        Text("\(previewTracks.count) tracks · metadata preview")
                             .font(.envScaled(size: 15, weight: .semibold))
                         ForEach(Array(previewTracks.prefix(showAllPreview ? previewTracks.count : 10).enumerated()), id: \.offset) { index, track in
                             HStack(spacing: 8) {
-                                Text("${index + 1}. ${track.title}")
+                                Text("\(index + 1). \(track.title)")
                                     .font(.envScaled(size: 12))
                                     .lineLimit(2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Button("Download") { startOnlineDownloads(only: track) }
                                     .buttonStyle(.bordered)
                                     .disabled(isWorking)
-                                    .accessibilityLabel("Download ${track.title}")
+                                    .accessibilityLabel("Download \(track.title)")
                             }
                         }
                         if previewTracks.count > 10 {
-                            Button(showAllPreview ? "Show less" : "See more (${previewTracks.count - 10})") {
+                            Button(showAllPreview ? "Show less" : "See more (\(previewTracks.count - 10))") {
                                 showAllPreview.toggle()
                             }
                             .buttonStyle(.bordered)
@@ -4145,7 +4145,7 @@ private struct NativeMusicDownloaderView: View {
                             .font(.envScaled(size: 11))
                             .foregroundStyle(.secondary)
                         Button { startOnlineDownloads() } label: {
-                            Label("Download ZIP (${previewTracks.count} tracks)", systemImage: "doc.zipper")
+                            Label("Download ZIP (\(previewTracks.count) tracks)", systemImage: "doc.zipper")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
@@ -4317,8 +4317,8 @@ private struct NativeMusicDownloaderView: View {
             } else {
                 previewTracks = outcome.tracks
                 showAllPreview = false
-                status = "Found ${outcome.tracks.count} songs. Review the list before downloading." +
-                    (outcome.warnings.isEmpty ? "" : " ${outcome.warnings.count} link(s) could not be inspected.")
+                status = "Found \(outcome.tracks.count) songs. Review the list before downloading." +
+                    (outcome.warnings.isEmpty ? "" : " \(outcome.warnings.count) link(s) could not be inspected.")
             }
         }
     }
@@ -4339,7 +4339,7 @@ private struct NativeMusicDownloaderView: View {
         let zipRequested = selected == nil
         let folder = collectionFolder(collectionName)
         isWorking = true
-        status = zipRequested ? "Preparing songs for ZIP…" : "Downloading ${tracks[0].title}…"
+        status = zipRequested ? "Preparing songs for ZIP…" : "Downloading \(tracks[0].title)…"
         transferTask = Task {
             let outcome = await Task.detached(priority: .userInitiated) { [trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
                 var saved: [URL] = []
@@ -4368,7 +4368,7 @@ private struct NativeMusicDownloaderView: View {
                         }
                     }
                     if zipRequested && !saved.isEmpty {
-                        let archive = folder.appendingPathComponent("enV-music-${UUID().uuidString}.zip")
+                        let archive = folder.appendingPathComponent("enV-music-\(UUID().uuidString).zip")
                         try NativeMusicArchive.create(files: saved, at: archive)
                         zipped = archive
                     }
@@ -4385,9 +4385,9 @@ private struct NativeMusicDownloaderView: View {
                 errorMessage = outcome.failures.first ?? "No audio files were downloaded."
                 status = "No files saved."
             } else {
-                status = "${outcome.saved.count} track(s) saved · ${ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file)}." +
+                status = "\(outcome.saved.count) track(s) saved · \(ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file))." +
                     (outcome.zip == nil ? "" : " ZIP ready: tap Share or save ZIP in Files.") +
-                    (outcome.failures.isEmpty ? "" : " ${outcome.failures.count} unavailable: " + outcome.failures.prefix(3).joined(separator: "; "))
+                    (outcome.failures.isEmpty ? "" : " \(outcome.failures.count) unavailable: " + outcome.failures.prefix(3).joined(separator: "; "))
             }
             if zipRequested && outcome.zip == nil && !outcome.saved.isEmpty {
                 errorMessage = "The tracks were saved to the library, but the ZIP could not be prepared."
