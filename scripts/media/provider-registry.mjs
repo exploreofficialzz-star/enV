@@ -6,6 +6,15 @@ export const PROVIDERS = {
   facebook: ["facebook.com", "m.facebook.com", "fb.watch"],
   instagram: ["instagram.com"],
   x: ["x.com", "twitter.com"],
+  audiomack: ["audiomack.com"],
+  soundcloud: ["soundcloud.com", "on.soundcloud.com"],
+  bandcamp: ["bandcamp.com"],
+  mixcloud: ["mixcloud.com"],
+  audius: ["audius.co"],
+  jamendo: ["jamendo.com"],
+  hearthis: ["hearthis.at"],
+  bandlab: ["bandlab.com"],
+  boomplay: ["boomplay.com"],
 };
 const PROVIDER_BY_HOST = new Map(
   Object.entries(PROVIDERS).flatMap(([provider, hosts]) => hosts.map((host) => [host, provider])),
