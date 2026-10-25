@@ -10,8 +10,18 @@ import org.junit.Test
 class MainActivityLaunchTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
+    private fun awaitHomeScreenReady() {
+        // CatalogGate reads the shared catalog on Dispatchers.IO; wait for its real
+        // destination rather than racing the launch screen.
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun launchShowsNativeCatalogHome() {
+        awaitHomeScreenReady()
         composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
