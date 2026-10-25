@@ -166,7 +166,7 @@ export function parseAudiomackAlbumPage(html, pageUrl) {
     // Next.js App Router can stream public track links inside serialized
     // flight-data strings, with slashes escaped as \\u002F or \\/. Normalize only
     // those escape sequences; never evaluate script code or invent song slugs.
-    const normalized = raw.replace(/\\\\+u002f/gi, "/").replace(/\\\\+x2f/gi, "/").replace(/\\\\+\\\//g, "/");
+    const normalized = raw.replace(/\\+u002f/gi, "/").replace(/\\+x2f/gi, "/").replace(/\\+\//g, "/");
     const serializedPattern = /(?:https?:\/\/(?:www\.)?audiomack\.com)?\/([a-z0-9._-]+)\/song\/([a-z0-9._-]+)/gi;
     let serialized;
     while ((serialized = serializedPattern.exec(normalized))) {
