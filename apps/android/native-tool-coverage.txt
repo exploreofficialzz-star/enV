@@ -6916,6 +6916,7 @@ slug-generator
 snake-case-converter
 solar-panel-count-calculator
 solar-panel-energy-calculator
+song-metadata-analyzer
 sort-lines
 sound-intensity-level-calculator
 speed-calculator
@@ -7094,4 +7095,3 @@ youtube-earnings-estimator
 youtube-rpm-calculator
 youtube-shorts-calculator
 z-score-calculator
-
