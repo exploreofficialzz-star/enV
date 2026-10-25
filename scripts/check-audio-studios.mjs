@@ -5,12 +5,12 @@ import { tools } from "../src/data/catalog.ts";
 const shared = JSON.parse(fs.readFileSync(new URL("../apps/shared/catalog.json", import.meta.url), "utf8"));
 const categoryTools = tools.filter((tool) => tool.category === "audio");
 const baseline = JSON.parse(fs.readFileSync(new URL("../docs/audits/enV-audio-studios-baseline-slugs.json", import.meta.url), "utf8"));
-const expectedRuntimeToolCount = tools.length + (tools.some((tool) => tool.id === "song-metadata-analyzer") ? 0 : 1);
+const expectedRuntimeToolCount = tools.length;
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
 assert.equal(byId.size, tools.length, "runtime catalog must have globally unique tool IDs");
 if (!byId.has("song-metadata-analyzer")) byId.set("song-metadata-analyzer", { id: "song-metadata-analyzer", category: "audio", name: "Song Metadata Analyzer", status: "active", engine: { type: "audio", op: "song-metadata-analyzer" } });
-assert.equal(shared.tools.length, expectedRuntimeToolCount, "shared native catalog must include the registered runtime analyzer extension");
-assert.equal(shared.counts.total, expectedRuntimeToolCount, "shared catalog totals must match the runtime catalog plus registered extensions");
+assert.equal(shared.tools.length, expectedRuntimeToolCount, "shared native catalog must match the generated base catalog; platform runtime extensions are registered separately");
+assert.equal(shared.counts.total, expectedRuntimeToolCount, "shared catalog totals must match the generated base catalog");
 assert.equal(shared.counts.categories, shared.categories.length, "shared category count must be consistent");
 
 const requiredLegacy = [
