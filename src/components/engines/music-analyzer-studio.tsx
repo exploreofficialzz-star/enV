@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { downloadBlob } from "@/lib/utils";
 import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
+import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
 
 const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
 const MODEL_FILE_LIMIT = 25 * 1024 * 1024;
@@ -140,7 +141,7 @@ export function MusicAnalyzerStudio() {
         await context.close().catch(() => undefined);
       }
       if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
-      if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 5 minutes. Split longer files into sections first.");
+      if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
       const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
       const result = analyzeMusicAudio({
@@ -201,6 +202,14 @@ export function MusicAnalyzerStudio() {
     downloadBlob(blob, file ? file.name.replace(/\.[^.]+$/, "") + "-env-music-analysis.json" : "env-music-analysis.json");
   }
 
+  function exportSongProfile() {
+    if (!analysis) return;
+    const profile = createMusicAnalysisProfile(analysis);
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json;charset=utf-8" });
+    const baseName = file?.name.replace(/\.[^.]+$/, "").trim() || "env-song";
+    downloadBlob(blob, baseName + "-song-profile.json");
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <header className="rounded-2xl border border-border bg-surface p-4 sm:p-6">
@@ -237,7 +246,8 @@ export function MusicAnalyzerStudio() {
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={!file || busy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
-          <Button type="button" variant="outline" disabled={!analysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Export JSON</Button>
+          <Button type="button" variant="outline" disabled={!analysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
+          <Button type="button" variant="ghost" disabled={!analysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Full analysis</Button>
         </div>
         {error ? <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{error}</p> : null}
         {notice ? <p className="mt-3 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground" role="status" aria-live="polite">{notice}</p> : null}
