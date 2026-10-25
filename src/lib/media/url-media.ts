@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { apiUrl } from "@/lib/api/base";
 import { mediaErrorMessage } from "@/lib/media/shared-media";
-export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" | "audiomack" | "soundcloud" | "bandcamp" | "mixcloud" | "audius" | "jamendo" | "hearthis" | "bandlab" | "boomplay";
+export type UrlMediaProvider = "generic" | "youtube" | "tiktok" | "facebook" | "instagram" | "x" | "audiomack" | "soundcloud" | "bandcamp" | "mixcloud" | "audius" | "jamendo" | "hearthis" | "bandlab" | "boomplay" | "zingmp3" | "netease" | "yandex-music" | "archive" | "audioboom" | "reverbnation" | "soundclick" | "spreaker" | "podomatic" | "freesound";
 
 export interface UrlMediaRequest {
   url: string;
