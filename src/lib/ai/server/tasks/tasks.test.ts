@@ -43,11 +43,15 @@ test("every structured task: schema is strict-compatible and its own example pas
     "developer.sql.explain": { sql: "SELECT id FROM users WHERE active = 1" },
     "developer.json.explain": { json: '{"a":1}' },
     "image.alt.generate": { imageBase64: png(), mimeType: "image/png" },
+    "music.analysis.classify": { audioBase64: mp3(), mimeType: "audio/mpeg", filename: "wedding-track.mp3" },
     "assistant.chat": { messages: [{ role: "user", content: "Help me organize a short work plan." }], candidates: [{ id: "work-planner", name: "Work Planner", description: "Organize daily work tasks.", category: "productivity" }] },
   };
   for (const t of ALL_TASKS.filter((x) => x.structured)) {
     assert.deepEqual(strictSchemaProblems(t.jsonSchema!), [], t.id);
-    const example = exampleFromSchema(t.jsonSchema!);
+    const schemaExample = exampleFromSchema(t.jsonSchema!);
+    const example = t.id === "music.analysis.classify"
+      ? { genre: "Afrobeats", sub_style: "Afro-pop", language: ["Nigerian Pidgin", "Yoruba"], mood: ["upbeat"], instruments: ["drums", "bass"], vocal_style: "melodic", genre_candidates: [{ label: "Afrobeats", score: 0.86 }] }
+      : schemaExample;
     assert.deepEqual(validateJsonSchema(example, t.jsonSchema!), [], t.id);
     const prepared = ok(t.id, examples[t.id]);
     const accepted = prepared.accept(reply(example), B);
