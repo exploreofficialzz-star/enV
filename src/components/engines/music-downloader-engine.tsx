@@ -318,7 +318,7 @@ export function MusicDownloaderEngine() {
           </label>
           <div className="rounded-xl border border-border p-3 text-sm">
             <p className="font-medium">Streaming-service links</p>
-            <p className="mt-1 text-muted">Spotify, Apple Music, YouTube Music, Deezer, Amazon Music, TIDAL and SoundCloud pages are not direct audio files. Use a service’s official offline feature for protected catalog tracks, or supply a direct download link provided by the rights holder.</p>
+            <p className="mt-1 text-muted">Spotify, Apple Music, YouTube Music, Audiomack, Boomplay, Deezer, Amazon Music, TIDAL, SoundCloud, Pandora, Mixcloud, Anghami, Qobuz, Napster, JioSaavn and iHeartRadio pages are not direct audio files. Use each service’s official offline/download option for protected catalog tracks, or supply a direct audio-file link provided by the rights holder.</p>
             {platform ? <a href={platform.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center font-medium text-accent hover:underline">Open {platform.label}</a> : null}
           </div>
           <Button type="button" onClick={() => void runOnline()} disabled={busy} className="w-full sm:w-auto">{busy ? "Downloading…" : (collectionType === "track" ? "Download track" : "Download " + collectionType)}</Button>
