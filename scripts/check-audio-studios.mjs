@@ -100,13 +100,17 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
 const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
+const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
 for (const marker of ["Analyze on this device", "Export JSON", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
+}
+for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
+  assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
 }
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
 }
-for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_NOT_CONFIGURED", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED"]) {
+for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_NOT_CONFIGURED", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification"]) {
   assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
 }
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
