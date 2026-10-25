@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
+import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { urlMediaProcessorPath } from "../processor/url-media-route.mjs";
 
 const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
@@ -93,3 +94,31 @@ assert.doesNotMatch(source, /catch \(error\) \{ console\.error\(error\)/);
 assert.match(source, /route=\/info causeType=/);
 assert.match(source, /route=\/download causeType=/);
 assert.match(source, /REQUEST_TOO_LARGE/);
+
+
+const audiomackAlbumFixture = `<!doctype html>
+<html><head>
+<meta property="og:title" content="Evado Promise land" />
+<meta name="music:musician" content="Evado" />
+</head><body>
+<h1>Evado Promise land</h1>
+<a href="/evadolee/song/promise-land/">Promise land</a>
+<a href="https://audiomack.com/evadolee/song/dna">DNA</a>
+<script type="application/ld+json">
+{"@type":"MusicAlbum","track":{"itemListElement":[{"item":{"@type":"MusicRecording","name":"By Now","url":"https://audiomack.com/evadolee/song/by-now"}}]}}
+</script>
+</body></html>`;
+
+const audiomackAlbumPage = parseAudiomackAlbumPage(
+  audiomackAlbumFixture,
+  "https://audiomack.com/evadolee/album/promise-land?share-user-id=118614535",
+);
+assert.equal(audiomackAlbumPage.title, "Promise Land");
+assert.equal(audiomackAlbumPage.entries.length, 3);
+assert.deepEqual(
+  audiomackAlbumPage.entries.map((entry) => entry.title),
+  ["Promise land", "DNA", "By Now"],
+);
+assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWith("https://audiomack.com/evadolee/song/")));
+assert.equal(audiomackAlbumPage.uploader, "Evado");
+assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
