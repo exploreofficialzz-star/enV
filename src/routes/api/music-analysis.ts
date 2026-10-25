@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 90_000;
+const RATE_LIMIT_WINDOW_MS = 10 * 60_000;
+const RATE_LIMIT_REQUESTS = 10;
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 type Candidate = { label: string; score: number | null };
 
@@ -63,6 +66,21 @@ function normalizeResponse(value: unknown) {
   };
 }
 
+function isRateLimited(request: Request): boolean {
+  const now = Date.now();
+  const ip = request.headers.get("cf-connecting-ip")
+    ?? request.headers.get("x-real-ip")
+    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? "unknown";
+  const existing = requestCounts.get(ip);
+  if (!existing || existing.resetAt <= now) {
+    requestCounts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  existing.count++;
+  return existing.count > RATE_LIMIT_REQUESTS;
+}
+
 async function handleMusicAnalysis({ request }: { request: Request }): Promise<Response> {
   const endpointValue = String(process.env.MUSIC_ANALYSIS_ENDPOINT ?? "").trim();
   if (!endpointValue) {
@@ -77,6 +95,20 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
   }
   if (endpoint.protocol !== "https:") {
     return errorResponse(503, "MUSIC_ANALYSIS_CONFIGURATION_INVALID", "MUSIC_ANALYSIS_ENDPOINT must use HTTPS in this deployment.");
+  }
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "Music analysis requests must come from the enV application origin.");
+      }
+    } catch {
+      return errorResponse(403, "MUSIC_ANALYSIS_ORIGIN_REJECTED", "The request origin could not be validated.");
+    }
+  }
+  if (isRateLimited(request)) {
+    return errorResponse(429, "MUSIC_ANALYSIS_RATE_LIMITED", "Too many model requests from this connection. Try again in a few minutes.");
   }
 
   const announcedLength = Number(request.headers.get("content-length") ?? "0");
