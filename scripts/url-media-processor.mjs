@@ -429,7 +429,16 @@ async function handleInfo(req, res) {
       ...(includePlaylist ? ["--flat-playlist", "--playlist-end", "50"] : []),
       url.toString(),
     ];
-    const { stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist));
+    let stdout;
+    try {
+      ({ stdout } = await runYtdlp(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (provider === "audiomack" && includePlaylist && isAudiomackAlbumUrl(url) && /invalid url for track \d+ of album url/i.test(message)) {
+        throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list, and the public page did not expose usable per-song links. Try an individual song URL or a direct authorized audio-file URL.");
+      }
+      throw error;
+    }
     const metadata = parseYtDlpJson(stdout);
     if (metadata.duration != null && Number(metadata.duration) > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: Media exceeds the configured duration limit.");
 
@@ -546,11 +555,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
   if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV URL media processor", downloader: YTDLP_BIN, providers: Object.keys(PROVIDERS), ready: await commandExists() });
   if (req.method === "POST" && req.url === "/info") {
-    try { await handleInfo(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/info causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
+    try { await handleInfo(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/info causeType=${error instanceof Error ? error.name : "UnknownError"} diagnostic=${String(error instanceof Error ? error.message : error).replace(/https?:\\/\\/\\S+/g, "[url]").replace(/[\\r\\n]+/g, " ").slice(0, 320)}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   if (req.method === "POST" && req.url === "/download") {
-    try { await handleDownload(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/download causeType=${error instanceof Error ? error.name : "UnknownError"}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
+    try { await handleDownload(req, res); } catch (error) { const failure = errorPayload(error); const requestId = randomUUID(); console.error(`[url-media] ${failure.code} requestId=${requestId} route=/download causeType=${error instanceof Error ? error.name : "UnknownError"} diagnostic=${String(error instanceof Error ? error.message : error).replace(/https?:\\/\\/\\S+/g, "[url]").replace(/[\\r\\n]+/g, " ").slice(0, 320)}`); if (!res.headersSent) json(res, errorStatus(failure.code), { ok: false, error: failure.message, ...failure, requestId }); }
     return;
   }
   json(res, 404, { error: "Not found." });
