@@ -139,4 +139,29 @@ class NativeAudioEngineTest {
         catch (_: IllegalArgumentException) { }
     }
 
+
+    @Test
+    fun songMetadataAnalyzerRoutesToItsDedicatedNativeScreen() {
+        val analyzer = ToolRecord(
+            id = "song-metadata-analyzer",
+            name = "Song Metadata Analyzer",
+            slug = "song-metadata-analyzer",
+            description = "Inspect song metadata and audio signals locally.",
+            category = "audio",
+            keywords = listOf("song", "metadata", "music", "analysis"),
+            tags = listOf("song", "audio"),
+            icon = "AudioLines",
+            popularity = 99,
+            featured = true,
+            clientSide = true,
+            requiresBackend = false,
+            requiresAuth = false,
+            status = "active",
+            related = listOf("audio-file-inspector"),
+            engine = EngineInfo(type = "audio", id = "song-metadata-analyzer")
+        )
+        assertEquals("song-metadata-analyzer", NativeAudioEngine.operationFor(analyzer))
+        assertTrue(NativeAudioEngine.supports(analyzer))
+    }
+
 }
