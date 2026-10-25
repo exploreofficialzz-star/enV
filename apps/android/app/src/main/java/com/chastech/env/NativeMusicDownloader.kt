@@ -190,11 +190,26 @@ private fun postMusicApiJson(path: String, payload: JSONObject): JSONObject {
     }
 }
 
+private fun musicPageIsCollection(raw: String): Boolean {
+    val uri = Uri.parse(raw)
+    val segments = uri.pathSegments.map { it.lowercase(Locale.ROOT) }
+    if (segments.any { it in setOf("album", "albums", "playlist", "playlists", "sets") }) return true
+    val host = uri.host?.lowercase(Locale.ROOT).orEmpty()
+    return (host == "youtube.com" || host.endsWith(".youtube.com")) && !uri.getQueryParameter("list").isNullOrBlank()
+}
+
 private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: Boolean): List<DirectMusicTrack> {
-    val info = postMusicApiJson(
+    val info = try {
+        postMusicApiJson(
         "/api/backend/url-media/info",
         JSONObject().put("url", track.url).put("includePlaylist", includePlaylist)
-    )
+        )
+    } catch (failure: Exception) {
+        // A provider's metadata endpoint can fail while its audio extractor works.
+        // Retry only an individual song, not a whole album/playlist as one track.
+        if (musicPageIsCollection(track.url)) throw failure
+        return listOf(track)
+    }
     val entries = info.optJSONArray("entries")
     if (entries != null && entries.length() > 0) {
         require(entries.length() <= 50) { "This collection has more than 50 tracks. Split it into smaller batches." }
@@ -206,6 +221,9 @@ private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: B
             resolved += DirectMusicTrack(entry.optString("title").ifBlank { "Track ${index + 1}" }, url, "mp3", true)
         }
         if (resolved.isNotEmpty()) return resolved
+    }
+    require(!info.optBoolean("isPlaylist", false) && !musicPageIsCollection(track.url)) {
+        "The album or playlist could not be expanded into public track links."
     }
     return listOf(track.copy(title = info.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: track.title))
 }
