@@ -166,6 +166,15 @@ jobs:
           fi
       # Native launch and accessibility checks are release gates. An emulator
       # infrastructure failure must remain visible and must not publish unverified artifacts.
+      # Enable host KVM first: prior runs silently used software acceleration and lost
+      # Android package-manager services before instrumentation tests began.
+      - name: Enable KVM for Android emulator
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
       - name: Run native Android launch and accessibility tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -173,10 +182,9 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          # Give the API 30 emulator enough RAM and keep device setup under the runner action's control.
-          # Avoid manually restarting ADB before boot; this runner has repeatedly lost the emulator shell.
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-snapshot-load -noaudio -no-boot-anim -memory 4096 -cores 2 -camera-back none -camera-front none
-          disable-animations: false
+          disable-linux-hw-accel: false
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
           script: cd apps/android && ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
       - name: Upload Android instrumentation test evidence
         if: always()
