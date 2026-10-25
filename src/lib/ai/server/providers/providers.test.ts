@@ -237,7 +237,7 @@ test("gemini interactions: audio payload and structured output use the official 
   assert.deepEqual(sent.input[0], { type: "text", text: "Classify this clip" });
   assert.deepEqual(sent.input[1], { type: "audio", data: "SUQzAAAA", mime_type: "audio/mpeg" });
   const m4aBody = buildGeminiInteractionBody(request({ capability: "AUDIO_UNDERSTANDING", user: [{ type: "audio", mimeType: "audio/mp4", dataBase64: "AAAA" }] }));
-  assert.deepEqual(m4aBody.input[0], { type: "audio", data: "AAAA", mime_type: "audio/m4a" });
+  assert.deepEqual((m4aBody.input as Array<Record<string, unknown>>)[0], { type: "audio", data: "AAAA", mime_type: "audio/m4a" });
   assert.equal(sent.response_format.mime_type, "application/json");
   assert.deepEqual(sent.response_format.schema, { type: "object", required: ["genre"], properties: { genre: { type: "string" } } });
   assert.equal(sent.generation_config.max_output_tokens, 100);
