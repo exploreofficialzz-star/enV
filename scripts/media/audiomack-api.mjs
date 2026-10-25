@@ -36,7 +36,7 @@ export function audiomackOAuthHeader(method, apiUrl, key, secret, nonce = random
     ...url.searchParams.entries(),
   ];
   const parameterString = parameters.map(([k, v]) => [encode(k), encode(v)])
-    .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]))
+    .sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)
     .map(([k, v]) => k + "=" + v).join("&");
   const base = [method.toUpperCase(), encode(url.origin + url.pathname), encode(parameterString)].join("&");
   const signature = createHmac("sha1", encode(secret) + "&").update(base).digest("base64");
