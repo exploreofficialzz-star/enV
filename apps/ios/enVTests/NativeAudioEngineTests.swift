@@ -153,6 +153,19 @@ final class NativeAudioEngineTests: XCTestCase {
     }
 
 
+    func testNativeSongZIPParserAcceptsAnEmptyArchiveWithoutCrashing() throws {
+        // End of central directory record for a valid, empty ZIP archive.
+        let emptyZIP = Data([
+            0x50, 0x4b, 0x05, 0x06,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00
+        ])
+        XCTAssertTrue(try nativeSongUnpackZIP(emptyZIP).isEmpty)
+    }
+
     func testSongMetadataAnalyzerRoutesToItsDedicatedNativeScreen() {
         let analyzer = Tool(
             id: "song-metadata-analyzer",
