@@ -36,7 +36,7 @@ const featureIds = [
   ...[...featureSource.matchAll(/toolId:\s*"([^"]+)"/g)].map((match) => match[1]),
 ];
 const unique = [...new Set(featureIds)];
-if (unique.length !== 17) fail(`Expected 17 AI feature bindings, found ${unique.length}`);
+if (unique.length !== 18) fail(`Expected 18 AI feature bindings, found ${unique.length}`);
 for (const id of unique) {
   if (!ids.has(id)) fail(`AI feature tool is absent from catalog: ${id}`);
   if (!active.has(id)) fail(`AI feature tool is not active in catalog: ${id}`);
