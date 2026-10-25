@@ -60,7 +60,7 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
         if (/sign in to confirm|login required|authentication required|please log in/i.test(detail)) {
           return reject(new Error(`AUTH_REQUIRED: ${provider || "The provider"} requires sign-in or is challenging the processor's anonymous request. Use content accessible to the processor or configure a provider cookie file on the processor.`));
         }
-        if (/unexpected response from webpage request|ip address is blocked|captcha|too many requests/i.test(detail)) {
+        if (/unexpected response from webpage request|ip address is blocked|captcha/i.test(detail)) {
           return reject(new Error(`SOURCE_UNAVAILABLE: ${provider || "The provider"} is challenging or blocking the processor request. Confirm the post is publicly available in the service region, then retry later.`));
         }
         return reject(classifyProviderFailure(provider, detail || `Media downloader exited with code ${code}.`));
