@@ -177,7 +177,7 @@ export const musicAnalysisTask = defineTask({
   kind: "structured",
   capability: "AUDIO_ANALYSIS",
   id: "audio.music.analyze",
-  version: "2026-10-25.1",
+  version: "2026-10-25.2",
   description: "Analyze short representative music excerpts for genre, mood, vocals, instruments, language and grounded descriptions.",
   privacy: "sensitive",
   remoteProcessingAllowed: true,
@@ -223,7 +223,7 @@ export const musicAnalysisTask = defineTask({
       "Do not guess the singer's identity, ethnicity, or verified gender identity. If vocal register/presentation is uncertain, omit it.",
       "Write up to three short, distinct descriptions. Do not quote song lyrics; summarize any lyrical evidence briefly and in your own words.",
       "Use empty lists and null when unsupported. Include concise warnings for uncertainty or insufficient evidence. Do not fabricate numeric confidence scores.",
-      "Reply with JSON matching the schema only.",
+      "Reply with only a JSON object that matches the provided schema.",
     ].join("\n");
     const context = [
       "Analyze the attached music excerpts.",
