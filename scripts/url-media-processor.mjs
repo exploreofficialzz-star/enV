@@ -152,7 +152,8 @@ function providerForUrl(raw) {
   let url;
   try { url = new URL(String(raw || "").trim()); } catch { throw new Error("INVALID_URL: Enter a valid http(s) URL."); }
   if (!/^https?:$/.test(url.protocol)) throw new Error("INVALID_URL: Only http and https URLs are supported.");
-  return { url, provider: detectProvider(url) };
+  const directAudio = /\.(?:mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff|aif|wma|webm)$/i.test(url.pathname);
+  return { url, provider: directAudio ? "generic" : detectProvider(url) };
 }
 
 const PUBLIC_ERROR_MESSAGES = {
