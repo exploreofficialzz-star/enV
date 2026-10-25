@@ -149,7 +149,7 @@ export function validateDirectMusicUrl(raw: string): DirectUrlValidation {
 export function isLikelyMusicCollectionUrl(raw: string): boolean {
   let url: URL;
   try { url = new URL(raw); } catch { return false; }
-  const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
   const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
   const has = (value: string) => parts.includes(value);
   if ((host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be") &&
