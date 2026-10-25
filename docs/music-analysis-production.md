@@ -35,3 +35,14 @@ These values are an example of the response contract, not a claim that enV predi
 Local analysis does not upload the audio. The user must explicitly enable model upload in the interface before the model endpoint is called. Model uploads go only to the configured endpoint; operators are responsible for the endpoint's access controls, retention policy, model license and processing location.
 
 Tempo and key are best-effort DSP estimates. The loudness field is an RMS-based proxy, not a standards-compliant integrated LUFS measurement. The signal features do not independently identify a genre, sub-style, language, mood or instrument. Language detection on singing or mixed vocals should be treated as uncertain unless the configured model was evaluated for that use case and the target languages, including Pidgin and Yoruba.
+
+
+## Choosing and validating the semantic model
+
+The repository does not silently select a public inference service. Until `MUSIC_ANALYSIS_ENDPOINT` is configured, the model-tag request returns an explicit unavailable response and on-device signal measurements continue to work.
+
+A reasonable candidate for a separately deployed adapter is [OpenMOSS MOSS-Music](https://github.com/OpenMOSS/MOSS-Music) / [the official model page](https://www.mosi.cn/en/models/moss-music). Its published scope includes music captioning/tagging, lyrics transcription, instrument/vocal descriptions, and key/tempo/chord analysis; the released 8B models are Apache-2.0 licensed. Treat this as a model candidate, not a preconfigured enV dependency: the adapter must convert its output into the JSON contract above, and operators must size and evaluate the actual deployment.
+
+Do not assume a model accurately detects Nigerian Pidgin, Yoruba, or code-switched lyrics just because it can caption music or transcribe some singing. Its published singing-ASR benchmark description specifically mentions Chinese and English. Evaluate Nigerian-language clips with consented, reviewed ground truth before marking those labels reliable. Unknown and low-confidence fields must stay unknown or visibly uncertain.
+
+The Discogs-EffNet ONNX mirror is another music-style classifier, but its published model card specifies CC-BY-NC-SA 4.0 / non-commercial terms. Do not ship it in a commercial enV build without confirming the applicable license and obtaining any needed permission.
