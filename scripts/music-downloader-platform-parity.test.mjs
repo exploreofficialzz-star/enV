@@ -37,6 +37,8 @@ test("iOS music downloader resolves supported public pages using the configured 
   assert.match(native, /nativeMusicProviderPageDomains/);
   assert.match(native, /nativeMusicResolve\(/);
   assert.match(native, /nativeMusicDownload\(/);
+  assert.match(native, /nativeMusicAPIError/);
+  assert.match(native, /!\["true", "false", "null"\]\.contains\(trimmed\.lowercased\(\)\)/);
   assert.doesNotMatch(native, /private let nativeMusicAPIEndpoint = URL\(string: "https:\/\/env-q3mq\.onrender\.com\/api\/backend\/url-media"\)!/);
 });
 
