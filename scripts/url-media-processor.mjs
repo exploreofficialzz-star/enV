@@ -200,7 +200,11 @@ function errorPayload(error) {
     (/request body is too large/i.test(message) ? "REQUEST_TOO_LARGE" :
       error instanceof SyntaxError ? "INVALID_REQUEST_BODY" : "PROVIDER_ERROR");
   const retryable = ["SOURCE_UNAVAILABLE", "NETWORK_TIMEOUT", "RATE_LIMITED", "SERVER_CAPACITY", "SEGMENT_FAILED"].includes(code);
-  return { code, message: PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR, retryable };
+  const audiomackAlbumFailure = code === "SOURCE_UNAVAILABLE" && /^SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list/i.test(message);
+  const publicMessage = audiomackAlbumFailure
+    ? message.replace(/^SOURCE_UNAVAILABLE:\s*/i, "")
+    : PUBLIC_ERROR_MESSAGES[code] || PUBLIC_ERROR_MESSAGES.PROVIDER_ERROR;
+  return { code, message: publicMessage, retryable };
 }
 
 function errorStatus(code) {
@@ -367,7 +371,9 @@ async function inspectAudiomackAlbumPage(url, signal) {
     method: "GET",
     headers: {
       accept: "text/html,application/xhtml+xml",
-      "user-agent": "Mozilla/5.0 (compatible; enVMusicDownloader/1.0)",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "accept-language": "en-US,en;q=0.9",
+      "cache-control": "no-cache",
     },
   }, signal);
   const finalHost = finalUrl.hostname.toLowerCase();
