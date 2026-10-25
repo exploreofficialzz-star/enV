@@ -45,6 +45,11 @@ async function readBoundedBody(request: Request, maximumBytes: number): Promise<
   return body;
 }
 
+function appCookiePath(cookie: string | null): string | null {
+  if (!cookie) return null;
+  return cookie.replace(/;\\s*Path=\\/api\\/ai\\b/i, "; Path=/api");
+}
+
 function isRateLimited(request: Request): boolean {
   const now = Date.now();
   if (requestCounts.size > 5000) {
@@ -155,10 +160,9 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
       flac: "audio/flac",
       webm: "audio/webm",
     };
-    const mimeType = [file.type, inferredMime[extension]].find((value) => value && (AI_LIMITS.audioBytesMax > 0) && [
-      "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a",
-      "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/flac",
-    ].includes(value)) ?? "";
+    const supportedMimes = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav", "audio/webm", "audio/ogg", "audio/flac"];
+    const rawMime = [file.type, inferredMime[extension]].find((value) => value && supportedMimes.includes(value)) ?? "";
+    const mimeType = rawMime === "audio/x-m4a" ? "audio/mp4" : rawMime === "audio/x-wav" ? "audio/wav" : rawMime;
     if (!mimeType) {
       return errorResponse(415, "MUSIC_ANALYSIS_UNSUPPORTED_MEDIA", "The built-in AI path supports MP3, WAV, M4A, OGG, FLAC and WebM audio.");
     }
@@ -185,7 +189,7 @@ async function handleMusicAnalysis({ request }: { request: Request }): Promise<R
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         cache: "no-store",
       });
-      const setCookie = upstream.headers.get("set-cookie");
+      const setCookie = appCookiePath(upstream.headers.get("set-cookie"));
       const payload = await upstream.json().catch(() => null) as {
         ok?: boolean;
         data?: { result?: unknown };
