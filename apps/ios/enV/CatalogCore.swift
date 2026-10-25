@@ -190,7 +190,7 @@ extension Catalog {
             description: "Download direct audio files online or import and organize tracks for offline use.",
             category: "audio",
             subcategory: "Music",
-            keywords: ["music", "download", "offline", "online", "track", "album", "playlist", "audio"],
+            keywords: ["music", "download", "offline", "online", "track", "album", "playlist", "audio", "spotify", "apple music", "youtube", "youtube music", "audiomack", "boomplay", "deezer", "amazon music", "tidal", "soundcloud", "pandora", "mixcloud", "anghami", "qobuz", "napster", "jiosaavn", "iheart radio"],
             tags: ["music", "download", "offline", "online", "album", "playlist"],
             icon: "Download",
             popularity: 10000,
