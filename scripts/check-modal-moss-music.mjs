@@ -12,7 +12,7 @@ const syntax = spawnSync(python, [
   "from pathlib import Path; import sys; p=Path(sys.argv[1]); compile(p.read_text(encoding='utf-8'), str(p), 'exec')",
   sourcePath,
 ], { encoding: "utf8" });
-assert.equal(syntax.error, undefined, \`Python is required to syntax-check the Modal service: \${syntax.error?.message ?? ""}\`);
+assert.equal(syntax.error, undefined, "Python is required to syntax-check the Modal service: " + (syntax.error?.message ?? ""));
 assert.equal(syntax.status, 0, \`Modal service Python syntax check failed:\n\${syntax.stdout}\n\${syntax.stderr}\`);
 
 const requirements = [
@@ -44,14 +44,14 @@ const failures = [];
 for (const [name, pattern] of requirements) {
   try {
     assert.match(source, pattern, name);
-    console.log(\`PASS \${name}\`);
+    console.log("PASS " + name);
   } catch {
     failures.push(name);
-    console.error(\`FAIL \${name}\`);
+    console.error("FAIL " + name);
   }
 }
 if (failures.length) {
-  console.error(\`Modal MOSS-Music checks failed (\${failures.length}/\${requirements.length}).\`);
+  console.error("Modal MOSS-Music checks failed (" + failures.length + "/" + requirements.length + ").");
   process.exit(1);
 }
-console.log(\`Modal MOSS-Music static and Python syntax checks passed (\${requirements.length}/\${requirements.length}).\`);
+console.log("Modal MOSS-Music static and Python syntax checks passed (" + requirements.length + "/" + requirements.length + ").");
