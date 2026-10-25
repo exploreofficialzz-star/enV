@@ -39,7 +39,7 @@ export interface AiUsageCaptureEvent {
   userId: string | null;
   provider: string | null;
   model: string | null;
-  usage: { inputTokens: number | null; outputTokens: number | null; totalTokens: number | null; audioSeconds: number | null };
+  usage: { inputTokens: number | null; outputTokens: number | null; totalTokens: number | null; audioSeconds: number | null; computeSeconds?: number | null };
   estimatedCostUsd: number | null;
   costBasis: "estimated" | "unknown";
   latencyMs: number | null;
@@ -249,7 +249,7 @@ export function createAiHandlers(deps: HandlerDeps): AiHandlers {
             provider: result.cached ? null : result.provider,
             model: result.cached ? null : result.model,
             usage: result.cached
-              ? { inputTokens: 0, outputTokens: 0, totalTokens: 0, audioSeconds: 0 }
+              ? { inputTokens: 0, outputTokens: 0, totalTokens: 0, audioSeconds: 0, computeSeconds: 0 }
               : result.usage,
             estimatedCostUsd: result.cached ? 0 : result.cost.usd,
             costBasis: result.cached ? "estimated" : result.cost.basis,
