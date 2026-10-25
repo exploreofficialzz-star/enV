@@ -157,8 +157,7 @@ await mkdir(dirname(dataPath), { recursive: true });
 await writeFile(dataPath, `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: profiles.length, profiles }, null, 2)}\n`);
 const indexProfiles = profiles.map(({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }) => ({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }));
 await writeFile(join(root, "src/data/billing-profile-index.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: indexProfiles.length, profiles: indexProfiles })}\n`);
-const runtimeExtensionIndex = runtimeExtensionProfiles.map(({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }) => ({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }));
-await writeFile(join(root, "src/data/billing-profile-runtime-extensions.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: runtimeExtensionIndex.length, profiles: runtimeExtensionIndex }, null, 2)}\n`);
+await writeFile(join(root, "src/data/billing-profile-runtime-extensions.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: runtimeExtensionProfiles.length, profiles: runtimeExtensionProfiles }, null, 2)}\n`);
 
 const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.set(p[key], (map.get(p[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 const byRule = countBy("billingKey");
