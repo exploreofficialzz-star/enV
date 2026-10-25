@@ -1,5 +1,9 @@
 {
   "catalogVersion": "1ba562f18a0b",
+  "baseCatalogVersion": "e9943f7f4c1f",
+  "runtimeExtensionIds": [
+    "song-metadata-analyzer"
+  ],
   "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
@@ -15827,9 +15831,5 @@
     "engineFamilies": 27,
     "androidImplemented": 7783,
     "iosImplemented": 7783
-  },
-  "baseCatalogVersion": "e9943f7f4c1f",
-  "runtimeExtensionIds": [
-    "song-metadata-analyzer"
-  ]
+  }
 }
