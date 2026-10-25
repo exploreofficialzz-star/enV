@@ -29,7 +29,7 @@ function request(): AdapterRequest {
 
 test("Gemini audio-understanding route preserves audio input and disables provider storage", () => {
   const adapter = createGeminiAdapter({ apiKey: () => "test-secret" });
-  assert.equal(adapter.supports("AUDIO_UNDERSTANDING"), true);
+  assert.equal(adapter.supports("AUDIO_UNDERSTANDING", "gemini-3.8-flash"), true);
   const body = buildGeminiInteractionBody(request()) as {
     input: Array<Record<string, unknown>>;
     store: boolean;
