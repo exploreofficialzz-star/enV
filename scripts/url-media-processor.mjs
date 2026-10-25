@@ -456,13 +456,21 @@ async function handleInfo(req, res) {
         json(res, 200, albumInfo);
         return;
       }
-      audiomackPageFallbackFailure = "The public album page did not expose any usable track links.";
+      audiomackPageFallbackFailure = "The public collection page did not expose usable song links.";
     } catch (error) {
       if (error?.name === "AbortError") throw error;
       const failure = error instanceof Error ? error.message : String(error);
       audiomackPageFallbackFailure = failure.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(0, 220);
       console.warn("[url-media] Audiomack page-link fallback unavailable: " + audiomackPageFallbackFailure);
     }
+  }
+  // yt-dlp's historical Audiomack album extractor loops over the obsolete
+  // /api/music/url/album endpoint. Running it after public-page discovery fails
+  // produces a misleading JSON error, not a usable album track list.
+  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack's public collection page did not expose readable song links. " +
+      (audiomackPageFallbackFailure || "Track enumeration was unavailable.") +
+      " The legacy album API extractor cannot recover those links. No audio was downloaded.");
   }
   if (provider === "generic") {
     const info = await inspectDirectUrl(url, controller.signal);
@@ -502,11 +510,6 @@ async function handleInfo(req, res) {
         }
       }
       const message = error instanceof Error ? error.message : String(error);
-      if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
-        const detail = message.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(-260);
-        const pageFailure = audiomackPageFallbackFailure || "The public page fallback did not return track links.";
-        throw new Error("SOURCE_UNAVAILABLE: Audiomack's album endpoint rejected its track list. Public-page fallback: " + pageFailure + " Extractor detail: " + detail + ". Try an individual song URL or an authorized direct audio-file URL.");
-      }
       throw error;
     }
     const metadata = parseYtDlpJson(stdout);
