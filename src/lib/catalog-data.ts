@@ -2,7 +2,27 @@
 import homeTools from "@/data/home-tools.json";
 import type { SearchTool, ToolMeta, ToolSummary } from "@/types/tool";
 
-export const CATALOG_COUNTS = homeTools.counts;
+const MUSIC_DOWNLOADER_META = {
+  id: "music-downloader",
+  name: "Music Downloader",
+  slug: "music-downloader",
+  description: "Download authorized direct audio files online, or package tracks already on your device for offline use.",
+  category: "audio",
+  icon: "Download",
+  popularity: 10000,
+  featured: true,
+  clientSide: true,
+  status: "active",
+  isNew: true,
+  keywords: ["music", "download", "offline", "online", "album", "playlist", "audio file"],
+  tags: ["music", "download", "album", "playlist", "offline", "online", "audio"],
+  detailShard: "00",
+};
+export const CATALOG_COUNTS = {
+  ...homeTools.counts,
+  total: homeTools.counts.total + 1,
+  active: homeTools.counts.active + 1,
+};
 const CATALOG_ROOT = `/catalog-runtime/${homeTools.version}`;
 
 let toolIndex: readonly ToolSummary[] | null = null;
@@ -52,8 +72,8 @@ export function loadToolIndex(): Promise<readonly ToolSummary[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The tool list response was invalid. Retry to load it again.");
-        toolIndex = data;
-        return data;
+        toolIndex = data.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id) ? data : [...data, MUSIC_DOWNLOADER_META];
+        return toolIndex;
       })
       .catch((error: unknown) => {
         toolIndexPromise = null;
@@ -74,8 +94,8 @@ export function loadSearchIndex(): Promise<readonly SearchTool[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The search index response was invalid. Retry to search tools.");
-        searchIndex = data;
-        return data;
+        searchIndex = data.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id) ? data : [...data, MUSIC_DOWNLOADER_META];
+        return searchIndex;
       })
       .catch((error: unknown) => {
         searchIndexPromise = null;

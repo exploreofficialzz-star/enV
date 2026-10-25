@@ -494,6 +494,7 @@ enum NativeCoverage {
     static func usesBackend(_ tool: Tool) -> Bool { NativeBackendEngine.supports(tool) }
     static func isLocallyExecutable(_ tool: Tool) -> Bool {
         if usesBackend(tool) || tool.isPlanned { return false }
+        if tool.id == "music-downloader" { return true }
         switch tool.engine.type {
         case "business": return NativeBusinessEngine.supports(tool)
         case "audio": return NativeAudioEngine.supports(tool)
@@ -532,7 +533,7 @@ struct NativeFamilyToolView: View {
         VStack(alignment: .leading, spacing: 14) {
             switch tool.engine.type {
             case "business": if NativeBusinessEngine.supports(tool) { NativeBusinessToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if ["music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet"].contains(tool.id) { NativeMusicStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "audio": if tool.id == "music-live-video-studio" { NativeMusicLiveVideoStudioView() } else if tool.id == "music-downloader" { NativeMusicDownloaderView() } else if ["music-studio", "music-practice", "music-stem-mixer", "music-karaoke", "music-duet"].contains(tool.id) { NativeMusicStudioView() } else if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "ai": if NativeAiMicroEngine.supports(tool.id) { NativeAiMicroToolView(tool: tool) } else if NativeAiEngine.supports(tool.id) { NativeAiToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "file-converter", "document-backend": if NativeFileConverterEngine.supports(tool) { NativeFileConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "text": if NativeTextEngine.operation(forToolID: tool.id) != nil { NativeTextToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
@@ -3547,6 +3548,328 @@ private struct NativeMusicLiveVideoStudioView: View {
             }
             finalURL = output; status = "Final MP4 ready. The selected \(presetID) preset was rendered on the microphone track before the backing mix. Review voice/backing balance before sharing."
         } catch { self.error = error.localizedDescription; status = "Mix failed; original camera recording remains available for another attempt." }
+    }
+}
+
+private struct NativeMusicDownloaderView: View {
+    @State private var mode = "Online"
+    @State private var collectionType = "Playlist"
+    @State private var collectionName = "My music"
+    @State private var directURLs = ""
+    @State private var rightsConfirmed = false
+    @State private var isWorking = false
+    @State private var status = ""
+    @State private var errorMessage: String?
+    @State private var showFileImporter = false
+    @State private var savedFiles: [URL] = []
+    @State private var transferTask: Task<Void, Never>?
+
+    private let extensions = Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "wma"])
+    private let trackLimit: Int64 = 50 * 1024 * 1024
+    private let batchLimit: Int64 = 200 * 1024 * 1024
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Music Downloader", systemImage: "arrow.down.circle")
+                    .font(.envScaled(size: 18, weight: .semibold))
+                Text("Save authorized direct audio files online, or import music already on this device for offline use.")
+                    .font(.envScaled(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            Picker("Source", selection: $mode) {
+                Text("Online").tag("Online")
+                Text("Offline library").tag("Offline")
+            }
+            .pickerStyle(.segmented)
+            Picker("Collection type", selection: $collectionType) {
+                Text("Track").tag("Track")
+                Text("Album").tag("Album")
+                Text("Playlist").tag("Playlist")
+            }
+            .pickerStyle(.segmented)
+            TextField("Album or playlist name", text: $collectionName)
+                .textFieldStyle(.roundedBorder)
+
+            if mode == "Online" {
+                Text("Direct audio-file URLs")
+                    .font(.envScaled(size: 14, weight: .semibold))
+                TextEditor(text: $directURLs)
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(minHeight: 135)
+                    .padding(4)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                    .accessibilityLabel("Direct audio file URLs")
+                Text("One public HTTPS audio URL per line. Use “Track title | URL” to name a file. Albums and playlists download as a batch into a folder in the enV offline library.")
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+                Toggle("I own these tracks or am authorized to download them", isOn: $rightsConfirmed)
+                    .font(.envScaled(size: 13))
+                Button {
+                    startOnlineDownloads()
+                } label: {
+                    Label(isWorking ? "Downloading…" : (collectionType == "Track" ? "Download track" : "Download " + collectionType.lowercased()), systemImage: "arrow.down.to.line")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isWorking)
+                Text("Streaming links from Spotify, Apple Music, YouTube Music, Deezer, Amazon Music, TIDAL and SoundCloud are not direct audio files. Use each service’s official offline-download feature or supply a direct audio URL offered by the rights holder.")
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Label("Import audio for offline use", systemImage: "folder.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isWorking)
+                Text("\(savedFiles.count) audio file(s) currently stored in the enV offline library.")
+                    .font(.envScaled(size: 13))
+                if savedFiles.isEmpty {
+                    Text("Imported tracks stay in this app’s local Documents folder until you share or remove them.")
+                        .font(.envScaled(size: 12))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(savedFiles, id: \.absoluteString) { file in
+                        HStack(spacing: 8) {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(Color.envAccent)
+                            Text(file.lastPathComponent)
+                                .font(.envScaled(size: 12))
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            ShareLink(item: file) {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .accessibilityLabel("Export \(file.lastPathComponent)")
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            }
+
+            if isWorking {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(status.isEmpty ? "Working…" : status)
+                        .font(.envScaled(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else if !status.isEmpty {
+                Text(status)
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.envScaled(size: 12))
+                    .foregroundStyle(.red)
+                    .accessibilityAddTraits(.isStaticText)
+            }
+            Text("Limits: 50 tracks per batch, 50 MB per track, 200 MB per batch. Direct sources must allow downloads. enV does not sign in to services, extract protected streams, or bypass DRM.")
+                .font(.envScaled(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { refreshLibrary() }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): importLocalFiles(urls)
+            case .failure(let error): errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func validatedTracks() throws -> [(title: String, url: URL, ext: String)] {
+        var result: [(title: String, url: URL, ext: String)] = []
+        var seen = Set<String>()
+        let platformDomains = ["spotify.com", "apple.com", "youtube.com", "youtu.be", "deezer.com", "amazon.com", "tidal.com", "soundcloud.com"]
+        for (index, rawLine) in directURLs.components(separatedBy: .newlines).enumerated() {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            let pieces = line.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            let title = pieces.count == 2 ? String(pieces[0]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            let urlText = String(pieces.last ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let url = URL(string: urlText), let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  components.scheme?.lowercased() == "https", components.user == nil, components.password == nil,
+                  let hostValue = components.host?.lowercased(), !hostValue.isEmpty else {
+                throw NSError(domain: "enVMusicDownloader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): enter a public HTTPS URL without embedded credentials."])
+            }
+            let host = hostValue.replacingOccurrences(of: "^www\\.", with: "", options: .regularExpression)
+            if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") || host.range(of: "^\\d{1,3}(\\.\\d{1,3}){3}$", options: .regularExpression) != nil {
+                throw NSError(domain: "enVMusicDownloader", code: 2, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): local and IP-literal hosts are not supported."])
+            }
+            if platformDomains.contains(where: { host == $0 || host.hasSuffix("." + $0) }) {
+                throw NSError(domain: "enVMusicDownloader", code: 3, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): streaming-service pages cannot be downloaded as portable tracks. Use the service’s official offline feature or a rights-holder-provided audio URL."])
+            }
+            let ext = url.pathExtension.lowercased()
+            guard extensions.contains(ext) else {
+                throw NSError(domain: "enVMusicDownloader", code: 4, userInfo: [NSLocalizedDescriptionKey: "Line \(index + 1): use a direct URL ending in a supported audio extension such as .mp3, .m4a, .flac or .wav."])
+            }
+            if seen.insert(url.absoluteString.lowercased()).inserted {
+                result.append((title.isEmpty ? url.lastPathComponent : title, url, ext))
+            }
+        }
+        guard !result.isEmpty else {
+            throw NSError(domain: "enVMusicDownloader", code: 5, userInfo: [NSLocalizedDescriptionKey: "Add at least one direct audio-file URL."])
+        }
+        guard result.count <= 50 else {
+            throw NSError(domain: "enVMusicDownloader", code: 6, userInfo: [NSLocalizedDescriptionKey: "A batch can contain at most 50 tracks. Split larger playlists into smaller batches."])
+        }
+        if collectionType == "Track" && result.count != 1 {
+            throw NSError(domain: "enVMusicDownloader", code: 7, userInfo: [NSLocalizedDescriptionKey: "For a single-track download, provide exactly one URL or select Album / Playlist."])
+        }
+        return result
+    }
+
+    private func startOnlineDownloads() {
+        errorMessage = nil
+        status = ""
+        guard rightsConfirmed else {
+            errorMessage = "Confirm that you own the tracks or have permission to download them."
+            return
+        }
+        let tracks: [(title: String, url: URL, ext: String)]
+        do { tracks = try validatedTracks() }
+        catch { errorMessage = error.localizedDescription; return }
+
+        let folder = collectionFolder(collectionName)
+        isWorking = true
+        status = "Starting download…"
+        transferTask = Task {
+            let outcome = await Task.detached(priority: .userInitiated) { [extensions = self.extensions, trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
+                var saved: [URL] = []
+                var failures: [String] = []
+                var totalBytes: Int64 = 0
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    for (index, track) in tracks.enumerated() {
+                        try Task.checkCancellation()
+                        do {
+                            let request = URLRequest(url: track.url)
+                            let (temporary, response) = try await URLSession.shared.download(for: request)
+                            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                                throw NSError(domain: "enVMusicDownloader", code: 8, userInfo: [NSLocalizedDescriptionKey: "The source returned an unsuccessful HTTP response."])
+                            }
+                            let mime = (http.mimeType ?? "").lowercased()
+                            guard mime.hasPrefix("audio/") || mime == "application/octet-stream" || mime == "binary/octet-stream" else {
+                                throw NSError(domain: "enVMusicDownloader", code: 9, userInfo: [NSLocalizedDescriptionKey: "The source did not return a direct audio file."])
+                            }
+                            let size = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+                            guard size > 0 && size <= trackLimit else {
+                                throw NSError(domain: "enVMusicDownloader", code: 10, userInfo: [NSLocalizedDescriptionKey: "The file is empty or exceeds the 50 MB per-track limit."])
+                            }
+                            guard totalBytes + size <= batchLimit else {
+                                throw NSError(domain: "enVMusicDownloader", code: 11, userInfo: [NSLocalizedDescriptionKey: "The collection reached the 200 MB batch limit."])
+                            }
+                            let dest = Self.uniqueFile(in: folder, name: track.title, ext: track.ext)
+                            try FileManager.default.moveItem(at: temporary, to: dest)
+                            saved.append(dest)
+                            totalBytes += size
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            failures.append(track.title + ": " + error.localizedDescription)
+                        }
+                        _ = index
+                    }
+                } catch {
+                    failures.append(error.localizedDescription)
+                }
+                return (saved: saved, failures: failures, totalBytes: totalBytes)
+            }.value
+            isWorking = false
+            transferTask = nil
+            refreshLibrary()
+            if outcome.saved.isEmpty {
+                errorMessage = outcome.failures.first ?? "No audio files were downloaded."
+                status = "No files saved."
+            } else {
+                status = "Saved \(outcome.saved.count) track(s) (\(ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file)))." +
+                    (outcome.failures.isEmpty ? "" : " Some tracks failed: " + outcome.failures.prefix(3).joined(separator: "; "))
+            }
+        }
+    }
+
+    private func importLocalFiles(_ urls: [URL]) {
+        errorMessage = nil
+        status = ""
+        guard !urls.isEmpty else { return }
+        guard urls.count <= 50 else {
+            errorMessage = "Choose at most 50 tracks per import."
+            return
+        }
+        isWorking = true
+        status = "Importing local audio…"
+        let folder = collectionFolder(collectionName)
+        transferTask = Task {
+            let result = await Task.detached(priority: .userInitiated) { [extensions = self.extensions, trackLimit = self.trackLimit, batchLimit = self.batchLimit] in
+                var copied: [URL] = []
+                var totalBytes: Int64 = 0
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    for source in urls {
+                        try Task.checkCancellation()
+                        let didAccess = source.startAccessingSecurityScopedResource()
+                        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
+                        let ext = source.pathExtension.lowercased()
+                        guard extensions.contains(ext) else {
+                            throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: source.lastPathComponent + " is not a supported audio file."])
+                        }
+                        let size = (try FileManager.default.attributesOfItem(atPath: source.path)[.size] as? NSNumber)?.int64Value ?? 0
+                        guard size > 0 && size <= trackLimit else {
+                            throw NSError(domain: "enVMusicDownloader", code: 13, userInfo: [NSLocalizedDescriptionKey: source.lastPathComponent + " is empty or exceeds the 50 MB per-track limit."])
+                        }
+                        guard totalBytes + size <= batchLimit else {
+                            throw NSError(domain: "enVMusicDownloader", code: 14, userInfo: [NSLocalizedDescriptionKey: "The import exceeds the 200 MB batch limit."])
+                        }
+                        let dest = Self.uniqueFile(in: folder, name: source.deletingPathExtension().lastPathComponent, ext: ext)
+                        try FileManager.default.copyItem(at: source, to: dest)
+                        copied.append(dest)
+                        totalBytes += size
+                    }
+                    return (copied: copied, totalBytes: totalBytes, error: Optional<String>.none)
+                } catch {
+                    copied.forEach { try? FileManager.default.removeItem(at: $0) }
+                    return (copied: [URL](), totalBytes: Int64(0), error: Optional(error.localizedDescription))
+                }
+            }.value
+            isWorking = false
+            transferTask = nil
+            refreshLibrary()
+            if let error = result.2 { errorMessage = error }
+            else { status = "Imported \(result.0.count) track(s) for offline use (\(ByteCountFormatter.string(fromByteCount: result.1, countStyle: .file)))." }
+        }
+    }
+
+    private func collectionFolder(_ name: String) -> URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let root = documents.appendingPathComponent("Music Downloader", isDirectory: true)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
+        let clean = String(name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: .whitespacesAndNewlines)
+        return root.appendingPathComponent(clean.isEmpty ? "My music" : String(clean.prefix(80)), isDirectory: true)
+    }
+
+    private static func uniqueFile(in folder: URL, name: String, ext: String) -> URL {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_."))
+        let cleanName = String(name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }).trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = cleanName.isEmpty ? "track" : String(cleanName.prefix(90))
+        var candidate = folder.appendingPathComponent(base).appendingPathExtension(ext)
+        var index = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = folder.appendingPathComponent(base + " (" + String(index) + ")").appendingPathExtension(ext)
+            index += 1
+        }
+        return candidate
+    }
+
+    private func refreshLibrary() {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let root = documents.appendingPathComponent("Music Downloader", isDirectory: true)
+        savedFiles = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])?.allObjects as? [URL] ?? [])
+            .filter { extensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
     }
 }
 

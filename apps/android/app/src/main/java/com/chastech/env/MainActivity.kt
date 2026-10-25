@@ -215,7 +215,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()) }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -981,7 +981,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1299,6 +1299,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 
 @Composable
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
+    if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)

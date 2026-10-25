@@ -101,6 +101,37 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
     )
 }
 
+/**
+ * Adds the separately implemented native Music Downloader to the bundled catalog at load time.
+ * This feature deliberately does not mutate the generated 10k-tool web catalog.
+ */
+fun Catalog.withMusicDownloader(): Catalog {
+    if (tools.any { it.id == "music-downloader" }) return this
+    val tool = ToolRecord(
+        id = "music-downloader",
+        name = "Music Downloader",
+        slug = "music-downloader",
+        description = "Download direct audio files online or import and organize tracks for offline use.",
+        category = "audio",
+        keywords = listOf("music", "download", "offline", "online", "track", "album", "playlist", "audio"),
+        tags = listOf("music", "download", "offline", "online", "album", "playlist"),
+        icon = "Download",
+        popularity = 10000,
+        featured = true,
+        clientSide = false,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = listOf("audio-file-inspector", "music-studio", "audio-to-wav"),
+        engine = EngineInfo("custom", "music-downloader"),
+        subcategory = "Music",
+    )
+    return copy(
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        tools = (tools + tool).sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 private val webSearchSynonyms = mapOf(
     "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
     "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),

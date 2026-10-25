@@ -180,6 +180,47 @@ extension Catalog {
 
 
 extension Catalog {
+    /// Adds the native Music Downloader as a runtime extension without editing the generated shared catalog.
+    func includingMusicDownloader() -> Catalog {
+        guard !tools.contains(where: { $0.id == "music-downloader" }) else { return self }
+        let tool = Tool(
+            id: "music-downloader",
+            name: "Music Downloader",
+            slug: "music-downloader",
+            description: "Download direct audio files online or import and organize tracks for offline use.",
+            category: "audio",
+            subcategory: "Music",
+            keywords: ["music", "download", "offline", "online", "track", "album", "playlist", "audio"],
+            tags: ["music", "download", "offline", "online", "album", "playlist"],
+            icon: "Download",
+            popularity: 10000,
+            featured: true,
+            clientSide: false,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["audio-file-inspector", "music-studio", "audio-to-wav"],
+            engine: ToolEngine(type: "custom", id: "music-downloader", op: "music-downloader", configuration: [:])
+        )
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: (tools + [tool]).sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory
+                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                    : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+}
+
+extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let sourceCandidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
@@ -273,7 +314,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing()
+        return catalog.nativeFacing().includingMusicDownloader()
     }
 }
 
