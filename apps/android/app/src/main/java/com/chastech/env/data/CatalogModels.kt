@@ -113,7 +113,7 @@ fun Catalog.withMusicDownloader(): Catalog {
         slug = "music-downloader",
         description = "Download direct audio files online or import and organize tracks for offline use.",
         category = "audio",
-        keywords = listOf("music", "download", "offline", "online", "track", "album", "playlist", "audio"),
+        keywords = listOf("music", "download", "offline", "online", "track", "album", "playlist", "audio", "spotify", "apple music", "youtube", "youtube music", "audiomack", "boomplay", "deezer", "amazon music", "tidal", "soundcloud", "pandora", "mixcloud", "anghami", "qobuz", "napster", "jiosaavn", "iheart radio"),
         tags = listOf("music", "download", "offline", "online", "album", "playlist"),
         icon = "Download",
         popularity = 10000,
