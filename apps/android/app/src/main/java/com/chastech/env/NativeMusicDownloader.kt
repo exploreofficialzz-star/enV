@@ -364,7 +364,7 @@ fun NativeMusicDownloaderScreen() {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Music Downloader", style = MaterialTheme.typography.titleLarge)
-                Text("Download direct, authorized audio URLs online or import tracks into enV's offline library.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Download authorized tracks from supported public music pages or direct audio URLs, or import tracks into the enV offline library.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = mode == "Online downloads", onClick = { mode = "Online downloads"; error = "" }, label = { Text("Online") })
                     FilterChip(selected = mode == "Offline library", onClick = { mode = "Offline library"; error = "" }, label = { Text("Offline") })
@@ -385,7 +385,7 @@ fun NativeMusicDownloaderScreen() {
 
         if (mode == "Online downloads") {
             OutlinedTextField(urls, { urls = it; rightsConfirmed = false }, label = { Text("Music links or direct audio URLs") }, placeholder = { Text("Audiomack, YouTube Music, SoundCloud song/album/playlist URL\nTrack name | https://cdn.example.com/track.mp3") }, modifier = Modifier.fillMaxWidth().height(150.dp), minLines = 4)
-            Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio-file URL. Use “Track title | URL” for direct files. Provider downloads are saved to this device’s enV offline library; direct files use Android download notifications."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Paste a supported public song, album or playlist link, or a direct HTTPS audio-file URL. Use “Track title | URL” for direct files. Provider downloads are saved to this device’s enV offline library; direct files use Android download notifications.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it })
                 Text("I own these tracks or am authorized to download them.", style = MaterialTheme.typography.bodySmall)
@@ -495,6 +495,6 @@ fun NativeMusicDownloaderScreen() {
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Text("Supported public providers are resolved only where their source permits downloading. Protected app-only catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline feature. enV does not sign in, bypass DRM or export restricted offline entitlements. Limits: 50 tracks, 50 MB per track, 200 MB per batch."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Supported public providers are resolved only where their source permits downloading. Protected app-only catalogs such as Spotify, Apple Music, Deezer and TIDAL must use their official offline feature. enV does not sign in, bypass DRM or export restricted offline entitlements. Limits: 50 tracks, 50 MB per track, 200 MB per batch.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
