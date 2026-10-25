@@ -40,7 +40,7 @@ export function buildGeminiInteractionBody(request: AdapterRequest): Record<stri
   }
   const input = request.user.map((part) => {
     if (part.type === "text") return { type: "text", text: part.text };
-    if (part.type === "audio") return { type: "audio", data: part.dataBase64, mime_type: part.mimeType };
+    if (part.type === "audio") return { type: "audio", data: part.dataBase64, mime_type: part.mimeType === "audio/mp4" || part.mimeType === "audio/x-m4a" ? "audio/m4a" : part.mimeType };
     throw new AiError("AI_UNSUPPORTED_CAPABILITY", { provider: "gemini", model: request.model });
   });
   if (!input.some((part) => part.type === "audio")) {
