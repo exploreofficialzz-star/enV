@@ -36,6 +36,8 @@ const songMetadataAnalyzerTool: ToolMeta = {
   keywords: ["song", "music", "metadata", "analyzer", "analyser", "bpm", "tempo", "key", "genre", "mood", "instruments", "vocals", "batch", "zip", "afrobeats", "afro-pop"],
   tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "mood", "batch", "audio"],
   icon: "AudioLines",
+  iconBackground: "#0f766e",
+  iconAccent: "#67e8f9",
   popularity: 9900,
   featured: true,
   clientSide: true,
