@@ -11,8 +11,6 @@ const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
 const MODEL_FILE_LIMIT = AI_LIMITS.audioBytesMax;
 const MAX_AUDIO_DURATION_SECONDS = 2 * 60;
 
-type ModelClassification = MusicAnalysisResult["classification"];
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
