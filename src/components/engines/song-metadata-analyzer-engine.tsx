@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AlertCircle, Archive, AudioLines, CheckCircle2, Download,
+  Activity, AlertCircle, Archive, Download,
   FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause, Sparkles,
   Upload, X,
 } from "lucide-react";
@@ -216,7 +216,7 @@ async function analyzeLocal(
   let rmsDbfs: number | null = null;
   let tempoBpm: number | null = null;
   let key: string | null = null;
-  let bpmTag = metadata.bpm && Number.isFinite(Number(metadata.bpm)) ? Number(metadata.bpm) : null;
+  const bpmTag = metadata.bpm && Number.isFinite(Number(metadata.bpm)) ? Number(metadata.bpm) : null;
   let semantic: MusicAnalysisResult | null = null;
   let aiRequestId: string | null = null;
   let aiWarning: string | null = null;
@@ -284,7 +284,7 @@ async function analyzeLocal(
   }
 
   if (mode === "full" && includeAi && !semantic && !aiWarning) aiWarning = "Full AI analysis did not return a result.";
-  if (mode === "full" && !includeAi) aiWarning = "AI analysis was not enabled.";
+  if (mode === "full" && !includeAi) aiWarning = "AI analysis is unavailable or was not enabled; local results are still included.";
   if (aiWarning) warnings.push(aiWarning);
   if (!decodedSuccessfully) warnings.push("Technical and embedded tags may still be available, but BPM/key and semantic audio analysis need a decodable file.");
   const bpmFromTag = bpmTag !== null && bpmTag > 0 && bpmTag <= 300 ? bpmTag : null;
@@ -562,7 +562,6 @@ export function SongMetadataAnalyzerEngine() {
       "song-analysis.csv": strToU8(songsToCsv(reports.map(outputCsvRow))),
       "processing-issues.json": strToU8(JSON.stringify(failed, null, 2)),
     };
-    zipSync(archive, { level: 6 });
     const zip = zipSync(archive, { level: 6 });
     downloadBlob(new Blob([zip], { type: "application/zip" }), "song-analysis-report.zip");
   }
@@ -628,9 +627,9 @@ export function SongMetadataAnalyzerEngine() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing || (mode === "full" && !aiConsent)} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing || (mode === "full" && (!aiConsent || aiAvailability !== true))} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <Sparkles size={16} /> : <Activity size={16} />}
-              {busy ? "Analyzing…" : mode === "full" ? "Analyze with AI" : "Scan songs"}
+              {busy ? "Analyzing…" : mode === "full" ? (aiAvailability === true ? "Analyze with AI" : aiAvailability === false ? "AI unavailable" : "Checking AI…") : "Scan songs"}
             </button>
             {busy
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
