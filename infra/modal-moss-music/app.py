@@ -22,7 +22,6 @@ from typing import Any
 import httpx
 import modal
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.security import HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 APP_NAME = "env-moss-music"
@@ -84,7 +83,6 @@ def download_model() -> dict[str, Any]:
         repo_id=MODEL_REPO,
         revision=MODEL_REVISION,
         local_dir=str(target),
-        local_dir_use_symlinks=False,
     )
     if not (target / "config.json").exists() or not (target / "model.safetensors.index.json").exists():
         raise RuntimeError("Model download completed without the required configuration and weight index.")
