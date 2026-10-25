@@ -276,7 +276,7 @@ export const songMetadataAnalysisTask = defineTask({
   kind: "structured",
   capability: "AUDIO_UNDERSTANDING",
   id: "audio.music.analyze",
-  version: "2026-10-25.3",
+  version: "2026-10-25.4",
   description: "Tag short representative music excerpts for genre, style, mood, sound, vocals, instruments and production. Lyrics transcription and interpretation are handled separately.",
   privacy: "sensitive",
   remoteProcessingAllowed: true,
