@@ -16,7 +16,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { parseFinalCatalog } from "./catalog-reader.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -211,39 +211,7 @@ else {
   }
 }
 
-const catalogSource = read(join(root, "src", "data", "catalog.ts"));
-const catalog = parseGeneratedCatalog(catalogSource);
-
-// catalog.ts appends the dedicated studio catalog after its 10,000 generated
-// entries. The AI audit must validate the final exported tool set, not only the
-// generated JSON payload, or it will incorrectly reject real supplemental tools.
-const audioStudioCatalogMatch = catalogSource.match(/const audioStudioTools:\s*ToolMeta\[\]\s*=\s*(\[[\s\S]*?\n\]);/);
-if (audioStudioCatalogMatch) {
-  let supplementalTools;
-  try {
-    supplementalTools = JSON.parse(audioStudioCatalogMatch[1]);
-  } catch {
-    fail("audio studio supplemental catalog is not valid JSON");
-    supplementalTools = [];
-  }
-  if (!Array.isArray(supplementalTools)) {
-    fail("audio studio supplemental catalog is not an array");
-  } else {
-    const catalogIds = new Set(catalog.map((tool) => tool.id));
-    for (const tool of supplementalTools) {
-      if (!tool || typeof tool.id !== "string") {
-        fail("audio studio supplemental catalog contains an entry without a tool id");
-        continue;
-      }
-      if (!catalogIds.has(tool.id)) {
-        catalog.push(tool);
-        catalogIds.add(tool.id);
-      }
-    }
-  }
-} else {
-  fail("audio studio supplemental catalog could not be located");
-}
+const catalog = parseFinalCatalog(read(join(root, "src", "data", "catalog.ts")));
 const toolsById = new Map(catalog.map((t) => [t.id, t]));
 const seenTools = new Set();
 for (const feature of AI_FEATURES) {
