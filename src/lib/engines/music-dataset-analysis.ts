@@ -372,14 +372,11 @@ export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): Musi
   }
 
   const allLevels = frameLevels(mono);
-  const frameRms: number[] = [];
   const frames: FeatureFrame[] = [];
-  const chromaByTwoSeconds: Array<{ start: number; end: number; chroma: number[] }> = [];
   const previousMagnitude = new Float64Array(FFT_SIZE / 2);
   let transientEvents = 0, spectralFrames = 0, previousRmsDb: number | null = null;
   const stepSamples = Math.max(1, Math.round(sampleRate * FFT_HOP_SECONDS));
   const durationPitchPoints: PitchPoint[] = [];
-  let pitchFrameIndex = 0;
   const maxSpectralFrames = Math.ceil(duration / FFT_HOP_SECONDS);
   const pitchStepFrames = Math.max(1, Math.round(1 / FFT_HOP_SECONDS));
   const chromaByBlock = new Map<number, number[]>();
@@ -400,9 +397,7 @@ export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): Musi
     if (spectralFlux > 0.22) transientEvents += 1;
     previousRmsDb = rmsDb;
     previousMagnitude.set(spec.magnitudes);
-    frameRms.push(levels.rms ?? 0);
     frameFluxes.push(spectralFlux);
-    spectralFrames += 1;
     for (let note = 0; note < 12; note += 1) {
       const block = Math.floor((start / sampleRate) / 2);
       const values = chromaByBlock.get(block) ?? Array(12).fill(0) as number[];
@@ -426,7 +421,6 @@ export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): Musi
     if (frameIndex % pitchStepFrames === 0) {
       const pitch = estimatePitch(mono, sampleRate, start, start / sampleRate);
       if (pitch) durationPitchPoints.push(pitch);
-      pitchFrameIndex += 1;
     }
     if (frameIndex + 1 >= maxSpectralFrames) break;
   }
