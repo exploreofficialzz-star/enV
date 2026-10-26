@@ -6,12 +6,12 @@ import {
   encodeMonoPcm16Wav,
 } from "./music-dataset-analysis.ts";
 
-test("local dataset analysis emits time-aligned DSP features without calling a model", () => {
+test("local dataset analysis emits time-aligned DSP features without calling a model", async () => {
   const sampleRate = 16_000;
   const samples = Float32Array.from({ length: sampleRate * 4 }, (_, index) =>
     0.35 * Math.sin((2 * Math.PI * 440 * index) / sampleRate),
   );
-  const result = analyzeMusicDatasetAudio({
+  const result = await analyzeMusicDatasetAudio({
     channels: [samples],
     sampleRate,
     fileName: "sine-test.wav",
@@ -77,7 +77,16 @@ test("PCM WAV export writes valid mono 16-bit PCM headers", () => {
   assert.equal(bytes.byteLength, 44 + samples.length * 2);
 });
 
-test("local analyzer rejects inconsistent channels and unsafe sample rates", () => {
-  assert.throws(() => analyzeMusicDatasetAudio({ channels: [new Float32Array(8), new Float32Array(9)], sampleRate: 16_000 }), /equal frame counts/);
-  assert.throws(() => analyzeMusicDatasetAudio({ channels: [new Float32Array(8_000)], sampleRate: 4_000 }), /between 8 kHz and 192 kHz/);
+test("local analyzer rejects inconsistent channels and unsafe sample rates", async () => {
+  await assert.rejects(analyzeMusicDatasetAudio({ channels: [new Float32Array(8), new Float32Array(9)], sampleRate: 16_000 }), /equal frame counts/);
+  await assert.rejects(analyzeMusicDatasetAudio({ channels: [new Float32Array(8_000)], sampleRate: 4_000 }), /between 8 kHz and 192 kHz/);
+});
+
+test("local analysis can be cancelled and yields progress", async () => {
+  const controller = new AbortController();
+  const samples = new Float32Array(16_000 * 4).fill(0.2);
+  let progressUpdates = 0;
+  const promise = analyzeMusicDatasetAudio({ channels: [samples], sampleRate: 16_000 }, { signal: controller.signal, onProgress: () => { progressUpdates += 1; controller.abort(); } });
+  await assert.rejects(promise, (error: unknown) => error instanceof Error && error.name === "AbortError");
+  assert.ok(progressUpdates >= 1);
 });
