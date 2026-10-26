@@ -114,10 +114,12 @@ test("Music Analyzer returns reproducible signal metrics and leaves semantic lab
     channels: [pcm, pcm], sampleRate, fileName: "test-track.wav", fileSizeBytes: 64000, mimeType: "audio/wav",
     metadata: { title: "Known Title", artist: "Known Artist", genre: "Tagged genre", bpm: "120" },
   });
-  assert.equal(result.schema_version, "env.music-analysis.v1");
+  assert.equal(result.schema_version, "env.music-analysis.v2");
   assert.equal(result.audio.duration_seconds, 4);
   assert.equal(result.audio.channels, 2);
   assert.ok(result.audio.rms_dbfs !== null && result.audio.rms_dbfs < -5 && result.audio.rms_dbfs > -15);
+  assert.ok(result.audio.rms_loudness_proxy_db !== null);
+  assert.ok(Math.abs((result.audio.rms_loudness_proxy_db ?? 0) - (result.audio.rms_dbfs ?? 0) + 0.691) < 0.02, "RMS-derived proxy must match its documented offset");
   assert.equal(result.audio.clipped_sample_percent, 0);
   assert.equal(result.metadata.title, "Known Title");
   assert.equal(result.metadata.embedded_genre, "Tagged genre");
@@ -227,15 +229,15 @@ test("Music Analyzer song profile exports the requested top-level metadata field
   };
 
   const profile = createMusicAnalysisProfile(classified);
-  assert.equal(profile.schema_version, "env.music-profile.v1");
+  assert.equal(profile.schema_version, "env.music-profile.v2");
   assert.equal(profile.genre, "Afrobeats");
   assert.equal(profile.sub_style, "Afro-pop");
   assert.deepEqual(profile.language, ["Nigerian Pidgin", "Yoruba"]);
   assert.equal(profile.tempo_bpm, local.rhythm.tempo_bpm);
   assert.equal(profile.title, "Demo");
   assert.equal(profile.metadata.embedded_genre, "Legacy file tag");
-  assert.equal(profile.analysis_status.genre, "model_estimate");
-  assert.equal(profile.analysis_status.language, "model_estimate");
+  assert.equal(profile.analysis_status.genre, "unknown");
+  assert.equal(profile.analysis_status.language, "unknown");
   assert.equal(profile.analysis_status.tempo_bpm, "signal_estimate");
   assert.equal(profile.analysis_status.classification, "model_completed");
   assert.equal(profile.genre_candidates[0]?.score, 0.86);
