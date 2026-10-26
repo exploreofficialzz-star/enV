@@ -2653,8 +2653,6 @@ private struct NativeSongMetadataAnalyzerView: View {
     @State private var document = NativeSongAnalysisDocument(data: Data())
     @State private var exportKind = "json"
     @State private var fullAnalysis = false
-    @State private var uploadConsent = false
-    @State private var aiAvailable: Bool?
     @State private var busy = false
     @State private var progress = 0
     @State private var notice = ""
@@ -2708,28 +2706,21 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
 
                 if fullAnalysis {
-                    Toggle(isOn: $uploadConsent) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Send short excerpts to AI").font(.subheadline)
-                            Text(aiAvailable == true ? "AI available" : aiAvailable == false ? "AI unavailable · Quick Scan still works" : "Checking AI setup…")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(busy)
-                    .toggleStyle(.switch)
+                    Text("Full Analysis runs local signal processing only. Add and review genre, language, vocal, instrument and production labels below. No audio is sent to an AI service.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
                 Button { startBatch() } label: {
                     HStack(spacing: 8) {
                         if busy { ProgressView().tint(.white) }
                         else { Image(systemName: fullAnalysis ? "sparkles" : "waveform") }
-                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Analyze with AI" : "Scan songs")
+                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Run detailed local analysis" : "Scan songs")
                     }
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(tracks.isEmpty || busy || (fullAnalysis && (!uploadConsent || aiAvailable != true)))
+                .disabled(tracks.isEmpty || busy)
 
                 if busy {
                     Button {
@@ -2743,7 +2734,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                Text("Local by default. Full Analysis sends short excerpts after consent.")
+                Text("Local-only processing. No hosted model or external AI request.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(15)
@@ -2846,10 +2837,7 @@ private struct NativeSongMetadataAnalyzerView: View {
         .fileExporter(isPresented: $showExporter, document: document, contentType: exportType, defaultFilename: exportFilename) { result in
             if case .failure(let failure) = result { error = failure.localizedDescription }
         }
-        .task {
-            do { aiAvailable = try await NativeAiClient.availability()["audio.music.analyze"] == true }
-            catch { aiAvailable = false }
-        }
+
     }
 
     private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -2942,10 +2930,6 @@ private struct NativeSongMetadataAnalyzerView: View {
 
     private func startBatch() {
         guard !busy else { return }
-        if fullAnalysis && (!uploadConsent || aiAvailable != true) {
-            error = "Enable AI analysis first."
-            return
-        }
         busy = true
         error = nil
         notice = ""
@@ -2961,36 +2945,19 @@ private struct NativeSongMetadataAnalyzerView: View {
             updateTrack(track.id) { $0.status = "Analyzing"; $0.error = nil }
             do {
                 var scan = try await Task.detached(priority: .userInitiated) {
-                    try nativeSongAnalyzeAudio(track.data, filename: track.filename)
+                    try nativeSongAnalyzeAudio(track.data, filename: track.filename, detailed: fullAnalysis)
                 }.value
                 if Task.isCancelled {
                     updateTrack(track.id) { $0.status = "Cancelled" }
                     continue
                 }
-                var semanticDone = false
-                if fullAnalysis && uploadConsent {
-                    if let excerpt = nativeSongAudioExcerpt(scan.monoSamples16k) {
-                        do {
-                            let response = try await NativeAiClient.runWithMetadata(task: "audio.music.analyze", input: [
-                                "audioBase64": excerpt.data.base64EncodedString(),
-                                "mimeType": "audio/wav",
-                                "filename": track.filename,
-                                "sampledSeconds": excerpt.seconds
-                            ])
-                            nativeSongMerge(&scan.report, semantic: response.result, extraWarnings: response.warnings)
-                            semanticDone = true
-                        } catch {
-                            nativeSongAppendWarning(&scan.report, error.localizedDescription)
-                        }
-                    } else {
-                        nativeSongAppendWarning(&scan.report, "Audio is too short for semantic analysis.")
-                    }
-                }
                 if Task.isCancelled {
                     updateTrack(track.id) { $0.status = "Cancelled" }
                     continue
                 }
-                let status = fullAnalysis && !semanticDone ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
+                let annotations = (scan.report["dataset_analysis"] as? [String: Any])?["annotations"] as? [String: Any]
+                let reviewed = annotations?["reviewed"] as? Bool == true
+                let status = fullAnalysis && !reviewed ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
                 updateTrack(track.id) {
                     $0.report = scan.report
                     $0.status = status
@@ -3040,7 +3007,7 @@ private struct NativeSongMetadataAnalyzerView: View {
 
 private let nativeSongExtensions: Set<String> = ["mp3", "wav", "flac", "m4a", "aac", "ogg", "oga", "opus", "aif", "aiff", "caf", "3gp", "mp4", "webm"]
 
-private func nativeSongAnalyzeAudio(_ data: Data, filename: String) throws -> NativeSongAnalysisScan {
+private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bool = false) throws -> NativeSongAnalysisScan {
     guard !data.isEmpty && data.count <= 20 * 1024 * 1024 else { throw NativeNativeError.message("Track exceeds the local file limit.") }
     let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
     let temp = FileManager.default.temporaryDirectory.appendingPathComponent("env-song-\(UUID().uuidString).\(ext.isEmpty ? "audio" : ext)")
