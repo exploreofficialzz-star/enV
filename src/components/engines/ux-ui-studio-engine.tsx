@@ -2143,7 +2143,15 @@ export function UxUiStudioEngine() {
     if (!selected) return;
     checkpoint();
     setElements((previous) => previous.filter((item) => item.id !== selected.id));
-    setSelectedId("");
+    finishSelection();
+    setNotice("Item deleted. Use Undo to bring it back.");
+  }
+
+  function finishSelection() {
+    setSelectedId(""); setSelectedIds([]); setCanvasSelected(false);
+    dragRef.current = null;
+    closeToolkit();
+    setNotice("Finished editing. Tap + Add for another item, or tap an item to edit it.");
   }
 
   if (onboarding) {
@@ -2214,7 +2222,7 @@ export function UxUiStudioEngine() {
     finally { setImageBusy(false); }
   }
   function renderToolkit(inline = false) { return (<div className={inline ? "uxui-inline-library" : "uxui-toolkit-overlay"} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeToolkit(); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="uxui-toolkit-title">
-          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => closeToolkit()} aria-label="Close studio toolkit"><X size={17} /></button></div>
+          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => closeToolkit()} aria-label="Cancel studio toolkit"><X size={17} /><span>Cancel</span></button></div>
           <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
             {([
@@ -2620,14 +2628,19 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
-            <button type="button" className="uxui-add-button" onClick={openToolkitHome} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
+            <button type="button" className="uxui-add-button" onClick={openToolkitHome} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={24} strokeWidth={1.6} /><span>Add</span></button>
             <div className="uxui-bottom-group">
               <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label={isExpanded ? "Exit full-screen studio" : "Expand studio to full screen"} title={isExpanded ? "Exit full screen" : "Full-screen studio"}>{isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}</button>
             </div>
           </div>
+          {selected && !prototypePreview && <div className="uxui-selection-bar" role="group" aria-label="Selected item">
+            <span>{selected.name || "Selected item"}</span>
+            <button type="button" onClick={deleteSelected} aria-label="Delete selected item"><Trash2 size={16} />Delete</button>
+            <button type="button" onClick={finishSelection} aria-label="Done editing selected item"><Check size={17} />Done</button>
+          </div>}
           {!prototypePreview && (selected || canvasSelected || inlineToolkit) && <div className="uxui-edit-tray" data-tool={editTool} aria-label="Editing controls">
-            {editTool !== "move" && <div className="uxui-edit-tray-heading"><button type="button" onClick={closeToolkit} aria-label="Back to movement controls"><ArrowLeft size={18} /></button><strong>{editTool === "library" ? STUDIO_TOOLKITS.find(item => item.id === activeToolkitId)?.name : editTool === "lookup" ? "Look closer · choose a layer" : editTool === "cutout" ? "Image cutout" : editTool === "canvas" ? "Canvas" : editTool.charAt(0).toUpperCase() + editTool.slice(1)}</strong><button type="button" onClick={closeToolkit}>Done</button></div>}
+            {editTool !== "move" && <div className="uxui-edit-tray-heading"><button type="button" onClick={closeToolkit} aria-label="Back to movement controls"><ArrowLeft size={18} /></button><strong>{editTool === "library" ? STUDIO_TOOLKITS.find(item => item.id === activeToolkitId)?.name : editTool === "lookup" ? "Look closer · choose a layer" : editTool === "cutout" ? "Image cutout" : editTool === "canvas" ? "Canvas" : editTool.charAt(0).toUpperCase() + editTool.slice(1)}</strong><button type="button" onClick={closeToolkit}>Close</button></div>}
             {selected && editTool === "move" && !prototypePreview && <div className="uxui-mobile-controls" key={selected.id} aria-label="Selected element movement and transform controls">
             <div className="uxui-gamepad" role="group" aria-label="Move selected element">
               <span className="uxui-gamepad-label">Move</span>

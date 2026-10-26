@@ -1165,6 +1165,10 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
             prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId)).apply()
         }.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}
     }
+    fun finishSelection(){
+        selectedId="";showCanvasSettings=false;inlineToolkit=false;showElementTray=false;editTool="move"
+        notice="Finished editing. Tap + Add for another item, or tap an item to edit it."
+    }
     fun checkpoint(){
         undoHistory.add(elements.toList())
         if(undoHistory.size>40)undoHistory.removeAt(0)
@@ -1501,7 +1505,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
     }
     @Composable fun ToolkitContent(){
                     Card(Modifier.fillMaxWidth().padding(horizontal=12.dp).heightIn(max=if(inlineToolkit)260.dp else LocalConfiguration.current.screenHeightDp.dp*.84f)) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Studio toolkit",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={showElementTray=false;inlineToolkit=false;editTool="move"}){Text("Done")}}
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Studio toolkit",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={showElementTray=false;inlineToolkit=false;editTool="move"}){Text("Cancel")}}
 
                         OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
@@ -1703,7 +1707,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         if(toolkitTab !in setOf("Icons","Fonts")){ToolkitContent();return}
         val previewInk="#%06X".format(MaterialTheme.colorScheme.onSurface.toArgb() and 0xFFFFFF)
         Card { Column(Modifier.fillMaxWidth().height(220.dp).padding(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(toolkitTab,modifier=Modifier.weight(1f));TextButton(onClick={inlineToolkit=false;editTool="move"}){Text("Done")}}
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(toolkitTab,modifier=Modifier.weight(1f));TextButton(onClick={inlineToolkit=false;editTool="move"}){Text("Close")}}
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 if(toolkitTab=="Icons")OutlinedTextField(iconQuery,{iconQuery=it},label={Text("Search icons")},modifier=Modifier.width(200.dp),singleLine=true)
                 else {OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Find font")},modifier=Modifier.width(140.dp),singleLine=true);OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.width(180.dp),singleLine=true);TextButton(onClick={animateFontPreviews=!animateFontPreviews}){Text(if(animateFontPreviews)"Pause" else "Play")}}
@@ -1866,7 +1870,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
                             OutlinedButton(onClick={moveLayer(e.id,-1)},modifier=Modifier.weight(1f)){Text("Move up")}
                             OutlinedButton(onClick={moveLayer(e.id,1)},modifier=Modifier.weight(1f)){Text("Move down")}
-                            OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==e.id};selectedId=elements.firstOrNull()?.id.orEmpty()},modifier=Modifier.weight(1f)){Text("Delete")}
+                            OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==e.id};finishSelection();notice="Item deleted. Use Undo to bring it back."},modifier=Modifier.weight(1f)){Text("Delete")}
                         }
                         Text("Exact specification",style=MaterialTheme.typography.labelLarge)
                         Text(uxNativeJson(listOf(e)).toString(2),style=MaterialTheme.typography.bodySmall)
@@ -1877,7 +1881,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
     }
     @Composable fun EditingPanel(e:UxUiNativeLayer){
         Card { Column(Modifier.fillMaxWidth().height(190.dp).verticalScroll(rememberScrollState()).padding(10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(editTool.replaceFirstChar{it.uppercase()},modifier=Modifier.weight(1f));TextButton(onClick={editTool="move"}){Text("Done")}}
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(editTool.replaceFirstChar{it.uppercase()},modifier=Modifier.weight(1f));TextButton(onClick={editTool="move"}){Text("Close")}}
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 when(editTool){
                     "color" -> { listOf("#111111","#FFFFFF","#64748B","#2563EB","#7C3AED","#DB2775","#DC2626","#059669").forEach{hex->OutlinedButton(onClick={edit(e.id){if(it.kind=="icon")it.copy(color=hex)else it.copy(fill=hex)}}){Box(Modifier.size(32.dp).background(uxNativeColor(hex),RoundedCornerShape(8.dp)))}} }
@@ -2014,7 +2018,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
                     }
                     Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;editTool="move";showElementTray=true},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
+                    OutlinedButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;editTool="move";showElementTray=true},modifier=Modifier.heightIn(min=44.dp),shape=RoundedCornerShape(50),contentPadding=PaddingValues(horizontal=12.dp)){Text("＋ Add")}
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
                         OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
@@ -2048,6 +2052,11 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                 if(selected==null && inlineToolkit) CompactLibrary()
                 val selectedElement=selected
                 if(selectedElement!=null){
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text(selectedElement.name,modifier=Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall)
+                        TextButton(onClick={checkpoint();elements.removeAll{it.id==selectedElement.id};finishSelection();notice="Item deleted. Use Undo to bring it back."}){Text("Delete")}
+                        OutlinedButton(onClick={finishSelection()}){Text("Done")}
+                    }
                     if(editTool=="move") {
                     Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
                         Text("Move · ${selectedElement.name}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

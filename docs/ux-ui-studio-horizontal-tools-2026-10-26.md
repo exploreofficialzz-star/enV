@@ -1,8 +1,10 @@
 # Horizontal Studio editing
 
-The editor now uses one horizontally scrolling action row. Color, Shape, Effects, Adjust, Text, Resize and Cutout take the movement controller's place in a bounded editing tray. Done returns to movement. Exact settings remain in More. Tool choices, color options, fonts, icons and image actions scroll sideways rather than wrapping into extra rows.
+The editor now uses one horizontally scrolling action row. Color, Shape, Effects, Adjust, Text, Resize and Cutout take the movement controller's place in a bounded editing tray. Close returns to movement. Exact settings remain in More. Tool choices, color options, fonts, icons and image actions scroll sideways rather than wrapping into extra rows.
 
 The main Add button always starts on All 26. Selecting a category closes that popup and opens its controls beside the artboard; selecting an actual component, font or icon returns to editing with the asset applied. Look closer shows enlarged selected artwork and a strip of selectable layers. New images preserve their proportions when fitted into a mockup.
+
+The main insert button visibly says **+ Add**. A selection bar keeps **Delete** and **Done** available above the controllers. Done keeps the item and clears its selection so users can add the next item; Delete clears selection and supports Undo. The toolkit's labelled Cancel closes the chooser without adding anything. These actions are implemented in React, Compose and SwiftUI.
 
 Movement, scaling and rotation support press-and-hold, with a short initial delay and repeat until release. A gesture creates one undo checkpoint. Cancellation, selection changes and unmount stop the repeat. The implementations use React pointer/keyboard events, Compose pointer gestures/coroutines, and SwiftUI gestures/tasks.
 

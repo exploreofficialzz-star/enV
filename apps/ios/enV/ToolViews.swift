@@ -10646,10 +10646,10 @@ private struct NativeUxUiStudioView: View {
                 }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
                 Spacer(minLength: 3)
                 Button { toolkitTab = "All 26"; toolkitQuery = ""; inlineToolkit = false; editTool = "move"; showComponentPalette.toggle() } label: {
-                    Image(systemName: showComponentPalette ? "xmark" : "plus")
-                        .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
-                        .foregroundStyle(Color.uxUiInk).background(Color.uxUiCard, in: Circle())
-                        .overlay(Circle().stroke(Color.uxUiInk, lineWidth: 3))
+                    Label(showComponentPalette ? "Cancel" : "Add", systemImage: showComponentPalette ? "xmark" : "plus")
+                        .font(.caption.bold()).frame(minWidth: 70, minHeight: 44)
+                        .foregroundStyle(Color.uxUiInk).background(Color.uxUiCard, in: Capsule())
+                        .overlay(Capsule().stroke(Color.uxUiInk, lineWidth: 2))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showComponentPalette ? "Close elements" : "Add elements")
@@ -10952,10 +10952,10 @@ private struct NativeUxUiStudioView: View {
                 Text("Studio toolkit").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Spacer()
                 Button { showComponentPalette = false; inlineToolkit = false; editTool = "move" } label: {
-                    Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.uxUiMuted).frame(width: 44, height: 44)
-                        .background(Color.uxUiSurface2, in: Circle())
-                }.accessibilityLabel("Close studio toolkit")
+                    Label("Cancel", systemImage: "xmark").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.uxUiInk).frame(minWidth: 76, minHeight: 44)
+                        .background(Color.uxUiSurface2, in: Capsule())
+                }.accessibilityLabel("Cancel studio toolkit")
             }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.uxUiMuted)
@@ -11117,7 +11117,7 @@ private struct NativeUxUiStudioView: View {
                 if let index = selectedIndex {
                     Text("Rotation · \(Int(elements[index].rotation))°").font(.callout)
                     Slider(value: Binding(get: { elements[index].rotation }, set: { checkpoint(); elements[index].rotation = $0 }), in: -180...180)
-                    selectedElementToolbar(for: index)
+                    movementControllers(for: index)
                 } else { Text("Select an object to rotate, resize or move it.").font(.callout); Button("Add shape") { addLayer("rect") }.buttonStyle(.bordered) }
             case "components": Button("Browse visual components") { toolkitTab = "Elements" }.buttonStyle(.borderedProminent)
             case "device", "responsive", "platform":
@@ -11129,7 +11129,7 @@ private struct NativeUxUiStudioView: View {
             case "layers": layerListPanel
             case "flows":
                 appScreensPanel
-                if let index = selectedIndex { selectedElementToolbar(for: index) }
+                if let index = selectedIndex { movementControllers(for: index) }
                 else { Text("Select a layer to set its destination screen, then preview the flow.").font(.callout) }
                 Button("Preview flow") { showComponentPalette = false; inlineToolkit = false; editTool = "move"; startPrototypePreview() }.buttonStyle(.borderedProminent).disabled(!hasActivePrototypeLinks)
             case "accessibility", "qa":
@@ -11365,7 +11365,7 @@ private struct NativeUxUiStudioView: View {
         if toolkitTab != "Icons" && toolkitTab != "Fonts" { ScrollView { componentPalette }.frame(height: 260) }
         else {
             VStack(alignment: .leading, spacing: 8) {
-                HStack { Text(toolkitTab).font(.caption.bold()); Spacer(); Button("Done") { inlineToolkit = false; editTool = "move" }.frame(minHeight: 44) }
+                HStack { Text(toolkitTab).font(.caption.bold()); Spacer(); Button("Close") { inlineToolkit = false; editTool = "move" }.frame(minHeight: 44) }
                 ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
                     if toolkitTab == "Icons" { TextField("Search icons", text: $iconQuery).frame(width: 200).textFieldStyle(.roundedBorder) }
                     else { TextField("Try your words", text: $fontPreviewWords).frame(width: 210).textFieldStyle(.roundedBorder); Button(animateFontPreviews ? "Pause" : "Play") { animateFontPreviews.toggle() }.buttonStyle(.bordered) }
@@ -11387,36 +11387,9 @@ private struct NativeUxUiStudioView: View {
 
     private func selectedElementToolbar(for index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            selectedItemActions(for: index)
             if editTool == "move" {
-            HStack(alignment: .top, spacing: 2) {
-                VStack(spacing: 4) {
-                    Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
-                    StudioHoldControl(symbol: "arrow.up", label: "arrow up", begin: { checkpoint() }, step: { elements[index].y = max(0, elements[index].y - 8) }).id(elements[index].id)
-                    HStack(spacing: 1) {
-                        StudioHoldControl(symbol: "arrow.left", label: "arrow left", begin: { checkpoint() }, step: { elements[index].x = max(0, elements[index].x - 8) }).id(elements[index].id)
-                        StudioHoldControl(symbol: "dot.circle", label: "dot circle", begin: { checkpoint() }, step: { elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) }).id(elements[index].id)
-                        StudioHoldControl(symbol: "arrow.right", label: "arrow right", begin: { checkpoint() }, step: { elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) }).id(elements[index].id)
-                    }
-                    StudioHoldControl(symbol: "arrow.down", label: "arrow down", begin: { checkpoint() }, step: { elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) }).id(elements[index].id)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Move selected element")
-                Spacer(minLength: 0)
-                VStack(spacing: 4) {
-                    Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
-                    StudioHoldControl(symbol: "plus.magnifyingglass", label: "plus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) }).id(elements[index].id)
-                    HStack(spacing: 1) {
-                        StudioHoldControl(symbol: "rotate.left", label: "rotate left", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
-                        StudioHoldControl(symbol: "arrow.counterclockwise", label: "arrow counterclockwise", begin: { checkpoint() }, step: { elements[index].rotation = 0 }).id(elements[index].id)
-                        StudioHoldControl(symbol: "rotate.right", label: "rotate right", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
-                    }
-                    StudioHoldControl(symbol: "minus.magnifyingglass", label: "minus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) }).id(elements[index].id)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Adjust selected element size and rotation")
-            }
+                movementControllers(for: index)
 
             } else if editTool == "library" {
                 compactStudioLibrary
@@ -11442,9 +11415,55 @@ private struct NativeUxUiStudioView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder))
     }
 
+    // Toolkit pages use these pads directly to avoid a recursive shelf -> toolkit -> shelf view type.
+    private func movementControllers(for index: Int) -> some View {
+        HStack(alignment: .top, spacing: 2) {
+            VStack(spacing: 4) {
+                Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
+                StudioHoldControl(symbol: "arrow.up", label: "arrow up", begin: { checkpoint() }, step: { elements[index].y = max(0, elements[index].y - 8) }).id(elements[index].id)
+                HStack(spacing: 1) {
+                    StudioHoldControl(symbol: "arrow.left", label: "arrow left", begin: { checkpoint() }, step: { elements[index].x = max(0, elements[index].x - 8) }).id(elements[index].id)
+                    StudioHoldControl(symbol: "dot.circle", label: "dot circle", begin: { checkpoint() }, step: { elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) }).id(elements[index].id)
+                    StudioHoldControl(symbol: "arrow.right", label: "arrow right", begin: { checkpoint() }, step: { elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) }).id(elements[index].id)
+                }
+                StudioHoldControl(symbol: "arrow.down", label: "arrow down", begin: { checkpoint() }, step: { elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) }).id(elements[index].id)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Move selected element")
+            Spacer(minLength: 0)
+            VStack(spacing: 4) {
+                Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
+                StudioHoldControl(symbol: "plus.magnifyingglass", label: "plus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) }).id(elements[index].id)
+                HStack(spacing: 1) {
+                    StudioHoldControl(symbol: "rotate.left", label: "rotate left", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
+                    StudioHoldControl(symbol: "arrow.counterclockwise", label: "arrow counterclockwise", begin: { checkpoint() }, step: { elements[index].rotation = 0 }).id(elements[index].id)
+                    StudioHoldControl(symbol: "rotate.right", label: "rotate right", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
+                }
+                StudioHoldControl(symbol: "minus.magnifyingglass", label: "minus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) }).id(elements[index].id)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Adjust selected element size and rotation")
+        }
+    }
+
+    private func selectedItemActions(for index: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(elements[index].name).font(.caption).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+            Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash").frame(minHeight: 44) }
+            Button { finishElementEditing() } label: { Label("Done", systemImage: "checkmark").frame(minHeight: 44) }
+        }.font(.caption).buttonStyle(.bordered).foregroundStyle(Color.uxUiInk)
+    }
+
+    private func finishElementEditing() {
+        selectedID = nil; canvasSelected = false; inlineToolkit = false; showComponentPalette = false; editTool = "move"
+        notice = "Finished editing. Tap + Add for another item, or tap an item to edit it."
+    }
+
     private func editingPanel(for index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack { Text(editTool.capitalized).font(.caption.bold()); Spacer(); Button("Done") { editTool = "move" }.frame(minHeight: 44) }
+            HStack { Text(editTool.capitalized).font(.caption.bold()); Spacer(); Button("Close") { editTool = "move" }.frame(minHeight: 44) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) { editingOptions(for: index) }
             }.frame(height: 104)
@@ -12450,7 +12469,8 @@ private struct NativeUxUiStudioView: View {
     private func deleteLayer(_ element: UxUiNativeLayer) {
         checkpoint()
         elements.removeAll { $0.id == element.id }
-        selectedID = elements.first?.id
+        finishElementEditing()
+        notice = "Item deleted. Use Undo to bring it back."
     }
 
     private func loadSavedDraftStatus() {

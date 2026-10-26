@@ -297,6 +297,32 @@ try {
         entry.checks.push("Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork");
       }
 
+      const beforeFinish = (await storedProject(page)).elements;
+      await checkBounds(page.getByRole("group", { name: "Selected item", exact: true }), "Visible finish/delete actions", viewport);
+      await page.getByRole("button", { name: "Done editing selected item", exact: true }).click();
+      await page.getByRole("group", { name: "Selected item", exact: true }).waitFor({state:"hidden"});
+      assert.deepEqual((await storedProject(page)).elements, beforeFinish, "Done keeps the finished artwork");
+      const addButton = page.getByRole("button", { name: "Add elements", exact: true });
+      assert.ok((await addButton.innerText()).includes("Add"), "Main insert action has a visible label");
+      await addButton.click();
+      let nextDrawer = page.getByRole("dialog", { name: "Studio toolkit", exact: true });
+      const cancel = nextDrawer.getByRole("button", { name: "Cancel studio toolkit", exact: true });
+      assert.ok((await cancel.innerText()).includes("Cancel"));
+      await cancel.click();
+      await nextDrawer.waitFor({state:"hidden"});
+      assert.deepEqual((await storedProject(page)).elements, beforeFinish, "Cancel leaves existing artwork unchanged");
+      await addButton.click();
+      nextDrawer = page.getByRole("dialog", { name: "Studio toolkit", exact: true });
+      assert.equal(await nextDrawer.getByRole("tab", {name:"All 26",exact:true}).getAttribute("aria-selected"), "true");
+      await nextDrawer.getByRole("tab", {name:"Elements",exact:true}).click();
+      await nextDrawer.getByRole("button", {name:/^Button:/}).click();
+      await waitForStored(page, project => project.elements.length === beforeFinish.length + 1, "adding the next item after Done");
+      await page.getByRole("button", {name:"Delete selected item",exact:true}).click();
+      await waitForStored(page, project => project.elements.length === beforeFinish.length, "visible Delete action");
+      await page.getByRole("button", {name:"Undo",exact:true}).last().click();
+      await waitForStored(page, project => project.elements.length === beforeFinish.length + 1, "undoing the deletion");
+      entry.checks.push("Done leaves the selection, labelled Add opens the next item, Cancel preserves artwork, and visible Delete has working Undo");
+
       const canvas = page.getByRole("button", { name: "Select canvas background", exact: true });
       const canvasBox = await canvas.boundingBox();
       await canvas.click({ position: { x: canvasBox.width * 0.9, y: canvasBox.height * 0.9 } });

@@ -2834,3 +2834,13 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-edit-tray[data-tool=more] .uxui-inline-fields label { flex:0 0 96px; }
 .uxui-edit-tray[data-tool=more] .uxui-inline-actions { display:flex; flex-wrap:nowrap; gap:10px; overflow-x:auto; }
 .uxui-edit-tray[data-tool=more] .uxui-inline-actions > * { flex:0 0 auto; min-height:44px; white-space:nowrap; }
+
+/* Keep finishing an item and adding the next one visible without searching the tools. */
+.ux-ui-studio .uxui-selection-bar { display:flex; flex:0 0 auto; align-items:center; gap:6px; min-height:48px; padding:2px 8px; border-top:1px solid var(--color-border); background:var(--color-surface); }
+.uxui-selection-bar > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.uxui-selection-bar button { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; gap:4px; min-height:44px; min-width:62px; padding:0 8px; border:1px solid var(--color-border); border-radius:8px; font-size:12px; font-weight:650; }
+.uxui-selection-bar button:last-child { background:var(--color-fg); color:var(--color-surface); }
+.ux-ui-studio.target-mobile .uxui-bottom-toolbar > .uxui-add-button,
+.ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button { display:flex !important; align-items:center; justify-content:center; gap:4px; width:80px !important; height:44px !important; flex-basis:80px !important; min-height:44px; border-radius:999px !important; padding:0 8px; font-size:12px; font-weight:700; }
+.ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button svg { width:22px !important; height:22px !important; }
+.ux-ui-studio .uxui-drawer-heading > button { display:inline-flex; align-items:center; justify-content:center; gap:4px; width:auto; min-width:76px; padding:0 8px; font-size:12px; }
