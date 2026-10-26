@@ -1,104 +1,39 @@
-# Music Analyzer model-service contract
+# Music Analyzer — local DSP contract
 
-The Music Analyzer always computes its local signal measurements in the browser. Semantic labels are a separate model operation and are never invented when a model is absent.
+## Processing policy
 
-## Deployment configuration
+The Music Analyzer uses deterministic signal processing and embedded metadata parsing. It does **not** run or host AI/ML models, download model weights, call a hosted classifier, transcribe lyrics, or send source audio to an AI service.
 
-Configure these server-side environment variables on the enV web deployment:
+The retired `POST /api/music-analysis` endpoint returns HTTP 410 (`MUSIC_ANALYSIS_MODEL_DISABLED`) and does not read or forward the request body. The `MUSIC_ANALYSIS_ENDPOINT` and `MUSIC_ANALYSIS_TOKEN` environment settings are intentionally removed. Do not re-enable this route or add a remote inference path without separate approval.
 
-- `MUSIC_ANALYSIS_ENDPOINT` — optional HTTPS URL for a trusted audio-classification or music-understanding endpoint. When omitted, the route uses enV’s existing AI service for clips up to 2.8 MB.
-- `MUSIC_ANALYSIS_TOKEN` — optional bearer token for the custom endpoint, stored only on the server and never sent to the browser.
+Semantic fields such as genre, sub-style, language, mood, instrument identity, lyrics/theme, vocal role and detailed vocal delivery remain unknown unless supplied and reviewed by a human through the annotation workflow. Embedded ID3/container tags are preserved as metadata, not promoted into confirmed classifications. Rule-derived cues and signal measurements must remain distinct from semantic labels.
 
-When configured, the custom endpoint receives a `POST` request whose body is the selected audio file as raw bytes. The `Content-Type` is the file's detected MIME type, falling back to `application/octet-stream`. The service must return JSON. enV limits model uploads to 25 MB and gives the endpoint up to 90 seconds to respond.
+## Current execution boundaries
 
-The route requires a same-origin `Origin` header, bounds the complete multipart body before parsing it, limits an individual audio file to 25 MB, and applies a best-effort per-process limit of 10 model requests per source IP in a 10-minute window. Because serverless instances do not share in-memory counters, a production deployment should additionally apply shared/edge rate limits at the ingress. The custom endpoint can return a structured object such as:
+- Web Music Analyzer decodes locally through the browser's Web Audio APIs. The current implementation retains a 25 MiB file limit and a two-minute duration limit as memory-safety guards. These are local-device limits, not claimed media-format limits.
+- Native Android/iOS offline analysis uses each platform's native WAV path and exposes platform-specific input/resource limits. The native paths do not embed the web app or run a hosted model.
+- The existing FFmpeg processor provides bounded media conversion operations. It is **not yet** a durable Music Analyzer DSP job queue: do not treat its availability as proof of full-track analysis, resumable analysis jobs, or persisted cloud datasets.
+- Long-track and batch analysis require a separately implemented non-model DSP worker/job path, validated resource budgets, authenticated ownership, actual job states/cancellation, checkpointing and explicit consent before upload. Until that path is deployed and verified, the Analyzer must keep its device safety guard instead of increasing limits speculatively.
+- Browser IndexedDB, where used elsewhere in enV, is quota-limited and may be evicted. A local export is a user-controlled copy, not a claim of a durable server backup.
 
-```json
-{
-  "genre": "Afrobeats",
-  "sub_style": "Afro-pop",
-  "language": ["Pidgin", "Yoruba"],
-  "mood": ["upbeat"],
-  "instruments": ["drums", "bass"],
-  "vocal_style": "melodic",
-  "genre_candidates": [
-    { "label": "Afrobeats", "score": 0.87 },
-    { "label": "Pop", "score": 0.42 }
-  ]
-}
-```
+## Measurement contract
 
-These values are an example of the response contract, not a claim that enV predicts them without a working model. An audio-classification endpoint that returns `[{"label":"Rock","score":0.8}]` is also accepted; enV will expose its ranked labels as genre candidates. Fields the model does not return remain unknown.
+The detailed signal contract is `env.music-analysis.v2`. The compact profile contract is `env.music-profile.v2`.
 
-## Privacy and interpretation
+- `peak_dbfs` is the maximum decoded sample peak; it is not true peak in dBTP.
+- `rms_dbfs` is the RMS level in dBFS for the reported analysis scope.
+- `rms_loudness_proxy_db` is a fixed-offset, RMS-derived decibel proxy. It is **not** integrated LUFS and does not implement standards-compliant EBU R 128 / ITU-R BS.1770 K-weighting and gating.
+- `silence_percent` is based on 100 ms windows below the current threshold; it is not a perceptual silence judgment.
+- Tempo, key, chords, dominant pitch, spectral descriptors and feature-change sections are estimates/candidates. Full-mix dominant pitch is not a vocal melody or vocal register.
+- Harmonic/percussive and frequency/spatial outputs are candidate signal layers, not clean source-separated stems.
+- Unknown measurements are null/unavailable; semantic facts are not inferred from tempo, spectrum or other signal metrics.
 
-Local analysis does not upload the audio. The user must explicitly enable model upload in the interface before the model endpoint is called. Model uploads go only to the configured endpoint; operators are responsible for the endpoint's access controls, retention policy, model license and processing location.
+A schema change that renames the RMS proxy from the misleading `estimated_loudness_lufs` field is versioned as v2. Consumers must not interpret the legacy field as a standards loudness result.
 
-Tempo and key are best-effort DSP estimates. The loudness field is an RMS-based proxy, not a standards-compliant integrated LUFS measurement. The signal features do not independently identify a genre, sub-style, language, mood or instrument. Language detection on singing or mixed vocals should be treated as uncertain unless the configured model was evaluated for that use case and the target languages, including Pidgin and Yoruba.
+## Dataset and provenance expectations
 
+Keep source metadata, DSP measurements, user annotations, and reviewer-confirmed labels separate. Any future persistent dataset API must enforce authentication and owner/tenant checks for every track, run, annotation and export. Long time-series data should be paginated or stored as bounded artifacts instead of an unbounded JSON object. Exported data should contain schema/engine versions, measurement methods and units, annotation provenance, unknown/missing fields, rights/retention state and checksums when available.
 
+## Verification status
 
-
-## Built-in enV AI route
-
-For small clips, the analyzer calls the existing enV AI task `music.analysis.classify`, which routes audio through the Gemini Interactions API. The browser must receive the clear upload-consent checkbox before starting this request. Inline audio requests are limited here to 2.8 MB to stay inside enV's existing API request-body budget; longer clips can still be measured locally, or can use the optional custom endpoint.
-
-Built-in semantic tags require the existing AI service to be configured with `AI_ENABLED=true`, a valid `GEMINI_API_KEY`, `AI_MAX_COST_CLASS=STANDARD`, and `AI_GEMINI_TIER=paid`. Gemini's free tier is intentionally not treated as approved for sensitive audio. Configure these values on the backend that serves `/api/ai/run`, not in client-side `VITE_*` variables. The Gemini adapter uses the Interactions API's audio input and structured JSON response format; audio request storage is disabled on the interaction where supported.
-
-The standard AI router keeps its normal session/quota/rate limits and usage accounting for this task. Model costs apply and vary by input audio length and output usage. If the backend does not have a compatible paid Gemini model configured, the endpoint reports a configuration/routing error and leaves the local measurements intact.
-
-## Choosing and validating the semantic model
-
-The repository does not silently select a public inference service. Until `MUSIC_ANALYSIS_ENDPOINT` is configured, the model-tag request returns an explicit unavailable response and on-device signal measurements continue to work.
-
-A reasonable candidate for a separately deployed adapter is [OpenMOSS MOSS-Music](https://github.com/OpenMOSS/MOSS-Music) / [the official model page](https://www.mosi.cn/en/models/moss-music). Its published scope includes music captioning/tagging, lyrics transcription, instrument/vocal descriptions, and key/tempo/chord analysis; the released 8B models are Apache-2.0 licensed. Treat this as a model candidate, not a preconfigured enV dependency: the adapter must convert its output into the JSON contract above, and operators must size and evaluate the actual deployment.
-
-Do not assume a model accurately detects Nigerian Pidgin, Yoruba, or code-switched lyrics just because it can caption music or transcribe some singing. Its published singing-ASR benchmark description specifically mentions Chinese and English. Evaluate Nigerian-language clips with consented, reviewed ground truth before marking those labels reliable. Unknown and low-confidence fields must stay unknown or visibly uncertain.
-
-The Discogs-EffNet ONNX mirror is another music-style classifier, but its published model card specifies CC-BY-NC-SA 4.0 / non-commercial terms. Do not ship it in a commercial enV build without confirming the applicable license and obtaining any needed permission.
-
-
-## Song profile JSON export
-
-The Analyzer offers two distinct exports. **Song profile JSON** is the compact, integration-friendly contract env.music-profile.v1: the principal fields are top-level (genre, sub_style, language, tempo_bpm, key, mood, instruments, and vocal_style) so downstream cataloging workflows do not have to infer field names from the detailed report. **Full analysis** preserves the complete nested env.music-analysis.v1 diagnostics.
-
-The profile keeps three sources distinct:
-
-- Semantic labels such as genre, sub-style, language, mood and instruments are model estimates only. If no model result exists, those fields stay null or empty and their analysis_status values say unknown.
-- Tempo and key come from local signal-analysis estimates. Their provenance states signal_estimate or unavailable; they are not presented as model-verified facts.
-- Embedded ID3/container tags stay under metadata. An embedded genre tag never gets promoted into the top-level genre field.
-
-The profile also preserves the original source, technical audio metrics, timbral metrics, candidate scores and explanatory notes. Candidate scores are uncalibrated model estimates, not verified probabilities. A sample output is illustrative only:
-
-```json
-{
-  "schema_version": "env.music-profile.v1",
-  "genre": "Afrobeats",
-  "sub_style": "Afro-pop",
-  "language": ["Nigerian Pidgin", "Yoruba"],
-  "tempo_bpm": 112,
-  "key": "A minor",
-  "mood": ["upbeat"],
-  "instruments": ["drums", "bass"],
-  "vocal_style": "melodic",
-  "genre_candidates": [{ "label": "Afrobeats", "score": 0.86 }],
-  "title": null,
-  "artist": null,
-  "album": null,
-  "duration_seconds": 183.4,
-  "analysis_status": {
-    "classification": "model_completed",
-    "genre": "model_estimate",
-    "sub_style": "model_estimate",
-    "language": "model_estimate",
-    "mood": "model_estimate",
-    "instruments": "model_estimate",
-    "vocal_style": "model_estimate",
-    "tempo_bpm": "signal_estimate",
-    "key": "signal_estimate",
-    "file_metadata": "unknown"
-  }
-}
-```
-
-The example labels are not fixed output. The selected audio and configured model determine the actual result; no example classification is bundled as a fallback.
+The contract updates in this branch add regression assertions for the v2 loudness field and retire the old model-forwarding endpoint. They do not by themselves implement a durable worker queue, standards-compliant LUFS/true-peak analysis, cloud dataset persistence, 10,000-track pagination, or a reference-corpus accuracy benchmark. Those capabilities must be implemented and verified separately; do not advertise them as active until that evidence exists.
