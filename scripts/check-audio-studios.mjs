@@ -102,14 +102,18 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
 }
 const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
+const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
 const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
-for (const marker of ["Analyze on this device", "Song profile JSON", "Training metadata JSON", "createMusicAnalysisProfile", "analyzeMusicDatasetAudio", "createLocalSignalLayers", "Human-reviewed training labels", "local-signal-layers.zip", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
+for (const marker of ["Analyze on this device", "Song profile JSON", "Training metadata JSON", "createMusicAnalysisProfile", "analyzeMusicDatasetAudio", "createLocalSignalLayers", "Training labels", "local-signal-layers.zip", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
 }
 assert.ok(!musicAnalyzer.includes("allowModelUpload"), "Music Analyzer must not send audio to a hosted classifier");
 assert.ok(!musicAnalyzer.includes("/api/music-analysis"), "Music Analyzer local processing must not call its legacy remote-classification route");
+assert.ok(songMetadataAnalyzer.includes("analyzeMusicDatasetAudio"), "Song Metadata Analyzer must use the local DSP dataset engine");
+assert.ok(!songMetadataAnalyzer.includes("runAiTask") && !songMetadataAnalyzer.includes("fetchAiAvailability"), "Song Metadata Analyzer must not call a hosted AI service");
+assert.ok(songMetadataAnalyzer.includes("Human-reviewed training labels") && songMetadataAnalyzer.includes("dataset_analysis"), "Song Metadata Analyzer must expose label review and detailed analysis data");
 const localDatasetEngine = fs.readFileSync(new URL("../src/lib/engines/music-dataset-analysis.ts", import.meta.url), "utf8");
 for (const marker of ["env.music-dataset-analysis.v1", "uses_remote_api: false", "uses_hosted_model: false", "chord_estimates", "change_points", "createLocalSignalLayers", "encodeMonoPcm16Wav", "manual_review_required"]) {
   assert.ok(localDatasetEngine.includes(marker), `Local music dataset analysis contract missing: ${marker}`);
