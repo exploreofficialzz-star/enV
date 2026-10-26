@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AudioLines, FileAudio, FileJson, FolderArchive, LoaderCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { strToU8, zipSync } from "fflate";
@@ -110,10 +110,15 @@ export function MusicAnalyzerStudio() {
   const [layersBusy, setLayersBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const analysisControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
+
+  useEffect(() => () => {
+    analysisControllerRef.current?.abort();
+  }, []);
 
   const metricCards = useMemo(() => {
     if (!analysis) return [];
@@ -130,6 +135,10 @@ export function MusicAnalyzerStudio() {
   }, [analysis]);
 
   function chooseFile(selected: File | null) {
+    analysisControllerRef.current?.abort();
+    analysisControllerRef.current = null;
+    setBusy(false);
+    setAnalysisProgress(0);
     setError("");
     setNotice("");
     setAnalysis(null);
@@ -159,14 +168,27 @@ export function MusicAnalyzerStudio() {
       setError("This browser does not support Web Audio decoding. Try an up-to-date browser.");
       return;
     }
+    analysisControllerRef.current?.abort();
+    const controller = new AbortController();
+    analysisControllerRef.current = controller;
+    const ensureCurrent = () => {
+      if (analysisControllerRef.current !== controller) return false;
+      if (controller.signal.aborted) throw new DOMException("Cancelled", "AbortError");
+      return true;
+    };
     setBusy(true);
     setAnalysisProgress(0);
+    setAnalysis(null);
+    setDatasetAnalysis(null);
+    setAnnotations(blankAnnotations());
     setError("");
     setNotice("Checking file duration, then measuring the audio on this device. Nothing is uploaded for local analysis.");
     try {
       const probedDuration = await probeAudioDuration(file);
+      if (!ensureCurrent()) return;
       if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
       const bytes = await file.arrayBuffer();
+      if (!ensureCurrent()) return;
       const context = new Ctx();
       let buffer: AudioBuffer;
       try {
@@ -174,6 +196,7 @@ export function MusicAnalyzerStudio() {
       } finally {
         await context.close().catch(() => undefined);
       }
+      if (!ensureCurrent()) return;
       if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
       if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
@@ -186,17 +209,37 @@ export function MusicAnalyzerStudio() {
         mimeType: file.type,
         metadata,
       });
-      const dataset = await analyzeMusicDatasetAudio({ channels, sampleRate: buffer.sampleRate, fileName: file.name }, { onProgress: (fraction) => setAnalysisProgress(fraction) });
+      if (!ensureCurrent()) return;
+      const dataset = await analyzeMusicDatasetAudio(
+        { channels, sampleRate: buffer.sampleRate, fileName: file.name },
+        {
+          signal: controller.signal,
+          onProgress: (fraction) => {
+            if (analysisControllerRef.current === controller && !controller.signal.aborted) setAnalysisProgress(fraction);
+          },
+        },
+      );
+      if (!ensureCurrent()) return;
       setAnalysis(result);
       setDatasetAnalysis(dataset);
       setAnnotations(dataset.annotations);
       setNotice("Local DSP analysis finished on this device. No AI model or remote API was used. Add and review semantic labels below before exporting training data.");
     } catch (cause) {
-      setAnalysis(null);
-      setError(cause instanceof Error ? cause.message : "Could not analyze this audio file.");
-      setNotice("");
+      if (analysisControllerRef.current !== controller) return;
+      if (cause instanceof Error && cause.name === "AbortError") {
+        setError("");
+        setNotice("Analysis cancelled.");
+      } else {
+        setAnalysis(null);
+        setDatasetAnalysis(null);
+        setError(cause instanceof Error ? cause.message : "Could not analyze this audio file.");
+        setNotice("");
+      }
     } finally {
-      setBusy(false);
+      if (analysisControllerRef.current === controller) {
+        analysisControllerRef.current = null;
+        setBusy(false);
+      }
     }
   }
 
@@ -309,6 +352,7 @@ export function MusicAnalyzerStudio() {
         {busy ? <div className="mt-4" role="status" aria-live="polite"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Local analysis</span><span>{Math.round(analysisProgress * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(analysisProgress * 100)}%` }} /></div></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={!file || busy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
+          {busy ? <Button type="button" variant="outline" onClick={() => analysisControllerRef.current?.abort()}>Cancel analysis</Button> : null}
           <Button type="button" variant="outline" disabled={!analysis || !datasetAnalysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
           <Button type="button" variant="ghost" disabled={!analysis || !datasetAnalysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Training metadata JSON</Button>
           <Button type="button" variant="outline" disabled={!file || !datasetAnalysis || layersBusy} onClick={() => void exportSignalLayers()}>{layersBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Preparing layers…</> : <><FolderArchive size={16} className="mr-2" />Signal layers ZIP ({layerExportLimitSeconds()}s max)</>}</Button>
