@@ -152,6 +152,67 @@ fun NativeSongMetadataAnalyzerScreen() {
         tracks = tracks.map { if (it.id == id) change(it) else it }
     }
 
+    fun updateDatasetTag(id: String, key: String, rawValue: String) {
+        val tags = rawValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(80)
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
+                annotations.put(key, JSONArray(tags)).put("reviewed", false)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                when (key) {
+                    "genre" -> report.put("genre", tags.firstOrNull() ?: JSONObject.NULL)
+                    "sub_style" -> report.put("sub_style", tags.firstOrNull() ?: JSONObject.NULL)
+                    "language" -> report.put("language", JSONArray(tags))
+                    "mood" -> report.put("mood", JSONArray(tags))
+                    "vocals" -> report.put("vocals", JSONArray(tags))
+                    "instruments" -> report.put("instruments", JSONArray(tags))
+                    "themes" -> report.put("theme", JSONArray(tags))
+                    "listening_scene" -> report.put("setting", JSONArray(tags))
+                }
+                val analysis = JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review")
+                report.put("analysis", analysis)
+                item.copy(report = report, status = "Partial")
+            }
+        }
+    }
+
+    fun updateDatasetAnnotationText(id: String, key: String, value: String) {
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
+                annotations.put(key, value).put("reviewed", false)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review"))
+                item.copy(report = report, status = "Partial")
+            }
+        }
+    }
+
+    fun markDatasetReviewed(id: String, reviewed: Boolean) {
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}").put("reviewed", reviewed)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}")
+                    .put("status", if (reviewed) "full_local_reviewed" else "full_local_needs_review"))
+                val hasWarnings = (report.optJSONArray("warnings")?.length() ?: 0) > 0
+                item.copy(report = report, status = if (reviewed && !hasWarnings) "Done" else "Partial")
+            }
+        }
+    }
+
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
@@ -334,6 +395,15 @@ fun NativeSongMetadataAnalyzerScreen() {
                     nativeTagList("VOCALS", *jsonStringList(report.optJSONArray("vocals")).toTypedArray())
                     nativeTagList("INSTRUMENTS", *jsonStringList(report.optJSONArray("instruments")).toTypedArray())
                     nativeTagList("DESCRIPTIONS", *jsonStringList(report.optJSONArray("descriptions")).toTypedArray())
+                    report.optJSONObject("dataset_analysis")?.let { dataset ->
+                        NativeSongDatasetDetails(dataset)
+                        NativeSongDatasetAnnotationEditor(
+                            dataset = dataset,
+                            onTagChange = { key, value -> updateDatasetTag(selected.id, key, value) },
+                            onTextChange = { key, value -> updateDatasetAnnotationText(selected.id, key, value) },
+                            onReviewedChange = { reviewed -> markDatasetReviewed(selected.id, reviewed) },
+                        )
+                    }
                     if (itemWarnings(report).isNotEmpty()) {
                         Text("Notes", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
                         itemWarnings(report).take(5).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -342,6 +412,90 @@ fun NativeSongMetadataAnalyzerScreen() {
             }
         }
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+private val nativeDatasetAnnotationFields = listOf(
+    Triple("genre", "Genre", "Afrobeats, R&B"),
+    Triple("sub_style", "Sub-style", "Afro-pop, Amapiano"),
+    Triple("style_influences", "Style influences", "Highlife, dancehall, soul"),
+    Triple("language", "Language", "Nigerian Pidgin, Yoruba"),
+    Triple("energy", "Energy", "Low, medium, high"),
+    Triple("mood", "Mood", "Celebratory, soulful"),
+    Triple("source_role", "Audio part / stem role", "Full mix, vocals, drums, bass, melody"),
+    Triple("vocals", "Vocal content", "Lead vocals, backing vocals, ad-libs"),
+    Triple("vocal_delivery", "Vocal delivery", "Melodic singing, rap, chant"),
+    Triple("vocal_register", "Vocal pitch / register", "High/low pitch, soprano, alto, tenor, baritone"),
+    Triple("vocal_harmony", "Vocal harmony", "Doubles, thirds, call-and-response"),
+    Triple("performance_technique", "Performance techniques", "Vibrato, falsetto, melisma"),
+    Triple("instruments", "Instruments", "Log drum, shakers, synth bass"),
+    Triple("themes", "Themes", "Love, celebration"),
+    Triple("listening_scene", "Listening scene", "Club, road trip"),
+    Triple("production_traits", "Production traits", "Reverb, saturation, sidechain"),
+    Triple("arrangement", "Arrangement", "Intro build, drum drop, instrumental break"),
+)
+
+@Composable
+private fun NativeSongDatasetDetails(dataset: JSONObject) {
+    val technical = dataset.optJSONObject("technical") ?: JSONObject()
+    val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
+    val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
+    val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
+    val structure = dataset.optJSONObject("structure") ?: JSONObject()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Local DSP findings", fontWeight = FontWeight.SemiBold)
+        Text("Pitch span: ${pitch.optString("lowest_detected_note", "unknown")}–${pitch.optString("highest_detected_note", "unknown")} · Chords: ${tonality.optJSONArray("chord_estimates")?.length() ?: 0} · Transient rate: ${rhythm.opt("transient_density_per_second") ?: "—"}/s", style = MaterialTheme.typography.bodySmall)
+        Text("Mean spectral centroid: ${technical.opt("mean_spectral_centroid_hz") ?: "—"} Hz · Feature changes: ${structure.optJSONArray("change_points")?.length() ?: 0}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val cueArray = dataset.optJSONArray("style_cues") ?: JSONArray()
+        for (index in 0 until min(cueArray.length(), 8)) {
+            val cue = cueArray.optJSONObject(index) ?: continue
+            Text("${cue.optString("tag")}: ${cue.optString("evidence")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Pitch and chord values are estimates from a mono mix, not verified vocal-only notes. Section cuts are not confirmed verse/chorus labels.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun NativeSongDatasetAnnotationEditor(
+    dataset: JSONObject,
+    onTagChange: (String, String) -> Unit,
+    onTextChange: (String, String) -> Unit,
+    onReviewedChange: (Boolean) -> Unit,
+) {
+    val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Text("Training labels (human-reviewed)", fontWeight = FontWeight.SemiBold)
+        Text("Genre, language, vocal type and instrument identity are annotations, not facts inferred by this local DSP pass.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        nativeDatasetAnnotationFields.forEach { (key, label, placeholder) ->
+            OutlinedTextField(
+                value = jsonStringList(annotations.optJSONArray(key)).joinToString(", "),
+                onValueChange = { onTagChange(key, it) },
+                label = { Text(label) },
+                placeholder = { Text(placeholder) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        }
+        OutlinedTextField(
+            value = annotations.optString("notes"),
+            onValueChange = { onTextChange("notes", it.take(4000)) },
+            label = { Text("Annotation notes") },
+            placeholder = { Text("Parts to preserve or replace, uncertainty, review notes") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            maxLines = 4,
+        )
+        OutlinedTextField(
+            value = annotations.optString("reviewer").takeUnless { it == "null" } ?: "",
+            onValueChange = { onTextChange("reviewer", it.take(100)) },
+            label = { Text("Reviewer initials / team ID") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = annotations.optBoolean("reviewed", false), onCheckedChange = onReviewedChange)
+            Text("Reviewed for training use", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
