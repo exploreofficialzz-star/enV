@@ -1955,7 +1955,7 @@ enum NativeAudioWavProcessor {
             return value
         }
         let payload: [String: Any] = [
-            "schema_version": "env.music-analysis.v1",
+            "schema_version": "env.music-analysis.v2",
             "source": [
                 "file_name": fileName.isEmpty ? "audio.wav" : fileName,
                 "mime_type": "audio/wav",
@@ -1972,7 +1972,7 @@ enum NativeAudioWavProcessor {
                 "channels": input.channels.count,
                 "peak_dbfs": nullable(peak > 0 ? 20 * log10(peak) : nil),
                 "rms_dbfs": nullable(rms > 0 ? 20 * log10(rms) : nil),
-                "estimated_loudness_lufs": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
+                "rms_loudness_proxy_db": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
                 "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
                 "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
                 "windowed_rms_spread_db": nullable(spread),
