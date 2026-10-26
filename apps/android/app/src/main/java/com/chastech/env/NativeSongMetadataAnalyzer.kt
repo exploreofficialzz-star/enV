@@ -8,7 +8,6 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -47,12 +46,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -143,19 +142,11 @@ fun NativeSongMetadataAnalyzerScreen() {
     var tracks by remember { mutableStateOf(emptyList<NativeSongSource>()) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var fullAnalysis by remember { mutableStateOf(false) }
-    var aiConsent by remember { mutableStateOf(false) }
-    var aiAvailable by remember { mutableStateOf<Boolean?>(null) }
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var currentJob by remember { mutableStateOf<Job?>(null) }
-
-    LaunchedEffect(Unit) {
-        aiAvailable = runCatching {
-            withContext(Dispatchers.IO) { NativeAiClient.availability(context)["audio.music.analyze"] == true }
-        }.getOrDefault(false)
-    }
 
     fun update(id: String, change: (NativeSongSource) -> NativeSongSource) {
         tracks = tracks.map { if (it.id == id) change(it) else it }
@@ -233,26 +224,11 @@ fun NativeSongMetadataAnalyzerScreen() {
                     FilterChip(selected = fullAnalysis, onClick = { if (!busy) fullAnalysis = true }, label = { Text("Full Analysis") }, enabled = !busy)
                 }
                 if (fullAnalysis) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = aiConsent, onCheckedChange = { if (!busy) aiConsent = it }, enabled = !busy)
-                        Column(Modifier.weight(1f)) {
-                            Text("Send short excerpts to AI", style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                when (aiAvailable) { true -> "AI available"; false -> "AI unavailable · Quick Scan still works"; null -> "Checking AI setup…" },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    Text("Full Analysis runs local signal processing only. Genre, language, mood, instruments and vocal labels are entered and reviewed by your team; no audio is sent to an AI service.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Button(
                     onClick = {
-                        if (fullAnalysis && !aiConsent) {
-                            error = "Confirm AI processing first."
-                        } else if (fullAnalysis && aiAvailable != true) {
-                            error = "AI analysis is unavailable. Quick Scan still works."
-                        } else {
-                            error = ""; notice = ""; progress = 0; busy = true
+                        error = ""; notice = ""; progress = 0; busy = true
                             currentJob = scope.launch {
                                 try {
                                     val queue = tracks.toList()
@@ -260,36 +236,10 @@ fun NativeSongMetadataAnalyzerScreen() {
                                         currentCoroutineContext().ensureActive()
                                         update(item.id) { it.copy(status = "Analyzing", error = null) }
                                         try {
-                                            val scan = withContext(Dispatchers.IO) { analyzeNativeSong(context, item) }
+                                            val scan = withContext(Dispatchers.IO) { analyzeNativeSong(context, item, detailed = fullAnalysis) }
                                             var report = scan.report
-                                            var semanticCompleted = false
-                                            if (fullAnalysis && aiConsent) {
-                                                val decoded = scan.decoded
-                                                if (decoded == null || decoded.samples.size < SONG_ANALYSIS_RATE) {
-                                                    report.put("warnings", (report.optJSONArray("warnings") ?: JSONArray()).put("Audio could not be decoded for AI analysis."))
-                                                } else {
-                                                    val excerpt = buildNativeSongExcerpt(decoded.samples)
-                                                    if (excerpt == null) {
-                                                        report.put("warnings", (report.optJSONArray("warnings") ?: JSONArray()).put("Audio is too short for semantic analysis."))
-                                                    } else {
-                                                        try {
-                                                            val aiInput = JSONObject()
-                                                                .put("audioBase64", Base64.encodeToString(excerpt.first, Base64.NO_WRAP))
-                                                                .put("mimeType", "audio/wav")
-                                                                .put("filename", item.name.take(120))
-                                                                .put("sampledSeconds", excerpt.second)
-                                                            val ai = NativeAiClient.runWithMetadata(context, "audio.music.analyze", aiInput)
-                                                            mergeNativeSemanticResult(report, ai.result)
-                                                            semanticCompleted = true
-                                                            ai.warnings.forEach { report.optJSONArray("warnings")?.put(it) }
-                                                        } catch (failure: Throwable) {
-                                                            if (failure is CancellationException) throw failure
-                                                            report.optJSONArray("warnings")?.put(failure.message ?: "AI analysis could not be completed.")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            val status = if (semanticCompleted || (!fullAnalysis && report.optString("tempo_bpm") != "null")) "Done" else "Partial"
+                                            val annotationReview = report.optJSONObject("dataset_analysis")?.optJSONObject("annotations")?.optBoolean("reviewed", false) == true
+                                            val status = if (!fullAnalysis && report.optString("tempo_bpm") != "null") "Done" else if (fullAnalysis && annotationReview && report.optString("tempo_bpm") != "null") "Done" else "Partial"
                                             update(item.id) { it.copy(status = status, report = report, error = null) }
                                             if (report.optJSONArray("warnings")?.length() ?: 0 > 0) notice = "Some results need review."
                                         } catch (failure: Throwable) {
@@ -308,13 +258,13 @@ fun NativeSongMetadataAnalyzerScreen() {
                             }
                         }
                     },
-                    enabled = tracks.isNotEmpty() && !busy && (!fullAnalysis || (aiConsent && aiAvailable == true)),
+                    enabled = tracks.isNotEmpty() && !busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (busy) "Analyzing… $progress%" else if (fullAnalysis) "Analyze with AI" else "Scan songs")
+                    Text(if (busy) "Analyzing locally… $progress%" else if (fullAnalysis) "Run detailed local analysis" else "Scan songs")
                 }
                 if (busy) {
                     OutlinedButton(onClick = { currentJob?.cancel() }, modifier = Modifier.fillMaxWidth()) {
@@ -323,7 +273,7 @@ fun NativeSongMetadataAnalyzerScreen() {
                 }
                 if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 if (notice.isNotEmpty()) Text(notice, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                Text("Local by default. Full Analysis sends short excerpts after consent.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Local-only processing. No model inference or external AI request.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -632,7 +582,7 @@ private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
 private fun readCurrentEntryBounded(input: InputStream, limit: Long): ByteArray =
     readBoundedContent(input, limit)
 
-private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource): NativeSongScan {
+private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, detailed: Boolean = false): NativeSongScan {
     val bytes = item.bytes ?: withContext(Dispatchers.IO) {
         val stream = item.uri?.let { context.contentResolver.openInputStream(it) } ?: error("Cannot open ${item.name}.")
         stream.use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) }
