@@ -126,7 +126,7 @@ export function MusicAnalyzerStudio() {
       { label: "Tempo", value: displayNumber(analysis.rhythm.tempo_bpm, " BPM"), hint: "Approximate beat estimate" },
       { label: "Key", value: analysis.tonality.key ?? "Not available", hint: "Approximate tonal center" },
       { label: "Duration", value: formatDuration(analysis.audio.duration_seconds), hint: "Decoded audio length" },
-      { label: "Loudness", value: displayNumber(analysis.audio.estimated_loudness_lufs, " LUFS est."), hint: "RMS proxy, not standards LUFS" },
+      { label: "Loudness proxy", value: displayNumber(analysis.audio.rms_loudness_proxy_db, " dB proxy"), hint: "RMS-derived estimate; not standards-compliant LUFS" },
       { label: "Peak", value: displayNumber(analysis.audio.peak_dbfs, " dBFS"), hint: "Highest decoded sample" },
       { label: "RMS", value: displayNumber(analysis.audio.rms_dbfs, " dBFS"), hint: "Mean signal energy" },
       { label: "Silence", value: displayNumber(analysis.audio.silence_percent, "%"), hint: "100 ms windows below −60 dBFS" },
