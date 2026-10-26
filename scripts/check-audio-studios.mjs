@@ -127,8 +127,11 @@ for (const marker of ["env.music-profile.v1", "tempo_bpm", "genre_candidates", "
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
 }
-for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_BUILTIN_LIMIT", "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "MUSIC_ANALYSIS_NO_LABELS", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification", "AI_LIMITS.audioBytesMax", "music.analysis.classify", "apiUrl(\"/api/ai/run\")"]) {
-  assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
+assert.ok(musicAnalysisRoute.includes("MUSIC_ANALYSIS_MODEL_DISABLED"), "legacy music-analysis route must return an explicit disabled result");
+assert.match(musicAnalysisRoute, /status:\s*410/, "legacy music-analysis route must return HTTP 410");
+assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_Endpoint_DISABLED|\/api\/ai\/run|fetch\(/, "Music Analyzer route must not forward audio to hosted inference");
+for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2"]) {
+  assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
 const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
 const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
