@@ -565,7 +565,7 @@ export function SongMetadataAnalyzerEngine() {
     if (!reports.length) return;
     const failed = tracks.filter((track) => track.error || track.status === "failed").map((track) => ({ filename: track.file.name, error: track.error ?? "Failed" }));
     const archive: Record<string, Uint8Array> = {
-      "song-analysis.json": strToU8(JSON.stringify({ schema_version: "1.0", tracks: reports }, null, 2)),
+      "song-analysis.json": strToU8(JSON.stringify({ schema_version: "env.song-analysis-export.v2", tracks: reports }, null, 2)),
       "song-analysis.csv": strToU8(songsToCsv(reports.map(outputCsvRow))),
       "processing-issues.json": strToU8(JSON.stringify(failed, null, 2)),
     };
