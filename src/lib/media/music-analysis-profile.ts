@@ -1,18 +1,18 @@
 import type { MusicAnalysisResult } from "../engines/music-analysis.ts";
 
-type SemanticSource = "model_estimate" | "unknown";
+type SemanticSource = "unknown";
 type SignalSource = "signal_estimate" | "unavailable";
 type MetadataSource = "embedded_metadata" | "unknown";
 
 /**
  * Compact, machine-friendly song profile for the Analyzer's profile export.
  *
- * The signal-derived tempo/key and the model-derived semantic labels stay separate.
- * Embedded file tags are preserved as metadata and are never silently promoted into
- * an audio classification.
+ * Signal-derived metrics and embedded tags retain separate fields. Semantic label
+ * provenance is reported as unknown unless an allowed source is explicitly recorded;
+ * this deterministic Analyzer does not run a classifier.
  */
 export type MusicAnalysisProfile = {
-  schema_version: "env.music-profile.v1";
+  schema_version: "env.music-profile.v2";
   genre: string | null;
   sub_style: string | null;
   language: string[];
@@ -61,7 +61,7 @@ export function createMusicAnalysisProfile(result: MusicAnalysisResult): MusicAn
   );
 
   return {
-    schema_version: "env.music-profile.v1",
+    schema_version: "env.music-profile.v2",
     genre: classification.genre,
     sub_style: classification.sub_style,
     language: [...classification.language],
@@ -81,12 +81,12 @@ export function createMusicAnalysisProfile(result: MusicAnalysisResult): MusicAn
     timbre: { ...result.timbre },
     analysis_status: {
       classification: classification.status,
-      genre: classification.genre ? "model_estimate" : "unknown",
-      sub_style: classification.sub_style ? "model_estimate" : "unknown",
-      language: classification.language.length ? "model_estimate" : "unknown",
-      mood: classification.mood.length ? "model_estimate" : "unknown",
-      instruments: classification.instruments.length ? "model_estimate" : "unknown",
-      vocal_style: classification.vocal_style ? "model_estimate" : "unknown",
+      genre: classification.genre ? "unknown" : "unknown",
+      sub_style: classification.sub_style ? "unknown" : "unknown",
+      language: classification.language.length ? "unknown" : "unknown",
+      mood: classification.mood.length ? "unknown" : "unknown",
+      instruments: classification.instruments.length ? "unknown" : "unknown",
+      vocal_style: classification.vocal_style ? "unknown" : "unknown",
       tempo_bpm: result.rhythm.status === "estimated" ? "signal_estimate" : "unavailable",
       key: result.tonality.status === "estimated" ? "signal_estimate" : "unavailable",
       file_metadata: hasEmbeddedMetadata ? "embedded_metadata" : "unknown",
