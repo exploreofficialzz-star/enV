@@ -648,7 +648,7 @@ export function SongMetadataAnalyzerEngine() {
       };
       return {
         ...track,
-        status: reviewed && report.warnings.length === 0 ? "done" : "partial",
+        status: reviewed ? "done" : "partial",
         report: {
           ...report,
           dataset_analysis: datasetAnalysis,
