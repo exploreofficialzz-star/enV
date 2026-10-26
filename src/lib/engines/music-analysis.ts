@@ -11,7 +11,7 @@ export type MusicAnalysisInput = {
 };
 
 export type MusicAnalysisResult = {
-  schema_version: "env.music-analysis.v1";
+  schema_version: "env.music-analysis.v2";
   source: { file_name: string; mime_type: string; file_size_bytes: number };
   metadata: {
     title: string | null;
@@ -32,7 +32,8 @@ export type MusicAnalysisResult = {
     channels: number;
     peak_dbfs: number | null;
     rms_dbfs: number | null;
-    estimated_loudness_lufs: number | null;
+    /** RMS-derived decibel proxy; not EBU R 128 / ITU-R BS.1770 integrated LUFS. */
+    rms_loudness_proxy_db: number | null;
     clipped_sample_percent: number;
     silence_percent: number;
     windowed_rms_spread_db: number | null;
@@ -150,8 +151,8 @@ function spectralFeatures(samples: Float32Array, sampleRate: number): {
 
 /**
  * Derives reproducible signal measurements on decoded PCM. Semantic labels such as
- * genre, language, instrument identity and mood are deliberately left unclassified
- * until a configured, trained model returns them.
+ * genre, language, instrument identity and mood remain unknown in this no-model
+ * analyzer; corrections belong in a separately provenance-tracked human annotation.
  */
 export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResult {
   const channels = input.channels;
@@ -201,7 +202,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const p95 = quantile(spreadDb, 0.95), p10 = quantile(spreadDb, 0.10);
   const spread = p95 === null || p10 === null ? null : Number(Math.max(0, p95 - p10).toFixed(2));
   const rmsAmplitude = Math.sqrt(sumSquares / Math.max(1, totalSamples));
-  const lufsEstimate = rmsAmplitude > 0 ? 20 * Math.log10(rmsAmplitude) - 0.691 : Number.NEGATIVE_INFINITY;
+  const rmsLoudnessProxy = rmsAmplitude > 0 ? 20 * Math.log10(rmsAmplitude) - 0.691 : Number.NEGATIVE_INFINITY;
   const tempoSamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 90)));
   const keySamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 30)));
   const tempo = estimateBpm(tempoSamples, input.sampleRate);
@@ -212,7 +213,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const taggedBpm = metadata.bpm ? Number(metadata.bpm) : NaN;
 
   return {
-    schema_version: "env.music-analysis.v1",
+    schema_version: "env.music-analysis.v2",
     source: {
       file_name: input.fileName || "audio",
       mime_type: input.mimeType || "application/octet-stream",
@@ -237,7 +238,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       channels: channels.length,
       peak_dbfs: safeDb(peak),
       rms_dbfs: safeDb(rmsAmplitude),
-      estimated_loudness_lufs: Number.isFinite(lufsEstimate) ? Number(lufsEstimate.toFixed(2)) : null,
+      rms_loudness_proxy_db: Number.isFinite(rmsLoudnessProxy) ? Number(rmsLoudnessProxy.toFixed(2)) : null,
       clipped_sample_percent: totalSamples ? Number((clippedSamples / totalSamples * 100).toFixed(4)) : 0,
       silence_percent: totalWindows ? Number((silenceWindows / totalWindows * 100).toFixed(2)) : 0,
       windowed_rms_spread_db: spread,
