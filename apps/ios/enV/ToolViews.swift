@@ -11560,12 +11560,15 @@ private struct NativeUxUiStudioView: View {
             }
             Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
             HStack(spacing: 6) {
-                Button("Sharp") { checkpoint(); elements[index].radius = 0 }
-                    .buttonStyle(.bordered)
-                Button("Soft") { checkpoint(); elements[index].radius = min(14, min(elements[index].width, elements[index].height) / 4) }
-                    .buttonStyle(.bordered)
-                Button("Round") { checkpoint(); elements[index].radius = min(elements[index].width, elements[index].height) / 2 }
-                    .buttonStyle(.bordered)
+                Button { checkpoint(); elements[index].radius = 0 } label: {
+                    VStack(spacing: 6) { RoundedRectangle(cornerRadius: 0).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 22); Text("Square").font(.caption) }.frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.bordered).accessibilityLabel("Square corners")
+                Button { checkpoint(); elements[index].radius = min(14, min(elements[index].width, elements[index].height) / 4) } label: {
+                    VStack(spacing: 6) { RoundedRectangle(cornerRadius: 7).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 22); Text("Soft").font(.caption) }.frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.bordered).accessibilityLabel("Soft corners")
+                Button { checkpoint(); elements[index].radius = min(elements[index].width, elements[index].height) / 2 } label: {
+                    VStack(spacing: 6) { RoundedRectangle(cornerRadius: 99).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 22); Text("Round").font(.caption) }.frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.bordered).accessibilityLabel("Round corners")
             }
             Text("Fill colour").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -11621,7 +11624,7 @@ private struct NativeUxUiStudioView: View {
             Slider(value: Binding(get: { Double(elements[index].radius) }, set: { elements[index].radius = Int($0) }), in: 0...Double(max(1, max(elements[index].radius, min(elements[index].width, elements[index].height) / 2))), onEditingChanged: { if $0 { checkpoint() } })
             Text("Border").font(.caption)
             Slider(value: Binding(get: { Double(elements[index].borderWidth) }, set: { elements[index].borderWidth = Int($0) }), in: 0...20, onEditingChanged: { if $0 { checkpoint() } })
-            Text("See-through").font(.caption)
+            Text("Visibility").font(.caption)
             Slider(value: Binding(get: { elements[index].opacity }, set: { elements[index].opacity = $0 }), in: 0...1, onEditingChanged: { if $0 { checkpoint() } })
             Toggle("Soft shadow", isOn: Binding(get: { elements[index].shadow }, set: { checkpoint(); elements[index].shadow = $0 }))
             if !["image", "icon", "rect", "ellipse", "line", "divider"].contains(elements[index].kind) {

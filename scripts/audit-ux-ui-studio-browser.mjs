@@ -11,15 +11,16 @@ import { chromium } from "playwright";
 
 const baseUrl = (process.env.EN_V_BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/, "");
 const output = resolve(process.env.ENV_UX_UI_AUDIT_DIR || "/tmp/env-ux-ui-studio-audit");
-const timeout = Number(process.env.EN_V_BROWSER_AUDIT_TIMEOUT_MS || 30000);
+const timeout = Number(process.env.EN_V_BROWSER_AUDIT_TIMEOUT_MS || 60000);
 const selectedWidths = process.env.ENV_UX_UI_AUDIT_WIDTHS?.split(",").map(Number);
 const toolkitNames = ["Icons", "Typography", "Colors", "Backgrounds", "Effects", "Illustrations", "Images & media", "Brand kit", "Motion", "UI components", "Device mockups", "Responsive layout", "Projects", "Layers", "Interactive flows", "Design system", "Accessibility", "Content", "Data visualization", "Patterns & textures", "Transform & alignment", "Platform kits", "Assets", "Export & handoff", "References", "Design QA"];
 const themes = ["light", "dark"];
-const report = { runAt: new Date().toISOString(), baseUrl, cdnsBlocked: true, themes, widths: [], errors: [] };
+const report = { runAt: new Date().toISOString(), baseUrl, cdnsBlocked: true, themes, widths: [], compactScreens: [], errors: [] };
 await mkdir(output, { recursive: true });
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
 const toolButtonName = (name) => new RegExp("^" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:\\s|$)");
+const normalizedHex = (value) => value.toLowerCase().replace(/^#([\da-f])([\da-f])([\da-f])$/, "#$1$1$2$2$3$3");
 
 async function storedProject(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("env-ux-ui-studio-project-v1") || "null"));
@@ -98,8 +99,8 @@ async function openToolkit(page, name) {
 }
 
 try {
-  for (const { viewport, theme } of [{ width: 320, height: 740 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1440, height: 1000 }].flatMap((viewport) => themes.map((theme) => ({ viewport, theme })))) {
-    if (selectedWidths && !selectedWidths.includes(viewport.width)) continue;
+  for (const { viewport, theme } of [{ width: 320, height: 740 }, { width: 375, height: 667 }, { width: 390, height: 844 }, { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1440, height: 1000 }].flatMap((viewport) => themes.map((theme) => ({ viewport, theme })))) {
+    if (process.env.ENV_UX_UI_AUDIT_COMPACT_ONLY || (selectedWidths && !selectedWidths.includes(viewport.width))) continue;
     console.log("Auditing Studio at " + viewport.width + "×" + viewport.height + " (" + theme + ")");
     const entry = { viewport, theme, checks: [], runtimeErrors: [] };
     report.widths.push(entry);
@@ -124,7 +125,7 @@ try {
         const channels = value.match(/[\d.]+/g).slice(0, 3).map(Number);
         assert.ok(Math.max(...channels) - Math.min(...channels) <= 1, "Studio chrome is monochrome: " + value);
       }
-      assert.equal(chrome.accent, theme === "dark" ? "#ffffff" : "#111111", "Accent icons adapt to black or white");
+      assert.equal(normalizedHex(chrome.accent), theme === "dark" ? "#ffffff" : "#111111", "Accent icons adapt to black or white");
       entry.checks.push("Monochrome studio chrome follows the effective " + theme + " theme");
       await drawer.getByRole("tab", { name: "Elements", exact: true }).click();
       await drawer.getByRole("button", { name: "Button: Primary action", exact: true }).click();
@@ -285,7 +286,7 @@ try {
         await page.emulateMedia({ colorScheme: "dark" });
         await page.waitForFunction(() => document.documentElement.classList.contains("dark"));
         const ink = await page.locator(".ux-ui-studio").evaluate((node) => getComputedStyle(node).getPropertyValue("--color-accent").trim());
-        assert.equal(ink, "#ffffff", "Studio follows a live system-theme change");
+        assert.equal(normalizedHex(ink), "#ffffff", "Studio follows a live system-theme change");
         const afterTheme = await storedProject(page);
         assert.equal(afterTheme.background, beforeTheme.background);
         assert.deepEqual(afterTheme.elements, beforeTheme.elements, "Theme changes preserve authored artwork colors and assets");
@@ -294,8 +295,58 @@ try {
     } catch (error) {
       entry.failure = error.stack || error.message;
       report.errors.push({ width: viewport.width, theme, error: error.message });
-      console.error("Studio " + viewport.width + ": " + error.message);
+      console.error("Studio " + viewport.width + ": " + (error.stack || error.message));
       await page.screenshot({ animations: "disabled", path: resolve(output, `failure-${viewport.width}-${theme}.png`) }).catch(() => {});
+    } finally { await context.close(); }
+  }
+  for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }, { width: 390, height: 430 }]) for (const theme of themes) {
+    if (selectedWidths && !selectedWidths.includes(viewport.width)) continue;
+    const entry = { viewport, theme, checks: [], runtimeErrors: [] };
+    report.compactScreens.push(entry);
+    console.log("Auditing compact Studio at " + viewport.width + "×" + viewport.height + " (" + theme + ")");
+    const context = await browser.newContext({ viewport, colorScheme: theme, acceptDownloads: true, serviceWorkers: "block", hasTouch: true });
+    const page = await context.newPage();
+    page.setDefaultTimeout(timeout);
+    page.on("pageerror", (error) => entry.runtimeErrors.push(error.message));
+    try {
+      await page.goto(baseUrl + "/tools/developer/ux-ui-studio", { waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === "ux-ui-studio", null, { timeout });
+      await page.getByRole("button", { name: "Add project", exact: true }).click();
+      await page.getByRole("button", { name: "Add elements", exact: true }).click();
+      let drawer = page.getByRole("dialog", { name: "Studio toolkit", exact: true });
+      await checkBounds(drawer, "Compact toolkit", viewport);
+      await drawer.getByRole("tab", { name: "Elements", exact: true }).click();
+      await drawer.getByRole("button", { name: "Button: Primary action", exact: true }).click();
+      if (await drawer.isVisible()) await drawer.getByRole("button", { name: "Close studio toolkit", exact: true }).click();
+      const styling = page.getByRole("region", { name: "Selected element styling", exact: true });
+      const corners = styling.getByRole("button", { name: "Round", exact: true });
+      await corners.scrollIntoViewIfNeeded();
+      await checkBounds(corners, "Visual corner choice", viewport);
+      await corners.click();
+      await waitForStored(page, (project) => project.elements.some((layer) => layer.kind === "button" && layer.radius >= 20), "the visual Round corner preset");
+      const fill = styling.getByLabel("Selected fill color", { exact: true });
+      await fill.scrollIntoViewIfNeeded();
+      await checkBounds(fill, "Compact color control", viewport);
+      await fill.fill("#7c3aed");
+      await waitForStored(page, (project) => project.elements.some((layer) => layer.background.toLowerCase() === "#7c3aed"), "compact color editing");
+      const size = styling.getByLabel("Selected size", { exact: true });
+      await size.scrollIntoViewIfNeeded();
+      await checkBounds(size, "Compact size slider", viewport);
+      await size.focus(); await size.press("ArrowRight");
+      entry.checks.push("Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports");
+      drawer = await openToolkit(page, "Effects");
+      await checkBounds(drawer, "Compact effects toolkit", viewport);
+      await checkGrid(drawer.locator(".uxui-effect-card"), "Compact effects");
+      entry.checks.push("Toolkit and effect samples fit without overlap");
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
+      assert.equal(overflow, false);
+      assert.deepEqual(entry.runtimeErrors, []);
+      await page.screenshot({ animations: "disabled", path: resolve(output, `compact-${viewport.width}-${viewport.height}-${theme}.png`) });
+    } catch (error) {
+      entry.failure = error.stack || error.message;
+      report.errors.push({ width: viewport.width, height: viewport.height, theme, error: error.message });
+      console.error("Compact Studio " + viewport.width + "×" + viewport.height + " " + theme + ": " + error.message);
+      await page.screenshot({ animations: "disabled", path: resolve(output, `compact-failure-${viewport.width}-${viewport.height}-${theme}.png`) }).catch(() => {});
     } finally { await context.close(); }
   }
 } finally {

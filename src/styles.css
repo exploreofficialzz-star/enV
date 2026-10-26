@@ -2731,3 +2731,36 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .uxui-font-animation > span { animation:none; opacity:1; transform:none; }
   .uxui-font-animation > span + span { display:none; }
 }
+
+/* Thumb-friendly visual corner choices, shared with the native styling panels. */
+.uxui-shape-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:9px; }
+.uxui-shape-choices button { display:flex; min-height:50px; min-width:0; align-items:center; justify-content:center; gap:8px; padding:6px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); color:var(--color-fg); }
+.uxui-shape-choices button[aria-pressed=true] { border-color:var(--color-fg); background:var(--color-surface-2); }
+.uxui-shape-choices button > span { display:block; flex:0 0 auto; width:26px; height:21px; border:2px solid currentColor; background:var(--color-surface-2); }
+.uxui-shape-choices strong { font-size:10px; font-weight:600; }
+.uxui-shape-choices button:focus-visible { outline:2px solid var(--color-fg); outline-offset:2px; }
+/* Small phones, landscape and an open keyboard keep every control reachable.
+   The preview and controls remain in order inside one scrolling editor pane. */
+@media (max-height:600px) {
+  .ux-ui-studio .uxui-canvas-panel { display:block !important; overflow-x:hidden !important; overflow-y:auto !important; overscroll-behavior:contain; height:100% !important; max-height:100% !important; }
+  .ux-ui-studio .uxui-canvas-stage { display:flex !important; height:clamp(160px,56dvh,250px) !important; min-height:clamp(160px,56dvh,250px) !important; max-height:none !important; overflow:hidden !important; }
+  .ux-ui-studio .uxui-style-dock { max-height:none !important; overflow:visible !important; }
+  .ux-ui-studio .uxui-bottom-toolbar, .ux-ui-studio .uxui-mobile-controls, .ux-ui-studio .uxui-context-controls { position:relative !important; flex-shrink:0 !important; }
+}
+@media (max-height:600px) {
+  .ux-ui-studio .uxui-toolkit-overlay,
+  .ux-ui-studio.is-expanded .uxui-toolkit-overlay { position:fixed !important; inset:0 !important; height:100dvh !important; max-height:100dvh !important; padding:6px !important; align-items:center !important; }
+  .ux-ui-studio .uxui-tools-drawer,
+  .ux-ui-studio.is-expanded .uxui-tools-drawer { width:min(760px,calc(100vw - 12px)) !important; height:calc(100dvh - 12px) !important; max-height:calc(100dvh - 12px) !important; margin:0 !important; padding:8px !important; }
+  .ux-ui-studio .uxui-drawer-heading { min-height:44px; margin-bottom:6px; }
+  .ux-ui-studio .uxui-drawer-heading button { min-width:44px; min-height:44px; }
+  .ux-ui-studio .uxui-toolkit-tabs { display:flex !important; flex:0 0 auto; overflow-x:auto; overflow-y:hidden; margin-top:6px; padding:3px; gap:3px; }
+  .ux-ui-studio .uxui-toolkit-tabs button { flex:1 0 52px; min-height:48px !important; padding:4px 2px; }
+  .ux-ui-studio .uxui-toolkit-content { min-height:0 !important; flex:1 1 auto !important; overflow-y:auto !important; }
+}
+@media (max-height:450px) and (min-width:500px) {
+  .ux-ui-studio .uxui-toolkit-tiles { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .ux-ui-studio .uxui-toolkit-tile { min-height:108px; padding:8px; }
+  .ux-ui-studio .uxui-toolkit-tile .uxui-toolkit-preview { height:54px; }
+  .ux-ui-studio .uxui-toolkit-tile-description { display:none; }
+}

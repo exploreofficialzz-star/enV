@@ -11,6 +11,8 @@ import { siteMetaPlugin } from "./scripts/site-meta-plugin.mjs";
 // @ts-expect-error JavaScript plugin alongside the TypeScript Vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
+// @ts-expect-error JavaScript build hook alongside the TypeScript Vite config
+import { copyPgliteRuntimeAssets } from "./scripts/pglite-runtime-assets.mjs";
 
 function hasMigrations(root: string): boolean {
   try {
@@ -48,7 +50,9 @@ export default defineConfig(({ command, isPreview }) => ({
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview
-      ? [nitro({ preset: "vercel", serverDir: "./server" })]
+      ? [nitro({ preset: "vercel", serverDir: "./server", hooks: {
+          compiled: async (nitro) => { await copyPgliteRuntimeAssets(nitro.options.output.serverDir); },
+        } })]
       : []),
     viteReact(),
   ],

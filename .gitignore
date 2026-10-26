@@ -13,3 +13,6 @@ dist
 .env.*
 !.env.example
 src/routeTree.gen.ts
+
+# Kotlin compiler session/cache output
+**/.kotlin/

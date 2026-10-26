@@ -55,6 +55,27 @@ jobs:
           cat /tmp/enV-dev.log
           exit 1
 
+      - name: Configure Studio browser
+        shell: bash
+        run: |
+          browser_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -n "$browser_path" ]; then
+            echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Check Studio in phone, landscape, tablet and desktop layouts
+        run: npm run audit:ux-ui-studio:browser
+
+      - name: Upload Studio visual checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-ui-studio-browser-audit
+          path: /tmp/env-ux-ui-studio-audit
+          if-no-files-found: ignore
+
       - name: Verify production
         env:
           BROWSER_AUDIT_SAMPLE: 250
