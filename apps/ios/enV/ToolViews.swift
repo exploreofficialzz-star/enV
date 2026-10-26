@@ -2948,8 +2948,8 @@ private struct NativeSongMetadataAnalyzerView: View {
             let list = Array(tags)
             annotations[key] = list
             switch key {
-            case "genre": report["genre"] = list.first ?? NSNull() as Any
-            case "sub_style": report["sub_style"] = list.first ?? NSNull() as Any
+            case "genre": report["genre"] = list.first as Any? ?? NSNull()
+            case "sub_style": report["sub_style"] = list.first as Any? ?? NSNull()
             case "language", "mood", "vocals", "instruments": report[key] = list
             case "themes": report["theme"] = list
             case "listening_scene": report["setting"] = list
@@ -3687,7 +3687,7 @@ private enum NativeSongSignal {
         }
         guard bestLag > 0 && bestScore >= 0.55 else { return nil }
         let frequency = reducedRate / Double(bestLag)
-        guard frequency.isFinite && (55...1_000).contains(frequency) else { return nil }
+        guard frequency.isFinite && (55.0...1_000.0).contains(frequency) else { return nil }
         let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
         return [
             "time_seconds": (time * 1_000).rounded() / 1_000,
@@ -3923,7 +3923,7 @@ private enum NativeSongSignal {
             "tonality": [
                 "key_estimate": estimateKey(samples, sampleRate: safeRate) as Any? ?? NSNull(),
                 "key_method": "Local chroma-template estimate",
-                "pitch_class_profile": zip(keys, normalizedChroma).map { ["note": $0.0, "energy": $0.1] },
+                "pitch_class_profile": zip(keys, normalizedChroma).map { ["note": $0.0 as Any, "energy": $0.1 as Any] },
                 "chord_estimates": chords,
                 "interpretation": "Chords are template-based estimates from the mixed signal."
             ],
