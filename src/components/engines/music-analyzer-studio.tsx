@@ -65,10 +65,6 @@ async function probeAudioDuration(file: File): Promise<number> {
   }
 }
 
-function listValue(value: string[]): string {
-  return value.length ? value.join(", ") : "Not identified";
-}
-
 type AnnotationListKey = Exclude<keyof MusicDatasetAnnotations, "notes" | "reviewed" | "reviewer">;
 
 const ANNOTATION_FIELDS: Array<{ key: AnnotationListKey; label: string; placeholder: string }> = [
@@ -103,6 +99,7 @@ export function MusicAnalyzerStudio() {
   const [datasetAnalysis, setDatasetAnalysis] = useState<MusicDatasetAnalysis | null>(null);
   const [annotations, setAnnotations] = useState<MusicDatasetAnnotations>(blankAnnotations);
   const [busy, setBusy] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [layersBusy, setLayersBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -156,6 +153,7 @@ export function MusicAnalyzerStudio() {
       return;
     }
     setBusy(true);
+    setAnalysisProgress(0);
     setError("");
     setNotice("Checking file duration, then measuring the audio on this device. Nothing is uploaded for local analysis.");
     try {
@@ -181,7 +179,7 @@ export function MusicAnalyzerStudio() {
         mimeType: file.type,
         metadata,
       });
-      const dataset = analyzeMusicDatasetAudio({ channels, sampleRate: buffer.sampleRate, fileName: file.name });
+      const dataset = await analyzeMusicDatasetAudio({ channels, sampleRate: buffer.sampleRate, fileName: file.name }, { onProgress: (fraction) => setAnalysisProgress(fraction) });
       setAnalysis(result);
       setDatasetAnalysis(dataset);
       setAnnotations(dataset.annotations);
@@ -301,6 +299,7 @@ export function MusicAnalyzerStudio() {
             {previewUrl ? <audio className="mt-3 w-full" controls preload="metadata" src={previewUrl} aria-label="Preview selected audio" /> : null}
           </div>
         ) : null}
+        {busy ? <div className="mt-4" role="status" aria-live="polite"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Local analysis</span><span>{Math.round(analysisProgress * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(analysisProgress * 100)}%` }} /></div></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={!file || busy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
           <Button type="button" variant="outline" disabled={!analysis || !datasetAnalysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
