@@ -9412,7 +9412,7 @@ private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rec
 
 
 private let uxUiBundledIcons: [String: String] = {
-    guard let url = Bundle.main.url(forResource: "uxui-icons", withExtension: "json", subdirectory: "Resources"),
+    guard let url = Bundle.main.url(forResource: "uxui-icons", withExtension: "json", subdirectory: "StudioAssets"),
           let data = try? Data(contentsOf: url) else { return [:] }
     return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
 }()
@@ -9466,7 +9466,7 @@ private let uxUiBundledFontFiles = ["Inter": "inter", "Lora": "lora", "JetBrains
 private let uxUiBundledFontAssets: [String: (name: String, dataURL: String?)] = {
     var assets: [String: (name: String, dataURL: String?)] = [:]
     for (family, filename) in uxUiBundledFontFiles {
-        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "Resources/fonts"),
+        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "StudioAssets/fonts"),
               let data = try? Data(contentsOf: url) else { continue }
         let dataURL = "data:font/ttf;base64," + data.base64EncodedString()
         if let name = uxUiRegisterImportedFont(dataURL, family: family) { assets[family] = (name, dataURL) }
@@ -11128,7 +11128,7 @@ private struct NativeUxUiStudioView: View {
                 }.buttonStyle(.plain).accessibilityLabel("Apply \(family)")
                 if let filename = uxUiBundledFontFiles[family] {
                     Button("Save \(family) TTF") {
-                        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "Resources/fonts"),
+                        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "StudioAssets/fonts"),
                               let data = try? Data(contentsOf: url) else { notice = "This font file is unavailable."; return }
                         fontDocument = UxUiStudioExport(data: data)
                         fontFilename = filename + ".ttf"

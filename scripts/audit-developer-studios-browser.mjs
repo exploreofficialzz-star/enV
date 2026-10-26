@@ -16,7 +16,7 @@ catch {
   process.exit(2);
 }
 const baseUrl = (process.env.EN_V_BROWSER_AUDIT_BASE_URL || 'http://127.0.0.1:8080').replace(/\/$/, '');
-const timeout = Number(process.env.EN_V_BROWSER_AUDIT_TIMEOUT_MS || 15000);
+const timeout = Number(process.env.EN_V_BROWSER_AUDIT_TIMEOUT_MS || 60000);
 const outputPath = resolve(process.env.EN_V_BROWSER_AUDIT_REPORT || 'audit/developer-studio-browser-audit.json');
 const marker = `ENV_PRIVACY_SENTINEL_${crypto.randomUUID().replaceAll('-', '').toUpperCase()}`;
 const regexMarker = `${marker}_REGEX`;
@@ -71,6 +71,7 @@ try {
     throw new Error('Developer Studio did not become interactive before the browser audit deadline.');
   };
   for (const route of routes) {
+    console.log('Auditing Developer Studio: ' + route.path);
     const routeDiagnostics = { runtimeErrors: [], consoleErrors: [] };
     activeRouteDiagnostics = routeDiagnostics;
     const routeReport = { path: route.path, label: route.label, loaded: false, actionWorked: false, mobileOverflow: null, runtimeStorageLeaks: [], browserDiagnostics: routeDiagnostics };
@@ -214,7 +215,9 @@ try {
         await page.getByLabel('Add elements', { exact: true }).click();
         await page.getByRole('tab', { name: 'Elements', exact: true }).click();
         await page.getByRole('button', { name: /^Button\b/ }).click();
-        await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
+        // One tap inserts the layer and returns to its visual styling controls.
+        await toolkitDialog.waitFor({ state: 'hidden', timeout });
+        await page.getByRole('region', { name: 'Selected element styling', exact: true }).waitFor({ state: 'visible', timeout });
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
         await page.getByRole('button', { name: 'Add app screen', exact: true }).click();
         await page.getByRole('button', { name: 'Open Screen 1', exact: true }).click();

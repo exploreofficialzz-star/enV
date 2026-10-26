@@ -18,7 +18,9 @@ const themes = ["light", "dark"];
 const report = { runAt: new Date().toISOString(), baseUrl, cdnsBlocked: true, themes, widths: [], compactScreens: [], errors: [] };
 await mkdir(output, { recursive: true });
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+// LCD subpixel text smoothing adds colored fringes to monochrome text on some
+// system Chrome builds; disable it so the pixel check measures authored colors.
+const browser = await chromium.launch({ headless: true, args: ["--disable-lcd-text"], ...(executablePath ? { executablePath } : {}) });
 const toolButtonName = (name) => new RegExp("^" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:\\s|$)");
 const normalizedHex = (value) => value.toLowerCase().replace(/^#([\da-f])([\da-f])([\da-f])$/, "#$1$1$2$2$3$3");
 

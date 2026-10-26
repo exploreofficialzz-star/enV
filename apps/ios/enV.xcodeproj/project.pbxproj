@@ -116,7 +116,7 @@
         D50000000000000000000002 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
         D60000000000000000000003 /* OfflineWalletProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWalletProtocolTests.swift; sourceTree = "<group>"; };
         D60000000000000000000004 /* offline-protocol-v1-fixtures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = offline-protocol-v1-fixtures.json; path = ../shared/offline-protocol-v1-fixtures.json; sourceTree = "<group>"; };
-        E26000000000000000000002 /* Studio Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "Studio Resources"; path = enV/Resources; sourceTree = SOURCE_ROOT; };
+        E26000000000000000000002 /* Studio Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "Studio Resources"; path = enV/StudioAssets; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */

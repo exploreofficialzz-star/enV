@@ -740,6 +740,9 @@ function svgToPng(svg: SVGSVGElement, scale = 3, target: DeviceTarget = "mobile"
   return new Promise((resolve, reject) => {
     const clean = svg.cloneNode(true) as SVGSVGElement;
     clean.querySelectorAll("[data-editor-only]").forEach((node) => node.remove());
+    clean.setAttribute("role", "img");
+    clean.querySelectorAll("[tabindex]").forEach((node) => node.removeAttribute("tabindex"));
+    clean.querySelectorAll('[role="button"]').forEach((node) => node.removeAttribute("role"));
     const source = new XMLSerializer().serializeToString(clean);
     const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -2502,7 +2505,7 @@ export function UxUiStudioEngine() {
               >
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
-                style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; resizeRef.current = null; }} onPointerCancel={() => { dragRef.current = null; resizeRef.current = null; }}>
+                style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="group" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; resizeRef.current = null; }} onPointerCancel={() => { dragRef.current = null; resizeRef.current = null; }}>
                 <rect width={board.width} height={board.height} fill={background} role="button" tabIndex={prototypePreview ? -1 : 0} aria-label="Select canvas background" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectCanvas(); } }} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}

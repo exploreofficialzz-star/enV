@@ -12,7 +12,7 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "src/components/engines/ux-ui-studio-engine.tsx"
-DESTINATIONS = [ROOT / "public/uxui", ROOT / "apps/shared", ROOT / "apps/ios/enV/Resources"]
+DESTINATIONS = [ROOT / "public/uxui", ROOT / "apps/shared", ROOT / "apps/ios/enV/StudioAssets"]
 EXTRA_LUCIDE = "a-arrow-down a-arrow-up a-large-small align-center align-end-horizontal align-end-vertical align-start-horizontal align-start-vertical align-horizontal-distribute-center align-vertical-distribute-center app-window arrow-down-left arrow-up-right baseline book-a box circle-dashed circle-dot-dashed columns-2 crop focus frame grid-2x2 grid-3x3 grip-horizontal hand helping-hand image-plus indent-decrease indent-increase letter-text ligature list-filter move-diagonal move-horizontal move-vertical panel-bottom-open panel-left-open panel-right-open panel-top-open pilcrow rectangle-ellipsis rotate-ccw rotate-cw rows-2 scan-text scaling separator-horizontal separator-vertical space text-cursor text-cursor-input text-select type-outline wrap-text".split()
 FONTS = {
     "inter": ("Inter", "inter/Inter[opsz,wght].ttf"),

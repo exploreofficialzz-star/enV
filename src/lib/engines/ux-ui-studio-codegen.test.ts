@@ -53,7 +53,7 @@ test("group paint overrides remain scoped and effects survive all handoffs", () 
 
 test("every shipped icon produces finite native geometry and bundled copies agree", () => {
   const web = readFileSync(new URL("../../../public/uxui/icons.json", import.meta.url), "utf8");
-  for (const relative of ["../../../apps/shared/uxui-icons.json", "../../../apps/ios/enV/Resources/uxui-icons.json"]) {
+  for (const relative of ["../../../apps/shared/uxui-icons.json", "../../../apps/ios/enV/StudioAssets/uxui-icons.json"]) {
     assert.equal(readFileSync(new URL(relative, import.meta.url), "utf8"), web);
   }
   const icons = JSON.parse(web) as Record<string, string>;
