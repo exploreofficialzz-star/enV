@@ -10349,6 +10349,10 @@ private struct NativeUxUiStudioView: View {
         }
         .tint(Color.uxUiInk)
         .foregroundStyle(Color.uxUiInk)
+        .sheet(isPresented: $showComponentPalette) {
+            ScrollView { componentPalette }.padding(.horizontal, 12).background(Color.uxUiSurface)
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .fileImporter(isPresented: $isImportingImage, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):
@@ -10646,7 +10650,7 @@ private struct NativeUxUiStudioView: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
                 }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
                 Spacer(minLength: 3)
-                Button { toolkitTab = "All 26"; toolkitQuery = ""; inlineToolkit = false; showComponentPalette.toggle() } label: {
+                Button { toolkitTab = "All 26"; toolkitQuery = ""; inlineToolkit = false; editTool = "move"; showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
                         .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
                         .foregroundStyle(Color.uxUiInk).background(Color.uxUiCard, in: Circle())
@@ -10663,7 +10667,6 @@ private struct NativeUxUiStudioView: View {
             } else if inlineToolkit {
                 compactStudioLibrary
             }
-            if showComponentPalette { componentPalette }
             if showScreenManager { layerListPanel }
             DisclosureGroup("Design system", isExpanded: $showDesignSystem) {
                 designSystemPanel

@@ -2017,7 +2017,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
                     }
                     Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;showElementTray=true},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
+                    OutlinedButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;editTool="move";showElementTray=true},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
                         OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
@@ -2118,7 +2118,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Studio toolkit",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;showElementTray=true}){Text(if(showElementTray)"Close" else "+ Add")}
+                    TextButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;editTool="move";showElementTray=true}){Text(if(showElementTray)"Close" else "+ Add")}
                 }
                 if(showElementTray){Dialog(onDismissRequest={showElementTray=false},properties=DialogProperties(usePlatformDefaultWidth=false)){ ToolkitContent() }}
                 Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)

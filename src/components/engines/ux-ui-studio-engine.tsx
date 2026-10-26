@@ -2195,7 +2195,7 @@ export function UxUiStudioEngine() {
   }
 
   function closeToolkit() { setShowToolsPanel(false); setInlineToolkit(false); setEditTool("move"); }
-  function openToolkitHome() { setInlineToolkit(false); setLeftTab("toolkits"); setToolkitPage(false); setToolkitSearch(""); setShowToolsPanel(true); }
+  function openToolkitHome() { setEditTool("move"); setInlineToolkit(false); setLeftTab("toolkits"); setToolkitPage(false); setToolkitSearch(""); setShowToolsPanel(true); }
   function chooseEditTool(tool: string) { setInlineToolkit(false); setEditTool(tool); }
   function chooseToolkit(id: string) { openToolkit(id); setShowToolsPanel(false); setInlineToolkit(true); setEditTool("library"); }
   function holdUpdate(id: string, patch: Partial<DesignLayer>) { updateLayer(id, patch, false); }
