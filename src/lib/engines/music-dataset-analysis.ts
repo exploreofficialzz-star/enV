@@ -348,8 +348,9 @@ function createSections(frames: FeatureFrame[], duration: number) {
   return { change_points: changePoints, sections };
 }
 
-export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): MusicDatasetAnalysis {
+export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput, options: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {}): Promise<MusicDatasetAnalysis> {
   const { channels, sampleRate } = input;
+  if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
   if (!Number.isFinite(sampleRate) || sampleRate < 8000 || sampleRate > 192000) throw new Error("Audio sample rate must be between 8 kHz and 192 kHz.");
   if (!channels.length || !channels[0]?.length) throw new Error("No decoded audio samples were supplied.");
   const frameCount = channels[0]!.length;
@@ -383,6 +384,11 @@ export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): Musi
   const frameFluxes: number[] = [];
 
   for (let frameIndex = 0, start = 0; start < frameCount; frameIndex += 1, start += stepSamples) {
+    if (frameIndex % 8 === 0) {
+      if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+      options.onProgress?.(clamp(frameIndex / Math.max(1, maxSpectralFrames), 0, 1));
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
     const end = Math.min(frameCount, start + stepSamples);
     const samples = mono.subarray(start, end);
     const levels = frameLevels(samples);
@@ -472,6 +478,8 @@ export function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput): Musi
   if ((meanCentroid ?? 0) >= 3000) styleCues.push({ tag: "spectrally-bright", evidence: `Mean spectral centroid is ${Math.round(meanCentroid ?? 0)} Hz.`, is_genre_classification: false });
   if (sideToMid !== null && sideToMid >= 0.35) styleCues.push({ tag: "wide-stereo-content", evidence: `Measured side-to-mid energy ratio is ${sideToMid}.`, is_genre_classification: false });
   if (!styleCues.length) styleCues.push({ tag: "no-dominant-rule-cue", evidence: "Measured features did not cross the conservative rule thresholds.", is_genre_classification: false });
+  if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+  options.onProgress?.(1);
   const warnings: string[] = [
     "No remote API or pretrained model was used. Genre, sub-style, language, mood and instrument identities require human annotation or a separately trained classifier.",
     "Pitch and chord results are estimates from the complete mix. Instruments, harmonics, percussion and overlapping voices can produce false notes or chords.",
