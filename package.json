@@ -31,7 +31,7 @@
     "audit:calculators:browser": "node scripts/browser-calculator-audit.mjs",
     "audit:converters:browser": "node scripts/browser-converter-audit.mjs",
     "media:processor": "node scripts/media-processor.mjs",
-    "check:processor": "node --check processor/server.mjs && node --check scripts/media-processor.mjs && node --check scripts/url-media-processor.mjs && node --check scripts/media/provider-registry.mjs && node --check scripts/media/url-security.mjs && node --check scripts/media/processor-admission.mjs && node --check scripts/transcription-processor.mjs",
+    "check:processor": "node --check processor/server.mjs && node --check scripts/media-processor.mjs && node --check scripts/url-media-processor.mjs && node --check scripts/media/provider-registry.mjs && node --check scripts/media/url-security.mjs && node --check scripts/media/processor-admission.mjs && node --check scripts/media/archive-org.mjs && node --check scripts/media/transfer-alternatives.mjs && node --check scripts/transcription-processor.mjs",
     "check:developer": "node scripts/check-developer.mjs && npm run check:developer:platform-parity",
     "check:developer:privacy": "node scripts/check-developer-privacy.mjs",
     "audit:developer:browser": "node scripts/audit-developer-studios-browser.mjs",
