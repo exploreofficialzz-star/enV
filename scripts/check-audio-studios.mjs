@@ -129,7 +129,7 @@ for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent
 }
 assert.ok(musicAnalysisRoute.includes("MUSIC_ANALYSIS_MODEL_DISABLED"), "legacy music-analysis route must return an explicit disabled result");
 assert.match(musicAnalysisRoute, /status:\s*410/, "legacy music-analysis route must return HTTP 410");
-assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_Endpoint_DISABLED|\/api\/ai\/run|fetch\(/, "Music Analyzer route must not forward audio to hosted inference");
+assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_ENDPOINT|MUSIC_ANALYSIS_TOKEN|\/api\/ai\/run|fetch\(/, "Music Analyzer route must not forward audio to hosted inference");
 for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
