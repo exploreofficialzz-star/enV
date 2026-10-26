@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, Archive, Download,
-  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause, Sparkles,
+  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause,
   Upload, X,
 } from "lucide-react";
 import { strToU8, unzipSync, zipSync } from "fflate";
@@ -11,8 +11,7 @@ import {
   crc32, inspectAudioHeader, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
 } from "@/lib/media/song-metadata-analyzer";
 import { amplitudeDbfs, estimateBpm, estimateKey, rms } from "@/lib/engines/audio-studio";
-import { bytesToBase64, fetchAiAvailability, runAiTask } from "@/lib/ai/client/ai-client";
-import type { MusicAnalysisResult } from "@/lib/ai/contracts";
+import { analyzeMusicDatasetAudio, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { downloadBlob } from "@/lib/utils";
 
 type Mode = "quick" | "full";
@@ -41,6 +40,7 @@ type SongAnalysisReport = {
   analysis: Record<string, unknown>;
   lyric_evidence: string;
   warnings: string[];
+  dataset_analysis: MusicDatasetAnalysis | null;
 };
 type SongRow = { id: string; file: File; status: RowStatus; progress: number; report?: SongAnalysisReport; error?: string };
 
@@ -106,47 +106,6 @@ function signalLevels(samples: Float32Array): { peakDbfs: number | null; rmsDbfs
   };
 }
 
-function createMusicSampleWav(buffer: AudioBuffer, monoChannel?: Float32Array): { bytes: Uint8Array; durationSeconds: number } {
-  const targetRate = 16_000;
-  const sectionSeconds = Math.min(20, Math.max(1, buffer.duration / 3));
-  const starts = [
-    0,
-    Math.max(0, buffer.duration / 2 - sectionSeconds / 2),
-    Math.max(0, buffer.duration - sectionSeconds),
-  ];
-  const sectionSamples = Math.max(1, Math.floor(sectionSeconds * targetRate));
-  const gapSamples = Math.floor(targetRate * 0.25);
-  const frameCount = sectionSamples * starts.length + gapSamples * (starts.length - 1);
-  const dataBytes = frameCount * 2;
-  const wav = new Uint8Array(44 + dataBytes);
-  const view = new DataView(wav.buffer);
-  const writeText = (offset: number, text: string) => { for (let i = 0; i < text.length; i += 1) wav[offset + i] = text.charCodeAt(i); };
-  writeText(0, "RIFF"); view.setUint32(4, 36 + dataBytes, true); writeText(8, "WAVE");
-  writeText(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true); view.setUint32(24, targetRate, true); view.setUint32(28, targetRate * 2, true);
-  view.setUint16(32, 2, true); view.setUint16(34, 16, true); writeText(36, "data"); view.setUint32(40, dataBytes, true);
-
-  const channels = monoChannel ? [monoChannel] : Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
-  let outIndex = 0;
-  for (let section = 0; section < starts.length; section += 1) {
-    const startFrame = Math.floor(starts[section] * buffer.sampleRate);
-    for (let i = 0; i < sectionSamples; i += 1) {
-      const sourceOffset = startFrame + (i * buffer.sampleRate) / targetRate;
-      const a = Math.min(buffer.length - 1, Math.max(0, Math.floor(sourceOffset)));
-      const b = Math.min(buffer.length - 1, a + 1);
-      const fraction = sourceOffset - a;
-      let sample = 0;
-      for (const channel of channels) sample += channel[a] + (channel[b] - channel[a]) * fraction;
-      sample /= channels.length || 1;
-      const clipped = Math.max(-1, Math.min(1, sample));
-      view.setInt16(44 + outIndex * 2, clipped < 0 ? clipped * 0x8000 : clipped * 0x7fff, true);
-      outIndex += 1;
-    }
-    if (section < starts.length - 1) outIndex += gapSamples;
-  }
-  return { bytes: wav, durationSeconds: frameCount / targetRate };
-}
-
 function metadataTags(metadata: MusicMetadata): Record<string, unknown> {
   return {
     title: metadata.title ?? null,
@@ -196,8 +155,8 @@ function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
 async function analyzeLocal(
   file: File,
   mode: Mode,
-  includeAi: boolean,
   signal: AbortSignal,
+  onDeepProgress?: (fraction: number) => void,
 ): Promise<{ report: SongAnalysisReport; status: RowStatus }> {
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
   let metadata: MusicMetadata;
@@ -216,17 +175,12 @@ async function analyzeLocal(
   let rmsDbfs: number | null = null;
   let tempoBpm: number | null = null;
   let key: string | null = null;
+  let datasetAnalysis: MusicDatasetAnalysis | null = null;
   const bpmTag = metadata.bpm && Number.isFinite(Number(metadata.bpm)) ? Number(metadata.bpm) : null;
-  let semantic: MusicAnalysisResult | null = null;
-  let aiRequestId: string | null = null;
-  let aiWarning: string | null = null;
   let decodedSuccessfully = false;
-  let sampleDurationSeconds: number | null = null;
 
   if (!header.container && !file.type.startsWith("audio/")) warnings.push("The file type could not be confirmed from its header.");
   const AudioContextConstructor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  // Estimate the decoded PCM footprint before asking the browser to allocate it.
-  // decodeAudioData allocates the decoded buffers first, so a post-decode check alone is too late.
   const conservativeBitrate = Math.max(32_000, Math.min(header.encodedBitrateBps ?? 64_000, 128_000));
   const preflightDuration = durationSeconds ?? (file.size * 8 / conservativeBitrate);
   const preflightSampleRate = header.sourceSampleRateHz ?? 48_000;
@@ -236,9 +190,9 @@ async function analyzeLocal(
     preflightDuration > 15 * 60 ||
     projectedMemoryBytes > 180 * 1024 * 1024;
   if (shouldSkipDecode) {
-    warnings.push("Estimated decoded audio exceeds the local memory budget; signal and AI analysis were skipped.");
+    warnings.push("Estimated decoded audio exceeds the local memory budget; detailed signal analysis was skipped.");
   } else if (!AudioContextConstructor) {
-    warnings.push("This browser cannot decode audio for tempo/key analysis.");
+    warnings.push("This browser cannot decode audio for local signal analysis.");
   } else {
     const context = new AudioContextConstructor();
     try {
@@ -248,87 +202,68 @@ async function analyzeLocal(
       decodedSuccessfully = true;
       durationSeconds = decoded.duration;
       analysisSampleRate = decoded.sampleRate;
+      sampleRateHz ??= decoded.sampleRate;
       channels ??= decoded.numberOfChannels;
       if (decoded.duration > 15 * 60) {
-        warnings.push("Track is longer than 15 minutes; signal analysis was skipped to protect device memory.");
+        warnings.push("Track is longer than 15 minutes; detailed signal analysis was skipped to protect device memory.");
       } else {
         const memoryBytes = decoded.length * (decoded.numberOfChannels + 1) * 4;
         if (memoryBytes > 180 * 1024 * 1024) {
-          warnings.push("Decoded audio exceeds the local memory budget; tempo/key analysis was skipped.");
+          warnings.push("Decoded audio exceeds the local memory budget; detailed signal analysis was skipped.");
         } else {
-          // Analyze a downmixed signal so instruments on the right channel are not ignored.
+          const decodedChannels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index));
           const mono = new Float32Array(decoded.length);
-          for (let channelIndex = 0; channelIndex < decoded.numberOfChannels; channelIndex += 1) {
-            const channel = decoded.getChannelData(channelIndex);
-            for (let frame = 0; frame < channel.length; frame += 1) mono[frame] += channel[frame] / decoded.numberOfChannels;
+          for (const channel of decodedChannels) {
+            for (let frame = 0; frame < channel.length; frame += 1) mono[frame] += channel[frame]! / decodedChannels.length;
           }
           const levels = signalLevels(mono);
           peakDbfs = levels.peakDbfs;
           rmsDbfs = levels.rmsDbfs;
-          tempoBpm = estimateBpm(mono, decoded.sampleRate);
-          key = estimateKey(mono, decoded.sampleRate);
-          if (includeAi && mode === "full") {
-            const excerpt = createMusicSampleWav(decoded, mono);
-            sampleDurationSeconds = excerpt.durationSeconds;
-            if (excerpt.bytes.byteLength > 2_800_000) {
-              aiWarning = "The sampled audio is too large for the current AI request limit.";
-            } else {
-              try {
-                const response = await runAiTask("audio.music.analyze", {
-                  audioBase64: bytesToBase64(excerpt.bytes),
-                  mimeType: "audio/wav",
-                  filename: file.name.slice(0, 120),
-                  sampledSeconds: excerpt.durationSeconds,
-                }, { signal, timeoutMs: 180_000 });
-                semantic = response.result;
-                aiRequestId = response.meta.requestId || null;
-                warnings.push(...response.meta.warnings);
-              } catch (error) {
-                if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
-                aiWarning = error instanceof Error ? error.message : "AI analysis could not be completed.";
-              }
-            }
+          tempoBpm = estimateBpm(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 90)), decoded.sampleRate);
+          key = estimateKey(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 30)), decoded.sampleRate);
+          if (mode === "full") {
+            datasetAnalysis = await analyzeMusicDatasetAudio(
+              { channels: decodedChannels, sampleRate: decoded.sampleRate, fileName: file.name },
+              { signal, onProgress: onDeepProgress },
+            );
           }
         }
       }
     } catch (error) {
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw new DOMException("Cancelled", "AbortError");
       const message = error instanceof Error ? error.message : "";
-      warnings.push(message ? `Audio decode failed: ${message.slice(0, 180)}` : "Audio decode failed; only available tags were read.");
+      warnings.push(message ? `Audio decode or DSP analysis failed: ${message.slice(0, 180)}` : "Audio decode failed; only embedded tags were read.");
     } finally {
       await context.close().catch(() => undefined);
     }
   }
 
-  if (mode === "full" && includeAi && !semantic && !aiWarning) aiWarning = "Full AI analysis did not return a result.";
-  if (mode === "full" && !includeAi) aiWarning = "AI classification was not run; local analysis results are included.";
-  if (aiWarning) warnings.push(aiWarning);
-  if (!decodedSuccessfully) warnings.push("Technical and embedded tags may still be available, but BPM/key and semantic audio analysis need a decodable file.");
+  if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+  if (!decodedSuccessfully) warnings.push("Embedded tags may still be available, but tempo, key, pitch, chord and timeline analysis need a decodable audio file.");
   const bpmFromTag = bpmTag !== null && bpmTag > 0 && bpmTag <= 300 ? bpmTag : null;
   const finalTempo = tempoBpm ?? bpmFromTag;
-  if (tempoBpm !== null && bpmFromTag !== null && Math.abs(tempoBpm - bpmFromTag) > 8) {
-    warnings.push("Estimated tempo differs from the embedded BPM tag.");
-  }
+  if (tempoBpm !== null && bpmFromTag !== null && Math.abs(tempoBpm - bpmFromTag) > 8) warnings.push("Estimated tempo differs from the embedded BPM tag.");
   const averageBitrate = durationSeconds && durationSeconds > 0 ? (file.size * 8) / durationSeconds : null;
   const embeddedGenre = metadata.genre?.trim() || null;
+  const annotations = datasetAnalysis?.annotations;
   const report: SongAnalysisReport = {
-    schema_version: "1.0",
+    schema_version: "1.1",
     filename: file.name,
-    genre: semantic?.genre ?? embeddedGenre,
-    sub_style: semantic?.sub_style ?? null,
-    language: semantic?.language ?? [],
+    genre: embeddedGenre,
+    sub_style: null,
+    language: [],
     tempo_bpm: finalTempo === null ? null : Math.round(finalTempo),
     tempo_band: tempoBandFromBpm(finalTempo),
     tempo_source: tempoBpm !== null ? "audio_estimate" : bpmFromTag !== null ? "embedded_tag" : null,
     key,
-    energy: semantic?.energy ?? "unknown",
-    mood: semantic?.mood ?? [],
-    theme: semantic?.theme ?? [],
-    setting: semantic?.setting ?? [],
-    vocals: semantic?.vocals ?? [],
-    instruments: semantic?.instruments ?? [],
-    descriptions: semantic?.descriptions ?? [],
-    lyric_evidence: semantic?.lyric_evidence ?? "",
+    energy: "unknown",
+    mood: [],
+    theme: [],
+    setting: [],
+    vocals: [],
+    instruments: [],
+    descriptions: datasetAnalysis?.style_cues.map((cue) => cue.evidence) ?? [],
+    lyric_evidence: "",
     identity: {
       title: metadata.title ?? null,
       artist: metadata.artist ?? null,
@@ -361,18 +296,26 @@ async function analyzeLocal(
     },
     embedded_metadata: metadataTags(metadata),
     analysis: {
-      status: semantic ? "full" : mode === "quick" ? "quick" : "partial",
+      status: datasetAnalysis ? (annotations?.reviewed ? "full_local_reviewed" : "full_local_needs_review") : mode === "quick" ? "quick_local" : "partial",
       local_audio_decoded: decodedSuccessfully,
-      semantic_analysis: semantic ? "completed" : mode === "quick" ? "skipped_by_choice" : "unavailable",
-      genre_source: semantic?.genre ? "music_model" : embeddedGenre ? "embedded_tag" : "unavailable",
-      excerpt_seconds_sent_to_ai: sampleDurationSeconds,
-      ai_request_id: aiRequestId,
+      semantic_analysis: "not_run_local_only",
+      genre_source: embeddedGenre ? "embedded_tag_unverified" : "manual_annotation_required",
+      excerpt_seconds_sent_to_ai: null,
+      ai_request_id: null,
       tempo_source: tempoBpm !== null ? "audio_estimate" : bpmFromTag !== null ? "embedded_tag" : "unavailable",
       key_source: key ? "audio_estimate" : "unavailable",
+      local_dsp_analysis: datasetAnalysis ? "completed" : "not_completed",
+      uses_remote_api: false,
+      uses_hosted_model: false,
     },
+    dataset_analysis: datasetAnalysis,
     warnings: [...new Set(warnings)],
   };
-  const status: RowStatus = semantic || mode === "quick" ? (warnings.length ? "partial" : "done") : "partial";
+  const status: RowStatus = mode === "quick"
+    ? (warnings.length ? "partial" : "done")
+    : datasetAnalysis && datasetAnalysis.annotations.reviewed
+      ? (warnings.length ? "partial" : "done")
+      : "partial";
   return { report, status };
 }
 
