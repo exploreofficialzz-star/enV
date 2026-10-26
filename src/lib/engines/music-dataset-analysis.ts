@@ -138,7 +138,7 @@ export type MusicDatasetAnalysisInput = {
 };
 
 export type LocalSignalLayer = {
-  id: "mono_mix" | "low_frequency" | "mid_frequency" | "high_frequency" | "stereo_center" | "stereo_side";
+  id: "mono_mix" | "harmonic_candidate" | "percussive_candidate" | "low_frequency" | "mid_frequency" | "high_frequency" | "stereo_center" | "stereo_side";
   label: string;
   samples: Float32Array;
   channels: 1 | 2;
