@@ -120,4 +120,11 @@ const toolkitThemeStart = styles.indexOf("/* Monochrome, user-theme-aware Studio
 const toolkitThemeEnd = styles.indexOf("/* Preserve native mockup size:", toolkitThemeStart);
 const toolkitTheme = styles.slice(toolkitThemeStart, toolkitThemeEnd);
 assert.ok(toolkitTheme.includes(".ux-ui-studio .uxui-toolkit-content") && toolkitTheme.includes(".dark .ux-ui-studio"), "Toolkit monochrome samples follow light/dark themes in fullscreen mode too");
+const compactLandscapeStart = styles.lastIndexOf("Keep the preview device picker tappable in narrow landscape windows.");
+assert.ok(compactLandscapeStart >= 0, "Narrow landscape toolbar has an explicit responsive style block");
+const compactLandscapeRules = styles.slice(compactLandscapeStart);
+assert.ok(compactLandscapeRules.includes("@media (max-height:450px) and (max-width:700px)"), "Short landscape viewports activate the compact Studio toolbar");
+assert.ok(compactLandscapeRules.includes("flex:0 0 34px;") && compactLandscapeRules.includes("min-width:34px;"), "Compact device picker buttons retain distinct hit boxes instead of overlapping");
+assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-target-switch button span { display:none; }"), "Landscape device picker hides labels when space is constrained while retaining accessible button names");
+assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-topbar-actions { min-width:0; flex:1 1 auto; justify-content:flex-end; gap:2px; }"), "Compact toolbar controls allocate remaining landscape width without covering the device picker");
 console.log("UX/UI Studio responsive layout, startup, remembered mode, canonical logo, Toolkit pages and full-screen editor checks: PASS");
