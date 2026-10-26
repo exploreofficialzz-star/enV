@@ -11446,31 +11446,122 @@ private struct NativeUxUiStudioView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack { Text(editTool.capitalized).font(.caption.bold()); Spacer(); Button("Done") { editTool = "move" }.frame(minHeight: 44) }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    if editTool == "color" {
-                        ColorPicker("Fill", selection: Binding(get: { uxUiUIColor(elements[index].fill) }, set: { checkpoint(); elements[index].fill = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 130)
-                        ColorPicker(elements[index].kind == "icon" ? "Icon color" : "Text color", selection: Binding(get: { uxUiUIColor(elements[index].color) }, set: { checkpoint(); elements[index].color = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 150)
-                    } else if editTool == "shape" {
-                        ForEach(["Square", "Soft", "Round"], id: \.self) { title in
-                            Button { checkpoint(); elements[index].radius = title == "Square" ? 0 : title == "Soft" ? 14 : min(elements[index].width, elements[index].height) / 2 } label: { VStack { RoundedRectangle(cornerRadius: title == "Square" ? 0 : title == "Soft" ? 7 : 99).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 24); Text(title).font(.caption) }.frame(minWidth: 64, minHeight: 64) }.buttonStyle(.bordered)
-                        }
-                    } else if editTool == "adjust" || editTool == "resize" {
-                        VStack { Text("Size").font(.caption); Slider(value: Binding(get: { Double(elements[index].width) }, set: { value in let ratio = value / Double(max(1, elements[index].width)); elements[index].width = Int(value); elements[index].height = max(12, Int(Double(elements[index].height) * ratio)) }), in: 12...Double(max(13, boardWidth - elements[index].x)), onEditingChanged: { if $0 { checkpoint() } }) }.frame(width: 170)
-                        if editTool == "adjust" { VStack { Text("Turn").font(.caption); Slider(value: Binding(get: { elements[index].rotation }, set: { elements[index].rotation = $0 }), in: 0...360, onEditingChanged: { if $0 { checkpoint() } }) }.frame(width: 170) } else { ForEach([256, 512, 1024], id: \.self) { edge in Button("\(edge)px") { processStudioImage("resize", edge: edge) }.buttonStyle(.bordered).disabled(imageBusy) } }
-                    } else if editTool == "effects" {
-                        ForEach(["Flat", "Shadow", "Outline", "Faded"], id: \.self) { name in Button(name) { checkpoint(); switch name { case "Flat": elements[index].shadow = false; elements[index].borderWidth = 0; elements[index].opacity = 1; case "Shadow": elements[index].shadow = true; case "Outline": elements[index].borderWidth = 2; default: elements[index].opacity = 0.5 } }.buttonStyle(.bordered).frame(minHeight: 64) }
-                    } else if editTool == "cutout" {
-                        VStack { Text("Plain backgrounds · strength").font(.caption); Slider(value: $cutoutStrength, in: 5...140) }.frame(width: 180)
-                        Button(imageBusy ? "Working…" : "Remove background") { processStudioImage("cutout") }.buttonStyle(.bordered).disabled(imageBusy)
-                    } else if editTool == "text" {
-                        TextField("Your words", text: Binding(get: { elements[index].text }, set: { checkpoint(); elements[index].text = $0 }), axis: .vertical).frame(width: 240).textFieldStyle(.roundedBorder)
-                    } else if editTool == "lookup" {
-                        layerPreview(elements[index], scale: min(100 / CGFloat(max(1, elements[index].width)), 100 / CGFloat(max(1, elements[index].height)))).frame(width: 100, height: 100)
-                        ForEach(elements) { item in Button { selectedID = item.id } label: { VStack { layerPreview(item, scale: min(40 / CGFloat(max(1, item.width)), 40 / CGFloat(max(1, item.height)))).frame(width: 44, height: 44); Text(item.name).font(.caption).lineLimit(1) }.frame(width: 90, height: 70) }.buttonStyle(.bordered) }
-                    }
-                }
+                HStack(spacing: 14) { editingOptions(for: index) }
             }.frame(height: 104)
         }.frame(height: 160)
+    }
+
+    @ViewBuilder private func editingOptions(for index: Int) -> some View {
+        switch editTool {
+        case "color": colorEditingOptions(for: index)
+        case "shape": shapeEditingOptions(for: index)
+        case "adjust", "resize": sizeEditingOptions(for: index)
+        case "effects": effectEditingOptions(for: index)
+        case "cutout": cutoutEditingOptions
+        case "text": textEditingOptions(for: index)
+        case "lookup": lookupEditingOptions(for: index)
+        default: EmptyView()
+        }
+    }
+
+    @ViewBuilder private func colorEditingOptions(for index: Int) -> some View {
+        ColorPicker("Fill", selection: Binding<Color>(get: { uxUiUIColor(elements[index].fill) }, set: { checkpoint(); elements[index].fill = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 130)
+        ColorPicker(elements[index].kind == "icon" ? "Icon color" : "Text color", selection: Binding<Color>(get: { uxUiUIColor(elements[index].color) }, set: { checkpoint(); elements[index].color = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 150)
+    }
+
+    private func shapeEditingOptions(for index: Int) -> some View {
+        ForEach(["Square", "Soft", "Round"], id: \.self) { title in
+            shapeEditingButton(title, index: index)
+        }
+    }
+
+    private func shapeEditingButton(_ title: String, index: Int) -> some View {
+        let previewRadius: CGFloat = title == "Square" ? 0 : title == "Soft" ? 7 : 99
+        return Button {
+            checkpoint()
+            elements[index].radius = title == "Square" ? 0 : title == "Soft" ? 14 : min(elements[index].width, elements[index].height) / 2
+        } label: {
+            VStack {
+                RoundedRectangle(cornerRadius: previewRadius).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 24)
+                Text(title).font(.caption)
+            }.frame(minWidth: 64, minHeight: 64)
+        }.buttonStyle(.bordered)
+    }
+
+    @ViewBuilder private func sizeEditingOptions(for index: Int) -> some View {
+        sizeEditingSlider(for: index)
+        if editTool == "adjust" {
+            rotationEditingSlider(for: index)
+        } else {
+            ForEach([256, 512, 1024], id: \.self) { edge in
+                Button("\(edge)px") { processStudioImage("resize", edge: edge) }.buttonStyle(.bordered).disabled(imageBusy)
+            }
+        }
+    }
+
+    private func sizeEditingSlider(for index: Int) -> some View {
+        let width = Binding<Double>(get: { Double(elements[index].width) }, set: { value in
+            let ratio = value / Double(max(1, elements[index].width))
+            elements[index].width = Int(value)
+            elements[index].height = max(12, Int(Double(elements[index].height) * ratio))
+        })
+        let upperBound = Double(max(13, boardWidth - elements[index].x))
+        return VStack {
+            Text("Size").font(.caption)
+            Slider(value: width, in: 12...upperBound, onEditingChanged: { if $0 { checkpoint() } })
+        }.frame(width: 170)
+    }
+
+    private func rotationEditingSlider(for index: Int) -> some View {
+        let rotation = Binding<Double>(get: { elements[index].rotation }, set: { elements[index].rotation = $0 })
+        return VStack {
+            Text("Turn").font(.caption)
+            Slider(value: rotation, in: 0...360, onEditingChanged: { if $0 { checkpoint() } })
+        }.frame(width: 170)
+    }
+
+    private func effectEditingOptions(for index: Int) -> some View {
+        ForEach(["Flat", "Shadow", "Outline", "Faded"], id: \.self) { name in
+            Button(name) {
+                checkpoint()
+                switch name {
+                case "Flat": elements[index].shadow = false; elements[index].borderWidth = 0; elements[index].opacity = 1
+                case "Shadow": elements[index].shadow = true
+                case "Outline": elements[index].borderWidth = 2
+                default: elements[index].opacity = 0.5
+                }
+            }.buttonStyle(.bordered).frame(minHeight: 64)
+        }
+    }
+
+    @ViewBuilder private var cutoutEditingOptions: some View {
+        VStack {
+            Text("Plain backgrounds · strength").font(.caption)
+            Slider(value: $cutoutStrength, in: 5...140)
+        }.frame(width: 180)
+        Button(imageBusy ? "Working…" : "Remove background") { processStudioImage("cutout") }.buttonStyle(.bordered).disabled(imageBusy)
+    }
+
+    private func textEditingOptions(for index: Int) -> some View {
+        let words = Binding<String>(get: { elements[index].text }, set: { checkpoint(); elements[index].text = $0 })
+        return TextField("Your words", text: words, axis: .vertical).frame(width: 240).textFieldStyle(.roundedBorder)
+    }
+
+    @ViewBuilder private func lookupEditingOptions(for index: Int) -> some View {
+        let selected = elements[index]
+        let scale = min(100 / CGFloat(max(1, selected.width)), 100 / CGFloat(max(1, selected.height)))
+        layerPreview(selected, scale: scale).frame(width: 100, height: 100)
+        ForEach(elements) { item in lookupEditingButton(item) }
+    }
+
+    private func lookupEditingButton(_ item: UxUiNativeLayer) -> some View {
+        let scale = min(40 / CGFloat(max(1, item.width)), 40 / CGFloat(max(1, item.height)))
+        return Button { selectedID = item.id } label: {
+            VStack {
+                layerPreview(item, scale: scale).frame(width: 44, height: 44)
+                Text(item.name).font(.caption).lineLimit(1)
+            }.frame(width: 90, height: 70)
+        }.buttonStyle(.bordered)
     }
 
     private func processStudioImage(_ operation: String, edge: Int = 1024) {
