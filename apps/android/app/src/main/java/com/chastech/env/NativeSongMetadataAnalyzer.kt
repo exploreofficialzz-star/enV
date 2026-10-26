@@ -598,6 +598,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, 
         val warnings = JSONArray()
         val tempo = decoded?.let { NativeSongSignalAnalysis.estimateBpm(it.samples, it.sampleRateHz) }
         val key = decoded?.let { NativeSongSignalAnalysis.estimateKey(it.samples, it.sampleRateHz) }
+        val datasetAnalysis = if (detailed && decoded != null) NativeSongSignalAnalysis.analyzeDataset(decoded.samples, decoded.sampleRateHz) else null
         if (decoded == null) warnings.put("This audio format could not be decoded on this device.")
         if (tempo == null) warnings.put("Tempo could not be estimated reliably.")
         if (key == null) warnings.put("Musical key could not be estimated reliably.")
@@ -628,7 +629,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, 
             .put("release_date", meta.optString("year").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("artwork_available", meta.optBoolean("artwork_available", false))
         val report = JSONObject()
-            .put("schema_version", "1.0")
+            .put("schema_version", "1.1")
             .put("filename", item.name)
             .put("genre", meta.optString("genre").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("sub_style", JSONObject.NULL)
@@ -648,9 +649,11 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, 
             .put("identity", identity)
             .put("technical", technical)
             .put("embedded_metadata", meta)
-            .put("analysis", JSONObject().put("status", "quick").put("local_audio_decoded", decoded != null)
-                .put("semantic_analysis", "skipped_by_choice").put("key_source", if (key != null) "audio_estimate" else "unavailable"))
+            .put("analysis", JSONObject().put("status", if (datasetAnalysis != null) "full_local_needs_review" else "quick_local").put("local_audio_decoded", decoded != null)
+                .put("semantic_analysis", "not_run_local_only").put("uses_remote_api", false).put("uses_hosted_model", false)
+                .put("key_source", if (key != null) "audio_estimate" else "unavailable"))
             .put("warnings", warnings)
+        if (datasetAnalysis != null) report.put("dataset_analysis", datasetAnalysis)
         return NativeSongScan(report, decoded)
     } finally {
         temp.delete()
