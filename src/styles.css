@@ -2781,9 +2781,9 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-edit-tray .uxui-style-dock-heading,.uxui-edit-tray .uxui-drag-hint,.uxui-edit-tray .uxui-inline-fields,.uxui-edit-tray .uxui-shape-choices,.uxui-edit-tray .uxui-inline-text-fields,.uxui-edit-tray .uxui-inline-actions,.uxui-edit-tray .uxui-exact-options,.uxui-edit-tray .uxui-inline-effect-choices,.uxui-edit-tray .uxui-resample-actions { display:none; }
 .uxui-edit-tray[data-tool=color] .uxui-visual-controls,.uxui-edit-tray[data-tool=adjust] .uxui-visual-controls,.uxui-edit-tray[data-tool=resize] .uxui-visual-controls,.uxui-edit-tray[data-tool=shape] .uxui-visual-controls { display:flex !important; gap:16px; overflow-x:auto; }
 .uxui-edit-tray .uxui-visual-controls > label { flex:0 0 150px; }
-.uxui-edit-tray[data-tool=color] .uxui-visual-controls > label:not([data-field=Fill]):not([data-field="Text color"]):not([data-field="Icon color"]) { display:none; }
-.uxui-edit-tray[data-tool=adjust] .uxui-visual-controls > label:is([data-field=Fill],[data-field="Text color"],[data-field="Icon color"]),.uxui-edit-tray[data-tool=resize] .uxui-visual-controls > label:not([data-field=Size]) { display:none; }
-.uxui-edit-tray[data-tool=shape] .uxui-visual-controls > label:not([data-field=Roundness]) { display:none; }
+.uxui-edit-tray[data-tool=color] .uxui-visual-controls > :not([data-field=Fill]):not([data-field="Text color"]):not([data-field="Icon color"]) { display:none; }
+.uxui-edit-tray[data-tool=adjust] .uxui-visual-controls > label:is([data-field=Fill],[data-field="Text color"],[data-field="Icon color"]),.uxui-edit-tray[data-tool=resize] .uxui-visual-controls > :not([data-field=Size]) { display:none; }
+.uxui-edit-tray[data-tool=shape] .uxui-visual-controls > :not([data-field=Roundness]) { display:none; }
 .uxui-edit-tray[data-tool=shape] .uxui-shape-choices { display:flex !important; gap:8px; margin:0 0 8px; }
 .uxui-edit-tray .uxui-shape-choices button { flex:0 0 96px; min-height:44px; }
 .uxui-edit-tray[data-tool=text] .uxui-inline-text-fields { display:flex; gap:10px; align-items:center; }
@@ -2844,3 +2844,15 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button { display:flex !important; align-items:center; justify-content:center; gap:4px; width:80px !important; height:44px !important; flex-basis:80px !important; min-height:44px; border-radius:999px !important; padding:0 8px; font-size:12px; font-weight:700; }
 .ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button svg { width:22px !important; height:22px !important; }
 .ux-ui-studio .uxui-drawer-heading > button { display:inline-flex; align-items:center; justify-content:center; gap:4px; width:auto; min-width:76px; padding:0 8px; font-size:12px; }
+
+.uxui-fader-field { display:flex; flex:0 0 76px; flex-direction:column; align-items:center; gap:2px; min-width:76px; font-size:11px; color:var(--color-fg); }
+.uxui-fader-field > span { height:14px; white-space:nowrap; }
+.uxui-fader { position:relative; width:44px; height:76px; flex:0 0 76px; touch-action:pan-x; cursor:ns-resize; border-radius:12px; user-select:none; }
+.uxui-fader:focus-visible { outline:2px solid var(--color-fg); outline-offset:2px; }
+.uxui-fader-track { position:absolute; top:12px; bottom:12px; left:19px; width:6px; border-radius:4px; background:var(--color-border); pointer-events:none; overflow:hidden; }
+.uxui-fader-track > span { position:absolute; bottom:0; width:100%; background:var(--color-fg); }
+.uxui-fader-thumb { position:absolute; left:10px; width:24px; height:24px; border:2px solid var(--color-surface); border-radius:50%; background:var(--color-fg); box-shadow:0 0 0 1px var(--color-border); pointer-events:none; }
+.uxui-fader-field output { height:14px; font-variant-numeric:tabular-nums; color:var(--color-muted); }
+.ux-ui-studio .uxui-fullscreen-brand { display:flex; flex:0 0 62px; width:62px; max-width:62px; min-height:28px; }
+.ux-ui-studio .uxui-fullscreen-logo { display:flex; flex:0 0 62px; width:62px; max-width:62px; height:28px; overflow:hidden; }
+.ux-ui-studio .uxui-fullscreen-logo img,.ux-ui-studio.is-expanded .uxui-fullscreen-logo img { width:62px !important; max-width:62px !important; height:28px !important; max-height:28px !important; object-fit:contain !important; }

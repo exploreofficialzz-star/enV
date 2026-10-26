@@ -29,6 +29,18 @@ async function storedProject(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("env-ux-ui-studio-project-v1") || "null"));
 }
 
+async function checkEmbeddedLogo(page, viewport, entry) {
+  await page.getByRole("button", {name:"Exit full-screen studio",exact:true}).click();
+  const logo = page.locator(".ux-ui-studio .uxui-fullscreen-logo img:visible");
+  await logo.scrollIntoViewIfNeeded();
+  const box = await logo.boundingBox();
+  assert.ok(box && box.width <= 64 && box.height <= 30, "Embedded Studio keeps a compact brand logo");
+  await checkBounds(logo, "Embedded brand logo", viewport);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), "Embedded header has no document overflow");
+  await page.getByRole("button", {name:"Expand studio to full screen",exact:true}).click();
+  entry.checks.push("Embedded and full-screen brand lockups keep a bounded size");
+}
+
 async function waitForStored(page, predicate, description) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -160,14 +172,43 @@ try {
         await page.getByRole("button",{name:"Adjust",exact:true}).click();
         const beforeSlider = await storedProject(page);
         const previous = beforeSlider.elements.find((item) => item.kind === "button");
-        const slider = styling.getByLabel("Selected size", { exact: true });
+        const letters = styling.getByLabel("Selected font size", {exact:true});
+        await letters.focus(); await letters.press("ArrowUp");
+        await waitForStored(page, project => project.elements.find(item => item.id === previous.id).fontSize === previous.fontSize + 1, "the actual letter size");
+        const afterLetters = (await storedProject(page)).elements.find(item => item.id === previous.id);
+        assert.equal(afterLetters.width, previous.width, "Text size leaves the box width alone");
+        const paintedText = page.locator('svg[aria-label$=" design artboard"] text').filter({hasText:previous.text}).first();
+        assert.equal(await paintedText.evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize)), previous.fontSize + 1, "The rendered letters grow");
+        await page.getByRole("button",{name:"Undo",exact:true}).last().click();
+        await waitForStored(page, project => project.elements.find(item => item.id === previous.id).fontSize === previous.fontSize, "undoing the text-size edit");
+        const slider = styling.getByLabel("Selected box width", { exact: true });
+        assert.equal(await slider.getAttribute("aria-orientation"), "vertical");
+        // Real touch pan starting on a fader must browse the strip without editing.
+        const turn = styling.getByLabel("Selected rotation", {exact:true});
+        await turn.scrollIntoViewIfNeeded();
+        const touchBox = await turn.boundingBox();
+        const strip = styling.locator(".uxui-visual-controls");
+        await strip.evaluate(node => { node.scrollLeft = 0; });
+        const client = await context.newCDPSession(page);
+        await client.send("Emulation.setTouchEmulationEnabled", {enabled:true});
+        const touch = {x:touchBox.x+touchBox.width/2,y:touchBox.y+touchBox.height/2};
+        await client.send("Input.dispatchTouchEvent", {type:"touchStart",touchPoints:[touch]});
+        for(let i=1;i<=6;i++) await client.send("Input.dispatchTouchEvent", {type:"touchMove",touchPoints:[{x:touch.x-i*12,y:touch.y}]});
+        await client.send("Input.dispatchTouchEvent", {type:"touchEnd",touchPoints:[]});
+        await page.waitForTimeout(180);
+        assert.ok(await strip.evaluate(node => node.scrollLeft)>20, "A sideways swipe over a fader scrolls the strip");
+        assert.deepEqual((await storedProject(page)).elements, beforeSlider.elements, "Sideways scrolling never changes a style value");
+        await client.detach();
         await slider.scrollIntoViewIfNeeded();
         const box = await slider.boundingBox();
-        await page.mouse.move(box.x + box.width * 0.45, box.y + box.height / 2);
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.75);
         await page.mouse.down();
-        await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 5 });
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.25, { steps: 5 });
         await page.mouse.up();
         await waitForStored(page, (project) => project.elements.find((item) => item.id === previous.id).width !== previous.width, "a visual size-slider drag");
+        await page.getByRole("button", { name: "Undo", exact: true }).last().click();
+        await waitForStored(page, project => project.elements.find(item => item.id === previous.id).width === previous.width, "one undo for a vertical fader gesture");
+        entry.checks.push("Sideways touch pans over faders scroll without editing; vertical drags adjust with one-step Undo");
         const beforeResize = await storedProject(page);
         const size = beforeResize.elements.find((item) => item.id === previous.id);
         const handle = page.locator(".uxui-resize-handle");
@@ -374,6 +415,7 @@ try {
         assert.deepEqual(afterTheme.elements, beforeTheme.elements, "Theme changes preserve authored artwork colors and assets");
         entry.checks.push("Live system-theme changes update controls while preserving artwork");
       }
+      await checkEmbeddedLogo(page, viewport, entry);
     } catch (error) {
       entry.failure = error.stack || error.message;
       report.errors.push({ width: viewport.width, theme, error: error.message });
@@ -414,7 +456,7 @@ try {
       await fill.fill("#7c3aed");
       await waitForStored(page, (project) => project.elements.some((layer) => layer.background.toLowerCase() === "#7c3aed"), "compact color editing");
       await page.getByRole("button",{name:"Adjust",exact:true}).click();
-      const size = styling.getByLabel("Selected size", { exact: true });
+      const size = styling.getByLabel("Selected box width", { exact: true });
       await size.scrollIntoViewIfNeeded();
       await checkBounds(size, "Compact size slider", viewport);
       await size.focus(); await size.press("ArrowRight");
@@ -423,6 +465,8 @@ try {
       await checkBounds(drawer, "Compact effects toolkit", viewport);
       await checkGrid(drawer.locator(".uxui-effect-card"), "Compact effects");
       entry.checks.push("Toolkit and effect samples fit without overlap");
+      await page.getByRole("button", {name:"Back to movement controls",exact:true}).click();
+      await checkEmbeddedLogo(page, viewport, entry);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
       assert.equal(overflow, false);
       assert.deepEqual(entry.runtimeErrors, []);

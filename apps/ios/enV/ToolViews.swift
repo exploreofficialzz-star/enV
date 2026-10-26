@@ -10012,6 +10012,8 @@ private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
     UxUiStudioToolkit(id: "qa", name: "Design QA", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
 ]
 
+private let uxUiTextLayerKinds: Set<String> = ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"]
+
 private struct StudioHoldControl: View {
     let symbol: String
     let label: String
@@ -10035,6 +10037,51 @@ private struct StudioHoldControl: View {
             }.onEnded { _ in stop() })
             .accessibilityElement().accessibilityLabel(label).accessibilityAddTraits(.isButton)
             .accessibilityAction { begin(); step() }.onDisappear { stop() }.onChange(of: scenePhase) { if $0 != .active { stop() } }
+    }
+}
+
+private struct StudioVerticalFader: View {
+    let label: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 1
+    let begin: () -> Void
+    @State private var axis = 0
+    @State private var origin = 0.0
+    @GestureState private var dragging = false
+    private var fraction: Double { min(1, max(0, (value - range.lowerBound) / max(step, range.upperBound - range.lowerBound))) }
+    private func adjust(_ next: Double) {
+        let snapped = range.lowerBound + ((next - range.lowerBound) / step).rounded() * step
+        value = min(range.upperBound, max(range.lowerBound, snapped))
+    }
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label).font(.caption2).lineLimit(1)
+            ZStack(alignment: .top) {
+                Capsule().fill(Color.uxUiInk.opacity(0.2)).frame(width: 6, height: 48).offset(y: 12)
+                Capsule().fill(Color.uxUiInk).frame(width: 6, height: 48 * fraction).offset(y: 12 + 48 * (1 - fraction))
+                Circle().fill(Color.uxUiInk).frame(width: 24, height: 24).offset(y: 48 * (1 - fraction))
+            }.frame(width: 44, height: 72).contentShape(Rectangle())
+                .simultaneousGesture(DragGesture(minimumDistance: 8).updating($dragging) { _, active, _ in active = true }.onChanged { gesture in
+                    if axis == 0 {
+                        let dx = abs(gesture.translation.width), dy = abs(gesture.translation.height)
+                        if dy > dx * 1.5 { axis = 2 }
+                        else if dx >= dy { axis = 1 }
+                        else { return }
+                        if axis == 2 { origin = value; begin() }
+                    }
+                    if axis == 2 { adjust(origin - Double(gesture.translation.height) * (range.upperBound - range.lowerBound) / 80) }
+                }.onEnded { _ in axis = 0 })
+            Text(value.formatted(.number.precision(.fractionLength(0...2)))).font(.caption2).monospacedDigit()
+        }.frame(width: 76)
+            .accessibilityElement(children: .ignore).accessibilityLabel(label)
+            .accessibilityValue(value.formatted(.number.precision(.fractionLength(0...2))))
+            .accessibilityHint("Drag up or down to adjust. Swipe sideways to browse tools.")
+            .accessibilityAdjustableAction { direction in
+                begin()
+                switch direction { case .increment: adjust(value + step); case .decrement: adjust(value - step); @unknown default: break }
+            }
+            .onChange(of: dragging) { if !$0 { axis = 0 } }
     }
 }
 
@@ -11434,13 +11481,13 @@ private struct NativeUxUiStudioView: View {
             Spacer(minLength: 0)
             VStack(spacing: 4) {
                 Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
-                StudioHoldControl(symbol: "plus.magnifyingglass", label: "plus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) }).id(elements[index].id)
+                StudioHoldControl(symbol: "plus.magnifyingglass", label: "plus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)); if uxUiTextLayerKinds.contains(elements[index].kind) { elements[index].fontSize = max(1, Int((Double(elements[index].fontSize) * 1.1).rounded())) } }).id(elements[index].id)
                 HStack(spacing: 1) {
                     StudioHoldControl(symbol: "rotate.left", label: "rotate left", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
                     StudioHoldControl(symbol: "arrow.counterclockwise", label: "arrow counterclockwise", begin: { checkpoint() }, step: { elements[index].rotation = 0 }).id(elements[index].id)
                     StudioHoldControl(symbol: "rotate.right", label: "rotate right", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
                 }
-                StudioHoldControl(symbol: "minus.magnifyingglass", label: "minus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) }).id(elements[index].id)
+                StudioHoldControl(symbol: "minus.magnifyingglass", label: "minus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)); if uxUiTextLayerKinds.contains(elements[index].kind) { elements[index].fontSize = max(1, Int((Double(elements[index].fontSize) * 0.9).rounded())) } }).id(elements[index].id)
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .contain)
@@ -11508,6 +11555,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     @ViewBuilder private func sizeEditingOptions(for index: Int) -> some View {
+        if uxUiTextLayerKinds.contains(elements[index].kind) { textSizeEditingSlider(for: index) }
         sizeEditingSlider(for: index)
         if editTool == "adjust" {
             rotationEditingSlider(for: index)
@@ -11525,18 +11573,19 @@ private struct NativeUxUiStudioView: View {
             elements[index].height = max(12, Int(Double(elements[index].height) * ratio))
         })
         let upperBound = Double(max(13, boardWidth - elements[index].x))
-        return VStack {
-            Text("Size").font(.caption)
-            Slider(value: width, in: 12...upperBound, onEditingChanged: { if $0 { checkpoint() } })
-        }.frame(width: 170)
+        let label = uxUiTextLayerKinds.contains(elements[index].kind) ? "Box width" : "Size"
+        return StudioVerticalFader(label: label, value: width, range: 12...upperBound, begin: { checkpoint() }).id(elements[index].id)
+    }
+
+    private func textSizeEditingSlider(for index: Int) -> some View {
+        let size = Binding<Double>(get: { Double(elements[index].fontSize) }, set: { elements[index].fontSize = max(1, Int($0.rounded())) })
+        let limit = Double(max(160, elements[index].fontSize))
+        return StudioVerticalFader(label: "Text size", value: size, range: 8...limit, begin: { checkpoint() }).id(elements[index].id)
     }
 
     private func rotationEditingSlider(for index: Int) -> some View {
         let rotation = Binding<Double>(get: { elements[index].rotation }, set: { elements[index].rotation = $0 })
-        return VStack {
-            Text("Turn").font(.caption)
-            Slider(value: rotation, in: 0...360, onEditingChanged: { if $0 { checkpoint() } })
-        }.frame(width: 170)
+        return StudioVerticalFader(label: "Turn", value: rotation, range: 0...360, begin: { checkpoint() }).id(elements[index].id)
     }
 
     private func effectEditingOptions(for index: Int) -> some View {
@@ -11554,10 +11603,8 @@ private struct NativeUxUiStudioView: View {
     }
 
     @ViewBuilder private var cutoutEditingOptions: some View {
-        VStack {
-            Text("Plain backgrounds · strength").font(.caption)
-            Slider(value: $cutoutStrength, in: 5...140)
-        }.frame(width: 180)
+        StudioVerticalFader(label: "Strength", value: $cutoutStrength, range: 5...140, begin: {})
+        Text("Plain backgrounds").font(.caption).frame(width: 78)
         Button(imageBusy ? "Working…" : "Remove background") { processStudioImage("cutout") }.buttonStyle(.bordered).disabled(imageBusy)
     }
 

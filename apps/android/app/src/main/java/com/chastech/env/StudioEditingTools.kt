@@ -4,16 +4,22 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.*
@@ -21,6 +27,43 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 import kotlin.math.*
+
+@Composable
+internal fun StudioVerticalFader(label:String,value:Float,range:ClosedFloatingPointRange<Float>,selection:String,begin:()->Unit,change:(Float)->Unit) {
+    val currentValue by rememberUpdatedState(value)
+    val currentBegin by rememberUpdatedState(begin)
+    val currentChange by rememberUpdatedState(change)
+    val step=if(range.endInclusive-range.start<=1f).05f else 1f
+    fun bounded(next:Float)=(range.start+((next-range.start)/step).roundToInt()*step).coerceIn(range.start,range.endInclusive)
+    val fraction=((value-range.start)/(range.endInclusive-range.start).coerceAtLeast(step)).coerceIn(0f,1f)
+    val ink=MaterialTheme.colorScheme.onSurface
+    val track=ink.copy(alpha=.2f)
+    val display=if(range.endInclusive<=1f)"${(value*100).roundToInt()}%" else value.roundToInt().toString()
+    Column(Modifier.width(76.dp),horizontalAlignment=Alignment.CenterHorizontally){
+        Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)
+        Canvas(Modifier.size(44.dp,76.dp).semantics {
+            contentDescription=label;stateDescription=display
+            progressBarRangeInfo=ProgressBarRangeInfo(value.coerceIn(range.start,range.endInclusive),range)
+            setProgress { currentBegin();currentChange(bounded(it));true }
+        }.onKeyEvent { event ->
+            val direction=when(event.key){Key.DirectionUp,Key.DirectionRight->1;Key.DirectionDown,Key.DirectionLeft->-1;else->0}
+            if(direction!=0&&event.type==KeyEventType.KeyDown){if(event.nativeKeyEvent.repeatCount==0)currentBegin();currentChange(bounded(currentValue+direction*step));true}else false
+        }.focusable().pointerInput(selection,range.start,range.endInclusive){
+            var origin=0f;var distance=0f
+            detectVerticalDragGestures(onDragStart={origin=currentValue;distance=0f;currentBegin()}){change,amount->
+                change.consume();distance+=amount
+                currentChange(bounded(origin-distance*(range.endInclusive-range.start)/size.height.coerceAtLeast(1)))
+            }
+        }){
+            val top=12.dp.toPx();val bottom=size.height-top;val x=size.width/2
+            val y=bottom-(bottom-top)*fraction
+            drawLine(track,Offset(x,top),Offset(x,bottom),6.dp.toPx(),StrokeCap.Round)
+            drawLine(ink,Offset(x,y),Offset(x,bottom),6.dp.toPx(),StrokeCap.Round)
+            drawCircle(ink,12.dp.toPx(),Offset(x,y))
+        }
+        Text(display,style=MaterialTheme.typography.labelSmall)
+    }
+}
 
 @Composable
 internal fun StudioHoldButton(label:String, selection:String, begin:()->Unit, step:()->Unit) {

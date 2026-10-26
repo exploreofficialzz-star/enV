@@ -1,5 +1,7 @@
 # Horizontal Studio editing
 
+Numeric styling now uses vertical faders in the horizontal tool strip. Values change only after a clearly vertical gesture; sideways touch gestures browse the strip. Keyboard and assistive controls remain adjustable, with one undo checkpoint for a drag. Text size changes the actual type size, while Box width controls wrapping separately. Visual scale controls and the corner handle scale the letters with the text frame. The brand lockup is bounded in both embedded and full-screen modes. Short editing windows scroll newly opened shelves into view.
+
 The editor now uses one horizontally scrolling action row. Color, Shape, Effects, Adjust, Text, Resize and Cutout take the movement controller's place in a bounded editing tray. Close returns to movement. Exact settings remain in More. Tool choices, color options, fonts, icons and image actions scroll sideways rather than wrapping into extra rows.
 
 The main Add button always starts on All 26. Selecting a category closes that popup and opens its controls beside the artboard; selecting an actual component, font or icon returns to editing with the asset applied. Look closer shows enlarged selected artwork and a strip of selectable layers. New images preserve their proportions when fitted into a mockup.

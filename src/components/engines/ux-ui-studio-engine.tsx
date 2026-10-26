@@ -1,3 +1,4 @@
+import { StudioFader } from "./ux-ui-studio-fader";
 import { StudioRepeatButton } from "./ux-ui-studio-repeat-button";
 import { editStudioImage } from "./ux-ui-studio-image";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
@@ -6,7 +7,7 @@ import { ToolkitPreview } from "./ux-ui-toolkit-preview";
 import { FontPreview, StudioIconPreview, getStudioIcon, getBundledStudioIconNames, BUNDLED_STUDIO_FONTS, loadStudioFont, loadSystemStudioFont } from "./ux-ui-studio-assets";
 import { Logo } from "@/components/brand/logo";
 import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Minimize2, Redo2, Undo2,
@@ -54,6 +55,8 @@ type DesignScreen = {
   customArtboard: boolean; customWidth: number; customHeight: number;
   elements: DesignLayer[]; updatedAt: string;
 };
+
+const TEXT_LAYER_KINDS: string[] = ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"];
 
 const DEFAULT_TOKENS: DesignTokens = {
   colors: [
@@ -1022,7 +1025,7 @@ export function UxUiStudioEngine() {
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
   const customFontRequests = useRef(new Map<string, Promise<FontFace>>());
-  const resizeRef = useRef<{ id: string; x: number; y: number; width: number; height: number; pointerX: number; pointerY: number; rotation: number } | null>(null);
+  const resizeRef = useRef<{ id: string; x: number; y: number; width: number; height: number; pointerX: number; pointerY: number; rotation: number; fontSize?: number } | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   useEffect(() => {
@@ -1140,7 +1143,7 @@ export function UxUiStudioEngine() {
 
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
-  const selectedHasText = Boolean(selected && ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"].includes(selected.kind));
+  const selectedHasText = Boolean(selected && TEXT_LAYER_KINDS.includes(selected.kind));
   const fontChoices = useMemo(() => {
     const byFamily = new Map<string, FontLibraryItem>();
     for (const font of FONT_LIBRARY) {
@@ -1344,6 +1347,11 @@ export function UxUiStudioEngine() {
     }
     return () => { cancelled = true; };
   }, [customFonts]);
+
+  useLayoutEffect(() => {
+    if (showToolsPanel || editTool === "move" || !window.matchMedia("(max-height: 600px)").matches) return;
+    studioRootRef.current?.querySelector(".uxui-edit-tray")?.scrollIntoView({ block: "end", inline: "nearest" });
+  }, [editTool, inlineToolkit, showToolsPanel]);
 
   function chooseStartingTarget(nextTarget: DeviceTarget) {
     const size = boardSize(nextTarget);
@@ -1823,10 +1831,10 @@ export function UxUiStudioEngine() {
       const dx = (event.clientX - resizing.pointerX) * board.width / Math.max(1, rect.width);
       const dy = (event.clientY - resizing.pointerY) * board.height / Math.max(1, rect.height);
       const angle = resizing.rotation * Math.PI / 180;
-      updateLayer(resizing.id, {
-        width: Math.max(12, Math.min(board.width - resizing.x, Math.round(resizing.width + dx * Math.cos(angle) + dy * Math.sin(angle)))),
-        height: Math.max(12, Math.min(board.height - resizing.y, Math.round(resizing.height - dx * Math.sin(angle) + dy * Math.cos(angle)))),
-      }, false);
+      const width = Math.max(12, Math.min(board.width - resizing.x, Math.round(resizing.width + dx * Math.cos(angle) + dy * Math.sin(angle))));
+      const height = Math.max(12, Math.min(board.height - resizing.y, Math.round(resizing.height - dx * Math.sin(angle) + dy * Math.cos(angle))));
+      const fontSize = resizing.fontSize === undefined ? undefined : Math.max(1, Math.round(resizing.fontSize * Math.min(width / resizing.width, height / resizing.height)));
+      updateLayer(resizing.id, { width, height, ...(fontSize === undefined ? {} : { fontSize }) }, false);
       return;
     }
     const drag = dragRef.current;
@@ -2611,7 +2619,7 @@ export function UxUiStudioEngine() {
                     {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
                     {selectedId === layer.id && <rect data-editor-only="true" x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
                     {selectedId === layer.id && !prototypePreview && !layer.locked && <g data-editor-only="true" role="button" tabIndex={0} aria-label="Drag to resize selected element" className="uxui-resize-handle"
-                      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); dragRef.current = null; resizeRef.current = { id: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height, pointerX: event.clientX, pointerY: event.clientY, rotation: layer.rotation || 0 }; artboardRef.current?.setPointerCapture(event.pointerId); }}
+                      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); dragRef.current = null; resizeRef.current = { id: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height, pointerX: event.clientX, pointerY: event.clientY, rotation: layer.rotation || 0, fontSize: TEXT_LAYER_KINDS.includes(layer.kind) ? layer.fontSize : undefined }; artboardRef.current?.setPointerCapture(event.pointerId); }}
                       onKeyDown={(event) => { if (["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); updateLayer(layer.id, { width: Math.max(12, layer.width + (event.key === "ArrowRight" ? 4 : event.key === "ArrowLeft" ? -4 : 0)), height: Math.max(12, layer.height + (event.key === "ArrowDown" ? 4 : event.key === "ArrowUp" ? -4 : 0)) }); } }}>
                       <circle cx={layer.x + layer.width} cy={layer.y + layer.height} r={22 * board.width / Math.max(1, deviceDisplayWidth)} fill="transparent" />
                       <circle cx={layer.x + layer.width} cy={layer.y + layer.height} r={7 * board.width / Math.max(1, deviceDisplayWidth)} fill="white" stroke="black" strokeWidth={1.5 * board.width / Math.max(1, deviceDisplayWidth)} />
@@ -2652,11 +2660,11 @@ export function UxUiStudioEngine() {
             </div>
             <div className="uxui-gamepad uxui-gamepad-transform" role="group" aria-label={selected.kind === "icon" ? "Icon transform controls" : "Selected element transform controls"}>
               <span className="uxui-gamepad-label">{selected.kind === "icon" ? "Icon" : "Adjust"}</span>
-              <StudioRepeatButton begin={checkpoint} className="uxui-pad-up" aria-label="Increase element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })}><ZoomIn size={18} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-up" aria-label="Increase element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))), ...(selectedHasText ? { fontSize: Math.max(1, Math.round(selected.fontSize * 1.1)) } : {}) })}><ZoomIn size={18} /></StudioRepeatButton>
               <StudioRepeatButton begin={checkpoint} className="uxui-pad-left" aria-label="Rotate element left 15 degrees" action={() => holdUpdate(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })}><RotateCw size={17} className="uxui-rotate-back" /></StudioRepeatButton>
               <StudioRepeatButton begin={checkpoint} className="uxui-pad-center" aria-label="Reset element rotation" action={() => holdUpdate(selected.id, { rotation: 0 })}>0°</StudioRepeatButton>
               <StudioRepeatButton begin={checkpoint} className="uxui-pad-right" aria-label="Rotate element right 15 degrees" action={() => holdUpdate(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })}><RotateCw size={17} /></StudioRepeatButton>
-              <StudioRepeatButton begin={checkpoint} className="uxui-pad-down" aria-label="Decrease element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-down" aria-label="Decrease element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)), ...(selectedHasText ? { fontSize: Math.max(1, Math.round(selected.fontSize * 0.9)) } : {}) })}><ZoomOut size={18} /></StudioRepeatButton>
             </div>
           </div>}
 {!prototypePreview && (selected || canvasSelected) && editTool !== "move" && editTool !== "library" && editTool !== "lookup" && editTool !== "cutout" && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
@@ -2666,15 +2674,16 @@ export function UxUiStudioEngine() {
               <div className="uxui-shape-choices" role="group" aria-label="Quick shape style">
                 {[{ name: "Square", radius: 0 }, { name: "Soft", radius: Math.min(14, Math.floor(Math.min(selected.width, selected.height) / 4)) }, { name: "Round", radius: Math.floor(Math.min(selected.width, selected.height) / 2) }].map((shape) => <button key={shape.name} type="button" aria-pressed={selected.radius === shape.radius} onClick={() => updateLayer(selected.id, { radius: shape.radius })}><span aria-hidden="true" style={{ borderRadius: shape.name === "Round" ? 99 : shape.name === "Soft" ? 7 : 0 }} /><strong>{shape.name}</strong></button>)}
               </div>
-              <div className="uxui-inline-fields uxui-visual-controls">
+              <div className="uxui-inline-fields uxui-visual-controls" key={selected.id}>
                 <Field label="Fill"><input type="color" aria-label="Selected fill color" value={/^#[0-9a-f]{6}$/i.test(selected.background) ? selected.background : "#FFFFFF"} onChange={(event) => updateLayer(selected.id, { background: event.target.value })} /></Field>
                 <Field label={selected.kind === "icon" ? "Icon color" : "Text color"}><input type="color" aria-label="Selected content color" value={/^#[0-9a-f]{6}$/i.test(selected.color) ? selected.color : "#111827"} onChange={(event) => updateLayer(selected.id, { color: event.target.value })} /></Field>
-                <Field label="Size"><input type="range" aria-label="Selected size" min="12" max={Math.max(12, board.width - selected.x)} value={selected.width} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => { const width = Number(event.target.value); updateLayer(selected.id, { width, height: Math.max(12, Math.round(selected.height * width / Math.max(1, selected.width))) }, false); }} /></Field>
-                <Field label="Turn"><input type="range" aria-label="Selected rotation" min="-180" max="180" value={((selected.rotation || 0) + 540) % 360 - 180} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { rotation: Number(event.target.value) }, false)} /></Field>
-                <Field label="Roundness"><input type="range" aria-label="Selected corner radius" min="0" max={Math.max(selected.radius, Math.ceil(Math.min(selected.width, selected.height) / 2))} value={selected.radius} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { radius: Number(event.target.value) }, false)} /></Field>
-                <Field label="Border"><input type="range" aria-label="Selected border width" min="0" max="20" value={selected.borderWidth} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { borderWidth: Number(event.target.value) }, false)} /></Field>
-                <Field label="Visibility"><input type="range" aria-label="Selected opacity" min="0" max="1" step=".05" value={selected.opacity} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { opacity: Number(event.target.value) }, false)} /></Field>
-                {selectedHasText && <Field label="Text size"><input type="range" aria-label="Selected font size" min="8" max={Math.max(160, selected.fontSize)} value={selected.fontSize} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { fontSize: Number(event.target.value) }, false)} /></Field>}
+                {selectedHasText && <StudioFader label="Text size" name="Selected font size" min={8} max={Math.max(160, selected.fontSize)} value={selected.fontSize} begin={checkpoint} change={next => updateLayer(selected.id, { fontSize: next }, false)} />}
+                <StudioFader label={selectedHasText ? "Box width" : "Size"} name={selectedHasText ? "Selected box width" : "Selected size"} min={12} max={Math.max(12, board.width - selected.x)} value={selected.width} begin={checkpoint} change={next => { const width = next; updateLayer(selected.id, { width, height: Math.max(12, Math.round(selected.height * width / Math.max(1, selected.width))) }, false); }} />
+                <StudioFader label="Turn" name="Selected rotation" min={-180} max={180} value={((selected.rotation || 0) + 540) % 360 - 180} begin={checkpoint} change={next => updateLayer(selected.id, { rotation: next }, false)} />
+                <StudioFader label="Roundness" name="Selected corner radius" min={0} max={Math.max(selected.radius, Math.ceil(Math.min(selected.width, selected.height) / 2))} value={selected.radius} begin={checkpoint} change={next => updateLayer(selected.id, { radius: next }, false)} />
+                <StudioFader label="Border" name="Selected border width" min={0} max={20} value={selected.borderWidth} begin={checkpoint} change={next => updateLayer(selected.id, { borderWidth: next }, false)} />
+                <StudioFader label="Visibility" name="Selected opacity" min={0} max={1} value={selected.opacity} step={0.05} begin={checkpoint} change={next => updateLayer(selected.id, { opacity: next }, false)} />
+
               </div>
               {selectedHasText && <div className="uxui-inline-fields uxui-inline-text-fields"><Field label={selected.kind === "chart" ? "Chart title and values" : "Your words"}><textarea aria-label="Selected text content" rows={selected.kind === "chart" ? 4 : 2} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field><button type="button" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}>Choose font</button></div>}
               <details className="uxui-exact-options" open={editTool === "more"}><summary>More options</summary><div className="uxui-inline-fields"><Field label="X"><input type="number" aria-label="Selected X" min="0" value={selected.x} onChange={event=>updateLayer(selected.id,{x:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Y"><input type="number" aria-label="Selected Y" min="0" value={selected.y} onChange={event=>updateLayer(selected.id,{y:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Width"><input type="number" aria-label="Selected width" min="1" value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Height"><input type="number" aria-label="Selected height" min="1" value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Border color"><input type="color" aria-label="Selected border color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#CCCCCC"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></Field></div></details>
@@ -2689,7 +2698,7 @@ export function UxUiStudioEngine() {
               {selected && <div className="uxui-detail-preview" aria-label="Magnified selected item">{selected.kind === "icon" ? <svg viewBox={selected.iconViewBox || "0 0 24 24"} style={{ color: selected.color }} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + selected.iconSvg + "</svg>").body }} /> : selected.imageDataUrl ? <img src={selected.imageDataUrl} alt={selected.name} /> : <span style={{ color: selected.color }}>{selected.text || selected.name}</span>}</div>}
               <div className="uxui-layer-finder">{elements.filter(item => !item.hidden).map(item => <button type="button" key={item.id} aria-pressed={selectedId === item.id} onClick={() => selectLayer(item.id)}><span>{item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + item.iconSvg + "</svg>").body }} /> : item.imageDataUrl ? <img src={item.imageDataUrl} alt="" /> : item.text.slice(0, 3) || "□"}</span><strong>{item.name}</strong></button>)}</div>
             </div>}
-            {selected?.kind === "image" && editTool === "cutout" && <div className="uxui-image-actions"><p>Remove a plain background. Your original stays available with Undo.</p><label>Strength<input type="range" aria-label="Cutout strength" min="5" max="140" value={cutoutStrength} onChange={event => setCutoutStrength(Number(event.target.value))} /></label><button type="button" disabled={imageBusy} onClick={() => void processImage("cutout")}>{imageBusy ? "Working…" : "Remove background"}</button><button type="button" disabled={imageBusy} onClick={() => void processImage("icon")}>Make silhouette icon</button></div>}
+            {selected?.kind === "image" && editTool === "cutout" && <div className="uxui-image-actions"><p>Remove a plain background. Your original stays available with Undo.</p><StudioFader label="Strength" name="Cutout strength" min={5} max={140} value={cutoutStrength} begin={() => {}} change={setCutoutStrength} /><button type="button" disabled={imageBusy} onClick={() => void processImage("cutout")}>{imageBusy ? "Working…" : "Remove background"}</button><button type="button" disabled={imageBusy} onClick={() => void processImage("icon")}>Make silhouette icon</button></div>}
             {inlineToolkit && renderToolkit(true)}
           </div>}
           {selected && !prototypePreview && <div className="uxui-context-controls">

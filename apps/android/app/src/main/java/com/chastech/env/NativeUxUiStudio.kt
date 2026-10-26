@@ -148,12 +148,11 @@ private fun UxNativeAnimatedFontSpecimen(family:String, words:String, animated:B
         modifier=Modifier.fillMaxWidth().heightIn(min=68.dp).graphicsLayer { alpha=.72f+phase*.28f; translationX=phase*3f; scaleX=.98f+phase*.02f; scaleY=.98f+phase*.02f })
 }
 
+private val uxNativeTextKinds = setOf("text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar")
+
 @Composable
-private fun UxNativeVisualSlider(label:String,value:Float,range:ClosedFloatingPointRange<Float>,begin:()->Unit,change:(Float)->Unit) {
-    var editing by remember { mutableStateOf(false) }
-    Text(label,style=MaterialTheme.typography.labelLarge)
-    Slider(value=value.coerceIn(range.start,range.endInclusive),valueRange=range,
-        onValueChange={ if(!editing){begin();editing=true};change(it) },onValueChangeFinished={editing=false})
+private fun UxNativeVisualSlider(label:String,value:Float,range:ClosedFloatingPointRange<Float>,selection:String,begin:()->Unit,change:(Float)->Unit) {
+    StudioVerticalFader(label,value,range,selection,begin,change)
 }
 
 @Composable
@@ -1601,7 +1600,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                             Slider(selected.rotation.coerceIn(-180f,180f),{angle->edit(selected.id){it.copy(rotation=angle)}},valueRange=-180f..180f)
                                             OutlinedButton(onClick={edit(selected.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},modifier=Modifier.fillMaxWidth()){Text("Center on canvas")}
                                             OutlinedButton(onClick={edit(selected.id){it.copy(rotation=0f)}},modifier=Modifier.fillMaxWidth()){Text("Reset rotation")}
-                                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={edit(selected.id){it.copy(width=(it.width*1.1f).roundToInt(),height=(it.height*1.1f).roundToInt())}},modifier=Modifier.weight(1f)){Text("Size +")};OutlinedButton(onClick={edit(selected.id){it.copy(width=(it.width*.9f).roundToInt().coerceAtLeast(1),height=(it.height*.9f).roundToInt().coerceAtLeast(1))}},modifier=Modifier.weight(1f)){Text("Size −")}}
+                                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={edit(selected.id){it.copy(fontSize=if(it.kind in uxNativeTextKinds)(it.fontSize*1.1f).roundToInt().coerceAtLeast(1)else it.fontSize,width=(it.width*1.1f).roundToInt(),height=(it.height*1.1f).roundToInt())}},modifier=Modifier.weight(1f)){Text("Size +")};OutlinedButton(onClick={edit(selected.id){it.copy(fontSize=if(it.kind in uxNativeTextKinds)(it.fontSize*.9f).roundToInt().coerceAtLeast(1)else it.fontSize,width=(it.width*.9f).roundToInt().coerceAtLeast(1),height=(it.height*.9f).roundToInt().coerceAtLeast(1))}},modifier=Modifier.weight(1f)){Text("Size −")}}
                                         }
                                         OutlinedButton(onClick={add("rect")},modifier=Modifier.fillMaxWidth()){Text("Add a shape")}
                                         Text("Rotation edits the saved design. Animated timelines are not part of this editor.",style=MaterialTheme.typography.bodySmall)
@@ -1723,15 +1722,17 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                         val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
                         Text("Style · "+e.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                        Text("Drag to move. Use these sliders to change the look.",style=MaterialTheme.typography.bodySmall)
-                        UxNativeVisualSlider("Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}
-                        UxNativeVisualSlider("Turn",e.rotation,-180f..180f,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}
-                        UxNativeVisualSlider("Roundness",e.radius.toFloat(),0f..maxOf(1,e.radius,shortEdge/2).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(radius=v.roundToInt())}}
-                        UxNativeVisualSlider("Border",e.borderWidth.toFloat(),0f..20f,{checkpoint()}){v->visualEdit(e.id){it.copy(borderWidth=v.roundToInt())}}
+                        Text("Swipe sideways to browse. Drag a fader up or down to adjust.",style=MaterialTheme.typography.bodySmall)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        UxNativeVisualSlider(if(e.kind in uxNativeTextKinds)"Box width" else "Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}
+                        UxNativeVisualSlider("Turn",e.rotation,-180f..180f,e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}
+                        UxNativeVisualSlider("Roundness",e.radius.toFloat(),0f..maxOf(1,e.radius,shortEdge/2).toFloat(),e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(radius=v.roundToInt())}}
+                        UxNativeVisualSlider("Border",e.borderWidth.toFloat(),0f..20f,e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(borderWidth=v.roundToInt())}}
                         if(e.kind !in setOf("image","icon","rect","ellipse","divider","line")){
-                            UxNativeVisualSlider("Text size",e.fontSize.toFloat(),8f..maxOf(160,e.fontSize).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(fontSize=v.roundToInt())}}
-                            OutlinedButton(onClick={toolkitTab="Fonts";showElementTray=true},modifier=Modifier.fillMaxWidth()){Text("Choose a font")}
+                            UxNativeVisualSlider("Text size",e.fontSize.toFloat(),8f..maxOf(160,e.fontSize).toFloat(),e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(fontSize=v.roundToInt())}}
                         }
+                        }
+                        if(e.kind !in setOf("image","icon","rect","ellipse","divider","line"))OutlinedButton(onClick={toolkitTab="Fonts";showElementTray=true},modifier=Modifier.fillMaxWidth()){Text("Choose a font")}
                         Text("Text or icon color",style=MaterialTheme.typography.labelLarge)
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                             colorTokens.forEach{(name,value)->OutlinedButton(onClick={edit(e.id){it.copy(color=value)}}){Box(Modifier.size(26.dp).background(uxNativeColor(value),CircleShape));Text(name)}}
@@ -1887,8 +1888,8 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     "color" -> { listOf("#111111","#FFFFFF","#64748B","#2563EB","#7C3AED","#DB2775","#DC2626","#059669").forEach{hex->OutlinedButton(onClick={edit(e.id){if(it.kind=="icon")it.copy(color=hex)else it.copy(fill=hex)}}){Box(Modifier.size(32.dp).background(uxNativeColor(hex),RoundedCornerShape(8.dp)))}} }
                     "shape" -> {listOf("Square" to 0,"Soft" to 14,"Round" to minOf(e.width,e.height)/2).forEach{(label,radius)->OutlinedButton(onClick={edit(e.id){it.copy(radius=radius)}}){Column(horizontalAlignment=Alignment.CenterHorizontally){Box(Modifier.size(32.dp,24.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(radius.dp)));Text(label)}}}}
                     "effects" -> {listOf("Flat","Shadow","Outline","Faded").forEach{effect->OutlinedButton(onClick={edit(e.id){when(effect){"Flat"->it.copy(shadow=false,borderWidth=0,opacity=1f);"Shadow"->it.copy(shadow=true);"Outline"->it.copy(borderWidth=2);else->it.copy(opacity=.5f)}}}){Text(effect)}}}
-                    "adjust","resize" -> {Column(Modifier.width(170.dp)){UxNativeVisualSlider("Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}};if(editTool=="adjust"){Column(Modifier.width(170.dp)){UxNativeVisualSlider("Turn",e.rotation.coerceIn(-180f,180f),-180f..180f,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}};Column(Modifier.width(170.dp)){UxNativeVisualSlider("Visibility",e.opacity,0f..1f,{checkpoint()}){v->visualEdit(e.id){it.copy(opacity=v)}}}}else listOf(256,512,1024).forEach{edge->OutlinedButton(onClick={processImage("resize",edge)},enabled=!imageBusy){Text("${edge}px")}}}
-                    "cutout" -> {Column(Modifier.width(170.dp)){Text("Plain backgrounds");Slider(cutoutStrength,{cutoutStrength=it},valueRange=5f..140f)};OutlinedButton(onClick={processImage("cutout")},enabled=!imageBusy){Text(if(imageBusy)"Working…" else "Remove background")}}
+                    "adjust","resize" -> {if(e.kind in uxNativeTextKinds)UxNativeVisualSlider("Text size",e.fontSize.toFloat(),8f..maxOf(160,e.fontSize).toFloat(),e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(fontSize=v.roundToInt())}};Column(Modifier.width(76.dp)){UxNativeVisualSlider(if(e.kind in uxNativeTextKinds)"Box width" else "Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}};if(editTool=="adjust"){Column(Modifier.width(76.dp)){UxNativeVisualSlider("Turn",e.rotation.coerceIn(-180f,180f),-180f..180f,e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}};Column(Modifier.width(76.dp)){UxNativeVisualSlider("Visibility",e.opacity,0f..1f,e.id,{checkpoint()}){v->visualEdit(e.id){it.copy(opacity=v)}}}}else listOf(256,512,1024).forEach{edge->OutlinedButton(onClick={processImage("resize",edge)},enabled=!imageBusy){Text("${edge}px")}}}
+                    "cutout" -> {StudioVerticalFader("Strength",cutoutStrength,5f..140f,e.id,{}){cutoutStrength=it};Text("Plain backgrounds",modifier=Modifier.width(90.dp));OutlinedButton(onClick={processImage("cutout")},enabled=!imageBusy){Text(if(imageBusy)"Working…" else "Remove background")}}
                     "text" -> {OutlinedTextField(e.text,{text->edit(e.id){it.copy(text=text)}},modifier=Modifier.width(260.dp),label={Text("Your words")})}
                     "lookup" -> {UxUiNativeArtworkPreview(e,Modifier.size(100.dp));elements.forEach{layer->OutlinedButton(onClick={selectedId=layer.id}){Column(Modifier.width(70.dp)){UxUiNativeArtworkPreview(layer,Modifier.size(50.dp));Text(layer.name,maxLines=1)}}}}
                 }
@@ -2074,6 +2075,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
                                 StudioHoldButton("＋ Size · Adjust",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){layer ->
                                             layer.copy(
+                                                fontSize = if(layer.kind in uxNativeTextKinds)(layer.fontSize * 1.1f).roundToInt().coerceAtLeast(1) else layer.fontSize,
                                                 width = (layer.width * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw - layer.x).coerceAtLeast(12)),
                                                 height = (layer.height * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh - layer.y).coerceAtLeast(12))
                                             )
@@ -2082,6 +2084,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                 StudioHoldButton("↻ Rotate · Rotate",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}}
                                 StudioHoldButton("－ Size · Adjust",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){layer ->
                                             layer.copy(
+                                                fontSize = if(layer.kind in uxNativeTextKinds)(layer.fontSize * 0.9f).roundToInt().coerceAtLeast(1) else layer.fontSize,
                                                 width = (layer.width * 0.9f).roundToInt().coerceAtLeast(12),
                                                 height = (layer.height * 0.9f).roundToInt().coerceAtLeast(12)
                                             )
