@@ -342,22 +342,12 @@ export function SongMetadataAnalyzerEngine() {
   const [tracks, setTracks] = useState<SongRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("quick");
-  const [aiConsent, setAiConsent] = useState(false);
-  const [aiAvailability, setAiAvailability] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const limits = useMemo(getClientLimits, []);
-
-  useEffect(() => {
-    let alive = true;
-    fetchAiAvailability().then((availability) => {
-      if (alive) setAiAvailability(availability["audio.music.analyze"] === true);
-    }).catch(() => { if (alive) setAiAvailability(false); });
-    return () => { alive = false; };
-  }, []);
 
   const selected = tracks.find((track) => track.id === selectedId) ?? tracks.find((track) => track.report) ?? tracks[0];
   const readyCount = tracks.filter((track) => track.report).length;
@@ -468,8 +458,10 @@ export function SongMetadataAnalyzerEngine() {
       setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "scanning", progress: 12, error: undefined } : item));
       try {
         setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "analyzing", progress: 35 } : item));
-        const includeAi = mode === "full" && aiConsent && aiAvailability === true;
-        const analysis = await analyzeLocal(track.file, mode, includeAi, controller.signal);
+        const analysis = await analyzeLocal(track.file, mode, controller.signal, (fraction) => {
+          setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 35 + Math.round(fraction * 60) } : item));
+          setProgress(Math.round(((finished + fraction) / Math.max(1, queue.length)) * 100));
+        });
         setTracks((previous) => previous.map((item) => item.id === track.id
           ? { ...item, status: analysis.status, progress: 100, report: analysis.report }
           : item));
@@ -578,32 +570,26 @@ export function SongMetadataAnalyzerEngine() {
             </button>
             <button type="button" disabled={busy} onClick={() => setMode("full")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "full" ? "bg-surface shadow-sm" : "text-muted-foreground"}`}>
               <span className="block text-sm font-semibold">Full Analysis</span>
-              <span className="mt-0.5 block text-[11px]">Local signals, optional AI tags</span>
+              <span className="mt-0.5 block text-[11px]">Pitch, chords, spectrum, structure</span>
             </button>
           </div>
 
           {mode === "full" && (
-            <div className="space-y-2 rounded-xl border border-border p-3">
-              <label className="flex cursor-pointer items-start gap-2 text-sm">
-                <input type="checkbox" className="mt-1 accent-primary" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} disabled={busy} />
-                <span>Add AI music understanding by sending short excerpts.</span>
-              </label>
-              <p className="text-xs leading-5 text-muted-foreground">
-                Local analysis runs in this tab too. AI tags are added only when you opt in and the service is configured.
-              </p>
+            <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-xs leading-5 text-muted-foreground">
+              Detailed analysis runs locally. No audio excerpts are sent to an AI service. Genre, sub-style, language, mood and instrument names must be added or verified by a human reviewer in the dataset-label panel.
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <Sparkles size={16} /> : <Activity size={16} />}
-              {busy ? "Analyzing…" : mode === "full" ? (aiAvailability === true && aiConsent ? "Analyze with AI" : "Run local analysis") : "Scan songs"}
+              {busy ? "Analyzing locally…" : mode === "full" ? "Run detailed local analysis" : "Scan songs"}
             </button>
             {busy
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
               : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" title="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">{mode === "full" ? "Local signals always run. Short excerpts are sent only after consent and when the AI service is configured." : "Quick Scan runs on this device; your audio is not uploaded."}</p>
+          <p className="text-[11px] text-muted-foreground">Both modes run in this browser. Audio files are not uploaded for analysis.</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
