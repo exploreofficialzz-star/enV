@@ -1724,7 +1724,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         }
                         if(hasActivePrototypeLinks)OutlinedButton(onClick={ startPrototypePreview() },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text(if(e.kind=="chart")"Chart data (title, then Label: value)" else "Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=if(e.kind=="chart")8 else 3)
-                        Text("Shape",style=MaterialTheme.typography.labelLarge)
+                        Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                             OutlinedButton(onClick={edit(e.id){it.copy(radius=0)}},modifier=Modifier.weight(1f),contentPadding=PaddingValues(8.dp)){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){Box(Modifier.size(30.dp,22.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(0.dp)));Text("Square",fontSize=11.sp,maxLines=1)}}
                             OutlinedButton(onClick={edit(e.id){it.copy(radius=minOf(14,shortEdge/4))}},modifier=Modifier.weight(1f),contentPadding=PaddingValues(8.dp)){Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){Box(Modifier.size(30.dp,22.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(7.dp)));Text("Soft",fontSize=11.sp,maxLines=1)}}

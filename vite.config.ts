@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { access } from "node:fs/promises";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -50,9 +51,17 @@ export default defineConfig(({ command, isPreview }) => ({
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview
-      ? [nitro({ preset: "vercel", serverDir: "./server", hooks: {
-          compiled: async (nitro) => { await copyPgliteRuntimeAssets(nitro.options.output.serverDir); },
-        } })]
+      ? [nitro({ preset: "vercel", serverDir: "./server", modules: [{
+          name: "env:pglite-runtime-assets",
+          setup(nitro) {
+            // Register alongside the preset; a config-level compiled hook replaces it.
+            nitro.hooks.hook("compiled", async () => {
+              await access(join(nitro.options.output.dir, "config.json"));
+              await access(join(nitro.options.output.serverDir, ".vc-config.json"));
+              await copyPgliteRuntimeAssets(nitro.options.output.serverDir);
+            });
+          },
+        }] })]
       : []),
     viteReact(),
   ],

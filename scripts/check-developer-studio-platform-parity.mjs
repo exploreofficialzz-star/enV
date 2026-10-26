@@ -91,7 +91,7 @@ assert.match(androidUxStudio, /0xFF9BA0A5/, 'Android desktop preview must includ
 assert.match(iosUxStudio, /didInitialize = true/, 'iOS native studio should initialize its design once');
 assert.match(iosUxStudio, /showComponentPalette\.toggle\(\)/, 'iOS native tools palette should be collapsible');
 assert.match(iosUxStudio, /aspectRatio\(CGFloat\(boardWidth\) \/ CGFloat\(boardHeight\), contentMode: \.fit\)/, 'iOS preview must preserve target viewport ratio inside a mockup');
-assert.match(iosUxStudio, /DisclosureGroup\("Fine-tune design"/, 'iOS technical measurements must be behind simple visual controls');
+assert.match(iosUxStudio, /DisclosureGroup\("More options", isExpanded: \$showAdvancedInspector\)/, 'iOS technical measurements must remain in the expandable More options inspector');
 assert.match(iosUxStudio, /showAllLayers \? elements : Array\(elements\.prefix\(6\)\)/, 'iOS layer list must support a compact preview with see-more');
 assert.match(webUx, /auditUxUiStudioTextContrast\(elements, background\)/, 'Web Design QA must report WCAG AA text contrast findings');
 assert.match(androidUxStudio, /NativeAccessibilityEngine\.contrastRatio\(e\.color,surface\)/, 'Android Design QA must report WCAG AA text contrast findings');
