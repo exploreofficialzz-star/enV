@@ -382,7 +382,7 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
   const allLevels = frameLevels(mono);
   const frames: FeatureFrame[] = [];
   const previousMagnitude = new Float64Array(FFT_SIZE / 2);
-  let transientEvents = 0, spectralFrames = 0, previousRmsDb: number | null = null;
+  let transientEvents = 0, previousRmsDb: number | null = null;
   const stepSamples = Math.max(1, Math.round(sampleRate * FFT_HOP_SECONDS));
   const durationPitchPoints: PitchPoint[] = [];
   const maxSpectralFrames = Math.ceil(duration / FFT_HOP_SECONDS);
