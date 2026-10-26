@@ -3065,8 +3065,8 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     if key == nil { warnings.append("Key could not be estimated reliably.") }
     if tag("genre") == nil { warnings.append("Genre is not embedded; use Full Analysis for an audio-based estimate.") }
     let bitrateEstimate = duration > 0 ? Double(fileSize * 8) / duration : 0
-    let report: [String: Any] = [
-        "schema_version": "1.0", "filename": filename,
+    var report: [String: Any] = [
+        "schema_version": "1.1", "filename": filename,
         "genre": tag("genre") as Any? ?? NSNull(), "sub_style": NSNull(), "language": [String](),
         "tempo_bpm": tempo as Any? ?? NSNull(), "tempo_band": tempo.map(nativeSongTempoBand) ?? "unknown",
         "tempo_source": bpm == nil ? NSNull() : "audio_estimate", "key": key as Any? ?? NSNull(),
@@ -3089,11 +3089,17 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
             "year": tag("creationDate") as Any? ?? NSNull()
         ],
         "analysis": [
-            "status": "quick", "local_audio_decoded": true,
-            "semantic_analysis": "skipped_by_choice", "key_source": key == nil ? "unavailable" : "audio_estimate"
+            "status": detailed ? "full_local_needs_review" : "quick_local", "local_audio_decoded": true,
+            "semantic_analysis": "not_run_local_only", "key_source": key == nil ? "unavailable" : "audio_estimate",
+            "uses_remote_api": false, "uses_hosted_model": false
         ],
         "warnings": warnings
     ]
+    if detailed {
+        report["dataset_analysis"] = NativeSongSignal.analyzeDataset(mono, sampleRate: 16_000)
+        warnings.append("Genre, language, mood, vocal type and instrument identity require human review; no hosted model was used.")
+        report["warnings"] = Array(Set(warnings))
+    }
     return NativeSongAnalysisScan(report: report, monoSamples16k: mono)
 }
 
@@ -3456,6 +3462,309 @@ private enum NativeSongSignal {
             }
         }
         return best >= 0.06 ? bestKey : nil
+    }
+
+    private static func localNoteName(_ midi: Int) -> String {
+        "\(keys[((midi % 12) + 12) % 12])\(midi / 12 - 1)"
+    }
+
+    private static func localDb(_ value: Double) -> Double {
+        guard value.isFinite && value > 1e-12 else { return -120 }
+        return max(-120, 20 * log10(value))
+    }
+
+    private static func localMean(_ values: [Double]) -> Double {
+        values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+    }
+
+    private static func estimateDominantPitch(_ samples: [Float], sampleRate: Double, start: Int, time: Double) -> [String: Any]? {
+        let count = min(2_048, samples.count - start)
+        guard count >= 512 && sampleRate > 0 else { return nil }
+        let decimation = max(1, Int(ceil(sampleRate / 8_000)))
+        let reducedRate = sampleRate / Double(decimation)
+        var reduced = [Double]()
+        reduced.reserveCapacity((count + decimation - 1) / decimation)
+        for index in stride(from: 0, to: count, by: decimation) {
+            let window = 0.5 - 0.5 * cos(2 * Double.pi * Double(index) / Double(max(1, count - 1)))
+            reduced.append(Double(samples[start + index]) * window)
+        }
+        let minLag = max(2, Int(reducedRate / 1_000))
+        let maxLag = min(Int(reducedRate / 55), reduced.count / 2)
+        guard maxLag > minLag else { return nil }
+        var bestLag = 0
+        var bestScore = 0.0
+        for lag in minLag...maxLag {
+            var dot = 0.0, left = 0.0, right = 0.0
+            for index in 0..<(reduced.count - lag) {
+                let a = reduced[index], b = reduced[index + lag]
+                dot += a * b
+                left += a * a
+                right += b * b
+            }
+            let score = dot / sqrt(max(left * right, 1e-12))
+            if score > bestScore { bestScore = score; bestLag = lag }
+        }
+        guard bestLag > 0 && bestScore >= 0.55 else { return nil }
+        let frequency = reducedRate / Double(bestLag)
+        guard frequency.isFinite && (55...1_000).contains(frequency) else { return nil }
+        let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+        return [
+            "time_seconds": (time * 1_000).rounded() / 1_000,
+            "frequency_hz": (frequency * 100).rounded() / 100,
+            "midi_note": midi,
+            "note": localNoteName(midi),
+            "confidence": min(1, max(0, bestScore))
+        ]
+    }
+
+    private static func estimateLocalChord(_ chroma: [Double], start: Double, end: Double) -> [String: Any] {
+        let total = chroma.reduce(0, +)
+        guard total > 1e-9 else {
+            return ["start_seconds": start, "end_seconds": end, "chord": NSNull(), "confidence": NSNull(), "method": "spectral-chroma-triad-template"]
+        }
+        let values = chroma.map { $0 / total }
+        var bestName: String?
+        var bestScore = -Double.infinity
+        var secondScore = -Double.infinity
+        for root in 0..<12 {
+            for isMinor in [false, true] {
+                let third = (root + (isMinor ? 3 : 4)) % 12
+                let fifth = (root + 7) % 12
+                var score = values[root] + values[third] * 0.8 + values[fifth] * 0.6
+                for note in 0..<12 where note != root && note != third && note != fifth {
+                    score -= values[note] * 0.15
+                }
+                if score > bestScore {
+                    secondScore = bestScore
+                    bestScore = score
+                    bestName = keys[root] + (isMinor ? "m" : "")
+                } else if score > secondScore {
+                    secondScore = score
+                }
+            }
+        }
+        let confidence = min(0.99, max(0, ((bestScore - max(0, secondScore)) / max(bestScore, 1e-9)) * 3 + 0.3))
+        return [
+            "start_seconds": start,
+            "end_seconds": end,
+            "chord": bestName ?? NSNull() as Any,
+            "confidence": confidence,
+            "method": "spectral-chroma-triad-template"
+        ]
+    }
+
+    static func analyzeDataset(_ samples: [Float], sampleRate: Double) -> [String: Any] {
+        let safeRate = max(8_000, sampleRate)
+        let duration = Double(samples.count) / safeRate
+        let fftSize = 2_048
+        let binCount = fftSize / 2
+        let hop = max(1, Int(safeRate * 0.5))
+        var timeline = [[String: Any]]()
+        var frames = [[String: Double]]()
+        var previousMagnitudes = [Double](repeating: 0, count: binCount)
+        var chromaByBlock = [Int: [Double]]()
+        var pitchPoints = [[String: Any]]()
+        var fluxValues = [Double]()
+        var transientCount = 0
+        var priorRms: Double?
+        var globalSquares = 0.0, globalPeak = 0.0, dcSum = 0.0
+        var clipped = 0
+        for value in samples {
+            let sample = Double(value)
+            globalSquares += sample * sample
+            globalPeak = max(globalPeak, abs(sample))
+            dcSum += sample
+            if abs(sample) >= 0.999 { clipped += 1 }
+        }
+        var start = 0
+        var frameIndex = 0
+        while start < samples.count {
+            let end = min(samples.count, start + hop)
+            var squares = 0.0, peak = 0.0, crossings = 0
+            var previous: Float = samples[start]
+            for index in start..<end {
+                let sample = samples[index]
+                squares += Double(sample) * Double(sample)
+                peak = max(peak, abs(Double(sample)))
+                if index > start && ((sample >= 0 && previous < 0) || (sample < 0 && previous >= 0)) { crossings += 1 }
+                previous = sample
+            }
+            let rms = sqrt(squares / Double(max(1, end - start)))
+            let rmsDb = localDb(rms)
+            var real = [Double](repeating: 0, count: fftSize)
+            var imag = [Double](repeating: 0, count: fftSize)
+            for index in 0..<fftSize {
+                let sampleIndex = start + index
+                let sample = sampleIndex < samples.count ? Double(samples[sampleIndex]) : 0
+                real[index] = sample * (0.5 - 0.5 * cos(2 * Double.pi * Double(index) / Double(fftSize - 1)))
+            }
+            fft(&real, &imag)
+            var chroma = [Double](repeating: 0, count: 12)
+            var magnitudes = [Double](repeating: 0, count: binCount)
+            var magnitudeSum = 0.0, weightedFrequency = 0.0, logSum = 0.0
+            var powerSum = 0.0, lowPower = 0.0, midPower = 0.0, highPower = 0.0, fluxNumerator = 0.0
+            for bin in 1..<binCount {
+                let magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                let frequency = Double(bin) * safeRate / Double(fftSize)
+                let power = magnitude * magnitude
+                magnitudeSum += magnitude
+                weightedFrequency += magnitude * frequency
+                logSum += log(max(magnitude, 1e-12))
+                powerSum += power
+                if frequency < 160 { lowPower += power }
+                else if frequency < 2_000 { midPower += power }
+                else { highPower += power }
+                if frequency >= 45 && frequency <= min(5_000, safeRate / 2) {
+                    let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+                    chroma[(midi % 12 + 12) % 12] += magnitude
+                }
+                fluxNumerator += max(0, magnitude - previousMagnitudes[bin])
+            }
+            let flux = magnitudeSum > 1e-9 ? fluxNumerator / magnitudeSum : 0
+            previousMagnitudes = magnitudes
+            if let priorRms, rmsDb - priorRms >= 3 { transientCount += 1 }
+            if flux > 0.22 { transientCount += 1 }
+            priorRms = rmsDb
+            fluxValues.append(flux)
+            let lowRatio = powerSum > 1e-12 ? lowPower / powerSum : 0
+            let midRatio = powerSum > 1e-12 ? midPower / powerSum : 0
+            let highRatio = powerSum > 1e-12 ? highPower / powerSum : 0
+            let centroid = magnitudeSum > 1e-9 ? weightedFrequency / magnitudeSum : 0
+            let flatness = magnitudeSum > 1e-9 ? exp(logSum / Double(max(1, binCount - 1))) / (magnitudeSum / Double(max(1, binCount - 1))) : 0
+            let startSeconds = Double(start) / safeRate
+            let endSeconds = Double(end) / safeRate
+            let zcr = Double(crossings) / Double(max(1, end - start - 1))
+            frames.append([
+                "start": startSeconds, "end": endSeconds, "rmsDb": rmsDb,
+                "centroid": centroid, "flatness": flatness, "low": lowRatio,
+                "mid": midRatio, "high": highRatio, "flux": flux, "zcr": zcr
+            ])
+            timeline.append([
+                "start_seconds": startSeconds, "end_seconds": endSeconds,
+                "rms_dbfs": rmsDb, "peak_dbfs": localDb(peak),
+                "spectral_centroid_hz": centroid, "spectral_rolloff_85_hz": 0,
+                "spectral_flatness": flatness, "low_frequency_energy_ratio": lowRatio,
+                "mid_frequency_energy_ratio": midRatio, "high_frequency_energy_ratio": highRatio,
+                "spectral_flux": flux, "zero_crossing_rate": zcr
+            ])
+            let block = Int(startSeconds / 2)
+            var blockChroma = chromaByBlock[block] ?? [Double](repeating: 0, count: 12)
+            for note in 0..<12 { blockChroma[note] += chroma[note] }
+            chromaByBlock[block] = blockChroma
+            if frameIndex % 4 == 0, let pitch = estimateDominantPitch(samples, sampleRate: safeRate, start: start, time: startSeconds) {
+                pitchPoints.append(pitch)
+            }
+            start += hop
+            frameIndex += 1
+        }
+        var allChroma = [Double](repeating: 0, count: 12)
+        for values in chromaByBlock.values {
+            for note in 0..<12 { allChroma[note] += values[note] }
+        }
+        let chromaTotal = allChroma.reduce(0, +)
+        let normalizedChroma = chromaTotal > 1e-9 ? allChroma.map { $0 / chromaTotal } : allChroma
+        var chords = [[String: Any]]()
+        for (block, values) in chromaByBlock.sorted(by: { $0.key < $1.key }) {
+            chords.append(estimateLocalChord(values, start: Double(block * 2), end: min(duration, Double((block + 1) * 2))))
+        }
+        let fluxMean = localMean(fluxValues)
+        let fluxThreshold = max(0.15, fluxMean * 1.4)
+        let fluxEvents = fluxValues.filter { $0 >= fluxThreshold }.count
+        let transientEvents = max(transientCount, fluxEvents)
+        let transientRate = duration > 0 ? Double(transientEvents) / duration : 0
+        var changePoints = [[String: Any]]()
+        var lastBoundary = 0.0
+        if frames.count > 1 {
+            for index in 1..<frames.count {
+                let prior = frames[index - 1], current = frames[index]
+                let rmsDelta = abs(current["rmsDb", default: -120] - prior["rmsDb", default: -120]) / 24
+                let centroidDelta = abs(current["centroid", default: 0] - prior["centroid", default: 0]) / max(1_000, prior["centroid", default: 1_000])
+                let lowDelta = abs(current["low", default: 0] - prior["low", default: 0])
+                let score = min(1, max(0, rmsDelta * 0.45 + centroidDelta * 0.25 + lowDelta * 0.2 + current["flux", default: 0] * 0.1))
+                let time = current["start", default: 0]
+                if score >= 0.27 && time - lastBoundary >= 4 && duration - time >= 3 {
+                    changePoints.append(["time_seconds": time, "change_score": score, "reason": "Measured level, spectral brightness, frequency balance or flux changed; not a verified verse/chorus label."])
+                    lastBoundary = time
+                }
+            }
+        }
+        var boundaries = [0.0] + changePoints.compactMap { $0["time_seconds"] as? Double } + [duration]
+        if boundaries.isEmpty { boundaries = [0, duration] }
+        var sections = [[String: Any]]()
+        if boundaries.count > 1 {
+            for index in 0..<(boundaries.count - 1) where boundaries[index + 1] - boundaries[index] >= 1 {
+                sections.append(["start_seconds": boundaries[index], "end_seconds": boundaries[index + 1], "label": "section_\(sections.count + 1)", "label_source": "automatic_feature_change", "semantic_section": NSNull()])
+            }
+        }
+        let meanLow = localMean(frames.map { $0["low", default: 0] })
+        let meanMid = localMean(frames.map { $0["mid", default: 0] })
+        let meanHigh = localMean(frames.map { $0["high", default: 0] })
+        let meanCentroid = localMean(frames.map { $0["centroid", default: 0] })
+        var styleCues = [[String: Any]]()
+        if meanLow >= 0.35 { styleCues.append(["tag": "low-frequency-prominent", "evidence": "Low band carries \(Int((meanLow * 100).rounded()))% of average spectral energy.", "is_genre_classification": false]) }
+        if meanHigh >= 0.30 { styleCues.append(["tag": "high-frequency-prominent", "evidence": "High band carries \(Int((meanHigh * 100).rounded()))% of average spectral energy.", "is_genre_classification": false]) }
+        if transientRate >= 3 { styleCues.append(["tag": "transient-dense", "evidence": "Approximately \(String(format: "%.2f", transientRate)) onset-like changes per second.", "is_genre_classification": false]) }
+        if meanCentroid >= 3_000 { styleCues.append(["tag": "spectrally-bright", "evidence": "Mean spectral centroid is \(Int(meanCentroid.rounded())) Hz.", "is_genre_classification": false]) }
+        if styleCues.isEmpty { styleCues.append(["tag": "no-dominant-rule-cue", "evidence": "No conservative measurable rule was triggered.", "is_genre_classification": false]) }
+        let midis = pitchPoints.compactMap { $0["midi_note"] as? Int }
+        let sortedDb = frames.map { $0["rmsDb", default: -120] }.sorted()
+        let dynamicRange: Double = sortedDb.count > 1 ? sortedDb[(sortedDb.count - 1) * 95 / 100] - sortedDb[(sortedDb.count - 1) * 10 / 100] : 0
+        let globalRms = sqrt(globalSquares / Double(max(1, samples.count)))
+        var annotations: [String: Any] = [:]
+        let keysToAnnotate = ["genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement"]
+        for key in keysToAnnotate { annotations[key] = [String]() }
+        annotations["notes"] = ""
+        annotations["reviewed"] = false
+        annotations["reviewer"] = NSNull()
+        var warnings = [
+            "No hosted model or AI API was used. Genre, language, mood, instrument identity and vocal type require human annotation.",
+            "Pitch and chord estimates come from the full mix and may follow instruments rather than a singer.",
+            "Automatic section boundaries describe measured feature changes, not verified verse/chorus labels."
+        ]
+        if pitchPoints.isEmpty { warnings.append("No stable dominant pitch was detected with sufficient confidence.") }
+        let peakDb = localDb(globalPeak)
+        let rmsDb = localDb(globalRms)
+        let lowPitch = midis.min(), highPitch = midis.max()
+        return [
+            "schema_version": "env.music-dataset-analysis.v1",
+            "source": ["sample_rate_hz": Int(safeRate), "channels": 1, "frame_count": samples.count, "duration_seconds": duration],
+            "processing": ["method": "local-digital-signal-processing", "uses_remote_api": false, "uses_hosted_model": false, "model_inference": false, "feature_frame_seconds": 0.5],
+            "technical": [
+                "duration_seconds": duration, "sample_rate_hz": Int(safeRate), "channels": 1,
+                "peak_dbfs": peakDb, "rms_dbfs": rmsDb,
+                "crest_factor_db": globalRms > 1e-12 ? peakDb - rmsDb : 0,
+                "dynamic_range_estimate_db": dynamicRange,
+                "clipped_sample_percent": Double(clipped) / Double(max(1, samples.count)) * 100,
+                "dc_offset_by_channel": [dcSum / Double(max(1, samples.count))]
+            ],
+            "rhythm": ["tempo_bpm": estimateBPM(samples, sampleRate: safeRate) as Any? ?? NSNull(), "tempo_method": "Local onset-envelope autocorrelation estimate", "transient_density_per_second": transientRate, "transient_event_count": transientEvents, "interpretation": "Transient estimates are not verified drum-hit counts; tempo may be half/double-time."],
+            "tonality": [
+                "key_estimate": estimateKey(samples, sampleRate: safeRate) as Any? ?? NSNull(),
+                "key_method": "Local chroma-template estimate",
+                "pitch_class_profile": zip(keys, normalizedChroma).map { ["note": $0.0, "energy": $0.1] },
+                "chord_estimates": chords,
+                "interpretation": "Chords are template-based estimates from the mixed signal."
+            ],
+            "pitch": [
+                "source": "full_mix_dominant_pitch_estimate", "points": pitchPoints,
+                "lowest_detected_note": lowPitch.map(localNoteName) as Any? ?? NSNull(),
+                "highest_detected_note": highPitch.map(localNoteName) as Any? ?? NSNull(),
+                "pitch_range_semitones": (lowPitch != nil && highPitch != nil) ? highPitch! - lowPitch! : NSNull() as Any,
+                "note": "Dominant pitch of the full mix; not a vocal-only contour or definitive voice type."
+            ],
+            "timbre": [
+                "mean_spectral_centroid_hz": meanCentroid, "mean_spectral_flatness": localMean(frames.map { $0["flatness", default: 0] }),
+                "mean_low_frequency_energy_ratio": meanLow, "mean_mid_frequency_energy_ratio": meanMid, "mean_high_frequency_energy_ratio": meanHigh,
+                "mean_zero_crossing_rate": localMean(frames.map { $0["zcr", default: 0] }),
+                "descriptors": styleCues.map { $0["tag"] as? String ?? "" }
+            ],
+            "timeline": timeline, "structure": ["change_points": changePoints, "sections": sections, "note": "Automatic boundaries are not verified verse/chorus labels."],
+            "style_cues": styleCues,
+            "separation": ["status": "not_performed", "reason": "Native local mode does not claim true vocal/drum/bass source separation.", "supported_local_layers": [String](), "note": "No clean source-isolated stems are generated by this DSP-only analysis."],
+            "annotations": annotations,
+            "warnings": warnings
+        ]
     }
 
     private static func fft(_ real: inout [Double], _ imag: inout [Double]) {
