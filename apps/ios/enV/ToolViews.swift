@@ -2630,7 +2630,6 @@ struct NativeSongAnalysisTrack: Identifiable {
 
 private struct NativeSongAnalysisScan {
     var report: [String: Any]
-    let monoSamples16k: [Float]
 }
 
 private struct NativeSongAnalysisDocument: FileDocument {
@@ -2644,6 +2643,13 @@ private struct NativeSongAnalysisDocument: FileDocument {
     }
 }
 
+private struct NativeSongAnnotationField: Identifiable {
+    let key: String
+    let label: String
+    let placeholder: String
+    var id: String { key }
+}
+
 private struct NativeSongMetadataAnalyzerView: View {
     let title: String
     @State private var tracks: [NativeSongAnalysisTrack] = []
@@ -2653,8 +2659,6 @@ private struct NativeSongMetadataAnalyzerView: View {
     @State private var document = NativeSongAnalysisDocument(data: Data())
     @State private var exportKind = "json"
     @State private var fullAnalysis = false
-    @State private var uploadConsent = false
-    @State private var aiAvailable: Bool?
     @State private var busy = false
     @State private var progress = 0
     @State private var notice = ""
@@ -2664,6 +2668,26 @@ private struct NativeSongMetadataAnalyzerView: View {
     private let maxTracks = 50
     private let maxTrackBytes = 20 * 1024 * 1024
     private let maxBatchBytes = 60 * 1024 * 1024
+
+    private let datasetAnnotationFields: [NativeSongAnnotationField] = [
+        .init(key: "genre", label: "Genre", placeholder: "Afrobeats, R&B"),
+        .init(key: "sub_style", label: "Sub-style", placeholder: "Afro-pop, Amapiano"),
+        .init(key: "style_influences", label: "Style influences", placeholder: "Highlife, dancehall, soul"),
+        .init(key: "language", label: "Language", placeholder: "Nigerian Pidgin, Yoruba"),
+        .init(key: "energy", label: "Energy", placeholder: "Low, medium, high"),
+        .init(key: "mood", label: "Mood", placeholder: "Celebratory, soulful"),
+        .init(key: "source_role", label: "Audio part / stem role", placeholder: "Full mix, vocals, drums, bass"),
+        .init(key: "vocals", label: "Vocal content", placeholder: "Lead vocal, backing vocals, ad-libs"),
+        .init(key: "vocal_delivery", label: "Vocal delivery", placeholder: "Melodic singing, rap, chant"),
+        .init(key: "vocal_register", label: "Vocal pitch / register", placeholder: "High/low pitch, soprano, alto, tenor"),
+        .init(key: "vocal_harmony", label: "Vocal harmony", placeholder: "Doubles, thirds, call-and-response"),
+        .init(key: "performance_technique", label: "Performance techniques", placeholder: "Vibrato, falsetto, melisma"),
+        .init(key: "instruments", label: "Instruments", placeholder: "Log drum, shakers, synth bass"),
+        .init(key: "themes", label: "Themes", placeholder: "Love, celebration"),
+        .init(key: "listening_scene", label: "Listening scene", placeholder: "Club, road trip"),
+        .init(key: "production_traits", label: "Production traits", placeholder: "Reverb, saturation, sidechain"),
+        .init(key: "arrangement", label: "Arrangement", placeholder: "Intro build, drum drop, break")
+    ]
 
     private var analyzedCount: Int { tracks.filter { $0.report != nil }.count }
     private var selectedTrack: NativeSongAnalysisTrack? {
@@ -2708,28 +2732,21 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
 
                 if fullAnalysis {
-                    Toggle(isOn: $uploadConsent) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Send short excerpts to AI").font(.subheadline)
-                            Text(aiAvailable == true ? "AI available" : aiAvailable == false ? "AI unavailable · Quick Scan still works" : "Checking AI setup…")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(busy)
-                    .toggleStyle(.switch)
+                    Text("Full Analysis runs local signal processing only. Add and review genre, language, vocal, instrument and production labels below. No audio is sent to an AI service.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
                 Button { startBatch() } label: {
                     HStack(spacing: 8) {
                         if busy { ProgressView().tint(.white) }
                         else { Image(systemName: fullAnalysis ? "sparkles" : "waveform") }
-                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Analyze with AI" : "Scan songs")
+                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Run detailed local analysis" : "Scan songs")
                     }
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(tracks.isEmpty || busy || (fullAnalysis && (!uploadConsent || aiAvailable != true)))
+                .disabled(tracks.isEmpty || busy)
 
                 if busy {
                     Button {
@@ -2743,7 +2760,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                Text("Local by default. Full Analysis sends short excerpts after consent.")
+                Text("Local-only processing. No hosted model or external AI request.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(15)
@@ -2821,6 +2838,57 @@ private struct NativeSongMetadataAnalyzerView: View {
                     nativeSongTags("VOCALS", nativeSongStrings(report["vocals"]))
                     nativeSongTags("INSTRUMENTS", nativeSongStrings(report["instruments"]))
                     nativeSongTags("DESCRIPTIONS", nativeSongStrings(report["descriptions"]))
+                    if let dataset = report["dataset_analysis"] as? [String: Any] {
+                        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
+                        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
+                        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
+                        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
+                        let structure = dataset["structure"] as? [String: Any] ?? [:]
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Local DSP findings").font(.subheadline.weight(.semibold))
+                            Text("Pitch span: \(nativeSongString(pitch["lowest_detected_note"], fallback: "—"))–\(nativeSongString(pitch["highest_detected_note"], fallback: "—"))")
+                                .font(.caption)
+                            Text("Tempo estimate: \(nativeSongString(rhythm["tempo_bpm"], fallback: "—")) BPM · Chord windows: \((tonality["chord_estimates"] as? [[String: Any]] ?? []).count)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Mean spectral centroid: \(nativeSongString(timbre["mean_spectral_centroid_hz"], fallback: "—")) Hz · Feature changes: \((structure["change_points"] as? [[String: Any]] ?? []).count)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("These are estimates from the full mix, not verified vocal-only notes. Generic section cuts are not confirmed verse/chorus labels.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Human-reviewed training labels").font(.subheadline.weight(.semibold))
+                            Text("Add tags by listening and reviewing the recording. These are annotations, not automatic genre or language classifications.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(datasetAnnotationFields) { field in
+                                TextField(field.label, text: Binding(
+                                    get: { selectedDatasetAnnotationText(key: field.key) },
+                                    set: { updateSelectedDatasetAnnotation(key: field.key, value: $0) }
+                                ), prompt: Text(field.placeholder))
+                                .textFieldStyle(.roundedBorder)
+                            }
+                            TextField("Annotation notes", text: Binding(
+                                get: { selectedDatasetAnnotationText(key: "notes") },
+                                set: { updateSelectedDatasetAnnotation(key: "notes", value: $0) }
+                            ), prompt: Text("Parts to preserve, uncertainty, review notes"))
+                            .textFieldStyle(.roundedBorder)
+                            TextField("Reviewer initials / team ID", text: Binding(
+                                get: { selectedDatasetAnnotationText(key: "reviewer") },
+                                set: { updateSelectedDatasetAnnotation(key: "reviewer", value: $0) }
+                            ), prompt: Text("Who reviewed the tags"))
+                            .textFieldStyle(.roundedBorder)
+                            Toggle("Reviewed for training use", isOn: Binding(
+                                get: { selectedDatasetAnnotationsReviewed() },
+                                set: { setSelectedDatasetReviewed($0) }
+                            ))
+                            .font(.caption)
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+                    }
                     let warnings = nativeSongStrings(report["warnings"])
                     if !warnings.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
@@ -2846,10 +2914,71 @@ private struct NativeSongMetadataAnalyzerView: View {
         .fileExporter(isPresented: $showExporter, document: document, contentType: exportType, defaultFilename: exportFilename) { result in
             if case .failure(let failure) = result { error = failure.localizedDescription }
         }
-        .task {
-            do { aiAvailable = try await NativeAiClient.availability()["audio.music.analyze"] == true }
-            catch { aiAvailable = false }
+
+    }
+
+    private func selectedDatasetAnnotationText(key: String) -> String {
+        guard let report = selectedTrack?.report,
+              let dataset = report["dataset_analysis"] as? [String: Any],
+              let annotations = dataset["annotations"] as? [String: Any] else { return "" }
+        if let values = annotations[key] as? [String] { return values.joined(separator: ", ") }
+        return nativeSongString(annotations[key])
+    }
+
+    private func selectedDatasetAnnotationsReviewed() -> Bool {
+        guard let report = selectedTrack?.report,
+              let dataset = report["dataset_analysis"] as? [String: Any],
+              let annotations = dataset["annotations"] as? [String: Any] else { return false }
+        return annotations["reviewed"] as? Bool == true
+    }
+
+    private func updateSelectedDatasetAnnotation(key: String, value: String) {
+        guard let selectedID,
+              let index = tracks.firstIndex(where: { $0.id == selectedID }),
+              var report = tracks[index].report,
+              var dataset = report["dataset_analysis"] as? [String: Any],
+              var annotations = dataset["annotations"] as? [String: Any] else { return }
+        if key == "notes" {
+            annotations[key] = String(value.prefix(4_000))
+        } else if key == "reviewer" {
+            annotations[key] = String(value.prefix(100))
+        } else {
+            let tags = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(80)
+            let list = Array(tags)
+            annotations[key] = list
+            switch key {
+            case "genre": report["genre"] = list.first as Any? ?? NSNull()
+            case "sub_style": report["sub_style"] = list.first as Any? ?? NSNull()
+            case "language", "mood", "vocals", "instruments": report[key] = list
+            case "themes": report["theme"] = list
+            case "listening_scene": report["setting"] = list
+            default: break
+            }
         }
+        annotations["reviewed"] = false
+        dataset["annotations"] = annotations
+        report["dataset_analysis"] = dataset
+        var analysis = report["analysis"] as? [String: Any] ?? [:]
+        analysis["status"] = "full_local_needs_review"
+        report["analysis"] = analysis
+        tracks[index].report = report
+        tracks[index].status = "Partial"
+    }
+
+    private func setSelectedDatasetReviewed(_ reviewed: Bool) {
+        guard let selectedID,
+              let index = tracks.firstIndex(where: { $0.id == selectedID }),
+              var report = tracks[index].report,
+              var dataset = report["dataset_analysis"] as? [String: Any],
+              var annotations = dataset["annotations"] as? [String: Any] else { return }
+        annotations["reviewed"] = reviewed
+        dataset["annotations"] = annotations
+        report["dataset_analysis"] = dataset
+        var analysis = report["analysis"] as? [String: Any] ?? [:]
+        analysis["status"] = reviewed ? "full_local_reviewed" : "full_local_needs_review"
+        report["analysis"] = analysis
+        tracks[index].report = report
+        tracks[index].status = reviewed ? "Done" : "Partial"
     }
 
     private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -2942,10 +3071,6 @@ private struct NativeSongMetadataAnalyzerView: View {
 
     private func startBatch() {
         guard !busy else { return }
-        if fullAnalysis && (!uploadConsent || aiAvailable != true) {
-            error = "Enable AI analysis first."
-            return
-        }
         busy = true
         error = nil
         notice = ""
@@ -2961,36 +3086,19 @@ private struct NativeSongMetadataAnalyzerView: View {
             updateTrack(track.id) { $0.status = "Analyzing"; $0.error = nil }
             do {
                 var scan = try await Task.detached(priority: .userInitiated) {
-                    try nativeSongAnalyzeAudio(track.data, filename: track.filename)
+                    try nativeSongAnalyzeAudio(track.data, filename: track.filename, detailed: fullAnalysis)
                 }.value
                 if Task.isCancelled {
                     updateTrack(track.id) { $0.status = "Cancelled" }
                     continue
                 }
-                var semanticDone = false
-                if fullAnalysis && uploadConsent {
-                    if let excerpt = nativeSongAudioExcerpt(scan.monoSamples16k) {
-                        do {
-                            let response = try await NativeAiClient.runWithMetadata(task: "audio.music.analyze", input: [
-                                "audioBase64": excerpt.data.base64EncodedString(),
-                                "mimeType": "audio/wav",
-                                "filename": track.filename,
-                                "sampledSeconds": excerpt.seconds
-                            ])
-                            nativeSongMerge(&scan.report, semantic: response.result, extraWarnings: response.warnings)
-                            semanticDone = true
-                        } catch {
-                            nativeSongAppendWarning(&scan.report, error.localizedDescription)
-                        }
-                    } else {
-                        nativeSongAppendWarning(&scan.report, "Audio is too short for semantic analysis.")
-                    }
-                }
                 if Task.isCancelled {
                     updateTrack(track.id) { $0.status = "Cancelled" }
                     continue
                 }
-                let status = fullAnalysis && !semanticDone ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
+                let annotations = (scan.report["dataset_analysis"] as? [String: Any])?["annotations"] as? [String: Any]
+                let reviewed = annotations?["reviewed"] as? Bool == true
+                let status = fullAnalysis && !reviewed ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
                 updateTrack(track.id) {
                     $0.report = scan.report
                     $0.status = status
@@ -3040,7 +3148,7 @@ private struct NativeSongMetadataAnalyzerView: View {
 
 private let nativeSongExtensions: Set<String> = ["mp3", "wav", "flac", "m4a", "aac", "ogg", "oga", "opus", "aif", "aiff", "caf", "3gp", "mp4", "webm"]
 
-private func nativeSongAnalyzeAudio(_ data: Data, filename: String) throws -> NativeSongAnalysisScan {
+private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bool = false) throws -> NativeSongAnalysisScan {
     guard !data.isEmpty && data.count <= 20 * 1024 * 1024 else { throw NativeNativeError.message("Track exceeds the local file limit.") }
     let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
     let temp = FileManager.default.temporaryDirectory.appendingPathComponent("env-song-\(UUID().uuidString).\(ext.isEmpty ? "audio" : ext)")
@@ -3096,10 +3204,10 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String) throws -> Na
     var warnings = [String]()
     if bpm == nil { warnings.append("Tempo could not be estimated reliably.") }
     if key == nil { warnings.append("Key could not be estimated reliably.") }
-    if tag("genre") == nil { warnings.append("Genre is not embedded; use Full Analysis for an audio-based estimate.") }
+    if tag("genre") == nil { warnings.append("Genre is not embedded; add a human-reviewed label in Full Analysis.") }
     let bitrateEstimate = duration > 0 ? Double(fileSize * 8) / duration : 0
-    let report: [String: Any] = [
-        "schema_version": "1.0", "filename": filename,
+    var report: [String: Any] = [
+        "schema_version": "1.1", "filename": filename,
         "genre": tag("genre") as Any? ?? NSNull(), "sub_style": NSNull(), "language": [String](),
         "tempo_bpm": tempo as Any? ?? NSNull(), "tempo_band": tempo.map(nativeSongTempoBand) ?? "unknown",
         "tempo_source": bpm == nil ? NSNull() : "audio_estimate", "key": key as Any? ?? NSNull(),
@@ -3122,12 +3230,18 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String) throws -> Na
             "year": tag("creationDate") as Any? ?? NSNull()
         ],
         "analysis": [
-            "status": "quick", "local_audio_decoded": true,
-            "semantic_analysis": "skipped_by_choice", "key_source": key == nil ? "unavailable" : "audio_estimate"
+            "status": detailed ? "full_local_needs_review" : "quick_local", "local_audio_decoded": true,
+            "semantic_analysis": "not_run_local_only", "key_source": key == nil ? "unavailable" : "audio_estimate",
+            "uses_remote_api": false, "uses_hosted_model": false
         ],
         "warnings": warnings
     ]
-    return NativeSongAnalysisScan(report: report, monoSamples16k: mono)
+    if detailed {
+        report["dataset_analysis"] = NativeSongSignal.analyzeDataset(mono, sampleRate: 16_000)
+        warnings.append("Genre, language, mood, vocal type and instrument identity require human review; no hosted model was used.")
+        report["warnings"] = Array(Set(warnings))
+    }
+    return NativeSongAnalysisScan(report: report)
 }
 
 private func nativeSongCodec(_ ext: String) -> String {
@@ -3157,61 +3271,24 @@ private func nativeSongString(_ value: Any?, fallback: String = "") -> String {
     return text == "unknown" || text == "null" ? fallback : text
 }
 private func nativeSongStrings(_ value: Any?) -> [String] { value as? [String] ?? [] }
-private func nativeSongAppendWarning(_ report: inout [String: Any], _ warning: String) {
-    var warnings = report["warnings"] as? [String] ?? []
-    warnings.append(warning)
-    report["warnings"] = Array(Set(warnings))
-}
-private func nativeSongMerge(_ report: inout [String: Any], semantic: [String: Any], extraWarnings: [String]) {
-    for key in ["genre", "sub_style", "energy", "lyric_evidence"] {
-        if let value = semantic[key], !(value is NSNull) { report[key] = value }
-    }
-    for key in ["language", "mood", "theme", "setting", "vocals", "instruments", "descriptions"] {
-        if let value = semantic[key] as? [String] { report[key] = value }
-    }
-    var warnings = report["warnings"] as? [String] ?? []
-    warnings.append(contentsOf: semantic["warnings"] as? [String] ?? [])
-    warnings.append(contentsOf: extraWarnings)
-    report["warnings"] = Array(Set(warnings))
-    if var analysis = report["analysis"] as? [String: Any] {
-        analysis["status"] = "full"
-        analysis["semantic_analysis"] = "completed"
-        report["analysis"] = analysis
-    }
-}
-
-private func nativeSongAudioExcerpt(_ samples: [Float]) -> (data: Data, seconds: Double)? {
-    let rate = 16_000
-    guard samples.count >= rate * 3 else { return nil }
-    let section = min(rate * 20, samples.count / 3)
-    guard section >= rate else { return nil }
-    let starts = [0, max(0, samples.count / 2 - section / 2), max(0, samples.count - section)]
-    let gap = rate / 4
-    let sampleCount = section * 3 + gap * 2
-    var data = Data()
-    data.reserveCapacity(44 + sampleCount * 2)
-    data.append(contentsOf: Array("RIFF".utf8)); data.appendNativeLE(UInt32(36 + sampleCount * 2))
-    data.append(contentsOf: Array("WAVEfmt ".utf8)); data.appendNativeLE(UInt32(16))
-    data.appendNativeLE(UInt16(1)); data.appendNativeLE(UInt16(1))
-    data.appendNativeLE(UInt32(rate)); data.appendNativeLE(UInt32(rate * 2)); data.appendNativeLE(UInt16(2)); data.appendNativeLE(UInt16(16))
-    data.append(contentsOf: Array("data".utf8)); data.appendNativeLE(UInt32(sampleCount * 2))
-    for (index, start) in starts.enumerated() {
-        for sample in samples[start..<(start + section)] {
-            let clipped = max(-1, min(1, sample))
-            data.appendNativeLE(Int16((clipped < 0 ? clipped * 32768 : clipped * 32767).rounded()))
-        }
-        if index < starts.count - 1 { data.append(Data(repeating: 0, count: gap * 2)) }
-    }
-    return (data, Double(sampleCount) / Double(rate))
-}
-
 private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
-    let columns = ["filename","title","artist","album","genre","sub_style","language","tempo_bpm","tempo_band","key","energy","mood","theme","setting","vocals","instruments","duration_seconds","file_size_bytes","codec","sample_rate_hz","channels","analysis_status","warnings"]
+    let columns = [
+        "filename","title","artist","album","genre","sub_style","style_influences","language",
+        "tempo_bpm","tempo_band","key","energy","mood","theme","setting","source_role",
+        "vocals","vocal_delivery","vocal_register","vocal_harmony","performance_technique","instruments",
+        "production_traits","arrangement","duration_seconds","file_size_bytes","codec","sample_rate_hz","channels",
+        "pitch_lowest_note","pitch_highest_note","pitch_range_semitones","transient_density_per_second",
+        "spectral_centroid_mean_hz","low_energy_ratio_mean","mid_energy_ratio_mean","high_energy_ratio_mean",
+        "chord_estimates","section_boundaries","labels_reviewed","reviewer","annotation_notes",
+        "uses_remote_api","uses_hosted_model","analysis_status","warnings"
+    ]
     func cell(_ value: Any?) -> String {
         var text: String
         if value == nil || value is NSNull { text = "" }
         else if let values = value as? [String] { text = values.joined(separator: "; ") }
-        else if let object = value as? [String: Any], let bytes = try? JSONSerialization.data(withJSONObject: object), let json = String(data: bytes, encoding: .utf8) { text = json }
+        else if let jsonValue = value, JSONSerialization.isValidJSONObject(jsonValue),
+                let bytes = try? JSONSerialization.data(withJSONObject: jsonValue, options: [.sortedKeys]),
+                let json = String(data: bytes, encoding: .utf8) { text = json }
         else { text = String(describing: value!) }
         let trim = text.trimmingCharacters(in: .whitespaces)
         if trim.hasPrefix("=") || trim.hasPrefix("+") || trim.hasPrefix("@") || trim.range(of: #"^-[0-9]"#, options: .regularExpression) != nil { text = "'" + text }
@@ -3221,14 +3298,42 @@ private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
         let identity = report["identity"] as? [String: Any] ?? [:]
         let technical = report["technical"] as? [String: Any] ?? [:]
         let analysis = report["analysis"] as? [String: Any] ?? [:]
+        let dataset = report["dataset_analysis"] as? [String: Any] ?? [:]
+        let annotations = dataset["annotations"] as? [String: Any] ?? [:]
+        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
+        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
+        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
+        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
+        let structure = dataset["structure"] as? [String: Any] ?? [:]
+        let chordText = (tonality["chord_estimates"] as? [[String: Any]] ?? []).map { item in
+            "\(item["start_seconds"] ?? "?")-\(item["end_seconds"] ?? "?")s:\(item["chord"] ?? "unknown")"
+        }.joined(separator: " | ")
+        let sectionText = (structure["change_points"] as? [[String: Any]] ?? []).map { item in
+            "\(item["time_seconds"] ?? "?")s(\(item["change_score"] ?? "?"))"
+        }.joined(separator: " | ")
         let fields: [String: Any] = [
             "filename": report["filename"] ?? "", "title": identity["title"] ?? "", "artist": identity["artist"] ?? "", "album": identity["album"] ?? "",
-            "genre": report["genre"] ?? "", "sub_style": report["sub_style"] ?? "", "language": report["language"] ?? [],
-            "tempo_bpm": report["tempo_bpm"] ?? "", "tempo_band": report["tempo_band"] ?? "", "key": report["key"] ?? "",
-            "energy": report["energy"] ?? "", "mood": report["mood"] ?? [], "theme": report["theme"] ?? [], "setting": report["setting"] ?? [],
-            "vocals": report["vocals"] ?? [], "instruments": report["instruments"] ?? [],
+            "genre": report["genre"] ?? "", "sub_style": report["sub_style"] ?? "", "style_influences": annotations["style_influences"] ?? [],
+            "language": report["language"] ?? [], "tempo_bpm": report["tempo_bpm"] ?? "", "tempo_band": report["tempo_band"] ?? "",
+            "key": report["key"] ?? "", "energy": annotations["energy"] ?? report["energy"] ?? "",
+            "mood": report["mood"] ?? [], "theme": report["theme"] ?? [], "setting": report["setting"] ?? [],
+            "source_role": annotations["source_role"] ?? [], "vocals": report["vocals"] ?? [],
+            "vocal_delivery": annotations["vocal_delivery"] ?? [], "vocal_register": annotations["vocal_register"] ?? [],
+            "vocal_harmony": annotations["vocal_harmony"] ?? [], "performance_technique": annotations["performance_technique"] ?? [],
+            "instruments": report["instruments"] ?? [], "production_traits": annotations["production_traits"] ?? [],
+            "arrangement": annotations["arrangement"] ?? [],
             "duration_seconds": technical["duration_seconds"] ?? "", "file_size_bytes": technical["file_size_bytes"] ?? "",
             "codec": technical["codec"] ?? "", "sample_rate_hz": technical["sample_rate_hz"] ?? "", "channels": technical["channels"] ?? "",
+            "pitch_lowest_note": pitch["lowest_detected_note"] ?? "", "pitch_highest_note": pitch["highest_detected_note"] ?? "",
+            "pitch_range_semitones": pitch["pitch_range_semitones"] ?? "", "transient_density_per_second": rhythm["transient_density_per_second"] ?? "",
+            "spectral_centroid_mean_hz": timbre["mean_spectral_centroid_hz"] ?? "",
+            "low_energy_ratio_mean": timbre["mean_low_frequency_energy_ratio"] ?? "",
+            "mid_energy_ratio_mean": timbre["mean_mid_frequency_energy_ratio"] ?? "",
+            "high_energy_ratio_mean": timbre["mean_high_frequency_energy_ratio"] ?? "",
+            "chord_estimates": chordText, "section_boundaries": sectionText, "labels_reviewed": annotations["reviewed"] ?? false,
+            "reviewer": annotations["reviewer"] ?? "", "annotation_notes": annotations["notes"] ?? "",
+            "uses_remote_api": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_remote_api"] as? Bool } ?? false,
+            "uses_hosted_model": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_hosted_model"] as? Bool } ?? false,
             "analysis_status": analysis["status"] ?? "", "warnings": report["warnings"] ?? []
         ]
         return columns.map { cell(fields[$0]) }.joined(separator: ",")
@@ -3489,6 +3594,342 @@ private enum NativeSongSignal {
             }
         }
         return best >= 0.06 ? bestKey : nil
+    }
+
+    private static func localNoteName(_ midi: Int) -> String {
+        "\(keys[((midi % 12) + 12) % 12])\(midi / 12 - 1)"
+    }
+
+    private static func localDb(_ value: Double) -> Double {
+        guard value.isFinite && value > 1e-12 else { return -120 }
+        return max(-120, 20 * log10(value))
+    }
+
+    private static func localMean(_ values: [Double]) -> Double {
+        values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+    }
+
+    private static func estimateDominantPitch(_ samples: [Float], sampleRate: Double, start: Int, time: Double) -> [String: Any]? {
+        let count = min(2_048, samples.count - start)
+        guard count >= 512 && sampleRate > 0 else { return nil }
+        let decimation = max(1, Int(ceil(sampleRate / 8_000)))
+        let reducedRate = sampleRate / Double(decimation)
+        var reduced = [Double]()
+        reduced.reserveCapacity((count + decimation - 1) / decimation)
+        for index in stride(from: 0, to: count, by: decimation) {
+            let window = 0.5 - 0.5 * cos(2 * Double.pi * Double(index) / Double(max(1, count - 1)))
+            reduced.append(Double(samples[start + index]) * window)
+        }
+        let minLag = max(2, Int(reducedRate / 1_000))
+        let maxLag = min(Int(reducedRate / 55), reduced.count / 2)
+        guard maxLag > minLag else { return nil }
+        var bestLag = 0
+        var bestScore = 0.0
+        for lag in minLag...maxLag {
+            var dot = 0.0, left = 0.0, right = 0.0
+            for index in 0..<(reduced.count - lag) {
+                let a = reduced[index], b = reduced[index + lag]
+                dot += a * b
+                left += a * a
+                right += b * b
+            }
+            let score = dot / sqrt(max(left * right, 1e-12))
+            if score > bestScore { bestScore = score; bestLag = lag }
+        }
+        guard bestLag > 0 && bestScore >= 0.55 else { return nil }
+        let frequency = reducedRate / Double(bestLag)
+        guard frequency.isFinite && (55.0...1_000.0).contains(frequency) else { return nil }
+        let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+        return [
+            "time_seconds": (time * 1_000).rounded() / 1_000,
+            "frequency_hz": (frequency * 100).rounded() / 100,
+            "midi_note": midi,
+            "note": localNoteName(midi),
+            "confidence": min(1, max(0, bestScore))
+        ]
+    }
+
+    private static func estimateLocalChord(_ chroma: [Double], start: Double, end: Double) -> [String: Any] {
+        let total = chroma.reduce(0, +)
+        guard total > 1e-9 else {
+            return ["start_seconds": start, "end_seconds": end, "chord": NSNull(), "confidence": NSNull(), "method": "spectral-chroma-triad-template"]
+        }
+        let values = chroma.map { $0 / total }
+        var bestName: String?
+        var bestScore = -Double.infinity
+        var secondScore = -Double.infinity
+        for root in 0..<12 {
+            for isMinor in [false, true] {
+                let third = (root + (isMinor ? 3 : 4)) % 12
+                let fifth = (root + 7) % 12
+                var score = values[root] + values[third] * 0.8 + values[fifth] * 0.6
+                for note in 0..<12 where note != root && note != third && note != fifth {
+                    score -= values[note] * 0.15
+                }
+                if score > bestScore {
+                    secondScore = bestScore
+                    bestScore = score
+                    bestName = keys[root] + (isMinor ? "m" : "")
+                } else if score > secondScore {
+                    secondScore = score
+                }
+            }
+        }
+        let confidence = min(0.99, max(0, ((bestScore - max(0, secondScore)) / max(bestScore, 1e-9)) * 3 + 0.3))
+        return [
+            "start_seconds": start,
+            "end_seconds": end,
+            "chord": bestName as Any? ?? NSNull(),
+            "confidence": confidence,
+            "method": "spectral-chroma-triad-template"
+        ]
+    }
+
+    static func analyzeDataset(_ samples: [Float], sampleRate: Double) -> [String: Any] {
+        let safeRate = max(8_000.0, sampleRate)
+        let duration = Double(samples.count) / safeRate
+        let fftSize = 2_048
+        let binCount = fftSize / 2
+        let hop = max(1, Int(safeRate * 0.5))
+        var timeline = [[String: Any]]()
+        var frames = [[String: Double]]()
+        var previousMagnitudes = [Double](repeating: 0, count: binCount)
+        var chromaByBlock = [Int: [Double]]()
+        var pitchPoints = [[String: Any]]()
+        var fluxValues = [Double]()
+        var transientCount = 0
+        var priorRms: Double?
+        var globalSquares = 0.0, globalPeak = 0.0, dcSum = 0.0
+        var clipped = 0
+        for value in samples {
+            let sample = Double(value)
+            globalSquares += sample * sample
+            globalPeak = max(globalPeak, abs(sample))
+            dcSum += sample
+            if abs(sample) >= 0.999 { clipped += 1 }
+        }
+        var start = 0
+        var frameIndex = 0
+        while start < samples.count {
+            let end = min(samples.count, start + hop)
+            var squares = 0.0, peak = 0.0, crossings = 0
+            var previous: Float = samples[start]
+            for index in start..<end {
+                let sample = samples[index]
+                squares += Double(sample) * Double(sample)
+                peak = max(peak, abs(Double(sample)))
+                if index > start && ((sample >= 0 && previous < 0) || (sample < 0 && previous >= 0)) { crossings += 1 }
+                previous = sample
+            }
+            let rms = sqrt(squares / Double(max(1, end - start)))
+            let rmsDb = localDb(rms)
+            var real = [Double](repeating: 0, count: fftSize)
+            var imag = [Double](repeating: 0, count: fftSize)
+            for index in 0..<fftSize {
+                let sampleIndex = start + index
+                let sample = sampleIndex < samples.count ? Double(samples[sampleIndex]) : 0
+                real[index] = sample * (0.5 - 0.5 * cos(2 * Double.pi * Double(index) / Double(fftSize - 1)))
+            }
+            fft(&real, &imag)
+            var chroma = [Double](repeating: 0, count: 12)
+            var magnitudes = [Double](repeating: 0, count: binCount)
+            var magnitudeSum = 0.0, weightedFrequency = 0.0, logSum = 0.0
+            var powerSum = 0.0, lowPower = 0.0, midPower = 0.0, highPower = 0.0, fluxNumerator = 0.0
+            for bin in 1..<binCount {
+                let magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                let frequency = Double(bin) * safeRate / Double(fftSize)
+                let power = magnitude * magnitude
+                magnitudeSum += magnitude
+                weightedFrequency += magnitude * frequency
+                logSum += log(max(magnitude, 1e-12))
+                powerSum += power
+                if frequency < 160 { lowPower += power }
+                else if frequency < 2_000 { midPower += power }
+                else { highPower += power }
+                if frequency >= 45 && frequency <= min(5_000.0, safeRate / 2) {
+                    let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
+                    chroma[(midi % 12 + 12) % 12] += magnitude
+                }
+                fluxNumerator += max(0, magnitude - previousMagnitudes[bin])
+            }
+            let flux = magnitudeSum > 1e-9 ? fluxNumerator / magnitudeSum : 0
+            previousMagnitudes = magnitudes
+            if let priorRms, rmsDb - priorRms >= 3 { transientCount += 1 }
+            if flux > 0.22 { transientCount += 1 }
+            priorRms = rmsDb
+            fluxValues.append(flux)
+            let lowRatio = powerSum > 1e-12 ? lowPower / powerSum : 0
+            let midRatio = powerSum > 1e-12 ? midPower / powerSum : 0
+            let highRatio = powerSum > 1e-12 ? highPower / powerSum : 0
+            let centroid = magnitudeSum > 1e-9 ? weightedFrequency / magnitudeSum : 0
+            let flatness = magnitudeSum > 1e-9 ? exp(logSum / Double(max(1, binCount - 1))) / (magnitudeSum / Double(max(1, binCount - 1))) : 0
+            let startSeconds = Double(start) / safeRate
+            let endSeconds = Double(end) / safeRate
+            let zcr = Double(crossings) / Double(max(1, end - start - 1))
+            frames.append([
+                "start": startSeconds, "end": endSeconds, "rmsDb": rmsDb,
+                "centroid": centroid, "flatness": flatness, "low": lowRatio,
+                "mid": midRatio, "high": highRatio, "flux": flux, "zcr": zcr
+            ])
+            timeline.append([
+                "start_seconds": startSeconds, "end_seconds": endSeconds,
+                "rms_dbfs": rmsDb, "peak_dbfs": localDb(peak),
+                "spectral_centroid_hz": centroid, "spectral_rolloff_85_hz": 0,
+                "spectral_flatness": flatness, "low_frequency_energy_ratio": lowRatio,
+                "mid_frequency_energy_ratio": midRatio, "high_frequency_energy_ratio": highRatio,
+                "spectral_flux": flux, "zero_crossing_rate": zcr
+            ])
+            let block = Int(startSeconds / 2)
+            var blockChroma = chromaByBlock[block] ?? [Double](repeating: 0, count: 12)
+            for note in 0..<12 { blockChroma[note] += chroma[note] }
+            chromaByBlock[block] = blockChroma
+            if frameIndex % 4 == 0, let pitch = estimateDominantPitch(samples, sampleRate: safeRate, start: start, time: startSeconds) {
+                pitchPoints.append(pitch)
+            }
+            start += hop
+            frameIndex += 1
+        }
+        var allChroma = [Double](repeating: 0, count: 12)
+        for values in chromaByBlock.values {
+            for note in 0..<12 { allChroma[note] += values[note] }
+        }
+        let chromaTotal = allChroma.reduce(0, +)
+        let normalizedChroma = chromaTotal > 1e-9 ? allChroma.map { $0 / chromaTotal } : allChroma
+        var chords = [[String: Any]]()
+        for (block, values) in chromaByBlock.sorted(by: { $0.key < $1.key }) {
+            chords.append(estimateLocalChord(values, start: Double(block * 2), end: min(duration, Double((block + 1) * 2))))
+        }
+        let fluxMean = localMean(fluxValues)
+        let fluxThreshold = max(0.15, fluxMean * 1.4)
+        let fluxEvents = fluxValues.filter { $0 >= fluxThreshold }.count
+        let transientEvents = max(transientCount, fluxEvents)
+        let transientRate = duration > 0 ? Double(transientEvents) / duration : 0
+        var changePoints = [[String: Any]]()
+        var lastBoundary = 0.0
+        if frames.count > 1 {
+            for index in 1..<frames.count {
+                let prior = frames[index - 1], current = frames[index]
+                let rmsDelta = abs(current["rmsDb", default: -120] - prior["rmsDb", default: -120]) / 24
+                let centroidDelta = abs(current["centroid", default: 0] - prior["centroid", default: 0]) / max(1_000, prior["centroid", default: 1_000])
+                let lowDelta = abs(current["low", default: 0] - prior["low", default: 0])
+                let score = min(1, max(0, rmsDelta * 0.45 + centroidDelta * 0.25 + lowDelta * 0.2 + current["flux", default: 0] * 0.1))
+                let time = current["start", default: 0]
+                if score >= 0.27 && time - lastBoundary >= 4 && duration - time >= 3 {
+                    changePoints.append(["time_seconds": time, "change_score": score, "reason": "Measured level, spectral brightness, frequency balance or flux changed; not a verified verse/chorus label."])
+                    lastBoundary = time
+                }
+            }
+        }
+        var boundaries = [0.0] + changePoints.compactMap { $0["time_seconds"] as? Double } + [duration]
+        if boundaries.isEmpty { boundaries = [0, duration] }
+        var sections = [[String: Any]]()
+        if boundaries.count > 1 {
+            for index in 0..<(boundaries.count - 1) where boundaries[index + 1] - boundaries[index] >= 1 {
+                sections.append(["start_seconds": boundaries[index], "end_seconds": boundaries[index + 1], "label": "section_\(sections.count + 1)", "label_source": "automatic_feature_change", "semantic_section": NSNull()])
+            }
+        }
+        let meanLow = localMean(frames.map { $0["low", default: 0] })
+        let meanMid = localMean(frames.map { $0["mid", default: 0] })
+        let meanHigh = localMean(frames.map { $0["high", default: 0] })
+        let meanCentroid = localMean(frames.map { $0["centroid", default: 0] })
+        var styleCues = [[String: Any]]()
+        if meanLow >= 0.35 { styleCues.append(["tag": "low-frequency-prominent", "evidence": "Low band carries \(Int((meanLow * 100).rounded()))% of average spectral energy.", "is_genre_classification": false]) }
+        if meanHigh >= 0.30 { styleCues.append(["tag": "high-frequency-prominent", "evidence": "High band carries \(Int((meanHigh * 100).rounded()))% of average spectral energy.", "is_genre_classification": false]) }
+        if transientRate >= 3 { styleCues.append(["tag": "transient-dense", "evidence": "Approximately \(String(format: "%.2f", transientRate)) onset-like changes per second.", "is_genre_classification": false]) }
+        if meanCentroid >= 3_000 { styleCues.append(["tag": "spectrally-bright", "evidence": "Mean spectral centroid is \(Int(meanCentroid.rounded())) Hz.", "is_genre_classification": false]) }
+        if styleCues.isEmpty { styleCues.append(["tag": "no-dominant-rule-cue", "evidence": "No conservative measurable rule was triggered.", "is_genre_classification": false]) }
+        let midis = pitchPoints.compactMap { $0["midi_note"] as? Int }
+        let sortedDb = frames.map { $0["rmsDb", default: -120] }.sorted()
+        let dynamicRange: Double = sortedDb.count > 1 ? sortedDb[(sortedDb.count - 1) * 95 / 100] - sortedDb[(sortedDb.count - 1) * 10 / 100] : 0
+        let globalRms = sqrt(globalSquares / Double(max(1, samples.count)))
+        var annotations: [String: Any] = [:]
+        let keysToAnnotate = ["genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement"]
+        for key in keysToAnnotate { annotations[key] = [String]() }
+        annotations["notes"] = ""
+        annotations["reviewed"] = false
+        annotations["reviewer"] = NSNull()
+        var warnings = [
+            "No hosted model or AI API was used. Genre, language, mood, instrument identity and vocal type require human annotation.",
+            "Pitch and chord estimates come from the full mix and may follow instruments rather than a singer.",
+            "Automatic section boundaries describe measured feature changes, not verified verse/chorus labels."
+        ]
+        if pitchPoints.isEmpty { warnings.append("No stable dominant pitch was detected with sufficient confidence.") }
+        let peakDb = localDb(globalPeak)
+        let rmsDb = localDb(globalRms)
+        let lowPitch = midis.min()
+        let highPitch = midis.max()
+        let tempoEstimate: Any = estimateBPM(samples, sampleRate: safeRate) as Any? ?? NSNull()
+        let keyEstimate: Any = estimateKey(samples, sampleRate: safeRate) as Any? ?? NSNull()
+        let lowestNote: Any = lowPitch.map(localNoteName) as Any? ?? NSNull()
+        let highestNote: Any = highPitch.map(localNoteName) as Any? ?? NSNull()
+        let pitchRange: Any
+        if let lowPitch, let highPitch { pitchRange = highPitch - lowPitch } else { pitchRange = NSNull() }
+        let pitchProfile: [[String: Any]] = zip(keys, normalizedChroma).map { pair in
+            ["note": pair.0, "energy": pair.1]
+        }
+        let source: [String: Any] = [
+            "sample_rate_hz": Int(safeRate), "channels": 1,
+            "frame_count": samples.count, "duration_seconds": duration
+        ]
+        let processing: [String: Any] = [
+            "method": "local-digital-signal-processing",
+            "uses_remote_api": false, "uses_hosted_model": false,
+            "model_inference": false, "feature_frame_seconds": 0.5
+        ]
+        let technical: [String: Any] = [
+            "duration_seconds": duration, "sample_rate_hz": Int(safeRate), "channels": 1,
+            "peak_dbfs": peakDb, "rms_dbfs": rmsDb,
+            "crest_factor_db": globalRms > 1e-12 ? peakDb - rmsDb : 0,
+            "dynamic_range_estimate_db": dynamicRange,
+            "clipped_sample_percent": Double(clipped) / Double(max(1, samples.count)) * 100,
+            "dc_offset_by_channel": [dcSum / Double(max(1, samples.count))]
+        ]
+        let rhythm: [String: Any] = [
+            "tempo_bpm": tempoEstimate,
+            "tempo_method": "Local onset-envelope autocorrelation estimate",
+            "transient_density_per_second": transientRate,
+            "transient_event_count": transientEvents,
+            "interpretation": "Transient estimates are not verified drum-hit counts; tempo may be half/double-time."
+        ]
+        let tonality: [String: Any] = [
+            "key_estimate": keyEstimate, "key_method": "Local chroma-template estimate",
+            "pitch_class_profile": pitchProfile, "chord_estimates": chords,
+            "interpretation": "Chords are template-based estimates from the mixed signal."
+        ]
+        let pitch: [String: Any] = [
+            "source": "full_mix_dominant_pitch_estimate", "points": pitchPoints,
+            "lowest_detected_note": lowestNote, "highest_detected_note": highestNote,
+            "pitch_range_semitones": pitchRange,
+            "note": "Dominant pitch of the full mix; not a vocal-only contour or definitive voice type."
+        ]
+        let timbre: [String: Any] = [
+            "mean_spectral_centroid_hz": meanCentroid,
+            "mean_spectral_flatness": localMean(frames.map { $0["flatness", default: 0] }),
+            "mean_low_frequency_energy_ratio": meanLow,
+            "mean_mid_frequency_energy_ratio": meanMid,
+            "mean_high_frequency_energy_ratio": meanHigh,
+            "mean_zero_crossing_rate": localMean(frames.map { $0["zcr", default: 0] }),
+            "descriptors": styleCues.map { $0["tag"] as? String ?? "" }
+        ]
+        let structure: [String: Any] = [
+            "change_points": changePoints, "sections": sections,
+            "note": "Automatic boundaries are not verified verse/chorus labels."
+        ]
+        let separation: [String: Any] = [
+            "status": "not_performed",
+            "reason": "Native local mode does not claim true vocal/drum/bass source separation.",
+            "supported_local_layers": [String](),
+            "note": "No clean source-isolated stems are generated by this DSP-only analysis."
+        ]
+        let result: [String: Any] = [
+            "schema_version": "env.music-dataset-analysis.v1",
+            "source": source, "processing": processing, "technical": technical,
+            "rhythm": rhythm, "tonality": tonality, "pitch": pitch, "timbre": timbre,
+            "timeline": timeline, "structure": structure, "style_cues": styleCues,
+            "separation": separation, "annotations": annotations, "warnings": warnings
+        ]
+        return result
     }
 
     private static func fft(_ real: inout [Double], _ imag: inout [Double]) {

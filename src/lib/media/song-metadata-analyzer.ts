@@ -332,9 +332,14 @@ export function csvCell(value: unknown): string {
 export function songsToCsv(rows: ReadonlyArray<Record<string, unknown>>): string {
   if (!rows.length) return "";
   const columns = [
-    "filename", "title", "artist", "album", "genre", "sub_style", "language",
-    "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting",
-    "vocals", "instruments", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels", "analysis_status", "warnings",
+    "filename", "title", "artist", "album", "genre", "sub_style", "style_influences", "language",
+    "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "source_role",
+    "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments",
+    "production_traits", "arrangement", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels",
+    "pitch_lowest_note", "pitch_highest_note", "pitch_range_semitones", "transient_density_per_second",
+    "spectral_centroid_mean_hz", "low_energy_ratio_mean", "mid_energy_ratio_mean", "high_energy_ratio_mean",
+    "chord_estimates", "section_boundaries", "labels_reviewed", "reviewer", "annotation_notes",
+    "uses_remote_api", "uses_hosted_model", "analysis_status", "warnings",
   ];
   return [
     columns.map(csvCell).join(","),

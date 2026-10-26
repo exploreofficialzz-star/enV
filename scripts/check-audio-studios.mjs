@@ -102,11 +102,21 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
 }
 const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
+const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
 const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
-for (const marker of ["Analyze on this device", "Song profile JSON", "Full analysis", "createMusicAnalysisProfile", "allowModelUpload", "/api/music-analysis", "genre_candidates", "not guessed here", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
+for (const marker of ["Analyze on this device", "Song profile JSON", "Training metadata JSON", "createMusicAnalysisProfile", "analyzeMusicDatasetAudio", "createLocalSignalLayers", "Training labels", "local-signal-layers.zip", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
+}
+assert.ok(!musicAnalyzer.includes("allowModelUpload"), "Music Analyzer must not send audio to a hosted classifier");
+assert.ok(!musicAnalyzer.includes("/api/music-analysis"), "Music Analyzer local processing must not call its legacy remote-classification route");
+assert.ok(songMetadataAnalyzer.includes("analyzeMusicDatasetAudio"), "Song Metadata Analyzer must use the local DSP dataset engine");
+assert.ok(!songMetadataAnalyzer.includes("runAiTask") && !songMetadataAnalyzer.includes("fetchAiAvailability"), "Song Metadata Analyzer must not call a hosted AI service");
+assert.ok(songMetadataAnalyzer.includes("Human-reviewed training labels") && songMetadataAnalyzer.includes("dataset_analysis"), "Song Metadata Analyzer must expose label review and detailed analysis data");
+const localDatasetEngine = fs.readFileSync(new URL("../src/lib/engines/music-dataset-analysis.ts", import.meta.url), "utf8");
+for (const marker of ["env.music-dataset-analysis.v1", "uses_remote_api: false", "uses_hosted_model: false", "chord_estimates", "change_points", "createLocalSignalLayers", "encodeMonoPcm16Wav", "reviewed: false"]) {
+  assert.ok(localDatasetEngine.includes(marker), `Local music dataset analysis contract missing: ${marker}`);
 }
 for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
   assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
@@ -140,16 +150,8 @@ for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "
 }
 
 const audioCategoryRoute = fs.readFileSync(new URL("../src/routes/tools/$category/index.tsx", import.meta.url), "utf8");
-const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
 assert.ok(!audioCategoryRoute.includes("AudioControlRoom"), "Audio category route must be the standard catalogue layout");
 for (const obsoleteCopy of ["enV / audio control room", "Make the next move in the mix.", "Browse studio lanes", "A familiar signal path"]) {
   assert.ok(!audioCategoryRoute.includes(obsoleteCopy), `Audio category still contains removed Control Room copy: ${obsoleteCopy}`);
 }
-assert.ok(songMetadataAnalyzer.includes('const includeAi = mode === "full" && aiConsent && aiAvailability === true;'), "AI audio upload must require both explicit consent and a ready service");
-assert.ok(songMetadataAnalyzer.includes("Local analysis runs in this tab too."), "Full Analysis must disclose its local fallback");
-assert.ok(songMetadataAnalyzer.includes('disabled={!tracks.length || busy || importing}'), "Full Analysis must not be disabled when AI is unavailable or consent is off");
-assert.ok(songMetadataAnalyzer.includes("Run local analysis"), "Full Analysis must expose a usable local analysis action without AI");
-assert.ok(!songMetadataAnalyzer.includes("AI unavailable · Quick Scan still works"), "The obsolete AI-unavailable status dot must be removed");
-assert.ok(!songMetadataAnalyzer.includes('setError("Confirm AI processing before Full Analysis.")'), "AI consent must gate upload only, not local analysis");
-
 console.log(`Audio Studios catalog check passed: ${expectedRuntimeToolCount} runtime tools, ${categoryTools.length} generated audio entries, ${expectedAdditions.length} additions, all ${baseline.slugs.length} baseline Audio slugs preserved (${requiredLegacy.length} explicit legacy checks); shared native catalog consistent; DRM-downloader guard passed.`);
