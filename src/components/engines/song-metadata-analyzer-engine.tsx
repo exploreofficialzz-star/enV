@@ -585,6 +585,7 @@ export function SongMetadataAnalyzerEngine() {
       if (track.id !== targetId || !track.report?.dataset_analysis) return track;
       const report = track.report;
       const datasetAnalysis = report.dataset_analysis;
+      if (!datasetAnalysis) return track;
       const annotations: MusicDatasetAnnotations = { ...datasetAnalysis.annotations, [key]: tags, reviewed: false };
       const primaryPatch: Partial<SongAnalysisReport> = {};
       if (key === "genre") primaryPatch.genre = tags[0] ?? null;
@@ -614,8 +615,10 @@ export function SongMetadataAnalyzerEngine() {
     setTracks((previous) => previous.map((track) => {
       if (track.id !== targetId || !track.report?.dataset_analysis) return track;
       const report = track.report;
+      const datasetAnalysis = report.dataset_analysis;
+      if (!datasetAnalysis) return track;
       const annotations = {
-        ...report.dataset_analysis.annotations,
+        ...datasetAnalysis.annotations,
         [key]: value,
         reviewed: false,
       };
@@ -624,7 +627,7 @@ export function SongMetadataAnalyzerEngine() {
         status: "partial",
         report: {
           ...report,
-          dataset_analysis: { ...report.dataset_analysis, annotations },
+          dataset_analysis: { ...datasetAnalysis, annotations },
           analysis: { ...report.analysis, status: "full_local_needs_review" },
         },
       };
@@ -637,9 +640,11 @@ export function SongMetadataAnalyzerEngine() {
     setTracks((previous) => previous.map((track) => {
       if (track.id !== targetId || !track.report?.dataset_analysis) return track;
       const report = track.report;
+      const currentDatasetAnalysis = report.dataset_analysis;
+      if (!currentDatasetAnalysis) return track;
       const datasetAnalysis = {
-        ...report.dataset_analysis,
-        annotations: { ...report.dataset_analysis.annotations, reviewed },
+        ...currentDatasetAnalysis,
+        annotations: { ...currentDatasetAnalysis.annotations, reviewed },
       };
       return {
         ...track,
